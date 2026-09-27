@@ -25,6 +25,7 @@ import {
 } from '@praxis/shared';
 import { useMemo, useState } from 'react';
 import type { TaskView } from '@/lib/work-types';
+import { SectionDraftBanner, StartPanel, useDrafting } from './drafting';
 import { SubmitPanel } from './submit-panel';
 import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
@@ -165,9 +166,15 @@ function RecordedCall({ r, setR, tools }: { r: KycToolResponse; setR: (next: Kyc
 export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitted: () => void }) {
   const slot = task.input.slot ?? null;
   const { value, update, currentRevision, state, flush } = useAutosave<KycTask & Record<string, unknown>>(task.id, (task.output ?? { header: {} }) as KycTask & Record<string, unknown>, task.revision, task.readOnly);
-  const [section, setSection] = useState<string>('W01');
+  // M9: KYC authoring tasks can start from a document, a transcript or an AI interview (W00).
+  const draftable = task.definition === 'kyc-onboarding-v1' && task.taskType === 'AUTHORING';
+  const drafting = useDrafting(task.id, draftable);
+  const blank = !task.output || Object.keys(task.output).every((k) => k === 'header' && !Object.values((task.output as KycTask).header ?? {}).some(Boolean));
+  const [section, setSection] = useState<string>(draftable && blank && !task.readOnly ? 'W00' : 'W01');
+  const drafted = drafting.view?.sections ?? {};
   const [sample, setSample] = useState<{ source: string; output: KycTask | null } | null>(null);
-  const ro = task.readOnly;
+  // While a draft is being written the editor is paused, so nothing typed is lost when the draft lands.
+  const ro = task.readOnly || drafting.running;
   const gen = useMemo(() => syntheticGenerator(`${task.id}:${Date.now()}`), [task.id]);
   const checks = useMemo(() => kycChecks(value, slot ? { edgeCase: slot.edgeCase, isOpen: slot.isOpen } : null), [value, slot]);
   const sectionOk = (id: string) => checks.filter((c) => c.section === id).every((c) => c.ok || c.severity === 'warning');
@@ -198,11 +205,20 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
       <div className="mt-4 grid gap-6 md:grid-cols-[13rem_1fr]">
         <nav aria-label="Workbench sections" className="md:sticky md:top-4 md:self-start">
           <ol className="flex gap-2 overflow-x-auto md:flex-col">
+            {draftable && (
+              <li>
+                <button type="button" onClick={() => setSection('W00')} aria-current={section === 'W00' ? 'step' : undefined} className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm md:whitespace-normal ${section === 'W00' ? 'bg-surface font-semibold' : ''}`}>
+                  <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full bg-brand-gradient" />
+                  W00 Start from a document or interview
+                </button>
+              </li>
+            )}
             {KYC_SECTIONS.map((s) => (
               <li key={s.id}>
                 <button type="button" onClick={() => setSection(s.id)} aria-current={section === s.id ? 'step' : undefined} className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm md:whitespace-normal ${section === s.id ? 'bg-surface font-semibold' : ''}`}>
                   <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${s.id === 'W06' ? 'bg-line' : sectionOk(s.id) ? 'bg-success' : 'bg-warning'}`} />
                   {s.id} {s.title}
+                  {drafted[s.id] && !drafted[s.id]!.confirmedAt && <span className="pill pill-warning ml-auto text-[10px]">AI draft</span>}
                   <span className="sr-only">{s.id !== 'W06' && (sectionOk(s.id) ? ' (passes checks)' : ' (needs attention)')}</span>
                 </button>
               </li>
@@ -235,6 +251,8 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
               ))}
             </ul>
           )}
+
+          {section !== 'W00' && section !== 'W06' && <SectionDraftBanner taskId={task.id} section={section} state={drafted[section]} running={drafting.running} readOnly={task.readOnly} onChanged={() => void drafting.load()} beforeDraft={flush} />}
 
           {section === 'W01' && (
             <section className="space-y-4">
@@ -370,8 +388,9 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                 )}
               />
               <MultiPick label="Tools available to the agent" value={tools} options={KYC_TOOLS.map((x) => x.key)} onChange={(v) => set('environment', { tools: v })} />
+              <p className="text-sm text-fg-muted">Each tool response is recorded as an MCP call: the arguments the agent sends and the result the environment returns, so the task can be replayed exactly.</p>
               <Rows<KycToolResponse>
-                title="Tool responses (recorded MCP calls)"
+                title="Tool responses"
                 items={responses}
                 disabled={ro}
                 itemLabel={(r) => `${r.id} ${r.tool ? label(r.tool) : ''}`}
@@ -490,7 +509,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
             </section>
           )}
 
-          {section !== 'W06' && (
+          {section !== 'W06' && section !== 'W00' && (
             <ul className="space-y-1 text-sm" aria-label={`${section} checks`}>
               {checks.filter((c) => c.section === section).map((c) => (
                 <li key={c.id} className={c.ok ? 'text-success' : 'text-warning'}>
@@ -500,6 +519,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
             </ul>
           )}
         </fieldset>
+        {section === 'W00' && <StartPanel taskId={task.id} drafting={drafting} onBlank={() => setSection('W01')} beforeDraft={flush} readOnly={task.readOnly} />}
         {/* W06 sits in the same column as the other sections (outside the fieldset so its own controls stay usable). */}
         {section === 'W06' && !ro && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={setSection} />}
         {section === 'W06' && ro && <p>This task is read-only.</p>}

@@ -1,6 +1,6 @@
 'use client';
 
-import { KYC_SECTIONS, type KycTask, type TaskCheck } from '@praxis/shared';
+import { KYC_SECTIONS, responseArguments, type KycTask, type TaskCheck } from '@praxis/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -30,6 +30,97 @@ export interface TaskReviewData {
   previousOutput: Record<string, unknown> | null;
   reviews: { decision: string; comments: { section: string; text: string }[]; notes: string | null; at: string; version: number }[];
   checklist: { key: string; label: string }[];
+  /** M9: how the task was made (null for annotation tasks). */
+  drafting: Drafting | null;
+}
+
+interface Drafting {
+  sources: { id: string; kind: 'DOCUMENT' | 'TRANSCRIPT'; fileName: string; sizeBytes: number; sha256: string; textChars: number; flags: { kind: string; line: number; preview: string }[]; uploadedAt: string }[];
+  interview: { turns: { id: string; speaker: string; questionId: string; content: string; redacted: boolean }[]; answered: number; total: number };
+  runs: { id: string; section: string | null; status: string; sections: string[]; model: string | null; problems: string[]; notes: string | null; error: string | null; createdAt: string }[];
+  sections: Record<string, { draftedAt: string; confirmedAt: string | null; editedAfterDraft: boolean }>;
+}
+
+/** TASK-DRAFTING section 6: sources (opening one is audited), the interview, drafts and what the author changed. */
+function HowMade({ taskId, d }: { taskId: string; d: Drafting }) {
+  const drafted = Object.entries(d.sections).sort(([a], [b]) => a.localeCompare(b));
+  if (!d.sources.length && !d.interview.answered && !d.runs.length) {
+    return (
+      <section aria-labelledby="made-h" className="card p-4 text-sm">
+        <h2 id="made-h" className="font-semibold">How this task was made</h2>
+        <p className="text-fg-muted">Written by hand in the workbench. No files, interview or AI draft.</p>
+      </section>
+    );
+  }
+  return (
+    <section aria-labelledby="made-h" className="card space-y-3 p-4 text-sm">
+      <h2 id="made-h" className="font-semibold">How this task was made</h2>
+      {drafted.length > 0 && (
+        <div>
+          <p className="font-medium">AI-drafted sections</p>
+          <ul className="mt-1 flex flex-wrap gap-2">
+            {drafted.map(([k, v]) => (
+              <li key={k} className={`pill ${v.editedAfterDraft ? 'pill-info' : 'pill-warning'}`} title={`Drafted ${new Date(v.draftedAt).toLocaleString()}${v.confirmedAt ? `, confirmed ${new Date(v.confirmedAt).toLocaleString()}` : ''}`}>
+                {k} {v.editedAfterDraft ? 'edited by the author' : 'unchanged from the draft'}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs text-fg-muted">Sections left unchanged from the draft deserve a closer look for realism and correctness.</p>
+        </div>
+      )}
+      {d.sources.length > 0 && (
+        <div>
+          <p className="font-medium">Files the author drafted from</p>
+          <ul className="mt-1 space-y-1">
+            {d.sources.map((s) => (
+              <li key={s.id}>
+                <a href={`/api/v1/review/tasks/${taskId}/sources/${s.id}/file`} className="text-link underline">
+                  {s.fileName}
+                </a>{' '}
+                <span className="text-xs text-fg-muted">
+                  {s.kind === 'DOCUMENT' ? 'document' : 'transcript'} · {Math.max(1, Math.round(s.sizeBytes / 1024))} KB · SHA-256 {s.sha256.slice(0, 12)}…
+                </span>
+                {s.flags.length > 0 && <span className="pill pill-warning ml-2">{s.flags.length} possible real identifier(s)</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs text-fg-muted">Opening a file is recorded in the audit log. Files never go into the dataset.</p>
+        </div>
+      )}
+      {d.interview.answered > 0 && (
+        <details>
+          <summary className="cursor-pointer font-medium">AI interview ({d.interview.answered} answers)</summary>
+          <dl className="mt-2 space-y-2">
+            {d.interview.turns.filter((t) => t.speaker === 'AUTHOR').map((a) => (
+              <div key={a.id}>
+                <dt className="text-fg-muted">{d.interview.turns.find((q) => q.speaker === 'ASSISTANT' && q.questionId === a.questionId)?.content}</dt>
+                <dd>
+                  {a.content}
+                  {a.redacted && <span className="ml-1 text-xs text-warning">(redacted)</span>}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      )}
+      {d.runs.length > 0 && (
+        <details>
+          <summary className="cursor-pointer font-medium">Drafts ({d.runs.length})</summary>
+          <ul className="mt-2 space-y-1">
+            {d.runs.map((r) => (
+              <li key={r.id}>
+                {new Date(r.createdAt).toLocaleString()} · {r.section ?? 'all sections'} · {r.status.toLowerCase()}
+                {r.model ? ` · ${r.model}` : ''}
+                {r.sections.length ? ` · wrote ${r.sections.join(', ')}` : ''}
+                {r.error && <span className="block text-xs text-error">{r.error}</span>}
+                {r.problems.length > 0 && <span className="block text-xs text-fg-muted">{r.problems.join('; ')}</span>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
 }
 
 const KYC_PARTS: [string, string[]][] = [
@@ -71,7 +162,7 @@ function KycView({ t }: { t: KycTask }) {
         <ul className="mt-1 list-disc pl-5">
           {(t.environment?.responses ?? []).map((r) => (
             <li key={r.id}>
-              {r.id} {r.tool} ({r.kind.toLowerCase()}): “{r.input}” → {r.response}
+              {r.id} <span className="font-mono">tools/call {r.tool}</span> {JSON.stringify(responseArguments(r))} ({r.kind.toLowerCase()}) → {r.response}
             </li>
           ))}
         </ul>
@@ -183,6 +274,7 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="min-w-0 space-y-6">
+          {d.drafting && <HowMade taskId={d.id} d={d.drafting} />}
           <section aria-labelledby="checks-h" className="card p-4 text-sm">
             <h2 id="checks-h" className="font-semibold">Automated checks</h2>
             <p className="text-fg-muted">{d.checks.every((c) => c.ok || c.severity === 'warning') ? 'All automated checks passed at submission.' : 'Some checks did not pass.'} Duplicate check: {d.embeddingModel ?? 'not run'}.</p>

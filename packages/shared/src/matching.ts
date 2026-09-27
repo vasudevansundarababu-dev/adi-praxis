@@ -30,7 +30,8 @@ export const MatchItemDto = z.object({
   hoursPerWeek: z.number().int().nullable(),
   timezone: z.string().nullable(),
   lastValidatedAt: z.string().nullable(),
-  status: z.enum(['AVAILABLE', 'ASSIGNED']),
+  /** PROPOSED: waiting for the candidate to accept (FLOW2 C08). ASSIGNED: accepted. */
+  status: z.enum(['AVAILABLE', 'PROPOSED', 'ASSIGNED']),
   assignmentId: z.string().uuid().nullable(),
 });
 export type MatchItemDto = z.infer<typeof MatchItemDto>;
@@ -40,7 +41,10 @@ export const MatchesResponse = z.object({
   projectName: z.string(),
   status: z.string(),
   requiredWorkers: z.number().int().nullable(),
+  /** Accepted assignments (count towards STAFFED). */
   assigned: z.number().int(),
+  /** Proposals awaiting the candidate's answer. */
+  proposed: z.number().int(),
   shortfall: z.number().int(),
   matchedAt: z.string().nullable(),
   items: z.array(MatchItemDto),

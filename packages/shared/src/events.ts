@@ -15,6 +15,7 @@ export const DOMAIN_EVENTS = [
   'rl_review.completed',
   // FLOW 2 (SME candidate flow)
   'enrollment.submitted',
+  'enrollment.decided',
   // Internal-user administration (M0)
   'user.created',
   'user.roles_changed',

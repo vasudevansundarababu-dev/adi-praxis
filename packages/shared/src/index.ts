@@ -8,3 +8,4 @@ export * from './matching';
 export * from './candidate';
 export * from './profile';
 export * from './taxonomy-data';
+export * from './selection';

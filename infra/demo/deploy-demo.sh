@@ -29,9 +29,11 @@ ENV_LABEL=${PRAXIS_ENV_LABEL:-Demo environment}
 VERTEX=${PRAXIS_VERTEX:-}
 say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 exists() { "$@" >/dev/null 2>&1; }
+# New service accounts take a little while to become visible to IAM; retry policy changes for up to ~2 minutes.
+retry() { for i in $(seq 1 12); do "$@" >/dev/null 2>&1 && return 0; sleep 10; done; "$@"; }
 
 if [ -z "${DEPLOY_ONLY:-}" ]; then
-say "Project $PROJECT_ID (ADI Praxis)"
+say "Project $PROJECT_ID (${PRAXIS_NAME:-ADI Praxis})"
 exists gcloud projects describe "$PROJECT_ID" || gcloud projects create "$PROJECT_ID" --name="${PRAXIS_NAME:-ADI Praxis}"
 gcloud billing projects link "$PROJECT_ID" --billing-account="$BILLING" >/dev/null
 gcloud config set project "$PROJECT_ID" >/dev/null
@@ -52,19 +54,19 @@ say "Service account"
 SA=praxis-demo-run@$PROJECT_ID.iam.gserviceaccount.com
 exists gcloud iam service-accounts describe "$SA" || gcloud iam service-accounts create praxis-demo-run --display-name="ADI Praxis demo runtime"
 for role in roles/cloudsql.client roles/secretmanager.secretAccessor roles/logging.logWriter roles/monitoring.metricWriter; do
-  gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" --role="$role" --condition=None >/dev/null
+  retry gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" --role="$role" --condition=None
 done
 # Claude and embeddings on Vertex AI for the runtime (testers' environment).
-[ -n "$VERTEX" ] && gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" --role=roles/aiplatform.user --condition=None >/dev/null
+[ -n "$VERTEX" ] && retry gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" --role=roles/aiplatform.user --condition=None
 # Cloud Build pushes images with the default compute service account.
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$PNUM-compute@developer.gserviceaccount.com" --role=roles/artifactregistry.writer --condition=None >/dev/null
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$PNUM-compute@developer.gserviceaccount.com" --role=roles/logging.logWriter --condition=None >/dev/null
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$PNUM-compute@developer.gserviceaccount.com" --role=roles/storage.objectViewer --condition=None >/dev/null
+for role in roles/artifactregistry.writer roles/logging.logWriter roles/storage.objectViewer; do
+  retry gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$PNUM-compute@developer.gserviceaccount.com" --role="$role" --condition=None
+done
 
 say "Evidence bucket"
 BUCKET=$PROJECT_ID-demo-evidence
 exists gcloud storage buckets describe "gs://$BUCKET" || gcloud storage buckets create "gs://$BUCKET" --location="$REGION" --uniform-bucket-level-access --public-access-prevention
-gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member="serviceAccount:$SA" --role=roles/storage.objectAdmin >/dev/null
+retry gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member="serviceAccount:$SA" --role=roles/storage.objectAdmin
 
 say "Secrets"
 secret() { # name value (only created once; values are never printed except the demo logins at the end)

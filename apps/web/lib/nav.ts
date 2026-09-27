@@ -6,9 +6,10 @@ export interface NavItem {
   roles: InternalRole[];
 }
 
-/** Console areas by role. Later milestones add Templates (M1), Projects (M2), Review queue (M3+). */
+/** Console areas by role. Later milestones add Projects (M2) and the Review queue (M3+). */
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Home', href: '/', roles: ['ADMIN', 'PM', 'REVIEWER'] },
+  { label: 'Templates', href: '/templates', roles: ['ADMIN', 'PM'] },
   { label: 'Users', href: '/users', roles: ['ADMIN'] },
 ];
 

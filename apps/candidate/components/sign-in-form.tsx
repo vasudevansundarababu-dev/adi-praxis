@@ -53,7 +53,9 @@ export function SignInForm({ returnTo, googleClientId }: { returnTo: string; goo
     window.google.accounts.id.initialize({ client_id: googleClientId, callback: (r: { credential: string }) => void finish(r.credential) });
     window.google.accounts.id.renderButton(buttonRef.current, { theme: 'filled_black', size: 'large', text: 'continue_with', width: 320 });
   }, [googleClientId, finish]);
-  useEffect(() => initGoogle(), [initGoogle]);
+  useEffect(() => {
+    initGoogle();
+  }, [initGoogle]);
 
   // Local dev only: mock Google.
   const [email, setEmail] = useState('');

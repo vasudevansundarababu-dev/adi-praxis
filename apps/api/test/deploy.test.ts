@@ -40,6 +40,11 @@ describe('M8 runtime database role (SPEC Security)', () => {
     const live = { ...base, NODE_ENV: 'production', GOOGLE_OAUTH_CLIENT_ID: 'g', STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_IDENTITY_WEBHOOK_SECRET: 'whsec_x', VERTEX_PROJECT_ID: 'p', SMTP_HOST: 'smtp.example.test' };
     expect(loadConfig({ ...live, APP_ENV: 'staging' })).toMatchObject({ appEnv: 'staging', requireLiveIdentity: false });
     expect(loadConfig(live)).toMatchObject({ appEnv: 'production', requireLiveIdentity: true });
+    // Demo: production build with the local mocks, only with its own strong mock secret; real production still refuses mocks.
+    const demo = { ...base, NODE_ENV: 'production', APP_ENV: 'demo' };
+    expect(() => loadConfig(demo)).toThrow(/demo environment needs its own MOCK_SECRET/);
+    expect(loadConfig({ ...demo, MOCK_SECRET: 'x'.repeat(40) })).toMatchObject({ appEnv: 'demo', candidateAuthMode: 'mock', identityMode: 'mock', requireLiveIdentity: false });
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', MOCK_SECRET: 'x'.repeat(40) })).toThrow(/mocks are local-only/);
     expect(() => loadConfig({ ...live, RL_GYM_WEBHOOK_URL: 'https://rl.example.test/hook', RL_GYM_WEBHOOK_SECRET: 'short' })).toThrow(/32 characters/);
   });
 });

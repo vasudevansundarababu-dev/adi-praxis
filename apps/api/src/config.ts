@@ -2,8 +2,12 @@ import { z } from 'zod';
 
 const Env = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  /** Deployment environment. Staging runs production builds with Stripe test mode, so live identity is required only in production. */
-  APP_ENV: z.enum(['local', 'staging', 'production']).optional(),
+  /**
+   * Deployment environment. Staging runs production builds with Stripe test mode, so live identity is required only
+   * in production. `demo` is a click-through environment: production builds with the local mocks (simulated Google
+   * sign-in, identity, AI and email), synthetic data only, never real candidates.
+   */
+  APP_ENV: z.enum(['local', 'staging', 'production', 'demo']).optional(),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   API_PORT: z.coerce.number().int().default(4000),
@@ -55,7 +59,7 @@ export type Config = z.infer<typeof Env> & {
   identityMode: 'stripe' | 'mock';
   /** Only live-mode identity results confer eligibility (FLOW2 CF-05). True in production, not in staging. */
   requireLiveIdentity: boolean;
-  appEnv: 'local' | 'staging' | 'production';
+  appEnv: 'local' | 'staging' | 'production' | 'demo';
   /** Derived: Claude on Vertex when a project is set, otherwise the local heuristic mock. */
   assistantMode: 'vertex' | 'mock';
   /** Derived: SMTP when a host is set, otherwise an in-memory outbox. */
@@ -74,7 +78,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const assistantMode = c.VERTEX_PROJECT_ID ? 'vertex' : 'mock';
   const emailMode = c.SMTP_HOST ? 'smtp' : 'memory';
   if (c.RL_GYM_WEBHOOK_URL && c.RL_GYM_WEBHOOK_SECRET.length < 32) throw new Error('Invalid configuration: RL_GYM_WEBHOOK_SECRET must be at least 32 characters when RL_GYM_WEBHOOK_URL is set');
-  if (c.NODE_ENV === 'production' && (candidateAuthMode === 'mock' || identityMode === 'mock' || assistantMode === 'mock' || emailMode === 'memory')) {
+  if (c.APP_ENV === 'demo' && (c.MOCK_SECRET === 'local-dev-mock-secret-not-for-production' || c.MOCK_SECRET.length < 32)) {
+    throw new Error('Invalid configuration: a demo environment needs its own MOCK_SECRET (32+ characters)');
+  }
+  if (c.NODE_ENV === 'production' && c.APP_ENV !== 'demo' && (candidateAuthMode === 'mock' || identityMode === 'mock' || assistantMode === 'mock' || emailMode === 'memory')) {
     throw new Error('Invalid configuration: production needs GOOGLE_OAUTH_CLIENT_ID, STRIPE_SECRET_KEY, STRIPE_IDENTITY_WEBHOOK_SECRET, VERTEX_PROJECT_ID and SMTP_HOST (mocks are local-only)');
   }
   const appEnv = c.APP_ENV ?? (c.NODE_ENV === 'production' ? 'production' : 'local');

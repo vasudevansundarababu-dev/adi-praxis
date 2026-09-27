@@ -11,4 +11,5 @@
 infra/terraform/**/.terraform
 **/*.tfstate*
 e2e
-docs
+docs/*
+!docs/Taskflow.xlsx

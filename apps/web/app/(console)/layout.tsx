@@ -11,6 +11,11 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
 
   return (
     <div className="min-h-screen">
+      {process.env.PRAXIS_DEMO === '1' && (
+        <p role="note" className="bg-warning px-4 py-1 text-center text-xs font-medium text-black">
+          Demo environment: synthetic data only. Candidate sign-in and identity checks are simulated.
+        </p>
+      )}
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-3">
           <Link href="/" aria-label="ADI Praxis home">

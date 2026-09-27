@@ -14,9 +14,11 @@ COPY packages/shared packages/shared
 COPY apps/api apps/api
 RUN pnpm --filter @praxis/api deploy --legacy --prod /out \
   && cd /out && npx prisma generate
+# The template catalog the seed job imports (TASKFLOW_PATH=/app/data/Taskflow.xlsx).
+COPY docs/Taskflow.xlsx /out/data/Taskflow.xlsx
 
 FROM base AS runtime
-ENV NODE_ENV=production API_PORT=8080
+ENV NODE_ENV=production API_PORT=8080 TASKFLOW_PATH=/app/data/Taskflow.xlsx
 WORKDIR /app
 COPY --from=build --chown=node:node /out ./
 USER node

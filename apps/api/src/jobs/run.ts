@@ -27,12 +27,16 @@ try {
   } else if (job === 'verify-chains') {
     const reports = await runChainVerification(db, log);
     if (reports.some((r) => r.breaks.length)) process.exitCode = 2;
+  } else if (job === 'demo-setup') {
+    if (config.appEnv !== 'demo') throw new Error('demo-setup runs only when APP_ENV=demo');
+    const { demoSetup } = await import('./demo-setup');
+    await demoSetup(db, process.env, log);
   } else if (job === 'seed') {
     const { seed } = await import('../../prisma/seed');
     const { client, admin } = await seed(db);
     log('info', 'seeded', { client: client.name, admin: admin.email });
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | seed`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | seed | demo-setup`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

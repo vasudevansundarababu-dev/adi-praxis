@@ -21,7 +21,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
         ADI Praxis invites subject-matter experts to write realistic, synthetic tasks. We check your identity to protect
         the contributor community, and we ask about your relevant experience to match you with suitable work.
       </p>
-      <SignInForm returnTo={returnTo} googleClientId={process.env.GOOGLE_OAUTH_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''} />
+      <SignInForm returnTo={returnTo} googleClientId={process.env.GOOGLE_OAUTH_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''} demo={process.env.PRAXIS_DEMO === '1'} />
       <p className="mt-6 text-xs text-fg-muted">
         By continuing you agree to the <Link href="/terms" className="text-link underline">contributor terms</Link> and
         the <Link href="/privacy" className="text-link underline">privacy notice</Link>. We only ask Google for your

@@ -18,7 +18,7 @@ function destination(me: CandidateMeDto, returnTo: string) {
   return returnTo || '/home';
 }
 
-export function SignInForm({ returnTo, googleClientId }: { returnTo: string; googleClientId: string }) {
+export function SignInForm({ returnTo, googleClientId, demo = false }: { returnTo: string; googleClientId: string; demo?: boolean }) {
   const router = useRouter();
   const [adult, setAdult] = useState(false);
   const [needsAdult, setNeedsAdult] = useState(false);
@@ -74,7 +74,7 @@ export function SignInForm({ returnTo, googleClientId }: { returnTo: string; goo
         <span>I confirm I am 18 or over. (Needed the first time you sign in.)</span>
       </label>
 
-      {!googleClientId && process.env.NODE_ENV === 'production' ? (
+      {!googleClientId && process.env.NODE_ENV === 'production' && !demo ? (
         <p role="alert" className="text-sm text-error">Sign-in is not configured yet. Please try again later.</p>
       ) : googleClientId ? (
         <>
@@ -83,7 +83,7 @@ export function SignInForm({ returnTo, googleClientId }: { returnTo: string; goo
         </>
       ) : (
         <form onSubmit={devSignIn} className="space-y-3 rounded-md border border-warning p-4">
-          <p className="text-sm font-medium text-warning">Dev sign-in (mock Google) — local development only</p>
+          <p className="text-sm font-medium text-warning">{demo ? 'Demo sign-in (simulated Google) — demo environment, synthetic data only' : 'Dev sign-in (mock Google) — local development only'}</p>
           <div>
             <label htmlFor="dev-email" className="block text-sm">
               Email

@@ -123,7 +123,7 @@ export const journeyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; sele
   );
   app.post('/me/onboarding/acknowledgements', { config: { access: 'candidate' }, schema: { tags: ['candidate'], body: AcknowledgeRequest } }, async (req, reply) => {
     await runCandidateCommand<object>(db, req, reply, async ({ tx, actor, audit, emit }) => {
-      const r = await acknowledge(tx, { ...req.body, smeUserId: actor.smeUserId, production: config.NODE_ENV === 'production' }, audit);
+      const r = await acknowledge(tx, { ...req.body, smeUserId: actor.smeUserId, production: config.NODE_ENV === 'production' && config.appEnv !== 'demo' }, audit);
       if (r.blocked) return { status: 409, body: { error: r.error, message: r.message } };
       if (r.completed) {
         const e = await tx.enrollment.findUniqueOrThrow({ where: { id: req.body.enrollmentId }, include: { opportunity: true } });

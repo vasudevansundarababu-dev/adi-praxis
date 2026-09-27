@@ -9,6 +9,7 @@ export async function Header() {
   const me = await getMe();
   return (
     <header className="border-b border-line">
+      {process.env.PRAXIS_DEMO === '1' && <DemoBanner />}
       <div className="mx-auto flex max-w-3xl items-center gap-4 px-4 py-3">
         <Link href={me ? '/home' : '/'} className="flex items-center gap-2 font-semibold">
           <Image src={mark} alt="" width={28} height={28} className="rounded" />
@@ -22,5 +23,13 @@ export async function Header() {
         </nav>
       </div>
     </header>
+  );
+}
+
+function DemoBanner() {
+  return (
+    <p role="note" className="bg-warning px-4 py-1 text-center text-xs font-medium text-black">
+      Demo environment: synthetic data, simulated sign-in and identity check. Do not enter real personal information.
+    </p>
   );
 }

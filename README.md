@@ -21,7 +21,7 @@ The specs in [docs/](docs/) are the source of truth:
 
 Requirements: Node 22 or later, and Docker.
 
-pnpm is pinned in `package.json` and runs through Corepack, which ships with Node. If `corepack enable` can't write to your global bin directory, prefix commands with `corepack pnpm` instead of `pnpm`.
+pnpm (version pinned in `package.json`) must be on your PATH, because the root scripts call it. Either run `corepack enable`, or, if that can't write to `/usr/local/bin`, run `corepack enable --install-directory ~/.local/bin` (with `~/.local/bin` on your PATH) or `npm install -g pnpm@10`.
 
 ```sh
 cp .env.example .env    # local defaults; never commit .env

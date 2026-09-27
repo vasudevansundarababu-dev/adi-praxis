@@ -12,6 +12,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Projects', href: '/projects', roles: ['ADMIN', 'PM'] },
   { label: 'Templates', href: '/templates', roles: ['ADMIN', 'PM'] },
   { label: 'Taxonomy', href: '/taxonomy', roles: ['ADMIN'] },
+  { label: 'Identity reviews', href: '/review/identity', roles: ['REVIEWER', 'ADMIN'] },
   { label: 'Users', href: '/users', roles: ['ADMIN'] },
 ];
 

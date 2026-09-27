@@ -13,7 +13,7 @@ export interface MutationResult<T> {
  * State-changing API call from the browser. Every call carries a fresh Idempotency-Key, so a double-click or
  * network retry of the same call is applied once (the API replays the first response).
  */
-export async function mutate<T>(method: 'POST' | 'PATCH', path: string, body?: unknown): Promise<MutationResult<T>> {
+export async function mutate<T>(method: 'POST' | 'PATCH' | 'PUT', path: string, body?: unknown): Promise<MutationResult<T>> {
   try {
     const res = await fetch(`/api/v1${path}`, {
       method,

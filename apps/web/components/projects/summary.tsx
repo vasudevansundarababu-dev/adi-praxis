@@ -57,6 +57,11 @@ export function ProjectSummary({
           {p.status === 'READY_FOR_STAFFING' ? 'Start staffing' : 'Resource assignment'}
         </Link>
       )}
+      {!['DRAFT', 'CANCELLED', 'COMPLETED'].includes(p.status) && (
+        <Link href={`/projects/${p.id}/opportunity`} className="ml-3 mt-6 inline-block rounded-md border border-line px-4 py-2 text-sm">
+          Opportunity page
+        </Link>
+      )}
       {CANCELLABLE_STATUSES.includes(p.status) && <CancelProjectButton projectId={p.id} />}
     </div>
   );

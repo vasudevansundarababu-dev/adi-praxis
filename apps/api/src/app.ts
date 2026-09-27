@@ -20,7 +20,11 @@ import { AppError } from './lib/errors';
 import { authRoutes } from './routes/auth';
 import { healthRoutes } from './routes/health';
 import { jobDescriptionRoutes } from './routes/job-descriptions';
+import { candidateRoutes } from './routes/candidates';
 import { projectRoutes } from './routes/projects';
+import { staffingRoutes } from './routes/staffing';
+import { OfflineGeocoder, type Geocoder } from './staffing/geocoder';
+import { stubSelectionGate, type SelectionGate } from './staffing/selection-gate';
 import { taxonomyRoutes } from './routes/taxonomy';
 import { templateRoutes } from './routes/templates';
 import { userRoutes } from './routes/users';
@@ -30,6 +34,9 @@ export interface AppDeps {
   db: Db;
   pingRedis: () => Promise<boolean>;
   logger?: boolean;
+  /** Defaults: offline city table; M3 selection stub (replaced in M4). */
+  geocoder?: Geocoder;
+  selectionGate?: SelectionGate;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -99,6 +106,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(taxonomyRoutes, { db: deps.db });
       await v1.register(jobDescriptionRoutes, { db: deps.db });
       await v1.register(projectRoutes, { db: deps.db });
+      await v1.register(staffingRoutes, {
+        db: deps.db,
+        geocoder: deps.geocoder ?? new OfflineGeocoder(),
+        selectionGate: deps.selectionGate ?? stubSelectionGate,
+      });
+      await v1.register(candidateRoutes, { db: deps.db });
     },
     { prefix: '/api/v1' },
   );

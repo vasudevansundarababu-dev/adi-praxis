@@ -52,3 +52,54 @@ export async function login(app: FastifyInstance, email: string, password = PASS
 }
 
 export const idem = () => ({ 'idempotency-key': randomUUID() });
+
+export interface CandidateOverrides {
+  name?: string;
+  accountStatus?: 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
+  identityStatus?: 'NOT_STARTED' | 'VERIFIED' | 'ALTERNATIVE_VERIFIED' | 'PROCESSING';
+  country?: string | null;
+  city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  languages?: { language: string; level: string }[];
+  specialties?: string[];
+  skills?: string[];
+  domainExperienceYears?: number | null;
+  educationLevel?: string | null;
+  hoursPerWeek?: number | null;
+  timezone?: string | null;
+  attributes?: Record<string, unknown>;
+  concurrentProjectLimit?: number;
+}
+
+/** A synthetic SME user + matching record. Defaults: verified London KYC expert, 10 years, 20 h/week, English C2. */
+export async function createCandidate(clientId: string, o: CandidateOverrides = {}) {
+  const sme = await db.smeUser.create({
+    data: {
+      clientId,
+      displayName: o.name ?? `Test Expert ${randomUUID().slice(0, 4)}`,
+      accountStatus: o.accountStatus ?? 'ACTIVE',
+      identityStatus: o.identityStatus ?? 'VERIFIED',
+    },
+  });
+  return db.candidate.create({
+    data: {
+      clientId,
+      smeUserId: sme.id,
+      country: o.country === undefined ? 'GB' : o.country,
+      city: o.city === undefined ? 'London' : o.city,
+      latitude: o.latitude === undefined ? 51.5074 : o.latitude,
+      longitude: o.longitude === undefined ? -0.1278 : o.longitude,
+      languages: o.languages ?? [{ language: 'en', level: 'C2' }],
+      specialties: o.specialties ?? ['KYC'],
+      skills: o.skills ?? ['KYC', 'EDD'],
+      domainExperienceYears: o.domainExperienceYears === undefined ? 10 : o.domainExperienceYears,
+      educationLevel: o.educationLevel === undefined ? 'ISCED_6' : o.educationLevel,
+      hoursPerWeek: o.hoursPerWeek === undefined ? 20 : o.hoursPerWeek,
+      timezone: o.timezone === undefined ? 'Europe/London' : o.timezone,
+      attributes: (o.attributes ?? {}) as object,
+      concurrentProjectLimit: o.concurrentProjectLimit ?? 2,
+      lastValidatedAt: new Date('2026-09-01T00:00:00Z'),
+    },
+  });
+}

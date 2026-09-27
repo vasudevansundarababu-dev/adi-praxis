@@ -75,7 +75,7 @@ export function toProjectDto(p: ProjectFull): ProjectDto {
 const isAdmin = (actor: Actor) => actor.roles.includes('ADMIN');
 
 /** Only the owning PM and Admins can see or change a project; anyone else gets 404 (no existence leak). */
-async function loadProject(tx: Db | Tx, id: string, actor: Actor): Promise<ProjectFull> {
+export async function loadProject(tx: Db | Tx, id: string, actor: Actor): Promise<ProjectFull> {
   const p = await tx.project.findFirst({ where: { id, clientId: actor.clientId }, include: INCLUDE });
   if (!p || (!isAdmin(actor) && p.ownerId !== actor.userId)) throw notFound('Project not found');
   return p;

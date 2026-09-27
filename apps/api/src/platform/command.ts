@@ -92,7 +92,8 @@ export async function runCommand<T>(
         },
       });
       return out;
-    });
+      // A FLOW 2 match run over a large talent pool happens inside the command; allow it time.
+    }, { timeout: 15_000, maxWait: 5_000 });
     reply.status(result.status).send(result.body);
   } catch (err) {
     // A concurrent request with the same key may have committed first (our transaction then fails on the

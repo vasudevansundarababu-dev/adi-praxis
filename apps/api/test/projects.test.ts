@@ -372,10 +372,10 @@ describe('M2 FLOW 1: project creation', () => {
   });
 
   describe('demographic taxonomy', () => {
-    it('is seeded with the 8 SPEC attributes and readable by PMs', async () => {
+    it('is seeded with the SPEC attributes (no age band) and readable by PMs', async () => {
       const items = (await get(pm, '/demographic-attributes')).json().items;
       expect(items.map((a: { key: string }) => a.key)).toEqual([
-        'country', 'city_radius', 'languages', 'education_level', 'domain_experience_years', 'age_band', 'availability_hours_week', 'time_zone',
+        'country', 'city_radius', 'languages', 'education_level', 'domain_experience_years', 'availability_hours_week', 'time_zone',
       ]);
     });
 
@@ -388,9 +388,9 @@ describe('M2 FLOW 1: project creation', () => {
     });
 
     it('re-running the seed does not overwrite an Admin’s edits', async () => {
-      await db.demographicAttribute.updateMany({ where: { key: 'age_band' }, data: { label: 'Age group' } });
+      await db.demographicAttribute.updateMany({ where: { key: 'time_zone' }, data: { label: 'Working time zone' } });
       await seed(db, { SEED_CLIENT_NAME: 'ADI-Labs', SEED_ADMIN_EMAIL: 'admin@test.local', SEED_ADMIN_PASSWORD: 'admin-password-123', TASKFLOW_PATH: '/none' });
-      expect((await db.demographicAttribute.findFirstOrThrow({ where: { key: 'age_band' } })).label).toBe('Age group');
+      expect((await db.demographicAttribute.findFirstOrThrow({ where: { key: 'time_zone' } })).label).toBe('Working time zone');
     });
   });
 });

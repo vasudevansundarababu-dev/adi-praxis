@@ -1,0 +1,76 @@
+# Merge to main: test, build and push images, migrate, deploy every service to staging, then smoke-test staging.
+name: Deploy staging
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  PROJECT: ${{ vars.GCP_PROJECT_STAGING }}
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/gcp-auth
+        with:
+          provider: ${{ vars.GCP_WIF_PROVIDER_STAGING }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA_STAGING }}
+          region: ${{ env.REGION }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push images
+        run: |
+          REG="$REGION-docker.pkg.dev/$PROJECT/praxis"
+          for app in api web candidate; do
+            docker buildx build --push -f "apps/$app/Dockerfile" -t "$REG/$app:$GITHUB_SHA" .
+          done
+      - name: Run database migrations (Cloud Run job, migration role)
+        run: |
+          REG="$REGION-docker.pkg.dev/$PROJECT/praxis"
+          gcloud run jobs update praxis-migrate --region "$REGION" --image "$REG/api:$GITHUB_SHA"
+          gcloud run jobs update praxis-verify-chains --region "$REGION" --image "$REG/api:$GITHUB_SHA"
+          gcloud run jobs execute praxis-migrate --region "$REGION" --wait
+      - name: Deploy services
+        run: |
+          REG="$REGION-docker.pkg.dev/$PROJECT/praxis"
+          gcloud run deploy praxis-api       --region "$REGION" --image "$REG/api:$GITHUB_SHA"
+          gcloud run deploy praxis-worker    --region "$REGION" --image "$REG/api:$GITHUB_SHA"
+          gcloud run deploy praxis-web       --region "$REGION" --image "$REG/web:$GITHUB_SHA"
+          gcloud run deploy praxis-candidate --region "$REGION" --image "$REG/candidate:$GITHUB_SHA"
+
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Smoke tests against staging
+        run: pnpm exec playwright test -c e2e
+        env:
+          PW_CHANNEL: ''
+          E2E_WEB_URL: ${{ vars.E2E_WEB_URL }}
+          E2E_CANDIDATE_URL: ${{ vars.E2E_CANDIDATE_URL }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          E2E_PM_EMAIL: ${{ secrets.E2E_PM_EMAIL }}
+          E2E_PM_PASSWORD: ${{ secrets.E2E_PM_PASSWORD }}

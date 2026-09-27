@@ -1,0 +1,22 @@
+name: GCP auth (Workload Identity Federation)
+description: Authenticates to Google Cloud without service-account keys and configures gcloud and Docker.
+inputs:
+  provider:
+    description: Workload identity provider resource name
+    required: true
+  service_account:
+    description: Service account to impersonate
+    required: true
+  region:
+    description: Artifact Registry region
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ inputs.provider }}
+        service_account: ${{ inputs.service_account }}
+    - uses: google-github-actions/setup-gcloud@v2
+    - shell: bash
+      run: gcloud auth configure-docker "${{ inputs.region }}-docker.pkg.dev" --quiet

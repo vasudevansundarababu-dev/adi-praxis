@@ -1,0 +1,87 @@
+# Release tag: manual approval (the "production" GitHub environment requires reviewers), migrations, new revisions
+# with no traffic, smoke tests on the tagged revision, 10% canary, smoke tests again, then 100%.
+name: Release production
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+env:
+  REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  PROJECT: ${{ vars.GCP_PROJECT_PRODUCTION }}
+  TAG: ${{ github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/gcp-auth
+        with:
+          provider: ${{ vars.GCP_WIF_PROVIDER_PRODUCTION }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA_PRODUCTION }}
+          region: ${{ env.REGION }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push images
+        run: |
+          REG="$REGION-docker.pkg.dev/$PROJECT/praxis"
+          for app in api web candidate; do
+            docker buildx build --push -f "apps/$app/Dockerfile" -t "$REG/$app:$TAG" -t "$REG/$app:$GITHUB_SHA" .
+          done
+      - name: Migrations (backward-compatible for one release)
+        run: |
+          REG="$REGION-docker.pkg.dev/$PROJECT/praxis"
+          gcloud run jobs update praxis-migrate --region "$REGION" --image "$REG/api:$TAG"
+          gcloud run jobs update praxis-verify-chains --region "$REGION" --image "$REG/api:$TAG"
+          gcloud run jobs execute praxis-migrate --region "$REGION" --wait
+      - name: Deploy new revisions without traffic
+        run: |
+          REG="$REGION-docker.pkg.dev/$PROJECT/praxis"
+          REV=$(echo "$TAG" | tr '.' '-' | tr '[:upper:]' '[:lower:]')
+          echo "REV=$REV" >> "$GITHUB_ENV"
+          gcloud run deploy praxis-api       --region "$REGION" --image "$REG/api:$TAG"       --no-traffic --tag "rc-$REV"
+          gcloud run deploy praxis-web       --region "$REGION" --image "$REG/web:$TAG"       --no-traffic --tag "rc-$REV"
+          gcloud run deploy praxis-candidate --region "$REGION" --image "$REG/candidate:$TAG" --no-traffic --tag "rc-$REV"
+          # The worker has no user traffic; it switches after the canary succeeds (see below).
+      - name: 10% canary
+        run: |
+          for s in praxis-api praxis-web praxis-candidate; do
+            gcloud run services update-traffic "$s" --region "$REGION" --to-tags "rc-$REV=10"
+          done
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+      - name: Automatic smoke tests during the canary
+        run: pnpm exec playwright test -c e2e
+        env:
+          PW_CHANNEL: ''
+          E2E_WEB_URL: ${{ vars.E2E_WEB_URL }}
+          E2E_CANDIDATE_URL: ${{ vars.E2E_CANDIDATE_URL }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          E2E_PM_EMAIL: ${{ secrets.E2E_PM_EMAIL }}
+          E2E_PM_PASSWORD: ${{ secrets.E2E_PM_PASSWORD }}
+      - name: Promote to 100%
+        run: |
+          REG="$REGION-docker.pkg.dev/$PROJECT/praxis"
+          for s in praxis-api praxis-web praxis-candidate; do
+            gcloud run services update-traffic "$s" --region "$REGION" --to-tags "rc-$REV=100"
+          done
+          gcloud run deploy praxis-worker --region "$REGION" --image "$REG/api:$TAG"
+      - name: Roll back the canary if anything failed
+        if: failure()
+        run: |
+          for s in praxis-api praxis-web praxis-candidate; do
+            PREV=$(gcloud run revisions list --service "$s" --region "$REGION" --format='value(metadata.name)' --sort-by='~metadata.creationTimestamp' | sed -n 2p)
+            [ -n "$PREV" ] && gcloud run services update-traffic "$s" --region "$REGION" --to-revisions "$PREV=100" || true
+          done

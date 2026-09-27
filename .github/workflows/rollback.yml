@@ -1,0 +1,43 @@
+# One-step rollback: shift all traffic to the previous (or a named) revision. Migrations stay backward-compatible for
+# one release, so the previous revision runs against the current schema.
+name: Roll back
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: staging or production
+        type: choice
+        options: [staging, production]
+        required: true
+      revision_suffix:
+        description: Optional revision to restore for every service (default = the one before the current)
+        required: false
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/gcp-auth
+        with:
+          provider: ${{ inputs.environment == 'staging' && vars.GCP_WIF_PROVIDER_STAGING || vars.GCP_WIF_PROVIDER_PRODUCTION }}
+          service_account: ${{ inputs.environment == 'staging' && vars.GCP_DEPLOYER_SA_STAGING || vars.GCP_DEPLOYER_SA_PRODUCTION }}
+          region: ${{ env.REGION }}
+      - name: Shift traffic
+        env:
+          SUFFIX: ${{ inputs.revision_suffix }}
+        run: |
+          for s in praxis-api praxis-web praxis-candidate praxis-worker; do
+            if [ -n "$SUFFIX" ]; then TARGET="$s-$SUFFIX"; else
+              CURRENT=$(gcloud run services describe "$s" --region "$REGION" --format='value(status.traffic[0].revisionName)')
+              TARGET=$(gcloud run revisions list --service "$s" --region "$REGION" --format='value(metadata.name)' --sort-by='~metadata.creationTimestamp' | grep -v "^$CURRENT$" | head -1)
+            fi
+            echo "$s -> $TARGET"
+            gcloud run services update-traffic "$s" --region "$REGION" --to-revisions "$TARGET=100"
+          done

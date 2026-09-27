@@ -495,6 +495,10 @@ model Project {
   slots              CoverageSlot[]
   inputBatches       TaskInputBatch[]
   opportunity        Opportunity?
+  matches            ProjectMatch[]
+  matchRejections    ProjectMatchRejection[]
+  /// When the last FLOW 2 match run finished.
+  matchedAt          DateTime?                 @map("matched_at")
 
   @@unique([clientId, name])
   @@index([ownerId])
@@ -519,29 +523,86 @@ model ProjectDemographicFilter {
 
 // ───────────────────────── FLOW 2: matching and sourcing ─────────────────────────
 
-/// Thin matching record for an SME user; fields copied from the latest confirmed profile.
+/// Thin matching record for an SME user; fields copied from the latest confirmed profile (FLOW2-SME section 11).
+/// Typed columns so FLOW 2 hard filters run in SQL. Unknown values stay null: never guessed, never defaulted.
 model Candidate {
   id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId               String    @map("client_id") @db.Uuid
   smeUserId              String    @unique @map("sme_user_id") @db.Uuid
   latestProfileVersionId String?   @map("latest_profile_version_id") @db.Uuid
   poolStatus             String?   @map("pool_status")
-  location               Json?
+  /// ISO 3166-1 alpha-2
+  country                String?   @db.Char(2)
+  city                   String?
+  latitude               Float?
+  longitude              Float?
+  /// [{ language: ISO 639-1, level: CEFR or NATIVE }]
   languages              Json      @default("[]")
   specialties            String[]
   jurisdictions          String[]
-  availability           Json?
+  skills                 String[]
+  domainExperienceYears  Float?    @map("domain_experience_years")
+  /// ISCED level key, e.g. ISCED_6
+  educationLevel         String?   @map("education_level")
+  hoursPerWeek           Int?      @map("hours_per_week")
+  /// IANA time zone
+  timezone               String?
+  /// Values for Admin-added taxonomy attributes, keyed by attribute key.
+  attributes             Json      @default("{}")
+  lastValidatedAt        DateTime? @map("last_validated_at")
   concurrentProjectLimit Int       @default(2) @map("concurrent_project_limit")
   deletedAt              DateTime? @map("deleted_at")
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
 
-  smeUser      SmeUser             @relation(fields: [smeUserId], references: [id])
+  smeUser      SmeUser                  @relation(fields: [smeUserId], references: [id])
   applications Application[]
   assignments  ProjectAssignment[]
   tasks        TaskInstance[]
+  matches      ProjectMatch[]
+  rejections   ProjectMatchRejection[]
 
   @@index([clientId])
+  @@index([country])
+  @@index([specialties], type: Gin)
+}
+
+/// Stored FLOW 2 match results for a project, replaced on each (re-)run so the list stays stable between runs.
+model ProjectMatch {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  candidateId String   @map("candidate_id") @db.Uuid
+  rank        Int
+  score       Decimal  @db.Decimal(6, 2)
+  /// Per-part scores and which preferred filters matched.
+  breakdown   Json
+  computedAt  DateTime @map("computed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project   Project   @relation(fields: [projectId], references: [id])
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+
+  @@unique([projectId, candidateId])
+  @@index([projectId, rank])
+}
+
+/// A PM's decision not to use a candidate for one project. Not a global exclusion.
+model ProjectMatchRejection {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  projectId    String   @map("project_id") @db.Uuid
+  candidateId  String   @map("candidate_id") @db.Uuid
+  reason       String?
+  rejectedById String   @map("rejected_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  project   Project   @relation(fields: [projectId], references: [id])
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+
+  @@unique([projectId, candidateId])
 }
 
 model Campaign {

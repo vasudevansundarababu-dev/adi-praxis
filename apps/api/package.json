@@ -13,7 +13,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx --env-file-if-exists=../../.env prisma/seed.ts",
-    "openapi": "tsx scripts/export-openapi.ts"
+    "openapi": "tsx scripts/export-openapi.ts",
+    "db:seed:candidates": "tsx --env-file-if-exists=../../.env prisma/seed-candidates.ts"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.2",

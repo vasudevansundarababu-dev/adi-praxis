@@ -14,7 +14,8 @@
     "services:up": "docker compose up -d --wait",
     "services:down": "docker compose down",
     "db:migrate": "pnpm --filter @praxis/api db:migrate",
-    "db:seed": "pnpm --filter @praxis/api db:seed"
+    "db:seed": "pnpm --filter @praxis/api db:seed",
+    "db:seed:candidates": "pnpm --filter @praxis/api db:seed:candidates"
   },
   "devDependencies": {
     "typescript": "5.9.3",

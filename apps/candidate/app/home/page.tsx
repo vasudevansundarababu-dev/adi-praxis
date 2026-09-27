@@ -26,6 +26,7 @@ export default async function HomePage() {
   if (!me) redirect('/sign-in');
   const eligible = identityEligible(me.identityStatus);
   const { data: assignments } = await api<{ items: AssignmentCard[] }>('/me/assignments');
+  const { data: projects } = await api<{ items: { projectId: string; name: string; status: string; counts: Record<string, number> }[] }>('/me/projects');
   const selected = me.enrollments.some((e) => e.status === 'SELECTED');
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
@@ -39,6 +40,23 @@ export default async function HomePage() {
           </Link>
         )}
       </section>
+      {(projects?.items.length ?? 0) > 0 && (
+        <section className="mt-6" aria-labelledby="projects-h">
+          <h2 id="projects-h" className="font-semibold">Your projects</h2>
+          <ul className="mt-2 space-y-2">
+            {projects!.items.map((p) => (
+              <li key={p.projectId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line p-3 text-sm">
+                <Link href={`/projects/${p.projectId}`} className="font-medium text-link hover:underline">
+                  {p.name}
+                </Link>
+                <span className="text-fg-muted">
+                  {(p.counts.ASSIGNED ?? 0) + (p.counts.IN_PROGRESS ?? 0) + (p.counts.REWORK ?? 0)} open · {p.counts.SUBMITTED ?? 0} in review · {p.counts.ACCEPTED ?? 0} accepted
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className="mt-6">
         <h2 className="font-semibold">Your applications</h2>
         {me.enrollments.length === 0 ? (

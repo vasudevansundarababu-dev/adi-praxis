@@ -193,6 +193,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(healthRoutes, { db: deps.db, pingRedis: deps.pingRedis });
   await app.register(
     async (v1) => {
+      // Which build is running (testers put this in defect reports). Set by the deploy; "local" otherwise.
+      v1.get('/version', { config: { access: 'public' }, schema: { tags: ['health'] } }, async () => ({ build: process.env.PRAXIS_BUILD || 'local', commit: process.env.PRAXIS_COMMIT || null, env: deps.config.appEnv, ai: deps.config.assistantMode }));
       v1.get('/openapi.json', { config: { access: 'public' }, schema: { hide: true } }, async () => app.swagger());
       await v1.register(authRoutes, { db: deps.db, config: deps.config });
       await v1.register(userRoutes, { db: deps.db });

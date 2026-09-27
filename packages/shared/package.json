@@ -8,7 +8,10 @@
     "./theme": "./theme/tokens.ts",
     "./theme/theme.css": "./theme/theme.css",
     "./brand/*": "./brand/*",
-    "./security-headers": "./security-headers.mjs"
+    "./security-headers": {
+      "types": "./security-headers.d.mts",
+      "default": "./security-headers.mjs"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

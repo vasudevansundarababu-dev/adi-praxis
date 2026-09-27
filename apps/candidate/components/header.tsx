@@ -30,7 +30,8 @@ export async function Header() {
 function DemoBanner() {
   return (
     <p role="note" className="bg-warning px-4 py-1 text-center text-xs font-medium text-black">
-      Demo environment: synthetic data, simulated sign-in and identity check. Do not enter real personal information.
+      {process.env.PRAXIS_ENV_LABEL ?? 'Demo environment'}: synthetic data, simulated sign-in and identity check. Do not enter real personal information.
+      {process.env.PRAXIS_BUILD && <span className="ml-2 font-mono">Build {process.env.PRAXIS_BUILD}</span>}
     </p>
   );
 }

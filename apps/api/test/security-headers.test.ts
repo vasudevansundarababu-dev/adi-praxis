@@ -32,3 +32,13 @@ describe('security headers (hardening before external testing)', () => {
     expect(dev['Strict-Transport-Security']).toBeUndefined();
   });
 });
+
+describe('version', () => {
+  it('reports the running build publicly (for defect reports)', async () => {
+    const app = await buildTestApp();
+    const res = await app.inject({ method: 'GET', url: '/api/v1/version' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ build: expect.any(String), env: expect.any(String), ai: 'mock' });
+    await app.close();
+  });
+});

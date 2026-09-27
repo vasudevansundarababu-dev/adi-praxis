@@ -1,11 +1,11 @@
 # Triage, the nightly agent and verification
 
-For the lead tester, the product owner and developers. Testers only need section 1 of [README.md](README.md) §11.
+For the lead tester, the product owner and developers. Testers only need section 11 of the [tester guide](README.md).
 
 ## 1. Issue lifecycle
 
 ```mermaid
-flowchart LR
+flowchart TD
   A[Tester files issue<br/>status:needs-triage] --> B{Triage 18:00 IST}
   B -->|Unclear| C[status:needs-info<br/>question to reporter]
   C --> B

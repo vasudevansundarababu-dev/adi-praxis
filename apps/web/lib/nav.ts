@@ -13,9 +13,11 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Templates', href: '/templates', roles: ['ADMIN', 'PM'] },
   { label: 'Taxonomy', href: '/taxonomy', roles: ['ADMIN'] },
   { label: 'Applications', href: '/review/applications', roles: ['REVIEWER', 'ADMIN'] },
+  { label: 'Task reviews', href: '/review/tasks', roles: ['REVIEWER', 'ADMIN'] },
   { label: 'Identity reviews', href: '/review/identity', roles: ['REVIEWER', 'ADMIN'] },
   { label: 'Conflicts', href: '/review/conflicts', roles: ['REVIEWER', 'ADMIN'] },
   { label: 'Terms', href: '/terms', roles: ['ADMIN'] },
+  { label: 'API clients', href: '/api-clients', roles: ['ADMIN'] },
   { label: 'Users', href: '/users', roles: ['ADMIN'] },
 ];
 

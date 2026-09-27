@@ -1,6 +1,7 @@
 import { CANCELLABLE_STATUSES, type DemographicAttributeDto, type JobDescriptionDto, type ProjectDto, type TemplateDto } from '@praxis/shared';
 import Link from 'next/link';
 import { CancelProjectButton } from './cancel-button';
+import { PauseResumeButton } from './pause-resume';
 import { ProjectStatusBadge } from './project-status';
 import { ReviewersPanel } from './reviewers-panel';
 
@@ -65,6 +66,17 @@ export function ProjectSummary({
           Opportunity page
         </Link>
       )}
+      {['STAFFING', 'STAFFED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED'].includes(p.status) && (
+        <>
+          <Link href={`/projects/${p.id}/dashboard`} className="ml-3 mt-6 inline-block rounded-md border border-line px-4 py-2 text-sm">
+            Progress dashboard
+          </Link>
+          <Link href={`/projects/${p.id}/tasks`} className="ml-3 mt-6 inline-block rounded-md border border-line px-4 py-2 text-sm">
+            Tasks and invites
+          </Link>
+        </>
+      )}
+      {(p.status === 'IN_PROGRESS' || p.status === 'PAUSED') && <PauseResumeButton projectId={p.id} paused={p.status === 'PAUSED'} />}
       {CANCELLABLE_STATUSES.includes(p.status) && <CancelProjectButton projectId={p.id} />}
       {reviewers && !['CANCELLED', 'COMPLETED'].includes(p.status) && <ReviewersPanel projectId={p.id} initial={reviewers} />}
     </div>

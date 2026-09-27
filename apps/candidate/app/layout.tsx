@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import mark from '@praxis/shared/brand/praxis-mark-512.png';
+import { Header } from '@/components/header';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -14,7 +15,10 @@ export const viewport: Viewport = { themeColor: '#212227', width: 'device-width'
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-bg text-fg antialiased">{children}</body>
+      <body className="min-h-screen bg-bg text-fg antialiased">
+        <Header />
+        {children}
+      </body>
     </html>
   );
 }

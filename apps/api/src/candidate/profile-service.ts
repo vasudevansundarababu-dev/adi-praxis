@@ -2,6 +2,7 @@ import type { ConversationTurn, Prisma } from '@prisma/client';
 import {
   experienceDurations,
   FIELD_DEFS,
+  isCriterionKey,
   fieldLabel,
   MAX_CLARIFICATIONS,
   nextQuestion,
@@ -63,7 +64,8 @@ async function say(tx: Tx, session: { id: string; clientId: string }, content: s
   });
 }
 
-const askText = (q: QuestionDef) => (q.options.length ? `${q.text}\n(For example: ${q.options.join(', ')}.)` : q.text);
+// Choices are shown as tap buttons in the app, so the question text stays short.
+const askText = (q: QuestionDef) => (q.safeExample ? `${q.text}\n${q.safeExample}` : q.text);
 
 /**
  * Starts the conversation for an enrollment (idempotent): session, a draft profile for this pool that reuses the
@@ -270,6 +272,34 @@ export interface MessageDeps {
 }
 
 /**
+ * A real answer to a question should not be asked again. Fields of this question that the extraction left empty get
+ * the answer itself as a proposal (a list from comma-separated choices, the first number, or the text), which the SME
+ * confirms or edits on the profile panel like any other proposal. Roles still need dates, so they are not filled here.
+ */
+export function proposeFromAnswer(profile: ProfileData, q: QuestionDef, answer: string, turnId: string): ProfileData {
+  const text = answer.trim();
+  if (text.length < 2) return profile;
+  const fields = { ...profile.fields };
+  for (const f of q.fields) {
+    if (f === 'roles' || fields[f]) continue;
+    const kind = isCriterionKey(f) ? 'text' : FIELD_DEFS[f]?.kind;
+    let value: string | number | string[] | null = null;
+    if (kind === 'list') {
+      const items = text.split(/\s*(?:,|;|\n|\band\b)\s*/).map((x) => x.trim()).filter(Boolean);
+      // Tap-to-choose questions only take listed options this way (typed extras come from extraction), so an
+      // instruction typed into the box never becomes a "fact".
+      const allowed = q.answerType === 'choice' && q.id !== 'jurisdictions' ? items.filter((x) => q.options.some((o) => o.toLowerCase() === x.toLowerCase())) : items;
+      value = allowed.slice(0, 20);
+    }
+    else if (kind === 'number') value = /\d+(?:\.\d+)?/.exec(text) ? Number(/\d+(?:\.\d+)?/.exec(text)![0]) : null;
+    else if (kind === 'text') value = text.slice(0, 2000);
+    if (value === null || (Array.isArray(value) && value.length === 0)) continue;
+    fields[f] = { value, status: 'PROPOSED', approximate: false, sources: [turnId], conflictWith: null, reused: false };
+  }
+  return { ...profile, fields };
+}
+
+/**
  * Phase 2 of a message: call the model outside any transaction, then commit its proposals and the next question.
  * A model failure leaves a retryable state and never affects suitability (CF-15).
  */
@@ -317,14 +347,15 @@ export async function processCandidateTurn(deps: MessageDeps, enrollmentId: stri
       await say(tx, session, `That doesn’t seem to answer this question, which is about your work for this opportunity.\n\n${askText(q)}`, q.id);
     } else {
       profile = mergeExtraction(profile, result, turn.id);
+      profile = proposeFromAnswer(profile, q, turn.content, turn.id);
       await tx.conversationTurn.update({ where: { id: turn.id }, data: { extractionStatus: 'DONE', modelVersion: assistant.modelVersion } });
       const attempts = await tx.conversationTurn.count({ where: { sessionId: session.id, speaker: 'CANDIDATE', questionId: q.id } });
       if (!questionCovered(q, profile)) {
         if (attempts <= MAX_CLARIFICATIONS) {
           await say(tx, session, result.followUpQuestion ?? `Could you say a little more? ${askText(q)}`, q.id);
         } else {
-          // Two clarifications reached: record as not known (no penalty) and offer alternatives (FLOW2 C04).
-          for (const f of q.fields) if (!profile.fields[f] || profile.fields[f]!.status === 'PROPOSED') profile.fields[f] = { value: null, status: 'UNKNOWN', approximate: false, sources: [turn.id], conflictWith: null, reused: false };
+          // Follow-up used: record what is still missing as not known (no penalty) and keep anything already proposed.
+          for (const f of q.fields) if (!profile.fields[f]) profile.fields[f] = { value: null, status: 'UNKNOWN', approximate: false, sources: [turn.id], conflictWith: null, reused: false };
           await say(tx, session, 'Thanks. I’ll note this as not known for now, which is fine. You can add evidence, edit it before submitting, or a reviewer may ask a specific question later.');
         }
       }

@@ -124,15 +124,21 @@ export const QuestionPolicy = z.object({
 });
 export type QuestionPolicy = z.infer<typeof QuestionPolicy>;
 
-/** At most two clarifications for one unresolved question before offering unknown / evidence / help (FLOW2 C04). */
-export const MAX_CLARIFICATIONS = 2;
+/** At most one follow-up for an unresolved question before recording it as not known (FLOW2 C04; shortened 27 Sep 2026). */
+export const MAX_CLARIFICATIONS = 1;
 
 const BANKING = /bank|financ|complian|kyc|aml|sanction|fraud|payment|credit|risk/i;
 
+/** Common jurisdictions offered as tap-to-choose answers; the SME can still type others. */
+export const JURISDICTION_CHOICES = ['United Kingdom', 'European Union', 'United States', 'India', 'Singapore', 'United Arab Emirates', 'Hong Kong', 'Australia', 'Canada'];
+
 /**
- * Default question policy from FLOW2's suggested sections (C04) and the banking/compliance extension (4.1), plus one
- * question per published criterion. It asks only task-relevant questions: never GitHub, papers, salary, age,
- * nationality or other unrelated or sensitive topics (CF-08, C04).
+ * Default question policy: six short questions (owner decision, 27 Sep 2026), most answered by tapping choices. It
+ * covers what a reviewer needs to judge suitability: what the SME worked on, their roles with dates (experience is
+ * computed from these), level of responsibility, jurisdictions, how they meet the pool's published requirements (one
+ * combined question), and one generic example case. Availability, conflicts and preferences are collected once, in
+ * onboarding. It never asks about GitHub, papers, salary, age, nationality or other unrelated or sensitive topics
+ * (CF-08, C04).
  */
 export function defaultQuestionPolicy(brief: OpportunityBrief, criteria: OpportunityCriteria): QuestionPolicy {
   const banking = BANKING.test(`${brief.domain} ${brief.specialty} ${brief.title}`);
@@ -144,37 +150,28 @@ export function defaultQuestionPolicy(brief: OpportunityBrief, criteria: Opportu
     banking
       ? {
           id: 'focus',
-          section: 'Expertise focus',
-          text: 'Which compliance processes have you personally worked on?',
+          section: 'Your expertise',
+          text: 'Which compliance processes have you personally worked on? Tap all that apply.',
           why: 'So we only ask about work that is relevant to you and to this opportunity.',
           fields: ['compliance_areas', 'specialties'],
           answerType: 'choice',
           options: ['KYC / onboarding', 'Enhanced due diligence', 'Transaction-monitoring investigation', 'Sanctions review', 'Compliance testing', 'Policy / control design', 'Audit', 'Regulatory reporting'],
         }
-      : { id: 'focus', section: 'Expertise focus', text: `Which parts of ${area} have you personally worked on?`, why: 'So we only ask about work that is relevant.', fields: ['specialties'] },
+      : { id: 'focus', section: 'Your expertise', text: `Which parts of ${area} have you personally worked on?`, why: 'So we only ask about work that is relevant.', fields: ['specialties'] },
   );
   add({
-    id: 'years',
-    section: 'Experience',
-    text: banking
-      ? 'How much experience do you have in banking or financial services overall, and specifically in those processes?'
-      : `How much experience do you have in ${brief.domain || 'the domain'} overall, and specifically in ${area}?`,
-    why: 'Overall and specialty experience are recorded separately; approximate answers are fine.',
-    fields: ['domain_years', 'specialty_years'],
-  });
-  add({
     id: 'roles',
-    section: 'Relevant roles',
-    text: 'Which roles made up that experience? Please give approximate start and end months and what you were responsible for.',
-    why: 'We calculate your experience from role dates, without double-counting overlapping roles.',
+    section: 'Your roles',
+    text: 'List the roles behind that experience, each with rough start and end years.',
+    why: 'We work out your years of experience from these dates, without double-counting overlaps.',
     fields: ['roles'],
     answerType: 'roles',
-    safeExample: 'e.g. "KYC Analyst, Mar 2016 to Jun 2019: prepared onboarding cases"',
+    safeExample: 'e.g. "KYC Analyst, 2016 to 2019; Senior KYC Reviewer, 2019 to now"',
   });
   add({
     id: 'authority',
-    section: 'Work performed and authority',
-    text: 'In your most relevant role, did you prepare cases, review others’ work, approve outcomes or advise the team?',
+    section: 'Your responsibility',
+    text: 'In your most relevant role, what did you do? Tap all that apply.',
     why: 'A job title alone does not show hands-on responsibility.',
     fields: ['decision_authority'],
     answerType: 'choice',
@@ -182,72 +179,33 @@ export function defaultQuestionPolicy(brief: OpportunityBrief, criteria: Opportu
   });
   add({
     id: 'jurisdictions',
-    section: 'Jurisdictions and task types',
-    text: banking ? 'Which jurisdictions and customer or product types were relevant to that work?' : 'Which jurisdictions or markets were relevant to that work?',
+    section: 'Jurisdictions',
+    text: 'Which jurisdictions did that work cover? Tap or type.',
     why: 'Experience in one jurisdiction does not automatically transfer to others.',
-    fields: banking ? ['jurisdictions', 'customer_segments'] : ['jurisdictions'],
+    fields: ['jurisdictions'],
+    answerType: 'choice',
+    options: JURISDICTION_CHOICES,
   });
+  if (criteria.length) {
+    const list = criteria.map((c) => `• ${c.text}${c.kind === 'REQUIRED' ? '' : ' (preferred)'}`).join('\n');
+    add({
+      id: 'requirements',
+      section: 'This opportunity',
+      text: `This pool looks for:\n${list}\nIn a sentence or two, how does your experience meet these?`,
+      why: 'These are the published requirements for this pool; the reviewer checks your answer against them.',
+      fields: criteria.map((c) => `criterion:${c.id}`),
+      criterionIds: criteria.map((c) => c.id),
+      required: criteria.some((c) => c.kind === 'REQUIRED'),
+      evidenceExpected: criteria.map((c) => c.evidence).filter(Boolean).join(' '),
+    });
+  }
   add({
     id: 'work_example',
-    section: 'Workflow explanation',
-    text: 'Without sharing any customer or confidential information, describe a typical case from its trigger to completion.',
-    why: 'A short generic walkthrough shows procedural knowledge. Do not include names, account numbers or real documents.',
+    section: 'An example',
+    text: 'Briefly describe a typical case from start to finish, in general terms.',
+    why: 'A short generic walkthrough shows how you work. Do not include names, account numbers or real documents.',
     fields: ['work_example'],
     sensitive: true,
-  });
-  if (banking) {
-    add({
-      id: 'exceptions',
-      section: 'Workflow explanation',
-      text: 'When evidence was missing or conflicting, what happened next, and how would a reviewer check that step?',
-      why: 'Handling exceptions and making work checkable matter for these tasks.',
-      fields: ['escalation_boundaries', 'quality_checks'],
-      required: false,
-    });
-  }
-  const roles = brief.contributionRoles.length ? brief.contributionRoles : [...CONTRIBUTION_ROLES];
-  add({
-    id: 'contribution',
-    section: 'Contribution role',
-    text: 'Which kinds of contribution would you like to make here?',
-    why: 'Each contribution role is assessed separately; seniority alone does not qualify for every role.',
-    fields: ['contribution_roles'],
-    answerType: 'choice',
-    options: roles.map((r) => r.toLowerCase().replace(/_/g, ' ')),
-  });
-  for (const c of criteria) {
-    add({
-      id: `criterion:${c.id}`,
-      section: 'Requirements',
-      text: `This opportunity ${c.kind === 'REQUIRED' ? 'requires' : 'prefers'}: ${c.text}. How does your experience meet this?`,
-      why: c.kind === 'REQUIRED' ? 'This is a published requirement for this pool.' : 'This is preferred, not required.',
-      fields: [`criterion:${c.id}`],
-      criterionIds: [c.id],
-      required: c.kind === 'REQUIRED',
-      evidenceExpected: c.evidence,
-    });
-  }
-  add({
-    id: 'evidence',
-    section: 'Supporting evidence',
-    text: 'What permitted evidence could support your key roles or credentials? For example redacted proof or a public credential listing.',
-    why: 'Evidence is only requested for important claims. "None available" is an acceptable answer.',
-    fields: ['evidence_available'],
-    required: false,
-  });
-  add({
-    id: 'availability',
-    section: 'Availability and conflicts',
-    text: 'How many hours a week could you offer, and when could you start?',
-    why: 'Used for scheduling only, never as an expertise score.',
-    fields: ['hours_per_week', 'start_availability'],
-  });
-  add({
-    id: 'conflicts',
-    section: 'Availability and conflicts',
-    text: 'Are there employer restrictions or conflicts of interest we should know about? You do not need to disclose confidential details.',
-    why: 'Needed to assign work you are allowed to do.',
-    fields: ['conflicts'],
   });
   return QuestionPolicy.parse({ version: 1, source: 'default', questions: q });
 }
@@ -261,8 +219,10 @@ export function reconcilePolicy(policy: QuestionPolicy | null, brief: Opportunit
   if (!policy) return base;
   const ids = new Set(criteria.map((c) => c.id));
   const kept = policy.questions.filter((x) => x.criterionIds.length === 0 || x.criterionIds.some((c) => ids.has(c)));
-  for (const c of criteria) {
-    if (!kept.some((x) => x.criterionIds.includes(c.id))) kept.push(base.questions.find((x) => x.id === `criterion:${c.id}`)!);
+  const missing = criteria.filter((c) => !kept.some((x) => x.criterionIds.includes(c.id)));
+  if (missing.length) {
+    const req = base.questions.find((x) => x.id === 'requirements')!;
+    kept.push({ ...req, id: kept.some((x) => x.id === 'requirements') ? 'requirements-added' : 'requirements', fields: missing.map((c) => `criterion:${c.id}`), criterionIds: missing.map((c) => c.id) });
   }
   return QuestionPolicy.parse({ version: 1, source: 'owner', questions: kept });
 }

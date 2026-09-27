@@ -123,7 +123,7 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
       expect(s.session).toMatchObject({ status: 'IN_PROGRESS' });
       expect(s.turns.map((t: { speaker: string }) => t.speaker)).toEqual(['ASSISTANT', 'ASSISTANT']);
       expect(s.turns[0].content).toMatch(/don’t share real customer/);
-      expect(s.nextQuestion).toMatchObject({ id: 'focus', text: 'Which compliance processes have you personally worked on?' });
+      expect(s.nextQuestion).toMatchObject({ id: 'focus', text: 'Which compliance processes have you personally worked on? Tap all that apply.', answerType: 'choice' });
       const all = s.questions.map((q: { text: string }) => q.text).join(' ');
       expect(all).not.toMatch(/github|paper|publication/i);
       expect(all).toMatch(/years|roles|jurisdictions/i);
@@ -208,8 +208,8 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
       await send(c, { quickReply: 'DONT_KNOW' });
       const s = (await send(c, { quickReply: 'CANNOT_DISCLOSE' })).json();
       expect(s.profile.fields.compliance_areas).toMatchObject({ status: 'UNKNOWN', value: null });
-      expect(s.profile.fields.domain_years).toMatchObject({ status: 'DECLINED', value: null });
-      expect(s.nextQuestion.id).toBe('roles');
+      expect(s.profile.fields.roles).toMatchObject({ status: 'DECLINED', value: null });
+      expect(s.nextQuestion.id).toBe('authority');
     });
 
     it('optional questions can be skipped without penalty; required ones cannot be skipped', async () => {
@@ -358,7 +358,7 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
       await send(c, { quickReply: 'DONT_KNOW' });
       const s = await state(c);
       expect(s.turns.filter((t: { speaker: string }) => t.speaker === 'CANDIDATE')).toHaveLength(1);
-      expect(s.nextQuestion.id).toBe('years');
+      expect(s.nextQuestion.id).toBe('roles');
     });
   });
 
@@ -418,7 +418,7 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
       await db.smeUser.update({ where: { id: c.smeUserId }, data: { identityStatus: 'VERIFIED' } });
       expect((await submit(c, { confirmAccuracy: false })).statusCode).toBe(400);
       assistant.next = () => ({ ...empty(), facts: [{ fieldKey: 'tools_methods', text: null, list: ['World-Check'], number: null, approximate: false }] });
-      await correct(c, { fields: [{ fieldKey: 'evidence_available', action: 'CLEAR' }] });
+      await correct(c, { fields: [{ fieldKey: 'work_example', action: 'CLEAR' }] });
       await send(c, { content: 'I used World-Check.' });
       const res = await submit(c);
       expect(res.statusCode).toBe(422);
@@ -436,9 +436,9 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
       await db.opportunityVersion.create({ data: { ...other.versions[0]!, id: undefined, opportunityId: o2.id, createdAt: undefined, updatedAt: undefined } as never });
       const e2 = await app.inject({ method: 'POST', url: '/api/v1/me/enrollments', headers: { cookie: c.cookie, ...idem() }, payload: { opportunityId: o2.id } });
       const s = await state({ cookie: c.cookie, enrollmentId: e2.json().id });
-      expect(s.profile.fields.domain_years).toMatchObject({ status: 'CONFIRMED', reused: true });
+      expect(s.profile.fields.decision_authority).toMatchObject({ status: 'CONFIRMED', reused: true });
       expect(s.profile.fields['criterion:skill-1']).toBeUndefined();
-      expect(s.nextQuestion.id).toBe('criterion:skill-1');
+      expect(s.nextQuestion.id).toBe('requirements');
       expect(s.turns[0].content).toMatch(/only ask what this opportunity adds/);
     });
   });

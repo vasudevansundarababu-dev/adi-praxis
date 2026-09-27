@@ -20,8 +20,9 @@ const policy = defaultQuestionPolicy(brief, criteria);
 const field = (status: string, value: unknown = 'x') => ({ value, status, approximate: false, sources: [], conflictWith: null, reused: false });
 
 describe('default question policy (CF-08)', () => {
-  it('asks banking SMEs about processes, years, roles and specialties first', () => {
-    expect(policy.questions.slice(0, 3).map((q) => q.id)).toEqual(['focus', 'years', 'roles']);
+  it('asks banking SMEs six short questions, most of them tap-to-choose', () => {
+    expect(policy.questions.map((q) => q.id)).toEqual(['focus', 'roles', 'authority', 'jurisdictions', 'requirements', 'work_example']);
+    expect(policy.questions.filter((q) => q.answerType === 'choice').map((q) => q.id)).toEqual(['focus', 'authority', 'jurisdictions']);
     expect(policy.questions[0]!.text).toMatch(/compliance processes/);
     expect(policy.questions[0]!.options).toContain('Sanctions review');
   });
@@ -29,9 +30,10 @@ describe('default question policy (CF-08)', () => {
     const all = policy.questions.map((q) => `${q.text} ${q.why}`).join(' ');
     expect(all).not.toMatch(/github|paper|publication|salary|age\b|date of birth|nationality|religion|photo/i);
   });
-  it('has one question per published criterion, required only for required criteria', () => {
-    expect(policy.questions.find((q) => q.id === 'criterion:kyc')).toMatchObject({ required: true, criterionIds: ['kyc'], evidenceExpected: 'Redacted role proof' });
-    expect(policy.questions.find((q) => q.id === 'criterion:edd')?.required).toBe(false);
+  it('asks about all published criteria in one question, required when any criterion is required', () => {
+    const req = policy.questions.find((q) => q.id === 'requirements')!;
+    expect(req).toMatchObject({ required: true, criterionIds: ['kyc', 'edd'], fields: ['criterion:kyc', 'criterion:edd'] });
+    expect(req.text).toMatch(/\(preferred\)/);
   });
   it('non-banking domains get generic wording', () => {
     const p = defaultQuestionPolicy(OpportunityBrief.parse({ title: 't', summary: 's', domain: 'Healthcare', specialty: 'Triage' }), []);
@@ -39,10 +41,10 @@ describe('default question policy (CF-08)', () => {
     expect(p.questions.some((q) => q.id === 'exceptions')).toBe(false);
   });
   it('reconciling an owner policy drops questions for removed criteria and adds missing ones', () => {
-    const owner = { ...policy, source: 'owner' as const, questions: policy.questions.filter((q) => q.id !== 'criterion:edd') };
+    const owner = { ...policy, source: 'owner' as const, questions: policy.questions.filter((q) => q.id !== 'requirements') };
     const r = reconcilePolicy(owner, brief, [criteria[1]!]);
-    expect(r.questions.some((q) => q.id === 'criterion:kyc')).toBe(false);
-    expect(r.questions.some((q) => q.id === 'criterion:edd')).toBe(true);
+    expect(r.questions.some((q) => q.criterionIds.includes('kyc'))).toBe(false);
+    expect(r.questions.find((q) => q.id === 'requirements')).toMatchObject({ criterionIds: ['edd'], fields: ['criterion:edd'] });
   });
 });
 
@@ -51,12 +53,12 @@ describe('controller (CF-09: never repeat what is already answered)', () => {
     expect(nextQuestion(policy, ProfileData.parse({}))?.id).toBe('focus');
   });
   it('a broad answer that proposes several fields skips those questions', () => {
-    const p = ProfileData.parse({ fields: { compliance_areas: field('PROPOSED', ['KYC']), specialties: field('PROPOSED', ['KYC']), domain_years: field('PROPOSED', 12), specialty_years: field('PROPOSED', 8) } });
+    const p = ProfileData.parse({ fields: { compliance_areas: field('PROPOSED', ['KYC']), specialties: field('PROPOSED', ['KYC']), decision_authority: field('PROPOSED', 'Prepared cases') } });
     expect(nextQuestion(policy, p)?.id).toBe('roles');
   });
   it('unknown, declined and skipped answers count as addressed (no penalty, no re-asking)', () => {
     const p = ProfileData.parse({ fields: { compliance_areas: field('UNKNOWN', null), specialties: field('DECLINED', null) } });
-    expect(nextQuestion(policy, p)?.id).toBe('years');
+    expect(nextQuestion(policy, p)?.id).toBe('roles');
   });
 });
 

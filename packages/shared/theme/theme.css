@@ -27,6 +27,9 @@
   --color-success: var(--praxis-success);
 
   --background-image-brand-gradient: linear-gradient(90deg, #0a2170 0%, #2a80d0 50%, #3fac95 100%);
+
+  --font-sans: var(--font-praxis), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --color-hairline: var(--praxis-hairline);
 }
 
 :root {
@@ -44,6 +47,10 @@
   --praxis-error: #b91c1c;
   --praxis-warning: #b45309;
   --praxis-success: #15803d;
+  /* Card edges and elevation (decorative; form controls keep --praxis-border for 3:1 contrast). */
+  --praxis-hairline: #dde4ec;
+  --praxis-shadow: 0 1px 2px rgb(10 33 112 / 0.06), 0 8px 24px -12px rgb(10 33 112 / 0.18);
+  --praxis-elevated: #ffffff;
 }
 
 .dark,
@@ -62,6 +69,9 @@
   --praxis-error: #f87171;
   --praxis-warning: #fbbf24;
   --praxis-success: #4ade80;
+  --praxis-hairline: #363944;
+  --praxis-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -14px rgb(0 0 0 / 0.6);
+  --praxis-elevated: #2c2e36;
 }
 
 @custom-variant dark (&:where(.dark, .dark *, [data-theme='dark'], [data-theme='dark'] *));
@@ -74,4 +84,116 @@ body {
 :focus-visible {
   outline: 2px solid var(--praxis-focus);
   outline-offset: 2px;
+}
+
+/* ───────────── Components (Bold brand refresh, 27 Sep 2026) ───────────── */
+@layer components {
+  .card {
+    background: var(--praxis-elevated);
+    border: 1px solid var(--praxis-hairline);
+    border-radius: 16px;
+    box-shadow: var(--praxis-shadow);
+  }
+  .card-link { transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
+  .card-link:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--praxis-focus) 45%, transparent); }
+
+  /* The brand gradient as a hero band: white text on navy → blue → teal. */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    color: #ffffff;
+    border-radius: 20px;
+    background:
+      radial-gradient(120% 140% at 100% 0%, rgb(63 172 149 / 0.55) 0%, transparent 55%),
+      linear-gradient(125deg, #0a2170 0%, #164a9a 55%, #2a80d0 100%);
+    box-shadow: 0 18px 40px -20px rgb(10 33 112 / 0.6);
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    inset: auto -60px -80px auto;
+    width: 240px;
+    height: 240px;
+    border-radius: 999px;
+    border: 36px solid rgb(255 255 255 / 0.06);
+    pointer-events: none;
+  }
+  .hero a:not(.btn) { color: #cfe6ff; }
+  .hero .muted { color: rgb(255 255 255 / 0.78); }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 20px;
+    white-space: nowrap;
+    background: color-mix(in srgb, var(--pill, var(--praxis-text-muted)) 14%, transparent);
+    color: var(--pill, var(--praxis-text-muted));
+  }
+  .pill::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+  .pill-info { --pill: var(--praxis-link); }
+  .pill-success { --pill: var(--praxis-success); }
+  .pill-warning { --pill: var(--praxis-warning); }
+  .pill-error { --pill: var(--praxis-error); }
+  .pill-brand { --pill: var(--praxis-accent); }
+  .hero .pill { background: rgb(255 255 255 / 0.14); color: #ffffff; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 12px;
+    padding: 10px 18px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: filter 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-primary { color: #ffffff; background: linear-gradient(90deg, #1f64b8 0%, #2a80d0 45%, #2f9c8a 100%); box-shadow: 0 8px 20px -10px rgb(42 128 208 / 0.8); }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+  .btn-secondary { border: 1px solid var(--praxis-hairline); background: var(--praxis-elevated); color: var(--praxis-text); }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--praxis-focus); }
+  .hero .btn-secondary { background: rgb(255 255 255 / 0.12); border-color: rgb(255 255 255 / 0.3); color: #ffffff; }
+
+  /* Tap-to-choose answers. */
+  .chip {
+    border: 1px solid var(--praxis-hairline);
+    background: var(--praxis-elevated);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 14px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .chip:hover { border-color: var(--praxis-focus); }
+  .chip[aria-pressed='true'] {
+    border-color: var(--praxis-focus);
+    background: color-mix(in srgb, var(--praxis-focus) 18%, transparent);
+    color: var(--praxis-text);
+    font-weight: 600;
+  }
+
+  /* A short journey stepper: done, current, upcoming. */
+  .stepper { display: flex; flex-wrap: wrap; gap: 6px 4px; align-items: center; font-size: 13px; }
+  .stepper li { display: inline-flex; align-items: center; gap: 6px; color: var(--praxis-text-muted); }
+  .stepper li + li::before { content: ''; width: 18px; height: 2px; border-radius: 2px; background: var(--praxis-hairline); margin-right: 2px; }
+  .stepper .dot { width: 20px; height: 20px; border-radius: 999px; display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; border: 2px solid var(--praxis-hairline); }
+  .stepper [data-state='done'] { color: var(--praxis-text); }
+  .stepper [data-state='done'] .dot { background: var(--praxis-accent); border-color: var(--praxis-accent); color: #ffffff; }
+  .stepper [data-state='current'] { color: var(--praxis-text); font-weight: 600; }
+  .stepper [data-state='current'] .dot { border-color: var(--praxis-focus); color: var(--praxis-focus); }
+  .hero .stepper li { color: rgb(255 255 255 / 0.7); }
+  .hero .stepper [data-state='done'], .hero .stepper [data-state='current'] { color: #ffffff; }
+  .hero .stepper li + li::before { background: rgb(255 255 255 / 0.25); }
+  .hero .stepper [data-state='current'] .dot { border-color: #ffffff; color: #ffffff; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-link, .btn, .chip { transition: none; }
+  .card-link:hover { transform: none; }
 }

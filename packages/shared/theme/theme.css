@@ -22,9 +22,9 @@
   --color-on-primary: var(--praxis-on-primary);
   --color-accent: var(--praxis-accent);
 
-  --color-warning: #b45309;
-  --color-error: #b91c1c;
-  --color-success: #15803d;
+  --color-warning: var(--praxis-warning);
+  --color-error: var(--praxis-error);
+  --color-success: var(--praxis-success);
 
   --background-image-brand-gradient: linear-gradient(90deg, #0a2170 0%, #2a80d0 50%, #3fac95 100%);
 }
@@ -41,6 +41,9 @@
   --praxis-primary: #0a2170;
   --praxis-on-primary: #ffffff;
   --praxis-accent: #3fac95;
+  --praxis-error: #b91c1c;
+  --praxis-warning: #b45309;
+  --praxis-success: #15803d;
 }
 
 .dark,
@@ -56,6 +59,9 @@
   --praxis-primary: #5aa3e6;
   --praxis-on-primary: #212227;
   --praxis-accent: #3fac95;
+  --praxis-error: #f87171;
+  --praxis-warning: #fbbf24;
+  --praxis-success: #4ade80;
 }
 
 @custom-variant dark (&:where(.dark, .dark *, [data-theme='dark'], [data-theme='dark'] *));

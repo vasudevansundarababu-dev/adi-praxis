@@ -28,8 +28,8 @@ describe('theme tokens', () => {
 
   for (const theme of ['light', 'dark'] as const) {
     const t = semantic[theme];
-    it(`${theme}: text, secondary text and links meet WCAG AA (4.5:1) on background and surface`, () => {
-      for (const fg of [t.text, t.textMuted, t.link]) {
+    it(`${theme}: text, secondary text, links and status text meet WCAG AA (4.5:1) on background and surface`, () => {
+      for (const fg of [t.text, t.textMuted, t.link, t.error, t.warning, t.success]) {
         expect(contrast(fg, t.bg)).toBeGreaterThanOrEqual(4.5);
         expect(contrast(fg, t.surface)).toBeGreaterThanOrEqual(4.5);
       }
@@ -46,6 +46,7 @@ describe('theme tokens', () => {
       expect(block).toContain(`--praxis-text: ${t.text.toLowerCase()}`);
       expect(block).toContain(`--praxis-text-muted: ${t.textMuted.toLowerCase()}`);
       expect(block).toContain(`--praxis-link: ${t.link.toLowerCase()}`);
+      expect(block).toContain(`--praxis-error: ${t.error.toLowerCase()}`);
     }
   });
 

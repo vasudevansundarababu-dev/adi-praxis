@@ -1,7 +1,8 @@
 /**
  * ADI Praxis design tokens (SPEC: Branding). Brand colours are sampled from the logo and must not change.
  * Semantic tokens pick accessible shades per theme: silver (#8597A3) and brand blue fail WCAG AA as text on
- * white, so light-theme secondary text and links use darker derived shades.
+ * white, so light-theme secondary text and links use darker derived shades. Status colours (error, warning,
+ * success) are standard and distinct from brand teal (SPEC: Branding rules), with lighter shades in dark.
  */
 export const brand = {
   navy: '#0A2170',
@@ -24,6 +25,9 @@ export const semantic = {
     primary: '#0A2170',
     onPrimary: '#FFFFFF',
     accent: '#3FAC95',
+    error: '#B91C1C',
+    warning: '#B45309',
+    success: '#15803D',
   },
   dark: {
     bg: '#212227',
@@ -36,14 +40,11 @@ export const semantic = {
     primary: '#5AA3E6',
     onPrimary: '#212227',
     accent: '#3FAC95',
+    // Lighter shades so status text stays readable on charcoal.
+    error: '#F87171',
+    warning: '#FBBF24',
+    success: '#4ADE80',
   },
-} as const;
-
-/** Standard status colours, kept distinct from brand teal (SPEC: Branding rules). */
-export const status = {
-  warning: '#B45309',
-  error: '#B91C1C',
-  success: '#15803D',
 } as const;
 
 export const TAGLINE = 'Intelligence Beyond Boundaries';

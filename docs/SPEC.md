@@ -452,7 +452,7 @@ REST under `/api/v1`, JSON, OpenAPI spec generated from code. Internal users use
 
 | Area | Endpoints | Role |
 | --- | --- | --- |
-| Templates | `GET/POST /domains`, `GET/POST /templates`, `POST /templates/{id}/publish`, `POST /templates/{id}/retire` | Admin (read: PM) |
+| Templates | `GET/POST /domains`, `GET/POST /templates`, `GET/PATCH /templates/{id}` (PATCH edits a draft only), `POST /templates/{id}/versions` (new draft version from a published or retired one), `GET /templates/{id}/versions`, `POST /templates/{id}/publish`, `POST /templates/{id}/retire` | Admin (read: PM) |
 | Taxonomy | `GET/POST /demographic-attributes` | Admin |
 | Projects (FLOW 1) | `GET/POST /projects`, `GET/PATCH /projects/{id}`, `POST /projects/{id}/submit`, `POST /projects/{id}/pause`, `POST /projects/{id}/cancel` | PM |
 | JDs | `GET/POST /job-descriptions`, `GET/PATCH /job-descriptions/{id}` | PM |

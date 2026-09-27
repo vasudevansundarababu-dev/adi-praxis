@@ -19,6 +19,7 @@ import type { Db } from './db';
 import { AppError } from './lib/errors';
 import { authRoutes } from './routes/auth';
 import { healthRoutes } from './routes/health';
+import { templateRoutes } from './routes/templates';
 import { userRoutes } from './routes/users';
 
 export interface AppDeps {
@@ -89,6 +90,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       v1.get('/openapi.json', { config: { access: 'public' }, schema: { hide: true } }, async () => app.swagger());
       await v1.register(authRoutes, { db: deps.db, config: deps.config });
       await v1.register(userRoutes, { db: deps.db });
+      await v1.register(templateRoutes, { db: deps.db });
     },
     { prefix: '/api/v1' },
   );

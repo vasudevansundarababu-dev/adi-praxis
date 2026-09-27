@@ -1,0 +1,70 @@
+/*
+ * ADI Praxis theme: CSS variables + Tailwind v4 theme. Import once from each app's global stylesheet,
+ * after `@import "tailwindcss";`. Values mirror theme/tokens.ts.
+ * Light is the default; add class="dark" (or data-theme="dark") on <html> for the dark theme.
+ */
+@theme {
+  --color-brand-navy: #0a2170;
+  --color-brand-blue: #2a80d0;
+  --color-brand-teal: #3fac95;
+  --color-brand-silver: #8597a3;
+  --color-brand-charcoal: #212227;
+
+  --color-bg: var(--praxis-bg);
+  --color-surface: var(--praxis-surface);
+  --color-fg: var(--praxis-text);
+  --color-fg-muted: var(--praxis-text-muted);
+  --color-line: var(--praxis-border);
+  --color-link: var(--praxis-link);
+  --color-focus: var(--praxis-focus);
+  --color-primary: var(--praxis-primary);
+  --color-on-primary: var(--praxis-on-primary);
+  --color-accent: var(--praxis-accent);
+
+  --color-warning: #b45309;
+  --color-error: #b91c1c;
+  --color-success: #15803d;
+
+  --background-image-brand-gradient: linear-gradient(90deg, #0a2170 0%, #2a80d0 50%, #3fac95 100%);
+}
+
+:root {
+  color-scheme: light;
+  --praxis-bg: #ffffff;
+  --praxis-surface: #f5f7fa;
+  --praxis-text: #0a2170;
+  --praxis-text-muted: #5b6b77;
+  --praxis-border: #8597a3;
+  --praxis-link: #1d68b0;
+  --praxis-focus: #2a80d0;
+  --praxis-primary: #0a2170;
+  --praxis-on-primary: #ffffff;
+  --praxis-accent: #3fac95;
+}
+
+:root.dark,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --praxis-bg: #212227;
+  --praxis-surface: #2a2c33;
+  --praxis-text: #e6eaee;
+  --praxis-text-muted: #8597a3;
+  --praxis-border: #3a3d46;
+  --praxis-link: #5aa3e6;
+  --praxis-focus: #5aa3e6;
+  --praxis-primary: #5aa3e6;
+  --praxis-on-primary: #212227;
+  --praxis-accent: #3fac95;
+}
+
+@custom-variant dark (&:where(.dark, .dark *, [data-theme='dark'], [data-theme='dark'] *));
+
+body {
+  background: var(--praxis-bg);
+  color: var(--praxis-text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--praxis-focus);
+  outline-offset: 2px;
+}

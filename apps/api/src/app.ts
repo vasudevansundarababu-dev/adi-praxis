@@ -23,7 +23,10 @@ import { healthRoutes } from './routes/health';
 import { jobDescriptionRoutes } from './routes/job-descriptions';
 import { GoogleIdTokenVerifier, MockGoogleVerifier, type GoogleVerifier } from './candidate/google';
 import { MockIdentityProvider, StripeIdentityProvider, type IdentityProvider } from './candidate/identity-provider';
+import { ClaudeVertexProfileAssistant, MockProfileAssistant, type ProfileAssistant } from './candidate/profile-assistant';
+import { GcsStorage, stubScanner, type MalwareScanner, type ObjectStorage } from './candidate/storage';
 import { campaignRoutes } from './routes/campaigns';
+import { profileRoutes } from './routes/profile';
 import { candidateAuthRoutes } from './routes/candidate-auth';
 import { candidateRoutes } from './routes/candidates';
 import { opportunityRoutes } from './routes/opportunities';
@@ -48,6 +51,21 @@ export interface AppDeps {
   identity?: IdentityProvider;
   /** The single v1 client candidates sign up under. Defaults to SEED_CLIENT_NAME, else the oldest client. */
   resolveClientId?: () => Promise<string>;
+  /** SME profile assistant: Claude on Vertex when configured, otherwise the local mock. */
+  assistant?: ProfileAssistant;
+  /** Evidence storage (GCS; the emulator locally) and malware scanning (stub in v1). */
+  storage?: ObjectStorage;
+  scanner?: MalwareScanner;
+}
+
+export function defaultAssistant(config: Config): ProfileAssistant {
+  return config.assistantMode === 'vertex'
+    ? new ClaudeVertexProfileAssistant({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION })
+    : new MockProfileAssistant();
+}
+
+export function defaultStorage(config: Config): ObjectStorage {
+  return new GcsStorage(config.EVIDENCE_BUCKET, config.GCS_EMULATOR_HOST ? { apiEndpoint: config.GCS_EMULATOR_HOST, projectId: config.GCS_PROJECT_ID } : {});
 }
 
 export function defaultGoogleVerifier(config: Config): GoogleVerifier {
@@ -137,6 +155,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(candidateRoutes, { db: deps.db });
       await v1.register(opportunityRoutes, { db: deps.db });
       await v1.register(campaignRoutes, { db: deps.db, config: deps.config });
+      await v1.register(profileRoutes, {
+        db: deps.db,
+        assistant: deps.assistant ?? defaultAssistant(deps.config),
+        storage: deps.storage ?? defaultStorage(deps.config),
+        scanner: deps.scanner ?? stubScanner,
+      });
       await v1.register(candidateAuthRoutes, {
         db: deps.db,
         config: deps.config,

@@ -1,15 +1,18 @@
 import '@fastify/multipart';
-import type { Opportunity, OpportunityVersion, Prisma } from '@prisma/client';
+import { Prisma, type Opportunity, type OpportunityVersion } from '@prisma/client';
 import {
   OpportunityBrief,
   OpportunityCriteria,
   opportunityPublishProblems,
+  QuestionPolicy,
+  reconcilePolicy,
   PublicOpportunityDto,
   SaveOpportunityDraftRequest,
 } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { extractDocumentText, MAX_DOCUMENT_BYTES } from '../candidate/document-text';
+import { ensureConversation } from '../candidate/profile-service';
 import type { Db, Tx } from '../db';
 import { sha256 } from '../lib/crypto';
 import { AppError, badRequest, notFound } from '../lib/errors';
@@ -78,6 +81,8 @@ const OwnerDto = z.object({
   opportunityId: z.string().uuid().nullable(),
   status: z.enum(['DRAFT', 'PUBLISHED', 'CLOSED']),
   draft: z.object({ brief: OpportunityBrief, criteria: OpportunityCriteria }),
+  /** The questions candidates will be asked (owner-edited, or generated from the brief and criteria). */
+  questionPolicy: QuestionPolicy,
   publishProblems: z.array(z.string()),
   versions: z.array(z.object({ version: z.number().int(), publishedAt: z.string().nullable() })),
   documents: z.array(
@@ -91,11 +96,13 @@ async function ownerView(tx: Db | Tx, projectId: string): Promise<z.infer<typeof
     include: { versions: { orderBy: { version: 'desc' } }, documents: { orderBy: { createdAt: 'desc' } } },
   });
   const draft = await currentDraft(tx, projectId);
+  const owned = QuestionPolicy.safeParse(o?.draftQuestionPolicy);
   return {
     projectId,
     opportunityId: o?.id ?? null,
     status: o?.status ?? 'DRAFT',
     draft,
+    questionPolicy: reconcilePolicy(owned.success ? owned.data : null, draft.brief, draft.criteria),
     publishProblems: opportunityPublishProblems(draft.brief, draft.criteria),
     versions: (o?.versions ?? []).map((v) => ({ version: v.version, publishedAt: v.publishedAt?.toISOString() ?? null })),
     documents: (o?.documents ?? []).map((d) => ({
@@ -130,9 +137,16 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, 
         const p = await ownedProject(tx, req.params.id, actor);
         const o = await ensureOpportunity(tx, p);
         if (o.status === 'CLOSED') throw new AppError(409, 'OPPORTUNITY_CLOSED', 'This opportunity is closed.');
+        let policyUpdate: Prisma.OpportunityUpdateInput = {};
+        if (req.body.questionPolicy === null) policyUpdate = { draftQuestionPolicy: Prisma.DbNull };
+        else if (req.body.questionPolicy !== undefined) {
+          const parsed = QuestionPolicy.safeParse(req.body.questionPolicy);
+          if (!parsed.success) throw new AppError(400, 'INVALID_QUESTION_POLICY', 'The question list is not valid.', { problems: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) });
+          policyUpdate = { draftQuestionPolicy: { ...parsed.data, source: 'owner' } as Prisma.InputJsonValue };
+        }
         await tx.opportunity.update({
           where: { id: o.id },
-          data: { draftBrief: req.body.brief as Prisma.InputJsonValue, draftCriteria: req.body.criteria as Prisma.InputJsonValue },
+          data: { draftBrief: req.body.brief as Prisma.InputJsonValue, draftCriteria: req.body.criteria as Prisma.InputJsonValue, ...policyUpdate },
         });
         await audit({ entityType: 'Opportunity', entityId: o.id, action: 'opportunity.draft_saved', after: { criteria: req.body.criteria.length } });
         return { status: 200, body: await ownerView(tx, p.id) };
@@ -236,7 +250,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, 
             version: (last?.version ?? 0) + 1,
             brief: draft.brief as Prisma.InputJsonValue,
             criteria: draft.criteria as Prisma.InputJsonValue,
-            questionPolicy: {}, // defined with the profile conversation (M4b)
+            // The pinned question policy: owner edits reconciled with the criteria, or the generated default.
+            questionPolicy: reconcilePolicy(QuestionPolicy.safeParse(o.draftQuestionPolicy).data ?? null, draft.brief, draft.criteria) as unknown as Prisma.InputJsonValue,
             scope: { domain: draft.brief.domain, specialty: draft.brief.specialty, contributionRoles: draft.brief.contributionRoles },
             ownerId: p.ownerId,
             publishedAt: new Date(),
@@ -317,6 +332,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, 
         if (o.status !== 'PUBLISHED') throw new AppError(409, 'OPPORTUNITY_CLOSED', 'This opportunity is not accepting new applications.');
         const v = (await latestVersion(tx, o.id))!;
         const e = await tx.enrollment.create({ data: { clientId: o.clientId, smeUserId: actor.smeUserId, opportunityId: o.id, opportunityVersionId: v.id } });
+        await ensureConversation(tx, e.id, actor.smeUserId);
 
         // Attribute the application to the campaign that brought the candidate, if it belongs to this project.
         if (req.body.campaignId) {

@@ -17,12 +17,15 @@
     "db:seed:candidates": "tsx --env-file-if-exists=../../.env prisma/seed-candidates.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.128.0",
+    "@anthropic-ai/vertex-sdk": "0.19.11",
     "@fastify/cookie": "11.1.2",
     "@fastify/cors": "11.3.0",
     "@fastify/multipart": "9.4.0",
     "@fastify/rate-limit": "10.3.0",
     "@fastify/swagger": "9.9.0",
     "@fastify/swagger-ui": "5.2.6",
+    "@google-cloud/storage": "7.22.0",
     "@node-rs/argon2": "2.2.1",
     "@praxis/shared": "workspace:*",
     "@prisma/client": "6.19.3",

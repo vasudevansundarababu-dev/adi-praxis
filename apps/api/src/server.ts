@@ -7,6 +7,12 @@ const config = loadConfig();
 const db = createDb(config.DATABASE_URL);
 const redis = new Redis(config.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 });
 
+// Local dev: make sure the evidence bucket exists in the Cloud Storage emulator.
+if (config.GCS_EMULATOR_HOST) {
+  const { GcsStorage } = await import('./candidate/storage');
+  await new GcsStorage(config.EVIDENCE_BUCKET, { apiEndpoint: config.GCS_EMULATOR_HOST, projectId: config.GCS_PROJECT_ID }).ensureBucket().catch((err) => console.warn('Could not create the evidence bucket in the emulator:', String(err)));
+}
+
 const app = await buildApp({
   config,
   db,

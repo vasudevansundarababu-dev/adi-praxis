@@ -23,6 +23,13 @@ const Env = z.object({
   STRIPE_IDENTITY_WEBHOOK_SECRET: z.string().default(''),
   /** Secret for the local-dev mocks (Google credentials, identity webhooks). Never used in production. */
   MOCK_SECRET: z.string().default('local-dev-mock-secret-not-for-production'),
+  /** Claude for the SME profile assistant via Vertex AI (decided 26 Sep 2026). Blank = local mock assistant. */
+  VERTEX_PROJECT_ID: z.string().default(''),
+  VERTEX_LOCATION: z.string().default('global'),
+  /** Private evidence bucket; GCS_EMULATOR_HOST points at fake-gcs-server locally. */
+  EVIDENCE_BUCKET: z.string().default('praxis-evidence'),
+  GCS_EMULATOR_HOST: z.string().default(''),
+  GCS_PROJECT_ID: z.string().default('praxis-local'),
 });
 
 export type Config = z.infer<typeof Env> & {
@@ -32,6 +39,8 @@ export type Config = z.infer<typeof Env> & {
   identityMode: 'stripe' | 'mock';
   /** Only live-mode identity results confer eligibility (FLOW2 CF-05). True in production. */
   requireLiveIdentity: boolean;
+  /** Derived: Claude on Vertex when a project is set, otherwise the local heuristic mock. */
+  assistantMode: 'vertex' | 'mock';
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -43,8 +52,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const c = parsed.data;
   const candidateAuthMode = c.GOOGLE_OAUTH_CLIENT_ID ? 'google' : 'mock';
   const identityMode = c.STRIPE_SECRET_KEY && c.STRIPE_IDENTITY_WEBHOOK_SECRET ? 'stripe' : 'mock';
-  if (c.NODE_ENV === 'production' && (candidateAuthMode === 'mock' || identityMode === 'mock')) {
-    throw new Error('Invalid configuration: production needs GOOGLE_OAUTH_CLIENT_ID, STRIPE_SECRET_KEY and STRIPE_IDENTITY_WEBHOOK_SECRET (mocks are local-only)');
+  const assistantMode = c.VERTEX_PROJECT_ID ? 'vertex' : 'mock';
+  if (c.NODE_ENV === 'production' && (candidateAuthMode === 'mock' || identityMode === 'mock' || assistantMode === 'mock')) {
+    throw new Error('Invalid configuration: production needs GOOGLE_OAUTH_CLIENT_ID, STRIPE_SECRET_KEY, STRIPE_IDENTITY_WEBHOOK_SECRET and VERTEX_PROJECT_ID (mocks are local-only)');
   }
-  return { ...c, candidateAuthMode, identityMode, requireLiveIdentity: c.NODE_ENV === 'production' };
+  return { ...c, candidateAuthMode, identityMode, assistantMode, requireLiveIdentity: c.NODE_ENV === 'production' };
 }

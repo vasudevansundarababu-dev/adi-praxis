@@ -1085,6 +1085,8 @@ model Opportunity {
   /// Working copy the owner edits; publishing freezes it into a new OpportunityVersion.
   draftBrief    Json?         @map("draft_brief")
   draftCriteria Json?         @map("draft_criteria")
+  /// Owner-edited question policy; when null, publishing generates the default from the brief and criteria.
+  draftQuestionPolicy Json?   @map("draft_question_policy")
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
 
@@ -1199,8 +1201,13 @@ model ConversationTurn {
   clientMessageId String    @map("client_message_id")
   sequence        Int
   speaker         Speaker
+  /// Stored text. For a message flagged as sensitive this is the redacted copy only; the original is never kept.
   content         String
+  redacted        Boolean   @default(false)
+  sensitiveKinds  String[]  @map("sensitive_kinds")
   questionId      String?   @map("question_id")
+  /// Candidate turns: NONE (quick reply), PENDING, DONE, FAILED (model error; retryable), SKIPPED (sensitive).
+  extractionStatus String   @default("NONE") @map("extraction_status")
   acknowledgedAt  DateTime? @map("acknowledged_at")
   schemaVersion   String?   @map("schema_version")
   modelVersion    String?   @map("model_version")
@@ -1219,6 +1226,8 @@ model ProfileVersion {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId    String    @map("client_id") @db.Uuid
   smeUserId   String    @map("sme_user_id") @db.Uuid
+  /// The enrollment this version was built for (each pool keeps its own snapshot; FLOW2 section 2).
+  enrollmentId String?  @map("enrollment_id") @db.Uuid
   version     Int
   data        Json
   /// Precision / unknown flags per field.
@@ -1286,6 +1295,8 @@ model EvidenceArtifact {
   clientId           String    @map("client_id") @db.Uuid
   smeUserId          String    @map("sme_user_id") @db.Uuid
   storageKey         String    @unique @map("storage_key")
+  /// Sanitised display name; the storage key never contains user input.
+  filename           String    @default("")
   sha256             String
   mimeType           String    @map("mime_type")
   sizeBytes          Int       @map("size_bytes")

@@ -12,6 +12,7 @@ import { defaultHandlers } from '../src/outbox/handlers';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { parseCsv } from '../src/routes/tasks';
+import { KYC_EXAMPLE_TASK } from '@praxis/shared';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
 const SECRET = 'test-mock-secret';
@@ -63,12 +64,12 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
     await db.$disconnect();
   });
 
-  async function template(taskMode: 'AUTHORING' | 'ANNOTATION') {
+  async function template(taskMode: 'AUTHORING' | 'ANNOTATION', workflowName = `KYC ${taskMode} ${randomUUID().slice(0, 4)}`, edgeCases = [{ name: 'PEP link', quota: 1, required: true }, { name: 'Nominee director', quota: 1, required: true }]) {
     const domainId = (await db.domain.findFirst({ where: { clientId } }))?.id ?? (await post(admin, '/domains', { name: 'Banking' })).json().id;
     const t = (
       await post(admin, '/templates', {
         domainId,
-        workflowName: `KYC ${taskMode} ${randomUUID().slice(0, 4)}`,
+        workflowName,
         primaryWork: 'Assemble identity evidence and recommend a disposition.',
         verificationCriteria: 'Document checks, completeness, policy adherence.',
         humanGate: 'Approval, rejection and high-risk classification remain human decisions.',
@@ -83,10 +84,7 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
           ],
           cells: [{ tags: { customer_type: 'corporate', risk_level: 'high' }, quota: 1, required: true }],
         },
-        edgeCaseCatalog: [
-          { name: 'PEP link', quota: 1, required: true },
-          { name: 'Nominee director', quota: 1, required: true },
-        ],
+        edgeCaseCatalog: edgeCases,
       })
     ).json();
     expect((await post(admin, `/templates/${t.id}/publish`)).statusCode).toBe(200);
@@ -94,8 +92,8 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
   }
 
   /** Two working days, so a 12-task authoring project needs two workers (room to assign two experts). */
-  async function project(taskMode: 'AUTHORING' | 'ANNOTATION', extra: object = {}) {
-    const templateId = await template(taskMode);
+  async function project(taskMode: 'AUTHORING' | 'ANNOTATION', extra: object = {}, templateId?: string) {
+    templateId ??= await template(taskMode);
     const jd = (await post(pm, '/job-descriptions', { title: 'KYC Analyst', responsibilities: 'Author KYC cases.', skills: ['KYC'], wagePerTask: 40, wageCurrency: 'GBP', locationType: 'REMOTE' })).json();
     const volume = taskMode === 'AUTHORING' ? { distinctTarget: 12, maxPerExpert: 4 } : { taskCount: 3 };
     const p = (await post(pm, '/projects', { templateId, name: `P ${randomUUID().slice(0, 6)}`, taskMode, ...volume, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-10-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: true }], ...extra })).json();
@@ -436,6 +434,54 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
       // A PM session cannot be replaced by a key of the wrong kind, and candidates cannot push at all.
       const rl = (await post(admin, '/api-clients', { name: 'RL Gym', kind: 'RL_GYM' })).json().key;
       expect((await app.inject({ method: 'POST', url: `/api/v1/projects/${projectId}/task-inputs`, headers: { authorization: `Bearer ${rl}`, ...idem() }, payload: { items: [{}] } })).statusCode).toBe(403);
+    });
+  });
+
+  describe('KYC authoring (docs/TASK-KYC.md)', () => {
+    async function kycTask() {
+      const templateId = await template('AUTHORING', 'KYC onboarding and refresh', [{ name: 'Complex or circular ownership', quota: 1, required: true }]);
+      const projectId = await project('AUTHORING', { distinctTarget: 4, maxPerExpert: 4 }, templateId);
+      const a = await expert();
+      await assign(projectId, a);
+      const mine = await db.taskInstance.findMany({ where: { projectId, assignedToId: a.candidateId } });
+      const t = mine.find((x) => (x.input as { slot: { edgeCase: string | null } }).slot.edgeCase === 'Complex or circular ownership')!;
+      return { a, id: t.id };
+    }
+
+    it('the task shows the KYC definition; a complete, synthetic, escalating case is accepted for review', async () => {
+      const { a, id } = await kycTask();
+      const view = await task(a, id);
+      expect(view.definition).toBe('kyc-onboarding-v1');
+      expect(view.input.slot).toMatchObject({ edgeCase: 'Complex or circular ownership', isOpen: false });
+      expect((await save(a, id, KYC_EXAMPLE_TASK)).statusCode).toBe(200);
+      const check = (await post(a.cookie, `/me/tasks/${id}/check`)).json();
+      expect(check.checks.filter((c: { ok: boolean }) => !c.ok)).toEqual([]);
+      expect(check.flags).toEqual([]);
+      expect((await submit(a, id)).json()).toEqual({ status: 'SUBMITTED', version: 1 });
+    });
+
+    it('submit is blocked when a check fails, naming the section; approving without escalation fails the human gate', async () => {
+      const { a, id } = await kycTask();
+      const bad = structuredClone(KYC_EXAMPLE_TASK);
+      bad.solution!.disposition = 'RECOMMEND_APPROVE';
+      bad.solution!.humanHandoff = '';
+      bad.rubric!.criteria![0]!.weight = 10;
+      await save(a, id, bad);
+      const res = await submit(a, id);
+      expect(res.statusCode).toBe(422);
+      const failed = res.json().details.checks.filter((c: { ok: boolean }) => !c.ok);
+      expect(failed.map((c: { id: string; section: string }) => `${c.section}:${c.id}`).sort()).toEqual(['W04:human-gate', 'W05:rubric.weights']);
+      expect((await db.taskInstance.findUniqueOrThrow({ where: { id } })).status).toBe('IN_PROGRESS');
+    });
+
+    it('likely real identifiers are flagged before submit', async () => {
+      const { a, id } = await kycTask();
+      const real = structuredClone(KYC_EXAMPLE_TASK);
+      real.customerFile!.parties![0]!.identifiers = [{ type: 'IBAN', value: 'GB82 WEST 1234 5698 7654 32' }];
+      await save(a, id, real);
+      const check = (await post(a.cookie, `/me/tasks/${id}/check`)).json();
+      expect(check.flags).toEqual([expect.objectContaining({ kind: 'IBAN', path: 'customerFile.parties[0].identifiers[0].value' })]);
+      expect((await submit(a, id)).json().details.unexplained).toHaveLength(1);
     });
   });
 });

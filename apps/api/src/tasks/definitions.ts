@@ -1,4 +1,4 @@
-import type { CoverageTags, TaskCheck } from '@praxis/shared';
+import { kycCanonicalText, kycChecks, kycKeyInputs, type CoverageTags, type KycTask, type TaskCheck } from '@praxis/shared';
 
 export interface TemplateRef {
   workflowName: string;
@@ -49,6 +49,16 @@ export function registerDefinition(domainName: string, workflowName: string, d: 
   registry.set(`${domainName} / ${workflowName}`.toLowerCase(), d);
 }
 export const definitionFor = (t: Pick<TemplateRef, 'domainName' | 'workflowName'>) => registry.get(`${t.domainName} / ${t.workflowName}`.toLowerCase()) ?? genericDefinition;
+
+/** Banking / KYC onboarding and refresh (docs/TASK-KYC.md). */
+export const kycDefinition: TaskDefinition = {
+  key: 'kyc-onboarding-v1',
+  validateTaskInput: genericDefinition.validateTaskInput,
+  validateSubmission: (_t, output, slot) => kycChecks(output as KycTask, slot),
+  canonicalText: (output) => kycCanonicalText(output as KycTask),
+  keyInputs: (output) => kycKeyInputs(output as KycTask),
+};
+registerDefinition('Banking', 'KYC onboarding and refresh', kycDefinition);
 
 /** The author's header (common to all authoring definitions): coverage tags and edge case for open slots. */
 export function authorCoverage(output: Record<string, unknown>): CoverageTags {

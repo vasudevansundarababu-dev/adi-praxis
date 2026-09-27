@@ -1,0 +1,10 @@
+# Cloud Build upload for infra/demo (images are built from the repository root).
+.git
+.gitignore
+**/node_modules
+**/.next
+**/.next-*
+**/test-results
+**/.terraform
+.env
+.vscode

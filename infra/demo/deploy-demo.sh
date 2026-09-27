@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# Deploys a click-through DEMO of ADI Praxis to a new Google Cloud project named "ADI Praxis".
+#
+#   infra/demo/deploy-demo.sh <project-id> <billing-account-id> [region]
+#
+# Demo only: production builds with the local mocks (simulated Google sign-in and identity check, rule-based AI,
+# in-memory email), synthetic data, the default *.run.app URLs. It is not the staging/production path (that is the
+# Terraform in infra/terraform plus GitHub Actions). Re-running is safe: existing resources are reused, new images
+# are built and deployed. Remove everything with: gcloud projects delete <project-id>
+set -euo pipefail
+
+PROJECT_ID=${1:?project id, e.g. adi-praxis-demo-1234}
+BILLING=${2:?billing account id (gcloud billing accounts list)}
+REGION=${3:-us-central1}
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+TAG=$(git -C "$ROOT" rev-parse --short HEAD)-$(date +%s)
+say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
+exists() { "$@" >/dev/null 2>&1; }
+
+say "Project $PROJECT_ID (ADI Praxis)"
+exists gcloud projects describe "$PROJECT_ID" || gcloud projects create "$PROJECT_ID" --name="ADI Praxis"
+gcloud billing projects link "$PROJECT_ID" --billing-account="$BILLING" >/dev/null
+gcloud config set project "$PROJECT_ID" >/dev/null
+PNUM=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+
+say "Enabling APIs (a few minutes the first time)"
+gcloud services enable run.googleapis.com sqladmin.googleapis.com redis.googleapis.com compute.googleapis.com \
+  artifactregistry.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com storage.googleapis.com \
+  iam.googleapis.com logging.googleapis.com
+
+say "Network"
+exists gcloud compute networks describe default || gcloud compute networks create default --subnet-mode=auto
+
+say "Service account"
+SA=praxis-demo-run@$PROJECT_ID.iam.gserviceaccount.com
+exists gcloud iam service-accounts describe "$SA" || gcloud iam service-accounts create praxis-demo-run --display-name="ADI Praxis demo runtime"
+for role in roles/cloudsql.client roles/secretmanager.secretAccessor roles/logging.logWriter roles/monitoring.metricWriter; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" --role="$role" --condition=None >/dev/null
+done
+# Cloud Build pushes images with the default compute service account.
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$PNUM-compute@developer.gserviceaccount.com" --role=roles/artifactregistry.writer --condition=None >/dev/null
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$PNUM-compute@developer.gserviceaccount.com" --role=roles/logging.logWriter --condition=None >/dev/null
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$PNUM-compute@developer.gserviceaccount.com" --role=roles/storage.objectViewer --condition=None >/dev/null
+
+say "Evidence bucket"
+BUCKET=$PROJECT_ID-demo-evidence
+exists gcloud storage buckets describe "gs://$BUCKET" || gcloud storage buckets create "gs://$BUCKET" --location="$REGION" --uniform-bucket-level-access --public-access-prevention
+gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member="serviceAccount:$SA" --role=roles/storage.objectAdmin >/dev/null
+
+say "Secrets"
+secret() { # name value (only created once; values are never printed except the demo logins at the end)
+  if ! exists gcloud secrets describe "$1"; then
+    printf '%s' "$2" | gcloud secrets create "$1" --data-file=- --replication-policy=automatic >/dev/null
+  fi
+}
+rand() { openssl rand -hex "${1:-16}"; }
+secret db-password-migrator "$(rand)"
+secret db-password-app "$(rand)"
+secret mock-secret "$(rand 32)"
+secret demo-admin-password "$(rand 8)"
+secret demo-pm-password "$(rand 8)"
+secret demo-reviewer-password "$(rand 8)"
+read_secret() { gcloud secrets versions access latest --secret="$1"; }
+
+say "Cloud SQL for PostgreSQL 16 (about 10 minutes the first time)"
+INSTANCE=praxis-demo
+# Reached only through the Cloud SQL connector (IAM-authorised); no authorised networks are added.
+exists gcloud sql instances describe "$INSTANCE" || gcloud sql instances create "$INSTANCE" --database-version=POSTGRES_16 \
+  --edition=ENTERPRISE --tier=db-g1-small --region="$REGION" --storage-type=SSD --storage-size=10 --backup
+exists gcloud sql databases describe praxis --instance="$INSTANCE" || gcloud sql databases create praxis --instance="$INSTANCE"
+sql_user() { # name password-secret
+  [ -n "$(gcloud sql users list --instance="$INSTANCE" --filter="name=$1" --format='value(name)')" ] || \
+    gcloud sql users create "$1" --instance="$INSTANCE" --password="$(read_secret "$2")"
+}
+sql_user praxis_migrator db-password-migrator
+sql_user praxis_app db-password-app
+CONN=$(gcloud sql instances describe "$INSTANCE" --format='value(connectionName)')
+secret database-url-migrator "postgresql://praxis_migrator:$(read_secret db-password-migrator)@localhost/praxis?host=/cloudsql/$CONN"
+secret database-url-app "postgresql://praxis_app:$(read_secret db-password-app)@localhost/praxis?host=/cloudsql/$CONN"
+
+say "Memorystore for Redis (about 5 minutes the first time)"
+exists gcloud redis instances describe praxis-demo --region="$REGION" || gcloud redis instances create praxis-demo --region="$REGION" \
+  --size=1 --tier=basic --redis-version=redis_7_2 --network=default --redis-config=maxmemory-policy=noeviction
+REDIS_HOST=$(gcloud redis instances describe praxis-demo --region="$REGION" --format='value(host)')
+secret redis-url "redis://$REDIS_HOST:6379"
+
+say "Images (Cloud Build)"
+exists gcloud artifacts repositories describe praxis --location="$REGION" || gcloud artifacts repositories create praxis --repository-format=docker --location="$REGION"
+REPO=$REGION-docker.pkg.dev/$PROJECT_ID/praxis
+API_URL=https://praxis-api-$PNUM.$REGION.run.app
+WEB_URL=https://praxis-web-$PNUM.$REGION.run.app
+CAND_URL=https://praxis-candidate-$PNUM.$REGION.run.app
+gcloud builds submit "$ROOT" --config="$ROOT/infra/demo/cloudbuild.yaml" --region="$REGION" \
+  --substitutions="_REPO=$REPO,_TAG=$TAG,_API_URL=$API_URL"
+
+ENVFILE=$(mktemp)
+cat > "$ENVFILE" <<YAML
+NODE_ENV: production
+APP_ENV: demo
+COOKIE_SECURE: "true"
+API_PORT: "8080"
+CANDIDATE_APP_URL: $CAND_URL
+CORS_ORIGINS: $WEB_URL,$CAND_URL
+EVIDENCE_BUCKET: $BUCKET
+GCS_PROJECT_ID: $PROJECT_ID
+API_URL: $API_URL
+WORKER_HEALTH_PORT: "8080"
+YAML
+COMMON=(--region="$REGION" --service-account="$SA" --set-cloudsql-instances="$CONN" --env-vars-file="$ENVFILE"
+  --network=default --subnet=default --vpc-egress=private-ranges-only)
+SECRETS=DATABASE_URL=database-url-app:latest,REDIS_URL=redis-url:latest,MOCK_SECRET=mock-secret:latest
+
+say "Database migrations (Cloud Run job, migration role)"
+gcloud run jobs deploy praxis-migrate --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=1800s \
+  --args=src/jobs/run.ts,migrate --update-env-vars=APP_DB_ROLE=praxis_app \
+  --set-secrets=DATABASE_URL=database-url-migrator:latest,REDIS_URL=redis-url:latest,MOCK_SECRET=mock-secret:latest
+gcloud run jobs execute praxis-migrate --region="$REGION" --wait
+
+say "Services"
+gcloud run deploy praxis-api --image="$REPO/api:$TAG" "${COMMON[@]}" --set-secrets="$SECRETS" \
+  --allow-unauthenticated --port=8080 --min-instances=0 --max-instances=3 --timeout=60
+gcloud run deploy praxis-worker --image="$REPO/api:$TAG" "${COMMON[@]}" --set-secrets="$SECRETS" --args=src/worker.ts \
+  --no-allow-unauthenticated --ingress=internal --port=8080 --no-cpu-throttling --min-instances=1 --max-instances=1
+for app in web candidate; do
+  gcloud run deploy "praxis-$app" --image="$REPO/$app:$TAG" --region="$REGION" --service-account="$SA" \
+    --set-env-vars="API_BASE_URL=$API_URL,CANDIDATE_APP_URL=$CAND_URL,PRAXIS_DEMO=1" \
+    --allow-unauthenticated --port=8080 --min-instances=0 --max-instances=3
+done
+
+say "Demo data (users and a published KYC project)"
+gcloud run jobs deploy praxis-demo-setup --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 \
+  --args=src/jobs/run.ts,demo-setup \
+  --set-secrets="$SECRETS,DEMO_ADMIN_PASSWORD=demo-admin-password:latest,DEMO_PM_PASSWORD=demo-pm-password:latest,DEMO_REVIEWER_PASSWORD=demo-reviewer-password:latest"
+gcloud run jobs execute praxis-demo-setup --region="$REGION" --wait
+rm -f "$ENVFILE"
+
+say "Ready"
+cat <<OUT
+Console (Admin, PM, Reviewer): $WEB_URL
+Candidate app:                 $CAND_URL
+API docs:                      $API_URL/docs
+
+Admin     admin@praxis.demo     $(read_secret demo-admin-password)
+PM        pm@praxis.demo        $(read_secret demo-pm-password)
+Reviewer  reviewer@praxis.demo  $(read_secret demo-reviewer-password)
+Candidates: use the demo sign-in with any email.
+
+Remove everything: gcloud projects delete $PROJECT_ID
+OUT

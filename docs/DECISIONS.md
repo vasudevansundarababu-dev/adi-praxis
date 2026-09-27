@@ -69,3 +69,11 @@ milestones without interruption (26 Sep 2026); each was the option Claude would 
 - **(chosen by Claude)** Machine clients (client API, RL Gym) use Admin-issued Bearer keys, stored as hashes, shown once and never kept in idempotency replays; they audit as SERVICE.
 - **(chosen by Claude)** Blind solve (TASK-KYC optional) is not built in v1; it stays an open question.
 
+## M6 Approved Task Dataset (chosen by Claude)
+- **(chosen by Claude)** Append-only is enforced by triggers (reject UPDATE and DELETE; TRUNCATE only with the session setting `praxis.allow_truncate`, used by test resets) and by revoking UPDATE/DELETE. It covers ApprovedTaskRecord, RLReviewRecord, AuditEvent, SelectionDecision and TaskReview. The app must run as a non-superuser in staging and production (M8), because superusers bypass grants.
+- **(chosen by Claude)** RLReviewRecord's `delivered_at` moved out: delivery to RL Gym is tracked in a separate table (M7) so the record itself never changes.
+- **(chosen by Claude)** One hash chain per table across clients, ordered by `seq` (assigned under a transaction-scoped advisory lock). The content hash covers the record's input, output and lineage fields plus prev_hash, using stable JSON.
+- **(chosen by Claude)** The nightly verification is a BullMQ job scheduler in the worker (03:00 UTC). Each run writes an audit event per client; a break also logs an ERROR with `alert: true`, which M8's log-based alert pages on.
+- **(chosen by Claude)** The dataset API is read-only for Admins and RL Gym (API key); PMs use the dashboard instead. Corrections are Admin-only and append a superseding record with the same lineage.
+- **(chosen by Claude)** The UI smoke test uses Playwright with system Chrome locally, on isolated ports and a `praxis_e2e` database.
+

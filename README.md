@@ -49,6 +49,14 @@ pnpm test
 
 API tests are integration tests against real Postgres and Redis. They use the separate `praxis_test` database and refuse to run against any other. External services (Google, Stripe, Vertex AI, email and SMS) are always mocked; tests never call live services.
 
+UI smoke tests use Playwright with your installed Chrome. They start their own API and apps on ports 4300, 3300 and 3301 against a separate `praxis_e2e` database, so a running `pnpm dev` is not disturbed:
+
+```sh
+pnpm test:e2e
+```
+
+Next.js may add its `.next-e2e` type paths to `apps/*/tsconfig.json` and `next-env.d.ts` during the run; discard those changes. In CI set `PW_CHANNEL=` (empty) and run `npx playwright install chromium` to use Playwright's own browser.
+
 ## Platform rules built into M0
 
 - **RBAC on every endpoint:** each route must declare `config.access` (`'public'`, `'authenticated'` or a list of roles). A route without one stops the API from starting.
@@ -57,3 +65,10 @@ API tests are integration tests against real Postgres and Redis. They use the se
   - The change, its `AuditEvent` and any outbox events commit in one transaction.
   - A command that writes no audit event is refused.
 - **Domain events:** the outbox is published to BullMQ by the worker. Handlers register in `apps/api/src/outbox/handlers.ts`, and a receipt per event and handler ensures each runs once, with retries.
+
+## Approved Task Dataset (M6)
+
+- `ApprovedTaskRecord`, `RLReviewRecord`, `AuditEvent`, `SelectionDecision` and `TaskReview` are append-only in the database. A trigger rejects `UPDATE` and `DELETE`, `TRUNCATE` needs the session setting `praxis.allow_truncate = on` (test resets only), and `UPDATE`/`DELETE` are revoked from the application role. The app must connect as a non-superuser role in staging and production so the revoked grants apply (superusers bypass grants; the triggers still hold).
+- Each record carries a SHA-256 `content_hash` chained to the previous record's hash in `seq` order. The worker verifies the chains nightly (`DATASET_VERIFY_CRON`, default 03:00 UTC) and logs `alert: true` on any break; Admins can run it on demand at `GET /api/v1/dataset/verification`.
+- Read-only access for Admins and RL Gym (Bearer key from **API clients**): `GET /dataset/records`, `/dataset/records/{id}`, `/dataset/records/{id}/lineage`, `/dataset/export` (NDJSON). Corrections append a superseding record: `POST /dataset/records/{id}/corrections`.
+

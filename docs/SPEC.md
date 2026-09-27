@@ -462,7 +462,9 @@ REST under `/api/v1`, JSON, OpenAPI spec generated from code. Internal users use
 | Tasks (FLOW 3) | `POST /projects/{id}/task-inputs` (upload), `GET /projects/{id}/tasks`, `POST /assignments/{id}/invite` | PM |
 | Candidate (FLOW 3) | `POST /auth/google`, `POST /me/identity/session`, `GET /me/projects`, `POST /me/projects/{id}/tasks/next`, `GET/PUT /me/tasks/{id}`, `POST /me/tasks/{id}/submit` | Candidate |
 | Review | `GET /review/tasks`, `POST /review/tasks/{id}/decision` | Reviewer |
-| Webhooks | `POST /webhooks/stripe-identity`, `POST /webhooks/job-board/{channel}` | Signed, external |
+| Webhooks | `POST /integrations/stripe/identity-webhook`, `POST /webhooks/job-board/{channel}` | Signed, external |
+
+The Stripe Identity webhook uses the FLOW 2 — SME candidate flow path (decided 26 Sep 2026); it replaces the earlier `POST /webhooks/stripe-identity`.
 
 Domain events (outbox table + worker): `project.ready_for_staffing`, `project.staffed`, `candidate.approved`, `candidate.assigned`, `task.submitted`, `task.reclaimed`, `project.completed`.
 

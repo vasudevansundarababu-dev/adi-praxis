@@ -2,14 +2,17 @@
   "name": "adi-praxis",
   "private": true,
   "packageManager": "pnpm@10.34.5",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "dev": "pnpm -r --parallel --filter \"./apps/*\" dev",
+    "worker": "pnpm --filter @praxis/api worker",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "db:up": "docker compose up -d --wait",
-    "db:down": "docker compose down",
+    "services:up": "docker compose up -d --wait",
+    "services:down": "docker compose down",
     "db:migrate": "pnpm --filter @praxis/api db:migrate",
     "db:seed": "pnpm --filter @praxis/api db:seed"
   },

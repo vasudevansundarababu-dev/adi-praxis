@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   plan:
+    if: vars.GCP_PROJECT_STAGING != ''
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

@@ -20,6 +20,8 @@ jobs:
 
   deploy:
     needs: ci
+    # Skipped until the staging project is configured (repository variables, see infra/README.md).
+    if: vars.GCP_PROJECT_STAGING != ''
     runs-on: ubuntu-latest
     environment: staging
     timeout-minutes: 45

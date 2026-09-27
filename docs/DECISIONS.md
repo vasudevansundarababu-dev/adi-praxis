@@ -145,3 +145,8 @@ privately with the task (never in the dataset); build M9 before the tester packa
 - **(chosen by Claude)** Found while testing for India: the time-zone list used older IANA names (Asia/Calcutta).
   It now lists current names (Asia/Kolkata, Asia/Kathmandu, Asia/Yangon, Asia/Ho_Chi_Minh, Europe/Kyiv, America/Nuuk)
   and maps the older names browsers may report.
+- **(chosen by Claude)** Hardening before external testing: the apps send a Content-Security-Policy (self, plus Google
+  sign-in in the candidate app; inline scripts allowed because Next.js inlines its bootstrap), HSTS outside local dev,
+  X-Frame-Options DENY, nosniff, a referrer policy and a permissions policy, and no longer send X-Powered-By. API
+  responses add nosniff, DENY, no-referrer, `default-src 'none'` and `Cache-Control: no-store` (Swagger UI at /docs
+  keeps its scripts). A nonce-based CSP without 'unsafe-inline' is left for later.

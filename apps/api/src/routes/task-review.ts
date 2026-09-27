@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Db } from '../db';
 import { runCommand } from '../platform/command';
 import { definitionFor } from '../tasks/definitions';
+import { draftingView } from '../tasks/drafting/service';
 import { CHECKLIST, completionStatus, decideTask, reviewableTask, TaskDecisionRequest } from '../tasks/review-service';
 import type { StoredChecks } from '../tasks/submission';
 import { EXPERT_TASK_TYPES, templateRef } from '../tasks/task-service';
@@ -85,6 +86,8 @@ export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, {
       previousOutput: versions.length > 1 ? versions.at(-2)!.output : null,
       reviews: t.reviews.map((r) => ({ decision: r.decision, comments: r.comments, notes: r.notes, rejectReason: r.rejectReason, at: r.createdAt.toISOString(), version: r.submissionVersion })),
       checklist: CHECKLIST,
+      // M9 "How this task was made": sources (files open via /review/tasks/:id/sources/:sourceId/file), interview, drafts.
+      drafting: t.taskType === 'AUTHORING' ? await draftingView(db, t) : null,
     };
   });
 

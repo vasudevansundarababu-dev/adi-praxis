@@ -5,6 +5,7 @@ import { AppError } from '../lib/errors';
 import type { writeAudit } from '../platform/audit';
 import type { OutboxInput } from '../outbox/outbox';
 import { coverageChecks, definitionFor, finalCoverage, type SlotRef } from './definitions';
+import { draftingChecks } from './drafting/service';
 import { findSimilar, storeEmbedding, type SimilarMatch } from './similarity';
 import { scanForRealData, type DataFlag } from './synthetic-scan';
 import { templateRef } from './task-service';
@@ -21,13 +22,13 @@ export interface StoredChecks {
 export const blocking = (c: TaskCheck) => !c.ok && c.severity !== 'warning';
 
 /** Every automated check for the task's current output (TASK-KYC section 5), without changing anything. */
-export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 'projectId' | 'taskType' | 'output' | 'input'>) {
+export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 'projectId' | 'taskType' | 'output' | 'input' | 'drafting'>) {
   const project = await tx.project.findUniqueOrThrow({ where: { id: task.projectId }, include: { template: true } });
   const template = await templateRef(tx, project.templateId);
   const def = definitionFor(template);
   const output = (task.output ?? {}) as Record<string, unknown>;
   const slot = task.taskType === 'AUTHORING' ? ((task.input as { slot?: SlotRef }).slot ?? null) : null;
-  const checks: TaskCheck[] = [...coverageChecks(template, slot, output), ...def.validateSubmission(template, output, slot)];
+  const checks: TaskCheck[] = [...coverageChecks(template, slot, output), ...def.validateSubmission(template, output, slot), ...draftingChecks(task)];
   const coverage: CoverageTags | null = task.taskType === 'AUTHORING' ? finalCoverage(slot, output) : null;
   return {
     project,

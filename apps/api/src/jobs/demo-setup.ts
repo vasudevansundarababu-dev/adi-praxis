@@ -46,7 +46,7 @@ export async function demoSetup(db: Db, env: NodeJS.ProcessEnv, log: (level: str
   const end = new Date(Date.now() + 45 * 86_400_000);
   const d = (x: Date) => x.toISOString().slice(0, 10);
   // 12 distinct tasks, up to 12 per expert: one selected expert can staff the demo project on their own.
-  const p = await call('p', 'POST', '/projects', { templateId: t.id, name: 'KYC authoring demo', distinctTarget: 12, maxPerExpert: 12, tptMinutes: 90, startDate: d(start), endDate: d(end), jobDescriptionId: jd.id });
+  const p = await call('p', 'POST', '/projects', { templateId: t.id, name: 'KYC authoring demo', distinctTarget: 12, maxPerExpert: 12, tptMinutes: 90, startDate: d(start), endDate: d(end), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] });
   await call('p', 'POST', `/projects/${p.id}/submit`);
   await call('p', 'POST', `/projects/${p.id}/match`);
   await call('p', 'POST', `/projects/${p.id}/opportunity/publish`);

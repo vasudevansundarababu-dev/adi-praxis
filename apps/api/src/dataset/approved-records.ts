@@ -1,6 +1,7 @@
 import type { ApprovedTaskRecord, Prisma } from '@prisma/client';
 import type { Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
+import { provenanceFor } from '../tasks/drafting/service';
 import type { StoredChecks } from '../tasks/submission';
 
 export const APPROVED_RECORD_SCHEMA_VERSION = 1;
@@ -9,8 +10,9 @@ const CHAIN_LOCK = 7_310_001;
 
 /** The fields covered by `content_hash`: input, output and lineage (SPEC: Approved Task Dataset). */
 export function recordContent(r: Omit<ApprovedTaskRecord, 'id' | 'seq' | 'createdAt' | 'contentHash' | 'prevHash'>) {
-  const { nearestDuplicateScore, ...rest } = r;
-  return { ...rest, nearestDuplicateScore: nearestDuplicateScore === null ? null : Number(nearestDuplicateScore).toFixed(4), submittedAt: r.submittedAt.toISOString(), reviewDecisionAt: r.reviewDecisionAt.toISOString() };
+  // Provenance (M9) is hashed only when present, so records written before it existed still verify.
+  const { nearestDuplicateScore, provenance, ...rest } = r;
+  return { ...rest, ...(provenance === null || provenance === undefined ? {} : { provenance }), nearestDuplicateScore: nearestDuplicateScore === null ? null : Number(nearestDuplicateScore).toFixed(4), submittedAt: r.submittedAt.toISOString(), reviewDecisionAt: r.reviewDecisionAt.toISOString() };
 }
 export const recordHash = (content: unknown, prevHash: string | null) => sha256(stableStringify({ content, prevHash }));
 
@@ -70,6 +72,7 @@ export async function writeApprovedRecord(tx: Tx, args: { taskId: string; review
     workflow: t.project.template.workflowName,
     jdSnapshotId: t.project.jdSnapshotId,
     workerTermsVersion: terms.length ? terms.map((d) => `${d.key}:v${d.version}`).sort().join(',') : null,
+    provenance: (await provenanceFor(tx, t, t.project.template.workflowName)) as Prisma.JsonValue,
   };
 
   return appendRecord(tx, base);
@@ -90,6 +93,7 @@ export async function appendRecord(tx: Tx, base: RecordBase) {
       output: base.output as Prisma.InputJsonValue,
       coverageTags: (base.coverageTags ?? undefined) as Prisma.InputJsonValue | undefined,
       qualificationSnapshot: (base.qualificationSnapshot ?? undefined) as Prisma.InputJsonValue | undefined,
+      provenance: (base.provenance ?? undefined) as Prisma.InputJsonValue | undefined,
       prevHash,
       contentHash,
     },

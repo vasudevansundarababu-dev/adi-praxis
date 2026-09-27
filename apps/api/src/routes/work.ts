@@ -18,7 +18,7 @@ const IdParams = z.object({ id: z.string().uuid() });
 /** What still stands between this candidate and the project's tasks (SPEC FLOW 3, candidate login step 4). */
 type Step = { step: 'identity' | 'account' | 'accept' | 'onboarding' | 'eligibility' | 'not_assigned'; message: string; href: string | null };
 
-async function workContext(tx: Db | Tx, gate: SelectionGate, smeUserId: string, projectId: string): Promise<{ ok: true; candidateId: string; paId: string } | ({ ok: false } & Step)> {
+export async function workContext(tx: Db | Tx, gate: SelectionGate, smeUserId: string, projectId: string): Promise<{ ok: true; candidateId: string; paId: string } | ({ ok: false } & Step)> {
   const u = await tx.smeUser.findUniqueOrThrow({ where: { id: smeUserId } });
   if (u.accountStatus !== 'ACTIVE') return { ok: false, step: 'account', message: 'Your account is not active. Contact support.', href: null };
   if (!identityEligible(u.identityStatus)) return { ok: false, step: 'identity', message: 'Verify your identity to open tasks.', href: '/verify' };
@@ -35,11 +35,11 @@ async function workContext(tx: Db | Tx, gate: SelectionGate, smeUserId: string, 
   return { ok: true, candidateId: candidate.id, paId: pa.id };
 }
 
-function outstanding(s: Step): never {
+export function outstanding(s: Step): never {
   throw new AppError(409, 'OUTSTANDING_STEP', s.message, s);
 }
 
-async function ownTask(tx: Db | Tx, taskId: string, smeUserId: string) {
+export async function ownTask(tx: Db | Tx, taskId: string, smeUserId: string) {
   const t = await tx.taskInstance.findFirst({ where: { id: taskId, assignedTo: { smeUserId } }, include: { project: { include: { template: true } }, reviews: { orderBy: { createdAt: 'desc' }, take: 1 } } });
   if (!t) throw notFound('Task not found');
   return t;

@@ -314,9 +314,9 @@ model User {
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
 
-  client        Client        @relation(fields: [clientId], references: [id])
+  client        Client            @relation(fields: [clientId], references: [id])
   sessions      Session[]
-  ownedProjects Project[]     @relation("ProjectOwner")
+  ownedProjects Project[]         @relation("ProjectOwner")
   reviewing     ProjectReviewer[]
 
   @@index([clientId])
@@ -324,18 +324,18 @@ model User {
 
 /// Server-side sessions. Internal users now; candidates (separate audience) from M4.
 model Session {
-  id         String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId   String          @map("client_id") @db.Uuid
-  audience   SessionAudience
-  userId     String?         @map("user_id") @db.Uuid
-  smeUserId  String?         @map("sme_user_id") @db.Uuid
-  tokenHash  String          @unique @map("token_hash")
-  expiresAt  DateTime        @map("expires_at")
-  revokedAt  DateTime?       @map("revoked_at")
-  ip         String?
-  userAgent  String?         @map("user_agent")
-  createdAt  DateTime        @default(now()) @map("created_at")
-  updatedAt  DateTime        @updatedAt @map("updated_at")
+  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String          @map("client_id") @db.Uuid
+  audience  SessionAudience
+  userId    String?         @map("user_id") @db.Uuid
+  smeUserId String?         @map("sme_user_id") @db.Uuid
+  tokenHash String          @unique @map("token_hash")
+  expiresAt DateTime        @map("expires_at")
+  revokedAt DateTime?       @map("revoked_at")
+  ip        String?
+  userAgent String?         @map("user_agent")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
 
   user    User?    @relation(fields: [userId], references: [id])
   smeUser SmeUser? @relation(fields: [smeUserId], references: [id])
@@ -466,44 +466,44 @@ model JobDescriptionSnapshot {
 }
 
 model Project {
-  id                     String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId               String        @map("client_id") @db.Uuid
-  ownerId                String        @map("owner_id") @db.Uuid
-  templateId             String        @map("template_id") @db.Uuid
-  templateVersion        Int           @map("template_version")
-  jobDescriptionId       String?       @map("job_description_id") @db.Uuid
-  jdSnapshotId           String?       @map("jd_snapshot_id") @db.Uuid
-  name                   String
-  description            String?
-  status                 ProjectStatus @default(DRAFT)
-  taskMode               TaskMode      @default(AUTHORING) @map("task_mode")
+  id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId                String        @map("client_id") @db.Uuid
+  ownerId                 String        @map("owner_id") @db.Uuid
+  templateId              String        @map("template_id") @db.Uuid
+  templateVersion         Int           @map("template_version")
+  jobDescriptionId        String?       @map("job_description_id") @db.Uuid
+  jdSnapshotId            String?       @map("jd_snapshot_id") @db.Uuid
+  name                    String
+  description             String?
+  status                  ProjectStatus @default(DRAFT)
+  taskMode                TaskMode      @default(AUTHORING) @map("task_mode")
   /// Annotation projects: number of task instances.
-  taskCount              Int?          @map("task_count")
+  taskCount               Int?          @map("task_count")
   /// Authoring projects: distinct-task target and per-expert cap.
-  distinctTarget         Int?          @map("distinct_target")
-  maxPerExpert           Int?          @map("max_per_expert")
-  openSlotShare          Decimal?      @map("open_slot_share") @db.Decimal(4, 3)
+  distinctTarget          Int?          @map("distinct_target")
+  maxPerExpert            Int?          @map("max_per_expert")
+  openSlotShare           Decimal?      @map("open_slot_share") @db.Decimal(4, 3)
   /// PM-raised coverage quotas (never below the template minimum).
-  coverageQuotas         Json?         @map("coverage_quotas")
-  tptMinutes             Int?          @map("tpt_minutes")
-  hoursPerWorkerDay      Decimal       @default(4) @map("hours_per_worker_day") @db.Decimal(4, 2)
-  startDate              DateTime?     @map("start_date") @db.Date
-  endDate                DateTime?     @map("end_date") @db.Date
-  requiredWorkers        Int?          @map("required_workers")
+  coverageQuotas          Json?         @map("coverage_quotas")
+  tptMinutes              Int?          @map("tpt_minutes")
+  hoursPerWorkerDay       Decimal       @default(4) @map("hours_per_worker_day") @db.Decimal(4, 2)
+  startDate               DateTime?     @map("start_date") @db.Date
+  endDate                 DateTime?     @map("end_date") @db.Date
+  requiredWorkers         Int?          @map("required_workers")
   /// Computed fields frozen at submit: tasks, requiredAuthors, totalEffortHours, workingDays, labourBudget.
-  figures                Json?
-  demographicsSnapshot   Json?         @map("demographics_snapshot")
-  autoLaunchCampaign     Boolean       @default(false) @map("auto_launch_campaign")
-  openTaskCapPerCandidate Int          @default(3) @map("open_task_cap_per_candidate")
-  submittedAt            DateTime?     @map("submitted_at")
-  createdAt              DateTime      @default(now()) @map("created_at")
-  updatedAt              DateTime      @updatedAt @map("updated_at")
+  figures                 Json?
+  demographicsSnapshot    Json?         @map("demographics_snapshot")
+  autoLaunchCampaign      Boolean       @default(false) @map("auto_launch_campaign")
+  openTaskCapPerCandidate Int           @default(3) @map("open_task_cap_per_candidate")
+  submittedAt             DateTime?     @map("submitted_at")
+  createdAt               DateTime      @default(now()) @map("created_at")
+  updatedAt               DateTime      @updatedAt @map("updated_at")
 
-  client             Client                    @relation(fields: [clientId], references: [id])
-  owner              User                      @relation("ProjectOwner", fields: [ownerId], references: [id])
-  template           Template                  @relation(fields: [templateId], references: [id])
-  jobDescription     JobDescription?           @relation(fields: [jobDescriptionId], references: [id])
-  jdSnapshot         JobDescriptionSnapshot?   @relation(fields: [jdSnapshotId], references: [id])
+  client             Client                     @relation(fields: [clientId], references: [id])
+  owner              User                       @relation("ProjectOwner", fields: [ownerId], references: [id])
+  template           Template                   @relation(fields: [templateId], references: [id])
+  jobDescription     JobDescription?            @relation(fields: [jobDescriptionId], references: [id])
+  jdSnapshot         JobDescriptionSnapshot?    @relation(fields: [jdSnapshotId], references: [id])
   demographicFilters ProjectDemographicFilter[]
   campaigns          Campaign[]
   assignments        ProjectAssignment[]
@@ -515,7 +515,7 @@ model Project {
   matches            ProjectMatch[]
   matchRejections    ProjectMatchRejection[]
   /// When the last FLOW 2 match run finished.
-  matchedAt          DateTime?                 @map("matched_at")
+  matchedAt          DateTime?                  @map("matched_at")
 
   @@unique([clientId, name])
   @@index([ownerId])
@@ -572,7 +572,7 @@ model Candidate {
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
 
-  smeUser      SmeUser                  @relation(fields: [smeUserId], references: [id])
+  smeUser      SmeUser                 @relation(fields: [smeUserId], references: [id])
   applications Application[]
   assignments  ProjectAssignment[]
   tasks        TaskInstance[]
@@ -770,50 +770,56 @@ model TaskInputBatch {
 }
 
 model TaskInstance {
-  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId            String             @map("client_id") @db.Uuid
-  projectId           String             @map("project_id") @db.Uuid
-  taskType            TaskType           @map("task_type")
-  slotId              String?            @map("slot_id") @db.Uuid
-  inputBatchId        String?            @map("input_batch_id") @db.Uuid
-  rlReviewRequestId   String?            @unique @map("rl_review_request_id") @db.Uuid
-  input               Json               @default("{}")
+  id                  String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId            String                      @map("client_id") @db.Uuid
+  projectId           String                      @map("project_id") @db.Uuid
+  taskType            TaskType                    @map("task_type")
+  slotId              String?                     @map("slot_id") @db.Uuid
+  inputBatchId        String?                     @map("input_batch_id") @db.Uuid
+  rlReviewRequestId   String?                     @unique @map("rl_review_request_id") @db.Uuid
+  input               Json                        @default("{}")
   output              Json?
-  status              TaskInstanceStatus @default(CREATED)
+  status              TaskInstanceStatus          @default(CREATED)
   /// Optimistic-concurrency revision for state changes.
-  revision            Int                @default(0)
-  assignedToId        String?            @map("assigned_to_id") @db.Uuid
-  projectAssignmentId String?            @map("project_assignment_id") @db.Uuid
-  assignedAt          DateTime?          @map("assigned_at")
-  startedAt           DateTime?          @map("started_at")
-  submittedAt         DateTime?          @map("submitted_at")
-  activeSeconds       Int                @default(0) @map("active_seconds")
-  reviewerId          String?            @map("reviewer_id") @db.Uuid
-  reviewNotes         String?            @map("review_notes")
-  reworkCount         Int                @default(0) @map("rework_count")
+  revision            Int                         @default(0)
+  assignedToId        String?                     @map("assigned_to_id") @db.Uuid
+  projectAssignmentId String?                     @map("project_assignment_id") @db.Uuid
+  assignedAt          DateTime?                   @map("assigned_at")
+  startedAt           DateTime?                   @map("started_at")
+  submittedAt         DateTime?                   @map("submitted_at")
+  activeSeconds       Int                         @default(0) @map("active_seconds")
+  reviewerId          String?                     @map("reviewer_id") @db.Uuid
+  reviewNotes         String?                     @map("review_notes")
+  reworkCount         Int                         @default(0) @map("rework_count")
   /// Final coverage: the slot's fixed tags plus the author's (open and edge-case slots). { tags, edgeCase }
-  coverageTags        Json?              @map("coverage_tags")
+  coverageTags        Json?                       @map("coverage_tags")
   /// Last automated check results (TASK-KYC section 5) and synthetic-data flags with the author's explanations.
   checks              Json?
   flags               Json?
-  rejectReason        TaskRejectReason?  @map("reject_reason")
+  rejectReason        TaskRejectReason?           @map("reject_reason")
   /// Content quarantined after a confirmed real-data finding; the output is removed and never enters the dataset.
-  quarantinedAt       DateTime?          @map("quarantined_at")
+  quarantinedAt       DateTime?                   @map("quarantined_at")
   /// Text embedding of the submitted task for near-duplicate search (pgvector, cosine).
   embedding           Unsupported("vector(768)")?
-  lastSavedAt         DateTime?          @map("last_saved_at")
-  createdAt           DateTime           @default(now()) @map("created_at")
-  updatedAt           DateTime           @updatedAt @map("updated_at")
+  lastSavedAt         DateTime?                   @map("last_saved_at")
+  /// M9 drafting state, kept server-side so autosave cannot change it: per section { runId, draftedAt, draftHash,
+  /// confirmedAt, editedAfterDraft }, plus the kinds of source used. Null for tasks written by hand.
+  drafting            Json?
+  createdAt           DateTime                    @default(now()) @map("created_at")
+  updatedAt           DateTime                    @updatedAt @map("updated_at")
 
   submissions       TaskSubmission[]
+  sources           TaskSource[]
+  interviewTurns    TaskInterviewTurn[]
+  draftRuns         TaskDraftRun[]
   reviews           TaskReview[]
-  project           Project            @relation(fields: [projectId], references: [id])
-  slot              CoverageSlot?      @relation(fields: [slotId], references: [id])
-  inputBatch        TaskInputBatch?    @relation(fields: [inputBatchId], references: [id])
-  rlReviewRequest   RLReviewRequest?   @relation(fields: [rlReviewRequestId], references: [id])
-  assignedTo        Candidate?         @relation(fields: [assignedToId], references: [id])
-  projectAssignment ProjectAssignment? @relation(fields: [projectAssignmentId], references: [id])
-  similarityChecks  SimilarityCheck[]  @relation("SimilaritySubject")
+  project           Project              @relation(fields: [projectId], references: [id])
+  slot              CoverageSlot?        @relation(fields: [slotId], references: [id])
+  inputBatch        TaskInputBatch?      @relation(fields: [inputBatchId], references: [id])
+  rlReviewRequest   RLReviewRequest?     @relation(fields: [rlReviewRequestId], references: [id])
+  assignedTo        Candidate?           @relation(fields: [assignedToId], references: [id])
+  projectAssignment ProjectAssignment?   @relation(fields: [projectAssignmentId], references: [id])
+  similarityChecks  SimilarityCheck[]    @relation("SimilaritySubject")
   approvedRecords   ApprovedTaskRecord[]
 
   @@index([projectId, status])
@@ -856,57 +862,60 @@ model Invite {
 
 /// RL Gym base table. Append-only; one per accepted TaskInstance (plus correction records via supersedesId).
 model ApprovedTaskRecord {
-  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   /// Chain order: assigned at insert while the chain lock is held (created_at is transaction start time).
-  seq                   BigInt    @unique @default(autoincrement())
-  schemaVersion         Int       @map("schema_version")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  contentHash           String    @map("content_hash")
-  prevHash              String?   @map("prev_hash")
-  supersedesId          String?   @map("supersedes_id") @db.Uuid
+  seq                   BigInt             @unique @default(autoincrement())
+  schemaVersion         Int                @map("schema_version")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  contentHash           String             @map("content_hash")
+  prevHash              String?            @map("prev_hash")
+  supersedesId          String?            @map("supersedes_id") @db.Uuid
   // Task
-  taskInstanceId        String    @map("task_instance_id") @db.Uuid
-  taskMode              TaskType  @map("task_mode")
+  taskInstanceId        String             @map("task_instance_id") @db.Uuid
+  taskMode              TaskType           @map("task_mode")
   input                 Json
   output                Json
-  activeSeconds         Int       @map("active_seconds")
-  submittedAt           DateTime  @map("submitted_at")
+  activeSeconds         Int                @map("active_seconds")
+  submittedAt           DateTime           @map("submitted_at")
   // Diversity
-  slotId                String?   @map("slot_id") @db.Uuid
-  coverageTags          Json?     @map("coverage_tags")
-  isOpenSlot            Boolean   @default(false) @map("is_open_slot")
-  nearestDuplicateId    String?   @map("nearest_duplicate_id") @db.Uuid
-  nearestDuplicateScore Decimal?  @map("nearest_duplicate_score") @db.Decimal(5, 4)
-  authorTaskIndex       Int?      @map("author_task_index")
+  slotId                String?            @map("slot_id") @db.Uuid
+  coverageTags          Json?              @map("coverage_tags")
+  isOpenSlot            Boolean            @default(false) @map("is_open_slot")
+  nearestDuplicateId    String?            @map("nearest_duplicate_id") @db.Uuid
+  nearestDuplicateScore Decimal?           @map("nearest_duplicate_score") @db.Decimal(5, 4)
+  authorTaskIndex       Int?               @map("author_task_index")
   // Input provider (annotation)
-  inputSource           InputSource? @map("input_source")
-  inputBatchId          String?   @map("input_batch_id") @db.Uuid
-  uploadedById          String?   @map("uploaded_by_id") @db.Uuid
-  apiClientId           String?   @map("api_client_id") @db.Uuid
+  inputSource           InputSource?       @map("input_source")
+  inputBatchId          String?            @map("input_batch_id") @db.Uuid
+  uploadedById          String?            @map("uploaded_by_id") @db.Uuid
+  apiClientId           String?            @map("api_client_id") @db.Uuid
   // Worker
-  candidateId           String    @map("candidate_id") @db.Uuid
-  identityRef           String?   @map("identity_ref")
-  projectAssignmentId   String?   @map("project_assignment_id") @db.Uuid
-  qualificationSnapshot Json?     @map("qualification_snapshot")
+  candidateId           String             @map("candidate_id") @db.Uuid
+  identityRef           String?            @map("identity_ref")
+  projectAssignmentId   String?            @map("project_assignment_id") @db.Uuid
+  qualificationSnapshot Json?              @map("qualification_snapshot")
   // Reviewer
-  reviewerId            String    @map("reviewer_id") @db.Uuid
-  reviewDecisionAt      DateTime  @map("review_decision_at")
-  reviewNotes           String?   @map("review_notes")
-  reworkCount           Int       @default(0) @map("rework_count")
+  reviewerId            String             @map("reviewer_id") @db.Uuid
+  reviewDecisionAt      DateTime           @map("review_decision_at")
+  reviewNotes           String?            @map("review_notes")
+  reworkCount           Int                @default(0) @map("rework_count")
   duplicateDecision     DuplicateDecision? @map("duplicate_decision")
   // Context
-  clientId              String    @map("client_id") @db.Uuid
-  projectId             String    @map("project_id") @db.Uuid
-  templateId            String    @map("template_id") @db.Uuid
-  templateVersion       Int       @map("template_version")
+  clientId              String             @map("client_id") @db.Uuid
+  projectId             String             @map("project_id") @db.Uuid
+  templateId            String             @map("template_id") @db.Uuid
+  templateVersion       Int                @map("template_version")
   domain                String
   workflow              String
-  jdSnapshotId          String?   @map("jd_snapshot_id") @db.Uuid
+  jdSnapshotId          String?            @map("jd_snapshot_id") @db.Uuid
   // Consent
-  workerTermsVersion    String?   @map("worker_terms_version")
+  workerTermsVersion    String?            @map("worker_terms_version")
+  /// M9: how the task was made (source kinds and SHA-256, interview, draft runs, confirmed sections, MCP catalog
+  /// version). Never source content. Covered by the content hash only when present, so older records verify unchanged.
+  provenance            Json?
 
-  taskInstance TaskInstance        @relation(fields: [taskInstanceId], references: [id])
-  supersedes   ApprovedTaskRecord? @relation("Supersedes", fields: [supersedesId], references: [id])
+  taskInstance TaskInstance         @relation(fields: [taskInstanceId], references: [id])
+  supersedes   ApprovedTaskRecord?  @relation("Supersedes", fields: [supersedesId], references: [id])
   supersededBy ApprovedTaskRecord[] @relation("Supersedes")
 
   @@index([createdAt])
@@ -969,17 +978,17 @@ model RLReviewRecord {
 /// Seeded, Admin-editable FLOW 4 failure reason codes.
 /// Delivery of an RLReviewRecord to RL Gym (signed webhook with retries). Kept apart so the record stays append-only.
 model RLResultDelivery {
-  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId      String             @map("client_id") @db.Uuid
-  recordId      String             @unique @map("record_id") @db.Uuid
-  status        RLDeliveryStatus   @default(PENDING)
-  attempts      Int                @default(0)
-  lastStatus    Int?               @map("last_status")
-  lastError     String?            @map("last_error")
-  lastAttemptAt DateTime?          @map("last_attempt_at")
-  deliveredAt   DateTime?          @map("delivered_at")
-  createdAt     DateTime           @default(now()) @map("created_at")
-  updatedAt     DateTime           @updatedAt @map("updated_at")
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String           @map("client_id") @db.Uuid
+  recordId      String           @unique @map("record_id") @db.Uuid
+  status        RLDeliveryStatus @default(PENDING)
+  attempts      Int              @default(0)
+  lastStatus    Int?             @map("last_status")
+  lastError     String?          @map("last_error")
+  lastAttemptAt DateTime?        @map("last_attempt_at")
+  deliveredAt   DateTime?        @map("delivered_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
 }
 
 enum RLDeliveryStatus {
@@ -1174,19 +1183,19 @@ model AlternativeIdentityCheck {
 
 /// The project's SME pool. Each project publishes one pool.
 model Opportunity {
-  id        String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId  String            @map("client_id") @db.Uuid
-  projectId String            @unique @map("project_id") @db.Uuid
-  status    OpportunityStatus @default(DRAFT)
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId            String            @map("client_id") @db.Uuid
+  projectId           String            @unique @map("project_id") @db.Uuid
+  status              OpportunityStatus @default(DRAFT)
   /// Working copy the owner edits; publishing freezes it into a new OpportunityVersion.
-  draftBrief    Json?         @map("draft_brief")
-  draftCriteria Json?         @map("draft_criteria")
+  draftBrief          Json?             @map("draft_brief")
+  draftCriteria       Json?             @map("draft_criteria")
   /// Owner-edited question policy; when null, publishing generates the default from the brief and criteria.
-  draftQuestionPolicy Json?   @map("draft_question_policy")
-  createdAt DateTime          @default(now()) @map("created_at")
-  updatedAt DateTime          @updatedAt @map("updated_at")
+  draftQuestionPolicy Json?             @map("draft_question_policy")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
 
-  project     Project                @relation(fields: [projectId], references: [id])
+  project     Project               @relation(fields: [projectId], references: [id])
   versions    OpportunityVersion[]
   enrollments Enrollment[]
   documents   OpportunityDocument[]
@@ -1264,18 +1273,18 @@ model Enrollment {
   createdAt            DateTime         @default(now()) @map("created_at")
   updatedAt            DateTime         @updatedAt @map("updated_at")
 
-  smeUser            SmeUser                 @relation(fields: [smeUserId], references: [id])
-  opportunity        Opportunity             @relation(fields: [opportunityId], references: [id])
-  opportunityVersion OpportunityVersion      @relation(fields: [opportunityVersionId], references: [id])
-  profileVersion     ProfileVersion?         @relation("EnrollmentProfile", fields: [profileVersionId], references: [id])
-  conversation       ConversationSession?
-  assessments        SuitabilityAssessment[]
-  decisions          SelectionDecision[]
+  smeUser             SmeUser                 @relation(fields: [smeUserId], references: [id])
+  opportunity         Opportunity             @relation(fields: [opportunityId], references: [id])
+  opportunityVersion  OpportunityVersion      @relation(fields: [opportunityVersionId], references: [id])
+  profileVersion      ProfileVersion?         @relation("EnrollmentProfile", fields: [profileVersionId], references: [id])
+  conversation        ConversationSession?
+  assessments         SuitabilityAssessment[]
+  decisions           SelectionDecision[]
   qualificationScopes QualificationScope[]
-  onboarding         OnboardingChecklist?
-  assignments        SmeAssignment[]
-  applications       Application[]
-  projectAssignments ProjectAssignment[]
+  onboarding          OnboardingChecklist?
+  assignments         SmeAssignment[]
+  applications        Application[]
+  projectAssignments  ProjectAssignment[]
 
   @@unique([smeUserId, opportunityId])
 }
@@ -1296,25 +1305,25 @@ model ConversationSession {
 }
 
 model ConversationTurn {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId        String    @map("client_id") @db.Uuid
-  sessionId       String    @map("session_id") @db.Uuid
-  clientMessageId String    @map("client_message_id")
-  sequence        Int
-  speaker         Speaker
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId         String    @map("client_id") @db.Uuid
+  sessionId        String    @map("session_id") @db.Uuid
+  clientMessageId  String    @map("client_message_id")
+  sequence         Int
+  speaker          Speaker
   /// Stored text. For a message flagged as sensitive this is the redacted copy only; the original is never kept.
-  content         String
-  redacted        Boolean   @default(false)
-  sensitiveKinds  String[]  @map("sensitive_kinds")
-  questionId      String?   @map("question_id")
+  content          String
+  redacted         Boolean   @default(false)
+  sensitiveKinds   String[]  @map("sensitive_kinds")
+  questionId       String?   @map("question_id")
   /// Candidate turns: NONE (quick reply), PENDING, DONE, FAILED (model error; retryable), SKIPPED (sensitive).
-  extractionStatus String   @default("NONE") @map("extraction_status")
-  acknowledgedAt  DateTime? @map("acknowledged_at")
-  schemaVersion   String?   @map("schema_version")
-  modelVersion    String?   @map("model_version")
-  policyVersion   String?   @map("policy_version")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  extractionStatus String    @default("NONE") @map("extraction_status")
+  acknowledgedAt   DateTime? @map("acknowledged_at")
+  schemaVersion    String?   @map("schema_version")
+  modelVersion     String?   @map("model_version")
+  policyVersion    String?   @map("policy_version")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   session ConversationSession @relation(fields: [sessionId], references: [id])
 
@@ -1324,21 +1333,21 @@ model ConversationTurn {
 
 /// Immutable once submitted; amendments create a new version.
 model ProfileVersion {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId    String    @map("client_id") @db.Uuid
-  smeUserId   String    @map("sme_user_id") @db.Uuid
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String    @map("client_id") @db.Uuid
+  smeUserId    String    @map("sme_user_id") @db.Uuid
   /// The enrollment this version was built for (each pool keeps its own snapshot; FLOW2 section 2).
-  enrollmentId String?  @map("enrollment_id") @db.Uuid
-  version     Int
-  data        Json
+  enrollmentId String?   @map("enrollment_id") @db.Uuid
+  version      Int
+  data         Json
   /// Precision / unknown flags per field.
-  flags       Json      @default("{}")
+  flags        Json      @default("{}")
   /// Field -> source turn / evidence ids.
-  sourceLinks Json      @default("{}") @map("source_links")
-  contentHash String    @map("content_hash")
-  submittedAt DateTime? @map("submitted_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  sourceLinks  Json      @default("{}") @map("source_links")
+  contentHash  String    @map("content_hash")
+  submittedAt  DateTime? @map("submitted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   smeUser     SmeUser             @relation(fields: [smeUserId], references: [id])
   enrollments Enrollment[]        @relation("EnrollmentProfile")
@@ -1349,21 +1358,21 @@ model ProfileVersion {
 }
 
 model ExperienceEpisode {
-  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId         String            @map("client_id") @db.Uuid
-  profileVersionId String            @map("profile_version_id") @db.Uuid
-  startMonth       String?           @map("start_month") // YYYY-MM
-  endMonth         String?           @map("end_month") // YYYY-MM, null = current
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId         String        @map("client_id") @db.Uuid
+  profileVersionId String        @map("profile_version_id") @db.Uuid
+  startMonth       String?       @map("start_month") // YYYY-MM
+  endMonth         String?       @map("end_month") // YYYY-MM, null = current
   precision        DatePrecision
   domain           String?
   specialty        String?
   role             String?
   responsibility   String?
-  employerScope    String?           @map("employer_scope")
-  contributionMode String?           @map("contribution_mode")
-  sourceTurnIds    String[]          @map("source_turn_ids")
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
+  employerScope    String?       @map("employer_scope")
+  contributionMode String?       @map("contribution_mode")
+  sourceTurnIds    String[]      @map("source_turn_ids")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
 
   profileVersion ProfileVersion @relation(fields: [profileVersionId], references: [id])
 }
@@ -1392,22 +1401,22 @@ model CredentialClaim {
 
 /// Private storage only; no public access.
 model EvidenceArtifact {
-  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId           String    @map("client_id") @db.Uuid
-  smeUserId          String    @map("sme_user_id") @db.Uuid
-  storageKey         String    @unique @map("storage_key")
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId            String    @map("client_id") @db.Uuid
+  smeUserId           String    @map("sme_user_id") @db.Uuid
+  storageKey          String    @unique @map("storage_key")
   /// Sanitised display name; the storage key never contains user input.
-  filename           String    @default("")
-  sha256             String
-  mimeType           String    @map("mime_type")
-  sizeBytes          Int       @map("size_bytes")
-  permissionGranted  Boolean   @default(false) @map("permission_granted")
-  redactionStatus    String    @default("NONE") @map("redaction_status")
-  scanStatus         String    @default("PENDING") @map("scan_status")
-  retentionCategory  String    @map("retention_category")
+  filename            String    @default("")
+  sha256              String
+  mimeType            String    @map("mime_type")
+  sizeBytes           Int       @map("size_bytes")
+  permissionGranted   Boolean   @default(false) @map("permission_granted")
+  redactionStatus     String    @default("NONE") @map("redaction_status")
+  scanStatus          String    @default("PENDING") @map("scan_status")
+  retentionCategory   String    @map("retention_category")
   deletionRequestedAt DateTime? @map("deletion_requested_at")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   smeUser SmeUser           @relation(fields: [smeUserId], references: [id])
   claims  CredentialClaim[]
@@ -1489,7 +1498,7 @@ model OnboardingChecklist {
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
-  enrollment      Enrollment                  @relation(fields: [enrollmentId], references: [id])
+  enrollment       Enrollment                  @relation(fields: [enrollmentId], references: [id])
   acknowledgements OnboardingAcknowledgement[]
 }
 
@@ -1596,19 +1605,108 @@ model ProjectReviewer {
 
 /// Admin-published contributor terms (FLOW2 C07: never invented). Candidates accept a specific version by hash.
 model TermsDocument {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId    String    @map("client_id") @db.Uuid
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
   /// contributor | confidentiality_ip | data_use
-  key         String
-  version     Int
-  title       String
-  body        String
-  sha256      String
+  key           String
+  version       Int
+  title         String
+  body          String
+  sha256        String
   /// Seeded stand-in text for local development; production refuses onboarding while any is in use.
-  placeholder Boolean   @default(false)
-  publishedById String? @map("published_by_id") @db.Uuid
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  placeholder   Boolean  @default(false)
+  publishedById String?  @map("published_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@unique([clientId, key, version])
+}
+
+// ───────────────────────── M9 task drafting (docs/TASK-DRAFTING.md) ─────────────────────────
+
+enum TaskSourceKind {
+  DOCUMENT
+  TRANSCRIPT
+}
+
+/// A document or interview transcript an author uploaded to draft from. Private to the task: the author, the
+/// project's Reviewers and Admins can open it; it never enters the Approved Task Dataset (only its SHA-256 does).
+model TaskSource {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String         @map("client_id") @db.Uuid
+  taskInstanceId String         @map("task_instance_id") @db.Uuid
+  kind           TaskSourceKind
+  /// Sanitised display name; the storage key never contains user input.
+  fileName       String         @map("file_name")
+  contentType    String         @map("content_type")
+  sizeBytes      Int            @map("size_bytes")
+  sha256         String
+  storageKey     String         @unique @map("storage_key")
+  textChars      Int            @map("text_chars")
+  /// Likely real identifiers found in the extracted text: [{ kind, excerpt, line }].
+  scanFlags      Json           @default("[]") @map("scan_flags")
+  scanStatus     String         @default("PENDING") @map("scan_status")
+  uploadedById   String         @map("uploaded_by_id") @db.Uuid
+  deletedAt      DateTime?      @map("deleted_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  task TaskInstance @relation(fields: [taskInstanceId], references: [id])
+
+  @@index([taskInstanceId])
+}
+
+/// The in-workbench AI interview: one row per question asked and per answer given.
+model TaskInterviewTurn {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String   @map("client_id") @db.Uuid
+  taskInstanceId  String   @map("task_instance_id") @db.Uuid
+  seq             Int
+  speaker         String
+  questionId      String   @map("question_id")
+  content         String
+  /// Sensitive content was removed before storing (as in the profile chat).
+  redacted        Boolean  @default(false)
+  clientMessageId String?  @map("client_message_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  task TaskInstance @relation(fields: [taskInstanceId], references: [id])
+
+  @@unique([taskInstanceId, seq])
+  @@unique([taskInstanceId, clientMessageId])
+}
+
+enum TaskDraftRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/// One request to draft all of W01–W05, or one section, from the task's sources and interview.
+model TaskDraftRun {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String             @map("client_id") @db.Uuid
+  taskInstanceId String             @map("task_instance_id") @db.Uuid
+  /// W01–W05, or null for all sections.
+  section        String?
+  instruction    String?
+  status         TaskDraftRunStatus @default(QUEUED)
+  sourceIds      String[]           @map("source_ids")
+  interviewTurns Int                @default(0) @map("interview_turns")
+  model          String?
+  promptVersion  String             @map("prompt_version")
+  /// Sections actually written, and validation problems that were repaired or caused failure.
+  sections       String[]           @default([])
+  problems       Json               @default("[]")
+  /// What the drafter assumed or could not fill, shown to the author.
+  notes          String?
+  error          String?
+  requestedById  String             @map("requested_by_id") @db.Uuid
+  startedAt      DateTime?          @map("started_at")
+  finishedAt     DateTime?          @map("finished_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  task TaskInstance @relation(fields: [taskInstanceId], references: [id])
+
+  @@index([taskInstanceId, createdAt])
 }

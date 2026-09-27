@@ -65,3 +65,10 @@ export function detectSensitive(text: string, opts: { allowEmails?: string[] } =
   }
   return { flagged: kinds.size > 0, kinds: [...kinds], redacted };
 }
+
+/** The matched values themselves (kind and text), for callers that must keep them out of generated content. */
+export function findSensitive(text: string): { kind: string; value: string }[] {
+  const out: { kind: string; value: string }[] = [];
+  for (const rule of RULES) for (const m of text.matchAll(rule.re)) if (!rule.check || rule.check(m[0])) out.push({ kind: rule.kind, value: m[0] });
+  return out;
+}

@@ -10,6 +10,7 @@ export const DOMAIN_EVENTS = [
   'task.reclaimed',
   'task.accepted',
   'task.duplicate_flagged',
+  'task.draft.requested',
   'slot.filled',
   'rl_review.requested',
   'rl_review.completed',

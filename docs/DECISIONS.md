@@ -150,3 +150,24 @@ privately with the task (never in the dataset); build M9 before the tester packa
   X-Frame-Options DENY, nosniff, a referrer policy and a permissions policy, and no longer send X-Powered-By. API
   responses add nosniff, DENY, no-referrer, `default-src 'none'` and `Cache-Control: no-store` (Swagger UI at /docs
   keeps its scripts). A nonce-based CSP without 'unsafe-inline' is left for later.
+
+## Tester package, defect process and test environment (owner request, 27 Sep 2026)
+Owner choices: agent pull requests need a human merge; a separate test environment with real Claude on Vertex.
+- **(chosen by Claude)** Test environment `adi-praxis-test-0928` ("ADI Praxis Test") is the demo deployment with
+  `PRAXIS_VERTEX=1`: real Claude and embeddings; simulated Google sign-in, identity check and email (testers cannot use
+  real identity checks). The banner says "Test environment" and shows the build.
+- **(chosen by Claude)** Test cases live as data (`docs/testing/data/*.mjs`); `node docs/testing/build.mjs` generates
+  the Markdown, the CSV (UTF-8 with BOM for Excel), the decision register and the API reference, and fails on unknown
+  decision ids.
+- **(chosen by Claude)** Proposed performance targets for testing (the SPEC only fixes the 2 s match): LCP ≤ 2.5 s on
+  broadband and ≤ 4 s on Fast 4G; saves and decisions ≤ 2 s; W06 checks ≤ 5 s; chat reply ≤ 15 s; full draft ≤ 90 s;
+  one section ≤ 45 s; pages ≤ 1.5 MB.
+- **(chosen by Claude)** Nightly schedule in IST: agent 01:00, build and deploy 02:00, only if `main` changed; testers
+  avoid 01:45–02:30. At most 5 issues per night, two at a time.
+- **(chosen by Claude)** Agent pull requests say `Issue: #N` (not "Fixes") so issues stay open until a tester comments
+  `/verified`; `/failed` reopens. The agent authenticates to Vertex with its own service account that can only call
+  Vertex AI; the deployer account can build and deploy but not read data.
+- **(chosen by Claude)** Security findings go to private GitHub advisories and are never given to the agent.
+- **(chosen by Claude)** Found while writing the tests and fixed: an Admin could remove their own Admin role (now
+  refused, like disabling yourself); Indian mobile numbers (+91 98765 43210) were not detected by the sensitive-data
+  and synthetic-data scans (now detected).

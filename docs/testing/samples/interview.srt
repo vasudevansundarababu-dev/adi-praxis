@@ -1,0 +1,11 @@
+1
+00:00:01,000 --> 00:00:05,000
+Interviewer: What would a junior analyst miss on a periodic refresh?
+
+2
+00:00:05,500 --> 00:00:16,000
+Expert: They check that the documents are in date and stop there. They miss that a new shareholder came in through a nominee, so the real owner changed.
+
+3
+00:00:16,500 --> 00:00:26,000
+Expert: The registry shows a nominee company with 30 percent. You have to ask who stands behind the nominee before you can rate the risk.

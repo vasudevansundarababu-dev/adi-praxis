@@ -1,0 +1,6 @@
+Case notes (TEST FILE: every value below is a public example or made up, but formatted like real data so the scanner must flag it).
+The customer paid from IBAN GB82 WEST 1234 5698 7654 32 last year.
+Their PAN was ABCDE1234F and the Aadhaar number given was 2345 6789 0123.
+Contact the relationship manager at ops@realbank.co.in or +91 98765 43210.
+Card on file 4111 1111 1111 1111.
+The rest of this note is about procedure: always check the registry filing date and resolve owners above 25 percent.

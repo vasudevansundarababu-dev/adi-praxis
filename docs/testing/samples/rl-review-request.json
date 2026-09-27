@@ -1,0 +1,19 @@
+{
+  "rl_run_id": "tester-run-REPLACE-WITH-YOUR-INITIALS-AND-DATE",
+  "rl_task_id": "task-001",
+  "source_record_ids": ["REPLACE-WITH-AN-ACCEPTED-DATASET-RECORD-ID"],
+  "eval_results": [
+    { "metric": "identifies_beneficial_owner", "score": 0, "passed": false, "details": "The agent did not name the settlor." },
+    { "metric": "escalates_high_risk", "score": 1, "passed": true },
+    { "metric": "clears_near_match_on_dob", "score": 1, "passed": true }
+  ],
+  "trajectories": {
+    "steps": [
+      { "index": 0, "action": "tool", "tool": "registry_lookup", "input": { "companyNumber": "SYN-889201" }, "output": "Holding company; filing 2021-03-01" },
+      { "index": 1, "action": "tool", "tool": "sanctions_pep_screening", "input": { "name": "Soren Dunmore", "dateOfBirth": "1964-11-02" }, "output": "Near match, different date of birth" },
+      { "index": 2, "action": "reasoning", "thought": "Ownership resolved; no beneficial owner above 25 percent." },
+      { "index": 3, "action": "final", "output": "Escalate as high risk" }
+    ]
+  },
+  "priority": 10
+}

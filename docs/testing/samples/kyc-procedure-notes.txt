@@ -1,0 +1,10 @@
+My own notes on onboarding corporate customers (written for training juniors; no customer names).
+
+1. Start with the registry. Check the latest annual filing date. A filing more than 18 months old is stale: request an updated filing before going further.
+2. Resolve ownership layer by layer until you reach people. Anyone holding 25 percent or more, directly or through holding companies or trusts, is a beneficial owner.
+3. Trusts: the settlor, trustees and any protector exercise control. If the settlor also sits on the board of the customer, treat that as circular control and note it.
+4. Screen every director, beneficial owner, trustee and signatory against sanctions and PEP lists. A near match is cleared only on date of birth plus one other identifier, never on name alone.
+5. Addresses: a registered office at a virtual office provider is not on its own a reason to decline, but it raises risk when combined with layered ownership.
+6. Rate risk. Layered ownership through a trust plus any unresolved near match is high risk.
+7. The analyst recommends; an authorised approver decides. High risk always goes to the approver with the findings listed.
+Common junior mistakes: approving because each document looks fine on its own; missing the settlor as a beneficial owner; clearing a near match on name spelling.

@@ -52,6 +52,11 @@ export function ProjectSummary({
         The job description, demographics and template version were frozen at submit; later edits to them don’t change this project.
         {template && template.status === 'RETIRED' ? ' This template has since been retired.' : ''}
       </p>
+      {['READY_FOR_STAFFING', 'STAFFING', 'STAFFED'].includes(p.status) && (
+        <Link href={`/projects/${p.id}/staffing`} className="mt-6 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary">
+          {p.status === 'READY_FOR_STAFFING' ? 'Start staffing' : 'Resource assignment'}
+        </Link>
+      )}
       {CANCELLABLE_STATUSES.includes(p.status) && <CancelProjectButton projectId={p.id} />}
     </div>
   );

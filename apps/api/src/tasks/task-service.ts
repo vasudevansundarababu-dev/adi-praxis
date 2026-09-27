@@ -7,6 +7,8 @@ import type { TemplateRef } from './definitions';
 
 type Audit = (i: Parameters<typeof writeAudit>[2]) => Promise<void>;
 export const WORKABLE_PROJECT = ['STAFFING', 'STAFFED', 'IN_PROGRESS'] as const;
+/** Expert work; RL_REVIEW tasks (FLOW 4) belong to internal Reviewers and never mix with project work. */
+export const EXPERT_TASK_TYPES = { in: ['AUTHORING', 'ANNOTATION'] as ('AUTHORING' | 'ANNOTATION')[] };
 
 export async function templateRef(tx: Db | Tx, templateId: string): Promise<TemplateRef> {
   const t = await tx.template.findUniqueOrThrow({ where: { id: templateId }, include: { domain: true } });
@@ -106,7 +108,7 @@ export async function allocateTasks(tx: Tx, args: { projectId: string; candidate
     }
   } else {
     const queued = await tx.$queryRaw<{ id: string }[]>`
-      SELECT id FROM "TaskInstance" WHERE project_id = ${p.id}::uuid AND status = 'CREATED' AND assigned_to_id IS NULL
+      SELECT id FROM "TaskInstance" WHERE project_id = ${p.id}::uuid AND task_type = 'ANNOTATION' AND status = 'CREATED' AND assigned_to_id IS NULL
       ORDER BY created_at, id LIMIT ${room} FOR UPDATE SKIP LOCKED`;
     for (const q of queued) {
       issued.push(await tx.taskInstance.update({ where: { id: q.id }, data: { status: 'ASSIGNED', assignedToId: args.candidateId, projectAssignmentId: pa.id, assignedAt: now, revision: { increment: 1 } } }));
@@ -123,7 +125,7 @@ export async function allocateTasks(tx: Tx, args: { projectId: string; candidate
 export async function markInProgressIfStarted(tx: Tx, projectId: string, audit: Audit) {
   const p = await tx.project.findUniqueOrThrow({ where: { id: projectId } });
   if (p.status !== 'STAFFED') return false;
-  const started = await tx.taskInstance.count({ where: { projectId, status: { not: 'CREATED' } } });
+  const started = await tx.taskInstance.count({ where: { projectId, taskType: EXPERT_TASK_TYPES, status: { not: 'CREATED' } } });
   if (!started) return false;
   const { count } = await tx.project.updateMany({ where: { id: projectId, status: 'STAFFED' }, data: { status: 'IN_PROGRESS' } });
   if (count) await audit({ entityType: 'Project', entityId: projectId, action: 'project.started', before: { status: 'STAFFED' }, after: { status: 'IN_PROGRESS' } });
@@ -135,7 +137,7 @@ export async function markInProgressIfStarted(tx: Tx, projectId: string, audit: 
  * and the author's draft is cleared. TPT alone never expires a task.
  */
 export async function reclaimTask(tx: Tx, args: { projectId: string; taskId: string; reason: string; note?: string }, audit: Audit) {
-  const t = await tx.taskInstance.findFirst({ where: { id: args.taskId, projectId: args.projectId } });
+  const t = await tx.taskInstance.findFirst({ where: { id: args.taskId, projectId: args.projectId, taskType: EXPERT_TASK_TYPES } });
   if (!t) throw notFound('Task not found');
   if (!['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(t.status)) throw new AppError(409, 'NOT_RECLAIMABLE', `A ${t.status.toLowerCase()} task cannot be reclaimed.`);
   const { count } = await tx.taskInstance.updateMany({

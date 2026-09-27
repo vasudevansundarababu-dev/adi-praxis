@@ -11,7 +11,7 @@ import { AppError, badRequest, notFound } from '../lib/errors';
 import { runCommand, runStaffOrServiceCommand } from '../platform/command';
 import { definitionFor } from '../tasks/definitions';
 import { createInvite, sendInvite } from '../tasks/invites';
-import { reclaimTask, templateRef } from '../tasks/task-service';
+import { EXPERT_TASK_TYPES, reclaimTask, templateRef } from '../tasks/task-service';
 import { loadProject } from './projects';
 
 const IdParams = z.object({ id: z.string().uuid() });
@@ -58,7 +58,7 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
     async (req) => {
       const p = await loadProject(db, req.params.id, req.actor!);
       const tasks = await db.taskInstance.findMany({
-        where: { projectId: p.id, ...(req.query.status ? { status: req.query.status } : {}) },
+        where: { projectId: p.id, taskType: EXPERT_TASK_TYPES, ...(req.query.status ? { status: req.query.status } : {}) },
         include: { assignedTo: { include: { smeUser: true } } },
         orderBy: [{ status: 'asc' }, { assignedAt: 'asc' }],
         take: 2000,

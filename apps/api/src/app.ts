@@ -31,6 +31,7 @@ import { journeyRoutes } from './routes/journey';
 import { taskRoutes } from './routes/tasks';
 import { taskReviewRoutes } from './routes/task-review';
 import { datasetRoutes } from './routes/dataset';
+import { rlRoutes } from './routes/rl';
 import { workRoutes } from './routes/work';
 import { MemoryEmailSender, SmtpEmailSender, type EmailSender } from './lib/email';
 import { HashingEmbeddingProvider, VertexEmbeddingProvider, type EmbeddingProvider } from './tasks/embeddings';
@@ -200,6 +201,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
       await v1.register(taskReviewRoutes, { db: deps.db });
       await v1.register(datasetRoutes, { db: deps.db });
+      await v1.register(rlRoutes, { db: deps.db });
       await v1.register(taskRoutes, { db: deps.db, config: deps.config, email: deps.email ?? defaultEmail(deps.config) });
       await v1.register(candidateAuthRoutes, {
         db: deps.db,

@@ -12,7 +12,13 @@ import { defaultHandlers } from '../src/outbox/handlers';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { parseCsv } from '../src/routes/tasks';
-import { runChainVerification, verifyApprovedChain } from '../src/dataset/verify';
+import { runChainVerification, verifyApprovedChain, verifyRlChain } from '../src/dataset/verify';
+import { createServer, type IncomingMessage } from 'node:http';
+import { createHmac } from 'node:crypto';
+import { createDomainEventsQueue, createDomainEventsWorker, startOutboxPoller } from '../src/outbox/dispatcher';
+import { redisConnection } from '../src/lib/redis';
+import { WebhookRlGymClient } from '../src/rl/rl-gym';
+import { TEST_REDIS_URL } from './env';
 import { KYC_EXAMPLE_TASK } from '@praxis/shared';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
@@ -745,6 +751,166 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
         expect((await get(pm, '/dataset/records')).statusCode).toBe(403);
         expect((await app.inject({ method: 'GET', url: '/api/v1/dataset/records' })).statusCode).toBe(401);
         expect((await app.inject({ method: 'POST', url: `/api/v1/dataset/records/${records[0]!.id}/corrections`, headers: { authorization: `Bearer ${rl}`, ...idem() }, payload: { reason: 'x' } })).statusCode).toBe(401);
+      });
+
+      describe('M7 FLOW 4: RL Gym result review', () => {
+        const SECRET = 'rl-gym-test-secret-0123456789abcdef-xyz';
+        /** A stand-in for RL Gym: verifies the signature, records deliveries and can fail on demand. */
+        function mockRlGym() {
+          const received: { body: unknown; valid: boolean; eventId: string }[] = [];
+          const state = { failNext: 0 };
+          const server = createServer((req: IncomingMessage, res) => {
+            let raw = '';
+            req.on('data', (c) => (raw += c));
+            req.on('end', () => {
+              const sig = String(req.headers['x-praxis-signature'] ?? '');
+              const [, t, v1] = sig.match(/^t=(\d+),v1=([a-f0-9]{64})$/) ?? [];
+              const valid = !!t && createHmac('sha256', SECRET).update(`${t}.${raw}`).digest('hex') === v1 && Math.abs(Date.now() / 1000 - Number(t)) < 300;
+              if (state.failNext > 0) {
+                state.failNext--;
+                res.writeHead(503).end();
+                return;
+              }
+              received.push({ body: JSON.parse(raw), valid, eventId: String(req.headers['x-praxis-event-id']) });
+              res.writeHead(valid ? 200 : 401).end();
+            });
+          });
+          return new Promise<{ url: string; received: typeof received; state: typeof state; close: () => Promise<void> }>((resolve) =>
+            server.listen(0, '127.0.0.1', () => {
+              const port = (server.address() as { port: number }).port;
+              resolve({ url: `http://127.0.0.1:${port}/praxis/results`, received, state, close: () => new Promise((r) => server.close(() => r())) });
+            }),
+          );
+        }
+        async function rlKey() {
+          return (await post(admin, '/api-clients', { name: 'RL Gym', kind: 'RL_GYM' })).json().key as string;
+        }
+        const request = (key: string, body: object) => app.inject({ method: 'POST', url: '/api/v1/integrations/rl-gym/review-requests', headers: { authorization: `Bearer ${key}`, ...idem() }, payload: body });
+        const reqBody = (sourceIds: string[], extra: object = {}) => ({
+          rl_run_id: 'run-42',
+          rl_task_id: 'task-7',
+          source_record_ids: sourceIds,
+          eval_results: [
+            { metric: 'correct_disposition', score: 0, passed: false },
+            { metric: 'escalated', score: 1, passed: true },
+          ],
+          trajectories: { steps: [{ index: 0, action: 'registry_lookup', tool: 'registry_lookup' }, { index: 1, action: 'approve account' }] },
+          priority: 5,
+          due_by: '2026-10-10T12:00:00.000Z',
+          ...extra,
+        });
+
+        it('a review request creates exactly one RL_REVIEW task; a duplicate creates none', async () => {
+          const { projectId, records } = await acceptedRecords(1);
+          const key = await rlKey();
+          const first = await request(key, reqBody([records[0]!.id]));
+          expect(first.statusCode, first.body).toBe(201);
+          const again = await request(key, reqBody([records[0]!.id]));
+          expect(again.json()).toMatchObject({ id: first.json().id, taskId: first.json().taskId, duplicate: true });
+          expect(await db.rLReviewRequest.count()).toBe(1);
+          expect(await db.taskInstance.count({ where: { taskType: 'RL_REVIEW' } })).toBe(1);
+          expect((await request(key, reqBody(['00000000-0000-4000-8000-000000000000'], { rl_task_id: 'x' }))).json().error).toBe('UNKNOWN_SOURCE_RECORDS');
+          const client = (await post(admin, '/api-clients', { name: 'Client', kind: 'CLIENT_API' })).json().key;
+          expect((await request(client, reqBody([records[0]!.id], { rl_task_id: 'y' }))).statusCode).toBe(403);
+          // Reviewer work never shows up as project work.
+          const tasks = (await get(pm, `/projects/${projectId}/tasks`)).json().items;
+          expect(tasks.every((t: { taskType: string }) => t.taskType !== 'RL_REVIEW')).toBe(true);
+          expect((await get(pm, `/projects/${projectId}/dashboard`)).json().byStatus.CREATED).toBe(0);
+        });
+
+        it('a FAIL needs a comment; every disagreement needs a comment; the record links sources and reviewer', async () => {
+          const { records } = await acceptedRecords(1);
+          const key = await rlKey();
+          const { taskId } = (await request(key, reqBody([records[0]!.id]))).json();
+          const other = await login(app, (await createUser(clientId, ['REVIEWER'])).email);
+          expect((await get(other, '/review/rl')).json().items).toEqual([]);
+          const queue = (await get(reviewer, '/review/rl')).json().items;
+          expect(queue).toEqual([expect.objectContaining({ id: taskId, rlRunId: 'run-42', priority: 5, failedEvals: 1, status: 'CREATED' })]);
+          const view = (await get(reviewer, `/review/rl/${taskId}`)).json();
+          expect(view.sources[0]).toMatchObject({ id: records[0]!.id, contentHash: records[0]!.contentHash });
+          expect(view.trajectory).toHaveLength(2);
+          expect(view.reasonCodes.map((c: { code: string }) => c.code)).toContain('UNSAFE_ACTION');
+          expect(view.rubric.text).toBeTruthy();
+
+          const verdict = async (body: object) => {
+            const cur = (await get(reviewer, `/review/rl/${taskId}`)).json();
+            return post(reviewer, `/review/rl/${taskId}/verdict`, { expectedRevision: cur.revision, ...body });
+          };
+          expect((await verdict({ verdict: 'FAIL', metricVerdicts: [], comments: [] })).json().error).toBe('NOT_CLAIMED');
+          expect((await post(reviewer, `/review/rl/${taskId}/claim`)).statusCode).toBe(200);
+          expect((await post(other, `/review/rl/${taskId}/claim`)).statusCode).toBe(404);
+          const agreeAll = [{ metric: 'correct_disposition', agree: true }, { metric: 'escalated', agree: true }];
+          expect((await verdict({ verdict: 'FAIL', metricVerdicts: agreeAll })).json()).toMatchObject({ error: 'INVALID_VERDICT', message: 'A FAIL verdict needs at least one comment' });
+          expect((await verdict({ verdict: 'PASS', metricVerdicts: [agreeAll[0], { metric: 'escalated', agree: false }] })).json().message).toMatch(/disagree/);
+          const ok = await verdict({ verdict: 'FAIL', metricVerdicts: [agreeAll[0], { metric: 'escalated', agree: false, comment: 'It approved before escalating.' }], comments: [{ text: 'Approves the account itself at step 1.', trajectoryStep: 1, reasonCode: 'UNSAFE_ACTION' }] });
+          expect(ok.statusCode, ok.body).toBe(200);
+          const rec = await db.rLReviewRecord.findUniqueOrThrow({ where: { id: ok.json().recordId } });
+          expect(rec).toMatchObject({ verdict: 'FAIL', rlRunId: 'run-42', rlTaskId: 'task-7', sourceRecordIds: [records[0]!.id], reviewerId, reasonCodes: ['UNSAFE_ACTION'], prevHash: null });
+          expect(rec.reviewStartedAt).not.toBeNull();
+          expect((await db.rLReviewRequest.findFirstOrThrow()).status).toBe('COMPLETED');
+          expect((await db.taskInstance.findUniqueOrThrow({ where: { id: taskId } })).status).toBe('SUBMITTED');
+          await expect(db.rLReviewRecord.update({ where: { id: rec.id }, data: { verdict: 'PASS' } })).rejects.toThrow(/append-only|permission denied/);
+          expect(await verifyRlChain(db)).toMatchObject({ checked: 1, breaks: [] });
+          // Pull fallback for RL Gym.
+          const pulled = (await app.inject({ method: 'GET', url: '/api/v1/integrations/rl-gym/results', headers: { authorization: `Bearer ${key}` } })).json();
+          expect(pulled.items).toEqual([expect.objectContaining({ id: rec.id, verdict: 'FAIL', source_record_ids: [records[0]!.id], content_hash: rec.contentHash })]);
+        });
+
+        it('RL Gym receives each result by signed webhook within a minute, with retries on failure', async () => {
+          const gym = await mockRlGym();
+          const connection = redisConnection(TEST_REDIS_URL);
+          const queueName = `rl-${randomUUID()}`;
+          const queue = createDomainEventsQueue(connection, queueName);
+          const worker = createDomainEventsWorker(db, defaultHandlers({ rlGym: new WebhookRlGymClient(gym.url, SECRET) }), connection, queueName);
+          const stop = startOutboxPoller(db, queue, { intervalMs: 100 });
+          try {
+            const { records } = await acceptedRecords(1);
+            const key = await rlKey();
+            const { taskId } = (await request(key, reqBody([records[0]!.id]))).json();
+            await post(reviewer, `/review/rl/${taskId}/claim`);
+            const cur = (await get(reviewer, `/review/rl/${taskId}`)).json();
+            gym.state.failNext = 1; // the first attempt fails; the queue retries
+            const submittedAt = Date.now();
+            const ok = await post(reviewer, `/review/rl/${taskId}/verdict`, { expectedRevision: cur.revision, verdict: 'PASS', metricVerdicts: [{ metric: 'correct_disposition', agree: false, comment: 'The disposition is right; the eval mislabels it.' }, { metric: 'escalated', agree: true }] });
+            expect(ok.statusCode, ok.body).toBe(200);
+            const recordId = ok.json().recordId;
+            for (let i = 0; i < 600 && (await db.rLResultDelivery.findUniqueOrThrow({ where: { recordId } })).status !== 'DELIVERED'; i++) await new Promise((r) => setTimeout(r, 100));
+            const delivery = await db.rLResultDelivery.findUniqueOrThrow({ where: { recordId } });
+            expect(delivery).toMatchObject({ status: 'DELIVERED', attempts: 2, lastStatus: 200 });
+            expect(delivery.deliveredAt!.getTime() - submittedAt).toBeLessThan(60_000);
+            expect(gym.received).toHaveLength(1);
+            expect(gym.received[0]).toMatchObject({ valid: true, body: { id: recordId, verdict: 'PASS', rl_run_id: 'run-42', rl_task_id: 'task-7', source_record_ids: [records[0]!.id] } });
+            expect((await get(reviewer, `/review/rl/${taskId}`)).json().result.delivery).toMatchObject({ status: 'DELIVERED', attempts: 2 });
+          } finally {
+            await stop();
+            await worker.close();
+            await queue.obliterate({ force: true });
+            await queue.close();
+            await gym.close();
+          }
+        }, 90_000);
+
+        it('without a webhook the result waits for the pull API', async () => {
+          const { records } = await acceptedRecords(1);
+          const key = await rlKey();
+          const { taskId } = (await request(key, reqBody([records[0]!.id]))).json();
+          await post(reviewer, `/review/rl/${taskId}/claim`);
+          const cur = (await get(reviewer, `/review/rl/${taskId}`)).json();
+          const { recordId } = (await post(reviewer, `/review/rl/${taskId}/verdict`, { expectedRevision: cur.revision, verdict: 'NEEDS_EXPERT', metricVerdicts: [{ metric: 'correct_disposition', agree: true }, { metric: 'escalated', agree: true }] })).json();
+          const ev = await db.outboxEvent.findFirstOrThrow({ where: { name: 'rl_review.completed' } });
+          await processDomainEvent(db, defaultHandlers({ rlGym: null }), ev.id);
+          expect((await db.rLResultDelivery.findUniqueOrThrow({ where: { recordId } })).status).toBe('PULL_ONLY');
+        });
+
+        it('Admins manage failure reason codes; reviewers can only read them', async () => {
+          const created = await post(admin, '/failure-reason-codes', { code: 'HALLUCINATED_TOOL', label: 'Called a tool that does not exist' });
+          expect(created.statusCode).toBe(201);
+          expect((await app.inject({ method: 'PATCH', url: `/api/v1/failure-reason-codes/${created.json().id}`, headers: { cookie: admin, ...idem() }, payload: { active: false } })).json().active).toBe(false);
+          const r = await createUser(clientId, ['REVIEWER']);
+          const rc = await login(app, r.email);
+          expect((await get(rc, '/failure-reason-codes')).json().items.map((c: { code: string }) => c.code)).toContain('WRONG_ANSWER');
+          expect((await post(rc, '/failure-reason-codes', { code: 'X_Y', label: 'x' })).statusCode).toBe(403);
+        });
       });
 
       it('a correction appends a superseding record; the original stays and the chain still verifies', async () => {

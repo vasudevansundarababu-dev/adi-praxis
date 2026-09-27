@@ -8,6 +8,7 @@ import type { EmailSender } from '../lib/email';
 import { OfflineGeocoder } from '../staffing/geocoder';
 import { issueTasksOnAssigned } from '../tasks/invites';
 import { startProjectOnStaffed } from '../tasks/handlers';
+import { deliverRlResult, type RlGymClient } from '../rl/rl-gym';
 import { closeCampaignsOnStaffed, rematchOnApproval } from '../staffing/handlers';
 
 /**
@@ -39,9 +40,10 @@ export class HandlerRegistry {
 }
 
 /** Production handler registry. Optional dependencies enable the handlers that need them (tests opt in). */
-export function defaultHandlers(deps: { evaluator?: SuitabilityEvaluator; email?: EmailSender; config?: Config } = {}): HandlerRegistry {
+export function defaultHandlers(deps: { evaluator?: SuitabilityEvaluator; email?: EmailSender; config?: Config; rlGym?: RlGymClient | null } = {}): HandlerRegistry {
   const r = new HandlerRegistry().register(rematchOnApproval(new OfflineGeocoder())).register(closeCampaignsOnStaffed()).register(startProjectOnStaffed());
   if (deps.evaluator) r.register(assessOnSubmit(deps.evaluator));
   if (deps.email && deps.config) r.register(issueTasksOnAssigned({ email: deps.email, config: deps.config }));
+  if (deps.rlGym !== undefined) r.register(deliverRlResult(deps.rlGym));
   return r;
 }

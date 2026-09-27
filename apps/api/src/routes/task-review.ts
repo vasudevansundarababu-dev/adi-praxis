@@ -6,7 +6,7 @@ import { runCommand } from '../platform/command';
 import { definitionFor } from '../tasks/definitions';
 import { CHECKLIST, completionStatus, decideTask, reviewableTask, TaskDecisionRequest } from '../tasks/review-service';
 import type { StoredChecks } from '../tasks/submission';
-import { templateRef } from '../tasks/task-service';
+import { EXPERT_TASK_TYPES, templateRef } from '../tasks/task-service';
 import { loadProject } from './projects';
 
 const IdParams = z.object({ id: z.string().uuid() });
@@ -97,7 +97,7 @@ export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, {
   // SPEC coverage dashboard (PM and Admin): distinct accepted vs target, authors, coverage heatmap, duplicates, rework, TPT.
   app.get('/projects/:id/dashboard', { config: { access: ['PM', 'ADMIN'] }, schema: { tags: ['tasks'], params: IdParams } }, async (req) => {
     const p = await loadProject(db, req.params.id, req.actor!);
-    const tasks = await db.taskInstance.findMany({ where: { projectId: p.id }, include: { assignedTo: { include: { smeUser: true } }, slot: true } });
+    const tasks = await db.taskInstance.findMany({ where: { projectId: p.id, taskType: EXPERT_TASK_TYPES }, include: { assignedTo: { include: { smeUser: true } }, slot: true } });
     const byStatus = Object.fromEntries(['CREATED', 'ASSIGNED', 'IN_PROGRESS', 'SUBMITTED', 'REWORK', 'ACCEPTED', 'REJECTED'].map((s) => [s, tasks.filter((t) => t.status === s).length]));
     const accepted = tasks.filter((t) => t.status === 'ACCEPTED');
     const everSubmitted = tasks.filter((t) => t.submittedAt);

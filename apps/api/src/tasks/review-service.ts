@@ -69,7 +69,7 @@ export async function reviewableTask(tx: Db | Tx, actor: InternalActor, taskId: 
 /** SPEC: a project completes only when the distinct-task target and all required coverage are met. */
 export async function completionStatus(tx: Db | Tx, projectId: string) {
   const p = await tx.project.findUniqueOrThrow({ where: { id: projectId }, include: { template: true } });
-  const accepted = await tx.taskInstance.findMany({ where: { projectId, status: 'ACCEPTED' }, select: { coverageTags: true } });
+  const accepted = await tx.taskInstance.findMany({ where: { projectId, taskType: { in: ['AUTHORING', 'ANNOTATION'] }, status: 'ACCEPTED' }, select: { coverageTags: true } });
   if (p.taskMode === 'ANNOTATION') return { met: !!p.taskCount && accepted.length >= p.taskCount, accepted: accepted.length, target: p.taskCount ?? 0, coverageMet: true };
   const cov = effectiveCoverage(p.template, CoverageQuotas.nullable().safeParse(p.coverageQuotas).data ?? null);
   const status = coverageStatus({ cells: cov.cells, edgeCases: cov.edgeCases }, accepted.map((a) => (a.coverageTags ?? { tags: {}, edgeCase: null }) as CoverageTags));

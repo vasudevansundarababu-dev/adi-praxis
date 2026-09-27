@@ -967,6 +967,28 @@ model RLReviewRecord {
 }
 
 /// Seeded, Admin-editable FLOW 4 failure reason codes.
+/// Delivery of an RLReviewRecord to RL Gym (signed webhook with retries). Kept apart so the record stays append-only.
+model RLResultDelivery {
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String             @map("client_id") @db.Uuid
+  recordId      String             @unique @map("record_id") @db.Uuid
+  status        RLDeliveryStatus   @default(PENDING)
+  attempts      Int                @default(0)
+  lastStatus    Int?               @map("last_status")
+  lastError     String?            @map("last_error")
+  lastAttemptAt DateTime?          @map("last_attempt_at")
+  deliveredAt   DateTime?          @map("delivered_at")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+}
+
+enum RLDeliveryStatus {
+  PENDING
+  DELIVERED
+  /// No webhook configured: RL Gym collects the result with the pull API.
+  PULL_ONLY
+}
+
 model FailureReasonCode {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId  String   @map("client_id") @db.Uuid

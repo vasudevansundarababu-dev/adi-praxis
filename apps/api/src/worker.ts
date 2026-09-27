@@ -1,4 +1,5 @@
 import { defaultEmail, defaultEvaluator } from './app';
+import { defaultRlGym } from './rl/rl-gym';
 import { loadConfig } from './config';
 import { createDb } from './db';
 import { redisConnection } from './lib/redis';
@@ -11,7 +12,7 @@ const config = loadConfig();
 const db = createDb(config.DATABASE_URL);
 const connection = redisConnection(config.REDIS_URL);
 const queue = createDomainEventsQueue(connection);
-const worker = createDomainEventsWorker(db, defaultHandlers({ evaluator: defaultEvaluator(config), email: defaultEmail(config), config }), connection);
+const worker = createDomainEventsWorker(db, defaultHandlers({ evaluator: defaultEvaluator(config), email: defaultEmail(config), config, rlGym: defaultRlGym(config) }), connection);
 const log = (level: string, msg: string, extra: object = {}) =>
   console.log(JSON.stringify({ level, msg, service: 'praxis-worker', time: new Date().toISOString(), ...extra }));
 

@@ -41,6 +41,9 @@ const Env = z.object({
   EMBEDDING_MODEL: z.string().default('text-embedding-005'),
   /** Nightly hash-chain verification of the append-only dataset (UTC cron). */
   DATASET_VERIFY_CRON: z.string().default('0 3 * * *'),
+  /** FLOW 4 results to RL Gym by signed webhook. Blank URL = RL Gym pulls results instead. */
+  RL_GYM_WEBHOOK_URL: z.string().default(''),
+  RL_GYM_WEBHOOK_SECRET: z.string().default(''),
 });
 
 export type Config = z.infer<typeof Env> & {
@@ -67,6 +70,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const identityMode = c.STRIPE_SECRET_KEY && c.STRIPE_IDENTITY_WEBHOOK_SECRET ? 'stripe' : 'mock';
   const assistantMode = c.VERTEX_PROJECT_ID ? 'vertex' : 'mock';
   const emailMode = c.SMTP_HOST ? 'smtp' : 'memory';
+  if (c.RL_GYM_WEBHOOK_URL && c.RL_GYM_WEBHOOK_SECRET.length < 32) throw new Error('Invalid configuration: RL_GYM_WEBHOOK_SECRET must be at least 32 characters when RL_GYM_WEBHOOK_URL is set');
   if (c.NODE_ENV === 'production' && (candidateAuthMode === 'mock' || identityMode === 'mock' || assistantMode === 'mock' || emailMode === 'memory')) {
     throw new Error('Invalid configuration: production needs GOOGLE_OAUTH_CLIENT_ID, STRIPE_SECRET_KEY, STRIPE_IDENTITY_WEBHOOK_SECRET, VERTEX_PROJECT_ID and SMTP_HOST (mocks are local-only)');
   }

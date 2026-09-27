@@ -39,4 +39,5 @@ export const ErrorDto = z.object({
   error: z.string(),
   message: z.string(),
   requestId: z.string().optional(),
+  details: z.unknown().optional(),
 });

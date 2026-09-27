@@ -15,10 +15,12 @@
     "services:down": "docker compose down",
     "db:migrate": "pnpm --filter @praxis/api db:migrate",
     "db:seed": "pnpm --filter @praxis/api db:seed",
-    "db:seed:candidates": "pnpm --filter @praxis/api db:seed:candidates"
+    "db:seed:candidates": "pnpm --filter @praxis/api db:seed:candidates",
+    "test:e2e": "pnpm --filter @praxis/api exec tsx scripts/e2e-prepare.ts && playwright test -c e2e"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
-    "@types/node": "22.20.4"
+    "@playwright/test": "1.56.1",
+    "@types/node": "22.20.4",
+    "typescript": "5.9.3"
   }
 }

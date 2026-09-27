@@ -4,6 +4,9 @@ dist/
 .next/
 .next-verify/
 .next-verify-dev/
+.next-e2e/
+test-results/
+playwright-report/
 out/
 coverage/
 *.tsbuildinfo
@@ -12,4 +15,3 @@ coverage/
 !.env.example
 .DS_Store
 playwright-report/
-test-results/

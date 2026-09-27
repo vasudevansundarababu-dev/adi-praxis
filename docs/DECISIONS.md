@@ -105,3 +105,8 @@ milestones without interruption (26 Sep 2026); each was the option Claude would 
 - **Shorter profile chat (owner choice):** the default policy asks six questions: focus (tap), roles with dates, level of responsibility (tap), jurisdictions (tap), one combined question on the pool's published requirements, and one generic example case. At most one follow-up. A plain answer fills that question's own fields as proposals the SME confirms; tap-to-choose questions only take the listed options this way. Availability and conflicts are asked once, in onboarding. Each published opportunity keeps its own question set, so the PM republishes to use the new default.
 - **Bold brand look (owner choice):** Plus Jakarta Sans; gradient hero bands; cards with depth; coloured status pills; tap chips; a journey stepper on candidate home and status; a navy console header; the console home shows what is waiting per role.
 - **(chosen by Claude)** Pages a role can't use now say so ("This page is for Reviewers and Admins; you're signed in as …") instead of a bare 404, and explain that one browser holds one sign-in.
+
+- Demo project has no country filter (chosen by Claude, owner approved 27 Sep 2026). The demo setup used to create
+  "KYC authoring demo" with a required UK-only filter, which silently excluded a selected expert in India from
+  matching. The live demo's filter was removed once, with an audit event `project.filters.demo_override`; the setup
+  script no longer adds it.

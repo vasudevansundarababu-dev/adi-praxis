@@ -14,6 +14,8 @@ REPO=${2:?github owner/repo, e.g. vasudevansundarababu-dev/adi-praxis}
 POOL=github
 PROVIDER=github-oidc
 exists() { "$@" >/dev/null 2>&1; }
+# New service accounts take a little while to become visible to IAM; retry policy changes for up to ~2 minutes.
+retry() { for _ in $(seq 1 12); do "$@" >/dev/null 2>&1 && return 0; sleep 10; done; "$@" >/dev/null; }
 PNUM=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 gcloud services enable iamcredentials.googleapis.com sts.googleapis.com aiplatform.googleapis.com --project="$PROJECT_ID"
 
@@ -29,9 +31,9 @@ PRINCIPAL="principalSet://iam.googleapis.com/projects/$PNUM/locations/global/wor
 sa() { # name display roles...
   local name=$1 display=$2; shift 2
   local email="$name@$PROJECT_ID.iam.gserviceaccount.com"
-  exists gcloud iam service-accounts describe "$email" --project="$PROJECT_ID" || gcloud iam service-accounts create "$name" --project="$PROJECT_ID" --display-name="$display"
-  for role in "$@"; do gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$email" --role="$role" --condition=None >/dev/null; done
-  gcloud iam service-accounts add-iam-policy-binding "$email" --project="$PROJECT_ID" --role=roles/iam.workloadIdentityUser --member="$PRINCIPAL" >/dev/null
+  exists gcloud iam service-accounts describe "$email" --project="$PROJECT_ID" || gcloud iam service-accounts create "$name" --project="$PROJECT_ID" --display-name="$display" >&2
+  for role in "$@"; do retry gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$email" --role="$role" --condition=None; done
+  retry gcloud iam service-accounts add-iam-policy-binding "$email" --project="$PROJECT_ID" --role=roles/iam.workloadIdentityUser --member="$PRINCIPAL"
   echo "$email"
 }
 DEPLOYER=$(sa praxis-gh-deployer "GitHub nightly deploy" roles/run.admin roles/cloudbuild.builds.editor roles/artifactregistry.writer \
@@ -39,7 +41,7 @@ DEPLOYER=$(sa praxis-gh-deployer "GitHub nightly deploy" roles/run.admin roles/c
 AGENT=$(sa praxis-gh-agent "GitHub nightly defect agent" roles/aiplatform.user)
 # The deployer runs services as the runtime account and Cloud Build as the default compute account.
 for target in "praxis-demo-run@$PROJECT_ID.iam.gserviceaccount.com" "$PNUM-compute@developer.gserviceaccount.com"; do
-  gcloud iam service-accounts add-iam-policy-binding "$target" --project="$PROJECT_ID" --role=roles/iam.serviceAccountUser --member="serviceAccount:$DEPLOYER" >/dev/null
+  retry gcloud iam service-accounts add-iam-policy-binding "$target" --project="$PROJECT_ID" --role=roles/iam.serviceAccountUser --member="serviceAccount:$DEPLOYER"
 done
 
 cat <<OUT

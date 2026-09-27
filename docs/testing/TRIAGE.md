@@ -88,8 +88,10 @@ If a nightly build fails, the previous build stays live. Look at the run in the 
 1. **Test environment:** `PRAXIS_VERTEX=1 PRAXIS_NAME="ADI Praxis Test" PRAXIS_ENV_LABEL="Test environment"
    infra/demo/deploy-demo.sh <project-id> <billing-account>` (done once; about 25 minutes).
 2. **Claude on Vertex AI:** in the Google Cloud console for that project, open Vertex AI → Model Garden, find
-   Claude (Opus), and enable it (accept Anthropic's terms). Without this, the chat, drafter and agent report the AI as
-   unavailable.
+   Claude (Opus), and enable it (accept Anthropic's terms). Then IAM & Admin → Quotas: request an increase for
+   "global online prediction requests per base model" for `anthropic-claude-opus` (a new project starts at 0; about
+   60 requests per minute is plenty for testers plus the agent). Without this, the chat, drafter and agent report the
+   AI as unavailable (a 429 "Quota exceeded" in the logs).
 3. **GitHub access:** `infra/test/setup-github-access.sh <project-id> <owner/repo>` and set the four repository
    variables it prints (Settings → Secrets and variables → Actions → Variables): `TEST_GCP_PROJECT`,
    `TEST_WIF_PROVIDER`, `TEST_DEPLOYER_SA`, `AGENT_SA`.

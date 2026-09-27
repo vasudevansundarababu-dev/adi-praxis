@@ -5,3 +5,4 @@ export * from './templates';
 export * from './taxonomy';
 export * from './projects';
 export * from './matching';
+export * from './candidate';

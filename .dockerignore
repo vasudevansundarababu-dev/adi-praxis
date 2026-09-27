@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/.next-*
+**/test-results
+**/playwright-report
+.git
+.vscode
+.env
+.env.*
+!.env.example
+infra/terraform/**/.terraform
+**/*.tfstate*
+e2e
+docs

@@ -100,7 +100,7 @@ Candidate status uses independent dimensions (account, identity, profile convers
 
 **Task instance status**
 
-`CREATED` → `ASSIGNED` → `IN_PROGRESS` → `SUBMITTED` → `ACCEPTED` or `REWORK` (back to `IN_PROGRESS`). TPT never expires a task; a PM can reclaim a stalled task, which returns it to `CREATED`.
+`CREATED` → `ASSIGNED` → `IN_PROGRESS` → `SUBMITTED` → `ACCEPTED`, `REWORK` (back to `IN_PROGRESS`) or `REJECTED` (TASK-KYC R03: duplicate, not realistic, incorrect or real data; the slot is released). TPT never expires a task; a PM can reclaim a stalled task, which returns it to `CREATED`.
 
 ## Admin: template catalog
 
@@ -461,9 +461,9 @@ REST under `/api/v1`, JSON, OpenAPI spec generated from code. Internal users use
 | Applications (FLOW 2) | `POST /public/campaigns/{id}/click` (tracked apply link; replaces `/apply`), `POST /me/enrollments` (the application: created when a signed-in candidate starts their profile, attributed to the campaign), `GET /me/enrollments/{id}/status`, `POST /me/enrollments/{id}/amend`, `POST /me/enrollments/{id}/review-request`, `POST /me/enrollments/{id}/withdraw` | Candidate |
 | Selection (FLOW 2) | `GET/POST /projects/{id}/reviewers`, `DELETE /projects/{id}/reviewers/{userId}` (PM / Admin); `GET /review/enrollments?status=`, `GET /review/enrollments/{id}`, `POST /review/enrollments/{id}/decision`, `POST /review/enrollments/{id}/reopen`, `POST /review/enrollments/{id}/assessment/retry`, `GET /review/evidence/{id}`, `POST /review/claims/{id}/verify`, `GET/POST /review/conflicts`, `POST /review/conflicts/{id}/resolve` (these replace `GET /applications?status=IN_VALIDATION` and `POST /applications/{id}/decision`) | Reviewer (assigned pools) / Admin |
 | Onboarding and assignment (FLOW 2) | `GET /me/onboarding?enrollmentId=`, `POST /me/onboarding/acknowledgements`, `GET /me/assignments`, `GET /me/assignments/{id}`, `POST /me/assignments/{id}/accept`, `POST /me/assignments/{id}/decline`, `POST /me/assignments/{id}/open-workbench`, `POST /workbench/handoff`; terms: `GET/POST /terms` (Admin) | Candidate / Admin |
-| Tasks (FLOW 3) | `POST /projects/{id}/task-inputs` (upload), `GET /projects/{id}/tasks`, `POST /assignments/{id}/invite` | PM |
-| Candidate (FLOW 3) | `POST /auth/google`, `POST /me/identity/session`, `GET /me/projects`, `POST /me/projects/{id}/tasks/next`, `GET/PUT /me/tasks/{id}`, `POST /me/tasks/{id}/submit` | Candidate |
-| Review | `GET /review/tasks`, `POST /review/tasks/{id}/decision` | Reviewer |
+| Tasks (FLOW 3) | `POST /projects/{id}/task-inputs` (PM upload as CSV/JSON, or client API push with a Bearer key), `GET /projects/{id}/tasks`, `POST /projects/{id}/tasks/{taskId}/reclaim`, `GET /projects/{id}/invites`, `POST /projects/{id}/invites/{inviteId}/resend`, `POST /projects/{id}/invites/{inviteId}/revoke` (invites are created automatically when an expert accepts; this replaces `POST /assignments/{id}/invite`), `POST /projects/{id}/resume`, `GET /projects/{id}/dashboard`; `GET/POST /api-clients`, `POST /api-clients/{id}/revoke` (Admin) | PM / Admin / client API |
+| Candidate (FLOW 3) | `POST /auth/google`, `POST /me/identity/session`, `POST /me/invites/redeem`, `GET /me/projects`, `GET /me/projects/{id}`, `POST /me/projects/{id}/tasks/next`, `GET/PUT /me/tasks/{id}`, `GET /me/tasks/{id}/sample`, `POST /me/tasks/{id}/check`, `POST /me/tasks/{id}/submit` | Candidate |
+| Review | `GET /review/tasks`, `GET /review/tasks/{id}`, `POST /review/tasks/{id}/decision` | Reviewer (assigned projects) / Admin |
 | Webhooks | `POST /integrations/stripe/identity-webhook`, `POST /webhooks/job-board/{channel}` | Signed, external |
 
 The Stripe Identity webhook uses the FLOW 2 — SME candidate flow path (decided 26 Sep 2026); it replaces the earlier `POST /webhooks/stripe-identity`.

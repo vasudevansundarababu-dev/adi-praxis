@@ -53,3 +53,19 @@ milestones without interruption (26 Sep 2026); each was the option Claude would 
 - **(chosen by Claude)** Candidate-declared conflicts block proposals until a Reviewer assigned to that project (or an Admin) resolves them. A reviewer who declares a conflict can no longer see or decide that application.
 - **(chosen by Claude)** "Open workbench" issues a single-use handoff token that is valid for 10 minutes and stored only as a hash. Until FLOW 3 (M5), the workbench page confirms the handoff and says tasks will appear when the project starts.
 - **(chosen by Claude)** Declining a proposal records an optional reason and has no effect on pool status or matching.
+
+## M5 FLOW 3 tasks, KYC workbench and review (chosen by Claude)
+- **(chosen by Claude)** Built in three slices (M5a tasks and invites, M5b KYC definition, M5c review and dataset).
+- **(chosen by Claude)** Tasks are issued when an expert accepts (C08): up to the open-task cap (3), then pulled one at a time up to the per-expert cap. Tasks may start while the project is still STAFFING; the project moves to IN_PROGRESS once STAFFED with work issued.
+- **(chosen by Claude)** Coverage slots: required cells and edge cases first, then the open-slot share, then optional cells and edge cases, then combinations of dimension values. Edge-case slots let the author choose the other tags. A slot whose jurisdiction is outside the expert's approved scope is not offered.
+- **(chosen by Claude)** The per-expert cap counts held and accepted tasks; rejected and reclaimed tasks free a place. Reclaiming clears the draft and releases the slot.
+- **(chosen by Claude)** Invites go by email (SMTP; Mailpit locally). SMS has an interface but no sender, because FLOW 2 collects no phone numbers and no provider is chosen. Resending revokes the old link, since only token hashes are stored. Production requires SMTP_HOST.
+- **(chosen by Claude)** Near-duplicates use Vertex AI `text-embedding-005` (768 dimensions; a hashing mock locally) with pgvector cosine search across the workflow's template lineage, plus a structured comparison of coverage tags and key inputs. Flags never block submission. If the embedding service is down, submission waits (503) so no task skips the check. There is no ANN index in v1; exact search is fine at this scale.
+- **(chosen by Claude)** KYC task structure and checks follow TASK-KYC. Human-gate compliance means approve/reject recommendations and high-risk ratings must escalate or describe a hand-off to a person. Tool steps must reference a defined response (replayable). The edge-case match is a keyword heuristic, and the Reviewer confirms coverage.
+- **(chosen by Claude)** The synthetic-data scan flags checksum-valid IBANs and cards, national ID formats, labelled passport and company numbers containing digits, and emails and phones outside reserved or fictitious ranges. Flags block submission until explained. Detecting text copied from known sources needs an external corpus and is not done in v1.
+- **(chosen by Claude)** Added task status REJECTED (TASK-KYC R03). Confirmed real data is quarantined: the output, submission copies and embedding are removed.
+- **(chosen by Claude)** Task review uses the same per-project Reviewer assignment as selection. Self-review is detected by matching the reviewer's email to the author's contact email; declared conflicts also block.
+- **(chosen by Claude)** ApprovedTaskRecord is written in the accept transaction with a SHA-256 content hash chained to the previous record, in `seq` order under an advisory lock. The database-level append-only rules and the nightly verification come in M6.
+- **(chosen by Claude)** Machine clients (client API, RL Gym) use Admin-issued Bearer keys, stored as hashes, shown once and never kept in idempotency replays; they audit as SERVICE.
+- **(chosen by Claude)** Blind solve (TASK-KYC optional) is not built in v1; it stays an open question.
+

@@ -110,3 +110,38 @@ milestones without interruption (26 Sep 2026); each was the option Claude would 
   "KYC authoring demo" with a required UK-only filter, which silently excluded a selected expert in India from
   matching. The live demo's filter was removed once, with an audit event `project.filters.demo_override`; the setup
   script no longer adds it.
+
+## M9 Task drafting and MCP tool recording (owner-approved spec, 27 Sep 2026)
+Owner choices: tools recorded as MCP; both an in-app AI interview and transcript upload; uploaded files kept
+privately with the task (never in the dataset); build M9 before the tester package.
+- **(chosen by Claude)** Author routes live under `/me/tasks/:id/...` like the rest of the workbench (the spec's
+  `/workbench/...` placeholder paths were aligned in `docs/TASK-DRAFTING.md`).
+- **(chosen by Claude)** The interview is eight fixed, tap-first questions built from the slot; the model's job is the
+  draft. Fixed questions make every author's experience the same and cost nothing per question.
+- **(chosen by Claude)** Drafting needs at least one file or three interview answers. One draft runs at a time per
+  task; the editor pauses while it runs and reloads when it lands, so nothing typed is lost.
+- **(chosen by Claude)** "Draft all" never replaces confirmed sections; redrafting one section clears its confirmation.
+  Editing a confirmed section keeps it confirmed; the Reviewer sees "edited by the author" or "unchanged from the draft".
+- **(chosen by Claude)** Up to 5 files per task; PDF, DOCX, TXT, VTT, SRT; 10 MB each; type from the bytes. Image-only
+  PDFs are refused (no OCR in v1).
+- **(chosen by Claude)** Likely real identifiers in a file are shown to the author with the values masked; the raw values
+  are passed to the drafter as forbidden and scrubbed from its output. The file itself is not blocked, because a
+  public document can contain example numbers; the Reviewer sees the count.
+- **(chosen by Claude)** Drafter: Claude on Vertex (`claude-opus-5`, one retry on `claude-opus-4-8` after a refusal),
+  structured JSON output, adaptive thinking, streamed. Its output is sanitised to the KYC schema, the MCP catalog and
+  allowed values; unknown tools are dropped and tool steps without a recorded call become reasoning steps.
+- **(chosen by Claude)** Tool arguments are text values checked against each tool's `inputSchema`. Old tasks' free-text
+  input becomes the tool's main argument. Two recorded calls with the same tool and arguments are an error (replay
+  could not tell them apart). A tool step uses its recorded call's arguments.
+- **(chosen by Claude)** The MCP catalog (`GET /mcp/kyc/tools`) is for Admin, PM, Reviewer and the RL Gym key;
+  authors see the same catalog inside the workbench. The replay bundle is for Admin and RL Gym.
+- **(chosen by Claude)** Dataset records carry `provenance` (source kinds and SHA-256, interview count, draft runs,
+  section confirmations, MCP catalog version). It is included in the content hash only when present, so records
+  written before M9 verify unchanged.
+- **(chosen by Claude)** A reference replay server (`packages/mcp-replay`) is provided for testing; it does not define
+  how RL Gym runs tasks.
+- **(chosen by Claude)** A project still needs at least one demographic filter to be submitted (M2 rule). The demo
+  project uses a *preferred* country filter (GB or IN) so it excludes nobody.
+- **(chosen by Claude)** Found while testing for India: the time-zone list used older IANA names (Asia/Calcutta).
+  It now lists current names (Asia/Kolkata, Asia/Kathmandu, Asia/Yangon, Asia/Ho_Chi_Minh, Europe/Kyiv, America/Nuuk)
+  and maps the older names browsers may report.

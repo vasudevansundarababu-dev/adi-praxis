@@ -20,10 +20,13 @@ export const JOB_OPTIONS = {
  * the BullMQ job id is the event id, so a re-dispatch after a crash never creates a second job.
  */
 export async function dispatchOutboxBatch(db: Db, queue: Queue<DomainEventJob>, batchSize = 100): Promise<number> {
+  // available_at is written by the application (Prisma fills @default(now()) client-side), so compare it with the
+  // application clock too; the database clock can differ by a few milliseconds (e.g. Docker's VM locally).
+  const now = new Date();
   return db.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<{ id: string; name: string }[]>`
       SELECT id, name FROM "OutboxEvent"
-      WHERE dispatched_at IS NULL AND available_at <= now()
+      WHERE dispatched_at IS NULL AND available_at <= ${now}
       ORDER BY created_at
       LIMIT ${batchSize}
       FOR UPDATE SKIP LOCKED`;

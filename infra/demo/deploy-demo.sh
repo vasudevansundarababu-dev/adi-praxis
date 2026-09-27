@@ -7,18 +7,32 @@
 # in-memory email), synthetic data, the default *.run.app URLs. It is not the staging/production path (that is the
 # Terraform in infra/terraform plus GitHub Actions). Re-running is safe: existing resources are reused, new images
 # are built and deployed. Remove everything with: gcloud projects delete <project-id>
+#
+# Options (environment variables):
+#   PRAXIS_VERTEX=1        Real Claude and embeddings on Vertex AI (the testers' environment); sign-in, identity
+#                          check and email stay simulated. Claude must be enabled for the project in Model Garden.
+#   PRAXIS_ENV_LABEL=...   Banner label, e.g. "Test environment" (default "Demo environment").
+#   PRAXIS_NAME=...        Project display name when the project is created (default "ADI Praxis").
+#   PRAXIS_BUILD=...       Build label shown in the banner and at /api/v1/version (default <commit>-<time>).
+#   DEPLOY_ONLY=1          Nightly redeploy: skip project, network, database, Redis and secret setup (they must exist);
+#                          build, migrate and deploy only, and never print passwords (used from GitHub Actions).
 set -euo pipefail
 
 PROJECT_ID=${1:?project id, e.g. adi-praxis-demo-1234}
 BILLING=${2:?billing account id (gcloud billing accounts list)}
 REGION=${3:-us-central1}
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-TAG=$(git -C "$ROOT" rev-parse --short HEAD)-$(date +%s)
+COMMIT=$(git -C "$ROOT" rev-parse --short HEAD)
+TAG=$COMMIT-$(date +%s)
+BUILD=${PRAXIS_BUILD:-$TAG}
+ENV_LABEL=${PRAXIS_ENV_LABEL:-Demo environment}
+VERTEX=${PRAXIS_VERTEX:-}
 say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 exists() { "$@" >/dev/null 2>&1; }
 
+if [ -z "${DEPLOY_ONLY:-}" ]; then
 say "Project $PROJECT_ID (ADI Praxis)"
-exists gcloud projects describe "$PROJECT_ID" || gcloud projects create "$PROJECT_ID" --name="ADI Praxis"
+exists gcloud projects describe "$PROJECT_ID" || gcloud projects create "$PROJECT_ID" --name="${PRAXIS_NAME:-ADI Praxis}"
 gcloud billing projects link "$PROJECT_ID" --billing-account="$BILLING" >/dev/null
 gcloud config set project "$PROJECT_ID" >/dev/null
 PNUM=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
@@ -27,6 +41,7 @@ say "Enabling APIs (a few minutes the first time)"
 gcloud services enable run.googleapis.com sqladmin.googleapis.com redis.googleapis.com compute.googleapis.com \
   artifactregistry.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com storage.googleapis.com \
   iam.googleapis.com logging.googleapis.com
+[ -n "$VERTEX" ] && gcloud services enable aiplatform.googleapis.com
 
 say "Network"
 # New projects usually get the default network automatically, shortly after the Compute API is enabled.
@@ -39,6 +54,8 @@ exists gcloud iam service-accounts describe "$SA" || gcloud iam service-accounts
 for role in roles/cloudsql.client roles/secretmanager.secretAccessor roles/logging.logWriter roles/monitoring.metricWriter; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" --role="$role" --condition=None >/dev/null
 done
+# Claude and embeddings on Vertex AI for the runtime (testers' environment).
+[ -n "$VERTEX" ] && gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" --role=roles/aiplatform.user --condition=None >/dev/null
 # Cloud Build pushes images with the default compute service account.
 gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$PNUM-compute@developer.gserviceaccount.com" --role=roles/artifactregistry.writer --condition=None >/dev/null
 gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$PNUM-compute@developer.gserviceaccount.com" --role=roles/logging.logWriter --condition=None >/dev/null
@@ -86,6 +103,17 @@ exists gcloud redis instances describe praxis-demo --region="$REGION" || gcloud 
 REDIS_HOST=$(gcloud redis instances describe praxis-demo --region="$REGION" --format='value(host)')
 secret redis-url "redis://$REDIS_HOST:6379"
 
+else
+  say "Redeploy only (project $PROJECT_ID)"
+  gcloud config set project "$PROJECT_ID" >/dev/null
+  PNUM=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+  SA=praxis-demo-run@$PROJECT_ID.iam.gserviceaccount.com
+  BUCKET=$PROJECT_ID-demo-evidence
+  INSTANCE=praxis-demo
+  CONN=$(gcloud sql instances describe "$INSTANCE" --format='value(connectionName)')
+  read_secret() { gcloud secrets versions access latest --secret="$1"; }
+fi
+
 say "Images (Cloud Build)"
 exists gcloud artifacts repositories describe praxis --location="$REGION" || gcloud artifacts repositories create praxis --repository-format=docker --location="$REGION"
 REPO=$REGION-docker.pkg.dev/$PROJECT_ID/praxis
@@ -107,7 +135,12 @@ EVIDENCE_BUCKET: $BUCKET
 GCS_PROJECT_ID: $PROJECT_ID
 API_URL: $API_URL
 WORKER_HEALTH_PORT: "8080"
+PRAXIS_BUILD: "$BUILD"
+PRAXIS_COMMIT: "$COMMIT"
 YAML
+if [ -n "$VERTEX" ]; then
+  printf 'VERTEX_PROJECT_ID: %s\nVERTEX_LOCATION: "%s"\nEMBEDDING_LOCATION: "%s"\n' "$PROJECT_ID" "${VERTEX_LOCATION:-global}" "$REGION" >> "$ENVFILE"
+fi
 # gcloud accepts one env-vars file and no extra variables, so the runtime role name lives in the shared file.
 echo 'APP_DB_ROLE: praxis_app' >> "$ENVFILE"
 COMMON=(--region="$REGION" --service-account="$SA" --set-cloudsql-instances="$CONN" --env-vars-file="$ENVFILE"
@@ -127,7 +160,7 @@ gcloud run deploy praxis-worker --image="$REPO/api:$TAG" "${COMMON[@]}" --set-se
   --no-allow-unauthenticated --ingress=internal --port=8080 --no-cpu-throttling --min-instances=1 --max-instances=1
 for app in web candidate; do
   gcloud run deploy "praxis-$app" --image="$REPO/$app:$TAG" --region="$REGION" --service-account="$SA" \
-    --set-env-vars="API_BASE_URL=$API_URL,CANDIDATE_APP_URL=$CAND_URL,PRAXIS_DEMO=1" \
+    --set-env-vars="^|^API_BASE_URL=$API_URL|CANDIDATE_APP_URL=$CAND_URL|PRAXIS_DEMO=1|PRAXIS_BUILD=$BUILD|PRAXIS_ENV_LABEL=$ENV_LABEL" \
     --no-invoker-iam-check --port=8080 --min-instances=0 --max-instances=3
 done
 
@@ -139,6 +172,10 @@ gcloud run jobs execute praxis-demo-setup --region="$REGION" --wait
 rm -f "$ENVFILE"
 
 say "Ready"
+if [ -n "${DEPLOY_ONLY:-}" ]; then
+  printf 'Build %s deployed.\nConsole: %s\nCandidate app: %s\n' "$BUILD" "$WEB_URL" "$CAND_URL"
+  exit 0
+fi
 cat <<OUT
 Console (Admin, PM, Reviewer): $WEB_URL
 Candidate app:                 $CAND_URL

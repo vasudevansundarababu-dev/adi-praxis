@@ -124,10 +124,11 @@ export function filterProblems(
 }
 
 // ───────────── Seed taxonomy (SPEC FLOW 1 step 4; decided 26 Sep 2026: standard lists) ─────────────
+// No age band: FLOW2-SME section 9 forbids matching on age, and 18+ is enforced at candidate sign-up instead.
 
 const opts = (pairs: readonly (readonly [string, string])[]): Option[] => pairs.map(([value, label]) => ({ value, label }));
 
-/** CEFR levels, plus native/bilingual which CEFR itself does not define. */
+/** CEFR levels in ascending order, plus native/bilingual which CEFR itself does not define. */
 export const CEFR_LEVELS: Option[] = [
   { value: 'A1', label: 'A1 Beginner' },
   { value: 'A2', label: 'A2 Elementary' },
@@ -151,16 +152,6 @@ export const ISCED_LEVELS: Option[] = opts([
   ['ISCED_8', 'Doctoral or equivalent'],
 ]);
 
-/** Adult age bands only (SPEC: 18+ enforced). */
-export const AGE_BANDS: Option[] = opts([
-  ['18_24', '18–24'],
-  ['25_34', '25–34'],
-  ['35_44', '35–44'],
-  ['45_54', '45–54'],
-  ['55_64', '55–64'],
-  ['65_PLUS', '65 and over'],
-]);
-
 export const SEED_DEMOGRAPHIC_ATTRIBUTES: CreateDemographicAttributeRequest[] = [
   { key: 'country', label: 'Country / region', type: 'MULTI_SELECT', allowedValues: opts(ISO_COUNTRIES) },
   { key: 'city_radius', label: 'City or radius', type: 'GEO_RADIUS', allowedValues: { maxRadiusKm: 500 } },
@@ -172,7 +163,9 @@ export const SEED_DEMOGRAPHIC_ATTRIBUTES: CreateDemographicAttributeRequest[] = 
   },
   { key: 'education_level', label: 'Education level', type: 'MULTI_SELECT', allowedValues: ISCED_LEVELS },
   { key: 'domain_experience_years', label: 'Domain experience', type: 'NUMBER_RANGE', allowedValues: { min: 0, max: 50, unit: 'years' } },
-  { key: 'age_band', label: 'Age band', type: 'MULTI_SELECT', allowedValues: AGE_BANDS },
   { key: 'availability_hours_week', label: 'Availability', type: 'NUMBER_RANGE', allowedValues: { min: 1, max: 60, unit: 'hours/week' } },
   { key: 'time_zone', label: 'Time zone', type: 'MULTI_SELECT', allowedValues: IANA_TIME_ZONES.map((z) => ({ value: z, label: z })) },
 ];
+
+/** Rank of a language level for "at least" comparisons; -1 if unknown. */
+export const levelRank = (level: string) => CEFR_LEVELS.findIndex((l) => l.value === level);

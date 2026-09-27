@@ -76,14 +76,13 @@ describe('coverage quotas', () => {
 
 describe('demographic filters against the seed taxonomy', () => {
   const attr = (key: string) => SEED_DEMOGRAPHIC_ATTRIBUTES.find((a) => a.key === key)! as Parameters<typeof filterProblems>[0];
-  it('seed has the 8 SPEC attributes with standard lists', () => {
+  it('seed has the SPEC attributes (no age band) with standard lists', () => {
+    // SPEC's 8 minus age band (decided 26 Sep 2026: FLOW2-SME section 9 forbids matching on age).
     expect(SEED_DEMOGRAPHIC_ATTRIBUTES.map((a) => a.key)).toEqual([
-      'country', 'city_radius', 'languages', 'education_level', 'domain_experience_years', 'age_band', 'availability_hours_week', 'time_zone',
+      'country', 'city_radius', 'languages', 'education_level', 'domain_experience_years', 'availability_hours_week', 'time_zone',
     ]);
     expect((attr('country').allowedValues as unknown[]).length).toBe(249);
     expect((attr('languages').allowedValues as { languages: unknown[] }).languages.length).toBe(184);
-    // Adults only.
-    expect((attr('age_band').allowedValues as { value: string }[]).map((o) => o.value)[0]).toBe('18_24');
   });
   it('accepts valid filters of each type', () => {
     expect(filterProblems(attr('country'), { attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: true })).toEqual([]);

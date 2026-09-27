@@ -1,0 +1,8 @@
+output "load_balancer_ip" { value = module.edge.ip_address }
+output "nat_ip" { value = module.network.nat_ip }
+output "registry" { value = module.registry.repository }
+output "services" { value = module.run.services }
+output "jobs" { value = module.run.jobs }
+output "deployer_service_account" { value = module.iam.deployer_email }
+output "workload_identity_provider" { value = module.iam.workload_identity_provider }
+output "planner_service_account" { value = module.iam.planner_email }

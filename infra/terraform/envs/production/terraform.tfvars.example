@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars (never commit real values). Secrets are better passed as TF_VAR_app_secret_values in CI.
+github_repository = "adi-labs/adi-praxis"
+domains = {
+  console   = "app.example.com"
+  candidate = "experts.example.com"
+  api       = "api.example.com"
+}
+smtp               = { host = "smtp.example.com", port = 587, user = "praxis", from = "ADI Praxis <no-reply@example.com>" }
+rl_gym_webhook_url = ""
+alert_emails       = ["oncall@example.com"]
+billing_account    = ""
+# app_secret_values = { "google-oauth-client-id" = "...", "stripe-secret-key" = "...", "stripe-identity-webhook-secret" = "...", "smtp-password" = "...", "rl-gym-webhook-secret" = "..." }

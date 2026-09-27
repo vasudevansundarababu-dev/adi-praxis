@@ -96,3 +96,7 @@ milestones without interruption (26 Sep 2026); each was the option Claude would 
 - **(chosen by Claude)** Production images are built from the release tag (the same commit that passed staging) into the production registry; images are not copied between projects.
 - **(chosen by Claude)** CI runs the same docker compose stack as local development. `terraform plan` runs with a separate read-only planner identity; applies are done by an operator.
 
+
+## Demo deployment (owner request, 27 Sep 2026)
+- The owner chose a demo environment with mocks to click through the whole flow on GCP. `APP_ENV=demo` lets production builds use the local mocks (simulated Google sign-in and identity check, rule-based AI, in-memory email) only with their own `MOCK_SECRET`; `PRAXIS_DEMO=1` shows the mock sign-in and a demo banner on every page. Real staging and production still refuse mocks.
+- **(chosen by Claude)** The demo is deployed by `infra/demo/deploy-demo.sh` (gcloud + Cloud Build) on default `run.app` URLs, because there is no domain yet. It is not the staging/production path, which stays Terraform plus GitHub Actions.

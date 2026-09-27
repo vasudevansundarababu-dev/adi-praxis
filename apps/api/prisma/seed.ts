@@ -1,13 +1,18 @@
 import { PrismaClient } from '@prisma/client';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { hashPassword } from '../src/auth/password';
+import { importTaskflow, readTaskflow, type ImportResult } from '../src/templates/taskflow-import';
 
 /**
  * Local/staging seed (synthetic data only). Safe to run repeatedly.
  * - the single v1 client
  * - the first Admin user (credentials from SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD)
  * - FLOW 4 failure reason codes (SPEC: "seeded, Admin-editable")
- * The template catalog from Taskflow.xlsx is seeded in M1.
+ * - the template catalog from docs/Taskflow.xlsx (or TASKFLOW_PATH), all as drafts
  */
+export const DEFAULT_TASKFLOW_PATH = path.resolve(import.meta.dirname, '../../../docs/Taskflow.xlsx');
+
 export const FAILURE_REASON_CODES = [
   ['WRONG_ANSWER', 'Wrong answer'],
   ['UNSUPPORTED_CLAIM', 'Unsupported claim'],
@@ -48,13 +53,27 @@ export async function seed(db: PrismaClient, env: NodeJS.ProcessEnv = process.en
     });
   }
 
-  return { client, admin };
+  const taskflowPath = env.TASKFLOW_PATH || DEFAULT_TASKFLOW_PATH;
+  let templates: ImportResult | null = null;
+  if (existsSync(taskflowPath)) {
+    templates = await importTaskflow(db, client.id, await readTaskflow(taskflowPath));
+  }
+
+  return { client, admin, templates, taskflowPath };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const db = new PrismaClient();
   seed(db)
-    .then(({ client, admin }) => console.log(`Seeded client "${client.name}" and admin ${admin.email}`))
+    .then(({ client, admin, templates, taskflowPath }) => {
+      console.log(`Seeded client "${client.name}" and admin ${admin.email}`);
+      if (!templates) console.log(`Template catalog skipped: ${taskflowPath} not found`);
+      else
+        console.log(
+          `Templates from ${path.basename(taskflowPath)}: ${templates.templatesCreated.length} created, ` +
+            `${templates.templatesSkipped.length} already present; domains created: ${templates.domainsCreated.join(', ') || 'none'}`,
+        );
+    })
     .catch((err) => {
       console.error(err);
       process.exitCode = 1;

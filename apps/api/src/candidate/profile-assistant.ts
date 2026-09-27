@@ -229,7 +229,7 @@ export class MockProfileAssistant implements ProfileAssistant {
     const hours = /(\d{1,2})\s*(?:hours|hrs)/i.exec(a);
     if (hours) add('hours_per_week', { number: Number(hours[1]) });
     const roles = [...a.matchAll(/([A-Z][A-Za-z ]{2,60}?(?:analyst|investigator|reviewer|lead|manager|officer|auditor|specialist|consultant))[^.]*?\b(\d{4})\s*(?:-|–|to)\s*(\d{4}|present|now)/gi)].map((m) => ({
-      title: m[1]!.trim(),
+      title: m[1]!.trim().replace(/^(?:then|and|also|later|before that|after that|as)\s+(?:a\s+|an\s+)?/i, ''),
       employerType: null,
       start: `${m[2]}-01`,
       end: /\d{4}/.test(m[3]!) ? `${m[3]}-12` : null,

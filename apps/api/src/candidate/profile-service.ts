@@ -121,6 +121,12 @@ export function mergeExtraction(p: ProfileData, r: ExtractionResult, turnId: str
       if (stableStringify(current.value) !== stableStringify(value)) next.fields[f.fieldKey] = { ...current, conflictWith: value, sources: [...current.sources, turnId] };
       continue;
     }
+    // A later answer adds to a still-unconfirmed list rather than replacing it.
+    if (current?.status === 'PROPOSED' && Array.isArray(current.value) && Array.isArray(value)) {
+      const seen = new Set(current.value.map((x) => x.toLowerCase()));
+      next.fields[f.fieldKey] = { ...current, value: [...current.value, ...value.filter((x) => !seen.has(x.toLowerCase()))], sources: [...current.sources, turnId] };
+      continue;
+    }
     next.fields[f.fieldKey] = { value, status: 'PROPOSED', approximate: f.approximate, sources: [turnId], conflictWith: null, reused: false };
   }
   for (const role of r.roles) {

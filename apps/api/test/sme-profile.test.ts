@@ -165,6 +165,16 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
       expect(JSON.stringify(s.profile)).not.toMatch(/VERIFIED/);
     });
 
+    it('a later answer adds to a proposed list instead of replacing it', async () => {
+      const c = await candidate();
+      assistant.next = () => ({ ...empty(), facts: [{ fieldKey: 'compliance_areas', text: null, list: ['KYC', 'EDD', 'sanctions'], number: null, approximate: false }] });
+      await send(c, { content: 'KYC and EDD, plus some sanctions review.' });
+      assistant.next = () => ({ ...empty(), facts: [{ fieldKey: 'compliance_areas', text: null, list: ['kyc', 'AML'], number: null, approximate: false }] });
+      const s = (await send(c, { content: '12 years in banking, 8 in KYC and some AML.' })).json();
+      expect(s.profile.fields.compliance_areas).toMatchObject({ value: ['KYC', 'EDD', 'sanctions', 'AML'], status: 'PROPOSED' });
+      expect(s.profile.fields.compliance_areas.sources).toHaveLength(2);
+    });
+
     it('a later extraction never silently overwrites a confirmed answer', async () => {
       const c = await candidate();
       await correct(c, { fields: [{ fieldKey: 'domain_years', action: 'EDIT', value: 12 }] });
@@ -499,7 +509,7 @@ describe('mock assistant (local dev only)', () => {
       question: { id: 'years', text: 'q', fields: ['domain_years', 'specialty_years'] },
       allowedFields: ['domain_years', 'specialty_years', 'compliance_areas', 'specialties', 'jurisdictions', 'hours_per_week'],
       confirmedSummary: [],
-      answer: '12 years in banking, about 8 years in KYC and EDD. KYC Analyst at a UK bank 2016 - 2019. Mostly United Kingdom and Ireland.',
+      answer: '12 years in banking, about 8 years in KYC and EDD. KYC Analyst at a UK bank 2016 - 2019, then Senior KYC Reviewer 2019 - present. Mostly United Kingdom and Ireland.',
     });
     expect(r.facts).toEqual(expect.arrayContaining([
       expect.objectContaining({ fieldKey: 'domain_years', number: 12 }),
@@ -507,5 +517,6 @@ describe('mock assistant (local dev only)', () => {
       expect.objectContaining({ fieldKey: 'jurisdictions', list: expect.arrayContaining(['United Kingdom', 'Ireland']) }),
     ]));
     expect(r.roles[0]).toMatchObject({ start: '2016-01', end: '2019-12', approximate: true });
+    expect(r.roles[1]).toMatchObject({ title: 'Senior KYC Reviewer', start: '2019-01', end: null, current: true });
   });
 });

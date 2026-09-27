@@ -3,7 +3,9 @@ import type { Metadata } from 'next';
 import { pageTitle } from '@praxis/shared/theme';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getMe } from '@/lib/api';
+import { Assignments } from '@/components/journey/assignments';
+import { api, getMe } from '@/lib/api';
+import type { AssignmentCard } from '@/lib/journey-types';
 
 export const metadata: Metadata = { title: { absolute: pageTitle('Home') } };
 
@@ -18,11 +20,13 @@ const ENROLLMENT_LABELS: Record<string, string> = {
   WITHDRAWN: 'Withdrawn',
 };
 
-/** Candidate home: identity status, next step and applications (C08 grows in M4c). */
+/** C08 home: identity status, applications and assignments. */
 export default async function HomePage() {
   const me = await getMe();
   if (!me) redirect('/sign-in');
   const eligible = identityEligible(me.identityStatus);
+  const { data: assignments } = await api<{ items: AssignmentCard[] }>('/me/assignments');
+  const selected = me.enrollments.some((e) => e.status === 'SELECTED');
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-2xl font-semibold">Welcome{me.displayName ? `, ${me.displayName}` : ''}</h1>
@@ -45,7 +49,7 @@ export default async function HomePage() {
           <ul className="mt-2 space-y-2">
             {me.enrollments.map((e) => (
               <li key={e.id} className="flex items-center justify-between rounded-md border border-line p-3 text-sm">
-                <Link href={`/enrollments/${e.id}`} className="text-link hover:underline">
+                <Link href={`/enrollments/${e.id}${e.status === 'DRAFT' ? '' : '/status'}`} className="text-link hover:underline">
                   {e.title}
                 </Link>
                 <span className="text-fg-muted">{ENROLLMENT_LABELS[e.status] ?? e.status}</span>
@@ -54,6 +58,7 @@ export default async function HomePage() {
           </ul>
         )}
       </section>
+      {(selected || (assignments?.items.length ?? 0) > 0) && <Assignments initial={assignments?.items ?? []} onboarded={selected} />}
     </main>
   );
 }

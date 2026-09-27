@@ -12,7 +12,7 @@ export default async function EnrollmentPage({ params }: { params: Promise<{ id:
   if (!(await getMe())) redirect(`/sign-in?returnTo=${encodeURIComponent(`/enrollments/${id}`)}`);
   const { data } = await api<ConversationState>(`/me/enrollments/${id}/conversation`);
   if (!data) notFound();
-  if (!data.editable) redirect(`/enrollments/${id}/review`);
+  if (!data.editable) redirect(`/enrollments/${id}/${data.enrollment.status === 'SUBMITTED' ? 'review' : 'status'}`);
   return (
     <main className="mx-auto max-w-6xl px-4 py-6">
       <Conversation initial={data} />

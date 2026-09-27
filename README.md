@@ -28,7 +28,8 @@ cp .env.example .env    # local defaults; never commit .env
 pnpm install
 pnpm services:up        # Postgres + pgvector, Redis, Mailpit, fake GCS
 pnpm db:migrate         # apply migrations to the dev database
-pnpm db:seed            # client, first Admin (SEED_ADMIN_* in .env), reason codes
+pnpm db:seed            # client, first Admin, reason codes, taxonomy, template catalog
+pnpm db:seed:candidates # LOCAL ONLY: 200 synthetic "Test Expert" candidates for FLOW 2 matching
 pnpm dev                # API on :4000, console on :3100, candidate app on :3101
 pnpm worker             # in a second terminal: outbox dispatcher + event handlers
 ```

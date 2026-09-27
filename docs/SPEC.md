@@ -152,7 +152,7 @@ A PM creates a project in one wizard: pick a template, name it, set volume, dive
 1. **Template** — choose Domain, then Workflow (published only). Show `primary_work`, `verification_criteria`, `human_gate` read-only.
 2. **Basics** — project name (required, unique per client), description, start date, target end date.
 3. **Volume, diversity and TPT** — task mode; for authoring, distinct-task target (default 50) and max tasks per expert (default 4), with coverage quotas pre-filled from the template (PM may raise); for annotation, number of tasks (int ≥ 1); TPT (time per task, minutes, pre-filled from template; a planning and pay target, not a deadline); computed fields shown live (below).
-4. **Demographics** — multi-select filters from the Admin-managed taxonomy: country/region, city or radius, languages and proficiency, education level, domain experience (years), age band (18+ only), availability (hours/week, time zone). Each filter marked required or preferred.
+4. **Demographics** — multi-select filters from the Admin-managed taxonomy: country/region, city or radius, languages and proficiency, education level, domain experience (years), availability (hours/week, time zone). Each filter marked required or preferred. No age filter: FLOW 2 — SME candidate flow §9 forbids matching on age, and 18+ is enforced at candidate sign-up (decided 26 Sep 2026). City or radius is matched by distance through a `Geocoder` interface (v1: offline table of major cities).
 5. **Job Description** — pick an existing JD or create one inline: title, responsibilities, required skills, wage per task (amount, currency), location type (remote, onsite, hybrid) and location.
 6. **Review and submit** — summary, then Save as draft or Submit.
 
@@ -456,7 +456,7 @@ REST under `/api/v1`, JSON, OpenAPI spec generated from code. Internal users use
 | Taxonomy | `GET/POST /demographic-attributes` | Admin (read: PM, for the FLOW 1 wizard) |
 | Projects (FLOW 1) | `GET/POST /projects`, `GET/PATCH /projects/{id}`, `POST /projects/{id}/submit`, `POST /projects/{id}/pause`, `POST /projects/{id}/cancel` | PM |
 | JDs | `GET/POST /job-descriptions`, `GET/PATCH /job-descriptions/{id}` | PM |
-| Matching (FLOW 2) | `POST /projects/{id}/match`, `GET /projects/{id}/matches`, `POST /projects/{id}/assignments`, `DELETE /projects/{id}/assignments/{aid}` | PM |
+| Matching (FLOW 2) | `POST /projects/{id}/match`, `GET /projects/{id}/matches`, `POST /projects/{id}/assignments`, `DELETE /projects/{id}/assignments/{aid}`, `POST /projects/{id}/rejections` (reject for this project), `GET /candidates/{id}` (matching profile for View profile) | PM |
 | Campaigns (FLOW 2) | `POST /projects/{id}/campaigns`, `GET/PATCH /campaigns/{id}`, `POST /campaigns/{id}/close` | PM |
 | Applications (FLOW 2) | `POST /public/campaigns/{id}/apply`, `GET /applications?status=IN_VALIDATION`, `POST /applications/{id}/decision` | Candidate / Reviewer |
 | Tasks (FLOW 3) | `POST /projects/{id}/task-inputs` (upload), `GET /projects/{id}/tasks`, `POST /assignments/{id}/invite` | PM |

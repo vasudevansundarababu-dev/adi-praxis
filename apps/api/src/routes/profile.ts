@@ -25,6 +25,7 @@ import type { Db } from '../db';
 import { sha256 } from '../lib/crypto';
 import { AppError, badRequest, notFound } from '../lib/errors';
 import { writeAudit } from '../platform/audit';
+import { ensureAmendmentDraft } from '../candidate/selection-service';
 import { runCandidateCommand } from '../platform/command';
 
 export interface ProfileDeps {
@@ -78,6 +79,8 @@ export const profileRoutes: FastifyPluginAsyncZod<ProfileDeps> = async (app, dep
       if (!(EDITABLE_ENROLLMENT as readonly string[]).includes(e.status)) throw notEditable(e.status);
       if (!e.conversation) throw new AppError(409, 'NOT_STARTED', 'Start the conversation first.');
       const session = e.conversation;
+      // A "more information" request reopens a draft copy of the submitted profile (M4c).
+      if (e.status === 'NEEDS_INFORMATION') await db.$transaction((tx) => ensureAmendmentDraft(tx, e));
 
       // Retries of the same message are deduplicated by the client message id (CF-15).
       const dup = await db.conversationTurn.findUnique({ where: { sessionId_clientMessageId: { sessionId: session.id, clientMessageId: req.body.clientMessageId } } });
@@ -168,6 +171,7 @@ export const profileRoutes: FastifyPluginAsyncZod<ProfileDeps> = async (app, dep
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => {
       const e = await ownEnrollment(tx, req.body.enrollmentId, actor.smeUserId);
       if (!(EDITABLE_ENROLLMENT as readonly string[]).includes(e.status)) throw notEditable(e.status);
+      if (e.status === 'NEEDS_INFORMATION') await ensureAmendmentDraft(tx, e);
       await ensureConversation(tx, e.id, actor.smeUserId);
       const session = (await tx.conversationSession.findUniqueOrThrow({ where: { enrollmentId: e.id } }));
       const { count } = await tx.conversationSession.updateMany({ where: { id: session.id, revision: req.body.expectedRevision }, data: { revision: { increment: 1 } } });
@@ -260,6 +264,7 @@ export const profileRoutes: FastifyPluginAsyncZod<ProfileDeps> = async (app, dep
         if (count === 0) throw stale(session.revision);
 
         const { policy, criteria } = policyFor(e.opportunityVersion);
+        if (e.status === 'NEEDS_INFORMATION') await ensureAmendmentDraft(tx, e);
         const draft = (await draftProfile(tx, e.id))!;
         const profile = ProfileData.parse(draft.data);
         const ready = readiness(policy, profile, criteria);
@@ -303,6 +308,7 @@ export const profileRoutes: FastifyPluginAsyncZod<ProfileDeps> = async (app, dep
         }
         await tx.enrollment.update({ where: { id: e.id }, data: { status: 'SUBMITTED', profileVersionId: draft.id, submittedAt: now, revision: { increment: 1 } } });
         // Exactly one assessment job per submission; it only recommends. A human decides (M4c).
+        await tx.suitabilityAssessment.updateMany({ where: { enrollmentId: e.id, status: { in: ['NOT_RUN', 'EVALUATING', 'ERROR'] } }, data: { status: 'SUPERSEDED' } });
         const assessment = await tx.suitabilityAssessment.create({
           data: { clientId: e.clientId, enrollmentId: e.id, profileVersionId: draft.id, opportunityVersionId: e.opportunityVersionId, status: 'NOT_RUN' },
         });

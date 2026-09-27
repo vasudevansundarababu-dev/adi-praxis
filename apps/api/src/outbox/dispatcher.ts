@@ -50,12 +50,19 @@ export async function processDomainEvent(db: Db, registry: HandlerRegistry, even
 
   for (const handler of registry.for(event.name)) {
     try {
+      if (handler.run) {
+        const done = await db.eventHandlerReceipt.findUnique({ where: { eventId_handler: { eventId, handler: handler.name } } });
+        if (done) continue;
+        await handler.run(event, db);
+        await db.eventHandlerReceipt.createMany({ data: [{ eventId, handler: handler.name }], skipDuplicates: true });
+        continue;
+      }
       await db.$transaction(async (tx) => {
         const done = await tx.eventHandlerReceipt.findUnique({
           where: { eventId_handler: { eventId, handler: handler.name } },
         });
         if (done) return;
-        await handler.handle(event, tx);
+        await handler.handle!(event, tx);
         await tx.eventHandlerReceipt.create({ data: { eventId, handler: handler.name } });
       });
     } catch (err) {

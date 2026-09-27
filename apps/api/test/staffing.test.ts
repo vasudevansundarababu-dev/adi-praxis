@@ -291,8 +291,8 @@ describe('M3 FLOW 2 core: matching and staffing', () => {
       expect((await post(pm, `/projects/${projectId}/assignments`, { candidateIds: [b.id] })).json().details.problems[0]).toMatch(/no longer eligible/);
     });
 
-    it('goes through the selection gate (stubbed until M4)', async () => {
-      const blocked: SelectionGate = { isSelected: async () => false };
+    it('goes through the selection gate', async () => {
+      const blocked: SelectionGate = { check: async () => ({ ok: false, reason: 'not selected for this pool' }) };
       const gated = await buildApp({ config: testConfig(), db, pingRedis: async () => true, selectionGate: blocked });
       try {
         const a = await createCandidate(clientId);
@@ -315,10 +315,10 @@ describe('M3 FLOW 2 core: matching and staffing', () => {
       let release!: () => void;
       const allArrived = new Promise<void>((r) => (release = r));
       const barrier: SelectionGate = {
-        async isSelected() {
+        async check() {
           if (++arrived === 6) release();
           await Promise.race([allArrived, new Promise((r) => setTimeout(r, 1000))]);
-          return true;
+          return { ok: true as const, enrollmentId: null, snapshot: {} };
         },
       };
       const racing = await buildApp({ config: testConfig(), db, pingRedis: async () => true, selectionGate: barrier });

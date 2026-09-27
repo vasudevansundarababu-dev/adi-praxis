@@ -1,4 +1,5 @@
-import { AssignRequest, MatchesResponse, RejectRequest } from '@praxis/shared';
+import type { Prisma } from '@prisma/client';
+import { ASSIGNMENT_PROPOSAL_DAYS, AssignRequest, MatchesResponse, RejectRequest } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db, Tx } from '../db';
@@ -7,7 +8,7 @@ import { runCommand } from '../platform/command';
 import type { Geocoder } from '../staffing/geocoder';
 import { RuleBasedMatchService } from '../staffing/match-service';
 import type { SelectionGate } from '../staffing/selection-gate';
-import { activeAssignmentCount, ensureJobDescription, listMatches, matchRequestFor, runAndStoreMatches } from '../staffing/staffing-service';
+import { assignmentCounts, ensureJobDescription, expireProposals, listMatches, markStaffedIfReady, matchRequestFor, runAndStoreMatches } from '../staffing/staffing-service';
 import { launchCampaign } from './campaigns';
 import { loadProject } from './projects';
 import type { Config } from '../config';
@@ -81,15 +82,16 @@ export const staffingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; geo
         const current = await tx.project.findUniqueOrThrow({ where: { id: p.id } });
         if (current.status !== 'STAFFING') throw notStaffing(current.status);
 
+        await expireProposals(tx, { projectId: p.id });
         const required = current.requiredWorkers ?? 0;
-        const assignedBefore = await activeAssignmentCount(tx, p.id);
-        const shortfall = Math.max(0, required - assignedBefore);
+        const counts = await assignmentCounts(tx, p.id);
+        const shortfall = Math.max(0, required - counts.accepted - counts.proposed);
 
         let ids: string[];
         if ('topN' in req.body) {
-          const assigned = new Set((await tx.projectAssignment.findMany({ where: { projectId: p.id, releasedAt: null } })).map((a) => a.candidateId));
+          const taken = new Set(counts.active.map((a) => a.candidateId));
           const ranked = await tx.projectMatch.findMany({ where: { projectId: p.id }, orderBy: { rank: 'asc' }, select: { candidateId: true } });
-          ids = ranked.map((r) => r.candidateId).filter((id) => !assigned.has(id)).slice(0, req.body.topN);
+          ids = ranked.map((r) => r.candidateId).filter((id) => !taken.has(id)).slice(0, req.body.topN);
           if (ids.length === 0) throw new AppError(409, 'NO_CANDIDATES', 'No available matched candidates to assign. Re-run the match or launch sourcing.');
         } else {
           ids = [...new Set(req.body.candidateIds)];
@@ -103,33 +105,55 @@ export const staffingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; geo
         await tx.$executeRaw`SELECT 1 FROM "Candidate" WHERE id = ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE`;
         const run = await new RuleBasedMatchService(tx, geocoder).findMatches(await matchRequestFor(tx, p.id, ids));
         const eligible = new Map(run.matches.map((m) => [m.candidateId, m]));
-        const already = new Set((await tx.projectAssignment.findMany({ where: { projectId: p.id, releasedAt: null, candidateId: { in: ids } } })).map((a) => a.candidateId));
+        const already = new Set(counts.active.filter((a) => ids.includes(a.candidateId)).map((a) => a.candidateId));
 
         const problems: string[] = [];
+        const gates = new Map<string, Awaited<ReturnType<SelectionGate['check']>>>();
         for (const id of ids) {
           if (already.has(id)) problems.push(`${id}: already assigned`);
           else if (!eligible.has(id)) problems.push(`${id}: no longer eligible (filters, identity, capacity or rejected)`);
-          else if (!(await selectionGate.isSelected({ candidateId: id, projectId: p.id }))) problems.push(`${id}: not selected for this project's pool`);
+          else {
+            const g = await selectionGate.check(tx, { candidateId: id, projectId: p.id });
+            gates.set(id, g);
+            if (!g.ok) problems.push(`${id}: ${g.reason}`);
+          }
         }
         if (problems.length) throw new AppError(409, 'NOT_ASSIGNABLE', `Cannot assign: ${problems.join('; ')}.`, { problems });
 
+        const opportunity = await tx.opportunityVersion.findFirst({ where: { opportunity: { projectId: p.id }, publishedAt: { not: null } }, orderBy: { version: 'desc' } });
         for (const id of ids) {
           const score = eligible.get(id)!.score;
+          const g = gates.get(id)! as Extract<Awaited<ReturnType<SelectionGate['check']>>, { ok: true }>;
           const a = await tx.projectAssignment.upsert({
             where: { projectId_candidateId: { projectId: p.id, candidateId: id } },
             create: { clientId: p.clientId, projectId: p.id, candidateId: id, matchScore: score },
-            update: { releasedAt: null, assignedAt: new Date(), matchScore: score },
+            update: { releasedAt: null, assignedAt: new Date(), matchScore: score, smeAssignmentId: null },
           });
-          await audit({ entityType: 'ProjectAssignment', entityId: a.id, action: 'project.candidate_assigned', after: { projectId: p.id, candidateId: id, matchScore: score } });
-          await emit({ name: 'candidate.assigned', aggregateType: 'ProjectAssignment', aggregateId: a.id, payload: { projectId: p.id, candidateId: id, projectAssignmentId: a.id } });
+          if (g.enrollmentId) {
+            // FLOW2 C08: the candidate must accept. The proposal pins the requirements version and qualification snapshot.
+            const candidate = await tx.candidate.findUniqueOrThrow({ where: { id } });
+            const proposal = await tx.smeAssignment.create({
+              data: {
+                clientId: p.clientId,
+                enrollmentId: g.enrollmentId,
+                smeUserId: candidate.smeUserId,
+                projectId: p.id,
+                requirementsVersion: opportunity?.version ?? 0,
+                qualificationSnapshot: g.snapshot as Prisma.InputJsonValue,
+                scope: (g.snapshot.scope ?? {}) as Prisma.InputJsonValue,
+                deadline: current.endDate,
+                expiresAt: new Date(Date.now() + ASSIGNMENT_PROPOSAL_DAYS * 86_400_000),
+              },
+            });
+            await tx.projectAssignment.update({ where: { id: a.id }, data: { smeAssignmentId: proposal.id, enrollmentId: g.enrollmentId } });
+            await audit({ entityType: 'SmeAssignment', entityId: proposal.id, action: 'assignment.proposed', after: { projectId: p.id, candidateId: id, matchScore: score, expiresAt: proposal.expiresAt } });
+          } else {
+            // Staffing test double: recorded as direct (already accepted).
+            await audit({ entityType: 'ProjectAssignment', entityId: a.id, action: 'project.candidate_assigned', after: { projectId: p.id, candidateId: id, matchScore: score } });
+            await emit({ name: 'candidate.assigned', aggregateType: 'ProjectAssignment', aggregateId: a.id, payload: { projectId: p.id, candidateId: id, projectAssignmentId: a.id } });
+          }
         }
-
-        const assigned = assignedBefore + ids.length;
-        if (assigned >= required) {
-          await tx.project.update({ where: { id: p.id }, data: { status: 'STAFFED' } });
-          await audit({ entityType: 'Project', entityId: p.id, action: 'project.staffed', before: { status: 'STAFFING' }, after: { status: 'STAFFED', assigned, requiredWorkers: required } });
-          await emit({ name: 'project.staffed', aggregateType: 'Project', aggregateId: p.id, payload: { projectId: p.id, assigned, requiredWorkers: required } });
-        }
+        await markStaffedIfReady(tx, p.id, audit, emit);
         return { status: 200, body: await listMatches(tx, p.id) };
       });
       return reply;
@@ -149,9 +173,12 @@ export const staffingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; geo
         const current = await tx.project.findUniqueOrThrow({ where: { id: p.id } });
         // After STAFFED, releasing a worker is FLOW 3's reclaim (M5), not a staffing action.
         if (current.status !== 'STAFFING') throw notStaffing(current.status);
-        const a = await tx.projectAssignment.findFirst({ where: { id: req.params.aid, projectId: p.id, releasedAt: null } });
+        const a = await tx.projectAssignment.findFirst({ where: { id: req.params.aid, projectId: p.id, releasedAt: null }, include: { smeAssignment: true } });
         if (!a) throw notFound('Assignment not found');
         await tx.projectAssignment.update({ where: { id: a.id }, data: { releasedAt: new Date() } });
+        if (a.smeAssignment && ['PROPOSED', 'ACCEPTED'].includes(a.smeAssignment.status)) {
+          await tx.smeAssignment.update({ where: { id: a.smeAssignment.id }, data: { status: 'CANCELED', respondedAt: new Date() } });
+        }
         await audit({ entityType: 'ProjectAssignment', entityId: a.id, action: 'project.candidate_released', before: { releasedAt: null }, after: { candidateId: a.candidateId } });
         return { status: 200, body: await listMatches(tx, p.id) };
       });

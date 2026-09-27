@@ -1,3 +1,4 @@
+import { defaultEvaluator } from './app';
 import { loadConfig } from './config';
 import { createDb } from './db';
 import { redisConnection } from './lib/redis';
@@ -9,7 +10,7 @@ const config = loadConfig();
 const db = createDb(config.DATABASE_URL);
 const connection = redisConnection(config.REDIS_URL);
 const queue = createDomainEventsQueue(connection);
-const worker = createDomainEventsWorker(db, defaultHandlers(), connection);
+const worker = createDomainEventsWorker(db, defaultHandlers(defaultEvaluator(config)), connection);
 const log = (level: string, msg: string, extra: object = {}) =>
   console.log(JSON.stringify({ level, msg, service: 'praxis-worker', time: new Date().toISOString(), ...extra }));
 

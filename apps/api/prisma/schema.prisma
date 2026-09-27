@@ -302,6 +302,7 @@ model User {
   client        Client        @relation(fields: [clientId], references: [id])
   sessions      Session[]
   ownedProjects Project[]     @relation("ProjectOwner")
+  reviewing     ProjectReviewer[]
 
   @@index([clientId])
 }
@@ -495,6 +496,7 @@ model Project {
   slots              CoverageSlot[]
   inputBatches       TaskInputBatch[]
   opportunity        Opportunity?
+  reviewers          ProjectReviewer[]
   matches            ProjectMatch[]
   matchRejections    ProjectMatchRejection[]
   /// When the last FLOW 2 match run finished.
@@ -1160,6 +1162,11 @@ model Enrollment {
   status               EnrollmentStatus @default(DRAFT)
   revision             Int              @default(0)
   submittedAt          DateTime?        @map("submitted_at")
+  /// The specific clarification a reviewer asked for (NEEDS_INFORMATION).
+  informationRequest   String?          @map("information_request")
+  /// Candidate-facing explanation of the latest human decision (never shown before a human decides).
+  decisionMessage      String?          @map("decision_message")
+  reviewRequestReason  String?          @map("review_request_reason")
   createdAt            DateTime         @default(now()) @map("created_at")
   updatedAt            DateTime         @updatedAt @map("updated_at")
 
@@ -1398,6 +1405,8 @@ model OnboardingAcknowledgement {
   checklistId    String   @map("checklist_id") @db.Uuid
   itemKey        String   @map("item_key")
   termsHash      String?  @map("terms_hash")
+  /// Item answers, e.g. work preferences or the conflict declaration.
+  data           Json?
   acknowledgedAt DateTime @default(now()) @map("acknowledged_at")
   createdAt      DateTime @default(now()) @map("created_at")
 
@@ -1423,6 +1432,13 @@ model SmeAssignment {
   revision              Int                 @default(0)
   declineReason         String?             @map("decline_reason")
   workbenchRef          String?             @map("workbench_ref")
+  proposedAt            DateTime            @default(now()) @map("proposed_at")
+  /// Proposals not answered by this time expire and free the slot (7 days).
+  expiresAt             DateTime?           @map("expires_at")
+  respondedAt           DateTime?           @map("responded_at")
+  /// Short-lived, single-use handoff to the task workbench (hash only).
+  handoffTokenHash      String?             @unique @map("handoff_token_hash")
+  handoffExpiresAt      DateTime?           @map("handoff_expires_at")
   createdAt             DateTime            @default(now()) @map("created_at")
   updatedAt             DateTime            @updatedAt @map("updated_at")
 
@@ -1466,4 +1482,39 @@ model ConflictDeclaration {
   smeUser SmeUser @relation(fields: [smeUserId], references: [id])
 
   @@index([reviewerId])
+}
+
+/// Reviewers assigned to a project's applicant pool (FLOW2: restrict reviewers to assigned pools).
+model ProjectReviewer {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  projectId    String   @map("project_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  assignedById String   @map("assigned_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+}
+
+/// Admin-published contributor terms (FLOW2 C07: never invented). Candidates accept a specific version by hash.
+model TermsDocument {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String    @map("client_id") @db.Uuid
+  /// contributor | confidentiality_ip | data_use
+  key         String
+  version     Int
+  title       String
+  body        String
+  sha256      String
+  /// Seeded stand-in text for local development; production refuses onboarding while any is in use.
+  placeholder Boolean   @default(false)
+  publishedById String? @map("published_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([clientId, key, version])
 }

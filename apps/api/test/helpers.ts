@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { buildApp } from '../src/app';
 import { hashPassword } from '../src/auth/password';
 import { loadConfig, type Config } from '../src/config';
+import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { createDb, type Db } from '../src/db';
 import { TEST_DATABASE_URL, TEST_REDIS_URL } from './env';
 
@@ -39,8 +40,12 @@ export async function createUser(clientId: string, roles: InternalRole[], email 
   return db.user.create({ data: { clientId, email, name: email.split('@')[0]!, roles, passwordHash: await hashed } });
 }
 
+/**
+ * App for tests that exercise staffing without the candidate journey: uses the stub selection gate (a documented test
+ * double). Tests of selection, onboarding and acceptance build the app with the real gate.
+ */
 export async function buildTestApp(configOverrides: Record<string, string> = {}): Promise<FastifyInstance> {
-  return buildApp({ config: testConfig(configOverrides), db, pingRedis: async () => true });
+  return buildApp({ config: testConfig(configOverrides), db, pingRedis: async () => true, selectionGate: stubSelectionGate });
 }
 
 /** Signs in through the real endpoint and returns the Cookie header value. */

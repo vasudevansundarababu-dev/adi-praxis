@@ -24,16 +24,19 @@ import { jobDescriptionRoutes } from './routes/job-descriptions';
 import { GoogleIdTokenVerifier, MockGoogleVerifier, type GoogleVerifier } from './candidate/google';
 import { MockIdentityProvider, StripeIdentityProvider, type IdentityProvider } from './candidate/identity-provider';
 import { ClaudeVertexProfileAssistant, MockProfileAssistant, type ProfileAssistant } from './candidate/profile-assistant';
+import { ClaudeVertexSuitabilityEvaluator, MockSuitabilityEvaluator, type SuitabilityEvaluator } from './candidate/suitability';
 import { GcsStorage, stubScanner, type MalwareScanner, type ObjectStorage } from './candidate/storage';
 import { campaignRoutes } from './routes/campaigns';
+import { journeyRoutes } from './routes/journey';
 import { profileRoutes } from './routes/profile';
+import { reviewRoutes } from './routes/review';
 import { candidateAuthRoutes } from './routes/candidate-auth';
 import { candidateRoutes } from './routes/candidates';
 import { opportunityRoutes } from './routes/opportunities';
 import { projectRoutes } from './routes/projects';
 import { staffingRoutes } from './routes/staffing';
 import { OfflineGeocoder, type Geocoder } from './staffing/geocoder';
-import { stubSelectionGate, type SelectionGate } from './staffing/selection-gate';
+import { dbSelectionGate, type SelectionGate } from './staffing/selection-gate';
 import { taxonomyRoutes } from './routes/taxonomy';
 import { templateRoutes } from './routes/templates';
 import { userRoutes } from './routes/users';
@@ -43,7 +46,7 @@ export interface AppDeps {
   db: Db;
   pingRedis: () => Promise<boolean>;
   logger?: boolean;
-  /** Defaults: offline city table; M3 selection stub (replaced in M4). */
+  /** Defaults: offline city table; the real selection gate (selected + onboarded + eligible). */
   geocoder?: Geocoder;
   selectionGate?: SelectionGate;
   /** Defaults follow config: real Google / Stripe when keys are set, local mocks otherwise. */
@@ -56,12 +59,20 @@ export interface AppDeps {
   /** Evidence storage (GCS; the emulator locally) and malware scanning (stub in v1). */
   storage?: ObjectStorage;
   scanner?: MalwareScanner;
+  /** Suitability assessment (reviewer aid only): Claude on Vertex when configured, otherwise the local mock. */
+  evaluator?: SuitabilityEvaluator;
 }
 
 export function defaultAssistant(config: Config): ProfileAssistant {
   return config.assistantMode === 'vertex'
     ? new ClaudeVertexProfileAssistant({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION })
     : new MockProfileAssistant();
+}
+
+export function defaultEvaluator(config: Config): SuitabilityEvaluator {
+  return config.assistantMode === 'vertex'
+    ? new ClaudeVertexSuitabilityEvaluator({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION })
+    : new MockSuitabilityEvaluator();
 }
 
 export function defaultStorage(config: Config): ObjectStorage {
@@ -79,6 +90,8 @@ export function defaultIdentityProvider(config: Config): IdentityProvider {
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
+  const storage = deps.storage ?? defaultStorage(deps.config);
+  const selectionGate = deps.selectionGate ?? dbSelectionGate;
   const app = Fastify({
     logger: deps.logger ?? false,
     genReqId: (req) => {
@@ -150,7 +163,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         db: deps.db,
         config: deps.config,
         geocoder: deps.geocoder ?? new OfflineGeocoder(),
-        selectionGate: deps.selectionGate ?? stubSelectionGate,
+        selectionGate,
       });
       await v1.register(candidateRoutes, { db: deps.db });
       await v1.register(opportunityRoutes, { db: deps.db });
@@ -158,9 +171,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(profileRoutes, {
         db: deps.db,
         assistant: deps.assistant ?? defaultAssistant(deps.config),
-        storage: deps.storage ?? defaultStorage(deps.config),
+        storage,
         scanner: deps.scanner ?? stubScanner,
       });
+      await v1.register(reviewRoutes, { db: deps.db, evaluator: deps.evaluator ?? defaultEvaluator(deps.config), storage });
+      await v1.register(journeyRoutes, { db: deps.db, config: deps.config, selectionGate });
       await v1.register(candidateAuthRoutes, {
         db: deps.db,
         config: deps.config,

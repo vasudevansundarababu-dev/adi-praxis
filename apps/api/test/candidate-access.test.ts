@@ -7,6 +7,7 @@ import { GoogleIdTokenVerifier, MockGoogleVerifier } from '../src/candidate/goog
 import { isAdult, MockIdentityProvider } from '../src/candidate/identity-provider';
 import { processIdentityWebhook } from '../src/candidate/identity-service';
 import { loadConfig } from '../src/config';
+import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { processDomainEvent } from '../src/outbox/dispatcher';
 import { defaultHandlers } from '../src/outbox/handlers';
 import { TEST_DATABASE_URL, TEST_REDIS_URL } from './env';
@@ -26,7 +27,8 @@ describe('M4a: sourcing, candidate sign-in, identity, opportunity', () => {
   beforeAll(async () => {
     google = new MockGoogleVerifier(SECRET);
     identity = new MockIdentityProvider(SECRET, 'http://candidate.test');
-    app = await buildApp({ config: testConfig(), db, pingRedis: async () => true, google, identity, resolveClientId: async () => clientId });
+    // Campaign tests assign synthetic candidates, so this file uses the staffing test double for the selection gate.
+    app = await buildApp({ config: testConfig(), db, pingRedis: async () => true, google, identity, resolveClientId: async () => clientId, selectionGate: stubSelectionGate });
   });
 
   beforeEach(async () => {

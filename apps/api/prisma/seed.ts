@@ -3,6 +3,7 @@ import { SEED_DEMOGRAPHIC_ATTRIBUTES } from '@praxis/shared';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { hashPassword } from '../src/auth/password';
+import { seedPlaceholderTerms } from '../src/candidate/onboarding-service';
 import { importTaskflow, readTaskflow, type ImportResult } from '../src/templates/taskflow-import';
 
 /**
@@ -12,6 +13,7 @@ import { importTaskflow, readTaskflow, type ImportResult } from '../src/template
  * - FLOW 4 failure reason codes (SPEC: "seeded, Admin-editable")
  * - the demographic taxonomy: SPEC's 8 attributes with standard value lists (ISO 3166, ISO 639, CEFR, ISCED, IANA)
  * - the template catalog from docs/Taskflow.xlsx (or TASKFLOW_PATH), all as drafts
+ * - placeholder contributor terms (version 1) until an Admin publishes approved text; production blocks onboarding on them
  */
 export const DEFAULT_TASKFLOW_PATH = path.resolve(import.meta.dirname, '../../../docs/Taskflow.xlsx');
 
@@ -63,6 +65,8 @@ export async function seed(db: PrismaClient, env: NodeJS.ProcessEnv = process.en
       create: { clientId: client.id, key: a.key, label: a.label, type: a.type, allowedValues: a.allowedValues as Prisma.InputJsonValue },
     });
   }
+
+  await seedPlaceholderTerms(db, client.id, admin.id);
 
   const taskflowPath = env.TASKFLOW_PATH || DEFAULT_TASKFLOW_PATH;
   let templates: ImportResult | null = null;

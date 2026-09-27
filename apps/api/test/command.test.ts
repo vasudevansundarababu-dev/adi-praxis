@@ -89,6 +89,15 @@ describe('State changes: audit log and idempotency', () => {
       });
     });
 
+    it('an Admin cannot remove their own Admin role or disable themselves (no lock-out)', async () => {
+      const roles = await app.inject({ method: 'PATCH', url: `/api/v1/users/${adminId}/roles`, headers: { cookie, ...idem() }, payload: { roles: ['PM'] } });
+      expect(roles.statusCode).toBe(409);
+      expect(roles.json().message).toMatch(/own Admin role/);
+      const status = await app.inject({ method: 'PATCH', url: `/api/v1/users/${adminId}/status`, headers: { cookie, ...idem() }, payload: { status: 'DISABLED' } });
+      expect(status.statusCode).toBe(409);
+      expect((await db.user.findUniqueOrThrow({ where: { id: adminId } })).roles).toEqual(['ADMIN']);
+    });
+
     it('change status records before and after', async () => {
       const { id } = (await createUserReq(idem())).json();
       const before = new Set((await db.auditEvent.findMany({ select: { id: true } })).map((e) => e.id));

@@ -73,6 +73,10 @@ export const userRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db })
         const before = await tx.user.findFirst({ where: { id: req.params.id, clientId: actor.clientId } });
         if (!before) throw notFound('User not found');
         const roles = [...new Set(req.body.roles)];
+        // Never leave the client without an Admin: you cannot remove your own Admin role (another Admin can).
+        if (before.id === actor.userId && before.roles.includes('ADMIN') && !roles.includes('ADMIN')) {
+          throw conflict('You cannot remove your own Admin role. Ask another Admin.');
+        }
         const user = await tx.user.update({ where: { id: before.id }, data: { roles } });
         await audit({
           entityType: 'User',

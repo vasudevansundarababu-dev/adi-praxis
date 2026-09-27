@@ -1,6 +1,6 @@
 'use client';
 
-import { CONTRIBUTION_ROLE_LABELS, CONTRIBUTION_ROLES, OpportunityCriteria, type ContributionRole, type OpportunityBrief } from '@praxis/shared';
+import { CONTRIBUTION_ROLE_LABELS, CONTRIBUTION_ROLES, OpportunityCriteria, type ContributionRole, type OpportunityBrief, type QuestionPolicy } from '@praxis/shared';
 import Link from 'next/link';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
@@ -10,6 +10,7 @@ export interface OwnerView {
   opportunityId: string | null;
   status: 'DRAFT' | 'PUBLISHED' | 'CLOSED';
   draft: { brief: OpportunityBrief; criteria: OpportunityCriteria };
+  questionPolicy: QuestionPolicy;
   publishProblems: string[];
   versions: { version: number; publishedAt: string | null }[];
   documents: { id: string; filename: string; status: string; extractedText: string; confirmedText: string | null; createdAt: string }[];
@@ -34,6 +35,9 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
   const [view, setView] = useState(initial);
   const [brief, setBrief] = useState(initial.draft.brief);
   const [criteria, setCriteria] = useState(initial.draft.criteria);
+  const [policy, setPolicy] = useState(initial.questionPolicy);
+  /** undefined = unchanged, null = reset to the generated default, otherwise the edited policy. */
+  const [policyEdit, setPolicyEdit] = useState<QuestionPolicy | null | undefined>(undefined);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string; problems?: string[] } | null>(null);
   const [pending, setPending] = useState(false);
   const pendingDoc = view.documents.find((d) => d.status === 'PENDING_REVIEW');
@@ -43,6 +47,8 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
     setView(v);
     setBrief(v.draft.brief);
     setCriteria(v.draft.criteria);
+    setPolicy(v.questionPolicy);
+    setPolicyEdit(undefined);
     setDocText(v.documents.find((d) => d.status === 'PENDING_REVIEW')?.extractedText ?? '');
     setMessage({ kind: 'ok', text });
   };
@@ -63,7 +69,7 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
       setMessage({ kind: 'error', text: 'Fix the criteria first.', problems: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) });
       return false;
     }
-    return run('PUT', `/projects/${view.projectId}/opportunity/draft`, { brief, criteria }, 'Draft saved.');
+    return run('PUT', `/projects/${view.projectId}/opportunity/draft`, { brief, criteria, ...(policyEdit !== undefined ? { questionPolicy: policyEdit } : {}) }, 'Draft saved.');
   };
 
   async function upload(file: File) {
@@ -198,6 +204,44 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
             + Add criterion
           </button>
         </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="font-semibold">Questions candidates will be asked</h2>
+        <p className="text-sm text-fg-muted">
+          {policy.source === 'owner' ? 'Edited by you.' : 'Generated from the brief and criteria.'} The assistant asks one at a time and may only rephrase
+          follow-ups; it cannot add questions or criteria. Each criterion keeps its own question when you publish.
+        </p>
+        <ol className="mt-2 space-y-2">
+          {policy.questions.map((q, i) => {
+            const update = (patch: Partial<typeof q>) => {
+              const next = { ...policy, source: 'owner' as const, questions: policy.questions.map((x, j) => (j === i ? { ...x, ...patch } : x)) };
+              setPolicy(next);
+              setPolicyEdit(next);
+            };
+            return (
+              <li key={q.id} className="rounded-md border border-line p-2 text-sm">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-fg-muted">
+                  <span>{i + 1}. {q.section}</span>
+                  {q.criterionIds.length > 0 && <span>· criterion {q.criterionIds.join(', ')}</span>}
+                  <label className="ml-auto flex items-center gap-1">
+                    <input type="checkbox" checked={q.required} onChange={(e) => update({ required: e.target.checked })} /> Required
+                  </label>
+                  <button type="button" onClick={() => { const next = { ...policy, source: 'owner' as const, questions: policy.questions.filter((_, j) => j !== i) }; setPolicy(next); setPolicyEdit(next); }} className="text-link">
+                    Remove
+                  </button>
+                </div>
+                <textarea aria-label={`Question ${i + 1}`} rows={2} value={q.text} onChange={(e) => update({ text: e.target.value })} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
+                <input aria-label={`Why we ask, question ${i + 1}`} placeholder="Why we ask" value={q.why} onChange={(e) => update({ why: e.target.value })} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1 text-xs" />
+              </li>
+            );
+          })}
+        </ol>
+        {policy.source === 'owner' && (
+          <button type="button" onClick={() => { setPolicyEdit(null); setMessage({ kind: 'ok', text: 'Questions will reset to the generated default when you save.' }); }} className="mt-2 text-sm text-link">
+            Reset to the generated questions
+          </button>
+        )}
       </section>
 
       {message && (

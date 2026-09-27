@@ -10,3 +10,4 @@ export * from './profile';
 export * from './taxonomy-data';
 export * from './selection';
 export * from './tasks';
+export * from './kyc';

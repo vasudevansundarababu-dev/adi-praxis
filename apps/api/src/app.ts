@@ -1,4 +1,5 @@
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
@@ -20,7 +21,12 @@ import { AppError } from './lib/errors';
 import { authRoutes } from './routes/auth';
 import { healthRoutes } from './routes/health';
 import { jobDescriptionRoutes } from './routes/job-descriptions';
+import { GoogleIdTokenVerifier, MockGoogleVerifier, type GoogleVerifier } from './candidate/google';
+import { MockIdentityProvider, StripeIdentityProvider, type IdentityProvider } from './candidate/identity-provider';
+import { campaignRoutes } from './routes/campaigns';
+import { candidateAuthRoutes } from './routes/candidate-auth';
 import { candidateRoutes } from './routes/candidates';
+import { opportunityRoutes } from './routes/opportunities';
 import { projectRoutes } from './routes/projects';
 import { staffingRoutes } from './routes/staffing';
 import { OfflineGeocoder, type Geocoder } from './staffing/geocoder';
@@ -37,6 +43,21 @@ export interface AppDeps {
   /** Defaults: offline city table; M3 selection stub (replaced in M4). */
   geocoder?: Geocoder;
   selectionGate?: SelectionGate;
+  /** Defaults follow config: real Google / Stripe when keys are set, local mocks otherwise. */
+  google?: GoogleVerifier;
+  identity?: IdentityProvider;
+  /** The single v1 client candidates sign up under. Defaults to SEED_CLIENT_NAME, else the oldest client. */
+  resolveClientId?: () => Promise<string>;
+}
+
+export function defaultGoogleVerifier(config: Config): GoogleVerifier {
+  return config.candidateAuthMode === 'google' ? new GoogleIdTokenVerifier(config.GOOGLE_OAUTH_CLIENT_ID) : new MockGoogleVerifier(config.MOCK_SECRET);
+}
+
+export function defaultIdentityProvider(config: Config): IdentityProvider {
+  return config.identityMode === 'stripe'
+    ? new StripeIdentityProvider(config.STRIPE_SECRET_KEY, config.STRIPE_IDENTITY_WEBHOOK_SECRET)
+    : new MockIdentityProvider(config.MOCK_SECRET, config.CANDIDATE_APP_URL);
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -77,6 +98,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   await app.register(cookie);
+  await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 + 1, files: 1, fields: 5 } });
   await app.register(cors, {
     origin: deps.config.CORS_ORIGINS,
     credentials: true,
@@ -108,10 +130,27 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(projectRoutes, { db: deps.db });
       await v1.register(staffingRoutes, {
         db: deps.db,
+        config: deps.config,
         geocoder: deps.geocoder ?? new OfflineGeocoder(),
         selectionGate: deps.selectionGate ?? stubSelectionGate,
       });
       await v1.register(candidateRoutes, { db: deps.db });
+      await v1.register(opportunityRoutes, { db: deps.db });
+      await v1.register(campaignRoutes, { db: deps.db, config: deps.config });
+      await v1.register(candidateAuthRoutes, {
+        db: deps.db,
+        config: deps.config,
+        google: deps.google ?? defaultGoogleVerifier(deps.config),
+        identity: deps.identity ?? defaultIdentityProvider(deps.config),
+        resolveClientId:
+          deps.resolveClientId ??
+          (async () => {
+            const byName = await deps.db.client.findFirst({ where: { name: process.env.SEED_CLIENT_NAME || 'ADI-Labs' } });
+            const c = byName ?? (await deps.db.client.findFirst({ orderBy: { createdAt: 'asc' } }));
+            if (!c) throw new Error('No client configured; run the seed');
+            return c.id;
+          }),
+      });
     },
     { prefix: '/api/v1' },
   );

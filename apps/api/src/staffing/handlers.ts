@@ -32,3 +32,31 @@ export function rematchOnApproval(geocoder: Geocoder): EventHandler {
     },
   };
 }
+
+/** SPEC FLOW 2: close the campaign automatically when the project is STAFFED. */
+export function closeCampaignsOnStaffed(): EventHandler {
+  return {
+    name: 'flow2.close-campaigns-on-staffed',
+    event: 'project.staffed',
+    async handle(event, tx) {
+      const projectId = (event.payload as { projectId?: string }).projectId;
+      if (!projectId) return;
+      const open = await tx.campaign.findMany({ where: { projectId, status: { in: ['LIVE', 'PAUSED'] } } });
+      for (const c of open) {
+        await tx.campaign.update({ where: { id: c.id }, data: { status: 'CLOSED', endAt: new Date() } });
+        await tx.auditEvent.create({
+          data: {
+            clientId: c.clientId,
+            actorType: 'SYSTEM',
+            actorId: 'flow2.close-campaigns-on-staffed',
+            entityType: 'Campaign',
+            entityId: c.id,
+            action: 'campaign.closed',
+            before: { status: c.status },
+            after: { status: 'CLOSED', trigger: 'project.staffed', eventId: event.id },
+          },
+        });
+      }
+    },
+  };
+}

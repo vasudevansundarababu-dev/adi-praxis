@@ -2,7 +2,7 @@ import type { OutboxEvent } from '@prisma/client';
 import type { DomainEventName } from '@praxis/shared';
 import type { Tx } from '../db';
 import { OfflineGeocoder } from '../staffing/geocoder';
-import { rematchOnApproval } from '../staffing/handlers';
+import { closeCampaignsOnStaffed, rematchOnApproval } from '../staffing/handlers';
 
 /** A consumer of one domain event. `name` must be stable: it keys the idempotency receipt. */
 export interface EventHandler {
@@ -31,5 +31,5 @@ export class HandlerRegistry {
 
 /** Production handler registry. FLOW 3 registers `candidate.assigned` / `project.staffed` consumers in M5. */
 export function defaultHandlers(): HandlerRegistry {
-  return new HandlerRegistry().register(rematchOnApproval(new OfflineGeocoder()));
+  return new HandlerRegistry().register(rematchOnApproval(new OfflineGeocoder())).register(closeCampaignsOnStaffed());
 }

@@ -1,8 +1,9 @@
 import type { Db } from '../db';
 import { newToken, sha256 } from '../lib/crypto';
-import type { InternalActor } from './actor';
+import type { CandidateActor, InternalActor } from './actor';
 
 export const SESSION_COOKIE = 'praxis_session';
+export const CANDIDATE_SESSION_COOKIE = 'praxis_candidate';
 
 /** Creates a server-side session; only the SHA-256 of the token is stored. Returns the raw token for the cookie. */
 export async function createInternalSession(
@@ -56,4 +57,40 @@ export async function revokeSession(db: Db, sessionId: string) {
 
 export async function revokeAllUserSessions(db: Db, userId: string) {
   await db.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+}
+
+/** Candidate session (separate audience). Only the token hash is stored. */
+export async function createCandidateSession(
+  db: Db,
+  args: { smeUserId: string; clientId: string; ttlHours: number; ip?: string; userAgent?: string },
+) {
+  const token = newToken();
+  const expiresAt = new Date(Date.now() + args.ttlHours * 3600_000);
+  await db.session.create({
+    data: {
+      audience: 'CANDIDATE',
+      smeUserId: args.smeUserId,
+      clientId: args.clientId,
+      tokenHash: sha256(token),
+      expiresAt,
+      ip: args.ip,
+      userAgent: args.userAgent?.slice(0, 500),
+    },
+  });
+  return { token, expiresAt };
+}
+
+export async function resolveCandidateSession(db: Db, token: string): Promise<CandidateActor | null> {
+  const session = await db.session.findUnique({ where: { tokenHash: sha256(token) }, include: { smeUser: true } });
+  if (
+    !session ||
+    session.audience !== 'CANDIDATE' ||
+    session.revokedAt ||
+    session.expiresAt <= new Date() ||
+    !session.smeUser ||
+    session.smeUser.accountStatus !== 'ACTIVE'
+  ) {
+    return null;
+  }
+  return { type: 'CANDIDATE', smeUserId: session.smeUser.id, clientId: session.smeUser.clientId, sessionId: session.id };
 }

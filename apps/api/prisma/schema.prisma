@@ -616,6 +616,8 @@ model Campaign {
   budget           Decimal?        @db.Decimal(12, 2)
   postText         String?         @map("post_text")
   applyUrl         String?         @map("apply_url")
+  /// Tracked apply-link clicks (other metrics are derived from applications and enrollments).
+  clicks           Int             @default(0)
   startAt          DateTime?       @map("start_at")
   endAt            DateTime?       @map("end_at")
   /// clicks, applies, kyc_completed, approved, assigned
@@ -1045,6 +1047,8 @@ model IdentityAttempt {
   providerSessionId String         @unique @map("provider_session_id")
   livemode          Boolean
   status            IdentityStatus
+  /// Over-18 result derived in memory from the provider's verified output. The date of birth is never stored.
+  adultConfirmed    Boolean?       @map("adult_confirmed")
   checkedAt         DateTime?      @map("checked_at")
   errorCode         String?        @map("error_code")
   lastEventAt       DateTime?      @map("last_event_at")
@@ -1078,12 +1082,46 @@ model Opportunity {
   clientId  String            @map("client_id") @db.Uuid
   projectId String            @unique @map("project_id") @db.Uuid
   status    OpportunityStatus @default(DRAFT)
+  /// Working copy the owner edits; publishing freezes it into a new OpportunityVersion.
+  draftBrief    Json?         @map("draft_brief")
+  draftCriteria Json?         @map("draft_criteria")
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
 
-  project     Project              @relation(fields: [projectId], references: [id])
+  project     Project                @relation(fields: [projectId], references: [id])
   versions    OpportunityVersion[]
   enrollments Enrollment[]
+  documents   OpportunityDocument[]
+}
+
+enum OpportunityDocumentStatus {
+  PENDING_REVIEW
+  CONFIRMED
+  DISCARDED
+}
+
+/// An owner-imported JD document. Only the extracted text and a hash are kept; the text is untrusted until an
+/// owner reviews and confirms it (FLOW2-SME C03, CF-07).
+model OpportunityDocument {
+  id            String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String                    @map("client_id") @db.Uuid
+  opportunityId String                    @map("opportunity_id") @db.Uuid
+  filename      String
+  mimeType      String                    @map("mime_type")
+  sizeBytes     Int                       @map("size_bytes")
+  sha256        String
+  extractedText String                    @map("extracted_text")
+  confirmedText String?                   @map("confirmed_text")
+  status        OpportunityDocumentStatus @default(PENDING_REVIEW)
+  uploadedById  String                    @map("uploaded_by_id") @db.Uuid
+  reviewedById  String?                   @map("reviewed_by_id") @db.Uuid
+  reviewedAt    DateTime?                 @map("reviewed_at")
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  updatedAt     DateTime                  @updatedAt @map("updated_at")
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
+
+  @@index([opportunityId])
 }
 
 model OpportunityVersion {

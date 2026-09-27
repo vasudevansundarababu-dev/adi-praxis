@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { Actor } from '../auth/actor';
+import type { Actor, CandidateActor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, badRequest, unauthorized } from '../lib/errors';
@@ -10,9 +10,9 @@ import { writeAudit, type AuditInput } from './audit';
 export const IDEMPOTENCY_HEADER = 'idempotency-key';
 const IDEMPOTENCY_TTL_MS = 24 * 3600_000;
 
-export interface CommandContext {
+export interface CommandContext<A = Actor> {
   tx: Tx;
-  actor: Actor;
+  actor: A;
   audit(input: AuditInput): Promise<void>;
   emit(event: OutboxInput): Promise<void>;
 }
@@ -38,14 +38,37 @@ export async function runCommand<T>(
 ): Promise<void> {
   const actor = req.actor;
   if (!actor) throw unauthorized();
+  return execute(db, req, reply, { actor, actorId: actor.userId, actorType: 'USER', clientId: actor.clientId }, handler);
+}
 
+/** The same guarantees for a signed-in candidate (separate audience; audited as actor type CANDIDATE). */
+export async function runCandidateCommand<T>(
+  db: Db,
+  req: FastifyRequest,
+  reply: FastifyReply,
+  handler: (ctx: CommandContext<CandidateActor>) => Promise<CommandResult<T>>,
+): Promise<void> {
+  const actor = req.candidate;
+  if (!actor) throw unauthorized();
+  return execute(db, req, reply, { actor, actorId: `candidate:${actor.smeUserId}`, actorType: 'CANDIDATE', clientId: actor.clientId }, handler);
+}
+
+async function execute<A, T>(
+  db: Db,
+  req: FastifyRequest,
+  reply: FastifyReply,
+  principal: { actor: A; actorId: string; actorType: 'USER' | 'CANDIDATE'; clientId: string },
+  handler: (ctx: CommandContext<A>) => Promise<CommandResult<T>>,
+): Promise<void> {
+  const { actor, actorId, actorType, clientId } = principal;
   const rawKey = req.headers[IDEMPOTENCY_HEADER];
   const key = Array.isArray(rawKey) ? rawKey[0] : rawKey;
   if (!key || key.length > 200) throw badRequest('Idempotency-Key header is required (max 200 characters)');
 
   const path = req.routeOptions.url ?? req.url;
-  const requestHash = sha256(stableStringify({ method: req.method, url: req.url, body: req.body ?? null }));
-  const actorId = actor.userId;
+  // Multipart bodies are not JSON; their idempotency hash covers method and URL only.
+  const body = String(req.headers['content-type'] ?? '').startsWith('multipart/') ? null : (req.body ?? null);
+  const requestHash = sha256(stableStringify({ method: req.method, url: req.url, body }));
 
   const replay = await findReplay(db, actorId, key, requestHash);
   if (replay) {
@@ -57,12 +80,12 @@ export async function runCommand<T>(
     const result = await db.$transaction(async (tx) => {
       let audits = 0;
       const auditCtx = {
-        clientId: actor.clientId,
-        actorType: actor.type,
-        actorId,
+        clientId,
+        actorType,
+        actorId: actorType === 'CANDIDATE' ? actorId.slice('candidate:'.length) : actorId,
         requestId: String(req.id),
       } as const;
-      const ctx: CommandContext = {
+      const ctx: CommandContext<A> = {
         tx,
         actor,
         audit: async (input) => {
@@ -70,7 +93,7 @@ export async function runCommand<T>(
           await writeAudit(tx, auditCtx, input);
         },
         emit: async (event) => {
-          await emitEvent(tx, actor.clientId, event);
+          await emitEvent(tx, clientId, event);
         },
       };
 
@@ -80,7 +103,7 @@ export async function runCommand<T>(
       }
       await tx.idempotencyKey.create({
         data: {
-          clientId: actor.clientId,
+          clientId,
           actorId,
           key,
           method: req.method,

@@ -8,7 +8,9 @@ import type { Geocoder } from '../staffing/geocoder';
 import { RuleBasedMatchService } from '../staffing/match-service';
 import type { SelectionGate } from '../staffing/selection-gate';
 import { activeAssignmentCount, ensureJobDescription, listMatches, matchRequestFor, runAndStoreMatches } from '../staffing/staffing-service';
+import { launchCampaign } from './campaigns';
 import { loadProject } from './projects';
+import type { Config } from '../config';
 
 const IdParams = z.object({ id: z.string().uuid() });
 const ACCESS = ['PM', 'ADMIN'] as const;
@@ -21,7 +23,7 @@ const notStaffing = (status: string) =>
 const lockProject = (tx: Tx, id: string) => tx.$executeRaw`SELECT 1 FROM "Project" WHERE id = ${id}::uuid FOR UPDATE`;
 
 /** FLOW 2 core: Resource Assignment (SPEC). */
-export const staffingRoutes: FastifyPluginAsyncZod<{ db: Db; geocoder: Geocoder; selectionGate: SelectionGate }> = async (app, { db, geocoder, selectionGate }) => {
+export const staffingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; geocoder: Geocoder; selectionGate: SelectionGate }> = async (app, { db, config, geocoder, selectionGate }) => {
   // Opening the screen: READY_FOR_STAFFING -> STAFFING, make sure there is a JD, and (re-)run the match.
   app.post(
     '/projects/:id/match',
@@ -42,7 +44,18 @@ export const staffingRoutes: FastifyPluginAsyncZod<{ db: Db; geocoder: Geocoder;
         }
         const run = await runAndStoreMatches(tx, new RuleBasedMatchService(tx, geocoder), p.id);
         await audit({ entityType: 'Project', entityId: p.id, action: 'project.matched', after: { matched: run.total, stored: run.stored } });
-        return { status: 200, body: await listMatches(tx, p.id, run.warnings) };
+
+        // SPEC: auto-launch the sourcing campaign when enabled on the project and there is a shortfall.
+        const list = await listMatches(tx, p.id, run.warnings);
+        if (p.autoLaunchCampaign && list.shortfall > 0) {
+          const ready = await tx.opportunity.findFirst({ where: { projectId: p.id, status: 'PUBLISHED' } });
+          const active = await tx.campaign.findFirst({ where: { projectId: p.id, status: { in: ['LIVE', 'PAUSED'] } } });
+          if (ready && !active) {
+            const c = await launchCampaign(tx, config, p.id, 'LINKEDIN_MANUAL');
+            await audit({ entityType: 'Campaign', entityId: c.id, action: 'campaign.launched', after: { projectId: p.id, channel: c.channel, status: 'LIVE', auto: true } });
+          }
+        }
+        return { status: 200, body: list };
       });
       return reply;
     },

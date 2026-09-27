@@ -2,12 +2,13 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import type { Db } from '../db';
 import { forbidden, unauthorized } from '../lib/errors';
-import type { AccessPolicy } from './actor';
-import { resolveInternalSession, SESSION_COOKIE } from './sessions';
+import type { AccessPolicy, CandidateActor } from './actor';
+import { CANDIDATE_SESSION_COOKIE, resolveCandidateSession, resolveInternalSession, SESSION_COOKIE } from './sessions';
 
 /** Pure RBAC decision, shared by the hook and unit tests. */
-export function checkAccess(policy: AccessPolicy, actor: FastifyRequest['actor']): 'ok' | 401 | 403 {
+export function checkAccess(policy: AccessPolicy, actor: FastifyRequest['actor'], candidate: CandidateActor | null = null): 'ok' | 401 | 403 {
   if (policy === 'public') return 'ok';
+  if (policy === 'candidate') return candidate ? 'ok' : 401;
   if (!actor) return 401;
   if (policy === 'authenticated') return 'ok';
   return actor.roles.some((r) => policy.includes(r)) ? 'ok' : 403;
@@ -19,6 +20,7 @@ export function checkAccess(policy: AccessPolicy, actor: FastifyRequest['actor']
  */
 export const rbacPlugin = fp(async (app: FastifyInstance, opts: { db: Db }) => {
   app.decorateRequest('actor', null);
+  app.decorateRequest('candidate', null);
 
   app.addHook('onRoute', (route) => {
     const access = (route.config as { access?: AccessPolicy } | undefined)?.access;
@@ -29,12 +31,19 @@ export const rbacPlugin = fp(async (app: FastifyInstance, opts: { db: Db }) => {
   });
 
   app.addHook('onRequest', async (req) => {
-    const token = req.cookies[SESSION_COOKIE];
-    req.actor = token ? await resolveInternalSession(opts.db, token) : null;
-
     const policy = req.routeOptions.config?.access;
+    // Each audience only ever reads its own cookie.
+    if (policy === 'candidate' || policy === 'public') {
+      const ct = req.cookies[CANDIDATE_SESSION_COOKIE];
+      req.candidate = ct ? await resolveCandidateSession(opts.db, ct) : null;
+    }
+    if (policy !== 'candidate') {
+      const token = req.cookies[SESSION_COOKIE];
+      req.actor = token ? await resolveInternalSession(opts.db, token) : null;
+    }
+
     if (!policy) return; // 404s and swagger-ui static assets
-    const result = checkAccess(policy, req.actor);
+    const result = checkAccess(policy, req.actor, req.candidate);
     if (result === 401) throw unauthorized();
     if (result === 403) throw forbidden();
   });

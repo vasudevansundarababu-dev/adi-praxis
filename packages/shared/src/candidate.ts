@@ -58,7 +58,8 @@ export const OpportunityCriteria = z
   });
 export type OpportunityCriteria = z.infer<typeof OpportunityCriteria>;
 
-export const SaveOpportunityDraftRequest = z.object({ brief: OpportunityBrief, criteria: OpportunityCriteria });
+/** questionPolicy: omit to keep the current one, null to go back to the generated default. */
+export const SaveOpportunityDraftRequest = z.object({ brief: OpportunityBrief, criteria: OpportunityCriteria, questionPolicy: z.unknown().optional() });
 
 /** What must be filled before an owner can publish (FLOW2 C03: requirements readable before commitment). */
 export function opportunityPublishProblems(brief: OpportunityBrief, criteria: OpportunityCriteria): string[] {

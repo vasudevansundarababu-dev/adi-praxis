@@ -166,6 +166,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
           </ol>
         </nav>
 
+        <div className="min-w-0">
         <fieldset disabled={ro} className="min-w-0 space-y-4 max-md:pointer-events-none">
           {task.review && task.status === 'REWORK' && section === 'W01' && (
             <div role="status" className="rounded-md border border-warning p-3 text-sm">
@@ -454,12 +455,10 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
             </ul>
           )}
         </fieldset>
-        {section === 'W06' && !ro && (
-          <div className="md:col-start-2">
-            <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={setSection} />
-          </div>
-        )}
-        {section === 'W06' && ro && <p className="md:col-start-2">This task is read-only.</p>}
+        {/* W06 sits in the same column as the other sections (outside the fieldset so its own controls stay usable). */}
+        {section === 'W06' && !ro && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={setSection} />}
+        {section === 'W06' && ro && <p>This task is read-only.</p>}
+        </div>
       </div>
     </div>
   );

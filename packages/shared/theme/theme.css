@@ -1,9 +1,10 @@
 /*
  * ADI Praxis theme: CSS variables + Tailwind v4 theme. Import once from each app's global stylesheet,
- * after `@import "tailwindcss";`. Values mirror theme/tokens.ts.
- * Light is the default; add class="dark" (or data-theme="dark") on <html> for the dark theme.
+ * after `@import "tailwindcss";`. Values mirror theme/tokens.ts. `@theme inline` makes utilities reference
+ * the --praxis-* variables directly, so a nested .dark subtree re-themes correctly.
+ * Light is the default; add class="dark" (or data-theme="dark") on <html>, or on any element to theme a subtree.
  */
-@theme {
+@theme inline {
   --color-brand-navy: #0a2170;
   --color-brand-blue: #2a80d0;
   --color-brand-teal: #3fac95;
@@ -42,8 +43,8 @@
   --praxis-accent: #3fac95;
 }
 
-:root.dark,
-:root[data-theme='dark'] {
+.dark,
+[data-theme='dark'] {
   color-scheme: dark;
   --praxis-bg: #212227;
   --praxis-surface: #2a2c33;

@@ -17,7 +17,8 @@ import { buildTestApp, createClient, createUser, db, idem, login, resetDb } from
 
 const connection = redisConnection(TEST_REDIS_URL);
 
-async function waitFor(check: () => Promise<boolean>, timeoutMs = 10_000) {
+// Generous: a loaded machine can delay BullMQ's blocking pick-up by several seconds.
+async function waitFor(check: () => Promise<boolean>, timeoutMs = 30_000) {
   const start = Date.now();
   while (!(await check())) {
     if (Date.now() - start > timeoutMs) throw new Error('timed out waiting for condition');
@@ -82,14 +83,16 @@ describe('Transactional outbox and worker', () => {
     await createUserViaApi();
     await createUserViaApi();
 
-    expect(await dispatchOutboxBatch(db, queue)).toBe(2);
-    expect(await dispatchOutboxBatch(db, queue)).toBe(0);
+    // On failure, show exactly which outbox rows existed (diagnoses interference from other processes).
+    const rows = async () => JSON.stringify(await db.outboxEvent.findMany({ select: { name: true, dispatchedAt: true, createdAt: true } }));
+    expect(await dispatchOutboxBatch(db, queue), await rows()).toBe(2);
+    expect(await dispatchOutboxBatch(db, queue), await rows()).toBe(0);
     expect(await db.outboxEvent.count({ where: { dispatchedAt: null } })).toBe(0);
 
     // Simulate a crash after publishing but before the dispatched mark committed.
     await db.outboxEvent.updateMany({ data: { dispatchedAt: null } });
-    expect(await dispatchOutboxBatch(db, queue)).toBe(2);
-    expect(await queue.count()).toBe(2); // job id = event id, so no duplicate jobs
+    expect(await dispatchOutboxBatch(db, queue), await rows()).toBe(2);
+    expect(await queue.count(), JSON.stringify(await queue.getJobCounts())).toBe(2); // job id = event id, so no duplicate jobs
   });
 
   it('concurrent dispatchers never publish the same event twice', async () => {

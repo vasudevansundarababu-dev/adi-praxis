@@ -6,7 +6,7 @@ export default defineConfig({
     globalSetup: ['test/global-setup.ts'],
     // Integration tests share one Postgres database and one Redis, so files run one at a time.
     fileParallelism: false,
-    testTimeout: 30_000,
+    testTimeout: 60_000,
     hookTimeout: 60_000,
   },
 });

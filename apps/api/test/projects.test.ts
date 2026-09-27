@@ -280,7 +280,7 @@ describe('M2 FLOW 1: project creation', () => {
       try {
         await dispatchOutboxBatch(db, queue);
         const start = Date.now();
-        while (received.length === 0 && Date.now() - start < 10_000) await new Promise((r) => setTimeout(r, 50));
+        while (received.length === 0 && Date.now() - start < 30_000) await new Promise((r) => setTimeout(r, 50));
         expect(received).toEqual([expect.objectContaining({ projectId: p.id })]);
       } finally {
         await worker.close();

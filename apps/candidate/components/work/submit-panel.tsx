@@ -53,7 +53,7 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
   return (
     <section aria-labelledby="w06-h" className="space-y-4">
       <h2 id="w06-h" className="text-lg font-semibold">Check and submit</h2>
-      <button type="button" disabled={pending} onClick={check} className="rounded-md border border-line px-4 py-2 disabled:opacity-60">
+      <button type="button" disabled={pending} onClick={check} className="btn btn-secondary disabled:opacity-60">
         {pending ? 'Checking…' : 'Run checks'}
       </button>
       {result && (
@@ -124,7 +124,7 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
         <input type="checkbox" checked={declared} onChange={(e) => setDeclared(e.target.checked)} className="mt-1" />
         {props.declaration ?? 'This case is entirely synthetic. It contains no real customer, colleague, employer or confidential information.'}
       </label>
-      <button type="button" disabled={pending || !declared || !result || failing.length > 0 || unexplained.length > 0} onClick={submit} className="rounded-md bg-primary px-5 py-2 font-medium text-on-primary disabled:opacity-50">
+      <button type="button" disabled={pending || !declared || !result || failing.length > 0 || unexplained.length > 0} onClick={submit} className="btn btn-primary disabled:opacity-50">
         Submit for review
       </button>
       {!result && <p className="text-sm text-fg-muted">Run the checks first.</p>}

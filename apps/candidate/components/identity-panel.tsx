@@ -61,7 +61,7 @@ export function IdentityPanel({ initial, returnTo }: { initial: CandidateMeDto; 
   const canStart = ['NOT_STARTED', 'REQUIRES_INPUT', 'CANCELED'].includes(me.identityStatus);
 
   return (
-    <section className="mt-6 rounded-lg border border-line bg-surface p-5" aria-live="polite">
+    <section className="mt-6 card p-5" aria-live="polite">
       <p className="text-sm text-fg-muted">Status</p>
       <p className="text-lg font-semibold">{eligible ? me.identityLabel : state.title}</p>
       <p className="mt-1 text-sm">{state.body}</p>
@@ -69,16 +69,16 @@ export function IdentityPanel({ initial, returnTo }: { initial: CandidateMeDto; 
 
       <div className="mt-5 flex flex-wrap gap-3">
         {eligible ? (
-          <Link href={returnTo || '/home'} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary">
+          <Link href={returnTo || '/home'} className="btn btn-primary">
             Continue
           </Link>
         ) : canStart ? (
-          <button type="button" disabled={pending} onClick={start} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-60">
+          <button type="button" disabled={pending} onClick={start} className="btn btn-primary disabled:opacity-60">
             {me.identityStatus === 'NOT_STARTED' ? 'Start verification' : 'Continue verification'}
           </button>
         ) : null}
         {!eligible && me.identityStatus !== 'MANUAL_REVIEW_REQUIRED' && (
-          <button type="button" onClick={() => setHelpOpen(!helpOpen)} className="rounded-md border border-line px-4 py-2 text-sm">
+          <button type="button" onClick={() => setHelpOpen(!helpOpen)} className="btn btn-secondary">
             I need help
           </button>
         )}
@@ -99,7 +99,7 @@ export function IdentityPanel({ initial, returnTo }: { initial: CandidateMeDto; 
             Anything else we should know? (optional; do not include ID numbers)
             <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-bg px-3 py-2" />
           </label>
-          <button type="submit" className="rounded-md border border-line px-4 py-2 text-sm">
+          <button type="submit" className="btn btn-secondary">
             Ask for help
           </button>
         </form>

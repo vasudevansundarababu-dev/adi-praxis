@@ -31,11 +31,11 @@ export function StartProfileButton({ opportunityId, campaignId, signedIn, autoSt
   }, [autoStart, signedIn]);
 
   return (
-    <div className="mt-6">
-      <button type="button" disabled={pending} onClick={start} className="rounded-md bg-primary px-5 py-2.5 font-medium text-on-primary disabled:opacity-60">
-        {pending ? 'Starting…' : 'Build my SME profile'}
+    <div className="mt-5">
+      <button type="button" disabled={pending} onClick={start} className="btn bg-white text-brand-navy shadow-lg hover:bg-white/90">
+        {pending ? 'Starting…' : 'Apply: build my SME profile →'}
       </button>
-      {error && <p role="alert" className="mt-2 text-sm text-error">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-sm text-red-200">{error}</p>}
     </div>
   );
 }

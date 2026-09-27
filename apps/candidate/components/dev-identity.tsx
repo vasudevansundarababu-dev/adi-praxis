@@ -29,7 +29,7 @@ export function DevIdentitySimulator({ sessionId, returnUrl }: { sessionId: stri
       <p className="mt-1 text-sm text-fg-muted">Session {sessionId}</p>
       <div className="mt-6 grid gap-2">
         {OUTCOMES.map((o) => (
-          <button key={o.label} type="button" onClick={() => simulate(o.body)} className="rounded-md border border-line px-4 py-2 text-left text-sm hover:bg-surface">
+          <button key={o.label} type="button" onClick={() => simulate(o.body)} className="btn btn-secondary text-left text-sm hover:bg-surface">
             {o.label}
           </button>
         ))}

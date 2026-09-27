@@ -109,7 +109,7 @@ function Rows<T>(p: { title: string; items: T[]; onChange: (items: T[]) => void;
         </div>
       ))}
       {!p.disabled && (
-        <button type="button" onClick={() => p.onChange([...p.items, p.make()])} className="rounded-md border border-line px-3 py-1.5 text-sm">
+        <button type="button" onClick={() => p.onChange([...p.items, p.make()])} className="btn btn-secondary">
           Add {p.title.toLowerCase().replace(/s$/, '')}
         </button>
       )}

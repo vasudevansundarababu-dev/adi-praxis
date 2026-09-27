@@ -8,9 +8,9 @@ import { SignOut } from './sign-out';
 export async function Header() {
   const me = await getMe();
   return (
-    <header className="border-b border-line">
+    <header className="sticky top-0 z-20 border-b border-hairline bg-bg/85 backdrop-blur">
       {process.env.PRAXIS_DEMO === '1' && <DemoBanner />}
-      <div className="mx-auto flex max-w-3xl items-center gap-4 px-4 py-3">
+      <div className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-3">
         <Link href={me ? '/home' : '/'} className="flex items-center gap-2 font-semibold">
           <Image src={mark} alt="" width={28} height={28} className="rounded" />
           ADI Praxis
@@ -19,9 +19,10 @@ export async function Header() {
           <Link href="/opportunities" className="text-link hover:underline">
             Opportunities
           </Link>
-          {me ? <SignOut /> : <Link href="/sign-in" className="text-link hover:underline">Sign in</Link>}
+          {me ? <SignOut /> : <Link href="/sign-in" className="btn btn-primary !px-3 !py-1.5">Sign in</Link>}
         </nav>
       </div>
+      <div className="h-0.5 bg-brand-gradient" aria-hidden />
     </header>
   );
 }

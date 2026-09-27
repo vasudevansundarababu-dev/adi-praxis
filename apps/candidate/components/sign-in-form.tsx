@@ -96,7 +96,7 @@ export function SignInForm({ returnTo, googleClientId, demo = false }: { returnT
             </label>
             <input id="dev-name" required value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2" />
           </div>
-          <button type="submit" disabled={pending} className="w-full rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-60">
+          <button type="submit" disabled={pending} className="w-full btn btn-primary disabled:opacity-60">
             {pending ? 'Signing in…' : 'Continue with Google (mock)'}
           </button>
         </form>

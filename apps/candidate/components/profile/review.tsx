@@ -59,7 +59,7 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
         <h1 className="text-2xl font-semibold">Profile submitted</h1>
         <p className="mt-3">Thank you. Your profile for <strong>{state.enrollment.title}</strong> was submitted{state.enrollment.submittedAt ? ` on ${new Date(state.enrollment.submittedAt).toLocaleDateString()}` : ''}.</p>
         <p className="mt-2 text-fg-muted">A person reviews every application; software does not make the decision. We’ll let you know the outcome, and if we need more information we’ll ask a specific question.</p>
-        <Link href="/home" className="mt-6 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary">Back to home</Link>
+        <Link href="/home" className="mt-6 inline-block btn btn-primary">Back to home</Link>
       </div>
     );
   }
@@ -71,7 +71,7 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
         <h1 className="mt-2 text-2xl font-semibold">Review your profile</h1>
         <p className="mt-1 text-sm text-fg-muted">For {state.enrollment.title} (requirements version {state.enrollment.version}). Your answers are saved as you go; nothing is sent for review until you submit.</p>
 
-        <section className="mt-6 rounded-lg border border-line p-4">
+        <section className="mt-6 card p-4">
           <h2 className="font-semibold">Before you submit</h2>
           {r.unconfirmed.length === 0 && r.unanswered.length === 0 && r.problems.length === 0 ? (
             <p className="mt-1 text-sm text-success">Everything is confirmed.</p>
@@ -115,7 +115,7 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
           </ul>
         </section>
 
-        <section className="mt-6 space-y-2 rounded-lg border border-line p-4">
+        <section className="mt-6 space-y-2 card p-4">
           <h2 className="font-semibold">Confirm and submit</h2>
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" checked={accuracy} onChange={(e) => setAccuracy(e.target.checked)} className="mt-1" />
@@ -135,7 +135,7 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
               {error.items && error.items.length > 0 && <ul className="mt-1 list-disc pl-5">{error.items.map((x) => <li key={x}>{x}</li>)}</ul>}
             </div>
           )}
-          <button type="button" disabled={pending || !accuracy || !permission || !r.canSubmit || !identityEligible} onClick={submit} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">
+          <button type="button" disabled={pending || !accuracy || !permission || !r.canSubmit || !identityEligible} onClick={submit} className="btn btn-primary disabled:opacity-50">
             {pending ? 'Submitting…' : 'Confirm and submit'}
           </button>
         </section>

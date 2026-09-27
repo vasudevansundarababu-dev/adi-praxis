@@ -27,7 +27,7 @@ export default async function ProjectTasksPage({ params, searchParams }: { param
         <h1 className="text-2xl font-semibold">One more step</h1>
         <p className="mt-3">{step?.message ?? 'This project is not available to you.'}</p>
         {step?.href && (
-          <Link href={step.href} className="mt-6 inline-block rounded-md bg-primary px-4 py-2 font-medium text-on-primary">
+          <Link href={step.href} className="mt-6 inline-block btn btn-primary">
             Continue
           </Link>
         )}

@@ -76,8 +76,8 @@ export function FormFallback({ initial }: { initial: ConversationState }) {
       ))}
       {message && <p role={message.ok ? 'status' : 'alert'} className={`text-sm ${message.ok ? 'text-success' : 'text-error'}`}>{message.text}</p>}
       <div className="flex gap-3">
-        <button type="submit" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary">Save answers</button>
-        <Link href={`/enrollments/${state.enrollment.id}/review`} className="rounded-md border border-line px-4 py-2 text-sm">Review and submit</Link>
+        <button type="submit" className="btn btn-primary">Save answers</button>
+        <Link href={`/enrollments/${state.enrollment.id}/review`} className="btn btn-secondary">Review and submit</Link>
       </div>
     </form>
   );

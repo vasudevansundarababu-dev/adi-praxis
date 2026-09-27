@@ -53,8 +53,8 @@ test.describe('candidate smoke', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Verify your identity');
     await expect(page.getByRole('button', { name: 'Start verification' })).toBeVisible();
     await page.goto(`${CANDIDATE}/home`);
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Welcome, Smoke Tester');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Welcome, Smoke');
     await expect(page.getByText('Identity not verified yet')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Verify your identity' })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Verify now/ })).toBeVisible();
   });
 });

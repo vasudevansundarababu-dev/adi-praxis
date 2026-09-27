@@ -21,7 +21,7 @@ export function NextTaskButton({ projectId, disabled }: { projectId: string; dis
           if (r.ok) router.push(`/tasks/${r.data!.id}`);
           else setError(r.error);
         }}
-        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50"
+        className="btn btn-primary disabled:opacity-50"
       >
         Get next task
       </button>

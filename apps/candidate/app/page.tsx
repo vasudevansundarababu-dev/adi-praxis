@@ -18,10 +18,10 @@ export default async function LandingPage() {
           ADI Praxis invites verified subject-matter experts to author realistic, synthetic tasks from real-world workflows.
         </p>
         <div className="mt-6 flex justify-center gap-3">
-          <Link href="/opportunities" className="rounded-md border border-line px-4 py-2 text-sm">
+          <Link href="/opportunities" className="btn btn-secondary">
             See opportunities
           </Link>
-          <Link href="/sign-in" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary">
+          <Link href="/sign-in" className="btn btn-primary">
             Sign in
           </Link>
         </div>

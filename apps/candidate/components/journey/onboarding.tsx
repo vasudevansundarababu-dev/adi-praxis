@@ -141,7 +141,7 @@ function ItemBody({ item, scope, pending, onDone }: { item: OnboardingItem; scop
 
 function Confirm({ pending, label, onClick }: { pending: boolean; label: string; onClick: () => void }) {
   return (
-    <button type="button" disabled={pending} onClick={onClick} className="mt-4 rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-60">
+    <button type="button" disabled={pending} onClick={onClick} className="mt-4 btn btn-primary disabled:opacity-60">
       {label}
     </button>
   );
@@ -178,7 +178,7 @@ function ConflictsForm({ pending, initial, onDone }: { pending: boolean; initial
         <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} className="mt-1" />
         I will contribute only original material or material I am permitted to share, and no confidential employer or customer information.
       </label>
-      <button type="submit" disabled={pending || has === null || !authorized || (has && !details.trim())} className="rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-60">
+      <button type="submit" disabled={pending || has === null || !authorized || (has && !details.trim())} className="btn btn-primary disabled:opacity-60">
         Save
       </button>
     </form>
@@ -268,7 +268,7 @@ function PreferencesForm({ pending, initial, onDone }: { pending: boolean; initi
         Email me when there is a proposal for me
       </label>
       <p className="text-xs text-fg-muted">Used only to match you with suitable tasks.</p>
-      <button type="submit" disabled={pending || !p.country || !p.timezone} className="rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-60">
+      <button type="submit" disabled={pending || !p.country || !p.timezone} className="btn btn-primary disabled:opacity-60">
         Save
       </button>
     </form>

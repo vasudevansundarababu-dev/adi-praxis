@@ -626,7 +626,7 @@ GitHub authenticates to GCP with Workload Identity Federation: no service-accoun
 
 **Open questions**
 
-- [ ] Region: `us-central1` (default), or another region for data residency?
+- [ ] Region: `us-central1` (default; the Terraform `region` variable), or another region for data residency?
 - [ ] Domain name for the three hostnames.
 - [x] Claude through Vertex AI (decided 26 Sep 2026). The SME profile assistant uses `claude-opus-5` with structured outputs, retrying once on `claude-opus-4-8` if the primary model declines.
 - [ ] Email and SMS providers.

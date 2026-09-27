@@ -84,3 +84,15 @@ milestones without interruption (26 Sep 2026); each was the option Claude would 
 - **(chosen by Claude)** RLReviewRecord uses the same hash chain and append-only rules as the dataset, and the nightly job verifies both chains. Delivery state lives in RLResultDelivery.
 - **(chosen by Claude)** Results go by a Stripe-style HMAC-signed webhook (`RL_GYM_WEBHOOK_URL`, secret of 32+ characters) with 8 exponential retries. Without a URL, results stay `PULL_ONLY` for `GET /integrations/rl-gym/results`. RL Gym's receiving side is outside this spec; tests use a mock that verifies signatures.
 
+## M8 GCP deployment (chosen by Claude)
+- **(chosen by Claude)** Code only: Terraform and GitHub Actions were written and checked (`terraform validate`, actionlint, local image builds), but nothing was applied, pushed or deployed.
+- **(chosen by Claude)** Region `us-central1` (SPEC default). The domain, the email/SMS providers and the monthly budgets are still open, so they are variables.
+- **(chosen by Claude)** Added `APP_ENV` (staging|production). Staging runs production builds (no mocks) but accepts Stripe test-mode identity; only production requires live identity.
+- **(chosen by Claude)** One API image serves the API, worker and Cloud Run jobs (`migrate`, `verify-chains`, `seed`). The Next apps build as standalone images with no environment-specific values baked in: settings formerly read from `NEXT_PUBLIC_*` are now read at runtime.
+- **(chosen by Claude)** The nightly chain verification runs as a Cloud Run job from Cloud Scheduler, as SPEC says; the worker's own schedule is switched off in GCP (`DATASET_VERIFY_CRON=off`). The worker exposes a health endpoint because Cloud Run services must listen on a port.
+- **(chosen by Claude)** Two database users: `praxis_migrator` owns the schema and runs migrations; `praxis_app` gets only runtime grants, with no UPDATE/DELETE/TRUNCATE on append-only tables. Both use password auth from Secret Manager (IAM database auth can come later).
+- **(chosen by Claude)** Memorystore uses AUTH on private service access, without in-transit TLS, to avoid shipping a custom CA to BullMQ. It has no public address.
+- **(chosen by Claude)** The load balancer routes `/api/*` on the console and candidate hosts to the API, so session cookies stay first-party; `api.<domain>` serves webhooks and RL Gym. Cloud Armor applies OWASP rules, a per-IP rate limit and adaptive DDoS protection. reCAPTCHA bot management needs a site key and is left for later.
+- **(chosen by Claude)** Production images are built from the release tag (the same commit that passed staging) into the production registry; images are not copied between projects.
+- **(chosen by Claude)** CI runs the same docker compose stack as local development. `terraform plan` runs with a separate read-only planner identity; applies are done by an operator.
+

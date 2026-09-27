@@ -72,3 +72,7 @@ Next.js may add its `.next-e2e` type paths to `apps/*/tsconfig.json` and `next-e
 - Each record carries a SHA-256 `content_hash` chained to the previous record's hash in `seq` order. The worker verifies the chains nightly (`DATASET_VERIFY_CRON`, default 03:00 UTC) and logs `alert: true` on any break; Admins can run it on demand at `GET /api/v1/dataset/verification`.
 - Read-only access for Admins and RL Gym (Bearer key from **API clients**): `GET /dataset/records`, `/dataset/records/{id}`, `/dataset/records/{id}/lineage`, `/dataset/export` (NDJSON). Corrections append a superseding record: `POST /dataset/records/{id}/corrections`.
 
+## Deployment (M8)
+
+Terraform for staging and production on Google Cloud, and the GitHub Actions pipeline, are in `infra/` and `.github/workflows/`. See [infra/README.md](infra/README.md). Container images: `apps/api/Dockerfile` (API, worker and jobs), `apps/web/Dockerfile` and `apps/candidate/Dockerfile`, built from the repository root.
+

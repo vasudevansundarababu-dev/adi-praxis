@@ -86,7 +86,7 @@ Every candidate, from the pool or from LinkedIn, passes validation for this proj
 | Status | Entered when | Next |
 | --- | --- | --- |
 | `DRAFT` | PM saves an incomplete project | `READY_FOR_STAFFING`, `CANCELLED` |
-| `READY_FOR_STAFFING` | PM submits a valid project (FLOW 1) | `STAFFING` |
+| `READY_FOR_STAFFING` | PM submits a valid project (FLOW 1) | `STAFFING`, `CANCELLED` |
 | `STAFFING` | Resource assignment starts (FLOW 2) | `STAFFED`, `CANCELLED` |
 | `STAFFED` | Assigned headcount ≥ required headcount | `IN_PROGRESS` |
 | `IN_PROGRESS` | First task instance is issued (FLOW 3) | `COMPLETED`, `PAUSED` |
@@ -453,7 +453,7 @@ REST under `/api/v1`, JSON, OpenAPI spec generated from code. Internal users use
 | Area | Endpoints | Role |
 | --- | --- | --- |
 | Templates | `GET/POST /domains`, `GET/POST /templates`, `GET/PATCH /templates/{id}` (PATCH edits a draft only), `POST /templates/{id}/versions` (new draft version from a published or retired one), `GET /templates/{id}/versions`, `POST /templates/{id}/publish`, `POST /templates/{id}/retire` | Admin (read: PM) |
-| Taxonomy | `GET/POST /demographic-attributes` | Admin |
+| Taxonomy | `GET/POST /demographic-attributes` | Admin (read: PM, for the FLOW 1 wizard) |
 | Projects (FLOW 1) | `GET/POST /projects`, `GET/PATCH /projects/{id}`, `POST /projects/{id}/submit`, `POST /projects/{id}/pause`, `POST /projects/{id}/cancel` | PM |
 | JDs | `GET/POST /job-descriptions`, `GET/PATCH /job-descriptions/{id}` | PM |
 | Matching (FLOW 2) | `POST /projects/{id}/match`, `GET /projects/{id}/matches`, `POST /projects/{id}/assignments`, `DELETE /projects/{id}/assignments/{aid}` | PM |

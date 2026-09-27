@@ -623,7 +623,7 @@ GitHub authenticates to GCP with Workload Identity Federation: no service-accoun
 
 - [ ] Region: `us-central1` (default), or another region for data residency?
 - [ ] Domain name for the three hostnames.
-- [ ] Claude through Vertex AI (default, one GCP bill) or the Anthropic API directly?
+- [x] Claude through Vertex AI (decided 26 Sep 2026). The SME profile assistant uses `claude-opus-5` with structured outputs, retrying once on `claude-opus-4-8` if the primary model declines.
 - [ ] Email and SMS providers.
 - [ ] Monthly budget per environment for alerts.
 

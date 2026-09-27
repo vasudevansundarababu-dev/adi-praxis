@@ -227,7 +227,7 @@ Then capture:
 - Whether they can author realistic synthetic cases, label evidence, review trajectories, define rubrics or validate failure/edge cases; validate each capability separately.
 - Current/recent experience and credential evidence where required by the published pool.
 
-Never ask for real customer records, account numbers, actual restricted investigation reports, internal suspicious-activity filings, employer credentials, nonpublic policies or trade secrets. Use generic, redacted or synthetic descriptions. If a candidate starts sharing such content, interrupt with a privacy warning, quarantine/redact the material under policy and ask for a safe alternative; do not propagate it into prompts or task banks.
+Never ask for real customer records, account numbers, actual restricted investigation reports, internal suspicious-activity filings, employer credentials, nonpublic policies or trade secrets. Use generic, redacted or synthetic descriptions. If a candidate starts sharing such content, interrupt with a privacy warning, quarantine/redact the material under policy and ask for a safe alternative; do not propagate it into prompts or task banks. (Decided 26 Sep 2026: only a redacted copy is kept; the original is never stored or sent to the model.)
 
 ### 4.2 Experience-duration rules
 
@@ -242,6 +242,8 @@ Month-only dates have month-level precision; approximate answers remain approxim
 Each published opportunity has a versioned schema of criteria and question templates. A question definition contains: question ID, mapped criterion IDs, purpose, applicable domain/task roles, branching condition, answer type, required/optional status, safe example, allowed follow-ups, evidence expectation, sensitivity classification and stop/skip rule.
 
 Published criteria must be task-related, explainable and approved by a domain owner. Minimum experience, required credentials, recency and proficiency levels are configuration—not invented by the model. If criteria are missing, the bot can gather a general profile but cannot make a definitive fit recommendation for that pool.
+
+Implementation note (decided 26 Sep 2026): each published opportunity version pins a question policy. By default it is generated from the sections in C04, the banking extension (4.1) and one question per criterion; the owner may edit wording, the "why we ask" text and required flags before publishing, and every criterion always keeps a question.
 
 ### 5.2 Turn-by-turn controller
 

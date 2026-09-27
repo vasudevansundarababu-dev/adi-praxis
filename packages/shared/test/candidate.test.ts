@@ -29,3 +29,16 @@ describe('opportunity publish rules', () => {
     expect(OpportunityBrief.parse({ title: 't', summary: 's', domain: 'd', specialty: 'x' }).compensation).toBeNull();
   });
 });
+
+describe('time zones (onboarding preferences)', () => {
+  it('lists current IANA names, e.g. Asia/Kolkata, and maps older ones browsers still report', async () => {
+    const { IANA_TIME_ZONES, canonicalTimeZone } = await import('../src');
+    expect(IANA_TIME_ZONES).toContain('Asia/Kolkata');
+    for (const old of ['Asia/Calcutta', 'Asia/Saigon', 'Europe/Kiev', 'Asia/Katmandu', 'Asia/Rangoon', 'America/Godthab']) {
+      expect(IANA_TIME_ZONES).not.toContain(old);
+      expect(IANA_TIME_ZONES).toContain(canonicalTimeZone(old));
+    }
+    expect(canonicalTimeZone('Europe/London')).toBe('Europe/London');
+    expect([...IANA_TIME_ZONES]).toEqual([...IANA_TIME_ZONES].sort());
+  });
+});

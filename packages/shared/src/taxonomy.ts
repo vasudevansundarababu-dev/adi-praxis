@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { IANA_TIME_ZONES, ISO_COUNTRIES, ISO_LANGUAGES } from './taxonomy-data';
+import { IANA_TIME_ZONES, ISO_COUNTRIES, ISO_LANGUAGES, TIME_ZONE_RENAMES } from './taxonomy-data';
+
+/** The current IANA name for a time zone (Asia/Calcutta → Asia/Kolkata); unknown names pass through. */
+export const canonicalTimeZone = (z: string) => TIME_ZONE_RENAMES[z] ?? z;
 
 /**
  * Admin-managed demographic taxonomy (SPEC: FLOW 1 step 4). Each attribute has a type that fixes the shape of its

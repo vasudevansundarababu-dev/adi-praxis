@@ -1,6 +1,6 @@
 'use client';
 
-import { CEFR_LEVELS, IANA_TIME_ZONES, ISO_COUNTRIES, ISO_LANGUAGES } from '@praxis/shared';
+import { canonicalTimeZone, CEFR_LEVELS, IANA_TIME_ZONES, ISO_COUNTRIES, ISO_LANGUAGES } from '@praxis/shared';
 import Link from 'next/link';
 import { useState } from 'react';
 import { call } from '@/lib/client';
@@ -189,7 +189,9 @@ type Prefs = { country: string; languages: { language: string; level: string }[]
 
 function PreferencesForm({ pending, initial, onDone }: { pending: boolean; initial: Prefs | null; onDone: (d: unknown) => void }) {
   const [p, setP] = useState<Prefs>(
-    initial ?? { country: '', languages: [{ language: 'en', level: 'C2' }], timezone: IANA_TIME_ZONES.includes(Intl.DateTimeFormat().resolvedOptions().timeZone) ? Intl.DateTimeFormat().resolvedOptions().timeZone : '', hoursPerWeek: 10, emailNotifications: true },
+    initial
+      ? { ...initial, timezone: canonicalTimeZone(initial.timezone) }
+      : { country: '', languages: [{ language: 'en', level: 'C2' }], timezone: IANA_TIME_ZONES.includes(canonicalTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone)) ? canonicalTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone) : '', hoursPerWeek: 10, emailNotifications: true },
   );
   const setLang = (i: number, v: Partial<Prefs['languages'][number]>) => setP({ ...p, languages: p.languages.map((l, j) => (j === i ? { ...l, ...v } : l)) });
   return (

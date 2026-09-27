@@ -445,6 +445,7 @@ export const ISO_LANGUAGES: readonly (readonly [code: string, name: string])[] =
   ["zu", "Zulu"],
 ];
 
+/** Current IANA names (e.g. Asia/Kolkata, not the older Asia/Calcutta that some systems still report). */
 export const IANA_TIME_ZONES: readonly string[] = [
   "Africa/Abidjan",
   "Africa/Accra",
@@ -551,7 +552,6 @@ export const IANA_TIME_ZONES: readonly string[] = [
   "America/Fort_Nelson",
   "America/Fortaleza",
   "America/Glace_Bay",
-  "America/Godthab",
   "America/Goose_Bay",
   "America/Grand_Turk",
   "America/Grenada",
@@ -606,6 +606,7 @@ export const IANA_TIME_ZONES: readonly string[] = [
   "America/North_Dakota/Beulah",
   "America/North_Dakota/Center",
   "America/North_Dakota/New_Salem",
+  "America/Nuuk",
   "America/Ojinaga",
   "America/Panama",
   "America/Paramaribo",
@@ -670,7 +671,6 @@ export const IANA_TIME_ZONES: readonly string[] = [
   "Asia/Beirut",
   "Asia/Bishkek",
   "Asia/Brunei",
-  "Asia/Calcutta",
   "Asia/Chita",
   "Asia/Colombo",
   "Asia/Damascus",
@@ -681,6 +681,7 @@ export const IANA_TIME_ZONES: readonly string[] = [
   "Asia/Famagusta",
   "Asia/Gaza",
   "Asia/Hebron",
+  "Asia/Ho_Chi_Minh",
   "Asia/Hong_Kong",
   "Asia/Hovd",
   "Asia/Irkutsk",
@@ -690,8 +691,9 @@ export const IANA_TIME_ZONES: readonly string[] = [
   "Asia/Kabul",
   "Asia/Kamchatka",
   "Asia/Karachi",
-  "Asia/Katmandu",
+  "Asia/Kathmandu",
   "Asia/Khandyga",
+  "Asia/Kolkata",
   "Asia/Krasnoyarsk",
   "Asia/Kuala_Lumpur",
   "Asia/Kuching",
@@ -712,9 +714,7 @@ export const IANA_TIME_ZONES: readonly string[] = [
   "Asia/Qatar",
   "Asia/Qostanay",
   "Asia/Qyzylorda",
-  "Asia/Rangoon",
   "Asia/Riyadh",
-  "Asia/Saigon",
   "Asia/Sakhalin",
   "Asia/Samarkand",
   "Asia/Seoul",
@@ -734,6 +734,7 @@ export const IANA_TIME_ZONES: readonly string[] = [
   "Asia/Vientiane",
   "Asia/Vladivostok",
   "Asia/Yakutsk",
+  "Asia/Yangon",
   "Asia/Yekaterinburg",
   "Asia/Yerevan",
   "Atlantic/Azores",
@@ -778,8 +779,8 @@ export const IANA_TIME_ZONES: readonly string[] = [
   "Europe/Istanbul",
   "Europe/Jersey",
   "Europe/Kaliningrad",
-  "Europe/Kiev",
   "Europe/Kirov",
+  "Europe/Kyiv",
   "Europe/Lisbon",
   "Europe/Ljubljana",
   "Europe/London",
@@ -865,3 +866,13 @@ export const IANA_TIME_ZONES: readonly string[] = [
   "Pacific/Wake",
   "Pacific/Wallis",
 ];
+
+/** Older IANA names some browsers and systems still report, mapped to the current ones. */
+export const TIME_ZONE_RENAMES: Readonly<Record<string, string>> = {
+  "Asia/Calcutta": "Asia/Kolkata",
+  "Asia/Katmandu": "Asia/Kathmandu",
+  "Asia/Rangoon": "Asia/Yangon",
+  "Asia/Saigon": "Asia/Ho_Chi_Minh",
+  "Europe/Kiev": "Europe/Kyiv",
+  "America/Godthab": "America/Nuuk",
+};

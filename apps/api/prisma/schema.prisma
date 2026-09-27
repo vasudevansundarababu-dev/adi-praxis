@@ -68,6 +68,7 @@ enum DemographicAttributeType {
   MULTI_SELECT
   NUMBER_RANGE
   GEO_RADIUS
+  LANGUAGE_PROFICIENCY
 }
 
 enum FilterOperator {
@@ -473,6 +474,8 @@ model Project {
   startDate              DateTime?     @map("start_date") @db.Date
   endDate                DateTime?     @map("end_date") @db.Date
   requiredWorkers        Int?          @map("required_workers")
+  /// Computed fields frozen at submit: tasks, requiredAuthors, totalEffortHours, workingDays, labourBudget.
+  figures                Json?
   demographicsSnapshot   Json?         @map("demographics_snapshot")
   autoLaunchCampaign     Boolean       @default(false) @map("auto_launch_campaign")
   openTaskCapPerCandidate Int          @default(3) @map("open_task_cap_per_candidate")

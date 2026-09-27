@@ -1,9 +1,11 @@
-/** Errors that map to a stable JSON error body: { error, message, requestId }. */
+/** Errors that map to a stable JSON error body: { error, message, requestId, details? }. */
 export class AppError extends Error {
   constructor(
     readonly statusCode: number,
     readonly code: string,
     message: string,
+    /** Optional structured detail, e.g. the list of problems blocking a submit. */
+    readonly details?: unknown,
   ) {
     super(message);
   }

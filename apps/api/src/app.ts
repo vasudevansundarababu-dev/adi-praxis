@@ -19,6 +19,9 @@ import type { Db } from './db';
 import { AppError } from './lib/errors';
 import { authRoutes } from './routes/auth';
 import { healthRoutes } from './routes/health';
+import { jobDescriptionRoutes } from './routes/job-descriptions';
+import { projectRoutes } from './routes/projects';
+import { taxonomyRoutes } from './routes/taxonomy';
 import { templateRoutes } from './routes/templates';
 import { userRoutes } from './routes/users';
 
@@ -48,7 +51,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.setErrorHandler((err, req, reply) => {
     const requestId = String(req.id);
     if (err instanceof AppError) {
-      return reply.status(err.statusCode).send({ error: err.code, message: err.message, requestId });
+      return reply
+        .status(err.statusCode)
+        .send({ error: err.code, message: err.message, requestId, ...(err.details !== undefined ? { details: err.details } : {}) });
     }
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       return reply.status(409).send({ error: 'CONFLICT', message: 'A record with these values already exists', requestId });
@@ -91,6 +96,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(authRoutes, { db: deps.db, config: deps.config });
       await v1.register(userRoutes, { db: deps.db });
       await v1.register(templateRoutes, { db: deps.db });
+      await v1.register(taxonomyRoutes, { db: deps.db });
+      await v1.register(jobDescriptionRoutes, { db: deps.db });
+      await v1.register(projectRoutes, { db: deps.db });
     },
     { prefix: '/api/v1' },
   );

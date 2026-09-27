@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
+import { SEED_DEMOGRAPHIC_ATTRIBUTES } from '@praxis/shared';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { hashPassword } from '../src/auth/password';
@@ -9,6 +10,7 @@ import { importTaskflow, readTaskflow, type ImportResult } from '../src/template
  * - the single v1 client
  * - the first Admin user (credentials from SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD)
  * - FLOW 4 failure reason codes (SPEC: "seeded, Admin-editable")
+ * - the demographic taxonomy: SPEC's 8 attributes with standard value lists (ISO 3166, ISO 639, CEFR, ISCED, IANA)
  * - the template catalog from docs/Taskflow.xlsx (or TASKFLOW_PATH), all as drafts
  */
 export const DEFAULT_TASKFLOW_PATH = path.resolve(import.meta.dirname, '../../../docs/Taskflow.xlsx');
@@ -50,6 +52,15 @@ export async function seed(db: PrismaClient, env: NodeJS.ProcessEnv = process.en
       where: { clientId_code: { clientId: client.id, code } },
       update: {},
       create: { clientId: client.id, code, label },
+    });
+  }
+
+  // Create-only: an Admin's later edits to an attribute are never overwritten.
+  for (const a of SEED_DEMOGRAPHIC_ATTRIBUTES) {
+    await db.demographicAttribute.upsert({
+      where: { clientId_key: { clientId: client.id, key: a.key } },
+      update: {},
+      create: { clientId: client.id, key: a.key, label: a.label, type: a.type, allowedValues: a.allowedValues as Prisma.InputJsonValue },
     });
   }
 

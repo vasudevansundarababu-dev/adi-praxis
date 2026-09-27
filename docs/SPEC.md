@@ -458,7 +458,9 @@ REST under `/api/v1`, JSON, OpenAPI spec generated from code. Internal users use
 | JDs | `GET/POST /job-descriptions`, `GET/PATCH /job-descriptions/{id}` | PM |
 | Matching (FLOW 2) | `POST /projects/{id}/match`, `GET /projects/{id}/matches`, `POST /projects/{id}/assignments`, `DELETE /projects/{id}/assignments/{aid}`, `POST /projects/{id}/rejections` (reject for this project), `GET /candidates/{id}` (matching profile for View profile) | PM |
 | Campaigns (FLOW 2) | `POST /projects/{id}/campaigns`, `GET/PATCH /campaigns/{id}`, `POST /campaigns/{id}/close` | PM |
-| Applications (FLOW 2) | `POST /public/campaigns/{id}/click` (tracked apply link; replaces `/apply`), `POST /me/enrollments` (the application: created when a signed-in candidate starts their profile, attributed to the campaign), `GET /applications?status=IN_VALIDATION`, `POST /applications/{id}/decision` | Candidate / Reviewer |
+| Applications (FLOW 2) | `POST /public/campaigns/{id}/click` (tracked apply link; replaces `/apply`), `POST /me/enrollments` (the application: created when a signed-in candidate starts their profile, attributed to the campaign), `GET /me/enrollments/{id}/status`, `POST /me/enrollments/{id}/amend`, `POST /me/enrollments/{id}/review-request`, `POST /me/enrollments/{id}/withdraw` | Candidate |
+| Selection (FLOW 2) | `GET/POST /projects/{id}/reviewers`, `DELETE /projects/{id}/reviewers/{userId}` (PM / Admin); `GET /review/enrollments?status=`, `GET /review/enrollments/{id}`, `POST /review/enrollments/{id}/decision`, `POST /review/enrollments/{id}/reopen`, `POST /review/enrollments/{id}/assessment/retry`, `GET /review/evidence/{id}`, `POST /review/claims/{id}/verify`, `GET/POST /review/conflicts`, `POST /review/conflicts/{id}/resolve` (these replace `GET /applications?status=IN_VALIDATION` and `POST /applications/{id}/decision`) | Reviewer (assigned pools) / Admin |
+| Onboarding and assignment (FLOW 2) | `GET /me/onboarding?enrollmentId=`, `POST /me/onboarding/acknowledgements`, `GET /me/assignments`, `GET /me/assignments/{id}`, `POST /me/assignments/{id}/accept`, `POST /me/assignments/{id}/decline`, `POST /me/assignments/{id}/open-workbench`, `POST /workbench/handoff`; terms: `GET/POST /terms` (Admin) | Candidate / Admin |
 | Tasks (FLOW 3) | `POST /projects/{id}/task-inputs` (upload), `GET /projects/{id}/tasks`, `POST /assignments/{id}/invite` | PM |
 | Candidate (FLOW 3) | `POST /auth/google`, `POST /me/identity/session`, `GET /me/projects`, `POST /me/projects/{id}/tasks/next`, `GET/PUT /me/tasks/{id}`, `POST /me/tasks/{id}/submit` | Candidate |
 | Review | `GET /review/tasks`, `POST /review/tasks/{id}/decision` | Reviewer |
@@ -466,7 +468,7 @@ REST under `/api/v1`, JSON, OpenAPI spec generated from code. Internal users use
 
 The Stripe Identity webhook uses the FLOW 2 — SME candidate flow path (decided 26 Sep 2026); it replaces the earlier `POST /webhooks/stripe-identity`.
 
-Domain events (outbox table + worker): `project.ready_for_staffing`, `project.staffed`, `candidate.approved`, `candidate.assigned`, `task.submitted`, `task.reclaimed`, `project.completed`.
+Domain events (outbox table + worker): `project.ready_for_staffing`, `project.staffed`, `enrollment.submitted` (runs the suitability assessment), `enrollment.decided`, `candidate.approved` (onboarding complete; re-runs the project's match), `candidate.assigned` (the expert accepted), `task.submitted`, `task.reclaimed`, `project.completed`.
 
 RL Gym endpoints (service-to-service, mutual TLS or signed tokens):
 

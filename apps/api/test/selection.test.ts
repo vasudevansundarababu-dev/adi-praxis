@@ -379,11 +379,15 @@ describe('M4c: selection, onboarding and assignment acceptance (FLOW2 CF-19 to C
 
     it('completing onboarding builds the matching record and emits candidate.approved', async () => {
       const c = await reviewPending();
-      await decide(c, 'SELECTED');
+      await decide(c, 'SELECTED', { scope: { ...scope, specialty: 'Corporate onboarding' } });
       const done = await completeOnboarding(c);
       expect(done.status).toBe('COMPLETE');
       const rec = await db.candidate.findUniqueOrThrow({ where: { smeUserId: c.smeUserId } });
       expect(rec).toMatchObject({ country: 'GB', timezone: 'Europe/London', hoursPerWeek: 20, jurisdictions: ['GB'], poolStatus: 'SELECTED' });
+      // Selection covers the pool's template skills, so the expert matches the project that selected them.
+      expect(rec.specialties).toEqual(expect.arrayContaining(['KYC']));
+      const match = (await post(pm, `/projects/${projectId}/match`)).json();
+      expect(match.items.map((i: { candidateId: string }) => i.candidateId)).toContain(rec.id);
       const ev = await db.outboxEvent.findFirstOrThrow({ where: { name: 'candidate.approved' } });
       expect(ev.payload).toEqual({ projectId, candidateId: rec.id, enrollmentId: c.enrollmentId });
     });

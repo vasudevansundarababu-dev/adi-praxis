@@ -141,13 +141,21 @@ export async function acknowledge(
 
 /**
  * Builds the candidate's matching record (M3) from the approved scope, the confirmed profile and onboarding
- * preferences. Only eligibility fields; nothing identity-related.
+ * preferences. Only eligibility fields; nothing identity-related. Selection for a pool counts as covering that pool's
+ * template skills (a person judged the published criteria), and lists from other pools are kept, not replaced.
  */
 export async function upsertMatchingRecord(tx: Tx, enrollmentId: string) {
   const e = await tx.enrollment.findUniqueOrThrow({
     where: { id: enrollmentId },
-    include: { onboarding: { include: { acknowledgements: true } }, qualificationScopes: { orderBy: { createdAt: 'desc' }, take: 1 }, profileVersion: true },
+    include: {
+      onboarding: { include: { acknowledgements: true } },
+      qualificationScopes: { orderBy: { createdAt: 'desc' }, take: 1 },
+      profileVersion: true,
+      opportunity: { include: { project: { include: { template: true } } } },
+    },
   });
+  const existing = await tx.candidate.findUnique({ where: { smeUserId: e.smeUserId } });
+  const union = (...lists: string[][]) => [...new Set(lists.flat().map((x) => x.trim()).filter(Boolean))];
   const prefs = PreferencesAnswer.parse(e.onboarding!.acknowledgements.find((a) => a.itemKey === 'preferences')!.data);
   const scope = e.qualificationScopes[0]!;
   const profile = ProfileData.parse(e.profileVersion!.data);
@@ -157,7 +165,8 @@ export async function upsertMatchingRecord(tx: Tx, enrollmentId: string) {
   };
   const computed = experienceDurations(profile).domain.years;
   const selfReported = profile.fields.domain_years?.status === 'CONFIRMED' && typeof profile.fields.domain_years.value === 'number' ? profile.fields.domain_years.value : null;
-  const specialties = [...new Set([...(scope.specialty ? [scope.specialty] : []), ...list('specialties'), ...list('compliance_areas')])];
+  const poolSkills = e.opportunity.project.template.skills;
+  const specialties = union(existing?.specialties ?? [], poolSkills, scope.specialty ? [scope.specialty] : [], list('specialties'), list('compliance_areas'));
   const data = {
     latestProfileVersionId: e.profileVersionId,
     country: prefs.country,
@@ -165,8 +174,8 @@ export async function upsertMatchingRecord(tx: Tx, enrollmentId: string) {
     timezone: prefs.timezone,
     hoursPerWeek: prefs.hoursPerWeek,
     specialties,
-    skills: [...new Set([...list('specialties'), ...list('compliance_areas'), ...list('tools_methods')])],
-    jurisdictions: scope.jurisdictions,
+    skills: union(existing?.skills ?? [], poolSkills, list('specialties'), list('compliance_areas'), list('tools_methods')),
+    jurisdictions: union(existing?.jurisdictions ?? [], scope.jurisdictions),
     domainExperienceYears: computed > 0 ? computed : selfReported,
     lastValidatedAt: new Date(),
     poolStatus: 'SELECTED',

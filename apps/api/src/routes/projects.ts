@@ -1,4 +1,4 @@
-import type { Domain, Prisma, Project, ProjectDemographicFilter, Template, User } from '@prisma/client';
+import type { Domain, JobDescriptionSnapshot, Prisma, Project, ProjectDemographicFilter, Template, User } from '@prisma/client';
 import {
   CANCELLABLE_STATUSES,
   computeProjectFigures,
@@ -21,11 +21,12 @@ import { toJdDto } from './job-descriptions';
 
 type ProjectFull = Project & {
   template: Template & { domain: Domain };
+  jdSnapshot: JobDescriptionSnapshot | null;
   owner: User;
   demographicFilters: ProjectDemographicFilter[];
 };
 
-const INCLUDE = { template: { include: { domain: true } }, owner: true, demographicFilters: { orderBy: { createdAt: 'asc' } } } as const;
+const INCLUDE = { template: { include: { domain: true } }, owner: true, jdSnapshot: true, demographicFilters: { orderBy: { createdAt: 'asc' } } } as const;
 
 const isoDate = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 const toDate = (s: string | null | undefined) => (s === undefined ? undefined : s === null ? null : new Date(`${s}T00:00:00Z`));
@@ -62,6 +63,7 @@ export function toProjectDto(p: ProjectFull): ProjectDto {
     demographicFilters: p.demographicFilters.map(toFilter),
     jobDescriptionId: p.jobDescriptionId,
     jdSnapshotId: p.jdSnapshotId,
+    jdSnapshot: p.jdSnapshot?.data ?? null,
     demographicsSnapshot: p.demographicsSnapshot,
     autoLaunchCampaign: p.autoLaunchCampaign,
     submittedAt: p.submittedAt?.toISOString() ?? null,

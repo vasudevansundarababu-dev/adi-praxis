@@ -241,6 +241,7 @@ describe('M2 FLOW 1: project creation', () => {
 
       const snap = await db.jobDescriptionSnapshot.findUniqueOrThrow({ where: { id: submitted.jdSnapshotId } });
       expect(snap.data).toMatchObject({ title: JD.title, wagePerTask: 40 });
+      expect((await get(pm, `/projects/${p.id}`)).json().jdSnapshot).toMatchObject({ title: JD.title, wagePerTask: 40 });
       const after = (await get(pm, `/projects/${p.id}`)).json();
       expect([after.templateId, after.templateVersion, after.tptMinutes]).toEqual([templateId, 1, 90]);
     });

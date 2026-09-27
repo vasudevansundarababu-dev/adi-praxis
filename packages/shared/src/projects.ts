@@ -154,7 +154,7 @@ export function computeProjectFigures(i: FigureInputs): ProjectFigures {
 }
 
 /** Template quotas merged with the PM's raises: effective quota = max(template, PM). */
-export function effectiveCoverage(template: { coverageDimensions: unknown; edgeCaseCatalog: unknown }, quotas: CoverageQuotas | null | undefined) {
+export function effectiveCoverage(template: { coverageDimensions?: unknown; edgeCaseCatalog?: unknown }, quotas: CoverageQuotas | null | undefined) {
   const matrix = CoverageDimensions.safeParse(template.coverageDimensions).data ?? { dimensions: [], cells: [] };
   const catalog = EdgeCaseCatalog.safeParse(template.edgeCaseCatalog).data ?? [];
   const sig = (tags: Record<string, string>) => JSON.stringify(Object.entries(tags).sort(([a], [b]) => a.localeCompare(b)));
@@ -277,6 +277,8 @@ export const ProjectDto = z.object({
   demographicFilters: z.array(DemographicFilterInput),
   jobDescriptionId: z.string().uuid().nullable(),
   jdSnapshotId: z.string().uuid().nullable(),
+  /** The JD as frozen at submit (null for drafts). */
+  jdSnapshot: z.unknown(),
   demographicsSnapshot: z.unknown(),
   autoLaunchCampaign: z.boolean(),
   submittedAt: z.string().nullable(),

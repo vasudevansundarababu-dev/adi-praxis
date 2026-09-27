@@ -140,6 +140,20 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
     };
   });
 
+  // W01: a sample accepted task of the same workflow from a different coverage cell (accepted content is synthetic).
+  app.get('/me/tasks/:id/sample', { config: { access: 'candidate' }, schema: { tags: ['work'], params: IdParams } }, async (req) => {
+    const t = await ownTask(db, req.params.id, req.candidate!.smeUserId);
+    const mine = JSON.stringify(t.coverageTags ?? null);
+    const recent = await db.approvedTaskRecord.findMany({
+      where: { workflow: t.project.template.workflowName, supersedesId: null, taskMode: 'AUTHORING' },
+      orderBy: { seq: 'desc' },
+      take: 20,
+      select: { output: true, coverageTags: true },
+    });
+    const other = recent.find((r) => JSON.stringify(r.coverageTags) !== mine);
+    return other ? { source: 'dataset', coverageTags: other.coverageTags, output: other.output } : { source: 'none', coverageTags: null, output: null };
+  });
+
   // Autosave (TASK-KYC W01–W06): the draft, time actively spent, and optimistic concurrency by revision.
   app.put('/me/tasks/:id', { config: { access: 'candidate', rateLimit: { max: 120, timeWindow: '1 minute' } }, schema: { tags: ['work'], params: IdParams, body: SaveTaskRequest } }, async (req, reply) => {
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => {

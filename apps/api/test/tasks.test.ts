@@ -505,7 +505,9 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
       const tasks = await db.taskInstance.findMany({ where: { projectId, assignedToId: a.candidateId }, include: { slot: true }, orderBy: { assignedAt: 'asc' } });
       return { projectId, a, tasks };
     }
-    const body = (title: string, extra: object = {}) => ({ header: { title, ...extra }, body: `${title}: a synthetic onboarding case with its own distinct parties, documents and escalation path ${randomUUID()}.` });
+    let n = 0;
+    const topics = ['sole trader with a cash-heavy shop', 'charity receiving overseas donations', 'import business with a new director', 'family trust refreshing its records', 'consultancy paid by offshore clients', 'property holding company with nominee shareholders'];
+    const body = (title: string, extra: object = {}) => ({ header: { title, ...extra }, body: `${title}: a synthetic onboarding case about a ${topics[n++ % topics.length]}, with its own parties, documents and escalation path.` });
     async function submitted(a: Who, id: string, title: string, header: object = {}) {
       expect((await save(a, id, body(title, header))).statusCode).toBe(200);
       const r = await submit(a, id);
@@ -645,6 +647,8 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
       expect(dash.experts).toEqual([expect.objectContaining({ name: 'Ada Lovelace', accepted: 3, working: 1 })]);
       expect((await db.project.findUniqueOrThrow({ where: { id: projectId } })).status).toBe('IN_PROGRESS');
 
+      // W01 shows a sample accepted task from a different cell.
+      expect((await get(a.cookie, `/me/tasks/${open.id}/sample`)).json()).toMatchObject({ source: 'dataset', output: { header: { title: expect.stringMatching(/^Case/) } } });
       await submitted(a, open.id, 'Open case', { coverageTags: { customer_type: 'trust' }, edgeCase: 'Trustee is a minor' });
       expect((await decide(open.id, { decision: 'ACCEPT' })).json().error).toBe('CONFIRM_TAGS');
       expect((await decide(open.id, { decision: 'ACCEPT', confirmedCoverage: { tags: { customer_type: 'trust', risk_level: 'high' }, edgeCase: 'Trustee is a minor' } })).statusCode).toBe(200);

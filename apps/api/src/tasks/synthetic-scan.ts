@@ -26,10 +26,11 @@ const RULES: { kind: string; re: RegExp; real: (m: string) => boolean }[] = [
   { kind: 'IN_PAN', re: /\b[A-Z]{5}\d{4}[A-Z]\b/g, real: () => true },
   { kind: 'IN_AADHAAR', re: /(?<![\d][ -]?)\b\d{4}\s\d{4}\s\d{4}\b(?![ -]?\d)/g, real: () => true },
   { kind: 'EMAIL', re: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, real: (m) => !RESERVED_EMAIL.test(m) },
-  { kind: 'PHONE', re: /(?<![\w\d])(?:\+\d{1,3}[\s-]?\d{2,4}|\(\d{2,5}\)|0\d{2,4})[\s-]?\d{3,4}[\s-]?\d{3,4}(?!\d)/g, real: (m) => !FICTIONAL_PHONE.some((r) => r.test(m.trim())) },
+  { kind: 'PHONE', re: /(?<![\w-])(?:\+\d{1,3}[\s-]?\d{2,4}|\(\d{2,5}\)|0\d{2,4})[\s-]?\d{3,4}[\s-]?\d{3,4}(?![-\w])/g, real: (m) => !FICTIONAL_PHONE.some((r) => r.test(m.trim())) },
   // Company and passport numbers only when labelled as such, and not from the synthetic generator.
-  { kind: 'COMPANY_NUMBER', re: /\b(?:company|registration|registry)\s*(?:number|no\.?|#)\s*[:#]?\s*[A-Z0-9-]{6,12}\b/gi, real: (m) => !/SYN-?[A-Z0-9]+\s*$/i.test(m) },
-  { kind: 'PASSPORT_NUMBER', re: /\bpassport\s*(?:number|no\.?|#)?\s*[:#]?\s*[A-Z0-9-]{6,12}\b/gi, real: (m) => !/SYN-?[A-Z0-9]+\s*$/i.test(m) },
+  // The identifier must contain a digit, so ordinary words ("passport expired") are not identifiers.
+  { kind: 'COMPANY_NUMBER', re: /\b(?:company|registration|registry)\s*(?:number|no\.?|#)\s*[:#]?\s*(?=[A-Z-]*\d)[A-Z0-9-]{6,12}\b/gi, real: (m) => !/SYN-?[A-Z0-9]+\s*$/i.test(m) },
+  { kind: 'PASSPORT_NUMBER', re: /\bpassport\s*(?:number|no\.?|#)?\s*[:#]?\s*(?=[A-Z-]*\d)[A-Z0-9-]{6,12}\b/gi, real: (m) => !/SYN-?[A-Z0-9]+\s*$/i.test(m) },
 ];
 
 function walk(v: unknown, path: string, out: [string, string][]) {

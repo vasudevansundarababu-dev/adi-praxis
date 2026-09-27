@@ -2,6 +2,7 @@ import { CANCELLABLE_STATUSES, type DemographicAttributeDto, type JobDescription
 import Link from 'next/link';
 import { CancelProjectButton } from './cancel-button';
 import { ProjectStatusBadge } from './project-status';
+import { ReviewersPanel } from './reviewers-panel';
 
 /** Read-only view of a submitted (or later) project, showing its frozen snapshots. */
 export function ProjectSummary({
@@ -9,7 +10,9 @@ export function ProjectSummary({
   template,
   attributes,
   jobDescriptions,
+  reviewers,
 }: {
+  reviewers: { items: { userId: string; name: string; email: string }[]; available: { userId: string; name: string; email: string }[] } | null;
   project: ProjectDto;
   template: TemplateDto | null;
   attributes: DemographicAttributeDto[];
@@ -63,6 +66,7 @@ export function ProjectSummary({
         </Link>
       )}
       {CANCELLABLE_STATUSES.includes(p.status) && <CancelProjectButton projectId={p.id} />}
+      {reviewers && !['CANCELLED', 'COMPLETED'].includes(p.status) && <ReviewersPanel projectId={p.id} initial={reviewers} />}
     </div>
   );
 }

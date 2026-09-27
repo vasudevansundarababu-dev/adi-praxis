@@ -77,12 +77,13 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
       </Link>
       <h1 className="mt-2 text-2xl font-semibold">Resource assignment · {data.projectName}</h1>
 
-      <dl className="mt-4 grid gap-3 sm:grid-cols-4">
+      <dl className="mt-4 grid gap-3 sm:grid-cols-5">
         {(
           [
             ['Status', projectStatusLabel(data.status as never)],
             ['Required workers', data.requiredWorkers ?? '—'],
-            ['Assigned', data.assigned],
+            ['Accepted', data.assigned],
+            ['Awaiting reply', data.proposed],
             ['Shortfall', data.shortfall],
           ] as const
         ).map(([k, v]) => (
@@ -94,7 +95,7 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
       </dl>
       {data.status === 'STAFFED' && (
         <p role="status" className="mt-4 rounded-md border border-success p-3 text-sm">
-          This project is fully staffed. Assigned candidates are listed below.
+          This project is fully staffed. Experts who accepted are listed below.
         </p>
       )}
       {data.warnings.map((w) => (
@@ -104,7 +105,12 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
       ))}
 
       {staffing && (
-        <div className="mt-6 flex flex-wrap items-end gap-3">
+        <p className="mt-4 text-sm text-fg-muted">
+          Assigning sends a proposal. The expert has 7 days to accept or decline; only accepted experts count towards staffing.
+        </p>
+      )}
+      {staffing && (
+        <div className="mt-4 flex flex-wrap items-end gap-3">
           <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${projectId}/match`, undefined, 'Match re-run.')} className="rounded-md border border-line px-3 py-2 text-sm disabled:opacity-60">
             Re-run match
           </button>
@@ -112,10 +118,10 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
             <span className="block">Assign top</span>
             <input type="number" min={1} value={topN} onChange={(e) => setTopN(e.target.value)} className="w-20 rounded-md border border-line bg-surface px-2 py-1.5" />
           </label>
-          <button type="button" disabled={pending || !Number(topN)} onClick={() => run('POST', `/projects/${projectId}/assignments`, { topN: Number(topN) }, `Assigned the top ${topN}.`)} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-on-primary disabled:opacity-60">
+          <button type="button" disabled={pending || !Number(topN)} onClick={() => run('POST', `/projects/${projectId}/assignments`, { topN: Number(topN) }, `Sent proposals to the top ${topN}.`)} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-on-primary disabled:opacity-60">
             Assign top {topN || 'N'}
           </button>
-          <button type="button" disabled={pending || selected.size === 0} onClick={() => run('POST', `/projects/${projectId}/assignments`, { candidateIds: [...selected] }, `Assigned ${selected.size}.`)} className="rounded-md border border-line px-3 py-2 text-sm disabled:opacity-60">
+          <button type="button" disabled={pending || selected.size === 0} onClick={() => run('POST', `/projects/${projectId}/assignments`, { candidateIds: [...selected] }, `Sent ${selected.size} proposal(s).`)} className="rounded-md border border-line px-3 py-2 text-sm disabled:opacity-60">
             Assign selected ({selected.size})
           </button>
         </div>
@@ -185,7 +191,7 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
                   onToggle={() => toggle(i.candidateId)}
                   expanded={expanded === i.candidateId}
                   onExpand={() => setExpanded(expanded === i.candidateId ? null : i.candidateId)}
-                  onAssign={() => run('POST', `/projects/${projectId}/assignments`, { candidateIds: [i.candidateId] }, `Assigned ${i.name}.`)}
+                  onAssign={() => run('POST', `/projects/${projectId}/assignments`, { candidateIds: [i.candidateId] }, `Sent a proposal to ${i.name}.`)}
                   onRelease={() => fetchRelease(projectId, i.assignmentId!, setData, setMessage, setPending)}
                   rejecting={rejecting === i.candidateId}
                   onStartReject={() => {
@@ -271,12 +277,14 @@ function Row(props: {
         <td className="px-3 py-2">{i.languages.map((l) => `${l.language} ${l.level}`).join(', ') || '—'}</td>
         <td className="px-3 py-2">{i.hoursPerWeek ? `${i.hoursPerWeek} h/wk` : '—'}{i.timezone ? <span className="block text-xs text-fg-muted">{i.timezone}</span> : null}</td>
         <td className="px-3 py-2">{i.lastValidatedAt ? new Date(i.lastValidatedAt).toLocaleDateString() : '—'}</td>
-        <td className="px-3 py-2">{i.status === 'ASSIGNED' ? <span className="font-medium text-success">Assigned</span> : 'Available'}</td>
+        <td className="px-3 py-2">
+          {i.status === 'ASSIGNED' ? <span className="font-medium text-success">Accepted</span> : i.status === 'PROPOSED' ? <span className="font-medium text-warning">Proposed · awaiting reply</span> : 'Available'}
+        </td>
         {staffing && (
           <td className="whitespace-nowrap px-3 py-2">
-            {i.status === 'ASSIGNED' ? (
+            {i.status !== 'AVAILABLE' ? (
               <button type="button" disabled={pending} onClick={props.onRelease} className="text-link disabled:opacity-60">
-                Release
+                {i.status === 'PROPOSED' ? 'Withdraw proposal' : 'Release'}
               </button>
             ) : (
               <>

@@ -6,13 +6,16 @@ export interface NavItem {
   roles: InternalRole[];
 }
 
-/** Console areas by role. The Review queue arrives with later milestones. */
+/** Console areas by role. */
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Home', href: '/', roles: ['ADMIN', 'PM', 'REVIEWER'] },
   { label: 'Projects', href: '/projects', roles: ['ADMIN', 'PM'] },
   { label: 'Templates', href: '/templates', roles: ['ADMIN', 'PM'] },
   { label: 'Taxonomy', href: '/taxonomy', roles: ['ADMIN'] },
+  { label: 'Applications', href: '/review/applications', roles: ['REVIEWER', 'ADMIN'] },
   { label: 'Identity reviews', href: '/review/identity', roles: ['REVIEWER', 'ADMIN'] },
+  { label: 'Conflicts', href: '/review/conflicts', roles: ['REVIEWER', 'ADMIN'] },
+  { label: 'Terms', href: '/terms', roles: ['ADMIN'] },
   { label: 'Users', href: '/users', roles: ['ADMIN'] },
 ];
 

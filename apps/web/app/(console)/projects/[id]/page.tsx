@@ -25,7 +25,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const jobDescriptions = j.data?.items ?? [];
 
   if (project.status !== 'DRAFT') {
-    return <ProjectSummary project={project} template={own.data} attributes={attributes} jobDescriptions={jobDescriptions} />;
+    const { data: reviewers } = await apiGet<{ items: { userId: string; name: string; email: string }[]; available: { userId: string; name: string; email: string }[] }>(`/projects/${id}/reviewers`);
+    return <ProjectSummary project={project} template={own.data} attributes={attributes} jobDescriptions={jobDescriptions} reviewers={reviewers} />;
   }
   // A draft may reference a template that is no longer offered; keep it selectable so the PM sees why submit fails.
   const templates = t.data?.items ?? [];

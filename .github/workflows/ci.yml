@@ -4,6 +4,8 @@ name: CI
 on:
   pull_request:
   workflow_call:
+  # The nightly agent starts CI on its branches (pull requests opened with the workflow token do not trigger CI).
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:

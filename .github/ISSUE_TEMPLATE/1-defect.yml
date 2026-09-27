@@ -1,0 +1,66 @@
+name: Defect
+description: Something does not work as specified, or differs from a documented decision.
+title: "[Defect] "
+labels: ["type:defect", "status:needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. One problem per report. **Never paste passwords, real personal data or real customer data.**
+        Security problems go to a private advisory instead (see SECURITY.md).
+  - type: input
+    id: test_case
+    attributes: { label: Test case ID, description: "From docs/testing/TEST-CASES.md, e.g. TC-SME-012. Write 'exploratory' if none.", placeholder: TC-SME-012 }
+    validations: { required: true }
+  - type: input
+    id: build
+    attributes: { label: Build, description: "Shown in the yellow banner at the top of every page, e.g. nightly-20260928-1a2b3c4.", placeholder: nightly-20260928-1a2b3c4 }
+    validations: { required: true }
+  - type: dropdown
+    id: persona
+    attributes: { label: Persona, options: ["SME / candidate", "Project manager", "Admin", "Reviewer", "RL Gym (API)", "Several / not role-specific"] }
+    validations: { required: true }
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity (your view; triage may change it)
+      options:
+        - "S1 critical: blocks a whole flow, loses or leaks data, or breaks a non-negotiable"
+        - "S2 major: a feature is wrong or blocked, no reasonable workaround"
+        - "S3 minor: wrong, but there is a workaround"
+        - "S4 trivial: cosmetic"
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes: { label: Steps to reproduce, description: "Numbered. Include the page URL and the account used (email only).", placeholder: "1. Sign in as pm+tester3@praxis.test\n2. Open Projects -> KYC authoring demo -> Staffing\n3. Click Assign next to ..." }
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes: { label: Expected result, description: "What the test case or decision says should happen. Quote the decision ID if there is one (e.g. D-M9-04)." }
+    validations: { required: true }
+  - type: textarea
+    id: actual
+    attributes: { label: Actual result, description: "What happened. Copy error messages exactly, including the request id if one is shown." }
+    validations: { required: true }
+  - type: textarea
+    id: evidence
+    attributes: { label: Screenshots or screen recording, description: "Drag files here. Crop out anything personal." }
+  - type: input
+    id: when
+    attributes: { label: When (IST), placeholder: "28 Sep 2026 11:42 IST" }
+    validations: { required: true }
+  - type: input
+    id: browser
+    attributes: { label: Browser, device and network, placeholder: "Chrome 129 on Windows 11, laptop, office Wi-Fi" }
+    validations: { required: true }
+  - type: dropdown
+    id: frequency
+    attributes: { label: How often, options: ["Every time", "Sometimes", "Once so far"] }
+    validations: { required: true }
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - { label: "I searched open issues and this is not a duplicate", required: true }
+        - { label: "The report contains no passwords and no real personal or customer data", required: true }

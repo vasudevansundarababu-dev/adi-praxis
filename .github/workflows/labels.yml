@@ -1,0 +1,27 @@
+# Keeps repository labels in line with .github/labels.yml (creates and updates; never deletes).
+name: Sync labels
+on:
+  push:
+    branches: [main]
+    paths: ['.github/labels.yml']
+  workflow_dispatch:
+permissions:
+  issues: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create or update labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import re, subprocess
+          for line in open('.github/labels.yml'):
+              m = re.match(r'\s*- \{ name: "([^"]+)", color: "([0-9a-f]{6})", description: "([^"]*)" \}', line)
+              if not m: continue
+              name, color, desc = m.groups()
+              subprocess.run(['gh', 'label', 'create', name, '--color', color, '--description', desc[:100], '--force'], check=True)
+              print('ok', name)
+          PY

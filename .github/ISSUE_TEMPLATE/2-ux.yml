@@ -1,0 +1,45 @@
+name: UX issue
+description: It works, but it is confusing, slow, hard to read, inaccessible or takes too many steps.
+title: "[UX] "
+labels: ["type:ux", "status:needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "Describe what a real user in this persona would struggle with. **No passwords or real personal data.**"
+  - type: input
+    id: screen
+    attributes: { label: Screen (URL or name), placeholder: "/tasks/<id> W00 Start" }
+    validations: { required: true }
+  - type: input
+    id: build
+    attributes: { label: Build (from the banner) }
+    validations: { required: true }
+  - type: dropdown
+    id: persona
+    attributes: { label: Persona, options: ["SME / candidate", "Project manager", "Admin", "Reviewer", "Several"] }
+    validations: { required: true }
+  - type: dropdown
+    id: kind
+    attributes: { label: Kind of problem, multiple: true, options: ["Confusing wording or instructions", "Too many steps", "Hard to find", "Slow or no feedback", "Layout or readability", "Mobile / small screen", "Accessibility (keyboard, screen reader, contrast)", "Error message unhelpful", "Inconsistent with other screens", "Other"] }
+    validations: { required: true }
+  - type: dropdown
+    id: impact
+    attributes: { label: Impact, options: ["High: users will fail or give up", "Medium: users will hesitate or make mistakes", "Low: users will notice but cope"] }
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes: { label: What happened, description: "What you were trying to do, and where you got stuck." }
+    validations: { required: true }
+  - type: textarea
+    id: suggestion
+    attributes: { label: Suggestion (optional) }
+  - type: input
+    id: decision
+    attributes: { label: Related decision or test case (optional), placeholder: "D-FB-01 / TC-SME-020" }
+  - type: textarea
+    id: evidence
+    attributes: { label: Screenshots or recording }
+  - type: input
+    id: browser
+    attributes: { label: Browser, device and screen size, placeholder: "Chrome on Android, 360x800" }
+    validations: { required: true }

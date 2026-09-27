@@ -1,0 +1,29 @@
+# Testers close the loop with a comment on the issue:
+#   /verified  the fix works on the test environment  -> status:verified, issue closed
+#   /failed    it still fails (say how in the comment) -> status:reopened, issue open, back to triage
+name: Issue commands
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  issues: write
+jobs:
+  command:
+    if: ${{ !github.event.issue.pull_request && (startsWith(github.event.comment.body, '/verified') || startsWith(github.event.comment.body, '/failed')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.event.issue.number }}
+          BODY: ${{ github.event.comment.body }}
+          WHO: ${{ github.event.comment.user.login }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [[ "$BODY" == /verified* ]]; then
+            gh issue edit "$N" -R "$REPO" --add-label status:verified --remove-label status:ready-to-verify,status:reopened || true
+            gh issue close "$N" -R "$REPO" --reason completed --comment "Verified by @$WHO on the test environment. Closing."
+          else
+            gh issue reopen "$N" -R "$REPO" || true
+            gh issue edit "$N" -R "$REPO" --add-label status:reopened,status:needs-triage --remove-label status:ready-to-verify,status:verified,agent:pr-open || true
+            gh issue comment "$N" -R "$REPO" --body "Verification failed (reported by @$WHO). Back to triage."
+          fi

@@ -1,0 +1,35 @@
+# Issue and pull request labels (synced by .github/workflows/labels.yml). See docs/testing/TRIAGE.md.
+- { name: "type:defect", color: "d73a4a", description: "Something does not work as specified or as documented in a decision" }
+- { name: "type:ux", color: "f9a825", description: "Works, but is confusing, slow, inaccessible or hard to use" }
+- { name: "type:enhancement", color: "0e8a16", description: "A new capability or a change to agreed behaviour" }
+- { name: "type:test-gap", color: "c5def5", description: "A test case is missing, wrong or unclear" }
+- { name: "sev:S1-critical", color: "b60205", description: "Blocks a whole flow, loses or leaks data, or breaks a non-negotiable. Fix before anything else" }
+- { name: "sev:S2-major", color: "e99695", description: "A feature is wrong or blocked with no reasonable workaround" }
+- { name: "sev:S3-minor", color: "fbca04", description: "Wrong but with a workaround, or a clear UX problem" }
+- { name: "sev:S4-trivial", color: "fef2c0", description: "Cosmetic: wording, spacing, alignment" }
+- { name: "persona:sme", color: "1d76db", description: "Candidate / subject-matter expert (candidate app)" }
+- { name: "persona:pm", color: "1d76db", description: "Project manager (console)" }
+- { name: "persona:admin", color: "1d76db", description: "Admin (console)" }
+- { name: "persona:reviewer", color: "1d76db", description: "Reviewer (console)" }
+- { name: "persona:rl-gym", color: "1d76db", description: "RL Gym machine client (API)" }
+- { name: "area:sign-in", color: "bfdadc", description: "Sign-in, sessions, identity check" }
+- { name: "area:profile", color: "bfdadc", description: "SME profile chat, form, review and submit" }
+- { name: "area:selection", color: "bfdadc", description: "Applications, reviewer decisions, onboarding" }
+- { name: "area:projects", color: "bfdadc", description: "Templates, projects, opportunities, staffing" }
+- { name: "area:authoring", color: "bfdadc", description: "Task workbench W00-W06, drafting, MCP tool calls" }
+- { name: "area:review", color: "bfdadc", description: "Task review, dataset, RL review" }
+- { name: "area:platform", color: "bfdadc", description: "Performance, availability, security headers, accessibility, deploy" }
+- { name: "status:needs-triage", color: "ededed", description: "New: waiting for triage" }
+- { name: "status:needs-info", color: "d4c5f9", description: "The reporter or product owner must answer a question" }
+- { name: "status:decision-needed", color: "5319e7", description: "Challenges a documented decision: the product owner decides" }
+- { name: "status:triaged", color: "c2e0c6", description: "Reproduced and prioritised" }
+- { name: "agent:ready", color: "7057ff", description: "Triaged defect the nightly agent may fix (it opens a pull request; a human merges)" }
+- { name: "agent:working", color: "7057ff", description: "The nightly agent is working on it" }
+- { name: "agent:pr-open", color: "7057ff", description: "The agent opened a pull request; waiting for human review" }
+- { name: "agent:failed", color: "7057ff", description: "The agent could not produce a safe fix; a developer should look" }
+- { name: "agent", color: "7057ff", description: "Pull request written by the nightly agent" }
+- { name: "status:ready-to-verify", color: "0052cc", description: "The fix is in the latest nightly build: tester, please verify" }
+- { name: "status:verified", color: "0e8a16", description: "Tester confirmed the fix on the test environment" }
+- { name: "status:reopened", color: "b60205", description: "Verification failed; back to triage" }
+- { name: "status:duplicate", color: "cfd3d7", description: "Already reported" }
+- { name: "status:wont-fix", color: "ffffff", description: "Works as decided, or out of scope" }

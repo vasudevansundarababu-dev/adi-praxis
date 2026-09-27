@@ -1,0 +1,30 @@
+name: Enhancement request
+description: A new capability, or a change to agreed behaviour (including challenging a documented decision).
+title: "[Enhancement] "
+labels: ["type:enhancement", "status:needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "Enhancements are decided by the product owner. The nightly agent never builds one until it is approved."
+  - type: dropdown
+    id: persona
+    attributes: { label: Who benefits, options: ["SME / candidate", "Project manager", "Admin", "Reviewer", "RL Gym (API)", "Several"] }
+    validations: { required: true }
+  - type: textarea
+    id: problem
+    attributes: { label: Problem, description: "What is hard or impossible today, and for whom." }
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes: { label: Proposed change }
+    validations: { required: true }
+  - type: input
+    id: decision
+    attributes: { label: Decision this would change (if any), description: "From docs/testing/DECISION-REGISTER.md", placeholder: D-M5-02 }
+  - type: dropdown
+    id: value
+    attributes: { label: Value, options: ["Must have before production", "Should have soon", "Nice to have"] }
+    validations: { required: true }
+  - type: textarea
+    id: evidence
+    attributes: { label: Screenshots, sketches or examples }

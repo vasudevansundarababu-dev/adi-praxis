@@ -210,7 +210,7 @@ Keep the scorer behind a `MatchService` interface so it can later move to embedd
 Triggered when shortfall > 0 and the PM clicks Launch (or auto-launch if enabled on the project).
 
 - Build the job post from the JD: title, description, responsibilities, skills, wage per task, location type and location, apply link.
-- Apply link points to the platform's own apply page with a `campaign_id` so every applicant is attributed.
+- Apply link points to the platform's own apply page with a `campaign_id` so every applicant is attributed. (Implemented as `<candidate app>/apply/{campaign_id}`: counts the click, then opens the opportunity page with the campaign carried through sign-in and verification.)
 - v1 uses `ManualAdapter`: the platform generates the post text and tracked apply link, and the PM posts it on LinkedIn as a job with "apply on company website". LinkedIn's Job Posting API is closed to new partners, so v1 does not depend on it.
 - Later, `LinkedInApplyConnectAdapter`: if an Apply Connect partnership is approved, jobs post via API and LinkedIn delivers applications by webhook to `POST /webhooks/job-board/linkedin`; each applicant then gets a link to finish details and KYC.
 - Track per campaign: status (`DRAFT`, `LIVE`, `PAUSED`, `CLOSED`), start/end, clicks, applies, KYC completed, approved, assigned.
@@ -458,7 +458,7 @@ REST under `/api/v1`, JSON, OpenAPI spec generated from code. Internal users use
 | JDs | `GET/POST /job-descriptions`, `GET/PATCH /job-descriptions/{id}` | PM |
 | Matching (FLOW 2) | `POST /projects/{id}/match`, `GET /projects/{id}/matches`, `POST /projects/{id}/assignments`, `DELETE /projects/{id}/assignments/{aid}`, `POST /projects/{id}/rejections` (reject for this project), `GET /candidates/{id}` (matching profile for View profile) | PM |
 | Campaigns (FLOW 2) | `POST /projects/{id}/campaigns`, `GET/PATCH /campaigns/{id}`, `POST /campaigns/{id}/close` | PM |
-| Applications (FLOW 2) | `POST /public/campaigns/{id}/apply`, `GET /applications?status=IN_VALIDATION`, `POST /applications/{id}/decision` | Candidate / Reviewer |
+| Applications (FLOW 2) | `POST /public/campaigns/{id}/click` (tracked apply link; replaces `/apply`), `POST /me/enrollments` (the application: created when a signed-in candidate starts their profile, attributed to the campaign), `GET /applications?status=IN_VALIDATION`, `POST /applications/{id}/decision` | Candidate / Reviewer |
 | Tasks (FLOW 3) | `POST /projects/{id}/task-inputs` (upload), `GET /projects/{id}/tasks`, `POST /assignments/{id}/invite` | PM |
 | Candidate (FLOW 3) | `POST /auth/google`, `POST /me/identity/session`, `GET /me/projects`, `POST /me/projects/{id}/tasks/next`, `GET/PUT /me/tasks/{id}`, `POST /me/tasks/{id}/submit` | Candidate |
 | Review | `GET /review/tasks`, `POST /review/tasks/{id}/decision` | Reviewer |

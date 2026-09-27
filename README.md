@@ -34,7 +34,9 @@ pnpm dev                # API on :4000, console on :3100, candidate app on :3101
 pnpm worker             # in a second terminal: outbox dispatcher + event handlers
 ```
 
-Sign in to the console at http://localhost:3100 with `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`. API docs are at http://localhost:4000/docs, and outgoing email appears in Mailpit at http://localhost:8035.
+Sign in to the console at http://localhost:3100 with `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`.
+
+The candidate app is at http://localhost:3101. With `GOOGLE_OAUTH_CLIENT_ID` and the Stripe keys blank (the default), it shows a clearly labelled **dev sign-in (mock Google)** and a **simulated identity provider** page; both exist only in development builds, and the API refuses to start in production without the real keys. API docs are at http://localhost:4000/docs, and outgoing email appears in Mailpit at http://localhost:8035.
 
 Local services use offset host ports (Postgres 5442, Redis 6389, SMTP 1035), so they don't clash with other Docker stacks.
 

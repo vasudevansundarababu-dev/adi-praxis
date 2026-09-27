@@ -3,6 +3,7 @@ node_modules/
 dist/
 .next/
 .next-verify/
+.next-verify-dev/
 out/
 coverage/
 *.tsbuildinfo

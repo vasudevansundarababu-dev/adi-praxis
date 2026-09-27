@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./theme": "./theme/tokens.ts",
     "./theme/theme.css": "./theme/theme.css",
-    "./brand/*": "./brand/*"
+    "./brand/*": "./brand/*",
+    "./security-headers": "./security-headers.mjs"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

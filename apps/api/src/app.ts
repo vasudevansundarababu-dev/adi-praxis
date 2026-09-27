@@ -165,6 +165,18 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     allowedHeaders: ['content-type', 'idempotency-key', 'x-request-id'],
   });
   await app.register(rateLimit, { global: false });
+  // Security headers on every API response (hardening before external testing, 27 Sep 2026). Responses are
+  // personal, so they are never cached; /docs (Swagger UI) keeps its own scripts and is not given the strict CSP.
+  app.addHook('onSend', async (req, reply) => {
+    reply.header('x-content-type-options', 'nosniff');
+    reply.header('x-frame-options', 'DENY');
+    reply.header('referrer-policy', 'no-referrer');
+    if (deps.config.COOKIE_SECURE) reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains');
+    if (!req.url.startsWith('/docs')) {
+      reply.header('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
+      if (!reply.hasHeader('cache-control')) reply.header('cache-control', 'no-store');
+    }
+  });
   await app.register(swagger, {
     openapi: {
       info: { title: 'ADI Praxis API', version: '0.1.0' },

@@ -465,7 +465,9 @@ REST under `/api/v1`, JSON, OpenAPI spec generated from code. Internal users use
 | Candidate (FLOW 3) | `POST /auth/google`, `POST /me/identity/session`, `POST /me/invites/redeem`, `GET /me/projects`, `GET /me/projects/{id}`, `POST /me/projects/{id}/tasks/next`, `GET/PUT /me/tasks/{id}`, `GET /me/tasks/{id}/sample`, `POST /me/tasks/{id}/check`, `POST /me/tasks/{id}/submit` | Candidate |
 | Review | `GET /review/tasks`, `GET /review/tasks/{id}`, `POST /review/tasks/{id}/decision` | Reviewer (assigned projects) / Admin |
 | Dataset | `GET /dataset/records` (cursor `after`), `GET /dataset/records/{id}`, `GET /dataset/records/{id}/lineage`, `GET /dataset/export` (NDJSON), `POST /dataset/records/{id}/corrections` (Admin; appends a superseding record), `GET /dataset/verification` (Admin) | Admin / RL Gym (API key), read-only |
+| RL review (FLOW 4) | `POST /integrations/rl-gym/review-requests` (idempotent per `rl_run_id`, `rl_task_id`), `GET /integrations/rl-gym/results` (pull fallback, cursor `after`); `GET /review/rl`, `GET /review/rl/{id}`, `POST /review/rl/{id}/claim`, `POST /review/rl/{id}/verdict`; `GET/POST /failure-reason-codes`, `PATCH /failure-reason-codes/{id}` (Admin) | RL Gym (API key) / Reviewer / Admin |
 | Webhooks | `POST /integrations/stripe/identity-webhook`, `POST /webhooks/job-board/{channel}` | Signed, external |
+| Outbound to RL Gym | `POST <RL_GYM_WEBHOOK_URL>` with `x-praxis-signature: t=<unix>,v1=<HMAC-SHA256(secret, t.body)>` and `x-praxis-event-id`; retried with exponential backoff (8 attempts) | Signed, outbound |
 
 The Stripe Identity webhook uses the FLOW 2 — SME candidate flow path (decided 26 Sep 2026); it replaces the earlier `POST /webhooks/stripe-identity`.
 

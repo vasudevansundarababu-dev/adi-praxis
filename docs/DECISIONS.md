@@ -77,3 +77,10 @@ milestones without interruption (26 Sep 2026); each was the option Claude would 
 - **(chosen by Claude)** The dataset API is read-only for Admins and RL Gym (API key); PMs use the dashboard instead. Corrections are Admin-only and append a superseding record with the same lineage.
 - **(chosen by Claude)** The UI smoke test uses Playwright with system Chrome locally, on isolated ports and a `praxis_e2e` database.
 
+## M7 FLOW 4 RL Gym result review (chosen by Claude)
+- **(chosen by Claude)** RL Gym authenticates with an Admin-issued RL_GYM API key. A duplicate `(rl_run_id, rl_task_id)` returns the existing request (200) and creates nothing. Source records must exist in the dataset.
+- **(chosen by Claude)** An RL_REVIEW task belongs to the project of its first source record, so "qualified reviewers" are those assigned to that project (or Admins). RL tasks are excluded from expert queues, PM task lists, dashboards and completion. A reviewer claims a review before judging it; a finished review ends in SUBMITTED.
+- **(chosen by Claude)** Every eval metric gets exactly one agree/disagree; a comment is required on every FAIL and every disagreement. Comments may be pinned to a trajectory step and tagged with an active failure reason code. Large trajectories arrive as a signed URL that the reviewer opens; the server never fetches it.
+- **(chosen by Claude)** RLReviewRecord uses the same hash chain and append-only rules as the dataset, and the nightly job verifies both chains. Delivery state lives in RLResultDelivery.
+- **(chosen by Claude)** Results go by a Stripe-style HMAC-signed webhook (`RL_GYM_WEBHOOK_URL`, secret of 32+ characters) with 8 exponential retries. Without a URL, results stay `PULL_ONLY` for `GET /integrations/rl-gym/results`. RL Gym's receiving side is outside this spec; tests use a mock that verifies signatures.
+

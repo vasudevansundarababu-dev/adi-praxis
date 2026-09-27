@@ -1,3 +1,4 @@
+import { argumentProblems, canonicalArgs, responseArguments, stepArguments } from './mcp';
 import type { TaskCheck } from './tasks';
 
 /**
@@ -45,10 +46,14 @@ export interface KycDocument {
   fields?: { name: string; value: string }[];
   defects?: string[];
 }
+/** A recorded MCP tools/call (docs/TASK-DRAFTING.md section 5): the request's arguments and the result text. */
 export interface KycToolResponse {
   id: string;
   tool: string;
+  /** Human-readable summary of the arguments; before M9 the only input (it maps to the tool's main argument). */
   input: string;
+  /** MCP arguments, valid against the tool's inputSchema. */
+  arguments?: Record<string, string>;
   kind: string;
   response: string;
 }
@@ -58,6 +63,8 @@ export interface KycStep {
   tool?: string;
   responseId?: string;
   input?: string;
+  /** When given, must equal the arguments of the recorded call (`responseId`). */
+  arguments?: Record<string, string>;
   expectedResult: string;
   why: string;
   dependsOn?: string[];
@@ -176,7 +183,17 @@ export function kycChecks(t: KycTask, slot: { edgeCase: string | null; isOpen: b
   const badDocDates = docs.filter((d) => (d.issueDate && !isDate(d.issueDate)) || (d.expiryDate && !isDate(d.expiryDate)) || (d.issueDate && d.expiryDate && d.issueDate > d.expiryDate));
   add('documents.dates', 'W03', badDocDates.length === 0, badDocDates.length ? `Issue dates must come before expiry dates (${badDocDates.map((d) => d.id).join(', ')})` : 'Document dates are in order');
   add('tools.catalog', 'W03', tools.length > 0 && tools.every((x) => catalog.has(x)), 'Choose the available tools from the fixed catalog');
-  add('responses.tools', 'W03', responses.every((r) => tools.includes(r.tool) && filled(r.input) && filled(r.response)), 'Each tool response needs an available tool, an input and a response');
+  add('responses.tools', 'W03', responses.every((r) => tools.includes(r.tool) && filled(r.response)), 'Each tool response needs an available tool and the response the environment returns');
+  const badArgs = responses.map((r) => ({ r, p: argumentProblems(r.tool, responseArguments(r)) })).filter((x) => x.p.length);
+  add('responses.arguments', 'W03', badArgs.length === 0, badArgs.length ? `Recorded calls need valid arguments: ${badArgs.map((x) => `${x.r.id} (${x.p.join('; ')})`).join(', ')}` : 'Every recorded call has valid MCP arguments');
+  const seen = new Map<string, string>();
+  const dupes: string[] = [];
+  for (const r of responses) {
+    const key = `${r.tool}|${canonicalArgs(responseArguments(r))}`;
+    if (seen.has(key)) dupes.push(`${seen.get(key)} and ${r.id}`);
+    else seen.set(key, r.id);
+  }
+  add('responses.unique', 'W03', dupes.length === 0, dupes.length ? `Two recorded calls have the same tool and arguments, so replay could not tell them apart: ${dupes.join(', ')}` : 'Each recorded call is distinct');
 
   // W04 reference trajectory
   const minSteps = (h.difficulty ?? 1) >= 3 ? 6 : 1;
@@ -186,7 +203,12 @@ export function kycChecks(t: KycTask, slot: { edgeCase: string | null; isOpen: b
   add('steps.tools', 'W04', toolSteps.every((x) => !!x.tool && tools.includes(x.tool)), 'Every tool step must use a tool that is available in the environment');
   const responseById = new Map(responses.map((r) => [r.id, r]));
   const unanswered = toolSteps.filter((x) => !x.responseId || responseById.get(x.responseId)?.tool !== x.tool);
-  add('steps.responses', 'W04', unanswered.length === 0, unanswered.length ? `Tool steps without a defined response: ${unanswered.map((x) => x.id).join(', ')}` : 'Every tool step has a defined response (replayable)');
+  add('steps.responses', 'W04', unanswered.length === 0, unanswered.length ? `Tool steps without a recorded call: ${unanswered.map((x) => x.id).join(', ')}` : 'Every tool step has a recorded call (replayable)');
+  const mismatched = toolSteps.filter((x) => {
+    const r = x.responseId ? responseById.get(x.responseId) : undefined;
+    return r && x.arguments && canonicalArgs(stepArguments(x, r) ?? {}) !== canonicalArgs(responseArguments(r));
+  });
+  add('steps.arguments', 'W04', mismatched.length === 0, mismatched.length ? `Tool steps whose arguments differ from their recorded call: ${mismatched.map((x) => x.id).join(', ')}` : 'Tool step arguments match their recorded calls');
   const deps = dependencyProblems(steps);
   add('steps.dependencies', 'W04', deps.length === 0, deps.length ? deps.join('; ') : 'Step dependencies are valid');
   const refs = new Set([...docs.map((d) => d.id), ...responses.map((r) => r.id)]);
@@ -317,8 +339,8 @@ export const KYC_EXAMPLE_TASK: KycTask = {
   environment: {
     tools: ['registry_lookup', 'sanctions_pep_screening', 'document_check', 'risk_calculator', 'request_info'],
     responses: [
-      { id: 'R1', tool: 'registry_lookup', input: 'SYN-889201', kind: 'DATA', response: 'Harbourline Holdings Ltd: last annual filing 2021-03-01; shareholders Arkwright Family Trust 50%, Hugo Fairwick 50%.' },
-      { id: 'R2', tool: 'sanctions_pep_screening', input: 'Soren Dunmore', kind: 'NEAR_MATCH', response: 'Near match: Soren Dunmore, born 1958-02-17, listed entry. Different date of birth.' },
+      { id: 'R1', tool: 'registry_lookup', input: 'SYN-889201', arguments: { companyNumber: 'SYN-889201', jurisdiction: 'GB' }, kind: 'DATA', response: 'Harbourline Holdings Ltd: last annual filing 2021-03-01; shareholders Arkwright Family Trust 50%, Hugo Fairwick 50%.' },
+      { id: 'R2', tool: 'sanctions_pep_screening', input: 'Soren Dunmore', arguments: { name: 'Soren Dunmore', dateOfBirth: '1964-11-02' }, kind: 'NEAR_MATCH', response: 'Near match: Soren Dunmore, born 1958-02-17, listed entry. Different date of birth.' },
       { id: 'R3', tool: 'document_check', input: 'D2', kind: 'DATA', response: 'Trust deed appears authentic; settlor Cleo Arkwright.' },
       { id: 'R4', tool: 'risk_calculator', input: 'corporate; layered ownership; trust', kind: 'DATA', response: 'Score 78: high.' },
       { id: 'R5', tool: 'request_info', input: 'Updated annual filing for Harbourline Holdings Ltd', kind: 'DATA', response: 'Request logged.' },

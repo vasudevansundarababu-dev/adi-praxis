@@ -10,7 +10,12 @@ import {
   KYC_SEVERITY,
   KYC_TOOLS,
   KYC_TRIGGERS,
+  argumentProblems,
+  argumentsSummary,
   kycChecks,
+  mcpTool,
+  responseArguments,
+  toMcpCall,
   syntheticGenerator,
   type KycDocument,
   type KycParty,
@@ -114,6 +119,45 @@ function Rows<T>(p: { title: string; items: T[]; onChange: (items: T[]) => void;
         </button>
       )}
     </div>
+  );
+}
+
+/** W03: one tool response as a recorded MCP call, with arguments edited through the tool's inputSchema. */
+function RecordedCall({ r, setR, tools }: { r: KycToolResponse; setR: (next: KycToolResponse) => void; tools: string[] }) {
+  const tool = mcpTool(r.tool);
+  const args = responseArguments(r);
+  const setArg = (k: string, v: string) => {
+    const next = { ...args, [k]: v };
+    setR({ ...r, arguments: next, input: argumentsSummary(next) });
+  };
+  const problems = r.tool ? argumentProblems(r.tool, args) : [];
+  const required = new Set([...(tool?.inputSchema.required ?? []), ...(tool?.inputSchema.anyOf?.flatMap((g) => g.required) ?? [])]);
+  return (
+    <>
+      <Pick label="Tool" value={r.tool} options={tools} onChange={(t) => setR({ ...r, tool: t, arguments: {}, input: '' })} />
+      <Pick label="Result kind" value={r.kind} options={KYC_RESPONSE_KINDS} onChange={(kind) => setR({ ...r, kind })} />
+      {tool && (
+        <fieldset className="rounded-md border border-line p-2 sm:col-span-2">
+          <legend className="px-1 text-sm">Arguments the agent sends</legend>
+          <p className="text-xs text-fg-muted">{tool.description}</p>
+          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+            {Object.entries(tool.inputSchema.properties).map(([k, spec]) => (
+              <Field key={k} label={`${k}${required.has(k) ? (tool.inputSchema.anyOf ? ' (one of the starred)' : ' *') : ''}`} value={args[k]} hint={spec.description} onChange={(v) => setArg(k, v)} />
+            ))}
+          </div>
+          {problems.length > 0 && <p className="mt-1 text-xs text-warning">{problems.join('; ')}</p>}
+        </fieldset>
+      )}
+      <div className="sm:col-span-2">
+        <Area label="Response the environment returns" value={r.response} onChange={(response) => setR({ ...r, response })} rows={2} />
+      </div>
+      {tool && (
+        <details className="text-xs sm:col-span-2">
+          <summary className="cursor-pointer text-fg-muted">Show as MCP call</summary>
+          <pre className="mt-1 overflow-x-auto rounded-md bg-surface p-2">{JSON.stringify(toMcpCall({ ...r, arguments: args }), null, 2)}</pre>
+        </details>
+      )}
+    </>
   );
 }
 
@@ -327,20 +371,13 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
               />
               <MultiPick label="Tools available to the agent" value={tools} options={KYC_TOOLS.map((x) => x.key)} onChange={(v) => set('environment', { tools: v })} />
               <Rows<KycToolResponse>
-                title="Tool responses"
+                title="Tool responses (recorded MCP calls)"
                 items={responses}
                 disabled={ro}
                 itemLabel={(r) => `${r.id} ${r.tool ? label(r.tool) : ''}`}
-                make={() => ({ id: nextId('R', responses.map((x) => x.id)), tool: tools[0] ?? '', input: '', kind: 'DATA', response: '' })}
+                make={() => ({ id: nextId('R', responses.map((x) => x.id)), tool: tools[0] ?? '', input: '', arguments: {}, kind: 'DATA', response: '' })}
                 onChange={(responses) => set('environment', { responses })}
-                render={(r, setR) => (
-                  <>
-                    <Pick label="Tool" value={r.tool} options={tools} onChange={(tool) => setR({ ...r, tool })} />
-                    <Pick label="Result kind" value={r.kind} options={KYC_RESPONSE_KINDS} onChange={(kind) => setR({ ...r, kind })} />
-                    <Field label="Input" value={r.input} onChange={(v) => setR({ ...r, input: v })} />
-                    <Area label="Response the environment returns" value={r.response} onChange={(response) => setR({ ...r, response })} rows={2} />
-                  </>
-                )}
+                render={(r, setR) => <RecordedCall r={r} setR={setR} tools={tools} />}
               />
               {steps.some((s) => s.action === 'TOOL' && !responses.some((r) => r.id === s.responseId)) && <p className="text-sm text-warning">A tool used in the reference trajectory has no defined response yet.</p>}
               <Rows<{ id: string; text: string }>
@@ -370,8 +407,16 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                     {s.action === 'TOOL' && (
                       <>
                         <Pick label="Tool" value={s.tool} options={tools} onChange={(tool) => setS({ ...s, tool })} />
-                        <Pick label="Response it gets" value={s.responseId} options={responses.filter((r) => r.tool === s.tool).map((r) => r.id)} format={(v) => v} onChange={(responseId) => setS({ ...s, responseId })} />
-                        <Field label="Input" value={s.input} onChange={(v) => setS({ ...s, input: v })} />
+                        <Pick
+                          label="Recorded call it makes"
+                          value={s.responseId}
+                          options={responses.filter((r) => r.tool === s.tool).map((r) => r.id)}
+                          format={(v) => { const r = responses.find((x) => x.id === v); return r ? `${v}: ${argumentsSummary(responseArguments(r))}` : v; }}
+                          onChange={(responseId) => { const r = responses.find((x) => x.id === responseId); setS({ ...s, responseId, input: r ? argumentsSummary(responseArguments(r)) : s.input, arguments: undefined }); }}
+                        />
+                        <p className="self-end text-xs text-fg-muted">
+                          {(() => { const r = responses.find((x) => x.id === s.responseId); return r ? `Arguments: ${JSON.stringify(responseArguments(r))}` : 'Choose the recorded call; the step uses its arguments.'; })()}
+                        </p>
                       </>
                     )}
                     <Area label="Expected result" value={s.expectedResult} onChange={(expectedResult) => setS({ ...s, expectedResult })} rows={2} />

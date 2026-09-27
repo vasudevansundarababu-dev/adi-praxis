@@ -1,4 +1,5 @@
 import type { ApprovedTaskRecord, Prisma } from '@prisma/client';
+import { KYC_MCP_CATALOG_VERSION, KYC_MCP_TOOLS, replayBundle, type KycTask } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db, Tx } from '../db';
@@ -76,6 +77,19 @@ export const datasetRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
       corrections: { supersedes: r.supersedesId, supersededBy: supersededBy.map((s) => s.id) },
     };
   });
+
+  // TASK-DRAFTING section 5: the task's MCP tools and recorded calls, enough to replay it on an MCP server.
+  app.get('/dataset/records/:id/replay', { config: { access: READ }, schema: { tags: ['dataset'], params: IdParams } }, async (req) => {
+    const r = await findRecord(db, clientOf(req), req.params.id);
+    if (r.workflow !== 'KYC onboarding and refresh' || r.taskMode !== 'AUTHORING') throw new AppError(409, 'NO_REPLAY', 'Only authored KYC tasks have a replay bundle.');
+    return { recordId: r.id, contentHash: r.contentHash, ...replayBundle(r.output as KycTask) };
+  });
+
+  // The MCP tool catalog for KYC tasks (tools/list shape), for internal users and RL Gym.
+  app.get('/mcp/kyc/tools', { config: { access: { roles: ['ADMIN', 'PM', 'REVIEWER'], apiClient: 'RL_GYM' } }, schema: { tags: ['dataset'] } }, async () => ({
+    catalogVersion: KYC_MCP_CATALOG_VERSION,
+    tools: KYC_MCP_TOOLS.map(({ name, title, description, inputSchema }) => ({ name, title, description, inputSchema })),
+  }));
 
   // Export: newline-delimited JSON in chain order; resume with ?after=<seq>.
   app.get('/dataset/export', { config: { access: READ }, schema: { tags: ['dataset'], querystring: ListQuery.extend({ limit: z.coerce.number().int().min(1).max(10_000).default(1000) }) } }, async (req, reply) => {

@@ -11,4 +11,5 @@ export * from './taxonomy-data';
 export * from './selection';
 export * from './tasks';
 export * from './kyc';
+export * from './mcp';
 export * from './rl';

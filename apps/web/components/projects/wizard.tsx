@@ -1,0 +1,476 @@
+'use client';
+
+import {
+  computeProjectFigures,
+  effectiveCoverage,
+  type CoverageQuotas,
+  type DemographicAttributeDto,
+  type DemographicFilterInput,
+  type JobDescriptionDto,
+  type ProjectDto,
+  type TaskMode,
+  type TemplateDto,
+} from '@praxis/shared';
+import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { mutate } from '@/lib/client-api';
+import { DemographicsStep } from './demographics-step';
+import { FiguresPanel } from './figures-panel';
+import { JobDescriptionStep } from './jd-step';
+
+const STEPS = ['Template', 'Basics', 'Volume, diversity and TPT', 'Demographics', 'Job description', 'Review and submit'] as const;
+
+export interface WizardState {
+  templateId: string;
+  name: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  taskMode: TaskMode;
+  taskCount: string;
+  distinctTarget: string;
+  maxPerExpert: string;
+  coverageQuotas: CoverageQuotas;
+  tptMinutes: string;
+  hoursPerWorkerDay: string;
+  demographicFilters: DemographicFilterInput[];
+  jobDescriptionId: string | null;
+}
+
+const num = (s: string) => (s.trim() === '' ? null : Number(s));
+
+function initialState(project: ProjectDto | null, templates: TemplateDto[]): WizardState {
+  if (project) {
+    return {
+      templateId: project.templateId,
+      name: project.name,
+      description: project.description ?? '',
+      startDate: project.startDate ?? '',
+      endDate: project.endDate ?? '',
+      taskMode: project.taskMode,
+      taskCount: project.taskCount?.toString() ?? '',
+      distinctTarget: project.distinctTarget?.toString() ?? '',
+      maxPerExpert: project.maxPerExpert?.toString() ?? '',
+      coverageQuotas: project.coverageQuotas ?? { cells: [], edgeCases: [] },
+      tptMinutes: project.tptMinutes?.toString() ?? '',
+      hoursPerWorkerDay: String(project.hoursPerWorkerDay),
+      demographicFilters: project.demographicFilters,
+      jobDescriptionId: project.jobDescriptionId,
+    };
+  }
+  const t = templates[0];
+  return {
+    templateId: t?.id ?? '',
+    name: '',
+    description: '',
+    startDate: '',
+    endDate: '',
+    taskMode: t?.taskModes.includes('AUTHORING') ? 'AUTHORING' : (t?.taskModes[0] ?? 'AUTHORING'),
+    taskCount: '',
+    distinctTarget: String(t?.defaultDistinctTarget ?? 50),
+    maxPerExpert: String(t?.defaultMaxPerExpert ?? 4),
+    coverageQuotas: { cells: [], edgeCases: [] },
+    tptMinutes: t?.defaultTptMinutes?.toString() ?? '',
+    hoursPerWorkerDay: '4',
+    demographicFilters: [],
+    // The API applies the template's default JD (if any) when the draft is created.
+    jobDescriptionId: null,
+  };
+}
+
+const input = 'mt-1 w-full rounded-md border border-line bg-surface px-3 py-2';
+
+/** FLOW 1 wizard (SPEC): six steps, save as draft at any point, submit from the review step. */
+export function ProjectWizard(props: {
+  templates: TemplateDto[];
+  attributes: DemographicAttributeDto[];
+  jobDescriptions: JobDescriptionDto[];
+  project: ProjectDto | null;
+}) {
+  const { templates, attributes, project } = props;
+  const router = useRouter();
+  const [jobDescriptions, setJobDescriptions] = useState(props.jobDescriptions);
+  const [state, setState] = useState<WizardState>(() => initialState(project, templates));
+  const [step, setStep] = useState(project ? 1 : 0);
+  const [projectId, setProjectId] = useState(project?.id ?? null);
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string; problems?: string[] } | null>(null);
+
+  const set = (patch: Partial<WizardState>) => {
+    setState((s) => ({ ...s, ...patch }));
+    setMessage(null);
+  };
+  const template = templates.find((t) => t.id === state.templateId);
+  const jd = jobDescriptions.find((j) => j.id === state.jobDescriptionId) ?? null;
+  const figures = useMemo(
+    () =>
+      computeProjectFigures({
+        taskMode: state.taskMode,
+        taskCount: num(state.taskCount),
+        distinctTarget: num(state.distinctTarget),
+        maxPerExpert: num(state.maxPerExpert),
+        tptMinutes: num(state.tptMinutes),
+        hoursPerWorkerDay: num(state.hoursPerWorkerDay) ?? 0,
+        startDate: state.startDate || null,
+        endDate: state.endDate || null,
+        wagePerTask: jd?.wagePerTask ?? null,
+      }),
+    [state, jd],
+  );
+
+  function payload() {
+    return {
+      templateId: state.templateId,
+      name: state.name.trim(),
+      description: state.description.trim() || null,
+      startDate: state.startDate || null,
+      endDate: state.endDate || null,
+      taskMode: state.taskMode,
+      taskCount: state.taskMode === 'ANNOTATION' ? num(state.taskCount) : null,
+      distinctTarget: state.taskMode === 'AUTHORING' ? num(state.distinctTarget) : null,
+      maxPerExpert: state.taskMode === 'AUTHORING' ? num(state.maxPerExpert) : null,
+      coverageQuotas: state.coverageQuotas,
+      tptMinutes: num(state.tptMinutes),
+      hoursPerWorkerDay: num(state.hoursPerWorkerDay) ?? 4,
+      demographicFilters: state.demographicFilters,
+      jobDescriptionId: state.jobDescriptionId,
+    };
+  }
+
+  /** Creates the draft on first save, then updates it. Returns the project id, or null on failure. */
+  async function save(): Promise<string | null> {
+    if (!state.templateId || !state.name.trim()) {
+      setMessage({ kind: 'error', text: 'Choose a template and give the project a name before saving.' });
+      setStep(state.templateId ? 1 : 0);
+      return null;
+    }
+    setPending(true);
+    const res = projectId
+      ? await mutate<ProjectDto>('PATCH', `/projects/${projectId}`, payload())
+      : await mutate<ProjectDto>('POST', '/projects', payload());
+    setPending(false);
+    if (!res.ok) {
+      setMessage({ kind: 'error', text: res.error! });
+      return null;
+    }
+    if (!projectId) {
+      setProjectId(res.data!.id);
+      // Keep the wizard open on the draft's own URL.
+      window.history.replaceState(null, '', `/projects/${res.data!.id}`);
+    }
+    setMessage({ kind: 'ok', text: 'Draft saved.' });
+    return res.data!.id;
+  }
+
+  async function submit() {
+    const id = await save();
+    if (!id) return;
+    setPending(true);
+    const res = await fetch(`/api/v1/projects/${id}/submit`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+      body: '{}',
+    });
+    setPending(false);
+    const body = await res.json().catch(() => null);
+    if (!res.ok) {
+      setMessage({ kind: 'error', text: 'This project can’t be submitted yet.', problems: body?.details?.problems ?? [body?.message ?? 'Submit failed'] });
+      return;
+    }
+    router.push(`/projects/${id}`);
+    router.refresh();
+  }
+
+  const coverage = template ? effectiveCoverage(template, state.coverageQuotas) : null;
+
+  return (
+    <div>
+      <h1 className="text-2xl font-semibold">{project ? state.name || 'Draft project' : 'New project'}</h1>
+      <ol className="mt-4 flex flex-wrap gap-2 text-sm" aria-label="Wizard steps">
+        {STEPS.map((label, i) => (
+          <li key={label}>
+            <button
+              type="button"
+              onClick={() => setStep(i)}
+              aria-current={i === step ? 'step' : undefined}
+              className={`rounded-full border px-3 py-1 ${i === step ? 'border-brand-blue bg-surface font-medium' : 'border-line text-fg-muted'}`}
+            >
+              {i + 1}. {label}
+            </button>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-1 h-1 rounded-full bg-brand-gradient" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} aria-hidden />
+
+      <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_18rem]">
+        <section aria-label={STEPS[step]}>
+          <h2 className="text-lg font-semibold">{STEPS[step]}</h2>
+
+          {step === 0 && (
+            <div className="mt-4 space-y-4">
+              {templates.length === 0 ? (
+                <p className="text-fg-muted">No published templates yet. An Admin needs to publish one first.</p>
+              ) : (
+                <>
+                  <label htmlFor="template" className="block text-sm font-medium">
+                    Domain and workflow
+                  </label>
+                  <select
+                    id="template"
+                    value={state.templateId}
+                    onChange={(e) => {
+                      const t = templates.find((x) => x.id === e.target.value)!;
+                      set({
+                        templateId: t.id,
+                        taskMode: t.taskModes.includes(state.taskMode) ? state.taskMode : t.taskModes[0]!,
+                        tptMinutes: state.tptMinutes || (t.defaultTptMinutes?.toString() ?? ''),
+                        coverageQuotas: { cells: [], edgeCases: [] },
+                      });
+                    }}
+                    className={input}
+                  >
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.domainName} — {t.workflowName} (v{t.version})
+                      </option>
+                    ))}
+                  </select>
+                  {template && (
+                    <dl className="space-y-3 rounded-md border border-line p-4 text-sm">
+                      {(
+                        [
+                          ['Primary work', template.primaryWork],
+                          ['Verification / reward', template.verificationCriteria],
+                          ['Human gate', template.humanGate],
+                        ] as const
+                      ).map(([k, v]) => (
+                        <div key={k}>
+                          <dt className="font-medium text-fg-muted">{k}</dt>
+                          <dd>{v ?? '—'}</dd>
+                        </div>
+                      ))}
+                      {template.status !== 'PUBLISHED' && <p className="text-error">This template is no longer published. Choose another.</p>}
+                    </dl>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {step === 1 && (
+            <div className="mt-4 space-y-4">
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium">
+                  Project name
+                </label>
+                <input id="name" value={state.name} onChange={(e) => set({ name: e.target.value })} className={input} />
+              </div>
+              <div>
+                <label htmlFor="description" className="block text-sm font-medium">
+                  Description
+                </label>
+                <textarea id="description" rows={3} value={state.description} onChange={(e) => set({ description: e.target.value })} className={input} />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="startDate" className="block text-sm font-medium">
+                    Start date
+                  </label>
+                  <input id="startDate" type="date" value={state.startDate} onChange={(e) => set({ startDate: e.target.value })} className={input} />
+                </div>
+                <div>
+                  <label htmlFor="endDate" className="block text-sm font-medium">
+                    Target end date
+                  </label>
+                  <input id="endDate" type="date" value={state.endDate} onChange={(e) => set({ endDate: e.target.value })} className={input} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && template && (
+            <div className="mt-4 space-y-4">
+              <fieldset>
+                <legend className="text-sm font-medium">Task mode</legend>
+                <div className="mt-2 flex gap-4">
+                  {template.taskModes.map((m) => (
+                    <label key={m} className="flex items-center gap-2 text-sm">
+                      <input type="radio" name="taskMode" checked={state.taskMode === m} onChange={() => set({ taskMode: m })} />
+                      {m === 'AUTHORING' ? 'Authoring (experts write new tasks)' : 'Annotation (workers process inputs)'}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              {state.taskMode === 'AUTHORING' ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="distinctTarget" className="block text-sm font-medium">
+                      Distinct-task target
+                    </label>
+                    <input id="distinctTarget" type="number" min={1} value={state.distinctTarget} onChange={(e) => set({ distinctTarget: e.target.value })} className={input} />
+                  </div>
+                  <div>
+                    <label htmlFor="maxPerExpert" className="block text-sm font-medium">
+                      Max tasks per expert
+                    </label>
+                    <input id="maxPerExpert" type="number" min={1} value={state.maxPerExpert} onChange={(e) => set({ maxPerExpert: e.target.value })} className={input} />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="taskCount" className="block text-sm font-medium">
+                    Number of tasks
+                  </label>
+                  <input id="taskCount" type="number" min={1} value={state.taskCount} onChange={(e) => set({ taskCount: e.target.value })} className={input} />
+                </div>
+              )}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="tpt" className="block text-sm font-medium">
+                    TPT (minutes per task)
+                  </label>
+                  <input id="tpt" type="number" min={1} max={480} value={state.tptMinutes} onChange={(e) => set({ tptMinutes: e.target.value })} className={input} />
+                  <p className="mt-1 text-xs text-fg-muted">A planning and pay target, not a deadline.</p>
+                </div>
+                <div>
+                  <label htmlFor="hours" className="block text-sm font-medium">
+                    Hours per worker per day
+                  </label>
+                  <input id="hours" type="number" min={0.5} max={24} step={0.5} value={state.hoursPerWorkerDay} onChange={(e) => set({ hoursPerWorkerDay: e.target.value })} className={input} />
+                </div>
+              </div>
+              {state.taskMode === 'AUTHORING' && coverage && (coverage.cells.length > 0 || coverage.edgeCases.length > 0) && (
+                <CoverageQuotaEditor template={template} state={state} set={set} requiredSlots={coverage.requiredSlots} />
+              )}
+            </div>
+          )}
+
+          {step === 3 && <DemographicsStep attributes={attributes} filters={state.demographicFilters} onChange={(demographicFilters) => set({ demographicFilters })} />}
+
+          {step === 4 && (
+            <JobDescriptionStep
+              jobDescriptions={jobDescriptions}
+              selectedId={state.jobDescriptionId}
+              onSelect={(jobDescriptionId) => set({ jobDescriptionId })}
+              onCreated={(jd) => {
+                setJobDescriptions((list) => [...list, jd]);
+                set({ jobDescriptionId: jd.id });
+              }}
+            />
+          )}
+
+          {step === 5 && (
+            <ReviewStep state={state} template={template} jd={jd} attributes={attributes} />
+          )}
+
+          {message && (
+            <div role={message.kind === 'error' ? 'alert' : 'status'} className={`mt-6 rounded-md border p-3 text-sm ${message.kind === 'error' ? 'border-error' : 'border-success'}`}>
+              <p className={message.kind === 'error' ? 'font-medium text-error' : 'text-success'}>{message.text}</p>
+              {message.problems && (
+                <ul className="mt-1 list-disc pl-5">
+                  {message.problems.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            {step > 0 && (
+              <button type="button" onClick={() => setStep(step - 1)} className="rounded-md border border-line px-4 py-2 text-sm">
+                Back
+              </button>
+            )}
+            <button type="button" disabled={pending} onClick={save} className="rounded-md border border-line px-4 py-2 text-sm disabled:opacity-60">
+              Save as draft
+            </button>
+            {step < STEPS.length - 1 ? (
+              <button type="button" onClick={() => setStep(step + 1)} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary">
+                Next
+              </button>
+            ) : (
+              <button type="button" disabled={pending} onClick={submit} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-60">
+                {pending ? 'Submitting…' : 'Submit project'}
+              </button>
+            )}
+          </div>
+        </section>
+
+        <FiguresPanel figures={figures} taskMode={state.taskMode} currency={jd?.wageCurrency ?? null} requiredSlots={coverage?.requiredSlots ?? null} />
+      </div>
+    </div>
+  );
+}
+
+function CoverageQuotaEditor({
+  template,
+  state,
+  set,
+  requiredSlots,
+}: {
+  template: TemplateDto;
+  state: WizardState;
+  set: (p: Partial<WizardState>) => void;
+  requiredSlots: number;
+}) {
+  const cov = effectiveCoverage(template, state.coverageQuotas);
+  const sig = (tags: Record<string, string>) => JSON.stringify(Object.entries(tags).sort(([a], [b]) => a.localeCompare(b)));
+  const setCell = (tags: Record<string, string>, quota: number) =>
+    set({ coverageQuotas: { ...state.coverageQuotas, cells: [...state.coverageQuotas.cells.filter((c) => sig(c.tags) !== sig(tags)), { tags, quota }] } });
+  const setEdge = (name: string, quota: number) =>
+    set({ coverageQuotas: { ...state.coverageQuotas, edgeCases: [...state.coverageQuotas.edgeCases.filter((e) => e.name !== name), { name, quota }] } });
+  const templateMin = (kind: 'cell' | 'edge', key: string) => {
+    const base = effectiveCoverage(template, null);
+    return kind === 'cell' ? (base.cells.find((c) => sig(c.tags) === key)?.quota ?? 1) : (base.edgeCases.find((e) => e.name === key)?.quota ?? 1);
+  };
+  return (
+    <div className="rounded-md border border-line p-4">
+      <h3 className="font-medium">Coverage quotas</h3>
+      <p className="text-sm text-fg-muted">
+        From the template. You can raise a quota but not go below the template minimum. Required slots: {requiredSlots}.
+      </p>
+      <ul className="mt-3 space-y-2 text-sm">
+        {cov.cells.map((c) => (
+          <li key={sig(c.tags)} className="flex items-center gap-3">
+            <span className="flex-1">
+              {Object.entries(c.tags).map(([k, v]) => `${k} = ${v}`).join(', ')} {c.required ? '' : <em className="text-fg-muted">(optional)</em>}
+            </span>
+            <input type="number" aria-label="Quota" min={templateMin('cell', sig(c.tags))} value={c.quota} onChange={(e) => setCell(c.tags, Number(e.target.value))} className="w-20 rounded-md border border-line bg-surface px-2 py-1" />
+          </li>
+        ))}
+        {cov.edgeCases.map((e) => (
+          <li key={e.name} className="flex items-center gap-3">
+            <span className="flex-1">
+              Edge case: {e.name} {e.required ? '' : <em className="text-fg-muted">(optional)</em>}
+            </span>
+            <input type="number" aria-label={`Quota for ${e.name}`} min={templateMin('edge', e.name)} value={e.quota} onChange={(ev) => setEdge(e.name, Number(ev.target.value))} className="w-20 rounded-md border border-line bg-surface px-2 py-1" />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ReviewStep({ state, template, jd, attributes }: { state: WizardState; template?: TemplateDto; jd: JobDescriptionDto | null; attributes: DemographicAttributeDto[] }) {
+  const label = (key: string) => attributes.find((a) => a.key === key)?.label ?? key;
+  const rows: [string, React.ReactNode][] = [
+    ['Template', template ? `${template.domainName} — ${template.workflowName} (v${template.version})` : '—'],
+    ['Name', state.name || '—'],
+    ['Dates', state.startDate && state.endDate ? `${state.startDate} to ${state.endDate}` : '—'],
+    ['Mode', state.taskMode === 'AUTHORING' ? `Authoring: ${state.distinctTarget || '?'} distinct tasks, max ${state.maxPerExpert || '?'} per expert` : `Annotation: ${state.taskCount || '?'} tasks`],
+    ['TPT', state.tptMinutes ? `${state.tptMinutes} minutes` : '—'],
+    ['Demographics', state.demographicFilters.length ? state.demographicFilters.map((f) => `${label(f.attributeKey)} (${f.required ? 'required' : 'preferred'})`).join(', ') : '—'],
+    ['Job description', jd ? `${jd.title}: ${jd.wagePerTask} ${jd.wageCurrency} per task, ${jd.locationType.toLowerCase()}${jd.location ? `, ${jd.location}` : ''}` : '—'],
+  ];
+  return (
+    <dl className="mt-4 divide-y divide-line rounded-md border border-line text-sm">
+      {rows.map(([k, v]) => (
+        <div key={k} className="grid gap-2 px-4 py-2 sm:grid-cols-[10rem_1fr]">
+          <dt className="font-medium text-fg-muted">{k}</dt>
+          <dd>{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}

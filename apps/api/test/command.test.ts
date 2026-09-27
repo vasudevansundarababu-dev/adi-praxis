@@ -72,7 +72,7 @@ describe('State changes: audit log and idempotency', () => {
 
     it('change roles records before and after', async () => {
       const { id } = (await createUserReq(idem())).json();
-      await db.auditEvent.deleteMany();
+      const before = new Set((await db.auditEvent.findMany({ select: { id: true } })).map((e) => e.id));
       const res = await app.inject({
         method: 'PATCH',
         url: `/api/v1/users/${id}/roles`,
@@ -80,7 +80,7 @@ describe('State changes: audit log and idempotency', () => {
         payload: { roles: ['PM', 'REVIEWER'] },
       });
       expect(res.statusCode).toBe(200);
-      const events = await db.auditEvent.findMany();
+      const events = (await db.auditEvent.findMany()).filter((e) => !before.has(e.id));
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
         action: 'user.roles_changed',
@@ -91,7 +91,7 @@ describe('State changes: audit log and idempotency', () => {
 
     it('change status records before and after', async () => {
       const { id } = (await createUserReq(idem())).json();
-      await db.auditEvent.deleteMany();
+      const before = new Set((await db.auditEvent.findMany({ select: { id: true } })).map((e) => e.id));
       const res = await app.inject({
         method: 'PATCH',
         url: `/api/v1/users/${id}/status`,
@@ -99,7 +99,7 @@ describe('State changes: audit log and idempotency', () => {
         payload: { status: 'DISABLED' },
       });
       expect(res.statusCode).toBe(200);
-      const events = await db.auditEvent.findMany();
+      const events = (await db.auditEvent.findMany()).filter((e) => !before.has(e.id));
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
         action: 'user.status_changed',
@@ -110,7 +110,7 @@ describe('State changes: audit log and idempotency', () => {
 
     it('a rejected command (validation, conflict, not found) writes no AuditEvent', async () => {
       await createUserReq(idem());
-      await db.auditEvent.deleteMany();
+      const before = new Set((await db.auditEvent.findMany({ select: { id: true } })).map((e) => e.id));
       expect((await createUserReq(idem())).statusCode).toBe(409); // duplicate email
       const missing = await app.inject({
         method: 'PATCH',
@@ -126,7 +126,7 @@ describe('State changes: audit log and idempotency', () => {
         payload: { roles: [] },
       });
       expect(invalid.statusCode).toBe(400);
-      expect(await db.auditEvent.count()).toBe(0);
+      expect((await db.auditEvent.findMany()).filter((e) => !before.has(e.id))).toHaveLength(0);
     });
 
     it('a command that changes state without auditing is refused and rolled back', async () => {

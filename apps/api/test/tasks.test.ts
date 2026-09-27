@@ -12,6 +12,7 @@ import { defaultHandlers } from '../src/outbox/handlers';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { parseCsv } from '../src/routes/tasks';
+import { runChainVerification, verifyApprovedChain } from '../src/dataset/verify';
 import { KYC_EXAMPLE_TASK } from '@praxis/shared';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
@@ -630,6 +631,134 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
       expect((await db.taskSubmission.findFirstOrThrow({ where: { taskInstanceId: t.id } })).output).toEqual({ quarantined: true });
       expect(await db.approvedTaskRecord.count()).toBe(0);
       expect((await task(a, t.id)).output).toBeNull();
+    });
+
+    describe('M6 Approved Task Dataset: append-only, hash chain, lineage, export', () => {
+      async function acceptedRecords(n = 3) {
+        const { projectId, a, tasks } = await setup();
+        for (const t of tasks.filter((x) => !x.slot!.isOpen).slice(0, n)) {
+          await submitted(a, t.id, `Case ${t.id.slice(0, 4)}`);
+          expect((await decide(t.id, { decision: 'ACCEPT' })).statusCode).toBe(200);
+        }
+        return { projectId, a, records: await db.approvedTaskRecord.findMany({ orderBy: { seq: 'asc' } }) };
+      }
+      /** Simulates someone with database-owner rights bypassing the rules, to prove the chain catches it. */
+      async function tamper(sql: string) {
+        await db.$transaction([
+          db.$executeRawUnsafe('ALTER TABLE "ApprovedTaskRecord" DISABLE TRIGGER USER'),
+          db.$executeRawUnsafe('GRANT UPDATE ON "ApprovedTaskRecord" TO CURRENT_USER'),
+          db.$executeRawUnsafe(sql),
+          db.$executeRawUnsafe('REVOKE UPDATE ON "ApprovedTaskRecord" FROM CURRENT_USER'),
+          db.$executeRawUnsafe('ALTER TABLE "ApprovedTaskRecord" ENABLE TRIGGER USER'),
+        ]);
+      }
+
+      it('any attempt to update, delete or truncate a record fails at the database', async () => {
+        const { records } = await acceptedRecords(1);
+        const id = records[0]!.id;
+        await expect(db.approvedTaskRecord.update({ where: { id }, data: { reviewNotes: 'edited' } })).rejects.toThrow(/append-only|permission denied/);
+        await expect(db.approvedTaskRecord.delete({ where: { id } })).rejects.toThrow(/append-only|permission denied/);
+        await expect(db.$executeRawUnsafe(`UPDATE "ApprovedTaskRecord" SET review_notes = 'x' WHERE id = '${id}'`)).rejects.toThrow(/append-only|permission denied/);
+        await expect(db.$executeRawUnsafe('TRUNCATE "ApprovedTaskRecord" CASCADE')).rejects.toThrow(/append-only|TRUNCATE is not allowed/);
+        await expect(db.auditEvent.deleteMany({})).rejects.toThrow(/append-only|permission denied/);
+        await expect(db.taskReview.updateMany({ data: { notes: 'x' } })).rejects.toThrow(/append-only|permission denied/);
+        expect((await db.approvedTaskRecord.findUniqueOrThrow({ where: { id } })).reviewNotes).toBeNull();
+        // Every append-only table has the trigger and no UPDATE/DELETE privilege for the application role.
+        const tables = ['ApprovedTaskRecord', 'RLReviewRecord', 'AuditEvent', 'SelectionDecision', 'TaskReview'];
+        const triggers = await db.$queryRaw<{ t: string }[]>`SELECT c.relname AS t FROM pg_trigger g JOIN pg_class c ON c.oid = g.tgrelid WHERE g.tgname LIKE '%_append_only'`;
+        expect(triggers.map((x) => x.t).sort()).toEqual([...tables].sort());
+        // Grants are revoked (the local superuser bypasses grants, so the triggers above are what stop it here).
+        for (const t of tables) {
+          const grants = await db.$queryRaw<{ p: string }[]>`SELECT privilege_type AS p FROM information_schema.table_privileges WHERE table_name = ${t}`;
+          expect(grants.map((g) => g.p).filter((p) => p === 'UPDATE' || p === 'DELETE'), t).toEqual([]);
+        }
+      });
+
+      it('the verification job recomputes the hash chain and reports any break', async () => {
+        const { records } = await acceptedRecords(3);
+        expect(await verifyApprovedChain(db)).toMatchObject({ checked: 3, breaks: [], lastHash: records[2]!.contentHash });
+        const logs: [string, string, object | undefined][] = [];
+        await runChainVerification(db, (l, m, e) => logs.push([l, m, e]));
+        expect(logs[0]![0]).toBe('info');
+        expect(await db.auditEvent.count({ where: { action: 'dataset.chain_verified', actorType: 'SYSTEM' } })).toBe(1);
+
+        await tamper(`UPDATE "ApprovedTaskRecord" SET output = '{"header":{"title":"forged"}}' WHERE id = '${records[1]!.id}'`);
+        const report = await verifyApprovedChain(db);
+        expect(report.breaks).toEqual([{ seq: String(records[1]!.seq), id: records[1]!.id, reason: 'CONTENT_CHANGED' }]);
+        await runChainVerification(db, (l, m, e) => logs.push([l, m, e]));
+        expect(logs.at(-1)).toEqual(['error', 'dataset hash chain broken', expect.objectContaining({ alert: true })]);
+        expect(await db.auditEvent.count({ where: { action: 'dataset.chain_broken' } })).toBe(1);
+        expect((await get(admin, '/dataset/verification')).json()).toMatchObject({ ok: false, checked: 3 });
+
+        await tamper(`UPDATE "ApprovedTaskRecord" SET prev_hash = repeat('0', 64) WHERE id = '${records[2]!.id}'`);
+        expect((await verifyApprovedChain(db)).breaks.map((b) => b.reason)).toEqual(['CONTENT_CHANGED', 'LINK_BROKEN']);
+      });
+
+      it('lineage from any record: input provider, worker, reviewer, project and template version', async () => {
+        const { projectId, a, records } = await acceptedRecords(1);
+        const l = (await get(admin, `/dataset/records/${records[0]!.id}/lineage`)).json();
+        const proj = await db.project.findUniqueOrThrow({ where: { id: projectId } });
+        expect(l).toMatchObject({
+          record: { id: records[0]!.id, contentVerified: true, prevHash: null },
+          inputProvider: { kind: 'AUTHOR', candidateId: a.candidateId },
+          worker: { candidateId: a.candidateId, smeUserId: a.smeUserId, authorTaskIndex: 1 },
+          reviewer: { id: reviewerId, reworkCount: 0 },
+          project: { id: projectId, name: proj.name },
+          template: { id: proj.templateId, version: proj.templateVersion },
+          diversity: { isOpenSlot: false },
+        });
+        expect(l.diversity.slot.brief).toBeTruthy();
+      });
+
+      it('annotation lineage names the client API that supplied the input', async () => {
+        const projectId = await project('ANNOTATION');
+        const r = await createUser(clientId, ['REVIEWER']);
+        reviewer = await login(app, r.email);
+        await post(pm, `/projects/${projectId}/reviewers`, { userId: r.id });
+        const key = (await post(admin, '/api-clients', { name: 'Bank intake system', kind: 'CLIENT_API' })).json().key;
+        await app.inject({ method: 'POST', url: `/api/v1/projects/${projectId}/task-inputs`, headers: { authorization: `Bearer ${key}`, ...idem() }, payload: { items: [{ case_id: 'X-1', text: 'Customer note' }] } });
+        const a = await expert();
+        await assign(projectId, a);
+        const t = await db.taskInstance.findFirstOrThrow({ where: { projectId, assignedToId: a.candidateId } });
+        await save(a, t.id, { answer: 'Escalate for review' });
+        expect((await submit(a, t.id)).statusCode).toBe(200);
+        expect((await decide(t.id, { decision: 'ACCEPT' })).statusCode).toBe(200);
+        const rec = await db.approvedTaskRecord.findFirstOrThrow({ where: { taskInstanceId: t.id } });
+        expect(rec).toMatchObject({ taskMode: 'ANNOTATION', inputSource: 'API', authorTaskIndex: null, input: { case_id: 'X-1', text: 'Customer note' }, output: { answer: 'Escalate for review' } });
+        const l = (await get(admin, `/dataset/records/${rec.id}/lineage`)).json();
+        expect(l.inputProvider).toMatchObject({ kind: 'API', itemCount: 1, apiClient: { name: 'Bank intake system', kind: 'CLIENT_API' } });
+      });
+
+      it('lists and exports read-only in chain order; RL Gym reads with its key, others cannot', async () => {
+        const { records } = await acceptedRecords(3);
+        const page = (await get(admin, '/dataset/records?limit=2')).json();
+        expect(page.items.map((x: { id: string }) => x.id)).toEqual([records[0]!.id, records[1]!.id]);
+        const rest = (await get(admin, `/dataset/records?after=${page.next}`)).json();
+        expect(rest).toMatchObject({ items: [expect.objectContaining({ id: records[2]!.id })], next: null });
+        const rl = (await post(admin, '/api-clients', { name: 'RL Gym', kind: 'RL_GYM' })).json().key;
+        const exp = await app.inject({ method: 'GET', url: '/api/v1/dataset/export', headers: { authorization: `Bearer ${rl}` } });
+        expect(exp.headers['content-type']).toMatch(/ndjson/);
+        const lines = exp.body.trim().split('\n').map((x) => JSON.parse(x));
+        expect(lines.map((x) => x.contentHash)).toEqual(records.map((r) => r.contentHash));
+        const other = (await post(admin, '/api-clients', { name: 'Client', kind: 'CLIENT_API' })).json().key;
+        expect((await app.inject({ method: 'GET', url: '/api/v1/dataset/records', headers: { authorization: `Bearer ${other}` } })).statusCode).toBe(403);
+        expect((await get(pm, '/dataset/records')).statusCode).toBe(403);
+        expect((await app.inject({ method: 'GET', url: '/api/v1/dataset/records' })).statusCode).toBe(401);
+        expect((await app.inject({ method: 'POST', url: `/api/v1/dataset/records/${records[0]!.id}/corrections`, headers: { authorization: `Bearer ${rl}`, ...idem() }, payload: { reason: 'x' } })).statusCode).toBe(401);
+      });
+
+      it('a correction appends a superseding record; the original stays and the chain still verifies', async () => {
+        const { records } = await acceptedRecords(2);
+        const first = records[0]!;
+        const res = await post(admin, `/dataset/records/${first.id}/corrections`, { reason: 'Title typo', output: { ...(first.output as object), header: { title: 'Corrected title' } } });
+        expect(res.statusCode, res.body).toBe(201);
+        const fixed = res.json();
+        expect(fixed).toMatchObject({ supersedesId: first.id, prevHash: records[1]!.contentHash, taskInstanceId: first.taskInstanceId, candidateId: first.candidateId });
+        expect((await db.approvedTaskRecord.findUniqueOrThrow({ where: { id: first.id } })).contentHash).toBe(first.contentHash);
+        expect((await post(admin, `/dataset/records/${first.id}/corrections`, { reason: 'again' })).json().error).toBe('ALREADY_SUPERSEDED');
+        expect((await get(admin, `/dataset/records/${first.id}/lineage`)).json().corrections).toEqual({ supersedes: null, supersededBy: [fixed.id] });
+        expect(await verifyApprovedChain(db)).toMatchObject({ checked: 3, breaks: [] });
+      });
     });
 
     it('a project completes only when the distinct-task target and all required coverage are met; open-slot tags are confirmed', async () => {

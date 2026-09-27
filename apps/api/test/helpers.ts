@@ -22,12 +22,18 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
 
 export const db: Db = createDb(TEST_DATABASE_URL);
 
-/** Empties every table (keeps the migration history). */
+/**
+ * Empties every table (keeps the migration history). Append-only tables refuse TRUNCATE unless the session opts in,
+ * which only test resets do.
+ */
 export async function resetDb() {
   const tables = await db.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
   if (tables.length === 0) return;
-  await db.$executeRawUnsafe(`TRUNCATE ${tables.map((t) => `"${t.tablename}"`).join(', ')} CASCADE`);
+  await db.$transaction([
+    db.$executeRawUnsafe(`SET LOCAL praxis.allow_truncate = 'on'`),
+    db.$executeRawUnsafe(`TRUNCATE ${tables.map((t) => `"${t.tablename}"`).join(', ')} CASCADE`),
+  ]);
 }
 
 export async function createClient() {

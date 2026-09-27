@@ -936,8 +936,10 @@ model RLReviewRequest {
 }
 
 /// Append-only reviewer verdict returned to RL Gym; same hash-chain rules as ApprovedTaskRecord.
+/// Append-only (database triggers and revoked privileges). Delivery to RL Gym is tracked in RLResultDelivery.
 model RLReviewRecord {
   id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  seq               BigInt    @unique @default(autoincrement())
   clientId          String    @map("client_id") @db.Uuid
   schemaVersion     Int       @map("schema_version")
   createdAt         DateTime  @default(now()) @map("created_at")
@@ -958,7 +960,6 @@ model RLReviewRecord {
   rubricId          String?   @map("rubric_id")
   reviewStartedAt   DateTime? @map("review_started_at")
   reviewSubmittedAt DateTime  @map("review_submitted_at")
-  deliveredAt       DateTime? @map("delivered_at")
 
   request RLReviewRequest @relation(fields: [rlReviewRequestId], references: [id])
 

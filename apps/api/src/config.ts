@@ -39,6 +39,8 @@ const Env = z.object({
   /** Near-duplicate detection embeddings on Vertex AI (same project as Claude). Blank project = local hashing mock. */
   EMBEDDING_LOCATION: z.string().default('us-central1'),
   EMBEDDING_MODEL: z.string().default('text-embedding-005'),
+  /** Nightly hash-chain verification of the append-only dataset (UTC cron). */
+  DATASET_VERIFY_CRON: z.string().default('0 3 * * *'),
 });
 
 export type Config = z.infer<typeof Env> & {

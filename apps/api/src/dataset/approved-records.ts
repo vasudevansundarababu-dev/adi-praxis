@@ -72,11 +72,32 @@ export async function writeApprovedRecord(tx: Tx, args: { taskId: string; review
     workerTermsVersion: terms.length ? terms.map((d) => `${d.key}:v${d.version}`).sort().join(',') : null,
   };
 
+  return appendRecord(tx, base);
+}
+
+type RecordBase = Omit<ApprovedTaskRecord, 'id' | 'seq' | 'createdAt' | 'contentHash' | 'prevHash'>;
+
+/** Appends one record to the hash chain: under the chain lock, prev_hash is the latest record's content_hash. */
+export async function appendRecord(tx: Tx, base: RecordBase) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CHAIN_LOCK})`;
   const prev = await tx.approvedTaskRecord.findFirst({ orderBy: { seq: 'desc' }, select: { contentHash: true } });
   const prevHash = prev?.contentHash ?? null;
-  const contentHash = recordHash(recordContent(base as never), prevHash);
+  const contentHash = recordHash(recordContent(base), prevHash);
   return tx.approvedTaskRecord.create({
-    data: { ...base, input: base.input as Prisma.InputJsonValue, output: base.output as Prisma.InputJsonValue, coverageTags: (base.coverageTags ?? undefined) as Prisma.InputJsonValue | undefined, qualificationSnapshot: (base.qualificationSnapshot ?? undefined) as Prisma.InputJsonValue | undefined, prevHash, contentHash },
+    data: {
+      ...base,
+      input: base.input as Prisma.InputJsonValue,
+      output: base.output as Prisma.InputJsonValue,
+      coverageTags: (base.coverageTags ?? undefined) as Prisma.InputJsonValue | undefined,
+      qualificationSnapshot: (base.qualificationSnapshot ?? undefined) as Prisma.InputJsonValue | undefined,
+      prevHash,
+      contentHash,
+    },
   });
+}
+
+/** Everything but the chain fields, as stored: the input to `recordContent` when verifying. */
+export function baseOf(r: ApprovedTaskRecord): RecordBase {
+  const { id: _i, seq: _s, createdAt: _c, contentHash: _h, prevHash: _p, ...rest } = r;
+  return rest;
 }

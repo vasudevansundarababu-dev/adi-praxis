@@ -23,14 +23,14 @@ export function CampaignPanel({ projectId, initial, opportunityPublished, staffi
   }
 
   return (
-    <section className="mt-6 rounded-lg border border-line p-4" aria-label="Sourcing campaign">
+    <section className="mt-6 card p-4" aria-label="Sourcing campaign">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="font-semibold">Sourcing campaign</h2>
         <Link href={`/projects/${projectId}/opportunity`} className="text-sm text-link hover:underline">
           Opportunity page
         </Link>
         {staffing && (!current || current.status === 'CLOSED') && (
-          <button type="button" disabled={pending || !opportunityPublished} onClick={() => act('POST', `/projects/${projectId}/campaigns`, { channel: 'LINKEDIN_MANUAL' })} className="ml-auto rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-on-primary disabled:opacity-50">
+          <button type="button" disabled={pending || !opportunityPublished} onClick={() => act('POST', `/projects/${projectId}/campaigns`, { channel: 'LINKEDIN_MANUAL' })} className="ml-auto btn btn-primary disabled:opacity-50">
             Launch sourcing campaign
           </button>
         )}
@@ -57,13 +57,13 @@ export function CampaignPanel({ projectId, initial, opportunityPublished, staffi
               </p>
               <textarea readOnly rows={10} value={current.postText ?? ''} aria-label="Job post text" className="w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-xs" />
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={async () => { await navigator.clipboard.writeText(current.postText ?? ''); setCopied(true); }} className="rounded-md border border-line px-3 py-1.5">
+                <button type="button" onClick={async () => { await navigator.clipboard.writeText(current.postText ?? ''); setCopied(true); }} className="btn btn-secondary">
                   {copied ? 'Copied' : 'Copy post text'}
                 </button>
-                <button type="button" disabled={pending} onClick={() => act('PATCH', `/campaigns/${current.id}`, { status: current.status === 'LIVE' ? 'PAUSED' : 'LIVE' })} className="rounded-md border border-line px-3 py-1.5">
+                <button type="button" disabled={pending} onClick={() => act('PATCH', `/campaigns/${current.id}`, { status: current.status === 'LIVE' ? 'PAUSED' : 'LIVE' })} className="btn btn-secondary">
                   {current.status === 'LIVE' ? 'Pause' : 'Resume'}
                 </button>
-                <button type="button" disabled={pending} onClick={() => act('POST', `/campaigns/${current.id}/close`)} className="rounded-md border border-line px-3 py-1.5">
+                <button type="button" disabled={pending} onClick={() => act('POST', `/campaigns/${current.id}/close`)} className="btn btn-secondary">
                   Close campaign
                 </button>
               </div>

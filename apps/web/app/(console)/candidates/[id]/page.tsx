@@ -45,7 +45,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
     <div className="max-w-2xl">
       <h1 className="text-2xl font-semibold">{c.name}</h1>
       <p className="mt-1 text-sm text-fg-muted">Matching profile. Claims are as confirmed by the candidate; badges are scoped to what was checked.</p>
-      <dl className="mt-6 divide-y divide-line rounded-md border border-line text-sm">
+      <dl className="mt-6 card divide-y divide-line text-sm">
         {rows.map(([k, v]) => (
           <div key={k} className="grid gap-2 px-4 py-2 sm:grid-cols-[10rem_1fr]">
             <dt className="font-medium text-fg-muted">{k}</dt>

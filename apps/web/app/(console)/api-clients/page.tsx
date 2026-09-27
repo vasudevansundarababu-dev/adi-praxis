@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { ApiClients, type ApiClientRow } from '@/components/tasks/api-clients';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { NoAccess } from '@/components/no-access';
 
 export const metadata: Metadata = { title: 'API clients' };
 
 export default async function ApiClientsPage() {
   const user = (await getCurrentUser())!;
-  if (!user.roles.includes('ADMIN')) notFound();
+  if (!user.roles.includes('ADMIN')) return <NoAccess need="Admins" />;
   const { data } = await apiGet<{ items: ApiClientRow[] }>('/api-clients');
   return (
     <div className="max-w-3xl">

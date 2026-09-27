@@ -116,10 +116,10 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
             </label>
             <textarea id="doc-text" rows={10} value={docText} onChange={(e) => setDocText(e.target.value)} className={`${input} font-mono text-xs`} />
             <div className="mt-2 flex gap-2">
-              <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/documents/${pendingDoc.id}/confirm`, { text: docText }, 'Text confirmed and added to the full description.')} className="rounded-md bg-primary px-3 py-1.5 text-sm text-on-primary">
+              <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/documents/${pendingDoc.id}/confirm`, { text: docText }, 'Text confirmed and added to the full description.')} className="btn btn-primary">
                 Confirm text
               </button>
-              <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/documents/${pendingDoc.id}/discard`, {}, 'Document discarded.')} className="rounded-md border border-line px-3 py-1.5 text-sm">
+              <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/documents/${pendingDoc.id}/discard`, {}, 'Document discarded.')} className="btn btn-secondary">
                 Discard
               </button>
             </div>
@@ -251,16 +251,16 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
         </div>
       )}
       <div className="mt-6 flex flex-wrap gap-3">
-        <button type="button" disabled={pending} onClick={save} className="rounded-md border border-line px-4 py-2 text-sm">
+        <button type="button" disabled={pending} onClick={save} className="btn btn-secondary">
           Save draft
         </button>
         {view.status !== 'CLOSED' && (
-          <button type="button" disabled={pending} onClick={async () => { if (await save()) await run('POST', `/projects/${view.projectId}/opportunity/publish`, {}, 'Published. Candidates now see this version.'); }} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary">
+          <button type="button" disabled={pending} onClick={async () => { if (await save()) await run('POST', `/projects/${view.projectId}/opportunity/publish`, {}, 'Published. Candidates now see this version.'); }} className="btn btn-primary">
             Save and publish
           </button>
         )}
         {view.status === 'PUBLISHED' && (
-          <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/close`, {}, 'Closed to new applications.')} className="rounded-md border border-line px-4 py-2 text-sm">
+          <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/close`, {}, 'Closed to new applications.')} className="btn btn-secondary">
             Close to new applications
           </button>
         )}

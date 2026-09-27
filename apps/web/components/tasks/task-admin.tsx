@@ -121,7 +121,7 @@ export function InvitesPanel({ projectId, initial }: { projectId: string; initia
       {initial.length === 0 ? (
         <p className="mt-2 text-sm text-fg-muted">No invites yet.</p>
       ) : (
-        <ul className="mt-2 divide-y divide-line rounded-md border border-line text-sm">
+        <ul className="mt-2 card divide-y divide-line text-sm">
           {initial.map((i) => (
             <li key={i.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
               <span className="font-medium">{i.candidateName ?? 'Expert'}</span>
@@ -166,12 +166,12 @@ export function InputUpload({ projectId }: { projectId: string }) {
     if (res.ok) router.refresh();
   }
   return (
-    <section aria-labelledby="up-h" className="mt-6 rounded-lg border border-line p-4 text-sm">
+    <section aria-labelledby="up-h" className="mt-6 card p-4 text-sm">
       <h2 id="up-h" className="font-semibold">Add task inputs</h2>
       <p className="text-fg-muted">Upload a CSV (header row) or JSON array. Every row is validated against the template; if any fails, nothing is added. Client systems can push the same inputs with an API key.</p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <input type="file" accept=".csv,.json,text/csv,application/json" onChange={(e) => setFile(e.target.files?.[0] ?? null)} aria-label="Inputs file" />
-        <button type="button" disabled={!file || pending} onClick={upload} className="rounded-md bg-primary px-3 py-1.5 font-medium text-on-primary disabled:opacity-50">
+        <button type="button" disabled={!file || pending} onClick={upload} className="btn btn-primary disabled:opacity-50">
           Upload
         </button>
       </div>

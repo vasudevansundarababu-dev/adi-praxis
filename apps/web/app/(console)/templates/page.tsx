@@ -22,7 +22,7 @@ export default async function TemplatesPage() {
       <div className="flex flex-wrap items-center gap-4">
         <h1 className="text-2xl font-semibold">Templates</h1>
         {isAdmin && (
-          <Link href="/templates/new" className="ml-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary">
+          <Link href="/templates/new" className="ml-auto btn btn-primary">
             New template
           </Link>
         )}
@@ -40,7 +40,7 @@ export default async function TemplatesPage() {
             {rows.length === 0 ? (
               <p className="mt-2 text-sm text-fg-muted">No workflows yet.</p>
             ) : (
-              <div className="mt-2 overflow-x-auto rounded-lg border border-line">
+              <div className="mt-2 overflow-x-auto card">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-surface">
                     <tr>

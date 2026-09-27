@@ -38,7 +38,7 @@ export function ConflictList({ initial }: { initial: Item[] }) {
                 How it was resolved (required)
                 <textarea value={resolution} onChange={(e) => setResolution(e.target.value)} rows={2} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
               </label>
-              <button type="button" disabled={!resolution.trim()} onClick={() => resolve(i.id)} className="rounded-md bg-primary px-3 py-1.5 text-on-primary disabled:opacity-50">
+              <button type="button" disabled={!resolution.trim()} onClick={() => resolve(i.id)} className="btn btn-primary disabled:opacity-50">
                 Mark resolved
               </button>
             </div>

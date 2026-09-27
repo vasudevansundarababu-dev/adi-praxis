@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { NoAccess } from '@/components/no-access';
 
 export const metadata: Metadata = { title: 'RL reviews' };
 
@@ -10,7 +10,7 @@ type Item = { id: string; rlRunId: string; rlTaskId: string; workflow: string; p
 /** FLOW 4 queue: one review per RL task, highest priority and earliest due first. */
 export default async function RlQueue({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const user = (await getCurrentUser())!;
-  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) notFound();
+  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Reviewers and Admins" />;
   const done = (await searchParams).status === 'DONE';
   const { data } = await apiGet<{ items: Item[] }>(`/review/rl?status=${done ? 'DONE' : 'OPEN'}`);
   const items = data?.items ?? [];

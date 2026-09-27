@@ -87,7 +87,7 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
             ['Shortfall', data.shortfall],
           ] as const
         ).map(([k, v]) => (
-          <div key={k} className="rounded-lg border border-line bg-surface p-3">
+          <div key={k} className="card p-3">
             <dt className="text-sm text-fg-muted">{k}</dt>
             <dd className="text-xl font-semibold tabular-nums">{v}</dd>
           </div>
@@ -111,17 +111,17 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
       )}
       {staffing && (
         <div className="mt-4 flex flex-wrap items-end gap-3">
-          <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${projectId}/match`, undefined, 'Match re-run.')} className="rounded-md border border-line px-3 py-2 text-sm disabled:opacity-60">
+          <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${projectId}/match`, undefined, 'Match re-run.')} className="btn btn-secondary disabled:opacity-60">
             Re-run match
           </button>
           <label className="text-sm">
             <span className="block">Assign top</span>
             <input type="number" min={1} value={topN} onChange={(e) => setTopN(e.target.value)} className="w-20 rounded-md border border-line bg-surface px-2 py-1.5" />
           </label>
-          <button type="button" disabled={pending || !Number(topN)} onClick={() => run('POST', `/projects/${projectId}/assignments`, { topN: Number(topN) }, `Sent proposals to the top ${topN}.`)} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-on-primary disabled:opacity-60">
+          <button type="button" disabled={pending || !Number(topN)} onClick={() => run('POST', `/projects/${projectId}/assignments`, { topN: Number(topN) }, `Sent proposals to the top ${topN}.`)} className="btn btn-primary disabled:opacity-60">
             Assign top {topN || 'N'}
           </button>
-          <button type="button" disabled={pending || selected.size === 0} onClick={() => run('POST', `/projects/${projectId}/assignments`, { candidateIds: [...selected] }, `Sent ${selected.size} proposal(s).`)} className="rounded-md border border-line px-3 py-2 text-sm disabled:opacity-60">
+          <button type="button" disabled={pending || selected.size === 0} onClick={() => run('POST', `/projects/${projectId}/assignments`, { candidateIds: [...selected] }, `Sent ${selected.size} proposal(s).`)} className="btn btn-secondary disabled:opacity-60">
             Assign selected ({selected.size})
           </button>
         </div>
@@ -161,9 +161,9 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
       </div>
 
       {data.items.length === 0 ? (
-        <p className="mt-6 text-fg-muted">No candidates match yet. Adjust the project’s filters or re-run the match later.</p>
+        <p className="mt-6 text-fg-muted">No eligible experts yet. Experts appear here after they apply to this project’s opportunity, a reviewer selects them, and they finish onboarding. You can also launch a sourcing campaign below.</p>
       ) : (
-        <div className="mt-3 overflow-x-auto rounded-lg border border-line">
+        <div className="mt-3 overflow-x-auto card">
           <table className="w-full text-left text-sm">
             <thead className="bg-surface">
               <tr>

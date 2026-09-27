@@ -66,7 +66,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-6">
-          <section aria-labelledby="criteria-h" className="rounded-lg border border-line p-4">
+          <section aria-labelledby="criteria-h" className="card p-4">
             <h2 id="criteria-h" className="font-semibold">Criteria and assessment</h2>
             <p className="mt-1 text-xs text-fg-muted">
               Assessment: {recommendationLabel(a.assessment?.status ?? null)}
@@ -110,7 +110,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
             )}
           </section>
 
-          <section aria-labelledby="profile-h" className="rounded-lg border border-line p-4">
+          <section aria-labelledby="profile-h" className="card p-4">
             <h2 id="profile-h" className="font-semibold">Submitted profile</h2>
             <dl className="mt-3 divide-y divide-line text-sm">
               {fields.map(([k, f]) => (
@@ -140,7 +140,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
             </ul>
           </section>
 
-          <section aria-labelledby="claims-h" className="rounded-lg border border-line p-4">
+          <section aria-labelledby="claims-h" className="card p-4">
             <h2 id="claims-h" className="font-semibold">Credentials and evidence</h2>
             {a.claims.length === 0 && <p className="mt-2 text-sm text-fg-muted">No credential claims.</p>}
             <ul className="mt-2 space-y-3">
@@ -170,7 +170,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
           </section>
 
           {a.decisions.length > 0 && (
-            <section aria-labelledby="history-h" className="rounded-lg border border-line p-4">
+            <section aria-labelledby="history-h" className="card p-4">
               <h2 id="history-h" className="font-semibold">Decision history</h2>
               <ol className="mt-2 space-y-2 text-sm">
                 {a.decisions.map((d) => (

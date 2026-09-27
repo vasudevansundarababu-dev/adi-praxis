@@ -14,6 +14,6 @@ const LABELS: Record<ProjectStatus, string> = {
 export const projectStatusLabel = (s: ProjectStatus) => LABELS[s];
 
 export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
-  const tone = status === 'DRAFT' || status === 'CANCELLED' ? 'border-line text-fg-muted' : 'border-brand-teal text-fg';
-  return <span className={`rounded-full border px-2 py-0.5 text-xs ${tone}`}>{LABELS[status]}</span>;
+  const tone: Record<ProjectStatus, string> = { DRAFT: '', READY_FOR_STAFFING: 'pill-info', STAFFING: 'pill-warning', STAFFED: 'pill-brand', IN_PROGRESS: 'pill-info', PAUSED: 'pill-warning', COMPLETED: 'pill-success', CANCELLED: '' };
+  return <span className={`pill ${tone[status]}`}>{LABELS[status]}</span>;
 }

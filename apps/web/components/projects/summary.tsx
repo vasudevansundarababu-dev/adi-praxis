@@ -44,7 +44,7 @@ export function ProjectSummary({
         <ProjectStatusBadge status={p.status} />
       </div>
       {p.description && <p className="mt-1 text-fg-muted">{p.description}</p>}
-      <dl className="mt-6 divide-y divide-line rounded-md border border-line text-sm">
+      <dl className="mt-6 card divide-y divide-line text-sm">
         {rows.map(([k, v]) => (
           <div key={k} className="grid gap-2 px-4 py-2 sm:grid-cols-[10rem_1fr]">
             <dt className="font-medium text-fg-muted">{k}</dt>
@@ -57,21 +57,21 @@ export function ProjectSummary({
         {template && template.status === 'RETIRED' ? ' This template has since been retired.' : ''}
       </p>
       {['READY_FOR_STAFFING', 'STAFFING', 'STAFFED'].includes(p.status) && (
-        <Link href={`/projects/${p.id}/staffing`} className="mt-6 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary">
+        <Link href={`/projects/${p.id}/staffing`} className="mt-6 inline-block btn btn-primary">
           {p.status === 'READY_FOR_STAFFING' ? 'Start staffing' : 'Resource assignment'}
         </Link>
       )}
       {!['DRAFT', 'CANCELLED', 'COMPLETED'].includes(p.status) && (
-        <Link href={`/projects/${p.id}/opportunity`} className="ml-3 mt-6 inline-block rounded-md border border-line px-4 py-2 text-sm">
+        <Link href={`/projects/${p.id}/opportunity`} className="ml-3 mt-6 inline-block btn btn-secondary">
           Opportunity page
         </Link>
       )}
       {['STAFFING', 'STAFFED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED'].includes(p.status) && (
         <>
-          <Link href={`/projects/${p.id}/dashboard`} className="ml-3 mt-6 inline-block rounded-md border border-line px-4 py-2 text-sm">
+          <Link href={`/projects/${p.id}/dashboard`} className="ml-3 mt-6 inline-block btn btn-secondary">
             Progress dashboard
           </Link>
-          <Link href={`/projects/${p.id}/tasks`} className="ml-3 mt-6 inline-block rounded-md border border-line px-4 py-2 text-sm">
+          <Link href={`/projects/${p.id}/tasks`} className="ml-3 mt-6 inline-block btn btn-secondary">
             Tasks and invites
           </Link>
         </>

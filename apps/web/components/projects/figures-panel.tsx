@@ -24,7 +24,7 @@ export function FiguresPanel({
     ['Labour budget', f.labourBudget === null ? '—' : `${fmt(f.labourBudget, 2)} ${currency ?? ''}`.trim()],
   ];
   return (
-    <aside aria-label="Computed figures" className="h-fit rounded-lg border border-line bg-surface p-4 lg:sticky lg:top-4">
+    <aside aria-label="Computed figures" className="h-fit card p-4 lg:sticky lg:top-4">
       <h2 className="font-semibold">Estimates</h2>
       <dl className="mt-3 space-y-2 text-sm">
         {rows.map(([k, v]) => (

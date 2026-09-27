@@ -183,7 +183,7 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="min-w-0 space-y-6">
-          <section aria-labelledby="checks-h" className="rounded-lg border border-line p-4 text-sm">
+          <section aria-labelledby="checks-h" className="card p-4 text-sm">
             <h2 id="checks-h" className="font-semibold">Automated checks</h2>
             <p className="text-fg-muted">{d.checks.every((c) => c.ok || c.severity === 'warning') ? 'All automated checks passed at submission.' : 'Some checks did not pass.'} Duplicate check: {d.embeddingModel ?? 'not run'}.</p>
             {d.flags.length > 0 && (
@@ -200,7 +200,7 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
             )}
           </section>
 
-          <section aria-labelledby="sim-h" className="rounded-lg border border-line p-4 text-sm">
+          <section aria-labelledby="sim-h" className="card p-4 text-sm">
             <h2 id="sim-h" className="font-semibold">Similar tasks {flaggedDup && <span className="text-warning">· likely duplicate</span>}</h2>
             {d.similar.length === 0 ? (
               <p className="text-fg-muted">No similar tasks in this workflow.</p>
@@ -231,13 +231,13 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
             )}
           </section>
 
-          <section aria-labelledby="task-h" className="rounded-lg border border-line p-4">
+          <section aria-labelledby="task-h" className="card p-4">
             <h2 id="task-h" className="font-semibold">Task</h2>
             {kyc ? <KycView t={d.output as KycTask} /> : <pre className="mt-2 max-h-[40rem] overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(d.taskType === 'ANNOTATION' ? { input: d.input, output: d.output } : d.output, null, 2)}</pre>}
           </section>
 
           {d.reviews.length > 0 && (
-            <section className="rounded-lg border border-line p-4 text-sm">
+            <section className="card p-4 text-sm">
               <h2 className="font-semibold">Earlier decisions</h2>
               <ul className="mt-1 space-y-1">
                 {d.reviews.map((r, i) => (
@@ -252,7 +252,7 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
 
         {canDecide ? (
           <aside className="space-y-4 text-sm" aria-label="Decision">
-            <fieldset className="rounded-lg border border-line p-4">
+            <fieldset className="card p-4">
               <legend className="px-1 font-semibold">Checklist</legend>
               {d.checklist.map((c) => (
                 <div key={c.key} className="mt-2">
@@ -268,7 +268,7 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
                 </div>
               ))}
             </fieldset>
-            <fieldset className="space-y-2 rounded-lg border border-line p-4">
+            <fieldset className="space-y-2 card p-4">
               <legend className="px-1 font-semibold">Decision</legend>
               {(['ACCEPT', 'REWORK', 'REJECT'] as const).map((x) => (
                 <label key={x} className="flex items-center gap-2">
@@ -339,7 +339,7 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
                 <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
               </label>
               {decision === 'ACCEPT' && <p className="text-xs text-fg-muted">Accepting writes the task into the Approved Task Dataset (append-only).</p>}
-              <button type="button" disabled={pending || !valid} onClick={decide} className="w-full rounded-md bg-primary px-3 py-2 font-medium text-on-primary disabled:opacity-50">
+              <button type="button" disabled={pending || !valid} onClick={decide} className="w-full btn btn-primary disabled:opacity-50">
                 Record decision
               </button>
               {error && <p role="alert" className="text-error">{error}</p>}

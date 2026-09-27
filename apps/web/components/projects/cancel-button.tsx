@@ -26,12 +26,12 @@ export function CancelProjectButton({ projectId }: { projectId: string }) {
           <button type="button" disabled={pending} onClick={cancel} className="rounded-md border border-error px-3 py-1.5 text-sm text-error disabled:opacity-60">
             Yes, cancel project
           </button>
-          <button type="button" onClick={() => setConfirming(false)} className="rounded-md border border-line px-3 py-1.5 text-sm">
+          <button type="button" onClick={() => setConfirming(false)} className="btn btn-secondary">
             Keep it
           </button>
         </div>
       ) : (
-        <button type="button" onClick={() => setConfirming(true)} className="rounded-md border border-line px-3 py-1.5 text-sm">
+        <button type="button" onClick={() => setConfirming(true)} className="btn btn-secondary">
           Cancel project
         </button>
       )}

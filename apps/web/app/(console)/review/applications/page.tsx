@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import { recommendationLabel, statusLabel } from '@/components/review/labels';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { NoAccess } from '@/components/no-access';
 
 export const metadata: Metadata = { title: 'Applications' };
 
@@ -17,7 +17,7 @@ const FILTERS = [
 
 export default async function ApplicationsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const user = (await getCurrentUser())!;
-  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) notFound();
+  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Reviewers and Admins" />;
   const { status } = await searchParams;
   const filter = FILTERS.some(([v]) => v === status) ? status! : '';
   const { data } = await apiGet<{ items: Item[] }>(`/review/enrollments${filter ? `?status=${filter}` : ''}`);
@@ -61,7 +61,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
                     {i.title}
                     <span className="block text-xs text-fg-muted">{i.projectName}</span>
                   </td>
-                  <td className="px-3 py-2">{statusLabel(i.status)}</td>
+                  <td className="px-3 py-2"><span className={`pill ${i.status === 'REVIEW_PENDING' ? 'pill-warning' : i.status === 'SELECTED' ? 'pill-success' : 'pill-info'}`}>{statusLabel(i.status)}</span></td>
                   <td className="px-3 py-2">{recommendationLabel(i.recommendation)}</td>
                   <td className="px-3 py-2">{i.submittedAt ? new Date(i.submittedAt).toLocaleString() : '—'}</td>
                 </tr>

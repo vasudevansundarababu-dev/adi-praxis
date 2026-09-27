@@ -28,7 +28,7 @@ export function ReviewersPanel({ projectId, initial }: { projectId: string; init
   }
 
   return (
-    <section aria-labelledby="reviewers-h" className="mt-8 rounded-lg border border-line p-4 text-sm">
+    <section aria-labelledby="reviewers-h" className="mt-8 card p-4 text-sm">
       <h2 id="reviewers-h" className="font-semibold">Application reviewers</h2>
       <p className="mt-1 text-fg-muted">People who review candidates for this project’s pool.</p>
       {data.items.length === 0 ? (
@@ -58,7 +58,7 @@ export function ReviewersPanel({ projectId, initial }: { projectId: string; init
               ))}
             </select>
           </label>
-          <button type="button" disabled={!choice} onClick={add} className="rounded-md border border-line px-3 py-1.5 disabled:opacity-50">
+          <button type="button" disabled={!choice} onClick={add} className="btn btn-secondary disabled:opacity-50">
             Add
           </button>
         </div>

@@ -378,19 +378,19 @@ export function ProjectWizard(props: {
 
           <div className="mt-6 flex flex-wrap gap-3">
             {step > 0 && (
-              <button type="button" onClick={() => setStep(step - 1)} className="rounded-md border border-line px-4 py-2 text-sm">
+              <button type="button" onClick={() => setStep(step - 1)} className="btn btn-secondary">
                 Back
               </button>
             )}
-            <button type="button" disabled={pending} onClick={save} className="rounded-md border border-line px-4 py-2 text-sm disabled:opacity-60">
+            <button type="button" disabled={pending} onClick={save} className="btn btn-secondary disabled:opacity-60">
               Save as draft
             </button>
             {step < STEPS.length - 1 ? (
-              <button type="button" onClick={() => setStep(step + 1)} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary">
+              <button type="button" onClick={() => setStep(step + 1)} className="btn btn-primary">
                 Next
               </button>
             ) : (
-              <button type="button" disabled={pending} onClick={submit} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-60">
+              <button type="button" disabled={pending} onClick={submit} className="btn btn-primary disabled:opacity-60">
                 {pending ? 'Submitting…' : 'Submit project'}
               </button>
             )}
@@ -464,7 +464,7 @@ function ReviewStep({ state, template, jd, attributes }: { state: WizardState; t
     ['Job description', jd ? `${jd.title}: ${jd.wagePerTask} ${jd.wageCurrency} per task, ${jd.locationType.toLowerCase()}${jd.location ? `, ${jd.location}` : ''}` : '—'],
   ];
   return (
-    <dl className="mt-4 divide-y divide-line rounded-md border border-line text-sm">
+    <dl className="mt-4 card divide-y divide-line text-sm">
       {rows.map(([k, v]) => (
         <div key={k} className="grid gap-2 px-4 py-2 sm:grid-cols-[10rem_1fr]">
           <dt className="font-medium text-fg-muted">{k}</dt>

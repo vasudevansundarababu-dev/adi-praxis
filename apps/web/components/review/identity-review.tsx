@@ -44,10 +44,10 @@ export function IdentityReviewList({ initial }: { initial: Item[] }) {
                 <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
               </label>
               <div className="flex gap-2">
-                <button type="button" disabled={!method.trim()} onClick={() => decide(i.smeUserId, 'ALTERNATIVE_VERIFIED')} className="rounded-md bg-primary px-3 py-1.5 text-on-primary disabled:opacity-50">
+                <button type="button" disabled={!method.trim()} onClick={() => decide(i.smeUserId, 'ALTERNATIVE_VERIFIED')} className="btn btn-primary disabled:opacity-50">
                   Verified by alternative process
                 </button>
-                <button type="button" disabled={!method.trim()} onClick={() => decide(i.smeUserId, 'NOT_VERIFIED')} className="rounded-md border border-line px-3 py-1.5 disabled:opacity-50">
+                <button type="button" disabled={!method.trim()} onClick={() => decide(i.smeUserId, 'NOT_VERIFIED')} className="btn btn-secondary disabled:opacity-50">
                   Not verified
                 </button>
               </div>

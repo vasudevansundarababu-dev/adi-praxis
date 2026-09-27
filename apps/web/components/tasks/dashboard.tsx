@@ -61,7 +61,7 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
       </div>
       <dl className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {cards.map(([k, v]) => (
-          <div key={k} className="rounded-lg border border-line bg-surface p-3">
+          <div key={k} className="card p-3">
             <dt className="text-sm text-fg-muted">{k}</dt>
             <dd className="text-xl font-semibold tabular-nums">{v}</dd>
           </div>

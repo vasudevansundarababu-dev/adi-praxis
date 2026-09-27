@@ -307,7 +307,7 @@ export function TemplateEditor({ template: t }: { template: TemplateDto }) {
         </div>
       )}
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={pending} className="rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-60">
+        <button type="submit" disabled={pending} className="btn btn-primary disabled:opacity-60">
           {pending ? 'Saving…' : 'Save draft'}
         </button>
         {saved && (

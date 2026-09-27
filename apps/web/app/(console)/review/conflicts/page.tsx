@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { ConflictList } from '@/components/review/conflict-list';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { NoAccess } from '@/components/no-access';
 
 export const metadata: Metadata = { title: 'Conflicts' };
 
 export default async function ConflictsPage() {
   const user = (await getCurrentUser())!;
-  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) notFound();
+  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Reviewers and Admins" />;
   const { data } = await apiGet<{ items: { id: string; candidateName: string | null; enrollmentId: string | null; details: string | null; declaredAt: string }[] }>('/review/conflicts');
   return (
     <div className="max-w-3xl">

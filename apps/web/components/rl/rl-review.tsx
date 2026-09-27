@@ -53,14 +53,14 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
       <p className="text-sm text-fg-muted">Priority {d.request.priority}{d.request.dueBy ? ` · due ${new Date(d.request.dueBy).toLocaleString()}` : ''} · rubric: {d.rubric.id ?? 'template verification criteria'}</p>
       {d.rubric.text && <p className="mt-2 max-w-4xl text-sm"><span className="font-medium">Verification criteria: </span>{d.rubric.text}</p>}
       {d.status === 'CREATED' && (
-        <button type="button" disabled={pending} onClick={() => run(`/review/rl/${d.id}/claim`, {})} className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-60">
+        <button type="button" disabled={pending} onClick={() => run(`/review/rl/${d.id}/claim`, {})} className="mt-4 btn btn-primary disabled:opacity-60">
           Claim this review
         </button>
       )}
       {d.status === 'IN_PROGRESS' && !d.claimedByMe && <p className="mt-4 text-sm text-warning">Another reviewer is working on this.</p>}
 
       <div className="mt-6 grid gap-4 xl:grid-cols-3">
-        <section aria-labelledby="src-h" className="min-w-0 rounded-lg border border-line p-3 text-sm">
+        <section aria-labelledby="src-h" className="min-w-0 card p-3 text-sm">
           <h2 id="src-h" className="font-semibold">Original approved task</h2>
           {d.sources.map((s) => (
             <details key={s.id} open className="mt-2">
@@ -69,7 +69,7 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
             </details>
           ))}
         </section>
-        <section aria-labelledby="traj-h" className="min-w-0 rounded-lg border border-line p-3 text-sm">
+        <section aria-labelledby="traj-h" className="min-w-0 card p-3 text-sm">
           <h2 id="traj-h" className="font-semibold">Trajectory</h2>
           {d.trajectoryUrl && (
             <p className="mt-2">
@@ -96,7 +96,7 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
             ))}
           </ol>
         </section>
-        <section aria-labelledby="eval-h" className="min-w-0 rounded-lg border border-line p-3 text-sm">
+        <section aria-labelledby="eval-h" className="min-w-0 card p-3 text-sm">
           <h2 id="eval-h" className="font-semibold">Automated evals</h2>
           <ul className="mt-2 space-y-3">
             {d.evalResults.map((e, i) => (
@@ -130,7 +130,7 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
       </div>
 
       {editable && (
-        <section aria-labelledby="verdict-h" className="mt-6 max-w-3xl space-y-3 rounded-lg border border-line p-4 text-sm">
+        <section aria-labelledby="verdict-h" className="mt-6 max-w-3xl space-y-3 card p-4 text-sm">
           <h2 id="verdict-h" className="font-semibold">Verdict</h2>
           <div className="flex gap-4">
             {(['PASS', 'FAIL', 'NEEDS_EXPERT'] as const).map((v) => (
@@ -166,7 +166,7 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
             type="button"
             disabled={pending || missing}
             onClick={() => run(`/review/rl/${d.id}/verdict`, { expectedRevision: d.revision, verdict, metricVerdicts: metrics.map((m) => ({ metric: m.metric, agree: m.agree, ...(m.comment.trim() ? { comment: m.comment } : {}) })), comments: comments.filter((c) => c.text.trim()) })}
-            className="rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-50"
+            className="btn btn-primary disabled:opacity-50"
           >
             Submit verdict
           </button>
@@ -175,7 +175,7 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
       )}
 
       {d.result && (
-        <section className="mt-6 max-w-3xl rounded-lg border border-line p-4 text-sm">
+        <section className="mt-6 max-w-3xl card p-4 text-sm">
           <h2 className="font-semibold">Verdict: {d.result.verdict.toLowerCase().replace('_', ' ')}</h2>
           <ul className="mt-1 list-disc pl-5">
             {d.result.comments.map((c, i) => (

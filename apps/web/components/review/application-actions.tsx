@@ -70,7 +70,7 @@ export function ApplicationActions(props: {
     <aside className="space-y-4" aria-label="Actions">
       {canDecide && (
         <form
-          className="space-y-3 rounded-lg border border-line p-4 text-sm"
+          className="space-y-3 card p-4 text-sm"
           onSubmit={(e) => {
             e.preventDefault();
             void run(`/review/enrollments/${props.id}/decision`, {
@@ -158,43 +158,43 @@ export function ApplicationActions(props: {
             <textarea required value={message} onChange={(e) => setMessage(e.target.value)} rows={4} placeholder={MESSAGE_HINT[outcome]} className={input} />
             <span className="mt-1 block text-xs text-fg-muted">Respectful and specific to this pool. Never a judgement of the person.</span>
           </label>
-          <button type="submit" disabled={pending || !valid} className="w-full rounded-md bg-primary px-3 py-2 font-medium text-on-primary disabled:opacity-50">
+          <button type="submit" disabled={pending || !valid} className="w-full btn btn-primary disabled:opacity-50">
             Record decision
           </button>
         </form>
       )}
 
       {props.status === 'SUBMITTED' && props.assessmentFailed && (
-        <div className="space-y-2 rounded-lg border border-line p-4 text-sm">
+        <div className="space-y-2 card p-4 text-sm">
           <h2 className="font-semibold">Assessment failed</h2>
-          <button type="button" disabled={pending} onClick={() => run(`/review/enrollments/${props.id}/assessment/retry`, {})} className="w-full rounded-md border border-line px-3 py-2 disabled:opacity-50">
+          <button type="button" disabled={pending} onClick={() => run(`/review/enrollments/${props.id}/assessment/retry`, {})} className="btn btn-secondary w-full disabled:opacity-50">
             Retry assessment
           </button>
-          <button type="button" disabled={pending} onClick={() => run(`/review/enrollments/${props.id}/assessment/retry`, { withoutRecommendation: true })} className="w-full rounded-md border border-line px-3 py-2 disabled:opacity-50">
+          <button type="button" disabled={pending} onClick={() => run(`/review/enrollments/${props.id}/assessment/retry`, { withoutRecommendation: true })} className="btn btn-secondary w-full disabled:opacity-50">
             Review without a recommendation
           </button>
         </div>
       )}
-      {props.status === 'SUBMITTED' && !props.assessmentFailed && <p className="rounded-lg border border-line p-4 text-sm text-fg-muted">The assessment is running. Refresh in a moment.</p>}
+      {props.status === 'SUBMITTED' && !props.assessmentFailed && <p className="card p-4 text-sm text-fg-muted">The assessment is running. Refresh in a moment.</p>}
 
       {props.status === 'REVIEW_REQUESTED' && (
-        <div className="space-y-2 rounded-lg border border-line p-4 text-sm">
+        <div className="space-y-2 card p-4 text-sm">
           <h2 className="font-semibold">Reconsider</h2>
           <p className="text-fg-muted">The earlier decision stays on record. Reopen for a new decision, or ask for more information.</p>
-          <button type="button" disabled={pending} onClick={() => run(`/review/enrollments/${props.id}/reopen`, { to: 'REVIEW_PENDING' })} className="w-full rounded-md bg-primary px-3 py-2 text-on-primary disabled:opacity-50">
+          <button type="button" disabled={pending} onClick={() => run(`/review/enrollments/${props.id}/reopen`, { to: 'REVIEW_PENDING' })} className="w-full btn btn-primary disabled:opacity-50">
             Reopen for decision
           </button>
           <label className="block">
             Information needed
             <input value={infoRequest} onChange={(e) => setInfoRequest(e.target.value)} className={input} />
           </label>
-          <button type="button" disabled={pending || !infoRequest.trim()} onClick={() => run(`/review/enrollments/${props.id}/reopen`, { to: 'NEEDS_INFORMATION', informationRequest: infoRequest })} className="w-full rounded-md border border-line px-3 py-2 disabled:opacity-50">
+          <button type="button" disabled={pending || !infoRequest.trim()} onClick={() => run(`/review/enrollments/${props.id}/reopen`, { to: 'NEEDS_INFORMATION', informationRequest: infoRequest })} className="btn btn-secondary w-full disabled:opacity-50">
             Ask for more information
           </button>
         </div>
       )}
 
-      <details className="rounded-lg border border-line p-4 text-sm">
+      <details className="card p-4 text-sm">
         <summary className="cursor-pointer font-semibold">Declare a conflict</summary>
         <p className="mt-2 text-fg-muted">If you know this candidate or have a conflict, declare it. You will no longer see this application.</p>
         <label className="mt-2 block">
@@ -207,7 +207,7 @@ export function ApplicationActions(props: {
           onClick={async () => {
             if (await run('/review/conflicts', { enrollmentId: props.id, details: conflict })) router.push('/review/applications');
           }}
-          className="mt-2 rounded-md border border-line px-3 py-1.5 disabled:opacity-50"
+          className="mt-2 btn btn-secondary disabled:opacity-50"
         >
           Declare conflict
         </button>
@@ -273,7 +273,7 @@ export function ClaimReview({ enrollmentId, claim }: { enrollmentId: string; cla
             How you checked
             <input required value={method} onChange={(e) => setMethod(e.target.value)} className={input} />
           </label>
-          <button type="submit" disabled={!method.trim()} className="rounded-md border border-line px-3 py-1.5 disabled:opacity-50">
+          <button type="submit" disabled={!method.trim()} className="btn btn-secondary disabled:opacity-50">
             Save
           </button>
           {error && <p role="alert" className="w-full text-error">{error}</p>}

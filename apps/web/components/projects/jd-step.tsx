@@ -137,7 +137,7 @@ export function JobDescriptionStep({
               ))}
             </ul>
           )}
-          <button type="button" disabled={pending} onClick={create} className="rounded-md border border-line px-4 py-2 text-sm disabled:opacity-60">
+          <button type="button" disabled={pending} onClick={create} className="btn btn-secondary disabled:opacity-60">
             {pending ? 'Creating…' : 'Create job description'}
           </button>
         </div>

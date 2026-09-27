@@ -15,7 +15,7 @@ export function ThemeToggle() {
     setDark(next);
   }
   return (
-    <button type="button" onClick={toggle} className="rounded-md border border-line px-3 py-1 text-sm">
+    <button type="button" onClick={toggle} className="rounded-lg border border-white/30 px-3 py-1 text-sm text-white hover:bg-white/10">
       {dark ? 'Light theme' : 'Dark theme'}
     </button>
   );
@@ -29,7 +29,7 @@ export function SignOutButton() {
     router.refresh();
   }
   return (
-    <button type="button" onClick={signOut} className="rounded-md border border-line px-3 py-1 text-sm">
+    <button type="button" onClick={signOut} className="rounded-lg border border-white/30 px-3 py-1 text-sm text-white hover:bg-white/10">
       Sign out
     </button>
   );

@@ -48,7 +48,7 @@ export function NewTemplateForm({ domains }: { domains: DomainDto[] }) {
           {error}
         </p>
       )}
-      <button type="submit" disabled={pending} className="rounded-md bg-primary px-4 py-2 font-medium text-on-primary disabled:opacity-60">
+      <button type="submit" disabled={pending} className="btn btn-primary disabled:opacity-60">
         {pending ? 'Creating…' : 'Create draft'}
       </button>
     </form>

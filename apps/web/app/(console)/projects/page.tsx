@@ -16,7 +16,7 @@ export default async function ProjectsPage() {
       <div className="flex flex-wrap items-center gap-4">
         <h1 className="text-2xl font-semibold">Projects</h1>
         {user.roles.includes('PM') && (
-          <Link href="/projects/new" className="ml-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-on-primary">
+          <Link href="/projects/new" className="ml-auto btn btn-primary">
             New project
           </Link>
         )}
@@ -25,7 +25,7 @@ export default async function ProjectsPage() {
       {items.length === 0 ? (
         <p className="mt-8 text-fg-muted">No projects yet.</p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-lg border border-line">
+        <div className="mt-6 overflow-x-auto card">
           <table className="w-full text-left text-sm">
             <thead className="bg-surface">
               <tr>

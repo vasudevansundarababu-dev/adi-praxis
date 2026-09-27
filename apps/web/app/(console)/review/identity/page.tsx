@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { IdentityReviewList } from '@/components/review/identity-review';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { NoAccess } from '@/components/no-access';
 
 export const metadata: Metadata = { title: 'Identity reviews' };
 
 export default async function IdentityReviewPage() {
   const user = (await getCurrentUser())!;
-  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) notFound();
+  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Reviewers and Admins" />;
   const { data } = await apiGet<{ items: { smeUserId: string; displayName: string | null; reason: string | null; requestedAt: string }[] }>('/review/identity');
   return (
     <div className="max-w-3xl">

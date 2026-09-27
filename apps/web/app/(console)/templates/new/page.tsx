@@ -1,14 +1,14 @@
 import type { DomainDto } from '@praxis/shared';
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { NewTemplateForm } from '@/components/templates/new-template-form';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { NoAccess } from '@/components/no-access';
 
 export const metadata: Metadata = { title: 'New template' };
 
 export default async function NewTemplatePage() {
   const user = (await getCurrentUser())!;
-  if (!user.roles.includes('ADMIN')) notFound();
+  if (!user.roles.includes('ADMIN')) return <NoAccess need="Admins" />;
   const { data } = await apiGet<{ items: DomainDto[] }>('/domains');
   const domains = (data?.items ?? []).filter((d) => d.status === 'ACTIVE');
   return (

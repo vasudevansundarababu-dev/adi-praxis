@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { TermsEditor, type TermsItem } from '@/components/terms/terms-editor';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { NoAccess } from '@/components/no-access';
 
 export const metadata: Metadata = { title: 'Contributor terms' };
 
 export default async function TermsPage() {
   const user = (await getCurrentUser())!;
-  if (!user.roles.includes('ADMIN')) notFound();
+  if (!user.roles.includes('ADMIN')) return <NoAccess need="Admins" />;
   const { data } = await apiGet<{ items: TermsItem[] }>('/terms');
   return (
     <div className="max-w-3xl">

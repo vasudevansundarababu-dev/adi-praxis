@@ -13,7 +13,7 @@ export function FailureCodes({ initial }: { initial: Code[] }) {
   const [error, setError] = useState<string | null>(null);
   return (
     <div className="mt-6 space-y-4 text-sm">
-      <ul className="divide-y divide-line rounded-md border border-line">
+      <ul className="card divide-y divide-line">
         {initial.map((c) => (
           <li key={c.id} className="flex items-center gap-3 px-3 py-2">
             <span className="font-mono text-xs">{c.code}</span>
@@ -51,7 +51,7 @@ export function FailureCodes({ initial }: { initial: Code[] }) {
           Label
           <input required value={label} onChange={(e) => setLabel(e.target.value)} className="mt-1 block w-full rounded-md border border-line bg-surface px-2 py-1.5" />
         </label>
-        <button type="submit" className="rounded-md bg-primary px-3 py-2 font-medium text-on-primary">Add code</button>
+        <button type="submit" className="btn btn-primary">Add code</button>
       </form>
       {error && <p role="alert" className="text-error">{error}</p>}
     </div>

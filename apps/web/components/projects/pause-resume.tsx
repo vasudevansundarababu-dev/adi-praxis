@@ -20,7 +20,7 @@ export function PauseResumeButton({ projectId, paused }: { projectId: string; pa
           if (!res.ok) return setError(res.error);
           router.refresh();
         }}
-        className="rounded-md border border-line px-3 py-1.5 text-sm disabled:opacity-60"
+        className="btn btn-secondary disabled:opacity-60"
       >
         {paused ? 'Resume project' : 'Pause project'}
       </button>

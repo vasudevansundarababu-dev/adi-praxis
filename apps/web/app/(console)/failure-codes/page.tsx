@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { FailureCodes, type Code } from '@/components/rl/failure-codes';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { NoAccess } from '@/components/no-access';
 
 export const metadata: Metadata = { title: 'Failure reason codes' };
 
 export default async function FailureCodesPage() {
   const user = (await getCurrentUser())!;
-  if (!user.roles.includes('ADMIN')) notFound();
+  if (!user.roles.includes('ADMIN')) return <NoAccess need="Admins" />;
   const { data } = await apiGet<{ items: Code[] }>('/failure-reason-codes');
   return (
     <div className="max-w-2xl">

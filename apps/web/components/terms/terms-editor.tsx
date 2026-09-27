@@ -25,7 +25,7 @@ function TermsDoc({ item }: { item: TermsItem }) {
   const [pending, setPending] = useState(false);
   const c = item.current;
   return (
-    <li className="rounded-lg border border-line p-4 text-sm">
+    <li className="card p-4 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="font-semibold">{c?.title ?? item.key}</h2>
         {c && <span className="text-fg-muted">v{c.version}</span>}
@@ -56,7 +56,7 @@ function TermsDoc({ item }: { item: TermsItem }) {
             Approved text
             <textarea required minLength={20} value={body} onChange={(e) => setBody(e.target.value)} rows={10} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5" />
           </label>
-          <button type="submit" disabled={pending} className="rounded-md bg-primary px-3 py-1.5 font-medium text-on-primary disabled:opacity-50">
+          <button type="submit" disabled={pending} className="btn btn-primary disabled:opacity-50">
             Publish version {(c?.version ?? 0) + 1}
           </button>
           {error && <p role="alert" className="text-error">{error}</p>}

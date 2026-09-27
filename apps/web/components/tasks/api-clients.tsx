@@ -15,7 +15,7 @@ export function ApiClients({ initial }: { initial: ApiClientRow[] }) {
   return (
     <div className="mt-6 space-y-6 text-sm">
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-line p-4"
+        className="flex flex-wrap items-end gap-3 card p-4"
         onSubmit={async (e) => {
           e.preventDefault();
           const res = await mutate<{ key: string }>('POST', '/api-clients', { name, kind });
@@ -36,7 +36,7 @@ export function ApiClients({ initial }: { initial: ApiClientRow[] }) {
             <option value="RL_GYM">RL Gym</option>
           </select>
         </label>
-        <button type="submit" className="rounded-md bg-primary px-3 py-2 font-medium text-on-primary">
+        <button type="submit" className="btn btn-primary">
           Create key
         </button>
       </form>
@@ -46,7 +46,7 @@ export function ApiClients({ initial }: { initial: ApiClientRow[] }) {
           <code className="mt-1 block break-all">{key}</code>
         </div>
       )}
-      <ul className="divide-y divide-line rounded-md border border-line">
+      <ul className="card divide-y divide-line">
         {initial.map((c) => (
           <li key={c.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
             <span className="font-medium">{c.name}</span>

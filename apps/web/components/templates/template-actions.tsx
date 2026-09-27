@@ -22,7 +22,7 @@ export function TemplateActions({ template: t, hasDraft }: { template: TemplateD
     else router.refresh();
   }
 
-  const btn = 'rounded-md border border-line px-3 py-1.5 text-sm disabled:opacity-60';
+  const btn = 'btn btn-secondary disabled:opacity-60';
   return (
     <div className="mt-4">
       <div className="flex flex-wrap gap-2">
@@ -31,7 +31,7 @@ export function TemplateActions({ template: t, hasDraft }: { template: TemplateD
             type="button"
             disabled={pending}
             onClick={() => run(`/templates/${t.id}/publish`)}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-on-primary disabled:opacity-60"
+            className="btn btn-primary disabled:opacity-60"
           >
             Publish
           </button>

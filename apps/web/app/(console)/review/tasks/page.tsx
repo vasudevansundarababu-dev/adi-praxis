@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { NoAccess } from '@/components/no-access';
 
 export const metadata: Metadata = { title: 'Task reviews' };
 
@@ -10,7 +10,7 @@ type Item = { id: string; projectName: string; workflow: string; taskType: strin
 /** TASK-KYC R01: tasks awaiting review, flagged items first. */
 export default async function TaskReviewQueue() {
   const user = (await getCurrentUser())!;
-  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) notFound();
+  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Reviewers and Admins" />;
   const { data } = await apiGet<{ items: Item[] }>('/review/tasks');
   const items = data?.items ?? [];
   return (

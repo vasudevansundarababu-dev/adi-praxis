@@ -29,6 +29,8 @@ gcloud services enable run.googleapis.com sqladmin.googleapis.com redis.googleap
   iam.googleapis.com logging.googleapis.com
 
 say "Network"
+# New projects usually get the default network automatically, shortly after the Compute API is enabled.
+for _ in $(seq 1 20); do exists gcloud compute networks describe default && break; sleep 6; done
 exists gcloud compute networks describe default || gcloud compute networks create default --subnet-mode=auto
 
 say "Service account"
@@ -106,25 +108,27 @@ GCS_PROJECT_ID: $PROJECT_ID
 API_URL: $API_URL
 WORKER_HEALTH_PORT: "8080"
 YAML
+# gcloud accepts one env-vars file and no extra variables, so the runtime role name lives in the shared file.
+echo 'APP_DB_ROLE: praxis_app' >> "$ENVFILE"
 COMMON=(--region="$REGION" --service-account="$SA" --set-cloudsql-instances="$CONN" --env-vars-file="$ENVFILE"
   --network=default --subnet=default --vpc-egress=private-ranges-only)
 SECRETS=DATABASE_URL=database-url-app:latest,REDIS_URL=redis-url:latest,MOCK_SECRET=mock-secret:latest
 
 say "Database migrations (Cloud Run job, migration role)"
 gcloud run jobs deploy praxis-migrate --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=1800s \
-  --args=src/jobs/run.ts,migrate --update-env-vars=APP_DB_ROLE=praxis_app \
+  --args=src/jobs/run.ts,migrate \
   --set-secrets=DATABASE_URL=database-url-migrator:latest,REDIS_URL=redis-url:latest,MOCK_SECRET=mock-secret:latest
 gcloud run jobs execute praxis-migrate --region="$REGION" --wait
 
 say "Services"
 gcloud run deploy praxis-api --image="$REPO/api:$TAG" "${COMMON[@]}" --set-secrets="$SECRETS" \
-  --allow-unauthenticated --port=8080 --min-instances=0 --max-instances=3 --timeout=60
+  --no-invoker-iam-check --port=8080 --min-instances=0 --max-instances=3 --timeout=60
 gcloud run deploy praxis-worker --image="$REPO/api:$TAG" "${COMMON[@]}" --set-secrets="$SECRETS" --args=src/worker.ts \
   --no-allow-unauthenticated --ingress=internal --port=8080 --no-cpu-throttling --min-instances=1 --max-instances=1
 for app in web candidate; do
   gcloud run deploy "praxis-$app" --image="$REPO/$app:$TAG" --region="$REGION" --service-account="$SA" \
     --set-env-vars="API_BASE_URL=$API_URL,CANDIDATE_APP_URL=$CAND_URL,PRAXIS_DEMO=1" \
-    --allow-unauthenticated --port=8080 --min-instances=0 --max-instances=3
+    --no-invoker-iam-check --port=8080 --min-instances=0 --max-instances=3
 done
 
 say "Demo data (users and a published KYC project)"

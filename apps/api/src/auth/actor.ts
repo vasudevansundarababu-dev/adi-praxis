@@ -11,6 +11,14 @@ export interface InternalActor {
 
 export type Actor = InternalActor;
 
+/** A machine client (client API push, RL Gym), resolved from a Bearer API key. Audited as actor type SERVICE. */
+export interface ApiClientActor {
+  type: 'SERVICE';
+  apiClientId: string;
+  clientId: string;
+  kind: 'CLIENT_API' | 'RL_GYM';
+}
+
 /** A candidate (SME user), resolved from the separate candidate session cookie. A different token audience. */
 export interface CandidateActor {
   type: 'CANDIDATE';
@@ -26,13 +34,15 @@ export interface CandidateActor {
  * - InternalRole[]: signed-in internal user holding at least one of these roles.
  * - 'candidate': a signed-in candidate. Internal sessions never satisfy it, and candidate sessions never
  *   satisfy an internal policy.
+ * - { roles, apiClient }: an internal user with one of the roles, or a machine client of that kind (Bearer key).
  */
-export type AccessPolicy = 'public' | 'authenticated' | 'candidate' | readonly InternalRole[];
+export type AccessPolicy = 'public' | 'authenticated' | 'candidate' | readonly InternalRole[] | { roles: readonly InternalRole[]; apiClient: ApiClientActor['kind'] };
 
 declare module 'fastify' {
   interface FastifyRequest {
     actor: Actor | null;
     candidate: CandidateActor | null;
+    apiClient: ApiClientActor | null;
   }
   interface FastifyContextConfig {
     access?: AccessPolicy;

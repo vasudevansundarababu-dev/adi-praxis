@@ -28,6 +28,10 @@ import { ClaudeVertexSuitabilityEvaluator, MockSuitabilityEvaluator, type Suitab
 import { GcsStorage, stubScanner, type MalwareScanner, type ObjectStorage } from './candidate/storage';
 import { campaignRoutes } from './routes/campaigns';
 import { journeyRoutes } from './routes/journey';
+import { taskRoutes } from './routes/tasks';
+import { workRoutes } from './routes/work';
+import { MemoryEmailSender, SmtpEmailSender, type EmailSender } from './lib/email';
+import { HashingEmbeddingProvider, VertexEmbeddingProvider, type EmbeddingProvider } from './tasks/embeddings';
 import { profileRoutes } from './routes/profile';
 import { reviewRoutes } from './routes/review';
 import { candidateAuthRoutes } from './routes/candidate-auth';
@@ -61,6 +65,21 @@ export interface AppDeps {
   scanner?: MalwareScanner;
   /** Suitability assessment (reviewer aid only): Claude on Vertex when configured, otherwise the local mock. */
   evaluator?: SuitabilityEvaluator;
+  /** Invite email (SMTP / Mailpit locally, in-memory in tests) and near-duplicate embeddings (Vertex or hashing mock). */
+  email?: EmailSender;
+  embeddings?: EmbeddingProvider;
+}
+
+export function defaultEmail(config: Config): EmailSender {
+  return config.emailMode === 'smtp'
+    ? new SmtpEmailSender(config.EMAIL_FROM, { host: config.SMTP_HOST, port: config.SMTP_PORT, user: config.SMTP_USER, password: config.SMTP_PASSWORD })
+    : new MemoryEmailSender();
+}
+
+export function defaultEmbeddings(config: Config): EmbeddingProvider {
+  return config.assistantMode === 'vertex'
+    ? new VertexEmbeddingProvider({ projectId: config.VERTEX_PROJECT_ID, location: config.EMBEDDING_LOCATION, model: config.EMBEDDING_MODEL })
+    : new HashingEmbeddingProvider();
 }
 
 export function defaultAssistant(config: Config): ProfileAssistant {
@@ -176,6 +195,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       });
       await v1.register(reviewRoutes, { db: deps.db, evaluator: deps.evaluator ?? defaultEvaluator(deps.config), storage });
       await v1.register(journeyRoutes, { db: deps.db, config: deps.config, selectionGate });
+      await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
+      await v1.register(taskRoutes, { db: deps.db, config: deps.config, email: deps.email ?? defaultEmail(deps.config) });
       await v1.register(candidateAuthRoutes, {
         db: deps.db,
         config: deps.config,

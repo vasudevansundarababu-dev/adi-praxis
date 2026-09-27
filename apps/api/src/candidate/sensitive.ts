@@ -9,7 +9,7 @@ export interface SensitiveResult {
   redacted: string;
 }
 
-function ibanValid(raw: string): boolean {
+export function ibanValid(raw: string): boolean {
   const s = raw.replace(/\s+/g, '').toUpperCase();
   if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
   const moved = s.slice(4) + s.slice(0, 4);
@@ -21,7 +21,7 @@ function ibanValid(raw: string): boolean {
   return rem === 1;
 }
 
-function luhnValid(raw: string): boolean {
+export function luhnValid(raw: string): boolean {
   const digits = raw.replace(/\D/g, '');
   if (digits.length < 13 || digits.length > 19 || /^(\d)\1+$/.test(digits)) return false;
   let sum = 0;

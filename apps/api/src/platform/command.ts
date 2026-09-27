@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { Actor, CandidateActor } from '../auth/actor';
+import type { Actor, ApiClientActor, CandidateActor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, badRequest, unauthorized } from '../lib/errors';
@@ -20,6 +20,8 @@ export interface CommandContext<A = Actor> {
 export interface CommandResult<T> {
   status: number;
   body: T;
+  /** What a replay returns instead of `body`, when the body holds a secret that must not be stored (e.g. a new API key). */
+  replayBody?: unknown;
 }
 
 /**
@@ -53,11 +55,24 @@ export async function runCandidateCommand<T>(
   return execute(db, req, reply, { actor, actorId: `candidate:${actor.smeUserId}`, actorType: 'CANDIDATE', clientId: actor.clientId }, handler);
 }
 
+/** For routes open to staff or a machine client (e.g. client API task-input push). Machine clients audit as SERVICE. */
+export async function runStaffOrServiceCommand<T>(
+  db: Db,
+  req: FastifyRequest,
+  reply: FastifyReply,
+  handler: (ctx: CommandContext<Actor | ApiClientActor>) => Promise<CommandResult<T>>,
+): Promise<void> {
+  if (req.actor) return execute<Actor | ApiClientActor, T>(db, req, reply, { actor: req.actor, actorId: req.actor.userId, actorType: 'USER', clientId: req.actor.clientId }, handler);
+  const c = req.apiClient;
+  if (!c) throw unauthorized();
+  return execute<Actor | ApiClientActor, T>(db, req, reply, { actor: c, actorId: `service:${c.apiClientId}`, actorType: 'SERVICE', clientId: c.clientId }, handler);
+}
+
 async function execute<A, T>(
   db: Db,
   req: FastifyRequest,
   reply: FastifyReply,
-  principal: { actor: A; actorId: string; actorType: 'USER' | 'CANDIDATE'; clientId: string },
+  principal: { actor: A; actorId: string; actorType: 'USER' | 'CANDIDATE' | 'SERVICE'; clientId: string },
   handler: (ctx: CommandContext<A>) => Promise<CommandResult<T>>,
 ): Promise<void> {
   const { actor, actorId, actorType, clientId } = principal;
@@ -82,7 +97,7 @@ async function execute<A, T>(
       const auditCtx = {
         clientId,
         actorType,
-        actorId: actorType === 'CANDIDATE' ? actorId.slice('candidate:'.length) : actorId,
+        actorId: actorType === 'CANDIDATE' ? actorId.slice('candidate:'.length) : actorType === 'SERVICE' ? actorId.slice('service:'.length) : actorId,
         requestId: String(req.id),
       } as const;
       const ctx: CommandContext<A> = {
@@ -110,7 +125,7 @@ async function execute<A, T>(
           path,
           requestHash,
           responseStatus: out.status,
-          responseBody: (out.body ?? null) as Prisma.InputJsonValue,
+          responseBody: ((out.replayBody !== undefined ? out.replayBody : out.body) ?? null) as Prisma.InputJsonValue,
           expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS),
         },
       });

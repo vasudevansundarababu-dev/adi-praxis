@@ -115,6 +115,21 @@ enum TaskInstanceStatus {
   SUBMITTED
   ACCEPTED
   REWORK
+  /// TASK-KYC R03: rejected (duplicate, not realistic, incorrect, real data). Terminal; the slot is released.
+  REJECTED
+}
+
+enum TaskReviewDecision {
+  ACCEPT
+  REWORK
+  REJECT
+}
+
+enum TaskRejectReason {
+  DUPLICATE
+  NOT_REALISTIC
+  INCORRECT
+  REAL_DATA
 }
 
 enum InviteChannel {
@@ -679,6 +694,43 @@ model ProjectAssignment {
 
 // ───────────────────── FLOW 3: tasks, slots, invites ─────────────────────
 
+/// Every submitted version of a task (rework keeps history; the Reviewer sees what changed). Append-only.
+model TaskSubmission {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String   @map("client_id") @db.Uuid
+  taskInstanceId String   @map("task_instance_id") @db.Uuid
+  version        Int
+  output         Json
+  coverageTags   Json?    @map("coverage_tags")
+  checks         Json?
+  submittedAt    DateTime @default(now()) @map("submitted_at")
+
+  taskInstance TaskInstance @relation(fields: [taskInstanceId], references: [id])
+
+  @@unique([taskInstanceId, version])
+}
+
+/// A Reviewer's decision on a submitted task (TASK-KYC R03), with the completed checklist. Append-only.
+model TaskReview {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String             @map("client_id") @db.Uuid
+  taskInstanceId    String             @map("task_instance_id") @db.Uuid
+  submissionVersion Int                @map("submission_version")
+  reviewerId        String             @map("reviewer_id") @db.Uuid
+  decision          TaskReviewDecision
+  rejectReason      TaskRejectReason?  @map("reject_reason")
+  duplicateDecision DuplicateDecision? @map("duplicate_decision")
+  checklist         Json
+  /// Comments pinned to workbench sections: [{ section, text }]
+  comments          Json               @default("[]")
+  notes             String?
+  createdAt         DateTime           @default(now()) @map("created_at")
+
+  taskInstance TaskInstance @relation(fields: [taskInstanceId], references: [id])
+
+  @@index([taskInstanceId])
+}
+
 model CoverageSlot {
   id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId     String             @map("client_id") @db.Uuid
@@ -686,6 +738,10 @@ model CoverageSlot {
   /// dimension values + edge case
   coverageTags Json               @map("coverage_tags")
   isOpen       Boolean            @default(false) @map("is_open")
+  /// Counts towards minimum coverage; offered first.
+  required     Boolean            @default(false)
+  /// Generation order, for stable offering.
+  position     Int                @default(0)
   brief        String
   status       CoverageSlotStatus @default(OPEN)
   assignedToId String?            @map("assigned_to_id") @db.Uuid
@@ -735,9 +791,22 @@ model TaskInstance {
   reviewerId          String?            @map("reviewer_id") @db.Uuid
   reviewNotes         String?            @map("review_notes")
   reworkCount         Int                @default(0) @map("rework_count")
+  /// Final coverage: the slot's fixed tags plus the author's (open and edge-case slots). { tags, edgeCase }
+  coverageTags        Json?              @map("coverage_tags")
+  /// Last automated check results (TASK-KYC section 5) and synthetic-data flags with the author's explanations.
+  checks              Json?
+  flags               Json?
+  rejectReason        TaskRejectReason?  @map("reject_reason")
+  /// Content quarantined after a confirmed real-data finding; the output is removed and never enters the dataset.
+  quarantinedAt       DateTime?          @map("quarantined_at")
+  /// Text embedding of the submitted task for near-duplicate search (pgvector, cosine).
+  embedding           Unsupported("vector(768)")?
+  lastSavedAt         DateTime?          @map("last_saved_at")
   createdAt           DateTime           @default(now()) @map("created_at")
   updatedAt           DateTime           @updatedAt @map("updated_at")
 
+  submissions       TaskSubmission[]
+  reviews           TaskReview[]
   project           Project            @relation(fields: [projectId], references: [id])
   slot              CoverageSlot?      @relation(fields: [slotId], references: [id])
   inputBatch        TaskInputBatch?    @relation(fields: [inputBatchId], references: [id])

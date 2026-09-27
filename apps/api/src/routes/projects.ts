@@ -15,6 +15,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Actor } from '../auth/actor';
 import type { Db, Tx } from '../db';
+import { ensureSlots } from '../tasks/task-service';
 import { AppError, badRequest, conflict, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { toJdDto } from './job-descriptions';
@@ -293,12 +294,14 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         });
         if (count === 0) throw new AppError(409, 'NOT_A_DRAFT', 'This project was submitted or cancelled meanwhile.');
 
+        // SPEC: coverage slots are generated on submit (authoring projects).
+        const slots = await ensureSlots(tx, p.id);
         await audit({
           entityType: 'Project',
           entityId: p.id,
           action: 'project.submitted',
           before: { status: 'DRAFT' },
-          after: { status: 'READY_FOR_STAFFING', templateId: p.templateId, templateVersion: p.templateVersion, jdSnapshotId: jdSnapshot.id, requiredWorkers: figures.requiredWorkers },
+          after: { status: 'READY_FOR_STAFFING', templateId: p.templateId, templateVersion: p.templateVersion, jdSnapshotId: jdSnapshot.id, requiredWorkers: figures.requiredWorkers, slots },
         });
         await emit({
           name: 'project.ready_for_staffing',
@@ -340,4 +343,5 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
 
   transition('cancel', 'project.cancelled', CANCELLABLE_STATUSES, 'CANCELLED');
   transition('pause', 'project.paused', ['IN_PROGRESS'], 'PAUSED');
+  transition('resume', 'project.resumed', ['PAUSED'], 'IN_PROGRESS');
 };

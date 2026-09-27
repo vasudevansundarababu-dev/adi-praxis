@@ -128,7 +128,7 @@ describe('M4c: selection, onboarding and assignment acceptance (FLOW2 CF-19 to C
   /** Delivers the latest enrollment.submitted event to the production handler registry (the worker's path). */
   async function deliverSubmitted(c: Cand) {
     const ev = await db.outboxEvent.findFirstOrThrow({ where: { name: 'enrollment.submitted', aggregateId: c.enrollmentId }, orderBy: { createdAt: 'desc' } });
-    await processDomainEvent(db, defaultHandlers(evaluator), ev.id);
+    await processDomainEvent(db, defaultHandlers({ evaluator }), ev.id);
   }
   async function reviewPending(u?: { cookie: string; smeUserId: string }, opp = opportunityId) {
     const c = await enroll(u ?? (await signUp()), opp);
@@ -239,7 +239,7 @@ describe('M4c: selection, onboarding and assignment acceptance (FLOW2 CF-19 to C
       expect((await db.enrollment.findUniqueOrThrow({ where: { id: c.enrollmentId } })).status).toBe('SUBMITTED');
       // The worker path throws so the queue retries with backoff.
       const ev = await db.outboxEvent.findFirstOrThrow({ where: { name: 'enrollment.submitted', aggregateId: c.enrollmentId } });
-      await expect(processDomainEvent(db, defaultHandlers(evaluator), ev.id)).rejects.toThrow(/retry/);
+      await expect(processDomainEvent(db, defaultHandlers({ evaluator }), ev.id)).rejects.toThrow(/retry/);
       expect(await db.selectionDecision.count()).toBe(0);
 
       evaluator.next = null;

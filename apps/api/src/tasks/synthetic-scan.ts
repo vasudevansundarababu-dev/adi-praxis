@@ -26,6 +26,8 @@ const RULES: { kind: string; re: RegExp; real: (m: string) => boolean }[] = [
   { kind: 'IN_PAN', re: /\b[A-Z]{5}\d{4}[A-Z]\b/g, real: () => true },
   { kind: 'IN_AADHAAR', re: /(?<![\d][ -]?)\b\d{4}\s\d{4}\s\d{4}\b(?![ -]?\d)/g, real: () => true },
   { kind: 'EMAIL', re: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, real: (m) => !RESERVED_EMAIL.test(m) },
+  // Indian mobiles: optional +91/0091, ten digits starting 6-9, grouped any way (e.g. +91 98765 43210).
+  { kind: 'PHONE', re: /(?<![\w-])(?:(?:\+|00)91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}(?![-\w])/g, real: () => true },
   { kind: 'PHONE', re: /(?<![\w-])(?:\+\d{1,3}[\s-]?\d{2,4}|\(\d{2,5}\)|0\d{2,4})[\s-]?\d{3,4}[\s-]?\d{3,4}(?![-\w])/g, real: (m) => !FICTIONAL_PHONE.some((r) => r.test(m.trim())) },
   // Company and passport numbers only when labelled as such, and not from the synthetic generator.
   // The identifier must contain a digit, so ordinary words ("passport expired") are not identifiers.

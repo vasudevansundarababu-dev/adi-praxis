@@ -275,6 +275,7 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
     it('the detector uses checksums and ignores ordinary numbers and the candidate’s own email', () => {
       expect(detectSensitive('I worked 2016-2019 and 2020 to 2024, about 12 years, 35 hours a week.').flagged).toBe(false);
       expect(detectSensitive('card 4111 1111 1111 1111').kinds).toEqual(['CARD_NUMBER']);
+      expect(detectSensitive('Call me on +91 98765 43210').redacted).toBe('Call me on [removed: phone]');
       expect(detectSensitive('card 4111 1111 1111 1112').flagged).toBe(false);
       expect(detectSensitive('IBAN GB82 WEST 1234 5698 7654 33').kinds).not.toContain('IBAN');
       expect(detectSensitive('reach me at me@example.test', { allowEmails: ['me@example.test'] }).flagged).toBe(false);

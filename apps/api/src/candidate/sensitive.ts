@@ -49,6 +49,8 @@ const RULES: { kind: string; re: RegExp; check?: (m: string) => boolean }[] = [
   { kind: 'PASSPORT_NUMBER', re: /\bpassport\s*(?:number|no\.?|#)?\s*[:#]?\s*[A-Z0-9]{6,9}\b/gi },
   { kind: 'EMAIL', re: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi },
   // International (+CC), national trunk (0…) or bracketed area code; never a slice of a longer number.
+  // Indian mobiles: optional +91/0091, ten digits starting 6-9, grouped any way (e.g. +91 98765 43210).
+  { kind: 'PHONE', re: /(?<!\d)(?:(?:\+|00)91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}(?!\d)/g },
   { kind: 'PHONE', re: /(?<!\d)(?:\+\d{1,3}[\s-]?\d{2,4}|\(\d{2,5}\)|0\d{2,4})[\s-]?\d{3,4}[\s-]?\d{3,4}(?!\d)/g },
 ];
 

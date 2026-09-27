@@ -30,6 +30,8 @@ describe('synthetic-data scan (TASK-KYC section 2)', () => {
   it('flags real-looking contact details', () => {
     expect(kinds('Email compliance.officer@hsbc.co.uk')).toEqual(['EMAIL']);
     expect(kinds('Call 07911 123456')).toEqual(['PHONE']);
+    // Indian mobile formats (testers are in India).
+    for (const n of ['+91 98765 43210', '+91-9876543210', '0091 9876543210', '98765 43210', '9876543210']) expect(kinds(`Call ${n}`)).toEqual(['PHONE']);
   });
 
   it('does not mistake hex ids for phone numbers', () => {

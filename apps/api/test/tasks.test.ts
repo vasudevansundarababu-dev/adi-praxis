@@ -484,4 +484,176 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
       expect((await submit(a, id)).json().details.unexplained).toHaveLength(1);
     });
   });
+
+  describe('M5c review, Approved Task Dataset and completion', () => {
+    const allTrue = { realistic: true, correct: true, coversSlot: true, difficultyFair: true, distinct: true, rubricCatches: true };
+    let reviewer: string;
+    let reviewerId: string;
+
+    /** One expert on a 4-slot project (1 required cell, 2 required edge cases, 1 open slot), with a reviewer. */
+    async function setup() {
+      const projectId = await project('AUTHORING', { distinctTarget: 4, maxPerExpert: 4 });
+      const r = await createUser(clientId, ['REVIEWER']);
+      reviewerId = r.id;
+      reviewer = await login(app, r.email);
+      expect((await post(pm, `/projects/${projectId}/reviewers`, { userId: r.id })).statusCode).toBe(200);
+      const a = await expert();
+      await assign(projectId, a);
+      await deliver('project.staffed');
+      await db.project.update({ where: { id: projectId }, data: { openTaskCapPerCandidate: 4 } });
+      await post(a.cookie, `/me/projects/${projectId}/tasks/next`);
+      const tasks = await db.taskInstance.findMany({ where: { projectId, assignedToId: a.candidateId }, include: { slot: true }, orderBy: { assignedAt: 'asc' } });
+      return { projectId, a, tasks };
+    }
+    const body = (title: string, extra: object = {}) => ({ header: { title, ...extra }, body: `${title}: a synthetic onboarding case with its own distinct parties, documents and escalation path ${randomUUID()}.` });
+    async function submitted(a: Who, id: string, title: string, header: object = {}) {
+      expect((await save(a, id, body(title, header))).statusCode).toBe(200);
+      const r = await submit(a, id);
+      expect(r.statusCode, r.body).toBe(200);
+    }
+    const decide = async (id: string, decision: object, cookie = reviewer) => {
+      const t = (await get(cookie, `/review/tasks/${id}`)).json();
+      return post(cookie, `/review/tasks/${id}/decision`, { expectedRevision: t.revision, checklist: allTrue, ...decision });
+    };
+
+    it('accepting a task writes exactly one ApprovedTaskRecord with full lineage, chained to the previous record', async () => {
+      const { projectId, a, tasks } = await setup();
+      const [t1, t2] = tasks.filter((t) => !t.slot!.isOpen);
+      await submitted(a, t1!.id, 'First case');
+      await submitted(a, t2!.id, 'Second case');
+      const queue = (await get(reviewer, '/review/tasks')).json().items;
+      expect(queue.map((q: { id: string }) => q.id).sort()).toEqual([t1!.id, t2!.id].sort());
+      expect((await decide(t1!.id, { decision: 'ACCEPT' })).json()).toMatchObject({ status: 'ACCEPTED' });
+      expect((await decide(t2!.id, { decision: 'ACCEPT' })).statusCode).toBe(200);
+
+      const records = await db.approvedTaskRecord.findMany({ orderBy: { seq: 'asc' } });
+      expect(records).toHaveLength(2);
+      const [r1, r2] = records;
+      const proj = await db.project.findUniqueOrThrow({ where: { id: projectId } });
+      expect(r1).toMatchObject({ taskInstanceId: t1!.id, taskMode: 'AUTHORING', candidateId: a.candidateId, slotId: t1!.slotId, reviewerId, projectId, templateId: proj.templateId, templateVersion: proj.templateVersion, jdSnapshotId: proj.jdSnapshotId, authorTaskIndex: 1, schemaVersion: 1, prevHash: null, isOpenSlot: false });
+      expect(r1!.coverageTags).toEqual((t1!.slot!.coverageTags as object));
+      expect((r1!.output as { header: { title: string } }).header.title).toBe('First case');
+      expect(r1!.activeSeconds).toBe(30);
+      expect(r2).toMatchObject({ authorTaskIndex: 2, prevHash: r1!.contentHash });
+      expect(r1!.contentHash).toMatch(/^[a-f0-9]{64}$/);
+      expect((await db.taskInstance.findUniqueOrThrow({ where: { id: t1!.id } })).status).toBe('ACCEPTED');
+      expect((await db.coverageSlot.findUniqueOrThrow({ where: { id: t1!.slotId! } })).status).toBe('FILLED');
+      expect(await db.outboxEvent.count({ where: { name: 'task.accepted' } })).toBe(2);
+      // A decided task cannot be decided again; no second record.
+      expect((await decide(t1!.id, { decision: 'ACCEPT' })).json().error).toBe('NOT_AWAITING_REVIEW');
+      expect(await db.approvedTaskRecord.count()).toBe(2);
+    });
+
+    it('the checklist must hold to accept; rework needs comments; reject needs a reason', async () => {
+      const { a, tasks } = await setup();
+      const t = tasks.find((x) => !x.slot!.isOpen)!;
+      await submitted(a, t.id, 'Case');
+      expect((await decide(t.id, { decision: 'ACCEPT', checklist: { ...allTrue, distinct: false } })).statusCode).toBe(400);
+      expect((await decide(t.id, { decision: 'REWORK' })).statusCode).toBe(400);
+      expect((await decide(t.id, { decision: 'REJECT' })).statusCode).toBe(400);
+      expect(await db.approvedTaskRecord.count()).toBe(0);
+    });
+
+    it('rework keeps version history; the author sees pinned comments and resubmits; the reviewer sees what changed', async () => {
+      const { a, tasks } = await setup();
+      const t = tasks.find((x) => !x.slot!.isOpen)!;
+      await submitted(a, t.id, 'Draft one');
+      expect((await decide(t.id, { decision: 'REWORK', checklist: { ...allTrue, correct: false }, comments: [{ section: 'W04', text: 'The disposition must escalate.' }] })).json()).toEqual({ status: 'REWORK' });
+      const mine = await task(a, t.id);
+      expect(mine).toMatchObject({ status: 'REWORK', readOnly: false, review: { decision: 'REWORK', comments: [{ section: 'W04', text: 'The disposition must escalate.' }] } });
+      await submitted(a, t.id, 'Draft two');
+      const view = (await get(reviewer, `/review/tasks/${t.id}`)).json();
+      expect(view.versions.map((v: { version: number }) => v.version)).toEqual([1, 2]);
+      expect(view.previousOutput.header.title).toBe('Draft one');
+      expect(view.output.header.title).toBe('Draft two');
+      expect((await decide(t.id, { decision: 'ACCEPT' })).statusCode).toBe(200);
+      expect((await db.approvedTaskRecord.findFirstOrThrow()).reworkCount).toBe(1);
+    });
+
+    it('reviewers see only assigned projects, never their own tasks, and never an author they declared a conflict with', async () => {
+      const { a, tasks } = await setup();
+      const t = tasks.find((x) => !x.slot!.isOpen)!;
+      await submitted(a, t.id, 'Case');
+      const other = await login(app, (await createUser(clientId, ['REVIEWER'])).email);
+      expect((await get(other, '/review/tasks')).json().items).toEqual([]);
+      expect((await get(other, `/review/tasks/${t.id}`)).statusCode).toBe(404);
+      // The author also holds an internal Reviewer account (same email): self-review is blocked.
+      const sme = await db.smeUser.findUniqueOrThrow({ where: { id: a.smeUserId } });
+      const self = await createUser(clientId, ['REVIEWER'], sme.contactEmail!);
+      await db.projectReviewer.create({ data: { clientId, projectId: t.projectId, userId: self.id, assignedById: self.id } });
+      const selfCookie = await login(app, self.email);
+      expect((await get(selfCookie, '/review/tasks')).json().items).toEqual([]);
+      expect((await get(selfCookie, `/review/tasks/${t.id}`)).statusCode).toBe(403);
+      await db.conflictDeclaration.create({ data: { clientId, smeUserId: a.smeUserId, reviewerId, employerDescription: 'Same team', details: 'Same team' } });
+      expect((await get(reviewer, '/review/tasks')).json().items).toEqual([]);
+      expect((await decide(t.id, { decision: 'ACCEPT' }, admin)).statusCode).toBe(200);
+    });
+
+    it('a flagged duplicate needs an explicit duplicate decision; rejecting it releases the slot', async () => {
+      const projectId = await project('AUTHORING');
+      const r = await createUser(clientId, ['REVIEWER']);
+      reviewer = await login(app, r.email);
+      await post(pm, `/projects/${projectId}/reviewers`, { userId: r.id });
+      const a = await expert();
+      const b = await expert('Grace Hopper');
+      await assign(projectId, a, b);
+      const ta = (await db.taskInstance.findMany({ where: { projectId, assignedToId: a.candidateId }, include: { slot: true } })).find((x) => !x.slot!.isOpen);
+      const tb = (await db.taskInstance.findMany({ where: { projectId, assignedToId: b.candidateId }, include: { slot: true } })).find((x) => !x.slot!.isOpen)!;
+      const same = { header: { title: 'Nominee director case' }, body: 'A nominee director signs for a shell company whose real controller lives abroad; the registry and the bank records disagree on the director list.' };
+      await save(a, ta!.id, same);
+      await submit(a, ta!.id);
+      await save(b, tb.id, same);
+      await submit(b, tb.id);
+      const queue = (await get(reviewer, '/review/tasks')).json().items;
+      expect(queue[0]).toMatchObject({ id: tb.id, flaggedDuplicate: true });
+      const view = (await get(reviewer, `/review/tasks/${tb.id}`)).json();
+      expect(view.similar[0]).toMatchObject({ taskId: ta!.id, flagged: true });
+      expect(view.similar[0].text).toContain('nominee director signs');
+      expect((await decide(tb.id, { decision: 'ACCEPT' })).json().error).toBe('DUPLICATE_DECISION_REQUIRED');
+      expect((await decide(tb.id, { decision: 'REJECT', rejectReason: 'DUPLICATE', duplicateDecision: 'REJECT_DUPLICATE', checklist: { ...allTrue, distinct: false } })).json()).toEqual({ status: 'REJECTED' });
+      expect((await db.coverageSlot.findUniqueOrThrow({ where: { id: tb.slotId! } })).status).toBe('RELEASED');
+      expect(await db.approvedTaskRecord.count()).toBe(0);
+      const dash = (await get(pm, `/projects/${projectId}/dashboard`)).json();
+      expect(dash.duplicates).toEqual({ flagged: 1, rejected: 1 });
+    });
+
+    it('confirmed real data is quarantined and never enters the dataset', async () => {
+      const { a, tasks } = await setup();
+      const t = tasks.find((x) => !x.slot!.isOpen)!;
+      await submitted(a, t.id, 'Case');
+      expect((await decide(t.id, { decision: 'REJECT', rejectReason: 'REAL_DATA', checklist: { ...allTrue, realistic: false } })).statusCode).toBe(200);
+      const stored = await db.taskInstance.findUniqueOrThrow({ where: { id: t.id } });
+      expect(stored).toMatchObject({ status: 'REJECTED', rejectReason: 'REAL_DATA', output: null });
+      expect(stored.quarantinedAt).not.toBeNull();
+      expect((await db.taskSubmission.findFirstOrThrow({ where: { taskInstanceId: t.id } })).output).toEqual({ quarantined: true });
+      expect(await db.approvedTaskRecord.count()).toBe(0);
+      expect((await task(a, t.id)).output).toBeNull();
+    });
+
+    it('a project completes only when the distinct-task target and all required coverage are met; open-slot tags are confirmed', async () => {
+      const { projectId, a, tasks } = await setup();
+      expect((await db.project.findUniqueOrThrow({ where: { id: projectId } })).status).toBe('IN_PROGRESS');
+      const open = tasks.find((x) => x.slot!.isOpen)!;
+      for (const t of tasks.filter((x) => !x.slot!.isOpen)) {
+        await submitted(a, t.id, `Case ${t.id.slice(0, 4)}`);
+        expect((await decide(t.id, { decision: 'ACCEPT' })).statusCode).toBe(200);
+      }
+      let dash = (await get(pm, `/projects/${projectId}/dashboard`)).json();
+      expect(dash).toMatchObject({ accepted: 3, target: 4, complete: false, authors: { distinct: 1, minimum: 1, cap: 4 }, coverage: { met: true } });
+      expect(dash.coverage.cells).toEqual([expect.objectContaining({ tags: { customer_type: 'corporate', risk_level: 'high' }, state: 'FILLED' })]);
+      expect(dash.coverage.edgeCases.map((e: { state: string }) => e.state)).toEqual(['FILLED', 'FILLED']);
+      expect(dash.experts).toEqual([expect.objectContaining({ name: 'Ada Lovelace', accepted: 3, working: 1 })]);
+      expect((await db.project.findUniqueOrThrow({ where: { id: projectId } })).status).toBe('IN_PROGRESS');
+
+      await submitted(a, open.id, 'Open case', { coverageTags: { customer_type: 'trust' }, edgeCase: 'Trustee is a minor' });
+      expect((await decide(open.id, { decision: 'ACCEPT' })).json().error).toBe('CONFIRM_TAGS');
+      expect((await decide(open.id, { decision: 'ACCEPT', confirmedCoverage: { tags: { customer_type: 'trust', risk_level: 'high' }, edgeCase: 'Trustee is a minor' } })).statusCode).toBe(200);
+      expect((await db.project.findUniqueOrThrow({ where: { id: projectId } })).status).toBe('COMPLETED');
+      expect(await db.outboxEvent.count({ where: { name: 'project.completed' } })).toBe(1);
+      const rec = await db.approvedTaskRecord.findFirstOrThrow({ where: { taskInstanceId: open.id } });
+      expect(rec).toMatchObject({ isOpenSlot: true, coverageTags: { tags: { customer_type: 'trust', risk_level: 'high' }, edgeCase: 'Trustee is a minor' } });
+      dash = (await get(pm, `/projects/${projectId}/dashboard`)).json();
+      expect(dash).toMatchObject({ complete: true, discoveredEdgeCases: ['Trustee is a minor'] });
+    });
+  });
 });

@@ -857,6 +857,8 @@ model Invite {
 /// RL Gym base table. Append-only; one per accepted TaskInstance (plus correction records via supersedesId).
 model ApprovedTaskRecord {
   id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Chain order: assigned at insert while the chain lock is held (created_at is transaction start time).
+  seq                   BigInt    @unique @default(autoincrement())
   schemaVersion         Int       @map("schema_version")
   createdAt             DateTime  @default(now()) @map("created_at")
   contentHash           String    @map("content_hash")

@@ -2,6 +2,7 @@ import { Redis } from 'ioredis';
 import { buildApp } from './app';
 import { loadConfig } from './config';
 import { createDb } from './db';
+import { cloudLogger } from './lib/logging';
 
 const config = loadConfig();
 const db = createDb(config.DATABASE_URL);
@@ -16,7 +17,7 @@ if (config.GCS_EMULATOR_HOST) {
 const app = await buildApp({
   config,
   db,
-  logger: true,
+  logger: config.NODE_ENV === 'production' ? cloudLogger : true,
   pingRedis: async () => (await redis.ping()) === 'PONG',
 });
 

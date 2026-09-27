@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 const Env = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  /** Deployment environment. Staging runs production builds with Stripe test mode, so live identity is required only in production. */
+  APP_ENV: z.enum(['local', 'staging', 'production']).optional(),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   API_PORT: z.coerce.number().int().default(4000),
@@ -39,7 +41,7 @@ const Env = z.object({
   /** Near-duplicate detection embeddings on Vertex AI (same project as Claude). Blank project = local hashing mock. */
   EMBEDDING_LOCATION: z.string().default('us-central1'),
   EMBEDDING_MODEL: z.string().default('text-embedding-005'),
-  /** Nightly hash-chain verification of the append-only dataset (UTC cron). */
+  /** Nightly hash-chain verification in the worker (UTC cron). "off" when Cloud Scheduler runs it as a Cloud Run job. */
   DATASET_VERIFY_CRON: z.string().default('0 3 * * *'),
   /** FLOW 4 results to RL Gym by signed webhook. Blank URL = RL Gym pulls results instead. */
   RL_GYM_WEBHOOK_URL: z.string().default(''),
@@ -51,8 +53,9 @@ export type Config = z.infer<typeof Env> & {
   candidateAuthMode: 'google' | 'mock';
   /** Derived: real Stripe when keys are set, otherwise the dev mock. */
   identityMode: 'stripe' | 'mock';
-  /** Only live-mode identity results confer eligibility (FLOW2 CF-05). True in production. */
+  /** Only live-mode identity results confer eligibility (FLOW2 CF-05). True in production, not in staging. */
   requireLiveIdentity: boolean;
+  appEnv: 'local' | 'staging' | 'production';
   /** Derived: Claude on Vertex when a project is set, otherwise the local heuristic mock. */
   assistantMode: 'vertex' | 'mock';
   /** Derived: SMTP when a host is set, otherwise an in-memory outbox. */
@@ -74,5 +77,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (c.NODE_ENV === 'production' && (candidateAuthMode === 'mock' || identityMode === 'mock' || assistantMode === 'mock' || emailMode === 'memory')) {
     throw new Error('Invalid configuration: production needs GOOGLE_OAUTH_CLIENT_ID, STRIPE_SECRET_KEY, STRIPE_IDENTITY_WEBHOOK_SECRET, VERTEX_PROJECT_ID and SMTP_HOST (mocks are local-only)');
   }
-  return { ...c, candidateAuthMode, identityMode, assistantMode, emailMode, requireLiveIdentity: c.NODE_ENV === 'production' };
+  const appEnv = c.APP_ENV ?? (c.NODE_ENV === 'production' ? 'production' : 'local');
+  return { ...c, candidateAuthMode, identityMode, assistantMode, emailMode, appEnv, requireLiveIdentity: appEnv === 'production' };
 }

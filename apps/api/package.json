@@ -14,7 +14,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx --env-file-if-exists=../../.env prisma/seed.ts",
     "openapi": "tsx scripts/export-openapi.ts",
-    "db:seed:candidates": "tsx --env-file-if-exists=../../.env prisma/seed-candidates.ts"
+    "db:seed:candidates": "tsx --env-file-if-exists=../../.env prisma/seed-candidates.ts",
+    "job": "tsx src/jobs/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.128.0",
@@ -38,7 +39,9 @@
     "ioredis": "5.11.1",
     "mammoth": "1.13.0",
     "nodemailer": "7.0.13",
+    "prisma": "6.19.3",
     "stripe": "18.5.0",
+    "tsx": "4.23.15",
     "unpdf": "1.8.1",
     "zod": "3.25.76"
   },
@@ -46,8 +49,6 @@
     "@types/node": "22.20.4",
     "@types/nodemailer": "8.0.2",
     "jszip": "3.10.1",
-    "prisma": "6.19.3",
-    "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vitest": "3.2.7"
   }

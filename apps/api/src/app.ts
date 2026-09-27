@@ -52,7 +52,7 @@ export interface AppDeps {
   config: Config;
   db: Db;
   pingRedis: () => Promise<boolean>;
-  logger?: boolean;
+  logger?: boolean | Record<string, unknown>;
   /** Defaults: offline city table; the real selection gate (selected + onboarded + eligible). */
   geocoder?: Geocoder;
   selectionGate?: SelectionGate;

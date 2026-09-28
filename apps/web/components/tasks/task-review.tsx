@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 export interface TaskReviewData {
   id: string;
@@ -344,12 +345,16 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
 
         {canDecide ? (
           <aside className="space-y-4 text-sm" aria-label="Decision">
+            <RequiredNote />
             <fieldset className="card p-4">
-              <legend className="px-1 font-semibold">Checklist</legend>
+              <legend className="px-1 font-semibold">
+                Checklist
+                <Req />
+              </legend>
               {d.checklist.map((c) => (
                 <div key={c.key} className="mt-2">
                   <p>{c.label}</p>
-                  <div className="flex gap-3">
+                  <div role="radiogroup" aria-label={c.label} aria-required="true" className="flex gap-3">
                     <label className="flex items-center gap-1">
                       <input type="radio" name={c.key} checked={checklist[c.key] === true} onChange={() => setChecklist({ ...checklist, [c.key]: true })} /> Yes
                     </label>
@@ -361,7 +366,10 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
               ))}
             </fieldset>
             <fieldset className="space-y-2 card p-4">
-              <legend className="px-1 font-semibold">Decision</legend>
+              <legend className="px-1 font-semibold">
+                Decision
+                <Req />
+              </legend>
               {(['ACCEPT', 'REWORK', 'REJECT'] as const).map((x) => (
                 <label key={x} className="flex items-center gap-2">
                   <input type="radio" name="decision" checked={decision === x} onChange={() => setDecision(x)} />
@@ -385,14 +393,16 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
                   ))}
                   <label className="block">
                     Edge case
-                    <input value={edgeCase} onChange={(e) => setEdgeCase(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
+                    <Req />
+                    <input aria-required="true" value={edgeCase} onChange={(e) => setEdgeCase(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
                   </label>
                 </div>
               )}
               {decision === 'REJECT' && (
                 <label className="block">
                   Reason
-                  <select value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1">
+                  <Req />
+                  <select aria-required="true" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1">
                     <option value="">Choose…</option>
                     <option value="DUPLICATE">Duplicate</option>
                     <option value="NOT_REALISTIC">Not realistic</option>
@@ -417,7 +427,7 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
                       </label>
                       <label className="flex-1">
                         <span className="sr-only">Comment</span>
-                        <input value={c.text} onChange={(e) => setComments(comments.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} className="w-full rounded-md border border-line bg-surface px-2 py-1" />
+                        <input aria-required={i === 0 ? 'true' : undefined} value={c.text} onChange={(e) => setComments(comments.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} className="w-full rounded-md border border-line bg-surface px-2 py-1" />
                       </label>
                     </div>
                   ))}

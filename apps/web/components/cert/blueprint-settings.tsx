@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, useAction } from '@/components/supply/action';
 import type { BlueprintDetail, Competency } from './types';
 
@@ -34,18 +35,22 @@ export function BlueprintSettings({ blueprint: b }: { blueprint: BlueprintDetail
           );
         }}
       >
+        <RequiredNote />
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="block">
             Items (5–100)
-            <input type="number" min={5} max={100} value={itemCount} onChange={(e) => setItemCount(e.target.value)} className={input} />
+            <Req />
+            <input required type="number" min={5} max={100} value={itemCount} onChange={(e) => setItemCount(e.target.value)} className={input} />
           </label>
           <label className="block">
             Time limit, minutes (10–300)
-            <input type="number" min={10} max={300} value={time} onChange={(e) => setTime(e.target.value)} className={input} />
+            <Req />
+            <input required type="number" min={10} max={300} value={time} onChange={(e) => setTime(e.target.value)} className={input} />
           </label>
           <label className="block">
             Overall pass mark, %
-            <input type="number" min={0} max={100} value={rules.overallPct} onChange={(e) => setRules({ ...rules, overallPct: Number(e.target.value) })} className={input} />
+            <Req />
+            <input required type="number" min={0} max={100} value={rules.overallPct} onChange={(e) => setRules({ ...rules, overallPct: Number(e.target.value) })} className={input} />
           </label>
           <label className="block">
             Planted errors to find, % (blank = not used)
@@ -71,11 +76,14 @@ export function BlueprintSettings({ blueprint: b }: { blueprint: BlueprintDetail
           </label>
         </div>
         <fieldset>
-          <legend className="font-medium">Competency weights (must total 100; now {total})</legend>
+          <legend className="font-medium">
+            Competency weights (must total 100; now {total})
+            <Req />
+          </legend>
           <div className="mt-2 space-y-2">
             {comps.map((c, i) => (
               <label key={c.key} className="flex items-center gap-3">
-                <input type="number" min={1} max={100} value={c.weight} onChange={(e) => setComps(comps.map((x, j) => (j === i ? { ...x, weight: Number(e.target.value) } : x)))} className="w-20 rounded-md border border-line bg-surface px-2 py-1.5" aria-label={`Weight for ${c.name}`} />
+                <input required type="number" min={1} max={100} value={c.weight} onChange={(e) => setComps(comps.map((x, j) => (j === i ? { ...x, weight: Number(e.target.value) } : x)))} className="w-20 rounded-md border border-line bg-surface px-2 py-1.5" aria-label={`Weight for ${c.name}`} />
                 <span>
                   {c.name} <span className="text-xs text-fg-muted">({c.key} · cites {c.citations.join(', ')})</span>
                 </span>

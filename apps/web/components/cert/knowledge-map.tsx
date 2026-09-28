@@ -18,7 +18,7 @@ function Row({ k, section, canEdit }: { k: KnowledgeRow; section?: string; canEd
       <td className={TD}>
         {editing ? (
           <div className="space-y-2">
-            <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} className={input} aria-label="Knowledge item text" />
+            <textarea aria-required="true" rows={3} value={text} onChange={(e) => setText(e.target.value)} className={input} aria-label="Knowledge item text" />
             <div className="flex gap-2">
               <button
                 type="button"

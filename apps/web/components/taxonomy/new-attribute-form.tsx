@@ -4,6 +4,7 @@ import { CreateDemographicAttributeRequest, DEMOGRAPHIC_TYPES, type DemographicT
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 const EXAMPLES: Record<DemographicType, unknown> = {
   SINGLE_SELECT: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }],
@@ -48,25 +49,30 @@ export function NewAttributeForm() {
   return (
     <form onSubmit={submit} className="mt-10 space-y-3 border-t border-line pt-6" noValidate>
       <h2 className="text-lg font-semibold">Add an attribute</h2>
+      <RequiredNote />
       <div className="grid gap-3 sm:grid-cols-3">
         <div>
           <label htmlFor="attr-label" className="block text-sm font-medium">
             Label
+            <Req />
           </label>
-          <input id="attr-label" value={label} onChange={(e) => setLabel(e.target.value)} className={input} />
+          <input id="attr-label" aria-required="true" value={label} onChange={(e) => setLabel(e.target.value)} className={input} />
         </div>
         <div>
           <label htmlFor="attr-key" className="block text-sm font-medium">
             Key (lower_snake_case)
+            <Req />
           </label>
-          <input id="attr-key" value={key} onChange={(e) => setKey(e.target.value)} className={input} />
+          <input id="attr-key" aria-required="true" value={key} onChange={(e) => setKey(e.target.value)} className={input} />
         </div>
         <div>
           <label htmlFor="attr-type" className="block text-sm font-medium">
             Type
+            <Req />
           </label>
           <select
             id="attr-type"
+            aria-required="true"
             value={type}
             onChange={(e) => {
               const t = e.target.value as DemographicType;
@@ -86,8 +92,9 @@ export function NewAttributeForm() {
       <div>
         <label htmlFor="attr-values" className="block text-sm font-medium">
           Allowed values (JSON)
+          <Req />
         </label>
-        <textarea id="attr-values" rows={6} value={values} onChange={(e) => setValues(e.target.value)} className={`${input} font-mono text-xs`} />
+        <textarea id="attr-values" aria-required="true" rows={6} value={values} onChange={(e) => setValues(e.target.value)} className={`${input} font-mono text-xs`} />
       </div>
       {errors.length > 0 && (
         <ul role="alert" className="list-disc rounded-md border border-error p-3 pl-8 text-sm">

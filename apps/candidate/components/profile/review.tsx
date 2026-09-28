@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { correct, loadState, submitProfile } from '@/lib/profile-client';
 import type { ConversationState } from '@/lib/profile-types';
 import { ProfilePanel } from './profile-panel';
@@ -117,13 +118,20 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
 
         <section className="mt-6 space-y-2 card p-4">
           <h2 className="font-semibold">Confirm and submit</h2>
+          <RequiredNote />
           <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={accuracy} onChange={(e) => setAccuracy(e.target.checked)} className="mt-1" />
-            The information in my profile is accurate to the best of my knowledge.
+            <input type="checkbox" aria-required="true" checked={accuracy} onChange={(e) => setAccuracy(e.target.checked)} className="mt-1" />
+            <span>
+              The information in my profile is accurate to the best of my knowledge.
+              <Req />
+            </span>
           </label>
           <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={permission} onChange={(e) => setPermission(e.target.checked)} className="mt-1" />
-            ADI Praxis may use my answers and uploaded files to review my qualification for this opportunity.
+            <input type="checkbox" aria-required="true" checked={permission} onChange={(e) => setPermission(e.target.checked)} className="mt-1" />
+            <span>
+              ADI Praxis may use my answers and uploaded files to review my qualification for this opportunity.
+              <Req />
+            </span>
           </label>
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" checked={future} onChange={(e) => setFuture(e.target.checked)} className="mt-1" />

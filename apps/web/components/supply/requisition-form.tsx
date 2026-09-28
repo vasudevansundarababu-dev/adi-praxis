@@ -3,6 +3,7 @@
 import { LAUNCH_DOMAINS, SME_TIERS, TIER_LABELS, type SmeTier } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, splitList, useAction } from './action';
 import type { PartnerRow, RequisitionDto } from './types';
 
@@ -79,8 +80,9 @@ export function RequisitionForm({ projects, partners, existing, initialProjectId
     >
       <section className="card space-y-3 p-4">
         <h2 className="font-semibold">Project and role</h2>
+        <RequiredNote />
         <label className="block">
-          Project
+          Project<Req />
           <select required disabled={!!e} value={f.projectId} onChange={(ev) => set('projectId', ev.target.value)} className={input}>
             {projects.length === 0 && <option value="">No projects you own</option>}
             {projects.map((p) => (
@@ -107,7 +109,7 @@ export function RequisitionForm({ projects, partners, existing, initialProjectId
           </div>
         )}
         <label className="block">
-          Title
+          Title<Req />
           <input required minLength={3} maxLength={200} value={f.title} onChange={(ev) => set('title', ev.target.value)} placeholder="KYC analysts, retail onboarding" className={input} />
         </label>
         <label className="block">
@@ -116,7 +118,7 @@ export function RequisitionForm({ projects, partners, existing, initialProjectId
         </label>
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="block">
-            Domain
+            Domain<Req />
             <input required list="req-domains" value={f.domain} onChange={(ev) => set('domain', ev.target.value)} className={input} />
             <datalist id="req-domains">
               {LAUNCH_DOMAINS.map((d) => (
@@ -125,8 +127,8 @@ export function RequisitionForm({ projects, partners, existing, initialProjectId
             </datalist>
           </label>
           <label className="block">
-            Tier
-            <select value={f.tier} onChange={(ev) => set('tier', ev.target.value as SmeTier)} className={input}>
+            Tier<Req />
+            <select required value={f.tier} onChange={(ev) => set('tier', ev.target.value as SmeTier)} className={input}>
               {SME_TIERS.map((t) => (
                 <option key={t} value={t}>
                   {TIER_LABELS[t]}
@@ -135,7 +137,7 @@ export function RequisitionForm({ projects, partners, existing, initialProjectId
             </select>
           </label>
           <label className="block">
-            Headcount
+            Headcount<Req />
             <input required type="number" min={1} max={10000} value={f.headcount} onChange={(ev) => set('headcount', ev.target.value)} className={input} />
           </label>
         </div>

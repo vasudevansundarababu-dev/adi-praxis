@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 import { DemographicsStep } from './demographics-step';
 import { FiguresPanel } from './figures-panel';
 import { JobDescriptionStep } from './jd-step';
@@ -212,11 +213,14 @@ export function ProjectWizard(props: {
                 <p className="text-fg-muted">No published templates yet. An Admin needs to publish one first.</p>
               ) : (
                 <>
+                  <RequiredNote />
                   <label htmlFor="template" className="block text-sm font-medium">
                     Domain and workflow
+                    <Req />
                   </label>
                   <select
                     id="template"
+                    aria-required="true"
                     value={state.templateId}
                     onChange={(e) => {
                       const t = templates.find((x) => x.id === e.target.value)!;
@@ -259,11 +263,13 @@ export function ProjectWizard(props: {
 
           {step === 1 && (
             <div className="mt-4 space-y-4">
+              <RequiredNote />
               <div>
                 <label htmlFor="name" className="block text-sm font-medium">
                   Project name
+                  <Req />
                 </label>
-                <input id="name" value={state.name} onChange={(e) => set({ name: e.target.value })} className={input} />
+                <input id="name" aria-required="true" value={state.name} onChange={(e) => set({ name: e.target.value })} className={input} />
               </div>
               <div>
                 <label htmlFor="description" className="block text-sm font-medium">
@@ -275,14 +281,16 @@ export function ProjectWizard(props: {
                 <div>
                   <label htmlFor="startDate" className="block text-sm font-medium">
                     Start date
+                    <Req />
                   </label>
-                  <input id="startDate" type="date" value={state.startDate} onChange={(e) => set({ startDate: e.target.value })} className={input} />
+                  <input id="startDate" aria-required="true" type="date" value={state.startDate} onChange={(e) => set({ startDate: e.target.value })} className={input} />
                 </div>
                 <div>
                   <label htmlFor="endDate" className="block text-sm font-medium">
                     Target end date
+                    <Req />
                   </label>
-                  <input id="endDate" type="date" value={state.endDate} onChange={(e) => set({ endDate: e.target.value })} className={input} />
+                  <input id="endDate" aria-required="true" type="date" value={state.endDate} onChange={(e) => set({ endDate: e.target.value })} className={input} />
                 </div>
               </div>
             </div>
@@ -290,12 +298,16 @@ export function ProjectWizard(props: {
 
           {step === 2 && template && (
             <div className="mt-4 space-y-4">
+              <RequiredNote />
               <fieldset>
-                <legend className="text-sm font-medium">Task mode</legend>
+                <legend className="text-sm font-medium">
+                  Task mode
+                  <Req />
+                </legend>
                 <div className="mt-2 flex gap-4">
                   {template.taskModes.map((m) => (
                     <label key={m} className="flex items-center gap-2 text-sm">
-                      <input type="radio" name="taskMode" checked={state.taskMode === m} onChange={() => set({ taskMode: m })} />
+                      <input type="radio" name="taskMode" aria-required="true" checked={state.taskMode === m} onChange={() => set({ taskMode: m })} />
                       {m === 'AUTHORING' ? 'Authoring (experts write new tasks)' : 'Annotation (workers process inputs)'}
                     </label>
                   ))}
@@ -306,30 +318,34 @@ export function ProjectWizard(props: {
                   <div>
                     <label htmlFor="distinctTarget" className="block text-sm font-medium">
                       Distinct-task target
+                      <Req />
                     </label>
-                    <input id="distinctTarget" type="number" min={1} value={state.distinctTarget} onChange={(e) => set({ distinctTarget: e.target.value })} className={input} />
+                    <input id="distinctTarget" aria-required="true" type="number" min={1} value={state.distinctTarget} onChange={(e) => set({ distinctTarget: e.target.value })} className={input} />
                   </div>
                   <div>
                     <label htmlFor="maxPerExpert" className="block text-sm font-medium">
                       Max tasks per expert
+                      <Req />
                     </label>
-                    <input id="maxPerExpert" type="number" min={1} value={state.maxPerExpert} onChange={(e) => set({ maxPerExpert: e.target.value })} className={input} />
+                    <input id="maxPerExpert" aria-required="true" type="number" min={1} value={state.maxPerExpert} onChange={(e) => set({ maxPerExpert: e.target.value })} className={input} />
                   </div>
                 </div>
               ) : (
                 <div>
                   <label htmlFor="taskCount" className="block text-sm font-medium">
                     Number of tasks
+                    <Req />
                   </label>
-                  <input id="taskCount" type="number" min={1} value={state.taskCount} onChange={(e) => set({ taskCount: e.target.value })} className={input} />
+                  <input id="taskCount" aria-required="true" type="number" min={1} value={state.taskCount} onChange={(e) => set({ taskCount: e.target.value })} className={input} />
                 </div>
               )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="tpt" className="block text-sm font-medium">
                     TPT (minutes per task)
+                    <Req />
                   </label>
-                  <input id="tpt" type="number" min={1} max={480} value={state.tptMinutes} onChange={(e) => set({ tptMinutes: e.target.value })} className={input} />
+                  <input id="tpt" aria-required="true" type="number" min={1} max={480} value={state.tptMinutes} onChange={(e) => set({ tptMinutes: e.target.value })} className={input} />
                   <p className="mt-1 text-xs text-fg-muted">A planning and pay target, not a deadline.</p>
                 </div>
                 <div>

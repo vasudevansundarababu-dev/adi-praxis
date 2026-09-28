@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { mutate } from '@/lib/client-api';
 
 type Item = { id: string; candidateName: string | null; enrollmentId: string | null; details: string | null; declaredAt: string };
@@ -34,9 +35,10 @@ export function ConflictList({ initial }: { initial: Item[] }) {
           <p className="mt-1">{i.details}</p>
           {open === i.id && (
             <div className="mt-3 space-y-2">
+              <RequiredNote />
               <label className="block">
-                How it was resolved (required)
-                <textarea value={resolution} onChange={(e) => setResolution(e.target.value)} rows={2} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
+                How it was resolved<Req />
+                <textarea aria-required="true" value={resolution} onChange={(e) => setResolution(e.target.value)} rows={2} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
               </label>
               <button type="button" disabled={!resolution.trim()} onClick={() => resolve(i.id)} className="btn btn-primary disabled:opacity-50">
                 Mark resolved

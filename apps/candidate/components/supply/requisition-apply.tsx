@@ -4,6 +4,7 @@ import { ISO_COUNTRIES, ISO_LANGUAGES } from '@praxis/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { call } from '@/lib/client';
 
 const input = 'mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5';
@@ -48,13 +49,16 @@ export function RequisitionApply({ requisitionId }: { requisitionId: string }) {
       <div>
         <h2 className="text-base font-semibold">Apply for this role</h2>
         <p className="mt-1 text-fg-muted">A few details to get started. Don’t include confidential employer or customer information.</p>
+        <RequiredNote className="mt-1" />
       </div>
       <label className="block">
         Your relevant experience, in a few sentences
+        <Req />
         <textarea required minLength={10} maxLength={4000} rows={4} value={summary} onChange={(e) => setSummary(e.target.value)} className={input} />
       </label>
       <label className="block">
         Years of relevant experience
+        <Req />
         <input type="number" required min={0} max={60} step={0.5} value={years} onChange={(e) => setYears(e.target.value)} className={`${input} sm:max-w-40`} />
       </label>
       <label className="block">
@@ -86,6 +90,7 @@ export function RequisitionApply({ requisitionId }: { requisitionId: string }) {
       </fieldset>
       <label className="block">
         Country you work from
+        <Req />
         <select required value={country} onChange={(e) => setCountry(e.target.value)} className={`${input} sm:max-w-xs`}>
           <option value="">Choose…</option>
           {ISO_COUNTRIES.map(([c, n]) => (
@@ -100,8 +105,11 @@ export function RequisitionApply({ requisitionId }: { requisitionId: string }) {
         <input type="tel" maxLength={40} autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={`${input} sm:max-w-xs`} />
       </label>
       <label className="flex items-start gap-2">
-        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1" />
-        I agree that ADI Praxis may use these details to consider me for this role.
+        <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1" />
+        <span>
+          I agree that ADI Praxis may use these details to consider me for this role.
+          <Req />
+        </span>
       </label>
       <button type="submit" disabled={pending || !valid} className="btn btn-primary">
         {pending ? 'Sending…' : 'Apply and continue →'}

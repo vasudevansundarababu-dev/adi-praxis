@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { call } from '@/lib/client';
 import type { CourseModule, CourseView, ModuleResult } from '@/lib/supply-types';
 
@@ -145,11 +146,13 @@ function ModuleView({ certificationId, module: m, onPassed }: { certificationId:
           <div>
             <h3 className="font-semibold">Quiz</h3>
             <p className="mt-1 text-xs text-fg-muted">Get at least 80% right to finish the module. You can try again straight away.</p>
+            {quiz.length > 0 && <RequiredNote className="mt-1" />}
           </div>
           {quiz.map((q, qi) => (
             <fieldset key={qi} disabled={pending || !!result?.passed}>
               <legend className="font-medium">
                 {qi + 1}. {q.question}
+                <Req />
               </legend>
               <div className="mt-2 space-y-1">
                 {q.options.map((o, oi) => (
@@ -157,6 +160,7 @@ function ModuleView({ certificationId, module: m, onPassed }: { certificationId:
                     <input
                       type="radio"
                       name={`q${qi}`}
+                      required
                       checked={answers[qi] === oi}
                       onChange={() => {
                         setAnswers(answers.map((a, j) => (j === qi ? oi : a)));

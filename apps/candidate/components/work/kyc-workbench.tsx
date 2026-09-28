@@ -24,6 +24,7 @@ import {
   type KycToolResponse,
 } from '@praxis/shared';
 import { useMemo, useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import type { TaskView } from '@/lib/work-types';
 import { SectionDraftBanner, StartPanel, useDrafting } from './drafting';
 import { SubmitPanel } from './submit-panel';
@@ -38,28 +39,31 @@ const nextId = (prefix: string, ids: string[]) => {
   return `${prefix}${n}`;
 };
 
-function Field(p: { label: string; value: string | number | undefined; onChange: (v: string) => void; type?: string; disabled?: boolean; hint?: string }) {
+function Field(p: { label: string; value: string | number | undefined; onChange: (v: string) => void; type?: string; disabled?: boolean; hint?: string; required?: boolean }) {
   return (
     <label className="block text-sm">
       {p.label}
-      <input type={p.type ?? 'text'} value={p.value ?? ''} disabled={p.disabled} onChange={(e) => p.onChange(e.target.value)} className={input} />
+      {p.required && <Req />}
+      <input type={p.type ?? 'text'} aria-required={p.required || undefined} value={p.value ?? ''} disabled={p.disabled} onChange={(e) => p.onChange(e.target.value)} className={input} />
       {p.hint && <span className="mt-0.5 block text-xs text-fg-muted">{p.hint}</span>}
     </label>
   );
 }
-function Area(p: { label: string; value: string | undefined; onChange: (v: string) => void; disabled?: boolean; rows?: number }) {
+function Area(p: { label: string; value: string | undefined; onChange: (v: string) => void; disabled?: boolean; rows?: number; required?: boolean }) {
   return (
     <label className="block text-sm">
       {p.label}
-      <textarea value={p.value ?? ''} disabled={p.disabled} rows={p.rows ?? 3} onChange={(e) => p.onChange(e.target.value)} className={input} />
+      {p.required && <Req />}
+      <textarea aria-required={p.required || undefined} value={p.value ?? ''} disabled={p.disabled} rows={p.rows ?? 3} onChange={(e) => p.onChange(e.target.value)} className={input} />
     </label>
   );
 }
-function Pick(p: { label: string; value: string | undefined; options: readonly string[]; onChange: (v: string) => void; disabled?: boolean; format?: (v: string) => string }) {
+function Pick(p: { label: string; value: string | undefined; options: readonly string[]; onChange: (v: string) => void; disabled?: boolean; format?: (v: string) => string; required?: boolean }) {
   return (
     <label className="block text-sm">
       {p.label}
-      <select value={p.value ?? ''} disabled={p.disabled} onChange={(e) => p.onChange(e.target.value)} className={input}>
+      {p.required && <Req />}
+      <select aria-required={p.required || undefined} value={p.value ?? ''} disabled={p.disabled} onChange={(e) => p.onChange(e.target.value)} className={input}>
         <option value="">Choose…</option>
         {p.options.map((o) => (
           <option key={o} value={o}>
@@ -80,11 +84,14 @@ function ListField(p: { label: string; value: string[] | undefined; onChange: (v
     }} />
   );
 }
-function MultiPick(p: { label: string; value: string[] | undefined; options: string[]; onChange: (v: string[]) => void; disabled?: boolean }) {
+function MultiPick(p: { label: string; value: string[] | undefined; options: string[]; onChange: (v: string[]) => void; disabled?: boolean; required?: boolean }) {
   const v = p.value ?? [];
   return (
     <fieldset className="text-sm">
-      <legend>{p.label}</legend>
+      <legend>
+        {p.label}
+        {p.required && <Req />}
+      </legend>
       <div className="mt-1 flex flex-wrap gap-2">
         {p.options.length === 0 && <span className="text-fg-muted">None yet</span>}
         {p.options.map((o) => (
@@ -135,22 +142,22 @@ function RecordedCall({ r, setR, tools }: { r: KycToolResponse; setR: (next: Kyc
   const required = new Set([...(tool?.inputSchema.required ?? []), ...(tool?.inputSchema.anyOf?.flatMap((g) => g.required) ?? [])]);
   return (
     <>
-      <Pick label="Tool" value={r.tool} options={tools} onChange={(t) => setR({ ...r, tool: t, arguments: {}, input: '' })} />
-      <Pick label="Result kind" value={r.kind} options={KYC_RESPONSE_KINDS} onChange={(kind) => setR({ ...r, kind })} />
+      <Pick label="Tool" required value={r.tool} options={tools} onChange={(t) => setR({ ...r, tool: t, arguments: {}, input: '' })} />
+      <Pick label="Result kind" required value={r.kind} options={KYC_RESPONSE_KINDS} onChange={(kind) => setR({ ...r, kind })} />
       {tool && (
         <fieldset className="rounded-md border border-line p-2 sm:col-span-2">
           <legend className="px-1 text-sm">Arguments the agent sends</legend>
           <p className="text-xs text-fg-muted">{tool.description}</p>
           <div className="mt-1 grid gap-2 sm:grid-cols-2">
             {Object.entries(tool.inputSchema.properties).map(([k, spec]) => (
-              <Field key={k} label={`${k}${required.has(k) ? (tool.inputSchema.anyOf ? ' (one of the starred)' : ' *') : ''}`} value={args[k]} hint={spec.description} onChange={(v) => setArg(k, v)} />
+              <Field key={k} label={`${k}${required.has(k) && tool.inputSchema.anyOf ? ' (one of the starred)' : ''}`} required={required.has(k) && !tool.inputSchema.anyOf} value={args[k]} hint={spec.description} onChange={(v) => setArg(k, v)} />
             ))}
           </div>
           {problems.length > 0 && <p className="mt-1 text-xs text-warning">{problems.join('; ')}</p>}
         </fieldset>
       )}
       <div className="sm:col-span-2">
-        <Area label="Response the environment returns" value={r.response} onChange={(response) => setR({ ...r, response })} rows={2} />
+        <Area label="Response the environment returns" required value={r.response} onChange={(response) => setR({ ...r, response })} rows={2} />
       </div>
       {tool && (
         <details className="text-xs sm:col-span-2">
@@ -186,6 +193,8 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
   const responses = t.environment?.responses ?? [];
   const steps = t.solution?.steps ?? [];
   const pinned = (task.review?.comments ?? []).filter((c) => c.section === section);
+  // Mirrors the human-gate check: approve, reject or high risk needs a hand-off unless the agent escalates.
+  const needsHandoff = (t.solution?.disposition === 'RECOMMEND_APPROVE' || t.solution?.disposition === 'RECOMMEND_REJECT' || t.solution?.riskRating === 'HIGH') && t.solution?.disposition !== 'ESCALATE';
 
   async function loadSample() {
     const res = await fetch(`/api/v1/me/tasks/${task.id}/sample`);
@@ -252,6 +261,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
             </ul>
           )}
 
+          {section !== 'W00' && section !== 'W06' && <RequiredNote />}
           {section !== 'W00' && section !== 'W06' && <SectionDraftBanner taskId={task.id} section={section} state={drafted[section]} running={drafting.running} readOnly={task.readOnly} onChanged={() => void drafting.load()} beforeDraft={flush} />}
 
           {section === 'W01' && (
@@ -278,15 +288,15 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                     {task.template.coverageDimensions.filter((d) => d.values.length && !slot.tags[d.key]).map((d) => (
                       <Pick key={d.key} label={d.label} value={t.header?.coverageTags?.[d.key]} options={d.values} format={(v) => v} onChange={(v) => set('header', { coverageTags: { ...(t.header?.coverageTags ?? {}), [d.key]: v } })} />
                     ))}
-                    {slot.isOpen && <Field label="Name the edge case this task tests" value={t.header?.edgeCase} onChange={(v) => set('header', { edgeCase: v })} />}
+                    {slot.isOpen && <Field label="Name the edge case this task tests" required value={t.header?.edgeCase} onChange={(v) => set('header', { edgeCase: v })} />}
                   </div>
                 </div>
               )}
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Title" value={t.header?.title} onChange={(v) => set('header', { title: v })} />
-                <Pick label="Difficulty (1 easy to 5 hard)" value={t.header?.difficulty ? String(t.header.difficulty) : ''} options={['1', '2', '3', '4', '5']} format={(v) => v} onChange={(v) => set('header', { difficulty: Number(v) })} />
-                <Field label="Jurisdiction" value={t.header?.jurisdiction} onChange={(v) => set('header', { jurisdiction: v })} />
-                <Field label="Language" value={t.header?.language} onChange={(v) => set('header', { language: v })} hint="e.g. en" />
+                <Field label="Title" required value={t.header?.title} onChange={(v) => set('header', { title: v })} />
+                <Pick label="Difficulty (1 easy to 5 hard)" required value={t.header?.difficulty ? String(t.header.difficulty) : ''} options={['1', '2', '3', '4', '5']} format={(v) => v} onChange={(v) => set('header', { difficulty: Number(v) })} />
+                <Field label="Jurisdiction" required value={t.header?.jurisdiction} onChange={(v) => set('header', { jurisdiction: v })} />
+                <Field label="Language" required value={t.header?.language} onChange={(v) => set('header', { language: v })} hint="e.g. en" />
                 <Field label="Estimated steps" type="number" value={t.header?.estimatedSteps} onChange={(v) => set('header', { estimatedSteps: Number(v) })} />
               </div>
               <button type="button" onClick={loadSample} className="text-sm text-link underline">
@@ -308,12 +318,12 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
           {section === 'W02' && (
             <section className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <Pick label="Trigger" value={t.scenario?.trigger} options={KYC_TRIGGERS} onChange={(v) => set('scenario', { trigger: v })} />
-                <Field label="Customer type" value={t.scenario?.customerType ?? slot?.tags.customer_type} onChange={(v) => set('scenario', { customerType: v })} />
+                <Pick label="Trigger" required value={t.scenario?.trigger} options={KYC_TRIGGERS} onChange={(v) => set('scenario', { trigger: v })} />
+                <Field label="Customer type" required value={t.scenario?.customerType ?? slot?.tags.customer_type} onChange={(v) => set('scenario', { customerType: v })} />
                 <Field label="Product" value={t.scenario?.product} onChange={(v) => set('scenario', { product: v })} />
                 <Field label="Channel" value={t.scenario?.channel ?? slot?.tags.channel} onChange={(v) => set('scenario', { channel: v })} />
               </div>
-              <Area label="Business context (what the agent is told at the start)" value={t.scenario?.businessContext} onChange={(v) => set('scenario', { businessContext: v })} />
+              <Area label="Business context (what the agent is told at the start)" required value={t.scenario?.businessContext} onChange={(v) => set('scenario', { businessContext: v })} />
               <Rows<KycParty>
                 title="Parties"
                 items={parties}
@@ -329,9 +339,9 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                 onChange={(parties) => set('customerFile', { parties })}
                 render={(p, setP) => (
                   <>
-                    <Pick label="Role" value={p.role} options={KYC_PARTY_ROLES} onChange={(role) => setP({ ...p, role })} />
-                    <Pick label="Kind" value={p.kind} options={['PERSON', 'ENTITY']} onChange={(kind) => setP({ ...p, kind: kind as KycParty['kind'] })} />
-                    <Field label="Name (synthetic)" value={p.name} onChange={(name) => setP({ ...p, name })} />
+                    <Pick label="Role" required value={p.role} options={KYC_PARTY_ROLES} onChange={(role) => setP({ ...p, role })} />
+                    <Pick label="Kind" required value={p.kind} options={['PERSON', 'ENTITY']} onChange={(kind) => setP({ ...p, kind: kind as KycParty['kind'] })} />
+                    <Field label="Name (synthetic)" required value={p.name} onChange={(name) => setP({ ...p, name })} />
                     {p.kind === 'PERSON' ? (
                       <Field label="Date of birth" type="date" value={p.dateOfBirth} onChange={(dateOfBirth) => setP({ ...p, dateOfBirth })} />
                     ) : (
@@ -355,9 +365,9 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                 onChange={(ownership) => set('customerFile', { ownership })}
                 render={(o, setO) => (
                   <>
-                    <Pick label="Owner" value={o.ownerId} options={parties.map((p) => p.id)} format={(v) => `${v} ${parties.find((p) => p.id === v)?.name ?? ''}`} onChange={(ownerId) => setO({ ...o, ownerId })} />
-                    <Pick label="Owns" value={o.ownedId} options={parties.filter((p) => p.kind === 'ENTITY').map((p) => p.id)} format={(v) => `${v} ${parties.find((p) => p.id === v)?.name ?? ''}`} onChange={(ownedId) => setO({ ...o, ownedId })} />
-                    <Field label="Percent" type="number" value={o.percent} onChange={(v) => setO({ ...o, percent: Number(v) })} />
+                    <Pick label="Owner" required value={o.ownerId} options={parties.map((p) => p.id)} format={(v) => `${v} ${parties.find((p) => p.id === v)?.name ?? ''}`} onChange={(ownerId) => setO({ ...o, ownerId })} />
+                    <Pick label="Owns" required value={o.ownedId} options={parties.filter((p) => p.kind === 'ENTITY').map((p) => p.id)} format={(v) => `${v} ${parties.find((p) => p.id === v)?.name ?? ''}`} onChange={(ownedId) => setO({ ...o, ownedId })} />
+                    <Field label="Percent" required type="number" value={o.percent} onChange={(v) => setO({ ...o, percent: Number(v) })} />
                   </>
                 )}
               />
@@ -377,7 +387,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                 onChange={(documents) => set('evidence', { documents })}
                 render={(d, setD) => (
                   <>
-                    <Field label="Type" value={d.type} onChange={(type) => setD({ ...d, type })} />
+                    <Field label="Type" required value={d.type} onChange={(type) => setD({ ...d, type })} />
                     <Field label="Issuer" value={d.issuer} onChange={(issuer) => setD({ ...d, issuer })} />
                     <Pick label="Belongs to" value={d.partyId} options={parties.map((p) => p.id)} format={(v) => `${v} ${parties.find((p) => p.id === v)?.name ?? ''}`} onChange={(partyId) => setD({ ...d, partyId })} />
                     <Field label="Issue date" type="date" value={d.issueDate} onChange={(issueDate) => setD({ ...d, issueDate })} />
@@ -387,7 +397,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                   </>
                 )}
               />
-              <MultiPick label="Tools available to the agent" value={tools} options={KYC_TOOLS.map((x) => x.key)} onChange={(v) => set('environment', { tools: v })} />
+              <MultiPick label="Tools available to the agent" required value={tools} options={KYC_TOOLS.map((x) => x.key)} onChange={(v) => set('environment', { tools: v })} />
               <p className="text-sm text-fg-muted">Each tool response is recorded as an MCP call: the arguments the agent sends and the result the environment returns, so the task can be replayed exactly.</p>
               <Rows<KycToolResponse>
                 title="Tool responses"
@@ -406,7 +416,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                 itemLabel={(r) => r.id}
                 make={() => ({ id: nextId('PR', (t.policy?.rules ?? []).map((x) => x.id)), text: '' })}
                 onChange={(rules) => set('policy', { rules })}
-                render={(r, setR) => <Area label="Synthetic policy the agent must follow" value={r.text} onChange={(text) => setR({ ...r, text })} rows={2} />}
+                render={(r, setR) => <Area label="Synthetic policy the agent must follow" required value={r.text} onChange={(text) => setR({ ...r, text })} rows={2} />}
               />
             </section>
           )}
@@ -422,12 +432,13 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                 onChange={(steps) => set('solution', { steps })}
                 render={(s, setS) => (
                   <>
-                    <Pick label="Action" value={s.action} options={['TOOL', 'REASONING']} onChange={(action) => setS({ ...s, action: action as KycStep['action'] })} />
+                    <Pick label="Action" required value={s.action} options={['TOOL', 'REASONING']} onChange={(action) => setS({ ...s, action: action as KycStep['action'] })} />
                     {s.action === 'TOOL' && (
                       <>
-                        <Pick label="Tool" value={s.tool} options={tools} onChange={(tool) => setS({ ...s, tool })} />
+                        <Pick label="Tool" required value={s.tool} options={tools} onChange={(tool) => setS({ ...s, tool })} />
                         <Pick
                           label="Recorded call it makes"
+                          required
                           value={s.responseId}
                           options={responses.filter((r) => r.tool === s.tool).map((r) => r.id)}
                           format={(v) => { const r = responses.find((x) => x.id === v); return r ? `${v}: ${argumentsSummary(responseArguments(r))}` : v; }}
@@ -438,8 +449,8 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                         </p>
                       </>
                     )}
-                    <Area label="Expected result" value={s.expectedResult} onChange={(expectedResult) => setS({ ...s, expectedResult })} rows={2} />
-                    <Area label="Why it matters" value={s.why} onChange={(why) => setS({ ...s, why })} rows={2} />
+                    <Area label="Expected result" required value={s.expectedResult} onChange={(expectedResult) => setS({ ...s, expectedResult })} rows={2} />
+                    <Area label="Why it matters" required value={s.why} onChange={(why) => setS({ ...s, why })} rows={2} />
                     <MultiPick label="Depends on" value={s.dependsOn} options={steps.map((x) => x.id).filter((x) => x !== s.id)} onChange={(dependsOn) => setS({ ...s, dependsOn })} />
                   </>
                 )}
@@ -453,20 +464,20 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                 onChange={(findings) => set('solution', { findings })}
                 render={(f, setF) => (
                   <>
-                    <Area label="Gap or discrepancy" value={f.description} onChange={(description) => setF({ ...f, description })} rows={2} />
+                    <Area label="Gap or discrepancy" required value={f.description} onChange={(description) => setF({ ...f, description })} rows={2} />
                     <Pick label="Severity" value={f.severity} options={KYC_SEVERITY} onChange={(severity) => setF({ ...f, severity })} />
-                    <MultiPick label="Cites evidence" value={f.evidenceRefs} options={[...docs.map((d) => d.id), ...responses.map((r) => r.id)]} onChange={(evidenceRefs) => setF({ ...f, evidenceRefs })} />
+                    <MultiPick label="Cites evidence" required value={f.evidenceRefs} options={[...docs.map((d) => d.id), ...responses.map((r) => r.id)]} onChange={(evidenceRefs) => setF({ ...f, evidenceRefs })} />
                   </>
                 )}
               />
               <div className="grid gap-3 sm:grid-cols-2">
-                <Pick label="Disposition (the agent recommends)" value={t.solution?.disposition} options={KYC_DISPOSITIONS} onChange={(disposition) => set('solution', { disposition })} />
-                <Pick label="Risk rating" value={t.solution?.riskRating} options={KYC_RISK} onChange={(riskRating) => set('solution', { riskRating })} />
+                <Pick label="Disposition (the agent recommends)" required value={t.solution?.disposition} options={KYC_DISPOSITIONS} onChange={(disposition) => set('solution', { disposition })} />
+                <Pick label="Risk rating" required value={t.solution?.riskRating} options={KYC_RISK} onChange={(riskRating) => set('solution', { riskRating })} />
               </div>
               <ListField label="Risk factors" value={t.solution?.riskFactors} onChange={(riskFactors) => set('solution', { riskFactors })} />
               <ListField label="Requests to the customer" value={t.solution?.requestsToCustomer} onChange={(requestsToCustomer) => set('solution', { requestsToCustomer })} />
-              <Area label="Rationale (grounded only in the task’s evidence)" value={t.solution?.rationale} onChange={(rationale) => set('solution', { rationale })} />
-              <Area label="Hand-off to a human (required for approve, reject or high risk)" value={t.solution?.humanHandoff} onChange={(humanHandoff) => set('solution', { humanHandoff })} rows={2} />
+              <Area label="Rationale (grounded only in the task’s evidence)" required value={t.solution?.rationale} onChange={(rationale) => set('solution', { rationale })} />
+              <Area label="Hand-off to a human (required for approve, reject or high risk)" required={needsHandoff} value={t.solution?.humanHandoff} onChange={(humanHandoff) => set('solution', { humanHandoff })} rows={2} />
             </section>
           )}
 
@@ -481,9 +492,9 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                 onChange={(criteria) => set('rubric', { criteria })}
                 render={(c, setC) => (
                   <>
-                    <Field label="Name" value={c.name} onChange={(name) => setC({ ...c, name })} />
-                    <Field label="Weight" type="number" value={c.weight} onChange={(v) => setC({ ...c, weight: Number(v) })} />
-                    <Area label="Pass condition (testable against the trajectory or outcome)" value={c.passCondition} onChange={(passCondition) => setC({ ...c, passCondition })} rows={2} />
+                    <Field label="Name" required value={c.name} onChange={(name) => setC({ ...c, name })} />
+                    <Field label="Weight" required type="number" value={c.weight} onChange={(v) => setC({ ...c, weight: Number(v) })} />
+                    <Area label="Pass condition (testable against the trajectory or outcome)" required value={c.passCondition} onChange={(passCondition) => setC({ ...c, passCondition })} rows={2} />
                     <label className="flex items-center gap-2 text-sm">
                       <input type="checkbox" checked={!!c.critical} onChange={(e) => setC({ ...c, critical: e.target.checked })} /> Critical
                     </label>
@@ -500,8 +511,8 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                 onChange={(commonErrors) => set('rubric', { commonErrors })}
                 render={(e, setE) => (
                   <>
-                    <Area label="A plausible wrong path" value={e.description} onChange={(description) => setE({ ...e, description })} rows={2} />
-                    <Pick label="Caught by criterion" value={e.caughtBy} options={(t.rubric?.criteria ?? []).map((c) => c.id)} format={(v) => v} onChange={(caughtBy) => setE({ ...e, caughtBy })} />
+                    <Area label="A plausible wrong path" required value={e.description} onChange={(description) => setE({ ...e, description })} rows={2} />
+                    <Pick label="Caught by criterion" required value={e.caughtBy} options={(t.rubric?.criteria ?? []).map((c) => c.id)} format={(v) => v} onChange={(caughtBy) => setE({ ...e, caughtBy })} />
                   </>
                 )}
               />

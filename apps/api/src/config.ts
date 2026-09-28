@@ -59,6 +59,8 @@ const Env = z.object({
    *  per-candidate question wording and the independent solver check. Blank bulk model = CERT_MODEL. */
   CERT_MODEL: z.string().default('claude-opus-5'),
   CERT_BULK_MODEL: z.string().default(''),
+  /** Support Bot model on Vertex (docs/SUPPORT-BOT.md). Used only when VERTEX_PROJECT_ID is set; otherwise a local mock. */
+  SUPPORT_MODEL: z.string().default('claude-sonnet-5'),
   /** M10c payouts through Trolley. Blank keys = the local mock (refused in production with SME supply on). */
   TROLLEY_ACCESS_KEY: z.string().default(''),
   TROLLEY_SECRET_KEY: z.string().default(''),

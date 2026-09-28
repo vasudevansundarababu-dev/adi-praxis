@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 type Person = { userId: string; name: string; email: string };
 
@@ -46,10 +47,13 @@ export function ReviewersPanel({ projectId, initial }: { projectId: string; init
         </ul>
       )}
       {data.available.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-end gap-2">
+        <>
+        <RequiredNote className="mt-3" />
+        <div className="mt-1 flex flex-wrap items-end gap-2">
           <label>
             Add reviewer
-            <select value={choice} onChange={(e) => setChoice(e.target.value)} className="mt-1 block rounded-md border border-line bg-surface px-2 py-1.5">
+            <Req />
+            <select aria-required="true" value={choice} onChange={(e) => setChoice(e.target.value)} className="mt-1 block rounded-md border border-line bg-surface px-2 py-1.5">
               <option value="">Choose…</option>
               {data.available.map((u) => (
                 <option key={u.userId} value={u.userId}>
@@ -62,6 +66,7 @@ export function ReviewersPanel({ projectId, initial }: { projectId: string; init
             Add
           </button>
         </div>
+        </>
       )}
       {error && <p role="alert" className="mt-2 text-error">{error}</p>}
     </section>

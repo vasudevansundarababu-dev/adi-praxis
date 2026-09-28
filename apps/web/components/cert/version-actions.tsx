@@ -2,6 +2,7 @@
 
 import { SME_TIERS, TIER_LABELS, type SmeTier } from '@praxis/shared';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, useAction } from '@/components/supply/action';
 
 /** Publishing a tier makes its course and test available to candidates; it cannot be undone for this version. */
@@ -52,9 +53,11 @@ export function RegenerateForm({ versionId, publishedTiers, disabled }: { versio
         void a.run('POST', `/guidelines/versions/${versionId}/regenerate`, { scope, ...(tiered && tier ? { tier } : {}) }, { success: 'Regeneration queued. Refresh in a minute to see the new drafts.' });
       }}
     >
+      <RequiredNote className="w-full" />
       <label className="block">
         Regenerate
-        <select value={scope} onChange={(e) => setScope(e.target.value as typeof scope)} className={input}>
+        <Req />
+        <select required value={scope} onChange={(e) => setScope(e.target.value as typeof scope)} className={input}>
           {SCOPES.map(([v, l]) => (
             <option key={v} value={v}>
               {l}

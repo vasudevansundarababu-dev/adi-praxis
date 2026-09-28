@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, inputInline, useAction } from '@/components/supply/action';
 import { humanize, StatePill, TD, TH } from '@/components/supply/ui';
 import type { PayoutExceptionDto } from './types';
@@ -22,8 +23,9 @@ export function ReconcileForm() {
         if (res.ok) setResult(res.data);
       }}
     >
+      <RequiredNote className="w-full" />
       <label className="block">
-        Reconcile the day (UTC)
+        Reconcile the day (UTC)<Req />
         <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className={inputInline} />
       </label>
       <button type="submit" disabled={a.pending} className="btn btn-primary">
@@ -58,7 +60,7 @@ function Resolve({ id }: { id: string }) {
   const [note, setNote] = useState('');
   return (
     <div className="space-y-1">
-      <input aria-label="Resolution note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="What you found and did" className={input} />
+      <input aria-label="Resolution note" aria-required="true" value={note} onChange={(e) => setNote(e.target.value)} placeholder="What you found and did" className={input} />
       <button type="button" disabled={a.pending || note.trim().length < 5} onClick={() => a.run('POST', `/payout-exceptions/${id}/resolve`, { note: note.trim() })} className="btn btn-secondary">
         Resolve
       </button>

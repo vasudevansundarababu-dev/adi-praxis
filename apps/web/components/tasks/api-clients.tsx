@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 export type ApiClientRow = { id: string; name: string; kind: string; createdAt: string; revokedAt: string | null };
 
@@ -25,13 +26,16 @@ export function ApiClients({ initial }: { initial: ApiClientRow[] }) {
           router.refresh();
         }}
       >
+        <RequiredNote className="w-full" />
         <label>
           Name
+          <Req />
           <input required value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block rounded-md border border-line bg-surface px-2 py-1.5" />
         </label>
         <label>
           Kind
-          <select value={kind} onChange={(e) => setKind(e.target.value)} className="mt-1 block rounded-md border border-line bg-surface px-2 py-1.5">
+          <Req />
+          <select required value={kind} onChange={(e) => setKind(e.target.value)} className="mt-1 block rounded-md border border-line bg-surface px-2 py-1.5">
             <option value="CLIENT_API">Client system (task inputs)</option>
             <option value="RL_GYM">RL Gym</option>
           </select>

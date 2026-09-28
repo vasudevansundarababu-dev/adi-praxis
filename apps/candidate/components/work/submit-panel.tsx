@@ -2,6 +2,7 @@
 
 import { KYC_SECTIONS, type TaskCheck } from '@praxis/shared';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import type { CheckResult } from '@/lib/work-types';
 
 const sectionTitle = (id: string) => KYC_SECTIONS.find((s) => s.id === id)?.title ?? id;
@@ -53,6 +54,7 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
   return (
     <section aria-labelledby="w06-h" className="space-y-4">
       <h2 id="w06-h" className="text-lg font-semibold">Check and submit</h2>
+      <RequiredNote />
       <button type="button" disabled={pending} onClick={check} className="btn btn-secondary disabled:opacity-60">
         {pending ? 'Checking…' : 'Run checks'}
       </button>
@@ -96,9 +98,10 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
                 {result.flags.map((f) => (
                   <li key={f.id}>
                     <span className="font-mono">{f.excerpt}</span> <span className="text-fg-muted">({f.kind.toLowerCase().replace(/_/g, ' ')} in {f.path})</span>
+                    <Req />
                     <label className="mt-1 block">
                       <span className="sr-only">Explanation for {f.excerpt}</span>
-                      <input value={explanations[f.id] ?? ''} onChange={(e) => setExplanations({ ...explanations, [f.id]: e.target.value })} placeholder="Why this is not real data" className="w-full rounded-md border border-line bg-surface px-2 py-1" />
+                      <input aria-required="true" value={explanations[f.id] ?? ''} onChange={(e) => setExplanations({ ...explanations, [f.id]: e.target.value })} placeholder="Why this is not real data" className="w-full rounded-md border border-line bg-surface px-2 py-1" />
                     </label>
                   </li>
                 ))}
@@ -121,8 +124,11 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
         </div>
       )}
       <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" checked={declared} onChange={(e) => setDeclared(e.target.checked)} className="mt-1" />
-        {props.declaration ?? 'This case is entirely synthetic. It contains no real customer, colleague, employer or confidential information.'}
+        <input type="checkbox" aria-required="true" checked={declared} onChange={(e) => setDeclared(e.target.checked)} className="mt-1" />
+        <span>
+          {props.declaration ?? 'This case is entirely synthetic. It contains no real customer, colleague, employer or confidential information.'}
+          <Req />
+        </span>
       </label>
       <button type="button" disabled={pending || !declared || !result || failing.length > 0 || unexplained.length > 0} onClick={submit} className="btn btn-primary disabled:opacity-50">
         Submit for review

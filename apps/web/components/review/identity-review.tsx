@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { mutate } from '@/lib/client-api';
 
 type Item = { smeUserId: string; displayName: string | null; reason: string | null; requestedAt: string };
@@ -35,9 +36,10 @@ export function IdentityReviewList({ initial }: { initial: Item[] }) {
           </div>
           {open === i.smeUserId && (
             <div className="mt-3 space-y-2">
+              <RequiredNote />
               <label className="block">
-                Alternative method used (required)
-                <input value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
+                Alternative method used<Req />
+                <input aria-required="true" value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
               </label>
               <label className="block">
                 Notes (no ID numbers)

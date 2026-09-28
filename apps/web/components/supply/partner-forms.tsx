@@ -2,6 +2,7 @@
 
 import { LAUNCH_DOMAINS, SME_TIERS, TIER_LABELS, type SmeTier } from '@praxis/shared';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, splitList, useAction } from './action';
 import type { PartnerContact, PartnerDetail } from './types';
 
@@ -72,9 +73,10 @@ export function NewPartnerForm() {
       }}
     >
       <h2 className="font-semibold">Add a partner</h2>
+      <RequiredNote />
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          Partner name
+          Partner name<Req />
           <input required minLength={2} value={name} onChange={(e) => setName(e.target.value)} className={input} />
         </label>
         <label className="block">
@@ -170,23 +172,24 @@ export function FeeTermsForm({ partnerId, currentVersion }: { partnerId: string;
       }}
     >
       <h2 className="font-semibold">Fee terms</h2>
+      <RequiredNote />
       <p className="text-fg-muted">
         Current version: <span className="font-medium text-fg">{currentVersion ?? 'none'}</span>. Setting new terms applies to candidates certified from now on; earlier fee entries keep their terms.
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block">
-          Fee per certified candidate
+          Fee per certified candidate<Req />
           <input required inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} placeholder="150.00" className={input} />
         </label>
         <label className="block">
-          Currency
-          <select value={currency} onChange={(e) => setCurrency(e.target.value as 'USD' | 'INR')} className={input}>
+          Currency<Req />
+          <select required value={currency} onChange={(e) => setCurrency(e.target.value as 'USD' | 'INR')} className={input}>
             <option value="USD">USD</option>
             <option value="INR">INR</option>
           </select>
         </label>
         <label className="block">
-          Terms version
+          Terms version<Req />
           <input required value={version} onChange={(e) => setVersion(e.target.value)} placeholder="2026-10" className={input} />
         </label>
       </div>
@@ -217,16 +220,17 @@ export function PartnerUserForm({ partnerId }: { partnerId: string }) {
         }
       }}
     >
+      <RequiredNote className="sm:col-span-4" />
       <label className="block">
-        Name
+        Name<Req />
         <input required value={name} onChange={(e) => setName(e.target.value)} className={input} />
       </label>
       <label className="block">
-        Email
+        Email<Req />
         <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={input} />
       </label>
       <label className="block">
-        Initial password (12+ characters)
+        Initial password (12+ characters)<Req />
         <input required type="password" minLength={12} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className={input} />
       </label>
       <button type="submit" disabled={a.pending || password.length < 12} className="btn btn-primary">

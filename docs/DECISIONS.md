@@ -313,6 +313,19 @@ Spec: `docs/SME-SUPPLY.md` (section 0 owner decisions). Runbook: `docs/M10-BUILD
 - **(chosen by Claude)** New internal role `FINANCE` (label Finance). Payee data in Praxis is provider, reference,
   status and payout currency only.
 
+### UI usability: required markers, grouped menu, Support Bot (owner, 28 Sep 2026)
+Spec: `docs/SUPPORT-BOT.md`. Owner chose: bot in the console and partner portal only; it answers from the screen, the
+help pack and the user's own data; required markers on every screen of all three apps; built on `m10-sme-supply`.
+- **(chosen by Claude)** Marker: a red asterisk after the label plus one "Fields marked * are required." line per form;
+  the control carries `required` or `aria-required`. The API schema decides what is required.
+- **(chosen by Claude)** Menu groups: Home; Projects (Projects, Templates, Requisitions); Reviews (Applications, Task
+  reviews, RL reviews, Identity reviews, Conflicts); Certification (Guidelines, Certification reviews); Partners;
+  Payments; Admin (Users, Taxonomy, Terms, Failure codes, API clients). A group link opens its first page.
+- **(chosen by Claude)** The bot's record lookup replays the read-only API call for the page with the user's own
+  session, so permissions are exactly the user's; refused calls attach nothing; secret-looking keys are removed.
+- **(chosen by Claude)** Model `claude-sonnet-5` (`SUPPORT_MODEL`) for fast, low-cost answers; mock locally. Questions
+  are not stored; 20 per minute per session; last 10 turns sent back each time.
+
 ### M10d Screens
 - **(chosen by Claude)** Every M10 screen reuses the existing console and candidate-app layouts, tokens and component
   classes (`card`, `hero`, `pill-*`, `btn-*`, `chip`); no new visual style and no new dependencies. The sign-off

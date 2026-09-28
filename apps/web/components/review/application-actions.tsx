@@ -3,6 +3,7 @@
 import { CLAIM_REVIEW_LEVELS, CONTRIBUTION_ROLES, type ContributionRole } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { mutate } from '@/lib/client-api';
 
 const input = 'mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5';
@@ -85,17 +86,20 @@ export function ApplicationActions(props: {
           }}
         >
           <h2 className="font-semibold">Your decision</h2>
+          <RequiredNote />
           <fieldset className="space-y-1">
-            <legend className="sr-only">Outcome</legend>
+            <legend className="sr-only">
+              Outcome<Req />
+            </legend>
             {OUTCOMES.map(([v, label]) => (
               <label key={v} className="flex items-center gap-2">
-                <input type="radio" name="outcome" value={v} checked={outcome === v} onChange={() => setOutcome(v)} />
+                <input type="radio" required name="outcome" value={v} checked={outcome === v} onChange={() => setOutcome(v)} />
                 {label}
               </label>
             ))}
           </fieldset>
           <label className="block">
-            Reason (task-related, for the record)
+            Reason (task-related, for the record)<Req />
             <textarea required value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className={input} />
           </label>
           <label className="block">
@@ -111,7 +115,7 @@ export function ApplicationActions(props: {
           </label>
           {outcome === 'NEEDS_INFORMATION' && (
             <label className="block">
-              The one thing you need to know
+              The one thing you need to know<Req />
               <input required value={infoRequest} onChange={(e) => setInfoRequest(e.target.value)} className={input} />
             </label>
           )}
@@ -119,8 +123,8 @@ export function ApplicationActions(props: {
             <fieldset className="space-y-2 rounded-md border border-line p-3">
               <legend className="px-1 font-medium">Approved scope</legend>
               <label className="block">
-                Domain
-                <input value={scope.domain} onChange={(e) => setScope({ ...scope, domain: e.target.value })} className={input} />
+                Domain<Req />
+                <input required value={scope.domain} onChange={(e) => setScope({ ...scope, domain: e.target.value })} className={input} />
               </label>
               <label className="block">
                 Specialty
@@ -135,7 +139,9 @@ export function ApplicationActions(props: {
                 <input value={scope.languages} onChange={(e) => setScope({ ...scope, languages: e.target.value })} className={input} />
               </label>
               <fieldset>
-                <legend>Task roles</legend>
+                <legend>
+                  Task roles<Req />
+                </legend>
                 {CONTRIBUTION_ROLES.map((r) => (
                   <label key={r} className="flex items-center gap-2">
                     <input
@@ -154,7 +160,7 @@ export function ApplicationActions(props: {
             </fieldset>
           )}
           <label className="block">
-            Message to the candidate
+            Message to the candidate<Req />
             <textarea required value={message} onChange={(e) => setMessage(e.target.value)} rows={4} placeholder={MESSAGE_HINT[outcome]} className={input} />
             <span className="mt-1 block text-xs text-fg-muted">Respectful and specific to this pool. Never a judgement of the person.</span>
           </label>
@@ -181,12 +187,13 @@ export function ApplicationActions(props: {
         <div className="space-y-2 card p-4 text-sm">
           <h2 className="font-semibold">Reconsider</h2>
           <p className="text-fg-muted">The earlier decision stays on record. Reopen for a new decision, or ask for more information.</p>
+          <RequiredNote />
           <button type="button" disabled={pending} onClick={() => run(`/review/enrollments/${props.id}/reopen`, { to: 'REVIEW_PENDING' })} className="w-full btn btn-primary disabled:opacity-50">
             Reopen for decision
           </button>
           <label className="block">
-            Information needed
-            <input value={infoRequest} onChange={(e) => setInfoRequest(e.target.value)} className={input} />
+            Information needed<Req />
+            <input aria-required="true" value={infoRequest} onChange={(e) => setInfoRequest(e.target.value)} className={input} />
           </label>
           <button type="button" disabled={pending || !infoRequest.trim()} onClick={() => run(`/review/enrollments/${props.id}/reopen`, { to: 'NEEDS_INFORMATION', informationRequest: infoRequest })} className="btn btn-secondary w-full disabled:opacity-50">
             Ask for more information
@@ -197,9 +204,10 @@ export function ApplicationActions(props: {
       <details className="card p-4 text-sm">
         <summary className="cursor-pointer font-semibold">Declare a conflict</summary>
         <p className="mt-2 text-fg-muted">If you know this candidate or have a conflict, declare it. You will no longer see this application.</p>
+        <RequiredNote className="mt-2" />
         <label className="mt-2 block">
-          Details
-          <input value={conflict} onChange={(e) => setConflict(e.target.value)} className={input} />
+          Details<Req />
+          <input aria-required="true" value={conflict} onChange={(e) => setConflict(e.target.value)} className={input} />
         </label>
         <button
           type="button"
@@ -259,9 +267,10 @@ export function ClaimReview({ enrollmentId, claim }: { enrollmentId: string; cla
             router.refresh();
           }}
         >
+          <RequiredNote className="w-full" />
           <label>
-            Level
-            <select value={level} onChange={(e) => setLevel(e.target.value as typeof level)} className={input}>
+            Level<Req />
+            <select required value={level} onChange={(e) => setLevel(e.target.value as typeof level)} className={input}>
               {CLAIM_REVIEW_LEVELS.map((l) => (
                 <option key={l} value={l}>
                   {l.toLowerCase().replace(/_/g, ' ')}
@@ -270,7 +279,7 @@ export function ClaimReview({ enrollmentId, claim }: { enrollmentId: string; cla
             </select>
           </label>
           <label className="flex-1">
-            How you checked
+            How you checked<Req />
             <input required value={method} onChange={(e) => setMethod(e.target.value)} className={input} />
           </label>
           <button type="submit" disabled={!method.trim()} className="btn btn-secondary disabled:opacity-50">

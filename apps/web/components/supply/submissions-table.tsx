@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, useAction } from './action';
 import type { SubmissionRow } from './types';
 import { fmtDate, humanize, StatePill, TD, TH } from './ui';
@@ -30,12 +31,13 @@ export function SubmissionsTable({ items, canDecide }: { items: SubmissionRow[];
     <div className="mt-3 space-y-3">
       {canDecide && (
         <div className="card flex flex-wrap items-end gap-3 p-4 text-sm">
+          <RequiredNote className="w-full" />
           <button type="button" disabled={!recommendedNotMet.length} onClick={() => setSelected(recommendedNotMet)} className="btn btn-secondary">
             Select all recommended “not met” ({recommendedNotMet.length})
           </button>
           <label className="block min-w-64 flex-1">
-            Note for the record (task-related)
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reported experience is below the 3-year minimum." className={input} />
+            Note for the record (task-related)<Req />
+            <input aria-required="true" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reported experience is below the 3-year minimum." className={input} />
           </label>
           <button type="button" disabled={a.pending || !selected.length || note.trim().length < 3} onClick={() => decide('CONFIRM_NOT_MET')} className="btn btn-primary">
             Confirm not met ({selected.length})

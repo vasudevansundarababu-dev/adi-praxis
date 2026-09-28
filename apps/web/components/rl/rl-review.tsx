@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 type Step = { index: number; action: string; tool?: string; input?: unknown; output?: unknown; thought?: string };
 type Source = { id: string; workflow: string; input: unknown; output: Record<string, unknown>; coverageTags: unknown; contentHash: string };
@@ -98,6 +99,7 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
         </section>
         <section aria-labelledby="eval-h" className="min-w-0 card p-3 text-sm">
           <h2 id="eval-h" className="font-semibold">Automated evals</h2>
+          {editable && <RequiredNote className="mt-1" />}
           <ul className="mt-2 space-y-3">
             {d.evalResults.map((e, i) => (
               <li key={e.metric}>
@@ -108,7 +110,10 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
                 {e.details && <p className="text-fg-muted">{e.details}</p>}
                 {editable && (
                   <fieldset className="mt-1">
-                    <legend className="sr-only">Your view on {e.metric}</legend>
+                    <legend className="sr-only">
+                      Your view on {e.metric}
+                      <Req />
+                    </legend>
                     <label className="mr-3 inline-flex items-center gap-1">
                       <input type="radio" name={`m-${i}`} checked={metrics[i]!.agree} onChange={() => setMetrics(metrics.map((m, j) => (j === i ? { ...m, agree: true } : m)))} /> Agree
                     </label>
@@ -117,8 +122,9 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
                     </label>
                     {!metrics[i]!.agree && (
                       <label className="mt-1 block">
-                        Why (required)
-                        <input value={metrics[i]!.comment} onChange={(ev) => setMetrics(metrics.map((m, j) => (j === i ? { ...m, comment: ev.target.value } : m)))} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
+                        Why
+                        <Req />
+                        <input aria-required="true" value={metrics[i]!.comment} onChange={(ev) => setMetrics(metrics.map((m, j) => (j === i ? { ...m, comment: ev.target.value } : m)))} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
                       </label>
                     )}
                   </fieldset>
@@ -131,8 +137,12 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
 
       {editable && (
         <section aria-labelledby="verdict-h" className="mt-6 max-w-3xl space-y-3 card p-4 text-sm">
-          <h2 id="verdict-h" className="font-semibold">Verdict</h2>
-          <div className="flex gap-4">
+          <h2 id="verdict-h" className="font-semibold">
+            Verdict
+            <Req />
+          </h2>
+          <RequiredNote />
+          <div role="radiogroup" aria-labelledby="verdict-h" aria-required="true" className="flex gap-4">
             {(['PASS', 'FAIL', 'NEEDS_EXPERT'] as const).map((v) => (
               <label key={v} className="flex items-center gap-1">
                 <input type="radio" name="verdict" checked={verdict === v} onChange={() => setVerdict(v)} /> {v === 'NEEDS_EXPERT' ? 'Needs an expert' : v.toLowerCase()}
@@ -145,7 +155,7 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
                 <span className="text-xs">{c.trajectoryStep !== undefined ? `Step ${c.trajectoryStep}` : 'General'}</span>
                 <label className="min-w-60 flex-1">
                   <span className="sr-only">Comment</span>
-                  <input value={c.text} onChange={(e) => setComments(comments.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} placeholder="What went wrong, and where" className="w-full rounded-md border border-line bg-surface px-2 py-1" />
+                  <input aria-required={verdict === 'FAIL' && i === 0 ? 'true' : undefined} value={c.text} onChange={(e) => setComments(comments.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} placeholder="What went wrong, and where" className="w-full rounded-md border border-line bg-surface px-2 py-1" />
                 </label>
                 <label>
                   <span className="sr-only">Reason code</span>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { call } from '@/lib/client';
 import type { AssessmentItem, ExpertReviewItem } from '@/lib/supply-types';
 
@@ -67,6 +68,7 @@ function GradeCard({ item, onDone }: { item: AssessmentItem; onDone: () => void 
   return (
     <form onSubmit={confirm} className="card space-y-3 p-5 text-sm">
       <p className="text-xs text-fg-muted">{item.domain} · candidate details are hidden</p>
+      <RequiredNote />
       <p className="whitespace-pre-wrap font-medium">{item.stem}</p>
       {item.rubric.length > 0 && (
         <div>
@@ -94,6 +96,7 @@ function GradeCard({ item, onDone }: { item: AssessmentItem; onDone: () => void 
       )}
       <label className="block">
         Your score, from 0 (not met) to 1 (fully met)
+        <Req />
         <input type="number" required min={0} max={1} step={0.05} value={score} onChange={(e) => setScore(e.target.value)} className={`${input} sm:max-w-40`} />
       </label>
       <button type="submit" disabled={pending || !valid} className="btn btn-primary">

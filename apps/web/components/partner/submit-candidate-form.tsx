@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { StatePill } from './labels';
 import { partnerMutate } from './partner-mutate';
 
@@ -143,12 +144,14 @@ export function SubmitCandidateForm({ requisitionId, requisitionTitle }: { requi
       <p className="rounded-md border border-line bg-surface px-3 py-2">
         This is a <strong>live</strong> submission: ADI Praxis emails the candidate an invite straight away. Use a sandbox API client to test without contacting anyone.
       </p>
+      <RequiredNote />
 
       <fieldset className="card grid gap-4 p-5 sm:grid-cols-2">
         <legend className="sr-only">Candidate</legend>
         <label className="block">
           Full name
-          <input className={input} value={f.name} onChange={set('name')} autoComplete="off" required />
+          <Req />
+          <input className={input} value={f.name} onChange={set('name')} autoComplete="off" aria-required="true" />
         </label>
         <label className="block">
           Your reference (optional)
@@ -157,7 +160,8 @@ export function SubmitCandidateForm({ requisitionId, requisitionTitle }: { requi
         </label>
         <label className="block">
           Email
-          <input className={input} type="email" value={f.email} onChange={set('email')} autoComplete="off" required />
+          <Req />
+          <input className={input} type="email" value={f.email} onChange={set('email')} autoComplete="off" aria-required="true" />
           <span className="mt-1 block text-xs text-fg-muted">The invite goes to this address.</span>
         </label>
         <label className="block">
@@ -166,16 +170,19 @@ export function SubmitCandidateForm({ requisitionId, requisitionTitle }: { requi
         </label>
         <label className="block">
           Country
-          <input className={input} value={f.country} onChange={set('country')} maxLength={2} placeholder="IN" />
+          <Req />
+          <input className={input} value={f.country} onChange={set('country')} maxLength={2} placeholder="IN" aria-required="true" />
           <span className="mt-1 block text-xs text-fg-muted">Two-letter code, for example IN, US or GB.</span>
         </label>
         <label className="block">
           Years of relevant experience
-          <input className={input} type="number" min={0} max={60} step="0.5" value={f.experienceYears} onChange={set('experienceYears')} />
+          <Req />
+          <input className={input} type="number" min={0} max={60} step="0.5" value={f.experienceYears} onChange={set('experienceYears')} aria-required="true" />
         </label>
         <label className="block sm:col-span-2">
           Experience summary
-          <textarea className={input} rows={4} value={f.experienceSummary} onChange={set('experienceSummary')} maxLength={4000} />
+          <Req />
+          <textarea className={input} rows={4} value={f.experienceSummary} onChange={set('experienceSummary')} maxLength={4000} aria-required="true" />
           <span className="mt-1 block text-xs text-fg-muted">What the candidate has done in this domain. Do not include ID numbers or customer data.</span>
         </label>
         <label className="block">
@@ -204,15 +211,18 @@ export function SubmitCandidateForm({ requisitionId, requisitionTitle }: { requi
               <li key={i} className="grid gap-3 rounded-md border border-hairline p-3 sm:grid-cols-[1fr_1fr_auto_auto_auto] sm:items-end">
                 <label className="block">
                   Employer
-                  <input className={input} value={j.employer} onChange={upd('employer')} maxLength={200} />
+                  <Req />
+                  <input className={input} value={j.employer} onChange={upd('employer')} maxLength={200} aria-required="true" />
                 </label>
                 <label className="block">
                   Job title
-                  <input className={input} value={j.title} onChange={upd('title')} maxLength={200} />
+                  <Req />
+                  <input className={input} value={j.title} onChange={upd('title')} maxLength={200} aria-required="true" />
                 </label>
                 <label className="block">
                   Start
-                  <input className={input} type="month" value={j.start} onChange={upd('start')} />
+                  <Req />
+                  <input className={input} type="month" value={j.start} onChange={upd('start')} aria-required="true" />
                 </label>
                 <label className="block">
                   End (empty if current)
@@ -230,12 +240,18 @@ export function SubmitCandidateForm({ requisitionId, requisitionTitle }: { requi
       <fieldset className="card space-y-3 p-5">
         <legend className="sr-only">Confirmations</legend>
         <label className="flex items-start gap-3">
-          <input type="checkbox" className="mt-1" checked={attest} onChange={(e) => setAttest(e.target.checked)} />
-          <span>I confirm that we trained this candidate on the requisition’s guidelines summary.</span>
+          <input type="checkbox" className="mt-1" checked={attest} onChange={(e) => setAttest(e.target.checked)} aria-required="true" />
+          <span>
+            I confirm that we trained this candidate on the requisition’s guidelines summary.
+            <Req />
+          </span>
         </label>
         <label className="flex items-start gap-3">
-          <input type="checkbox" className="mt-1" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-          <span>The candidate agreed to be put forward for this requisition and to be contacted by ADI Praxis.</span>
+          <input type="checkbox" className="mt-1" checked={consent} onChange={(e) => setConsent(e.target.checked)} aria-required="true" />
+          <span>
+            The candidate agreed to be put forward for this requisition and to be contacted by ADI Praxis.
+            <Req />
+          </span>
         </label>
       </fieldset>
 

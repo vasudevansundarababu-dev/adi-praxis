@@ -4,6 +4,7 @@ import type { MatchesResponse, MatchItemDto } from '@praxis/shared';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 import { projectStatusLabel } from '../projects/project-status';
 
 type Data = MatchesResponse & { warnings: string[] };
@@ -109,14 +110,18 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
           Assigning sends a proposal. The expert has 7 days to accept or decline; only accepted experts count towards staffing.
         </p>
       )}
+      {staffing && <RequiredNote className="mt-4" />}
       {staffing && (
-        <div className="mt-4 flex flex-wrap items-end gap-3">
+        <div className="mt-2 flex flex-wrap items-end gap-3">
           <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${projectId}/match`, undefined, 'Match re-run.')} className="btn btn-secondary disabled:opacity-60">
             Re-run match
           </button>
           <label className="text-sm">
-            <span className="block">Assign top</span>
-            <input type="number" min={1} value={topN} onChange={(e) => setTopN(e.target.value)} className="w-20 rounded-md border border-line bg-surface px-2 py-1.5" />
+            <span className="block">
+              Assign top
+              <Req />
+            </span>
+            <input type="number" aria-required="true" min={1} value={topN} onChange={(e) => setTopN(e.target.value)} className="w-20 rounded-md border border-line bg-surface px-2 py-1.5" />
           </label>
           <button type="button" disabled={pending || !Number(topN)} onClick={() => run('POST', `/projects/${projectId}/assignments`, { topN: Number(topN) }, `Sent proposals to the top ${topN}.`)} className="btn btn-primary disabled:opacity-60">
             Assign top {topN || 'N'}

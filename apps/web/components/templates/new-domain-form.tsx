@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 export function NewDomainForm() {
   const router = useRouter();
@@ -23,9 +24,11 @@ export function NewDomainForm() {
 
   return (
     <form onSubmit={onSubmit} className="mt-10 flex flex-wrap items-end gap-3 border-t border-line pt-6">
+      <RequiredNote className="w-full" />
       <div>
         <label htmlFor="domain-name" className="block text-sm font-medium">
           Add a domain
+          <Req />
         </label>
         <input
           id="domain-name"

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { upload } from '@/lib/client';
 import type { LicenceStatus } from '@/lib/supply-types';
 
@@ -42,17 +43,21 @@ export function LicenceForm({ certificationId, status }: { certificationId: stri
         <p className="mt-1 text-fg-muted">
           {status === 'REJECTED' ? 'The Validator could not confirm your last upload. Check the details and upload it again.' : 'This role needs a current professional licence. A Validator checks it; your certificate is issued once it is confirmed.'}
         </p>
+        <RequiredNote className="mt-1" />
       </div>
       <label className="block">
         Licence number
+        <Req />
         <input required maxLength={60} value={number} onChange={(e) => setNumber(e.target.value)} className={`${input} sm:max-w-xs`} />
       </label>
       <label className="block">
         Issuing body
+        <Req />
         <input required maxLength={200} value={issuingBody} onChange={(e) => setIssuingBody(e.target.value)} className={input} />
       </label>
       <label className="block">
         Licence certificate (PDF, PNG or JPG, up to 10 MB)
+        <Req />
         <input required type="file" accept="application/pdf,image/png,image/jpeg" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-1 block w-full text-sm" />
       </label>
       <button type="submit" disabled={pending || !number.trim() || !issuingBody.trim() || !file} className="btn btn-primary">

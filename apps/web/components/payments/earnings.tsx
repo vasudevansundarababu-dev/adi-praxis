@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, useAction } from '@/components/supply/action';
 import { fmtDate, humanize, shortId, TD, TH } from '@/components/supply/ui';
 import type { EarningDto } from './types';
@@ -52,7 +53,7 @@ function ReverseButton({ e, reversed }: { e: EarningDto; reversed: boolean }) {
     );
   return (
     <div className="space-y-1">
-      <input aria-label="Reason for reversal" value={reason} onChange={(ev) => setReason(ev.target.value)} placeholder="Why (5+ characters)" className={input} />
+      <input aria-label="Reason for reversal" aria-required="true" value={reason} onChange={(ev) => setReason(ev.target.value)} placeholder="Why (5+ characters)" className={input} />
       <div className="flex gap-2">
         <button type="button" disabled={a.pending || reason.trim().length < 5} onClick={() => a.run('POST', `/earnings/${e.id}/reverse`, { reason: reason.trim() })} className="btn btn-primary">
           Reverse
@@ -135,19 +136,20 @@ export function HoldForms({ smeUserId }: { smeUserId: string }) {
         }}
       >
         <h2 className="font-semibold">Place a pay hold</h2>
+        <RequiredNote />
         <label className="block">
-          SME id
+          SME id<Req />
           <input required value={sme} onChange={(e) => setSme(e.target.value)} className={input} />
         </label>
         <label className="block">
-          Kind
-          <select value={kind} onChange={(e) => setKind(e.target.value as 'DISPUTE' | 'FRAUD')} className={input}>
+          Kind<Req />
+          <select required value={kind} onChange={(e) => setKind(e.target.value as 'DISPUTE' | 'FRAUD')} className={input}>
             <option value="DISPUTE">Dispute</option>
             <option value="FRAUD">Fraud flag</option>
           </select>
         </label>
         <label className="block">
-          Reason
+          Reason<Req />
           <input required value={reason} onChange={(e) => setReason(e.target.value)} className={input} />
         </label>
         <button type="submit" disabled={place.pending || reason.trim().length < 5 || !sme.trim()} className="btn btn-primary">
@@ -167,12 +169,13 @@ export function HoldForms({ smeUserId }: { smeUserId: string }) {
         }}
       >
         <h2 className="font-semibold">Release a pay hold</h2>
+        <RequiredNote />
         <label className="block">
-          Hold id
+          Hold id<Req />
           <input required value={holdId} onChange={(e) => setHoldId(e.target.value)} className={input} />
         </label>
         <label className="block">
-          Note (what was resolved)
+          Note (what was resolved)<Req />
           <input required value={note} onChange={(e) => setNote(e.target.value)} className={input} />
         </label>
         <button type="submit" disabled={release.pending || note.trim().length < 3 || !holdId.trim()} className="btn btn-primary">

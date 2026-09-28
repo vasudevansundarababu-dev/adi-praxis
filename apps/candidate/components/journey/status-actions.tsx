@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { call } from '@/lib/client';
 
 export function StatusActions({ id, canAmend, canRequestReview, canWithdraw }: { id: string; canAmend: boolean; canRequestReview: boolean; canWithdraw: boolean }) {
@@ -37,8 +38,10 @@ export function StatusActions({ id, canAmend, canRequestReview, canWithdraw }: {
         >
           <h2 className="font-semibold">Ask for a review</h2>
           <p className="mt-1 text-fg-muted">If something was missed or has changed, tell us. A different person can look again; the earlier decision stays on record.</p>
+          <RequiredNote className="mt-2" />
           <label className="mt-3 block">
             What should the Validator know?
+            <Req />
             <textarea required value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5" />
           </label>
           <button type="submit" disabled={pending || !reason.trim()} className="mt-2 btn btn-secondary disabled:opacity-60">

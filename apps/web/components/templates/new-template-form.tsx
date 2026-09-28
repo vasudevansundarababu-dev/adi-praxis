@@ -4,6 +4,7 @@ import type { DomainDto, TemplateDto } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 export function NewTemplateForm({ domains }: { domains: DomainDto[] }) {
   const router = useRouter();
@@ -25,9 +26,11 @@ export function NewTemplateForm({ domains }: { domains: DomainDto[] }) {
 
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-4">
+      <RequiredNote />
       <div>
         <label htmlFor="domainId" className="block text-sm font-medium">
           Domain
+          <Req />
         </label>
         <select id="domainId" name="domainId" required className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2">
           {domains.map((d) => (
@@ -40,6 +43,7 @@ export function NewTemplateForm({ domains }: { domains: DomainDto[] }) {
       <div>
         <label htmlFor="workflowName" className="block text-sm font-medium">
           Workflow name
+          <Req />
         </label>
         <input id="workflowName" name="workflowName" required className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2" />
       </div>

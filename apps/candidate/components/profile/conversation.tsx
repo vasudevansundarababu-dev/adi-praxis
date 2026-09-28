@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { loadState, retryMessage, sendMessage, startConversation } from '@/lib/profile-client';
 import type { ConversationState } from '@/lib/profile-types';
 import { ProfilePanel } from './profile-panel';
@@ -83,11 +84,15 @@ export function Conversation({ initial }: { initial: ConversationState }) {
         >
           <div className="flex flex-wrap items-center gap-2 text-xs text-fg-muted">
             <span className="pill pill-brand">Question {Math.min(asked, total)} of {total}</span>
-            <span>{q.section}{q.required ? '' : ' · optional'}</span>
+            <span>
+              {q.section}
+              {q.required ? <Req /> : ' · optional'}
+            </span>
             <button type="button" onClick={() => setShowWhy(!showWhy)} className="ml-auto text-link underline" aria-expanded={showWhy}>
               Why we ask
             </button>
           </div>
+          {q.required && <RequiredNote />}
           {showWhy && <p className="text-xs text-fg-muted">{q.why}</p>}
           {q.sensitive && <p className="text-xs text-warning">Keep it general: no customer names, account or ID numbers.</p>}
           {q.options.length > 0 && (
@@ -100,7 +105,7 @@ export function Conversation({ initial }: { initial: ConversationState }) {
             </div>
           )}
           <label htmlFor="answer" className="sr-only">Your answer</label>
-          <textarea id="answer" rows={q.options.length ? 1 : 3} value={text} onChange={(e) => setText(e.target.value)} maxLength={4000} className="w-full rounded-xl border border-line bg-bg px-3 py-2 text-[15px]" placeholder={q.options.length ? 'Anything else? (optional)' : 'Type your answer…'} />
+          <textarea id="answer" aria-required={(q.required && q.options.length === 0) || undefined} rows={q.options.length ? 1 : 3} value={text} onChange={(e) => setText(e.target.value)} maxLength={4000} className="w-full rounded-xl border border-line bg-bg px-3 py-2 text-[15px]" placeholder={q.options.length ? 'Anything else? (optional)' : 'Type your answer…'} />
           <div className="flex flex-wrap items-center gap-2">
             <button type="submit" disabled={pending || (!text.trim() && picked.length === 0)} className="btn btn-primary">
               {pending ? 'Saving…' : 'Send'}

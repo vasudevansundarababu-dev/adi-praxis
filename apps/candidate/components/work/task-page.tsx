@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Req, RequiredNote } from '@/components/required';
 import type { TaskView } from '@/lib/work-types';
 import { minutes, TASK_STATUS } from '@/lib/work-types';
 import { KycWorkbench } from './kyc-workbench';
@@ -61,6 +62,7 @@ function GenericAuthoring({ task, onSubmitted }: { task: TaskView; onSubmitted: 
           Reviewer: {c.text}
         </p>
       ))}
+      {slot?.isOpen && !task.readOnly && <RequiredNote />}
       <fieldset disabled={task.readOnly} className="space-y-3">
         <label className="block text-sm">
           Title
@@ -81,7 +83,8 @@ function GenericAuthoring({ task, onSubmitted }: { task: TaskView; onSubmitted: 
             ))}
             <label className="block text-sm">
               Edge case this task tests
-              <input value={value.header.edgeCase ?? ''} onChange={(e) => update({ ...value, header: { ...value.header, edgeCase: e.target.value } })} className={input} />
+              <Req />
+              <input aria-required="true" value={value.header.edgeCase ?? ''} onChange={(e) => update({ ...value, header: { ...value.header, edgeCase: e.target.value } })} className={input} />
             </label>
           </div>
         )}
@@ -98,6 +101,8 @@ function GenericAuthoring({ task, onSubmitted }: { task: TaskView; onSubmitted: 
 /** Annotation: the input as given, and a form from the template's collection schema (free text when it has none). */
 function AnnotationTask({ task, onSubmitted }: { task: TaskView; onSubmitted: () => void }) {
   const props = task.template.collectionSchema?.properties ?? { answer: { type: 'string', title: 'Your answer' } };
+  // The template's collection schema lists its required answers; a yes/no checkbox always has a value, so it is not marked.
+  const required = new Set((task.template.collectionSchema?.required ?? []).filter((k) => k in props && props[k]?.type !== 'boolean'));
   const { value, update, currentRevision, state, flush } = useAutosave<Record<string, unknown>>(task.id, task.output ?? {}, task.revision, task.readOnly);
   const input = 'mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5';
   const { slot: _slot, ...data } = task.input;
@@ -120,12 +125,14 @@ function AnnotationTask({ task, onSubmitted }: { task: TaskView; onSubmitted: ()
           <h2 id="output-h" className="text-xl font-semibold">Your work</h2>
           <SaveIndicator state={state} readOnly={task.readOnly} />
         </div>
+        {required.size > 0 && !task.readOnly && <RequiredNote />}
         <fieldset disabled={task.readOnly} className="space-y-3">
           {Object.entries(props).map(([k, def]) => (
             <label key={k} className="block text-sm">
               {def.title ?? k}
+              {required.has(k) && <Req />}
               {def.enum ? (
-                <select value={String(value[k] ?? '')} onChange={(e) => update({ ...value, [k]: e.target.value })} className={input}>
+                <select aria-required={required.has(k) || undefined} value={String(value[k] ?? '')} onChange={(e) => update({ ...value, [k]: e.target.value })} className={input}>
                   <option value="">Choose…</option>
                   {def.enum.map((o) => (
                     <option key={o}>{o}</option>
@@ -134,9 +141,9 @@ function AnnotationTask({ task, onSubmitted }: { task: TaskView; onSubmitted: ()
               ) : def.type === 'boolean' ? (
                 <input type="checkbox" checked={!!value[k]} onChange={(e) => update({ ...value, [k]: e.target.checked })} className="ml-2" />
               ) : def.type === 'number' || def.type === 'integer' ? (
-                <input type="number" value={String(value[k] ?? '')} onChange={(e) => update({ ...value, [k]: e.target.value === '' ? null : Number(e.target.value) })} className={input} />
+                <input type="number" aria-required={required.has(k) || undefined} value={String(value[k] ?? '')} onChange={(e) => update({ ...value, [k]: e.target.value === '' ? null : Number(e.target.value) })} className={input} />
               ) : (
-                <textarea value={String(value[k] ?? '')} rows={4} onChange={(e) => update({ ...value, [k]: e.target.value })} className={input} />
+                <textarea aria-required={required.has(k) || undefined} value={String(value[k] ?? '')} rows={4} onChange={(e) => update({ ...value, [k]: e.target.value })} className={input} />
               )}
               {def.description && <span className="block text-xs text-fg-muted">{def.description}</span>}
             </label>

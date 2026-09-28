@@ -2,6 +2,7 @@
 
 import { REQUISITION_TRANSITIONS, type RequisitionState } from '@praxis/shared';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, useAction } from './action';
 import type { GuidelinesPackageRow, RateCardRow } from './types';
 
@@ -63,9 +64,10 @@ export function LinkGuidelines({ requisitionId, domain, packages, currentPackage
         <p className="text-fg-muted">No guidelines package for “{domain}” yet. An Admin creates one under Guidelines.</p>
       ) : (
         <>
+          <RequiredNote />
           <label className="block">
-            Package
-            <select value={packageId} onChange={(e) => setPackageId(e.target.value)} className={input}>
+            Package<Req />
+            <select aria-required="true" value={packageId} onChange={(e) => setPackageId(e.target.value)} className={input}>
               {matching.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} ({p.taskFamily})
@@ -105,9 +107,10 @@ export function LinkRateCard({ requisitionId, cards, currentId }: { requisitionI
         <p className="text-fg-muted">No rate cards yet. Finance creates them under Payments → Rate cards.</p>
       ) : (
         <>
+          <RequiredNote />
           <label className="block">
-            Rate card version
-            <select value={id} onChange={(e) => setId(e.target.value)} className={input}>
+            Rate card version<Req />
+            <select aria-required="true" value={id} onChange={(e) => setId(e.target.value)} className={input}>
               {cards.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name} v{c.version} · {c.currency} · {Object.entries(c.perTask).map(([k, v]) => `${k.replace('_', ' ').toLowerCase()} ${v}`).join(', ')}

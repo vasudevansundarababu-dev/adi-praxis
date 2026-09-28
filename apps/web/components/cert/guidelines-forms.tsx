@@ -3,6 +3,7 @@
 import { LAUNCH_DOMAINS } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, upload, useAction } from '@/components/supply/action';
 
 /** A package is one domain + task family; it serves all three tiers. */
@@ -24,9 +25,11 @@ export function NewPackageForm() {
       }}
     >
       <h2 className="font-semibold">New guidelines package</h2>
+      <RequiredNote />
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block">
           Domain
+          <Req />
           <input required list="pkg-domains" value={domain} onChange={(e) => setDomain(e.target.value)} className={input} />
           <datalist id="pkg-domains">
             {LAUNCH_DOMAINS.map((d) => (
@@ -36,10 +39,12 @@ export function NewPackageForm() {
         </label>
         <label className="block">
           Task family
+          <Req />
           <input required minLength={2} value={taskFamily} onChange={(e) => setTaskFamily(e.target.value)} placeholder="KYC review" className={input} />
         </label>
         <label className="block">
           Name
+          <Req />
           <input required minLength={2} value={name} onChange={(e) => setName(e.target.value)} placeholder="Banking KYC guidelines" className={input} />
         </label>
       </div>
@@ -82,8 +87,10 @@ export function UploadVersionForm({ packageId }: { packageId: string }) {
         router.push(`/guidelines/versions/${res.data!.id}`);
       }}
     >
+      <RequiredNote className="w-full" />
       <label className="block">
         Upload a new version
+        <Req />
         <input required type="file" accept=".pdf,.docx,.md,.markdown,.txt,application/pdf,text/markdown,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-1 block" />
       </label>
       <label className="flex items-center gap-2">

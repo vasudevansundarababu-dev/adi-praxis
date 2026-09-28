@@ -13,11 +13,35 @@ test.describe('console smoke', () => {
     await page.getByLabel('Email').fill(ADMIN.email);
     await page.getByLabel('Password').fill(ADMIN.password);
     await page.getByRole('button', { name: /sign in/i }).click();
+    // Two-level menu: groups on the top row, the chosen group's pages on the second row.
     const nav = page.getByRole('navigation', { name: 'Main' });
-    await expect(nav.getByRole('link', { name: 'Templates' })).toBeVisible();
-    await expect(nav.getByRole('link', { name: 'Users' })).toBeVisible();
-    await nav.getByRole('link', { name: 'Templates' }).click();
+    await expect(nav.getByRole('link', { name: 'Projects' })).toBeVisible({ timeout: 30_000 });
+    await expect(nav.getByRole('link', { name: 'Admin' })).toBeVisible();
+    await nav.getByRole('link', { name: 'Projects' }).click();
+    await page.getByRole('navigation', { name: 'Projects pages' }).getByRole('link', { name: 'Templates' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/templates/i);
+    await expect(nav.getByRole('link', { name: 'Projects' })).toHaveAttribute('aria-current', 'true');
+  });
+
+  test('the Support Bot explains the screen, including which fields are required', async ({ page }) => {
+    test.skip(EXTERNAL, 'the local mock assistant answers only in local runs');
+    await page.goto(`${WEB}/login`);
+    await page.getByLabel('Email').fill(ADMIN.email);
+    await page.getByLabel('Password').fill(ADMIN.password);
+    await page.getByRole('button', { name: /sign in/i }).click();
+    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible({ timeout: 30_000 });
+    await page.goto(`${WEB}/users`);
+    // In the dev server a page compiled for another test can force a full reload; ask once the page has settled.
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Help' }).click();
+    const panel = page.getByRole('dialog', { name: 'Support Bot' });
+    await panel.getByRole('button', { name: 'What do I need to fill in on this screen?' }).click();
+    await expect(panel.getByText(/Local assistant/)).toBeVisible({ timeout: 30_000 });
+    await panel.getByLabel('Your question').fill('Which roles exist?');
+    await panel.getByRole('button', { name: 'Ask' }).click();
+    await expect(panel.getByText(/ROLES\./)).toBeVisible({ timeout: 30_000 });
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
   });
 
   test('a PM does not see Admin areas, and a wrong password is refused', async ({ page }) => {
@@ -30,7 +54,7 @@ test.describe('console smoke', () => {
     await page.getByRole('button', { name: /sign in/i }).click();
     const nav = page.getByRole('navigation', { name: 'Main' });
     await expect(nav.getByRole('link', { name: 'Projects' })).toBeVisible();
-    await expect(nav.getByRole('link', { name: 'Users' })).toHaveCount(0);
+    await expect(nav.getByRole('link', { name: 'Admin' })).toHaveCount(0);
   });
 });
 

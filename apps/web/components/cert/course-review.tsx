@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, useAction } from '@/components/supply/action';
 import type { CourseDetail, QuizQuestion } from './types';
 
@@ -43,17 +44,21 @@ export function CourseModuleCard({ module: m, canEdit }: { module: Module; canEd
       </div>
       {editing ? (
         <div className="mt-3 space-y-3">
+          <RequiredNote />
           <label className="block">
             Title
-            <input value={title} onChange={(e) => setTitle(e.target.value)} className={input} />
+            <Req />
+            <input aria-required="true" value={title} onChange={(e) => setTitle(e.target.value)} className={input} />
           </label>
           <label className="block">
             Explanation
-            <textarea rows={8} value={explanation} onChange={(e) => setExplanation(e.target.value)} className={input} />
+            <Req />
+            <textarea aria-required="true" rows={8} value={explanation} onChange={(e) => setExplanation(e.target.value)} className={input} />
           </label>
           <label className="block">
             Quiz (JSON)
-            <textarea rows={10} value={quiz} onChange={(e) => setQuiz(e.target.value)} className={`${input} font-mono text-xs`} spellCheck={false} />
+            <Req />
+            <textarea aria-required="true" rows={10} value={quiz} onChange={(e) => setQuiz(e.target.value)} className={`${input} font-mono text-xs`} spellCheck={false} />
           </label>
           {quizError && (
             <p role="alert" className="text-error">

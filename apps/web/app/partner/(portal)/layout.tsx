@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { NavBrand } from '@/components/brand';
 import { PartnerSignOutButton } from '@/components/partner/partner-login-form';
 import { ThemeToggle } from '@/components/shell-controls';
+import { SupportBot } from '@/components/support/support-bot';
 import { getPartnerMe } from '@/lib/partner-api';
 
 /** Partner-only nav: the console nav (lib/nav.ts) never shows here, and partner sessions never open the console. */
@@ -49,7 +50,8 @@ export default async function PartnerPortalLayout({ children }: { children: Reac
         </nav>
         <div className="h-1 bg-brand-gradient" aria-hidden />
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-8 pb-24">{children}</main>
+      <SupportBot endpoint="/api/v1/partner-portal/support/ask" audience="partner" />
     </div>
   );
 }

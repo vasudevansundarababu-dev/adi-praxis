@@ -3,6 +3,7 @@
 import { canonicalTimeZone, CEFR_LEVELS, IANA_TIME_ZONES, ISO_COUNTRIES, ISO_LANGUAGES } from '@praxis/shared';
 import Link from 'next/link';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { call } from '@/lib/client';
 import type { OnboardingItem, OnboardingView } from '@/lib/journey-types';
 import { CERT_STATE, type CertState, type PayeeView } from '@/lib/supply-types';
@@ -229,24 +230,32 @@ function ConflictsForm({ pending, initial, onDone }: { pending: boolean; initial
         onDone({ hasConflicts: has, ...(has ? { details } : {}), authorizedToContribute: true });
       }}
     >
+      <RequiredNote />
       <fieldset>
-        <legend>Do you have a relevant employer or customer conflict for this work?</legend>
+        <legend>
+          Do you have a relevant employer or customer conflict for this work?
+          <Req />
+        </legend>
         <label className="mt-1 flex items-center gap-2">
-          <input type="radio" name="has" checked={has === false} onChange={() => setHas(false)} /> No
+          <input type="radio" name="has" required checked={has === false} onChange={() => setHas(false)} /> No
         </label>
         <label className="flex items-center gap-2">
-          <input type="radio" name="has" checked={has === true} onChange={() => setHas(true)} /> Yes
+          <input type="radio" name="has" required checked={has === true} onChange={() => setHas(true)} /> Yes
         </label>
       </fieldset>
       {has && (
         <label className="block">
           Briefly describe it (no confidential details). Someone will review it before you are proposed for work.
+          <Req />
           <textarea required value={details} onChange={(e) => setDetails(e.target.value)} rows={3} className={input} />
         </label>
       )}
       <label className="flex items-start gap-2">
-        <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} className="mt-1" />
-        I will contribute only original material or material I am permitted to share, and no confidential employer or customer information.
+        <input type="checkbox" required checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} className="mt-1" />
+        <span>
+          I will contribute only original material or material I am permitted to share, and no confidential employer or customer information.
+          <Req />
+        </span>
       </label>
       <button type="submit" disabled={pending || has === null || !authorized || (has && !details.trim())} className="btn btn-primary disabled:opacity-60">
         Save
@@ -272,8 +281,10 @@ function PreferencesForm({ pending, initial, onDone }: { pending: boolean; initi
         onDone(p);
       }}
     >
+      <RequiredNote />
       <label className="block">
         Country you work from
+        <Req />
         <select required value={p.country} onChange={(e) => setP({ ...p, country: e.target.value })} className={input}>
           <option value="">Choose…</option>
           {ISO_COUNTRIES.map(([c, name]) => (
@@ -284,12 +295,15 @@ function PreferencesForm({ pending, initial, onDone }: { pending: boolean; initi
         </select>
       </label>
       <fieldset className="space-y-2">
-        <legend>Languages you can work in</legend>
+        <legend>
+          Languages you can work in
+          <Req />
+        </legend>
         {p.languages.map((l, i) => (
           <div key={i} className="flex flex-wrap items-end gap-2">
             <label className="flex-1">
               <span className="sr-only">Language {i + 1}</span>
-              <select value={l.language} onChange={(e) => setLang(i, { language: e.target.value })} className={input}>
+              <select required value={l.language} onChange={(e) => setLang(i, { language: e.target.value })} className={input}>
                 {ISO_LANGUAGES.map(([c, name]) => (
                   <option key={c} value={c}>
                     {name}
@@ -299,7 +313,7 @@ function PreferencesForm({ pending, initial, onDone }: { pending: boolean; initi
             </label>
             <label>
               <span className="sr-only">Level for language {i + 1}</span>
-              <select value={l.level} onChange={(e) => setLang(i, { level: e.target.value })} className={input}>
+              <select required value={l.level} onChange={(e) => setLang(i, { level: e.target.value })} className={input}>
                 {CEFR_LEVELS.map((x) => (
                   <option key={x.value} value={x.value}>
                     {x.label}
@@ -322,6 +336,7 @@ function PreferencesForm({ pending, initial, onDone }: { pending: boolean; initi
       </fieldset>
       <label className="block">
         Time zone
+        <Req />
         <select required value={p.timezone} onChange={(e) => setP({ ...p, timezone: e.target.value })} className={input}>
           <option value="">Choose…</option>
           {IANA_TIME_ZONES.map((z) => (
@@ -333,6 +348,7 @@ function PreferencesForm({ pending, initial, onDone }: { pending: boolean; initi
       </label>
       <label className="block">
         Hours a week you could give
+        <Req />
         <input type="number" min={1} max={60} required value={p.hoursPerWeek} onChange={(e) => setP({ ...p, hoursPerWeek: Number(e.target.value) })} className={input} />
       </label>
       <label className="flex items-center gap-2">

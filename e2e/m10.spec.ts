@@ -175,8 +175,11 @@ test('a pay run is built, confirmed by a PM, approved by Finance and submitted',
   await staffLogin(f, 'finance@e2e.local', 'e2e-finance-password');
   await f.goto(`${WEB}/payments/pay-runs`);
   await expect(f.getByRole('heading', { level: 1 })).toHaveText('Pay runs');
-  // Last week's run (the e2e database is reset before each suite run).
+  // Last week's run. On a Monday the worker may already have drafted it; then open that run instead.
   await f.getByRole('button', { name: 'Build pay run' }).click();
+  const exists = f.getByText('A pay run for this week already exists.');
+  await expect(exists.or(f.getByRole('heading', { level: 1, name: /Week of/ })).first()).toBeVisible({ timeout: 30_000 });
+  if (await exists.isVisible()) await f.getByRole('link', { name: /\d{4} – / }).first().click();
   await f.waitForURL(/\/payments\/pay-runs\/[0-9a-f-]{36}/, { timeout: 30_000 });
   const runUrl = f.url();
   // Finance cannot approve before a PM confirms.

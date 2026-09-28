@@ -4,7 +4,9 @@ import { redirect } from 'next/navigation';
 import { NavBrand } from '@/components/brand';
 import { SignOutButton, ThemeToggle } from '@/components/shell-controls';
 import { getCurrentUser } from '@/lib/api';
-import { navFor } from '@/lib/nav';
+import { MainNav } from '@/components/main-nav';
+import { SupportBot } from '@/components/support/support-bot';
+import { navGroupsFor } from '@/lib/nav';
 
 export default async function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -31,16 +33,11 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
             <SignOutButton />
           </div>
         </div>
-        <nav aria-label="Main" className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 pb-2 text-sm">
-          {navFor(user.roles).map((item) => (
-            <Link key={item.href} href={item.href} className="shrink-0 rounded-lg px-2 py-1.5 whitespace-nowrap text-white/85 hover:bg-white/10 hover:text-white">
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <MainNav groups={navGroupsFor(user.roles)} />
         <div className="h-1 bg-brand-gradient" aria-hidden />
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-8 pb-24">{children}</main>
+      <SupportBot endpoint="/api/v1/support/ask" audience="staff" />
     </div>
   );
 }

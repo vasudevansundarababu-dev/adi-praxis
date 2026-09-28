@@ -4,6 +4,7 @@ import { roleLabel } from '@praxis/shared';
 import { useState } from 'react';
 import { ActionMessages, input, useAction } from '@/components/supply/action';
 import { fmtDateTime, humanize } from '@/components/supply/ui';
+import { Req, RequiredNote } from '@/components/required';
 
 export interface GradeItemDto {
   itemId: string;
@@ -94,9 +95,11 @@ export function GradeItem({ attemptId, item: i, n, userId }: { attemptId: string
             if (res.ok) setScore('');
           }}
         >
+          <RequiredNote className="w-full" />
           <label className="block">
             Your grade (0 to 1)
-            <input type="number" min={0} max={1} step={0.05} value={score} onChange={(e) => setScore(e.target.value)} className="mt-1 block w-28 rounded-md border border-line bg-surface px-2 py-1.5" />
+            <Req />
+            <input required type="number" min={0} max={1} step={0.05} value={score} onChange={(e) => setScore(e.target.value)} className="mt-1 block w-28 rounded-md border border-line bg-surface px-2 py-1.5" />
           </label>
           {i.recommendation && (
             <button type="button" onClick={() => setScore(String(i.recommendation!.score))} className="text-link">
@@ -134,11 +137,15 @@ export function CertificationDecision({ id, licenceBlocking }: { id: string; lic
         void a.run('POST', `/certifications/${id}/decision`, { decision, reason: reason.trim() }, { success: 'Decision recorded. The candidate is told.' });
       }}
     >
+      <RequiredNote />
       <fieldset className="flex flex-wrap gap-4">
-        <legend className="sr-only">Decision</legend>
+        <legend className="sr-only">
+          Decision
+          <Req />
+        </legend>
         {DECISIONS.map(([v, label]) => (
           <label key={v} className="flex items-center gap-2">
-            <input type="radio" name={`decision-${id}`} checked={decision === v} onChange={() => setDecision(v)} disabled={v === 'CERTIFY' && licenceBlocking} />
+            <input required type="radio" name={`decision-${id}`} checked={decision === v} onChange={() => setDecision(v)} disabled={v === 'CERTIFY' && licenceBlocking} />
             {label}
           </label>
         ))}
@@ -146,6 +153,7 @@ export function CertificationDecision({ id, licenceBlocking }: { id: string; lic
       {licenceBlocking && <p className="text-xs text-fg-muted">Confirm the professional licence before certifying.</p>}
       <label className="block">
         Reason (task-related, shared with the candidate)
+        <Req />
         <textarea required minLength={5} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} className={input} />
       </label>
       <button type="submit" disabled={a.pending || reason.trim().length < 5 || (decision === 'CERTIFY' && licenceBlocking)} className="btn btn-primary">
@@ -182,9 +190,11 @@ export function LicenceCheck({ cert: c }: { cert: QueueCert }) {
         </dd>
       </dl>
       <p className="mt-2 text-xs text-fg-muted">If this candidate has already passed the test, confirming the licence certifies them.</p>
+      <RequiredNote className="mt-2" />
       <label className="mt-3 block">
         Note (what you checked)
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Checked the number against the issuing body’s public register." className={input} />
+        <Req />
+        <input aria-required="true" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Checked the number against the issuing body’s public register." className={input} />
       </label>
       <div className="mt-2 flex flex-wrap gap-2">
         <button type="button" disabled={a.pending || note.trim().length < 3} onClick={() => a.run('POST', `/certifications/${c.id}/licence-decision`, { confirm: true, note: note.trim() }, { success: 'Licence confirmed.' })} className="btn btn-primary">

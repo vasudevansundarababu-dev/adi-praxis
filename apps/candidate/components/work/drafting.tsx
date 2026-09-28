@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { call } from '@/lib/client';
 
 /** M9 (docs/TASK-DRAFTING.md): start from a document, a transcript or an AI interview, then check each drafted section. */
@@ -85,14 +86,19 @@ function Upload({ taskId, kind, onDone }: { taskId: string; kind: 'DOCUMENT' | '
   const accept = kind === 'DOCUMENT' ? '.pdf,.docx,.txt' : '.pdf,.docx,.txt,.vtt,.srt';
   return (
     <div className="space-y-2 text-sm">
+      <RequiredNote />
       <label className="block">
         <span className="font-medium">{kind === 'DOCUMENT' ? 'Your document' : 'Interview transcript'}</span>
+        <Req />
         <span className="block text-xs text-fg-muted">{kind === 'DOCUMENT' ? 'PDF, Word (.docx) or text, up to 10 MB: a procedure you wrote, your notes on a case pattern, public guidance, a training handout.' : 'PDF, Word, text, or captions (.vtt, .srt), up to 10 MB. Speaker names are kept as context.'}</span>
-        <input ref={ref} type="file" accept={accept} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-1 block w-full text-sm" />
+        <input ref={ref} type="file" aria-required="true" accept={accept} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-1 block w-full text-sm" />
       </label>
       <label className="flex items-start gap-2">
-        <input type="checkbox" checked={declared} onChange={(e) => setDeclared(e.target.checked)} className="mt-1" />
-        <span>This file contains no customer data, and I am allowed to share it. I understand that names, numbers and details will be replaced with invented ones.</span>
+        <input type="checkbox" aria-required="true" checked={declared} onChange={(e) => setDeclared(e.target.checked)} className="mt-1" />
+        <span>
+          This file contains no customer data, and I am allowed to share it. I understand that names, numbers and details will be replaced with invented ones.
+          <Req />
+        </span>
       </label>
       <button type="button" disabled={!file || !declared || pending} onClick={send} className="btn btn-primary disabled:opacity-50">
         {pending ? 'Uploading…' : 'Upload'}
@@ -150,7 +156,11 @@ function Interview({ taskId, view, onChange }: { taskId: string; view: DraftingV
               Why we ask
             </button>
           </div>
-          <p className="font-medium">{q.text}</p>
+          {q.required && <RequiredNote />}
+          <p className="font-medium">
+            {q.text}
+            {q.required && <Req />}
+          </p>
           {why && <p className="text-xs text-fg-muted">{q.why}</p>}
           {q.options.length > 0 && (
             <div className="flex flex-wrap gap-2" role="group" aria-label={q.multi ? 'Tap all that apply' : 'Tap one'}>
@@ -165,7 +175,7 @@ function Interview({ taskId, view, onChange }: { taskId: string; view: DraftingV
           <label htmlFor="interview-answer" className="sr-only">
             Your answer
           </label>
-          <textarea id="interview-answer" rows={q.options.length ? 1 : 3} value={text} maxLength={4000} onChange={(e) => setText(e.target.value)} placeholder={q.options.length ? 'Anything to add? (optional)' : 'Type your answer…'} className="w-full rounded-xl border border-line bg-bg px-3 py-2 text-sm" />
+          <textarea id="interview-answer" aria-required={(q.required && q.options.length === 0) || undefined} rows={q.options.length ? 1 : 3} value={text} maxLength={4000} onChange={(e) => setText(e.target.value)} placeholder={q.options.length ? 'Anything to add? (optional)' : 'Type your answer…'} className="w-full rounded-xl border border-line bg-bg px-3 py-2 text-sm" />
           <p className="text-xs text-warning">Describe the pattern, never a real customer: no names, account or ID numbers.</p>
           <div className="flex flex-wrap gap-2">
             <button type="submit" disabled={pending || (!text.trim() && !picked.length)} className="btn btn-primary disabled:opacity-50">

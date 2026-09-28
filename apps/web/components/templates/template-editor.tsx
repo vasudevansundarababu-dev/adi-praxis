@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 interface DimRow {
   key: string;
@@ -137,12 +138,14 @@ export function TemplateEditor({ template: t }: { template: TemplateDto }) {
 
   return (
     <form onSubmit={save} onChange={() => setSaved(false)} className="space-y-8" noValidate>
+      <RequiredNote />
       <section className="space-y-4">
         <div>
           <label htmlFor="workflowName" className="block text-sm font-medium">
             Workflow name
+            <Req />
           </label>
-          <input id="workflowName" value={workflowName} onChange={(e) => setWorkflowName(e.target.value)} className={input} />
+          <input id="workflowName" aria-required="true" value={workflowName} onChange={(e) => setWorkflowName(e.target.value)} className={input} />
         </div>
         {(
           [
@@ -191,17 +194,18 @@ export function TemplateEditor({ template: t }: { template: TemplateDto }) {
         <div />
         {(
           [
-            ['distinctTarget', 'Distinct-task target', distinctTarget, setDistinctTarget],
-            ['maxPerExpert', 'Max tasks per expert', maxPerExpert, setMaxPerExpert],
-            ['openSlot', 'Open-slot share (%)', openSlotPct, setOpenSlotPct],
-            ['similarity', 'Similarity threshold (0–1)', similarity, setSimilarity],
+            ['distinctTarget', 'Distinct-task target', distinctTarget, setDistinctTarget, true],
+            ['maxPerExpert', 'Max tasks per expert', maxPerExpert, setMaxPerExpert, true],
+            ['openSlot', 'Open-slot share (%)', openSlotPct, setOpenSlotPct, false],
+            ['similarity', 'Similarity threshold (0–1)', similarity, setSimilarity, false],
           ] as const
-        ).map(([id, label, value, set]) => (
+        ).map(([id, label, value, set, req]) => (
           <div key={id}>
             <label htmlFor={id} className="block text-sm font-medium">
               {label}
+              {req && <Req />}
             </label>
-            <input id={id} type="number" step="any" value={value} onChange={(e) => set(e.target.value)} className={input} />
+            <input id={id} aria-required={req ? 'true' : undefined} type="number" step="any" value={value} onChange={(e) => set(e.target.value)} className={input} />
           </div>
         ))}
       </section>
@@ -212,8 +216,8 @@ export function TemplateEditor({ template: t }: { template: TemplateDto }) {
         <div className="mt-2 space-y-2">
           {dims.map((d, i) => (
             <div key={i} className="flex flex-wrap gap-2">
-              <input aria-label="Dimension key" placeholder="customer_type" value={d.key} onChange={(e) => update(dims, setDims, i, { key: e.target.value })} className={`${small} w-40`} />
-              <input aria-label="Dimension label" placeholder="Customer type" value={d.label} onChange={(e) => update(dims, setDims, i, { label: e.target.value })} className={`${small} w-40`} />
+              <input aria-label="Dimension key" aria-required="true" placeholder="customer_type" value={d.key} onChange={(e) => update(dims, setDims, i, { key: e.target.value })} className={`${small} w-40`} />
+              <input aria-label="Dimension label" aria-required="true" placeholder="Customer type" value={d.label} onChange={(e) => update(dims, setDims, i, { label: e.target.value })} className={`${small} w-40`} />
               <input aria-label="Allowed values" placeholder="individual, corporate" value={d.values} onChange={(e) => update(dims, setDims, i, { values: e.target.value })} className={`${small} min-w-60 flex-1`} />
               <button type="button" onClick={() => remove(dims, setDims, i)} className="text-sm text-link">
                 Remove
@@ -232,10 +236,11 @@ export function TemplateEditor({ template: t }: { template: TemplateDto }) {
         <div className="mt-2 space-y-2">
           {cells.map((c, i) => (
             <div key={i} className="flex flex-wrap items-center gap-2">
-              <input aria-label="Cell tags" value={c.tags} onChange={(e) => update(cells, setCells, i, { tags: e.target.value })} className={`${small} min-w-60 flex-1`} />
+              <input aria-label="Cell tags" aria-required="true" value={c.tags} onChange={(e) => update(cells, setCells, i, { tags: e.target.value })} className={`${small} min-w-60 flex-1`} />
               <label className="flex items-center gap-1 text-sm">
                 Quota
-                <input type="number" min={1} value={c.quota} onChange={(e) => update(cells, setCells, i, { quota: Number(e.target.value) })} className={`${small} w-16`} />
+                <Req />
+                <input type="number" min={1} aria-required="true" value={c.quota} onChange={(e) => update(cells, setCells, i, { quota: Number(e.target.value) })} className={`${small} w-16`} />
               </label>
               <label className="flex items-center gap-1 text-sm">
                 <input type="checkbox" checked={c.required} onChange={(e) => update(cells, setCells, i, { required: e.target.checked })} />
@@ -258,10 +263,11 @@ export function TemplateEditor({ template: t }: { template: TemplateDto }) {
           {edges.map((e, i) => (
             <div key={i} className="space-y-1 rounded-md border border-line p-2">
               <div className="flex flex-wrap items-center gap-2">
-                <input aria-label="Edge case name" placeholder="Name" value={e.name} onChange={(ev) => update(edges, setEdges, i, { name: ev.target.value })} className={`${small} min-w-60 flex-1`} />
+                <input aria-label="Edge case name" aria-required="true" placeholder="Name" value={e.name} onChange={(ev) => update(edges, setEdges, i, { name: ev.target.value })} className={`${small} min-w-60 flex-1`} />
                 <label className="flex items-center gap-1 text-sm">
                   Quota
-                  <input type="number" min={1} value={e.quota} onChange={(ev) => update(edges, setEdges, i, { quota: Number(ev.target.value) })} className={`${small} w-16`} />
+                  <Req />
+                  <input type="number" min={1} aria-required="true" value={e.quota} onChange={(ev) => update(edges, setEdges, i, { quota: Number(ev.target.value) })} className={`${small} w-16`} />
                 </label>
                 <label className="flex items-center gap-1 text-sm">
                   <input type="checkbox" checked={e.required} onChange={(ev) => update(edges, setEdges, i, { required: ev.target.checked })} />

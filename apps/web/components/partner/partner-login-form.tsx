@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 
 /** Partner portal sign-in (email + password). The API sets the `praxis_partner` cookie on this same origin. */
 export function PartnerLoginForm() {
@@ -42,15 +43,18 @@ export function PartnerLoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
+      <RequiredNote />
       <div>
         <label htmlFor="partner-email" className="block text-sm font-medium">
           Work email
+          <Req />
         </label>
         <input id="partner-email" name="email" type="email" autoComplete="username" required className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-fg" />
       </div>
       <div>
         <label htmlFor="partner-password" className="block text-sm font-medium">
           Password
+          <Req />
         </label>
         <input id="partner-password" name="password" type="password" autoComplete="current-password" required className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-fg" />
       </div>

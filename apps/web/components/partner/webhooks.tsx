@@ -4,6 +4,7 @@ import { PARTNER_WEBHOOK_EVENTS } from '@praxis/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import type { PartnerWebhook, PartnerWebhookDelivery } from '@/lib/partner-api';
 import { EnvPill, fmtDate, fmtDateTime, StatePill } from './labels';
 import { partnerMutate } from './partner-mutate';
@@ -52,21 +53,24 @@ export function PartnerWebhooks({ initial }: { initial: PartnerWebhook[] }) {
   return (
     <div className="space-y-4 text-sm">
       <form onSubmit={create} noValidate className="card space-y-4 p-4">
+        <RequiredNote />
         <div className="flex flex-wrap items-end gap-4">
           <label className="min-w-64 flex-1">
             Endpoint URL
-            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/praxis/webhooks" className="mt-1 block w-full rounded-md border border-line bg-surface px-2 py-1.5" />
+            <Req />
+            <input value={url} required onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/praxis/webhooks" className="mt-1 block w-full rounded-md border border-line bg-surface px-2 py-1.5" />
           </label>
           <label>
             Environment
-            <select value={environment} onChange={(e) => setEnvironment(e.target.value as 'SANDBOX' | 'LIVE')} className="mt-1 block rounded-md border border-line bg-surface px-2 py-1.5">
+            <Req />
+            <select value={environment} required onChange={(e) => setEnvironment(e.target.value as 'SANDBOX' | 'LIVE')} className="mt-1 block rounded-md border border-line bg-surface px-2 py-1.5">
               <option value="SANDBOX">Sandbox events</option>
               <option value="LIVE">Live events</option>
             </select>
           </label>
         </div>
         <fieldset>
-          <legend className="font-medium">Events</legend>
+          <legend className="font-medium">Events<Req /></legend>
           <label className="mt-1 flex items-center gap-2">
             <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />
             All events, including ones added later

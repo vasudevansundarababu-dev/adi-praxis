@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, inputInline, useAction } from '@/components/supply/action';
 import type { PayRunDto } from './types';
 
@@ -82,9 +83,10 @@ export function PayRunActions({ run: r, roles, userId }: { run: PayRunDto; roles
       {canSubmit && <p className="text-xs text-fg-muted">Payees are checked again at submission; anyone no longer ready is held. A retried submit pays nobody twice.</p>}
       {cancelling && (
         <div className="space-y-2 border-t border-line pt-3">
+          <RequiredNote />
           <label className="block">
-            Why cancel? (kept in the audit log)
-            <input value={reason} onChange={(e) => setReason(e.target.value)} className={input} />
+            Why cancel? (kept in the audit log)<Req />
+            <input aria-required="true" value={reason} onChange={(e) => setReason(e.target.value)} className={input} />
           </label>
           <div className="flex gap-2">
             <button type="button" disabled={a.pending || reason.trim().length < 5} onClick={() => a.run('POST', `/pay-runs/${r.id}/cancel`, { reason: reason.trim() }, { success: 'Pay run cancelled. You can build the week again.' })} className="btn btn-primary">

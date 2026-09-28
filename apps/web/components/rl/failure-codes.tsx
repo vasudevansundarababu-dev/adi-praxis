@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 export type Code = { id: string; code: string; label: string; active: boolean };
 
@@ -43,12 +44,15 @@ export function FailureCodes({ initial }: { initial: Code[] }) {
           router.refresh();
         }}
       >
+        <RequiredNote className="w-full" />
         <label>
           Code
+          <Req />
           <input required value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="E.G. WRONG_TOOL" className="mt-1 block rounded-md border border-line bg-surface px-2 py-1.5" />
         </label>
         <label className="flex-1">
           Label
+          <Req />
           <input required value={label} onChange={(e) => setLabel(e.target.value)} className="mt-1 block w-full rounded-md border border-line bg-surface px-2 py-1.5" />
         </label>
         <button type="submit" className="btn btn-primary">Add code</button>

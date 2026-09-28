@@ -2,6 +2,7 @@
 
 import type { DemographicAttributeDto, DemographicFilterInput, FilterOperator, Option } from '@praxis/shared';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 
 type Range = { min: number; max: number; unit: string };
 type Lang = { languages: Option[]; levels: Option[] };
@@ -24,17 +25,21 @@ export function DemographicsStep({
 
   return (
     <div className="mt-4 space-y-3">
+      <RequiredNote />
       <p className="text-sm text-fg-muted">Add at least one filter. Required filters must match; preferred ones raise the match score.</p>
       {attributes.map((a) => {
         const f = byKey.get(a.key);
         return (
           <div key={a.key} className="rounded-md border border-line p-3">
             <div className="flex flex-wrap items-center gap-3">
-              <h3 className="font-medium">{a.label}</h3>
+              <h3 className="font-medium">
+                {a.label}
+                {f && <Req />}
+              </h3>
               {f ? (
                 <>
                   <label className="ml-auto flex items-center gap-2 text-sm">
-                    <select value={f.required ? 'required' : 'preferred'} onChange={(e) => update(a.key, { required: e.target.value === 'required' })} className="rounded-md border border-line bg-surface px-2 py-1" aria-label={`${a.label}: required or preferred`}>
+                    <select aria-required="true" value={f.required ? 'required' : 'preferred'} onChange={(e) => update(a.key, { required: e.target.value === 'required' })} className="rounded-md border border-line bg-surface px-2 py-1" aria-label={`${a.label}: required or preferred`}>
                       <option value="required">Required</option>
                       <option value="preferred">Preferred</option>
                     </select>
@@ -90,17 +95,17 @@ function renderEditor(a: DemographicAttributeDto, f: DemographicFilterInput, upd
       const numOrUndef = (s: string) => (s === '' ? undefined : Number(s));
       return (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <select aria-label={`${a.label} comparison`} value={f.operator} onChange={(e) => update({ operator: e.target.value as FilterOperator })} className="rounded-md border border-line bg-surface px-2 py-1">
+          <select aria-required="true" aria-label={`${a.label} comparison`} value={f.operator} onChange={(e) => update({ operator: e.target.value as FilterOperator })} className="rounded-md border border-line bg-surface px-2 py-1">
             <option value="GTE">at least</option>
             <option value="LTE">at most</option>
             <option value="BETWEEN">between</option>
           </select>
           {f.operator !== 'LTE' && (
-            <input type="number" aria-label={`${a.label} minimum`} min={r.min} max={r.max} value={v.min ?? ''} onChange={(e) => update({ values: { ...v, min: numOrUndef(e.target.value) } })} className="w-24 rounded-md border border-line bg-surface px-2 py-1" />
+            <input type="number" aria-required="true" aria-label={`${a.label} minimum`} min={r.min} max={r.max} value={v.min ?? ''} onChange={(e) => update({ values: { ...v, min: numOrUndef(e.target.value) } })} className="w-24 rounded-md border border-line bg-surface px-2 py-1" />
           )}
           {f.operator === 'BETWEEN' && <span>and</span>}
           {f.operator !== 'GTE' && (
-            <input type="number" aria-label={`${a.label} maximum`} min={r.min} max={r.max} value={v.max ?? ''} onChange={(e) => update({ values: { ...v, max: numOrUndef(e.target.value) } })} className="w-24 rounded-md border border-line bg-surface px-2 py-1" />
+            <input type="number" aria-required="true" aria-label={`${a.label} maximum`} min={r.min} max={r.max} value={v.max ?? ''} onChange={(e) => update({ values: { ...v, max: numOrUndef(e.target.value) } })} className="w-24 rounded-md border border-line bg-surface px-2 py-1" />
           )}
           <span className="text-fg-muted">{r.unit}</span>
         </div>
@@ -111,9 +116,9 @@ function renderEditor(a: DemographicAttributeDto, f: DemographicFilterInput, upd
       return (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span>Within</span>
-          <input type="number" aria-label="Radius in km" min={1} max={(a.allowedValues as { maxRadiusKm: number }).maxRadiusKm} value={v.radiusKm ?? ''} onChange={(e) => update({ values: { ...v, radiusKm: Number(e.target.value) } })} className="w-24 rounded-md border border-line bg-surface px-2 py-1" />
+          <input type="number" aria-required="true" aria-label="Radius in km" min={1} max={(a.allowedValues as { maxRadiusKm: number }).maxRadiusKm} value={v.radiusKm ?? ''} onChange={(e) => update({ values: { ...v, radiusKm: Number(e.target.value) } })} className="w-24 rounded-md border border-line bg-surface px-2 py-1" />
           <span>km of</span>
-          <input aria-label="City" placeholder="City" value={v.city ?? ''} onChange={(e) => update({ values: { ...v, city: e.target.value } })} className="rounded-md border border-line bg-surface px-2 py-1" />
+          <input aria-required="true" aria-label="City" placeholder="City" value={v.city ?? ''} onChange={(e) => update({ values: { ...v, city: e.target.value } })} className="rounded-md border border-line bg-surface px-2 py-1" />
         </div>
       );
     }
@@ -125,7 +130,7 @@ function renderEditor(a: DemographicAttributeDto, f: DemographicFilterInput, upd
         <div className="space-y-2 text-sm">
           {rows.map((row, i) => (
             <div key={i} className="flex flex-wrap items-center gap-2">
-              <select aria-label="Language" value={row.language} onChange={(e) => set(rows.map((r, j) => (j === i ? { ...r, language: e.target.value } : r)))} className="rounded-md border border-line bg-surface px-2 py-1">
+              <select aria-required="true" aria-label="Language" value={row.language} onChange={(e) => set(rows.map((r, j) => (j === i ? { ...r, language: e.target.value } : r)))} className="rounded-md border border-line bg-surface px-2 py-1">
                 {allowed.languages.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
@@ -133,7 +138,7 @@ function renderEditor(a: DemographicAttributeDto, f: DemographicFilterInput, upd
                 ))}
               </select>
               <span>at least</span>
-              <select aria-label="Minimum level" value={row.minLevel} onChange={(e) => set(rows.map((r, j) => (j === i ? { ...r, minLevel: e.target.value } : r)))} className="rounded-md border border-line bg-surface px-2 py-1">
+              <select aria-required="true" aria-label="Minimum level" value={row.minLevel} onChange={(e) => set(rows.map((r, j) => (j === i ? { ...r, minLevel: e.target.value } : r)))} className="rounded-md border border-line bg-surface px-2 py-1">
                 {allowed.levels.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
@@ -181,7 +186,7 @@ function OptionPicker({ label, options, selected, single, onChange }: { label: s
       <div className="max-h-48 overflow-y-auto rounded-md border border-line p-2">
         {shown.map((o) => (
           <label key={o.value} className="flex items-center gap-2 py-0.5">
-            <input type={single ? 'radio' : 'checkbox'} name={single ? label : undefined} checked={selected.includes(o.value)} onChange={() => toggle(o.value)} />
+            <input type={single ? 'radio' : 'checkbox'} name={single ? label : undefined} aria-required={single ? true : undefined} checked={selected.includes(o.value)} onChange={() => toggle(o.value)} />
             {o.label}
           </label>
         ))}

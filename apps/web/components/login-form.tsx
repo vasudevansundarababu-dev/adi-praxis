@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { Req, RequiredNote } from './required';
+
 export function LoginForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -35,9 +37,11 @@ export function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
+      <RequiredNote />
       <div>
         <label htmlFor="email" className="block text-sm font-medium">
           Email
+          <Req />
         </label>
         <input
           id="email"
@@ -51,6 +55,7 @@ export function LoginForm() {
       <div>
         <label htmlFor="password" className="block text-sm font-medium">
           Password
+          <Req />
         </label>
         <input
           id="password"

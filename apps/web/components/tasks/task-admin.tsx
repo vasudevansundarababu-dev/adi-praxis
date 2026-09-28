@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 export type TaskRow = { id: string; status: string; taskType: string; brief: string | null; author: string | null; assignedAt: string | null; lastSavedAt: string | null; submittedAt: string | null; activeSeconds: number; reworkCount: number };
 export type InviteRow = { id: string; candidateName: string | null; channel: string; sentAt: string | null; expiresAt: string; usedAt: string | null; state: string };
@@ -76,7 +77,7 @@ export function TaskTable({ projectId, tptMinutes, initial }: { projectId: strin
                         <span className="flex items-center gap-2">
                           <label>
                             <span className="sr-only">Reason</span>
-                            <select value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-md border border-line bg-surface px-1 py-0.5">
+                            <select value={reason} onChange={(e) => setReason(e.target.value)} aria-required="true" className="rounded-md border border-line bg-surface px-1 py-0.5">
                               <option value="STALLED">Stalled</option>
                               <option value="AUTHOR_UNAVAILABLE">Expert unavailable</option>
                               <option value="OTHER">Other</option>
@@ -169,8 +170,13 @@ export function InputUpload({ projectId }: { projectId: string }) {
     <section aria-labelledby="up-h" className="mt-6 card p-4 text-sm">
       <h2 id="up-h" className="font-semibold">Add task inputs</h2>
       <p className="text-fg-muted">Upload a CSV (header row) or JSON array. Every row is validated against the template; if any fails, nothing is added. Client systems can push the same inputs with an API key.</p>
+      <RequiredNote className="mt-2" />
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <input type="file" accept=".csv,.json,text/csv,application/json" onChange={(e) => setFile(e.target.files?.[0] ?? null)} aria-label="Inputs file" />
+        <label htmlFor="inputs-file" className="font-medium">
+          Inputs file
+          <Req />
+        </label>
+        <input id="inputs-file" type="file" accept=".csv,.json,text/csv,application/json" onChange={(e) => setFile(e.target.files?.[0] ?? null)} aria-required="true" />
         <button type="button" disabled={!file || pending} onClick={upload} className="btn btn-primary disabled:opacity-50">
           Upload
         </button>

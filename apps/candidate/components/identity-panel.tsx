@@ -3,6 +3,7 @@
 import { IDENTITY_HELP_REASONS, identityEligible, type CandidateMeDto } from '@praxis/shared';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { call } from '@/lib/client';
 
 const STATE_TEXT: Record<string, { title: string; body: string }> = {
@@ -86,11 +87,15 @@ export function IdentityPanel({ initial, returnTo }: { initial: CandidateMeDto; 
 
       {helpOpen && (
         <form onSubmit={askHelp} className="mt-4 space-y-3 border-t border-line pt-4">
+          <RequiredNote />
           <fieldset>
-            <legend className="text-sm font-medium">What is the problem?</legend>
+            <legend className="text-sm font-medium">
+              What is the problem?
+              <Req />
+            </legend>
             {IDENTITY_HELP_REASONS.map((r) => (
               <label key={r} className="mt-1 flex items-center gap-2 text-sm">
-                <input type="radio" name="reason" checked={reason === r} onChange={() => setReason(r)} />
+                <input type="radio" name="reason" required checked={reason === r} onChange={() => setReason(r)} />
                 {HELP_LABELS[r]}
               </label>
             ))}

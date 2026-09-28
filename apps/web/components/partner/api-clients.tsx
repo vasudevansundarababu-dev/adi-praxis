@@ -3,6 +3,7 @@
 import { PARTNER_SCOPES } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import type { PartnerApiClient } from '@/lib/partner-api';
 import { EnvPill, fmtDate } from './labels';
 import { partnerMutate } from './partner-mutate';
@@ -44,15 +45,17 @@ export function PartnerApiClients({ initial }: { initial: PartnerApiClient[] }) 
   return (
     <div className="space-y-4 text-sm">
       <form onSubmit={create} className="card flex flex-wrap items-end gap-4 p-4">
+        <RequiredNote className="basis-full" />
         <label>
           Environment
-          <select value={environment} onChange={(e) => setEnvironment(e.target.value as 'SANDBOX' | 'LIVE')} className="mt-1 block rounded-md border border-line bg-surface px-2 py-1.5">
+          <Req />
+          <select value={environment} required onChange={(e) => setEnvironment(e.target.value as 'SANDBOX' | 'LIVE')} className="mt-1 block rounded-md border border-line bg-surface px-2 py-1.5">
             <option value="SANDBOX">Sandbox — test data, no real candidates</option>
             <option value="LIVE">Live — real candidates are invited</option>
           </select>
         </label>
         <fieldset>
-          <legend>Scopes</legend>
+          <legend>Scopes<Req /></legend>
           <div className="mt-1 flex flex-wrap gap-3">
             {PARTNER_SCOPES.map((s) => (
               <label key={s} className="flex items-center gap-1.5 font-mono text-xs">

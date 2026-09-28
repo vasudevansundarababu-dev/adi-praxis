@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, useAction } from '@/components/supply/action';
 
 const MONEY = /^\d{1,8}(\.\d{1,2})?$/;
@@ -32,9 +33,10 @@ export function RateCardForm({ names }: { names: string[] }) {
       }}
     >
       <h2 className="font-semibold">New rate card or version</h2>
+      <RequiredNote />
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          Name
+          Name<Req />
           <input required list="rate-card-names" value={name} onChange={(e) => setName(e.target.value)} placeholder="Banking KYC 2026" className={input} />
           <datalist id="rate-card-names">
             {names.map((n) => (
@@ -44,15 +46,17 @@ export function RateCardForm({ names }: { names: string[] }) {
           {existing && <span className="mt-1 block text-xs text-fg-muted">This adds a new version of “{name.trim()}”. Requisitions keep the version they are linked to.</span>}
         </label>
         <label className="block">
-          Currency
-          <select value={currency} onChange={(e) => setCurrency(e.target.value as 'USD' | 'INR')} className={input}>
+          Currency<Req />
+          <select required value={currency} onChange={(e) => setCurrency(e.target.value as 'USD' | 'INR')} className={input}>
             <option value="USD">USD</option>
             <option value="INR">INR</option>
           </select>
         </label>
       </div>
       <fieldset>
-        <legend>Per accepted task (at least one)</legend>
+        <legend>
+          Per accepted task (at least one)<Req />
+        </legend>
         <div className="mt-1 grid gap-3 sm:grid-cols-3">
           {(
             [

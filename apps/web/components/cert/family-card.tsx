@@ -2,6 +2,7 @@
 
 import { roleLabel } from '@praxis/shared';
 import { useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, useAction } from '@/components/supply/action';
 import { fmtDateTime, StatePill } from '@/components/supply/ui';
 import type { FamilyDto } from './types';
@@ -102,9 +103,11 @@ function FamilyEditor({ f, onDone }: { f: FamilyDto; onDone: () => void }) {
         if (res.ok) onDone();
       }}
     >
+      <RequiredNote />
       <label className="block">
         Stem pattern
-        <textarea rows={4} value={stem} onChange={(e) => setStem(e.target.value)} className={input} />
+        <Req />
+        <textarea required rows={4} value={stem} onChange={(e) => setStem(e.target.value)} className={input} />
       </label>
       <label className="block">
         Options (one per line)
@@ -113,11 +116,13 @@ function FamilyEditor({ f, onDone }: { f: FamilyDto; onDone: () => void }) {
       <div className="flex flex-wrap items-end gap-3">
         <label className="block">
           Difficulty from
-          <input type="number" min={1} max={5} value={min} onChange={(e) => setMin(Number(e.target.value))} className="mt-1 block w-20 rounded-md border border-line bg-surface px-2 py-1.5" />
+          <Req />
+          <input required type="number" min={1} max={5} value={min} onChange={(e) => setMin(Number(e.target.value))} className="mt-1 block w-20 rounded-md border border-line bg-surface px-2 py-1.5" />
         </label>
         <label className="block">
           to
-          <input type="number" min={1} max={5} value={max} onChange={(e) => setMax(Number(e.target.value))} className="mt-1 block w-20 rounded-md border border-line bg-surface px-2 py-1.5" />
+          <Req />
+          <input required type="number" min={1} max={5} value={max} onChange={(e) => setMax(Number(e.target.value))} className="mt-1 block w-20 rounded-md border border-line bg-surface px-2 py-1.5" />
         </label>
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={critical} onChange={(e) => setCritical(e.target.checked)} />
@@ -127,11 +132,13 @@ function FamilyEditor({ f, onDone }: { f: FamilyDto; onDone: () => void }) {
       <div className="grid gap-3 lg:grid-cols-2">
         <label className="block">
           Variable schema (JSON)
-          <textarea rows={8} value={schema} onChange={(e) => setSchema(e.target.value)} className={`${input} font-mono text-xs`} spellCheck={false} />
+          <Req />
+          <textarea aria-required="true" rows={8} value={schema} onChange={(e) => setSchema(e.target.value)} className={`${input} font-mono text-xs`} spellCheck={false} />
         </label>
         <label className="block">
           Answer rule (JSON)
-          <textarea rows={8} value={rule} onChange={(e) => setRule(e.target.value)} className={`${input} font-mono text-xs`} spellCheck={false} />
+          <Req />
+          <textarea aria-required="true" rows={8} value={rule} onChange={(e) => setRule(e.target.value)} className={`${input} font-mono text-xs`} spellCheck={false} />
         </label>
       </div>
       {parseError && (

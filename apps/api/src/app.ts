@@ -40,6 +40,8 @@ import { secretBox } from './lib/secrets';
 import { certAdminRoutes } from './routes/cert-admin';
 import { certCandidateRoutes } from './routes/cert-candidate';
 import { paymentCandidateRoutes, paymentRoutes } from './routes/payments';
+import { supportRoutes } from './routes/support';
+import { ClaudeVertexSupportAssistant, MockSupportAssistant, type SupportAssistant } from './support/assistant';
 import { MockPayoutProvider, TrolleyPayoutProvider, type PayoutProvider } from './pay/provider';
 import { ClaudeVertexCurriculumGenerator, MockCurriculumGenerator, type CurriculumGenerator } from './cert/generator';
 import { MockSelfieCheck, StripeSelfieCheck, type SelfieCheck } from './cert/selfie';
@@ -89,6 +91,12 @@ export interface AppDeps {
   selfie?: SelfieCheck;
   /** M10c payout provider: Trolley when configured, otherwise the mock. */
   payouts?: PayoutProvider;
+  /** Support Bot: Claude on Vertex when configured, otherwise the local mock. */
+  support?: SupportAssistant;
+}
+
+export function defaultSupport(config: Config): SupportAssistant {
+  return config.assistantMode === 'vertex' ? new ClaudeVertexSupportAssistant({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION, model: config.SUPPORT_MODEL }) : new MockSupportAssistant();
 }
 
 export function defaultPayouts(config: Config): PayoutProvider {
@@ -270,6 +278,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         await v1.register(paymentCandidateRoutes, { db: deps.db, payouts });
         await v1.register(certCandidateRoutes, { db: deps.db, config: deps.config, gen, box, embeddings, selfie: deps.selfie ?? defaultSelfie(deps.config), storage });
       }
+      await v1.register(supportRoutes, { assistant: deps.support ?? defaultSupport(deps.config), partnerPortal: deps.config.SME_SUPPLY_ENABLED });
       await v1.register(datasetRoutes, { db: deps.db });
       await v1.register(rlRoutes, { db: deps.db });
       await v1.register(taskRoutes, { db: deps.db, config: deps.config, email: deps.email ?? defaultEmail(deps.config) });

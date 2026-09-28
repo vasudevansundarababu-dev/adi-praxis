@@ -4,6 +4,7 @@ import type { CandidateMeDto } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Req, RequiredNote } from '@/components/required';
 import { call } from '@/lib/client';
 
 declare global {
@@ -69,9 +70,13 @@ export function SignInForm({ returnTo, googleClientId, demo = false }: { returnT
 
   return (
     <div className="mt-6 space-y-4">
+      <RequiredNote />
       <label className={`flex items-start gap-2 text-sm ${needsAdult ? 'rounded-md border border-warning p-2' : ''}`}>
-        <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="mt-1" />
-        <span>I confirm I am 18 or over. (Needed the first time you sign in.)</span>
+        <input type="checkbox" aria-required="true" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="mt-1" />
+        <span>
+          I confirm I am 18 or over.
+          <Req /> (Needed the first time you sign in.)
+        </span>
       </label>
 
       {!googleClientId && process.env.NODE_ENV === 'production' && !demo ? (
@@ -87,12 +92,14 @@ export function SignInForm({ returnTo, googleClientId, demo = false }: { returnT
           <div>
             <label htmlFor="dev-email" className="block text-sm">
               Email
+              <Req />
             </label>
             <input id="dev-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2" />
           </div>
           <div>
             <label htmlFor="dev-name" className="block text-sm">
               Name
+              <Req />
             </label>
             <input id="dev-name" required value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2" />
           </div>

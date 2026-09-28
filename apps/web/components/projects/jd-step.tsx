@@ -3,6 +3,7 @@
 import { CreateJobDescriptionRequest, LOCATION_TYPES, type JobDescriptionDto } from '@praxis/shared';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 const input = 'mt-1 w-full rounded-md border border-line bg-surface px-3 py-2';
 
@@ -43,6 +44,7 @@ export function JobDescriptionStep({
 
   return (
     <div className="mt-4 space-y-4">
+      <RequiredNote />
       <div className="flex gap-4 text-sm">
         <label className="flex items-center gap-2">
           <input type="radio" name="jdMode" checked={mode === 'existing'} onChange={() => setMode('existing')} disabled={!jobDescriptions.length} />
@@ -58,8 +60,9 @@ export function JobDescriptionStep({
         <div>
           <label htmlFor="jd" className="block text-sm font-medium">
             Job description
+            <Req />
           </label>
-          <select id="jd" value={selectedId ?? ''} onChange={(e) => onSelect(e.target.value || null)} className={input}>
+          <select id="jd" aria-required="true" value={selectedId ?? ''} onChange={(e) => onSelect(e.target.value || null)} className={input}>
             <option value="">Choose…</option>
             {jobDescriptions.map((j) => (
               <option key={j.id} value={j.id}>
@@ -88,34 +91,39 @@ export function JobDescriptionStep({
             <div key={k}>
               <label htmlFor={`jd-${k}`} className="block text-sm font-medium">
                 {label}
+                <Req />
               </label>
-              <input id={`jd-${k}`} value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} className={input} />
+              <input id={`jd-${k}`} aria-required="true" value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} className={input} />
             </div>
           ))}
           <div>
             <label htmlFor="jd-resp" className="block text-sm font-medium">
               Responsibilities
+              <Req />
             </label>
-            <textarea id="jd-resp" rows={3} value={form.responsibilities} onChange={(e) => setForm({ ...form, responsibilities: e.target.value })} className={input} />
+            <textarea id="jd-resp" aria-required="true" rows={3} value={form.responsibilities} onChange={(e) => setForm({ ...form, responsibilities: e.target.value })} className={input} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="jd-wage" className="block text-sm font-medium">
                 Wage per task
+                <Req />
               </label>
-              <input id="jd-wage" type="number" min={0.01} step={0.01} value={form.wagePerTask} onChange={(e) => setForm({ ...form, wagePerTask: e.target.value })} className={input} />
+              <input id="jd-wage" aria-required="true" type="number" min={0.01} step={0.01} value={form.wagePerTask} onChange={(e) => setForm({ ...form, wagePerTask: e.target.value })} className={input} />
             </div>
             <div>
               <label htmlFor="jd-cur" className="block text-sm font-medium">
                 Currency (ISO code)
+                <Req />
               </label>
-              <input id="jd-cur" maxLength={3} value={form.wageCurrency} onChange={(e) => setForm({ ...form, wageCurrency: e.target.value.toUpperCase() })} className={input} />
+              <input id="jd-cur" aria-required="true" maxLength={3} value={form.wageCurrency} onChange={(e) => setForm({ ...form, wageCurrency: e.target.value.toUpperCase() })} className={input} />
             </div>
             <div>
               <label htmlFor="jd-lt" className="block text-sm font-medium">
                 Location type
+                <Req />
               </label>
-              <select id="jd-lt" value={form.locationType} onChange={(e) => setForm({ ...form, locationType: e.target.value })} className={input}>
+              <select id="jd-lt" aria-required="true" value={form.locationType} onChange={(e) => setForm({ ...form, locationType: e.target.value })} className={input}>
                 {LOCATION_TYPES.map((l) => (
                   <option key={l} value={l}>
                     {l[0] + l.slice(1).toLowerCase()}
@@ -125,9 +133,9 @@ export function JobDescriptionStep({
             </div>
             <div>
               <label htmlFor="jd-loc" className="block text-sm font-medium">
-                Location {form.locationType === 'REMOTE' ? '(optional)' : ''}
+                Location {form.locationType === 'REMOTE' ? '(optional)' : <Req />}
               </label>
-              <input id="jd-loc" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className={input} />
+              <input id="jd-loc" aria-required={form.locationType === 'REMOTE' ? undefined : true} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className={input} />
             </div>
           </div>
           {errors.length > 0 && (

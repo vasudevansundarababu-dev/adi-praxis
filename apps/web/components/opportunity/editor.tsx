@@ -4,6 +4,7 @@ import { CONTRIBUTION_ROLE_LABELS, CONTRIBUTION_ROLES, OpportunityCriteria, type
 import Link from 'next/link';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 export interface OwnerView {
   projectId: string;
@@ -29,6 +30,8 @@ const LONG_FIELDS: [keyof OpportunityBrief, string, string][] = [
   ['doNotDisclose', 'What not to disclose', 'Required: e.g. no real customer data.'],
   ['fullDescription', 'Full description', 'Filled from a confirmed imported document, or typed here.'],
 ];
+/** Long fields that must be filled before publishing (opportunityPublishProblems). */
+const REQUIRED_LONG = new Set<keyof OpportunityBrief>(['summary', 'whatWeWillAsk', 'doNotDisclose']);
 
 /** Owner side of FLOW2-SME C03: edit the brief and criteria, import a JD document, publish a version. */
 export function OpportunityEditor({ initial, candidateAppUrl }: { initial: OwnerView; candidateAppUrl: string }) {
@@ -111,10 +114,12 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
         <input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={pending || !!pendingDoc} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} className="mt-2 text-sm" aria-label="JD document" />
         {pendingDoc && (
           <div className="mt-4">
+            <RequiredNote className="mb-2" />
             <label htmlFor="doc-text" className="block text-sm font-medium">
               Extracted from {pendingDoc.filename}: check and correct before confirming
+              <Req />
             </label>
-            <textarea id="doc-text" rows={10} value={docText} onChange={(e) => setDocText(e.target.value)} className={`${input} font-mono text-xs`} />
+            <textarea id="doc-text" aria-required="true" rows={10} value={docText} onChange={(e) => setDocText(e.target.value)} className={`${input} font-mono text-xs`} />
             <div className="mt-2 flex gap-2">
               <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/documents/${pendingDoc.id}/confirm`, { text: docText }, 'Text confirmed and added to the full description.')} className="btn btn-primary">
                 Confirm text
@@ -128,13 +133,15 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
       </section>
 
       <section className="mt-6 space-y-4">
+        <RequiredNote />
         <div className="grid gap-4 sm:grid-cols-2">
           {(['title', 'domain', 'specialty'] as const).map((k) => (
             <div key={k} className={k === 'title' ? 'sm:col-span-2' : ''}>
               <label htmlFor={`b-${k}`} className="block text-sm font-medium capitalize">
                 {k}
+                <Req />
               </label>
-              <input id={`b-${k}`} value={brief[k]} onChange={(e) => set(k, e.target.value)} className={input} />
+              <input id={`b-${k}`} aria-required="true" value={brief[k]} onChange={(e) => set(k, e.target.value)} className={input} />
             </div>
           ))}
           <div>
@@ -157,7 +164,10 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
           </div>
         </div>
         <fieldset>
-          <legend className="text-sm font-medium">Contribution roles</legend>
+          <legend className="text-sm font-medium">
+            Contribution roles
+            <Req />
+          </legend>
           <div className="mt-1 flex flex-wrap gap-4">
             {CONTRIBUTION_ROLES.map((r) => (
               <label key={r} className="flex items-center gap-2 text-sm">
@@ -175,22 +185,27 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
           <div key={k}>
             <label htmlFor={`b-${k}`} className="block text-sm font-medium">
               {label}
+              {REQUIRED_LONG.has(k) && <Req />}
             </label>
             {hint && <p className="text-xs text-fg-muted">{hint}</p>}
-            <textarea id={`b-${k}`} rows={k === 'fullDescription' ? 6 : 3} value={(brief[k] as string) ?? ''} onChange={(e) => set(k, e.target.value as never)} className={input} />
+            <textarea id={`b-${k}`} aria-required={REQUIRED_LONG.has(k) || undefined} rows={k === 'fullDescription' ? 6 : 3} value={(brief[k] as string) ?? ''} onChange={(e) => set(k, e.target.value as never)} className={input} />
           </div>
         ))}
       </section>
 
       <section className="mt-8">
-        <h2 className="font-semibold">Eligibility criteria</h2>
+        <h2 className="font-semibold">
+          Eligibility criteria
+          <Req />
+        </h2>
         <p className="text-sm text-fg-muted">Task-related and approved by a domain owner. The assistant never adds criteria.</p>
+        <RequiredNote className="mt-1" />
         <div className="mt-2 space-y-2">
           {criteria.map((c, i) => (
             <div key={i} className="grid gap-2 rounded-md border border-line p-2 sm:grid-cols-[8rem_1fr_8rem_auto]">
-              <input aria-label="Criterion id" value={c.id} onChange={(e) => setCriteria(criteria.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)))} className="rounded-md border border-line bg-surface px-2 py-1 text-sm" />
-              <input aria-label="Criterion" value={c.text} onChange={(e) => setCriteria(criteria.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} className="rounded-md border border-line bg-surface px-2 py-1 text-sm" />
-              <select aria-label="Required or preferred" value={c.kind} onChange={(e) => setCriteria(criteria.map((x, j) => (j === i ? { ...x, kind: e.target.value as 'REQUIRED' | 'PREFERRED' } : x)))} className="rounded-md border border-line bg-surface px-2 py-1 text-sm">
+              <input aria-required="true" aria-label="Criterion id" value={c.id} onChange={(e) => setCriteria(criteria.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)))} className="rounded-md border border-line bg-surface px-2 py-1 text-sm" />
+              <input aria-required="true" aria-label="Criterion" value={c.text} onChange={(e) => setCriteria(criteria.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} className="rounded-md border border-line bg-surface px-2 py-1 text-sm" />
+              <select aria-required="true" aria-label="Required or preferred" value={c.kind} onChange={(e) => setCriteria(criteria.map((x, j) => (j === i ? { ...x, kind: e.target.value as 'REQUIRED' | 'PREFERRED' } : x)))} className="rounded-md border border-line bg-surface px-2 py-1 text-sm">
                 <option value="REQUIRED">Required</option>
                 <option value="PREFERRED">Preferred</option>
               </select>
@@ -212,6 +227,7 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
           {policy.source === 'owner' ? 'Edited by you.' : 'Generated from the brief and criteria.'} The assistant asks one at a time and may only rephrase
           follow-ups; it cannot add questions or criteria. Each criterion keeps its own question when you publish.
         </p>
+        <RequiredNote className="mt-1" />
         <ol className="mt-2 space-y-2">
           {policy.questions.map((q, i) => {
             const update = (patch: Partial<typeof q>) => {
@@ -231,7 +247,7 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
                     Remove
                   </button>
                 </div>
-                <textarea aria-label={`Question ${i + 1}`} rows={2} value={q.text} onChange={(e) => update({ text: e.target.value })} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
+                <textarea aria-required="true" aria-label={`Question ${i + 1}`} rows={2} value={q.text} onChange={(e) => update({ text: e.target.value })} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1" />
                 <input aria-label={`Why we ask, question ${i + 1}`} placeholder="Why we ask" value={q.why} onChange={(e) => update({ why: e.target.value })} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1 text-xs" />
               </li>
             );

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { Req, RequiredNote } from '@/components/required';
 
 export type TermsItem = { key: string; current: { id: string; title: string; version: number; placeholder: boolean; body: string } | null };
 
@@ -48,12 +49,15 @@ function TermsDoc({ item }: { item: TermsItem }) {
             router.refresh();
           }}
         >
+          <RequiredNote />
           <label className="block">
             Title
+            <Req />
             <input required value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5" />
           </label>
           <label className="block">
             Approved text
+            <Req />
             <textarea required minLength={20} value={body} onChange={(e) => setBody(e.target.value)} rows={10} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5" />
           </label>
           <button type="submit" disabled={pending} className="btn btn-primary disabled:opacity-50">

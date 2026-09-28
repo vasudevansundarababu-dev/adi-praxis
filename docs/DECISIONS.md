@@ -180,4 +180,5 @@ Owner choices: agent pull requests need a human merge; a separate test environme
 - Payer at launch: US entity for all SMEs including India; RazorpayX through the Indian subsidiary once operational
   (~26 Oct 2026). Partner model: certified-candidate fee. Retainers: Experts only, December 2026.
 - Pay runs and tier promotions approved by the owner until the operations lead joins.
+- Web application first; mobile app later as an add-on. M10 candidate screens are desktop web, usable in a phone browser.
 - Development starts after sign-off of the UI mockups and the payment integration (pending).

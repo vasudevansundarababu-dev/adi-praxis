@@ -213,7 +213,9 @@ themselves; an assessor cannot grade a candidate from a partner they are linked 
 
 ## 12. UI screens (sign-off item)
 
-Mockups for sign-off cover: partner portal (requisitions, submit candidate, candidate tracker, statements, API keys),
+**Web application first; the mobile app is a later add-on** (owner, 28 Sep 2026). Candidate screens are designed for desktop web and must stay usable on a phone browser; no native app work in M10.
+
+Mockups (Design canvas "ADI Praxis M10 — UI mockups for sign-off", https://claude.ai/artifact/CKynR8o85ng93ZQgJuEKvk) cover: partner portal (requisitions, submit candidate, candidate tracker, statements, API keys),
 candidate course and test, candidate payee set-up and earnings, admin partners and requisitions, certification review
 queue, pay run approval, payout exceptions. Link and sign-off date are recorded in `docs/DECISIONS.md`.
 

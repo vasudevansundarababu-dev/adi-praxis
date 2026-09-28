@@ -6,6 +6,27 @@ console and candidate-app design; payment integration approved as recommended (T
 
 Built on `main` (branch `m10-sme-supply`), not on `release/1.0`. See `docs/RELEASES.md`.
 
+## 0. Owner decisions (28 Sep 2026)
+
+| Topic | Decision |
+| --- | --- |
+| Build | All four slices overnight without stopping; open points chosen and logged by Claude (`docs/M10-BUILD.md`) |
+| Partner portal | Inside `apps/web` under `/partner`, separate partner accounts (email + password), own cookie and nav |
+| Internal role name | Display label "Validator" everywhere; enum stays `REVIEWER`. SME tiers: Expert, Reviewer, Annotator |
+| Expert confirmation before Experts exist | Admin + Validator, until the domain has two certified Experts |
+| Generated test content | Admin approves every item family (with samples) per tier before publish |
+| Models | Opus (existing constant) for guidelines, courses, templates and grading; a cheaper Claude model (`CERT_BULK_MODEL`) for per-candidate questions and the solver check |
+| Pass marks and lengths | Spec defaults (section 7.2), editable per blueprint before approval |
+| Healthcare licences | Validator checks licence number, issuing body and certificate for requisitions marked "licence required" |
+| Rate card currency | Per requisition: USD or INR; payouts in the SME's local currency, FX recorded |
+| Pay runs | Weekly, Monday, for the previous Monday–Sunday; minimum USD 10 / INR 500 carried forward |
+| Selfie re-check | Every certification attempt |
+| Partner ownership / cool-off | 12 months / 90 days |
+| Payer | US entity via Trolley at launch; RazorpayX via the Indian subsidiary once operational (~26 Oct 2026) |
+| Partner fees | Certified-candidate fee |
+| Retainers | Experts only, December 2026 (not in this build) |
+| Platform | Web first; mobile app later |
+
 ## 1. Goal and 7-day scope
 
 Let staffing partners supply candidates through a Praxis Partner API; train and certify every candidate inside Praxis
@@ -325,6 +346,10 @@ queue, pay run approval, payout exceptions. Link and sign-off date are recorded 
 - [ ] All of the above are in the audit log.
 
 ## 14. Open questions
+
+All answered in section 0 except Expert retainer terms (December).
+
+### Previously open
 
 - Q1 Candidate ownership window (default 12 months) and resubmission cool-off (default 90 days).
 - Q2 Tier requirements and pass thresholds per launch domain; licence verification for healthcare Experts.

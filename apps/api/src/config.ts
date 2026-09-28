@@ -55,6 +55,10 @@ const Env = z.object({
   /** 32-byte key (base64) for secrets M10 must read back: partner webhook signing secrets, test answer keys. */
   M10_ENCRYPTION_KEY: z.string().default(''),
   PARTNER_API_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
+  /** M10b models on Vertex: CERT_MODEL for knowledge, courses, blueprints, families and grading; CERT_BULK_MODEL for
+   *  per-candidate question wording and the independent solver check. Blank bulk model = CERT_MODEL. */
+  CERT_MODEL: z.string().default('claude-opus-5'),
+  CERT_BULK_MODEL: z.string().default(''),
 });
 
 export type Config = z.infer<typeof Env> & {

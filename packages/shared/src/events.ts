@@ -19,6 +19,8 @@ export const DOMAIN_EVENTS = [
   'enrollment.decided',
   // M10 (SME supply): identity verified for an SME user; partner webhook fan-out
   'sme.identity_verified',
+  'guidelines.generate',
+  'cert.certified',
   // Internal-user administration (M0)
   'user.created',
   'user.roles_changed',

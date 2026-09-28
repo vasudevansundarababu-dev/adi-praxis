@@ -1,5 +1,8 @@
 import { createServer } from 'node:http';
-import { defaultDrafter, defaultEmail, defaultEvaluator, defaultStorage } from './app';
+import { defaultCurriculum, defaultDrafter, defaultEmail, defaultEmbeddings, defaultEvaluator, defaultStorage } from './app';
+import { sweepCertifications } from './cert/attempts';
+import { refillBuffers } from './cert/items';
+import { sectionsOf } from './cert/pipeline';
 import { defaultRlGym } from './rl/rl-gym';
 import { loadConfig } from './config';
 import { createDb } from './db';
@@ -16,7 +19,8 @@ const config = loadConfig();
 const db = createDb(config.DATABASE_URL);
 const connection = redisConnection(config.REDIS_URL);
 const queue = createDomainEventsQueue(connection);
-const worker = createDomainEventsWorker(db, defaultHandlers({ evaluator: defaultEvaluator(config), email: defaultEmail(config), config, rlGym: defaultRlGym(config), drafter: defaultDrafter(config), storage: defaultStorage(config), smeSupply: config.SME_SUPPLY_ENABLED }), connection);
+const cert = { gen: defaultCurriculum(config), box: secretBox(config), embeddings: defaultEmbeddings(config) };
+const worker = createDomainEventsWorker(db, defaultHandlers({ evaluator: defaultEvaluator(config), email: defaultEmail(config), config, rlGym: defaultRlGym(config), drafter: defaultDrafter(config), storage: defaultStorage(config), smeSupply: config.SME_SUPPLY_ENABLED, cert }), connection);
 const log = (level: string, msg: string, extra: object = {}) =>
   console.log(JSON.stringify({ level, severity: level.toUpperCase(), message: msg, msg, service: 'praxis-worker', time: new Date().toISOString(), ...extra }));
 
@@ -25,9 +29,13 @@ worker.on('failed', (job, err) => log('warn', 'domain event handler failed', { j
 const maintenanceQueue = config.DATASET_VERIFY_CRON === 'off' ? null : await scheduleMaintenance(connection, config.DATASET_VERIFY_CRON);
 // M10 SME supply jobs, only with the feature flag on: partner webhook delivery and invite reminders/expiry.
 const supplyJobs: Record<string, () => Promise<unknown>> = config.SME_SUPPLY_ENABLED
-  ? { 'partner-webhooks': () => processPartnerWebhooks(db, secretBox(config)), 'partner-invites': () => remindAndExpireInvites(db, defaultEmail(config), config.CANDIDATE_APP_URL) }
+  ? { 'partner-webhooks': () => processPartnerWebhooks(db, secretBox(config)), 'partner-invites': () => remindAndExpireInvites(db, defaultEmail(config), config.CANDIDATE_APP_URL),
+      // M10b: keep each published blueprint's buffer of ready test forms full; expire certificates and stale attempts.
+      'cert-forms': () => refillBuffers({ ...cert, db }, (v) => sectionsOf(db, v)),
+      'cert-sweep': () => sweepCertifications(db, cert),
+    }
   : {};
-const supplyQueue = config.SME_SUPPLY_ENABLED ? await scheduleRecurring(connection, [{ name: 'partner-webhooks', everyMs: 30_000 }, { name: 'partner-invites', everyMs: 3_600_000 }]) : null;
+const supplyQueue = config.SME_SUPPLY_ENABLED ? await scheduleRecurring(connection, [{ name: 'partner-webhooks', everyMs: 30_000 }, { name: 'partner-invites', everyMs: 3_600_000 }, { name: 'cert-forms', everyMs: 300_000 }, { name: 'cert-sweep', everyMs: 600_000 }]) : null;
 const maintenance = createMaintenanceWorker(db, connection, log, undefined, supplyJobs);
 maintenance.on('failed', (job, err) => log('error', 'maintenance job failed', { job: job?.name, err: String(err), alert: true }));
 // Queue depth every minute: the backlog alert (M8) is a log-based metric on these entries.

@@ -37,6 +37,10 @@ import { partnerPortalRoutes } from './routes/partner-portal';
 import { supplyCandidateRoutes } from './routes/supply-candidate';
 import { supplyInternalRoutes } from './routes/supply-internal';
 import { secretBox } from './lib/secrets';
+import { certAdminRoutes } from './routes/cert-admin';
+import { certCandidateRoutes } from './routes/cert-candidate';
+import { ClaudeVertexCurriculumGenerator, MockCurriculumGenerator, type CurriculumGenerator } from './cert/generator';
+import { MockSelfieCheck, StripeSelfieCheck, type SelfieCheck } from './cert/selfie';
 import { ClaudeVertexTaskDrafter, MockTaskDrafter, type TaskDrafter } from './tasks/drafting/drafter';
 import { rlRoutes } from './routes/rl';
 import { workRoutes } from './routes/work';
@@ -78,6 +82,20 @@ export interface AppDeps {
   /** Invite email (SMTP / Mailpit locally, in-memory in tests) and near-duplicate embeddings (Vertex or hashing mock). */
   email?: EmailSender;
   embeddings?: EmbeddingProvider;
+  /** M10b certification: course/test generator (Claude on Vertex or the mock) and the per-attempt selfie check. */
+  curriculum?: CurriculumGenerator;
+  selfie?: SelfieCheck;
+}
+
+/** M10b curriculum generator: Claude on Vertex (CERT_MODEL / CERT_BULK_MODEL) when configured, otherwise the mock. */
+export function defaultCurriculum(config: Config): CurriculumGenerator {
+  return config.assistantMode === 'vertex'
+    ? new ClaudeVertexCurriculumGenerator({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION, model: config.CERT_MODEL, bulkModel: config.CERT_BULK_MODEL })
+    : new MockCurriculumGenerator();
+}
+
+export function defaultSelfie(config: Config): SelfieCheck {
+  return config.identityMode === 'stripe' ? new StripeSelfieCheck(config.STRIPE_SECRET_KEY) : new MockSelfieCheck();
 }
 
 export function defaultEmail(config: Config): EmailSender {
@@ -233,6 +251,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         await v1.register(supplyInternalRoutes, { db: deps.db });
         await v1.register(partnerPortalRoutes, { db: deps.db, config: deps.config, email, box: secretBox(deps.config) });
         await v1.register(supplyCandidateRoutes, { db: deps.db, config: deps.config });
+        const box = secretBox(deps.config);
+        const gen = deps.curriculum ?? defaultCurriculum(deps.config);
+        const embeddings = deps.embeddings ?? defaultEmbeddings(deps.config);
+        await v1.register(certAdminRoutes, { db: deps.db, storage, box });
+        await v1.register(certCandidateRoutes, { db: deps.db, config: deps.config, gen, box, embeddings, selfie: deps.selfie ?? defaultSelfie(deps.config), storage });
       }
       await v1.register(datasetRoutes, { db: deps.db });
       await v1.register(rlRoutes, { db: deps.db });

@@ -11,6 +11,8 @@ import {
   TERMS_KEYS,
 } from '@praxis/shared';
 import type { Db, Tx } from '../db';
+import { supplyOnboardingItems } from '../supply/onboarding-items';
+import { onActivated } from '../supply/submissions';
 import { sha256 } from '../lib/crypto';
 import { AppError, badRequest, notFound } from '../lib/errors';
 import type { writeAudit } from '../platform/audit';
@@ -51,13 +53,14 @@ export async function onboardingView(tx: Db | Tx, enrollmentId: string, smeUserI
   if (e.status !== 'SELECTED' || !e.onboarding) throw new AppError(409, 'NOT_SELECTED', 'Onboarding opens once you are selected for this pool.');
   const terms = await currentTerms(tx, e.clientId);
   const acks = new Map(e.onboarding.acknowledgements.map((a) => [a.itemKey, a]));
+  const extra = await supplyOnboardingItems(tx, e.id, smeUserId);
   return {
     enrollmentId: e.id,
     status: e.onboarding.status,
     blockReason: e.onboarding.blockReason,
     checklistVersion: e.onboarding.checklistVersion,
     scope: e.qualificationScopes[0] ?? null,
-    items: ONBOARDING_ITEMS.map((i) => {
+    items: [...ONBOARDING_ITEMS.map((i) => {
       const ack = acks.get(i.key);
       const doc = i.termsKey ? terms[TERMS_KEYS.indexOf(i.termsKey)] : null;
       // Newer terms must be accepted again; nothing is accepted automatically (FLOW2 section 11).
@@ -69,6 +72,8 @@ export async function onboardingView(tx: Db | Tx, enrollmentId: string, smeUserI
         terms: doc ? { title: doc.title, version: doc.version, body: doc.body, sha256: doc.sha256, placeholder: doc.placeholder } : null,
       };
     }),
+    ...extra,
+    ],
   };
 }
 
@@ -81,6 +86,7 @@ export async function acknowledge(
   const view = await onboardingView(tx, args.enrollmentId, args.smeUserId);
   const item = view.items.find((i) => i.key === args.itemKey);
   if (!item) throw badRequest('Unknown checklist item');
+  if (item.kind === 'certification' || item.kind === 'payee') throw new AppError(409, 'AUTOMATIC_ITEM', 'This item completes by itself when the certification is passed or the payment set-up is ready.');
   const e = await tx.enrollment.findUniqueOrThrow({ where: { id: args.enrollmentId }, include: { onboarding: true } });
   const checklist = e.onboarding!;
   let data: unknown = null;
@@ -132,11 +138,31 @@ export async function acknowledge(
   if (complete && checklist.status !== 'COMPLETE') {
     await tx.onboardingChecklist.update({ where: { id: checklist.id }, data: { status: 'COMPLETE', completedAt: new Date(), blockReason: null } });
     await upsertMatchingRecord(tx, e.id);
+    await onActivated(tx, e.id);
     await audit({ entityType: 'OnboardingChecklist', entityId: checklist.id, action: 'onboarding.completed', before: { status: checklist.status }, after: { status: 'COMPLETE' } });
     return { blocked: false as const, completed: true, view: { ...after, status: 'COMPLETE' as const } };
   }
   if (!complete && checklist.status === 'NOT_STARTED') await tx.onboardingChecklist.update({ where: { id: checklist.id }, data: { status: 'IN_PROGRESS' } });
   return { blocked: false as const, completed: false, view: after };
+}
+
+/**
+ * M10: completes any checklist whose items are now all done (called when a certification passes or a payee becomes
+ * ready). Returns the enrollments completed.
+ */
+export async function completeOnboardingIfDone(tx: Tx, smeUserId: string) {
+  const checklists = await tx.onboardingChecklist.findMany({ where: { enrollment: { smeUserId, status: 'SELECTED' }, status: { in: ['NOT_STARTED', 'IN_PROGRESS'] } }, include: { enrollment: true } });
+  const done: string[] = [];
+  for (const c of checklists) {
+    const view = await onboardingView(tx, c.enrollmentId, smeUserId);
+    if (!view.items.every((i) => i.done)) continue;
+    await tx.onboardingChecklist.update({ where: { id: c.id }, data: { status: 'COMPLETE', completedAt: new Date(), blockReason: null } });
+    await upsertMatchingRecord(tx, c.enrollmentId);
+    await onActivated(tx, c.enrollmentId);
+    await tx.auditEvent.create({ data: { clientId: c.clientId, actorType: 'SYSTEM', actorId: 'onboarding', entityType: 'OnboardingChecklist', entityId: c.id, action: 'onboarding.completed', before: { status: c.status }, after: { status: 'COMPLETE', by: 'm10-automatic-item' } } });
+    done.push(c.enrollmentId);
+  }
+  return done;
 }
 
 /**

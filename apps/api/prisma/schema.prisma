@@ -1993,3 +1993,330 @@ model CandidateStateEvent {
 
   @@index([submissionId, at])
 }
+
+// ───────────────────────── M10b Guidelines → courses and certifications (docs/SME-SUPPLY.md section 7) ─────────────────────────
+
+/// A guidelines package for a domain and task family; versions are uploaded by an Admin.
+model GuidelinesPackage {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId   String   @map("client_id") @db.Uuid
+  domain     String
+  taskFamily String   @map("task_family")
+  name       String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  versions GuidelinesVersion[]
+
+  @@unique([clientId, domain, taskFamily])
+}
+
+/// One uploaded version: the source file (private), its cited sections, and what has been generated and published.
+model GuidelinesVersion {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String    @map("client_id") @db.Uuid
+  packageId      String    @map("package_id") @db.Uuid
+  version        Int
+  /// A major version needs an update module before an SME's next task; a minor version only notifies.
+  major          Boolean   @default(true)
+  fileName       String    @map("file_name")
+  storageKey     String    @map("storage_key")
+  sha256         String
+  /// [{ anchor, heading, text }] — every generated artifact cites these anchors.
+  sections       Json      @default("[]")
+  status         String    @default("GENERATING")
+  publishedTiers SmeTier[] @default([]) @map("published_tiers")
+  createdById    String    @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  package    GuidelinesPackage        @relation(fields: [packageId], references: [id])
+  runs       GenerationRun[]
+  knowledge  KnowledgeItem[]
+  courses    Course[]
+  blueprints CertificationBlueprint[]
+
+  @@unique([packageId, version])
+}
+
+/// One generation pipeline run (or one regeneration of a stage/artifact), with model, prompts and cost.
+model GenerationRun {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String    @map("client_id") @db.Uuid
+  versionId      String    @map("version_id") @db.Uuid
+  /// FULL, or a single stage: KNOWLEDGE, COURSE, BLUEPRINT, FAMILIES, SAMPLE
+  scope          String    @default("FULL")
+  target         Json      @default("{}")
+  stage          String    @default("QUEUED")
+  status         String    @default("QUEUED")
+  model          String?
+  promptVersions Json      @default("{}") @map("prompt_versions")
+  cost           Json      @default("{}")
+  error          String?
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  finishedAt     DateTime? @map("finished_at")
+
+  version GuidelinesVersion @relation(fields: [versionId], references: [id])
+}
+
+/// Rules, definitions, steps, thresholds, edge cases and failure modes extracted from the guidelines, each cited.
+model KnowledgeItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  versionId String   @map("version_id") @db.Uuid
+  kind      String
+  text      String
+  citation  String
+  critical  Boolean  @default(false)
+  status    String   @default("DRAFT")
+  model     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  version GuidelinesVersion @relation(fields: [versionId], references: [id])
+
+  @@index([versionId])
+}
+
+/// One course per tier per guidelines version.
+model Course {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String    @map("client_id") @db.Uuid
+  versionId     String    @map("version_id") @db.Uuid
+  tier          SmeTier
+  title         String
+  status        String    @default("DRAFT")
+  model         String?
+  promptVersion String?   @map("prompt_version")
+  approvedById  String?   @map("approved_by_id") @db.Uuid
+  approvedAt    DateTime? @map("approved_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  version GuidelinesVersion @relation(fields: [versionId], references: [id])
+  modules CourseModule[]
+
+  @@unique([versionId, tier])
+}
+
+model CourseModule {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  courseId     String   @map("course_id") @db.Uuid
+  position     Int
+  title        String
+  explanation  String
+  goodExamples Json     @default("[]") @map("good_examples")
+  badExamples  Json     @default("[]") @map("bad_examples")
+  /// [{ question, options[], answerIndex, feedback, citation }]
+  quiz         Json     @default("[]")
+  practice     Json     @default("[]")
+  citations    String[] @default([])
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([courseId, position])
+}
+
+/// One certification blueprint per tier per guidelines version (section 7.2 defaults, editable before approval).
+model CertificationBlueprint {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId         String    @map("client_id") @db.Uuid
+  versionId        String    @map("version_id") @db.Uuid
+  tier             SmeTier
+  /// [{ key, name, weight, citations[] }]; weights sum to 100
+  competencies     Json      @default("[]")
+  itemCount        Int       @map("item_count")
+  authoringTask    Boolean   @default(false) @map("authoring_task")
+  timeLimitMinutes Int       @map("time_limit_minutes")
+  /// { overallPct, plantedErrorsPct?, noCriticalMiss, writtenPassScore?, confirmationsRequired? }
+  passRules        Json      @map("pass_rules")
+  status           String    @default("DRAFT")
+  model            String?
+  approvedById     String?   @map("approved_by_id") @db.Uuid
+  approvedAt       DateTime? @map("approved_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  version  GuidelinesVersion @relation(fields: [versionId], references: [id])
+  families ItemFamily[]
+  forms    TestForm[]
+
+  @@unique([versionId, tier])
+}
+
+/// A reusable question template. The correct answer is derived from the variables by `answerRule`, never by a model.
+model ItemFamily {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId            String   @map("client_id") @db.Uuid
+  blueprintId         String   @map("blueprint_id") @db.Uuid
+  competency          String
+  /// Difficulty band on a 1–5 scale: [min, max]
+  difficultyMin       Int      @map("difficulty_min")
+  difficultyMax       Int      @map("difficulty_max")
+  cognitiveLevel      String   @map("cognitive_level")
+  itemType            String   @map("item_type")
+  stemPattern         String   @map("stem_pattern")
+  variableSchema      Json     @map("variable_schema")
+  answerRule          Json     @map("answer_rule")
+  options             String[] @default([])
+  distractorRationale String   @default("") @map("distractor_rationale")
+  citation            String
+  /// Missing this item fails the test (critical rule).
+  critical            Boolean  @default(false)
+  status              String   @default("DRAFT")
+  /// Approvals so far: [{ userId, role, at }]
+  approvals           Json     @default("[]")
+  /// { served, correct, validationFailures, consecutiveFailures }
+  stats               Json     @default("{}")
+  model               String?
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  blueprint CertificationBlueprint @relation(fields: [blueprintId], references: [id])
+  instances ItemInstance[]
+
+  @@index([blueprintId, status])
+}
+
+/// One generated question. Served to one candidate only; the key is encrypted.
+model ItemInstance {
+  id          String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String                      @map("client_id") @db.Uuid
+  familyId    String                      @map("family_id") @db.Uuid
+  variables   Json
+  /// SHA-256 of the family and its canonical variables: no two instances of a family share it.
+  fingerprint String
+  stem        String
+  /// Presentation: options, trajectory steps, etc.
+  content     Json                        @default("{}")
+  keyEnc      String                      @map("key_enc")
+  validation  Json                        @default("{}")
+  embedding   Unsupported("vector(768)")?
+  /// SAMPLE (for Admin review, never served), VALID, DISCARDED
+  status      String                      @default("VALID")
+  servedTo    String?                     @map("served_to") @db.Uuid
+  servedAt    DateTime?                   @map("served_at")
+  createdAt   DateTime                    @default(now()) @map("created_at")
+
+  family ItemFamily @relation(fields: [familyId], references: [id])
+
+  @@unique([familyId, fingerprint])
+  @@index([familyId, status])
+}
+
+/// A pre-assembled, pre-validated test form. Buffered, used once.
+model TestForm {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String    @map("client_id") @db.Uuid
+  blueprintId String    @map("blueprint_id") @db.Uuid
+  itemIds     String[]  @map("item_ids")
+  status      String    @default("BUFFERED")
+  usedBy      String?   @unique @map("used_by") @db.Uuid
+  assembledAt DateTime  @default(now()) @map("assembled_at")
+  usedAt      DateTime? @map("used_at")
+
+  blueprint CertificationBlueprint @relation(fields: [blueprintId], references: [id])
+
+  @@index([blueprintId, status])
+}
+
+enum CertificationState {
+  NOT_STARTED
+  IN_TRAINING
+  TEST_READY
+  IN_TEST
+  PASSED
+  RETAKE_AVAILABLE
+  REVIEW_REQUIRED
+  NOT_CERTIFIED
+  EXPIRED
+}
+
+/// An SME's certification for one domain, tier and guidelines version (section 6).
+model Certification {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String             @map("client_id") @db.Uuid
+  smeUserId         String             @map("sme_user_id") @db.Uuid
+  domain            String
+  tier              SmeTier
+  versionId         String             @map("version_id") @db.Uuid
+  requisitionId     String?            @map("requisition_id") @db.Uuid
+  state             CertificationState @default(NOT_STARTED)
+  /// Module ids completed in order.
+  completedModules  String[]           @default([]) @map("completed_modules")
+  attemptsUsed      Int                @default(0) @map("attempts_used")
+  retakeAvailableAt DateTime?          @map("retake_available_at")
+  reviewReason      String?            @map("review_reason")
+  licenceRequired   Boolean            @default(false) @map("licence_required")
+  /// { number, issuingBody, fileName, storageKey, submittedAt }
+  licence           Json?
+  licenceStatus     String?            @map("licence_status")
+  licenceDecidedBy  String?            @map("licence_decided_by") @db.Uuid
+  issuedAt          DateTime?          @map("issued_at")
+  expiresAt         DateTime?          @map("expires_at")
+  decidedBy         String?            @map("decided_by") @db.Uuid
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  attempts TestAttempt[]
+
+  @@unique([smeUserId, domain, tier, versionId])
+}
+
+/// One sitting of a certification test.
+model TestAttempt {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String    @map("client_id") @db.Uuid
+  certificationId String    @map("certification_id") @db.Uuid
+  smeUserId       String    @map("sme_user_id") @db.Uuid
+  attemptNo       Int       @map("attempt_no")
+  formId          String    @map("form_id") @db.Uuid
+  itemIds         String[]  @map("item_ids")
+  /// IN_PROGRESS, NEEDS_REVIEW, PASSED, FAILED
+  status          String    @default("IN_PROGRESS")
+  /// Provider reference and result of the selfie re-check (never an image or ID number).
+  identityCheck   Json      @map("identity_check")
+  startedAt       DateTime  @default(now()) @map("started_at")
+  deadlineAt      DateTime  @map("deadline_at")
+  submittedAt     DateTime? @map("submitted_at")
+  answers         Json      @default("{}")
+  integrityEvents Json      @default("[]") @map("integrity_events")
+  /// Per item: { correct?, score?, recommendation?, confirmations[] }
+  grading         Json      @default("{}")
+  score           Decimal?  @db.Decimal(5, 2)
+  sectionScores   Json      @default("{}") @map("section_scores")
+  result          String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  certification Certification @relation(fields: [certificationId], references: [id])
+
+  @@unique([certificationId, attemptNo])
+}
+
+enum SmeStandingState {
+  PROBATION
+  ACTIVE
+  RETRAINING
+  SUSPENDED
+  OFFBOARDED
+}
+
+/// SME standing per domain and tier; every change is a new row (history kept), approved by a person.
+model SmeStanding {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String           @map("client_id") @db.Uuid
+  smeUserId    String           @map("sme_user_id") @db.Uuid
+  domain       String
+  tier         SmeTier
+  standing     SmeStandingState
+  metrics      Json             @default("{}")
+  reason       String?
+  approvedById String?          @map("approved_by_id") @db.Uuid
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  @@index([smeUserId, domain, createdAt])
+}

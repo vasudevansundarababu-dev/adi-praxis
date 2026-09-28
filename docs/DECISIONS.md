@@ -224,3 +224,51 @@ Spec: `docs/SME-SUPPLY.md` (section 0 owner decisions). Runbook: `docs/M10-BUILD
   and revoked UPDATE/DELETE), like the M6 tables.
 - **(chosen by Claude)** "Validator" replaces "Reviewer" for the internal role in every console and candidate-app text
   and API message; the enum, routes and code names keep REVIEWER/review. Shared `roleLabel()` and `ROLE_LABELS`.
+
+### M10b Guidelines to courses and certifications
+- **(chosen by Claude)** Guidelines are uploaded per package (domain + task family) as a new version (PDF, DOCX,
+  Markdown or text, up to 10 MB), stored privately, and split into cited sections `S1…Sn` (headings, else paragraph
+  groups). One package serves all three tiers; each tier gets its own course, blueprint and families from the same
+  version. Generation runs as a worker job (`guidelines.generate`), never in a request.
+- **(chosen by Claude)** Anything generated without a valid section citation is dropped. Every generation run records
+  its model, prompt versions and token usage. `CERT_MODEL` (default `claude-opus-5`) writes knowledge, courses,
+  blueprints and families; `CERT_BULK_MODEL` (blank = `CERT_MODEL`) words instances and solves them independently.
+- **(chosen by Claude)** Correct answers are never written by a model. Each item family declares a variable schema and
+  an answer rule in a small rule language (threshold, all-of, lookup, select, order, planted errors, written); the
+  platform samples variables and derives the key. Keys are stored encrypted and never reach the candidate app.
+- **(chosen by Claude)** The four checks per instance are: (1) the rule produces a valid key; (2) an independent solve
+  without the key matches it; (3) the cited section supports the answer; (4) the estimated difficulty is inside the
+  family's band. An instance whose stem is a near-copy (cosine ≥ 0.97) of an earlier one of the same family is also
+  refused. A failed instance is kept as DISCARDED (with its check results) and regenerated, up to 3 tries per request;
+  after 5 consecutive failures the family is FLAGGED and cannot be approved until an Admin edits it.
+- **(chosen by Claude)** Nothing is served until an Admin approves the tier's course, blueprint and every family (with
+  at least one valid sample) and publishes the tier. Expert-tier families also need a Validator's approval until the
+  domain has two certified Experts, then an Expert's. A published tier cannot be edited or regenerated; that needs a new
+  version.
+- **(chosen by Claude)** Test forms are assembled ahead of time (a buffer of 2 per published blueprint, worker job
+  every 5 minutes, or on demand if the buffer is empty) and used once. Each instance is served to exactly one person
+  (`servedTo`), so two candidates never share an instance and a retake never repeats one.
+- **(chosen by Claude)** The course unlocks module by module; a module completes when its quiz scores at least 80%.
+  The test opens after the last module. Each attempt needs a new selfie check (a Stripe Identity session with a
+  matching selfie; the mock locally and in tests). Only the provider reference and the result are stored.
+- **(chosen by Claude)** Objective items are scored against the derived keys; trajectory reviews count planted errors
+  found. Written answers get a model grade as a recommendation only; every written grade needs people to confirm it
+  (1 confirmation; the Expert authoring task needs 2: an Admin and a Validator until the domain has two certified
+  Experts, then two Experts not linked to the candidate's partner). The result is decided only when every confirmation
+  is in, so a model score alone never passes or refuses anyone. The confirmation that completes the review decides the
+  result in the same transaction.
+- **(chosen by Claude)** A failed attempt offers a retake after 48 hours; the third failed attempt goes to a person
+  (Validator or Admin), who can certify, decline, or allow another retake. Candidates see pass or fail and a band per
+  section (Strong, Meets, Developing, Below), never items, answers or keys. Integrity signals (paste, focus changes)
+  are logged for reviewers and never fail anyone by themselves. Tests past their deadline (plus 1 minute) are submitted
+  with the saved answers by a sweep every 10 minutes, which also expires certificates after 12 months.
+- **(chosen by Claude)** Passing certifies for 12 months, starts standing on PROBATION (append-only `SmeStanding`),
+  tells the supplying partner (`candidate.test_passed`, `candidate.certified`) and completes the C07 checklist when
+  the new "Guidelines course and certification" item was the last one open. The candidate cannot tick that item.
+- **(chosen by Claude)** Healthcare Experts upload a licence (number, issuing body, certificate file); a Validator
+  confirms it. A passed test waits in review until the licence is confirmed.
+- **(chosen by Claude)** Candidate test endpoints are rate-limited per candidate session, not per IP, because
+  candidates in one office share an address.
+- **(chosen by Claude)** Partners see a requisition's guidelines summary (package name, version, section headings) and
+  course outline (module titles, number of questions, time limit) once the tier is published; never items, answers or
+  pass rules.

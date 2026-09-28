@@ -10,6 +10,7 @@ import { AppError, notFound } from '../lib/errors';
 import { runPartnerCommand } from '../platform/command';
 import { issueToken, OAuthError } from '../supply/partners';
 import { partnerRequisitionDto } from '../supply/requisitions';
+import { partnerGuidelinesView } from '../cert/partner-view';
 import { candidateView, simulate, submitCandidate, withdraw } from '../supply/submissions';
 
 const IdParams = z.object({ id: z.string().uuid() });
@@ -45,8 +46,8 @@ export const partnerApiRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; e
     const c = client(req);
     const r = await db.requisition.findFirst({ where: { id: req.params.id, clientId: c.clientId, allowedPartnerIds: { has: c.partnerId }, state: { not: 'DRAFT' } } });
     if (!r) throw notFound('Requisition not found');
-    // The course outline comes from the published guidelines package (M10b); null until one is published.
-    return { ...partnerRequisitionDto(r), guidelinesSummary: null, courseOutline: null };
+    // Summary and course outline from the published guidelines (null until the tier is published).
+    return { ...partnerRequisitionDto(r), ...(await partnerGuidelinesView(db, r)) };
   });
 
   app.post('/requisitions/:id/candidates', { config: { access: { partnerScope: 'candidates:write' }, rateLimit: perToken(120) }, schema: { tags: ['partner-api'], params: IdParams, body: CandidateSubmissionInput } }, async (req, reply) => {

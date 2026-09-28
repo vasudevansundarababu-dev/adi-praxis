@@ -318,3 +318,13 @@ export async function onFlow2Change(tx: Tx, smeUserId: string, change: { dimensi
   }
   return subs.length;
 }
+
+/** Onboarding (C07) completed for an application that came through a requisition: the SME is active (on probation). */
+export async function onActivated(tx: Tx, enrollmentId: string) {
+  const subs = await tx.partnerSubmission.findMany({ where: { enrollmentId, sandbox: false, state: 'INVITED' } });
+  for (const s of subs) {
+    const prev = await tx.candidateStateEvent.findFirst({ where: { submissionId: s.id, dimension: 'standing' }, orderBy: { at: 'desc' } });
+    if (prev) continue;
+    await recordState(tx, s, { dimension: 'standing', from: null, to: 'PROBATION', event: 'candidate.activated' }, null);
+  }
+}

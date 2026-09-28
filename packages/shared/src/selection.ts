@@ -105,7 +105,8 @@ export interface OnboardingItemDef {
   key: string;
   title: string;
   description: string;
-  kind: 'confirm' | 'terms' | 'conflicts' | 'guidance' | 'preferences';
+  /** M10 adds 'certification' and 'payee': completed by the platform, never by a tick. */
+  kind: 'confirm' | 'terms' | 'conflicts' | 'guidance' | 'preferences' | 'certification' | 'payee';
   termsKey?: TermsKey;
 }
 

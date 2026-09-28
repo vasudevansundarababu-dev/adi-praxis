@@ -32,6 +32,7 @@ export const requisitionDto = (r: Requisition, extra: Record<string, unknown> = 
   guidelinesPackageId: r.guidelinesPackageId,
   guidelinesVersion: r.guidelinesVersion,
   rateCardId: r.rateCardId,
+  payRoute: r.payRoute,
   state: r.state,
   createdAt: r.createdAt.toISOString(),
   updatedAt: r.updatedAt.toISOString(),
@@ -80,6 +81,7 @@ const dataOf = (i: RequisitionInput) => ({
   directChannel: i.directChannel,
   submissionDeadline: i.submissionDeadline ? new Date(i.submissionDeadline) : null,
   maxPerPartner: i.maxPerPartner,
+  payRoute: i.payRoute,
 });
 
 export async function createRequisition(tx: Tx, actor: InternalActor, input: RequisitionInput, audit: Audit) {

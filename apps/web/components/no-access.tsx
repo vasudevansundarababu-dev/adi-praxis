@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/api';
 
-const ROLE = { ADMIN: 'Admin', PM: 'PM', REVIEWER: 'Validator' } as const;
+const ROLE = { ADMIN: 'Admin', PM: 'PM', REVIEWER: 'Validator', FINANCE: 'Finance' } as const;
 
 /**
  * Shown instead of a bare 404 when the signed-in role can't use a page. The console keeps one sign-in per browser, so

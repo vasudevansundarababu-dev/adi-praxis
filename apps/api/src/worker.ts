@@ -1,8 +1,10 @@
 import { createServer } from 'node:http';
-import { defaultCurriculum, defaultDrafter, defaultEmail, defaultEmbeddings, defaultEvaluator, defaultStorage } from './app';
+import { defaultCurriculum, defaultPayouts, defaultDrafter, defaultEmail, defaultEmbeddings, defaultEvaluator, defaultStorage } from './app';
 import { sweepCertifications } from './cert/attempts';
 import { refillBuffers } from './cert/items';
 import { sectionsOf } from './cert/pipeline';
+import { buildStatements, monthOf } from './pay/ledger';
+import { buildPayRun, previousWeek, reconcile } from './pay/payruns';
 import { defaultRlGym } from './rl/rl-gym';
 import { loadConfig } from './config';
 import { createDb } from './db';
@@ -33,9 +35,23 @@ const supplyJobs: Record<string, () => Promise<unknown>> = config.SME_SUPPLY_ENA
       // M10b: keep each published blueprint's buffer of ready test forms full; expire certificates and stale attempts.
       'cert-forms': () => refillBuffers({ ...cert, db }, (v) => sectionsOf(db, v)),
       'cert-sweep': () => sweepCertifications(db, cert),
+      // M10c: Monday pay-run drafts for the previous week, daily reconciliation of yesterday, monthly partner statements.
+      'pay-run-build': async () => {
+        if (new Date().getUTCDay() !== 1) return 0;
+        const week = previousWeek();
+        let made = 0;
+        for (const c of await db.client.findMany({ select: { id: true } })) {
+          if (await db.payRun.findUnique({ where: { clientId_periodStart: { clientId: c.id, periodStart: week.periodStart } } })) continue;
+          await db.$transaction((tx) => buildPayRun(tx, c.id, week, { type: 'SYSTEM', id: 'pay-run-schedule' }));
+          made++;
+        }
+        return made;
+      },
+      'payout-reconcile': () => reconcile(db, defaultPayouts(config), new Date(Date.now() - 86_400_000)),
+      'partner-statements': () => buildStatements(db, monthOf(new Date(Date.now() - new Date().getUTCDate() * 86_400_000)), { type: 'SYSTEM', id: 'statement-schedule' }),
     }
   : {};
-const supplyQueue = config.SME_SUPPLY_ENABLED ? await scheduleRecurring(connection, [{ name: 'partner-webhooks', everyMs: 30_000 }, { name: 'partner-invites', everyMs: 3_600_000 }, { name: 'cert-forms', everyMs: 300_000 }, { name: 'cert-sweep', everyMs: 600_000 }]) : null;
+const supplyQueue = config.SME_SUPPLY_ENABLED ? await scheduleRecurring(connection, [{ name: 'partner-webhooks', everyMs: 30_000 }, { name: 'partner-invites', everyMs: 3_600_000 }, { name: 'cert-forms', everyMs: 300_000 }, { name: 'cert-sweep', everyMs: 600_000 }, { name: 'pay-run-build', everyMs: 3_600_000 }, { name: 'payout-reconcile', everyMs: 86_400_000 }, { name: 'partner-statements', everyMs: 86_400_000 }]) : null;
 const maintenance = createMaintenanceWorker(db, connection, log, undefined, supplyJobs);
 maintenance.on('failed', (job, err) => log('error', 'maintenance job failed', { job: job?.name, err: String(err), alert: true }));
 // Queue depth every minute: the backlog alert (M8) is a log-based metric on these entries.

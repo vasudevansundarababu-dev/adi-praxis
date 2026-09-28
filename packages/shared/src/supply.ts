@@ -9,7 +9,7 @@ import type { InternalRole } from './roles';
 // ── Labels (owner decision 28 Sep 2026) ──
 
 /** Internal roles as shown in the UI. The enum keeps REVIEWER; the label is "Validator" everywhere. */
-export const ROLE_LABELS: Record<InternalRole | 'FINANCE', string> = { ADMIN: 'Admin', PM: 'PM', REVIEWER: 'Validator', FINANCE: 'Finance' };
+export const ROLE_LABELS: Record<InternalRole, string> = { ADMIN: 'Admin', PM: 'PM', REVIEWER: 'Validator', FINANCE: 'Finance' };
 export const roleLabel = (r: string) => (ROLE_LABELS as Record<string, string>)[r] ?? r.charAt(0) + r.slice(1).toLowerCase();
 
 export const SME_TIERS = ['EXPERT', 'REVIEWER_SME', 'ANNOTATOR'] as const;
@@ -89,6 +89,8 @@ export const RequisitionInput = z.object({
   directChannel: z.boolean().default(false),
   submissionDeadline: z.string().datetime().nullable().default(null),
   maxPerPartner: z.number().int().min(1).max(10_000).nullable().default(null),
+  /** M10c: DIRECT = Praxis pays the SME (payee set-up on the checklist); VIA_PARTNER = the partner pays its people. */
+  payRoute: z.enum(['DIRECT', 'VIA_PARTNER']).default('DIRECT'),
 });
 export type RequisitionInput = z.infer<typeof RequisitionInput>;
 

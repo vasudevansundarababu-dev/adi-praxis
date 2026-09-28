@@ -22,6 +22,8 @@ enum InternalRole {
   ADMIN
   PM
   REVIEWER
+  /// M10c: approves pay runs (label "Finance").
+  FINANCE
 }
 
 enum UserStatus {
@@ -1750,6 +1752,9 @@ model Partner {
   allowedDomains       String[]      @default([]) @map("allowed_domains")
   allowedTiers         SmeTier[]     @default([]) @map("allowed_tiers")
   feeTermsVersion      String?       @map("fee_terms_version")
+  /// M10c: fee per certified candidate (currency below); null = no fee agreed yet.
+  certifiedFee         Decimal?      @map("certified_fee") @db.Decimal(12, 2)
+  feeCurrency          String        @default("USD") @map("fee_currency")
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
 
@@ -1880,6 +1885,8 @@ model Requisition {
   guidelinesPackageId String?          @map("guidelines_package_id") @db.Uuid
   guidelinesVersion   Int?             @map("guidelines_version")
   rateCardId          String?          @map("rate_card_id") @db.Uuid
+  /// M10c: DIRECT = Praxis pays the SME (payee set-up required); VIA_PARTNER = the partner pays its people.
+  payRoute            PayRoute         @default(DIRECT) @map("pay_route")
   allowedPartnerIds   String[]         @default([]) @map("allowed_partner_ids")
   directChannel       Boolean          @default(false) @map("direct_channel")
   submissionDeadline  DateTime?        @map("submission_deadline")
@@ -2319,4 +2326,231 @@ model SmeStanding {
   createdAt    DateTime         @default(now()) @map("created_at")
 
   @@index([smeUserId, domain, createdAt])
+}
+
+// ───────────────────────── M10c payments (docs/SME-SUPPLY.md section 8) ─────────────────────────
+
+enum PayRoute {
+  DIRECT
+  VIA_PARTNER
+}
+
+/// A rate card version: never edited; a change is a new version of the same name.
+model RateCard {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
+  name        String
+  version     Int
+  /// USD or INR (owner decision, 28 Sep 2026).
+  currency    String
+  /// { AUTHORING: "40.00", ANNOTATION: "8.00", RL_REVIEW: "20.00" } per task type.
+  perTask     Json     @map("per_task")
+  hourlyRate  Decimal? @map("hourly_rate") @db.Decimal(12, 2)
+  weeklyCap   Decimal? @map("weekly_cap") @db.Decimal(12, 2)
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([clientId, name, version])
+}
+
+enum EarningKind {
+  TASK
+  RL_REVIEW
+  HOURS
+  REVERSAL
+}
+
+/// Ledger of what an SME earned. Append-only in the database; a correction is a reversing entry.
+model EarningEntry {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String      @map("client_id") @db.Uuid
+  smeUserId       String      @map("sme_user_id") @db.Uuid
+  amount          Decimal     @db.Decimal(12, 2)
+  currency        String
+  kind            EarningKind
+  sourceType      String      @map("source_type")
+  sourceId        String      @map("source_id")
+  requisitionId   String?     @map("requisition_id") @db.Uuid
+  rateCardId      String?     @map("rate_card_id") @db.Uuid
+  rateCardVersion Int?        @map("rate_card_version")
+  /// The entry this one reverses (no foreign key: append-only tables are never referenced).
+  reversesId      String?     @unique @map("reverses_id") @db.Uuid
+  reason          String?
+  earnedAt        DateTime    @default(now()) @map("earned_at")
+  createdById     String?     @map("created_by_id")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  @@unique([sourceType, sourceId, kind])
+  @@index([smeUserId, earnedAt])
+}
+
+enum PayeeStatus {
+  NOT_REQUIRED
+  NOT_STARTED
+  PENDING
+  READY
+  BLOCKED
+}
+
+/// The SME's account at the payout provider. Status only: no bank or tax data is stored in Praxis.
+model Payee {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String      @map("client_id") @db.Uuid
+  smeUserId      String      @unique @map("sme_user_id") @db.Uuid
+  provider       String
+  payeeRef       String?     @map("payee_ref")
+  status         PayeeStatus @default(NOT_STARTED)
+  /// Currency the provider pays out in (e.g. INR for India); set from the provider.
+  payoutCurrency String?     @map("payout_currency")
+  statusReason   String?     @map("status_reason")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  @@unique([provider, payeeRef])
+}
+
+/// A manual hold on an SME's payouts (dispute, fraud flag). Released by a person; history kept by the audit log.
+model PayHold {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String    @map("client_id") @db.Uuid
+  smeUserId   String    @map("sme_user_id") @db.Uuid
+  kind        String
+  reason      String
+  createdById String    @map("created_by_id") @db.Uuid
+  releasedAt  DateTime? @map("released_at")
+  releasedBy  String?   @map("released_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([smeUserId, releasedAt])
+}
+
+enum PayRunStatus {
+  DRAFT
+  CONFIRMED
+  APPROVED
+  SUBMITTED
+  COMPLETED
+  CANCELLED
+}
+
+model PayRun {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId         String       @map("client_id") @db.Uuid
+  /// Monday 00:00 UTC to the next Monday (exclusive).
+  periodStart      DateTime     @map("period_start")
+  periodEnd        DateTime     @map("period_end")
+  status           PayRunStatus @default(DRAFT)
+  confirmedBy      String?      @map("confirmed_by") @db.Uuid
+  confirmedAt      DateTime?    @map("confirmed_at")
+  /// [{ userId, at, singleApprover }]
+  approvals        Json         @default("[]")
+  providerBatchRef String?      @map("provider_batch_ref")
+  /// Totals per currency, and what was held or carried forward (reported with the run).
+  totals           Json         @default("{}")
+  report           Json         @default("{}")
+  createdById      String?      @map("created_by_id")
+  submittedAt      DateTime?    @map("submitted_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  items PayoutItem[]
+
+  @@unique([clientId, periodStart])
+}
+
+enum PayoutItemStatus {
+  PENDING
+  HELD
+  SUBMITTED
+  PAID
+  FAILED
+  RETURNED
+}
+
+model PayoutItem {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String           @map("client_id") @db.Uuid
+  payRunId           String           @map("pay_run_id") @db.Uuid
+  smeUserId          String           @map("sme_user_id") @db.Uuid
+  amount             Decimal          @db.Decimal(12, 2)
+  currency           String
+  entryIds           String[]         @map("entry_ids")
+  status             PayoutItemStatus @default(PENDING)
+  holdReason         String?          @map("hold_reason")
+  idempotencyKey     String           @unique @map("idempotency_key")
+  providerPaymentRef String?          @unique @map("provider_payment_ref")
+  /// { payoutCurrency, rate, payoutAmount } as reported by the provider.
+  fx                 Json?
+  failureReason      String?          @map("failure_reason")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  payRun PayRun @relation(fields: [payRunId], references: [id])
+
+  @@index([smeUserId])
+}
+
+/// Provider webhook receipts: one row per provider event id (duplicates are ignored).
+model PayoutProviderEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String?  @map("client_id") @db.Uuid
+  provider    String
+  eventId     String   @map("event_id")
+  type        String
+  livemode    Boolean
+  payloadHash String   @map("payload_hash")
+  outcome     String
+  receivedAt  DateTime @default(now()) @map("received_at")
+
+  @@unique([provider, eventId])
+}
+
+/// Reconciliation mismatches (daily job) for Finance to resolve.
+model PayoutException {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String    @map("client_id") @db.Uuid
+  reportDate   DateTime  @map("report_date") @db.Date
+  kind         String
+  paymentRef   String    @map("payment_ref")
+  payoutItemId String?   @map("payout_item_id") @db.Uuid
+  detail       Json
+  status       String    @default("OPEN")
+  resolvedBy   String?   @map("resolved_by") @db.Uuid
+  resolvedAt   DateTime? @map("resolved_at")
+  note         String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@unique([reportDate, kind, paymentRef])
+}
+
+/// A fee owed by a partner for each certified candidate. Append-only; a correction is a reversing entry.
+model PartnerFeeEntry {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String   @map("client_id") @db.Uuid
+  partnerId       String   @map("partner_id") @db.Uuid
+  certificationId String?  @map("certification_id") @db.Uuid
+  submissionId    String?  @map("submission_id") @db.Uuid
+  amount          Decimal  @db.Decimal(12, 2)
+  currency        String
+  feeTermsVersion String?  @map("fee_terms_version")
+  reversesId      String?  @unique @map("reverses_id") @db.Uuid
+  reason          String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([partnerId, certificationId])
+  @@index([partnerId, createdAt])
+}
+
+model PartnerStatement {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  partnerId String   @map("partner_id") @db.Uuid
+  /// YYYY-MM (UTC).
+  period    String
+  totals    Json
+  entryIds  String[] @map("entry_ids")
+  status    String   @default("ISSUED")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([partnerId, period])
 }

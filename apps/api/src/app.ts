@@ -39,6 +39,8 @@ import { supplyInternalRoutes } from './routes/supply-internal';
 import { secretBox } from './lib/secrets';
 import { certAdminRoutes } from './routes/cert-admin';
 import { certCandidateRoutes } from './routes/cert-candidate';
+import { paymentCandidateRoutes, paymentRoutes } from './routes/payments';
+import { MockPayoutProvider, TrolleyPayoutProvider, type PayoutProvider } from './pay/provider';
 import { ClaudeVertexCurriculumGenerator, MockCurriculumGenerator, type CurriculumGenerator } from './cert/generator';
 import { MockSelfieCheck, StripeSelfieCheck, type SelfieCheck } from './cert/selfie';
 import { ClaudeVertexTaskDrafter, MockTaskDrafter, type TaskDrafter } from './tasks/drafting/drafter';
@@ -85,6 +87,14 @@ export interface AppDeps {
   /** M10b certification: course/test generator (Claude on Vertex or the mock) and the per-attempt selfie check. */
   curriculum?: CurriculumGenerator;
   selfie?: SelfieCheck;
+  /** M10c payout provider: Trolley when configured, otherwise the mock. */
+  payouts?: PayoutProvider;
+}
+
+export function defaultPayouts(config: Config): PayoutProvider {
+  return config.payoutMode === 'trolley'
+    ? new TrolleyPayoutProvider({ accessKey: config.TROLLEY_ACCESS_KEY, secretKey: config.TROLLEY_SECRET_KEY, webhookSecret: config.TROLLEY_WEBHOOK_SECRET, apiUrl: config.TROLLEY_API_URL, widgetUrl: config.TROLLEY_WIDGET_URL, livemode: config.appEnv === 'production' })
+    : new MockPayoutProvider(config.MOCK_SECRET, config.CANDIDATE_APP_URL);
 }
 
 /** M10b curriculum generator: Claude on Vertex (CERT_MODEL / CERT_BULK_MODEL) when configured, otherwise the mock. */
@@ -255,6 +265,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         const gen = deps.curriculum ?? defaultCurriculum(deps.config);
         const embeddings = deps.embeddings ?? defaultEmbeddings(deps.config);
         await v1.register(certAdminRoutes, { db: deps.db, storage, box });
+        const payouts = deps.payouts ?? defaultPayouts(deps.config);
+        await v1.register(paymentRoutes, { db: deps.db, config: deps.config, payouts });
+        await v1.register(paymentCandidateRoutes, { db: deps.db, payouts });
         await v1.register(certCandidateRoutes, { db: deps.db, config: deps.config, gen, box, embeddings, selfie: deps.selfie ?? defaultSelfie(deps.config), storage });
       }
       await v1.register(datasetRoutes, { db: deps.db });

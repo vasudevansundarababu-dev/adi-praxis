@@ -9,11 +9,12 @@ import type { Db, Tx } from '../db';
  */
 export async function supplyOnboardingItems(tx: Db | Tx, enrollmentId: string, smeUserId: string) {
   const s = await tx.partnerSubmission.findFirst({ where: { enrollmentId, sandbox: false }, include: { requisition: true } });
-  if (!s?.requisition.guidelinesPackageId) return [];
+  if (!s) return [];
   const r = s.requisition;
-  const cert = await tx.certification.findFirst({ where: { smeUserId, domain: r.domain, tier: r.tier }, orderBy: { createdAt: 'desc' } });
-  return [
-    {
+  const items = [];
+  if (r.guidelinesPackageId) {
+    const cert = await tx.certification.findFirst({ where: { smeUserId, domain: r.domain, tier: r.tier }, orderBy: { createdAt: 'desc' } });
+    items.push({
       key: 'certification',
       kind: 'certification' as const,
       title: 'Guidelines course and certification',
@@ -21,6 +22,19 @@ export async function supplyOnboardingItems(tx: Db | Tx, enrollmentId: string, s
       done: cert?.state === 'PASSED',
       data: cert ? { certificationId: cert.id, state: cert.state } : null,
       terms: null,
-    },
-  ];
+    });
+  }
+  if (r.payRoute === 'DIRECT') {
+    const payee = await tx.payee.findUnique({ where: { smeUserId } });
+    items.push({
+      key: 'payee',
+      kind: 'payee' as const,
+      title: 'Payment set-up',
+      description: 'Set up how you are paid with our payout provider (tax form and payout method). Praxis never sees your bank or tax details.',
+      done: payee?.status === 'READY',
+      data: { status: payee?.status ?? 'NOT_STARTED' },
+      terms: null,
+    });
+  }
+  return items;
 }

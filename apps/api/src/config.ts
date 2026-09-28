@@ -59,6 +59,15 @@ const Env = z.object({
    *  per-candidate question wording and the independent solver check. Blank bulk model = CERT_MODEL. */
   CERT_MODEL: z.string().default('claude-opus-5'),
   CERT_BULK_MODEL: z.string().default(''),
+  /** M10c payouts through Trolley. Blank keys = the local mock (refused in production with SME supply on). */
+  TROLLEY_ACCESS_KEY: z.string().default(''),
+  TROLLEY_SECRET_KEY: z.string().default(''),
+  TROLLEY_WEBHOOK_SECRET: z.string().default(''),
+  TROLLEY_API_URL: z.string().default('https://api.trolley.com'),
+  TROLLEY_WIDGET_URL: z.string().default('https://widget.trolley.com'),
+  /** Pay-run total (in USD-equivalent units of the run's currency) above which a second Finance approver is needed.
+   *  Blank = one approver (flagged in the audit log as single-approver). */
+  PAYRUN_SECOND_APPROVAL_ABOVE: z.string().default(''),
 });
 
 export type Config = z.infer<typeof Env> & {
@@ -66,6 +75,8 @@ export type Config = z.infer<typeof Env> & {
   candidateAuthMode: 'google' | 'mock';
   /** Derived: real Stripe when keys are set, otherwise the dev mock. */
   identityMode: 'stripe' | 'mock';
+  /** Derived: Trolley when its keys are set, otherwise the local payout mock. */
+  payoutMode: 'trolley' | 'mock';
   /** Only live-mode identity results confer eligibility (FLOW2 CF-05). True in production, not in staging. */
   requireLiveIdentity: boolean;
   appEnv: 'local' | 'staging' | 'production' | 'demo';
@@ -86,6 +97,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const identityMode = c.STRIPE_SECRET_KEY && c.STRIPE_IDENTITY_WEBHOOK_SECRET ? 'stripe' : 'mock';
   const assistantMode = c.VERTEX_PROJECT_ID ? 'vertex' : 'mock';
   const emailMode = c.SMTP_HOST ? 'smtp' : 'memory';
+  const payoutMode = c.TROLLEY_ACCESS_KEY && c.TROLLEY_SECRET_KEY && c.TROLLEY_WEBHOOK_SECRET ? 'trolley' : 'mock';
+  if (c.SME_SUPPLY_ENABLED && c.NODE_ENV === 'production' && c.APP_ENV !== 'demo' && payoutMode === 'mock') {
+    throw new Error('Invalid configuration: SME_SUPPLY_ENABLED in production needs TROLLEY_ACCESS_KEY, TROLLEY_SECRET_KEY and TROLLEY_WEBHOOK_SECRET (the payout mock is refused)');
+  }
   if (c.SME_SUPPLY_ENABLED && c.NODE_ENV === 'production' && c.APP_ENV !== 'demo' && Buffer.from(c.M10_ENCRYPTION_KEY, 'base64').length !== 32) {
     throw new Error('Invalid configuration: SME_SUPPLY_ENABLED needs M10_ENCRYPTION_KEY (32 bytes, base64)');
   }
@@ -97,5 +112,5 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error('Invalid configuration: production needs GOOGLE_OAUTH_CLIENT_ID, STRIPE_SECRET_KEY, STRIPE_IDENTITY_WEBHOOK_SECRET, VERTEX_PROJECT_ID and SMTP_HOST (mocks are local-only)');
   }
   const appEnv = c.APP_ENV ?? (c.NODE_ENV === 'production' ? 'production' : 'local');
-  return { ...c, candidateAuthMode, identityMode, assistantMode, emailMode, appEnv, requireLiveIdentity: appEnv === 'production' };
+  return { ...c, candidateAuthMode, identityMode, assistantMode, emailMode, payoutMode, appEnv, requireLiveIdentity: appEnv === 'production' };
 }

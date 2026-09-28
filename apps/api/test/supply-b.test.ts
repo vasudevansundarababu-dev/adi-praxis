@@ -154,7 +154,7 @@ describe('M10b guidelines, courses and certification (docs/SME-SUPPLY.md section
   }
 
   async function requisition(projectId: string, partnerId: string, tier: SmeTier, packageId: string, extra: object = {}) {
-    const r = (await post(pm, '/requisitions', { projectId, title: `KYC ${tier.toLowerCase()}s (India)`, summary: 'Label KYC onboarding decisions.', domain: 'banking', tier, headcount: 10, languages: ['en'], jurisdictions: ['IN'], minimumRequirements: { minYears: 2, qualifications: [], licenceRequired: false }, allowedPartnerIds: [partnerId], maxPerPartner: 50, ...extra })).json();
+    const r = (await post(pm, '/requisitions', { projectId, title: `KYC ${tier.toLowerCase()}s (India)`, summary: 'Label KYC onboarding decisions.', domain: 'banking', tier, headcount: 10, languages: ['en'], jurisdictions: ['IN'], minimumRequirements: { minYears: 2, qualifications: [], licenceRequired: false }, allowedPartnerIds: [partnerId], maxPerPartner: 50, payRoute: 'VIA_PARTNER', ...extra })).json();
     expect(r.id, JSON.stringify(r)).toBeTruthy();
     expect((await put(pm, `/requisitions/${r.id}/guidelines`, { packageId })).statusCode).toBe(200);
     expect((await post(pm, `/requisitions/${r.id}/transition`, { to: 'OPEN' })).statusCode).toBe(200);

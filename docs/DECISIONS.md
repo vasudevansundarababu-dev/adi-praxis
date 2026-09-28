@@ -272,3 +272,43 @@ Spec: `docs/SME-SUPPLY.md` (section 0 owner decisions). Runbook: `docs/M10-BUILD
 - **(chosen by Claude)** Partners see a requisition's guidelines summary (package name, version, section headings) and
   course outline (module titles, number of questions, time limit) once the tier is published; never items, answers or
   pass rules.
+
+### M10c Payments
+- **(chosen by Claude)** The pay route is set per requisition: `DIRECT` (default; Praxis pays the SME, payee set-up
+  is a C07 checklist item) or `VIA_PARTNER` (the partner pays its people; no payee, no earnings in Praxis).
+- **(chosen by Claude)** Rate cards are versioned and never edited: a change is a new version of the same name, and a
+  requisition is linked to one version. Per-task rates by task type (Authoring, Annotation, RL review), in USD or INR.
+  An entry records the rate-card version it was priced at.
+- **(chosen by Claude)** Earnings are written when a person accepts a task (the existing `task.accepted` event, which
+  is the spec's `task.approved`), dated at the acceptance, exactly once per task (unique source), for SMEs who came
+  through a DIRECT requisition on that project. `rl_review.accepted` and `hours.approved` are not built: in this
+  platform FLOW 4 reviews are done by internal Validators (not SMEs), and there is no hours tracking yet. The ledger
+  kinds `RL_REVIEW` and `HOURS` exist for when they are.
+- **(chosen by Claude)** `EarningEntry` and `PartnerFeeEntry` are append-only in the database (trigger plus revoked
+  UPDATE/DELETE, as for the M6 tables). A correction is a `REVERSAL` entry pointing at the original; an entry is
+  reversed at most once and a reversal is never reversed. Only Finance or an Admin reverses. No foreign key points at
+  these tables (Postgres foreign-key checks need UPDATE on the referenced table).
+- **(chosen by Claude)** Pay runs: one per client per week (Monday 00:00 UTC to the next Monday), drafted by a worker
+  job on Mondays or by Finance/PM. One payout item per SME and currency. Held (reported, not submitted): SME account
+  not active, an open hold (dispute or fraud flag, placed by Finance, Admin or a Validator), standing SUSPENDED, payee
+  not READY. Balances under USD 10 / INR 500, and held, failed or returned amounts, carry into the next run.
+- **(chosen by Claude)** Approvals: a PM (or Admin) confirms, then a FINANCE user approves. Above
+  `PAYRUN_SECOND_APPROVAL_ABOVE` two different Finance approvers are needed; until that is set, every approval is
+  flagged `singleApprover: true` in the audit log (and `sameAsConfirmer` when the same person confirmed). A Finance user
+  who is paid in the run (matched by email) cannot approve it. Only Finance submits; submission re-checks payees and
+  sends each payment with a stable idempotency key, so a retried submit pays nobody twice. Approved runs can be
+  cancelled and rebuilt; submitted runs cannot.
+- **(chosen by Claude)** Provider webhook `POST /api/v1/integrations/trolley/webhook`: signature on the raw body with a
+  5-minute tolerance, one receipt per provider event id (duplicates return `duplicate: true`), events from the other
+  mode (test vs live) are recorded and ignored. Payment statuses only move forward (SUBMITTED → PAID/FAILED/RETURNED,
+  PAID → RETURNED); FX (payout currency, rate, amount) is stored from the provider. A run completes when every item is
+  final.
+- **(chosen by Claude)** Reconciliation runs daily for the previous UTC day (and on demand): every mismatch between the
+  provider's settlement report and our items becomes an open exception — unknown payment, amount/currency mismatch,
+  status mismatch, or a payment we marked PAID that is missing from the report. Finance resolves each with a note.
+- **(chosen by Claude)** Partner fees: one entry per certified candidate (event `cert.certified`) for the partner that
+  supplied them, at the partner's fee terms (`PUT /partners/:id/fee-terms`, Admin). Without agreed terms the entry is
+  written at zero with the note `NO_FEE_TERMS` so Finance sees it. Statements are built monthly (worker job, and on
+  demand) per partner and shown in the partner portal with the partner's own candidate ids.
+- **(chosen by Claude)** New internal role `FINANCE` (label Finance). Payee data in Praxis is provider, reference,
+  status and payout currency only.

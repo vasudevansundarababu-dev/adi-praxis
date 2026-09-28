@@ -15,6 +15,7 @@ import type { TaskDrafter } from '../tasks/drafting/drafter';
 import { draftOnRequest } from '../tasks/drafting/service';
 import { supplyHandlers } from '../supply/handlers';
 import { generationHandler } from '../cert/pipeline';
+import { payHandlers } from '../pay/ledger';
 import type { ItemDeps } from '../cert/items';
 
 /**
@@ -55,6 +56,7 @@ export function defaultHandlers(deps: { evaluator?: SuitabilityEvaluator; email?
   // M10 SME supply: only with the feature flag on (docs/SME-SUPPLY.md section 13).
   if (deps.smeSupply ?? deps.config?.SME_SUPPLY_ENABLED) {
     for (const h of supplyHandlers()) r.register(h);
+    for (const h of payHandlers()) r.register(h);
     if (deps.cert) r.register(generationHandler(deps.cert));
   }
   return r;

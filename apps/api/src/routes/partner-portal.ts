@@ -2,6 +2,7 @@ import { CandidateSubmissionInput } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { PartnerUserActor } from '../auth/actor';
+import { statementDto } from '../pay/ledger';
 import { getDummyHash, verifyPassword } from '../auth/password';
 import { createPartnerSession, PARTNER_SESSION_COOKIE, revokeSession } from '../auth/sessions';
 import type { Config } from '../config';
@@ -49,6 +50,12 @@ export const partnerPortalRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
   app.get('/partner-portal/me', { config: { access: 'partner' }, schema: { tags: ['partner-portal'] } }, async (req) => {
     const u = await db.partnerUser.findUniqueOrThrow({ where: { id: me(req).partnerUserId }, include: { partner: true } });
     return { user: { id: u.id, email: u.email, name: u.name }, partner: { id: u.partner.id, name: u.partner.name, allowedDomains: u.partner.allowedDomains, allowedTiers: u.partner.allowedTiers } };
+  });
+
+  // M10c: monthly certified-candidate fee statements (payment happens outside Praxis).
+  app.get('/partner-portal/statements', { config: { access: 'partner' }, schema: { tags: ['partner-portal'] } }, async (req) => {
+    const rows = await db.partnerStatement.findMany({ where: { partnerId: me(req).partnerId }, orderBy: { period: 'desc' } });
+    return { items: await Promise.all(rows.map((s) => statementDto(db, s))) };
   });
 
   app.get('/partner-portal/requisitions', { config: { access: 'partner' }, schema: { tags: ['partner-portal'] } }, async (req) => {

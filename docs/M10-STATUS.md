@@ -16,7 +16,7 @@ Branch `m10-sme-supply`. Spec: `docs/SME-SUPPLY.md`. Runbook: `docs/M10-BUILD.md
 | --- | --- |
 | M10a Foundations, partners and requisitions | done (API); portal and candidate pages come with M10d |
 | M10b Guidelines to courses and certifications | done (API); Admin and candidate screens come with M10d |
-| M10c Payments | not started |
+| M10c Payments | done (API); Finance, candidate and partner screens come with M10d |
 | M10d Screens | not started |
 
 ## M10a — done
@@ -54,3 +54,22 @@ Branch `m10-sme-supply`. Spec: `docs/SME-SUPPLY.md`. Runbook: `docs/M10-BUILD.md
     verification per attempt).
   - Vertex quota in the test project still returns 429 for Claude; generation there falls back to FAILED runs until it
     is raised.
+
+## M10c — done
+
+- Migration `20260928030000_m10c_payments`: rate cards, append-only `EarningEntry` and `PartnerFeeEntry`, payees, pay
+  holds, pay runs and payout items, provider event receipts, payout exceptions, partner statements; `FINANCE` role;
+  `Requisition.payRoute`; partner fee terms.
+- `apps/api/src/pay/`: `PayoutProvider` with `TrolleyPayoutProvider` and `MockPayoutProvider`; ledger and partner fees;
+  payees; pay runs, webhook processing and reconciliation. Routes `apps/api/src/routes/payments.ts` (internal,
+  candidate `/me/payee*` and `/me/earnings`, webhook) and `/partner-portal/statements`. Worker jobs `pay-run-build`
+  (hourly, acts on Mondays), `payout-reconcile` (daily), `partner-statements` (daily, previous month).
+- C07 checklist: "Payment set-up" item for DIRECT requisitions, completed by a READY payee.
+- Tests: `apps/api/test/supply-c.test.ts` (9). Suite: api 434, shared 101 — all green; workspace typecheck green.
+- Owner:
+  - The Trolley adapter follows Trolley's public API reference but has **not** been run against a Trolley account:
+    request signing, field names, status values, the widget URL and the settlement search must be checked in a
+    Trolley sandbox before go-live. Tests use the mock only.
+  - Set `TROLLEY_ACCESS_KEY`, `TROLLEY_SECRET_KEY`, `TROLLEY_WEBHOOK_SECRET` where M10 runs in production (the mock is
+    refused there), and `PAYRUN_SECOND_APPROVAL_ABOVE` once a second Finance approver exists.
+  - Not built: earnings from FLOW 4 (reviews are internal) and hours (no hours tracking); retainers (December 2026).

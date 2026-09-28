@@ -8,7 +8,7 @@ body:
       value: "Enhancements are decided by the product owner. The nightly agent never builds one until it is approved."
   - type: dropdown
     id: persona
-    attributes: { label: Who benefits, options: ["SME / candidate", "Project manager", "Admin", "Reviewer", "RL Gym (API)", "Several"] }
+    attributes: { label: Who benefits, options: ["SME / candidate", "Project manager", "Admin", "Validator (Reviewer)", "Finance", "Partner (portal or Partner API)", "RL Gym (API)", "Several"] }
     validations: { required: true }
   - type: textarea
     id: problem

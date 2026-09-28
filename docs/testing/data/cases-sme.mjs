@@ -95,7 +95,7 @@ export const CASES = [
   c('TC-SME-021', 'Declare a conflict in onboarding', {
     category: 'FUNC', priority: 'P2', pre: 'A selected candidate.',
     steps: ['In "Conflicts and authorisation" answer Yes and describe a conflict (synthetic).', 'Ask a PM to try to assign you.'],
-    expected: ['The PM cannot propose you until a Reviewer resolves the conflict (Review → Conflicts).'],
+    expected: ['The PM cannot propose you until a Reviewer resolves the conflict (Reviews → Conflicts).'],
     decisions: ['D-M4C-08'],
   }),
   c('TC-SME-022', 'Accept or decline an assignment proposal', {
@@ -233,5 +233,105 @@ export const CASES = [
     steps: ['Tab A: Draft my task. Tab B: type into W02 while it runs, then after it finishes.'],
     expected: ['Tab B also pauses editing while the draft is written and reloads with the draft when it lands.', 'Anything typed in Tab B just before the draft landed is not silently written over the draft: Tab B reports "Changed in another window: reload to continue".'],
     decisions: ['D-M9-04'],
+  }),
+  // ── Release 1.1: careers page, partner invites, course and certification, payments ──
+  // The careers page link is <candidate URL>/careers/requisitions/<requisition id>; the lead shares the link of the
+  // demo requisition "KYC authors — India (Annotator)". The course and test exist only after an Admin has published the
+  // Annotator tier and a PM has linked it to the requisition (see README "What's new", day 1).
+  c('TC-SME-060', 'Careers page when signed out', {
+    category: 'UX', priority: 'P2', pre: 'Signed out of the candidate app. The careers link from the lead.',
+    steps: ['Open the careers link.', 'Read About the role, What you\'ll need and What happens next.', 'Press the apply button.', 'Open a careers link with a made-up id (change the last characters).'],
+    expected: ['The page is readable without signing in: title, tier, hours a week, languages, jurisdictions, minimum experience.', '"What happens next" explains: verify identity and build a profile, a person reviews, then a short course and a certification test. It says "Applying does not guarantee selection; a person makes every decision."', 'You are asked to sign in ("Sign in with Google to apply. You come straight back here.") and return to the same page afterwards.', 'A wrong id says the role is not open for applications, not a crash.'],
+    decisions: ['D-M10-09'],
+  }),
+  c('TC-SME-061', 'Apply on the careers page', {
+    category: 'FUNC', priority: 'P1', pre: 'A new candidate sme.<initials>.061@example.test, signed in and identity verified (TC-SME-001, TC-SME-002).',
+    steps: ['Open the careers link → Apply for this role.', 'Press "Apply and continue →" with everything empty.', 'Fill: a short experience summary (10+ characters), years 4, country India, add languages English and Hindi, tick consent. Apply.', 'Go back to the careers link and apply again.'],
+    expected: ['Required fields carry asterisks with "Fields marked * are required."; empty submit says "Some answers need another look. Check each field and try again." and marks the fields.', 'After applying you go straight into the profile chat for the "KYC authoring demo" opportunity (FLOW 2 unchanged).', 'The second application says "You already have an application in progress for this role, or applied recently."'],
+    decisions: ['D-M10-09', 'D-UI-01'],
+  }),
+  c('TC-SME-062', 'Partner invite links that cannot be used', {
+    category: 'FUNC', priority: 'P2', pre: 'Signed in as any candidate. (Working invite links, shown to the partner in the test environment, are tested in TC-PTR-015 and TC-E2E-008.)',
+    steps: ['Open <candidate URL>/partner-invite/abc.', 'Open <candidate URL>/partner-invite/ followed by 40 random letters.'],
+    expected: ['Both show "This link can\'t be used" with "We couldn\'t find this invitation. Check that you opened the full link from the email, or ask the person who put you forward to send it again." No crash, no technical error.'],
+    decisions: ['D-M10-11'],
+  }),
+  c('TC-SME-063', 'Certifications list and the course in module order', {
+    category: 'FUNC', priority: 'P1', pre: 'A candidate selected on a requisition whose Annotator tier is published and linked (TC-E2E-008 up to selection).',
+    steps: ['Header → Certifications. Read the card.', 'Start the course. Try to open module 2 before passing module 1 (click it, or change the URL).', 'In module 1 read the explanation, good examples and examples to avoid; try Practice and "Show a model answer".'],
+    expected: ['The card says to start with the course and that modules open one after another, each with a short quiz.', 'Later modules are locked: "Finish the modules in order. The next one opens when you pass the quiz at the end of the one before."', 'Practice "doesn\'t count towards anything"; content cites the guidelines and uses synthetic examples only.'],
+    decisions: ['D-M10-19', 'D-M10-24'],
+  }),
+  c('TC-SME-064', 'Module quiz: 80% to pass, retry straight away', {
+    category: 'FUNC', priority: 'P1', pre: 'In module 1 of the course.',
+    steps: ['Press "Check my answers" with nothing chosen.', 'Answer deliberately wrongly; check.', 'Fix the answers; check. Then Next module.', 'Finish every module ("Finish the course").'],
+    expected: ['"Answer every question, then check your answers."', 'Below 80%: "Not quite: read the feedback above, change your answers and try again." with feedback per question.', 'At 80%+: "Well done: you passed this module." and the next module opens.', 'After the last module: "Go to the test".'],
+    decisions: ['D-M10-19'],
+  }),
+  c('TC-SME-065', 'Selfie check before every attempt', {
+    category: 'FUNC', priority: 'P1', pre: 'Course finished.',
+    steps: ['Go to the test. Read "Before you start".', 'Press "Start the test now" if it is visible before the selfie.', 'Take the selfie check → on the simulated page choose the successful outcome → come back.', 'Close the tab before starting; come back later.'],
+    expected: ['The page explains: timed test, one sitting, answers save automatically, pasting and leaving the page are logged and never fail anyone on their own, up to 3 attempts with a 48-hour wait after a fail.', 'The test cannot start before the selfie check.', '"Quick selfie check": "We check it\'s you before every attempt. Only the result is kept; we never store your photo or ID." After it, "Start the test now →" is enabled.', 'If you leave before starting you are told you need to take the selfie check again.'],
+    decisions: ['D-M10-19', 'D-M10-23', 'D-PL-10'],
+  }),
+  c('TC-SME-066', 'Test player: question types, map, countdown and ordering', {
+    category: 'FUNC', priority: 'P1', pre: 'A test just started (TC-SME-065).',
+    steps: ['Read the countdown and the question map.', 'Answer a single-choice, a multiple-choice ("Choose all that apply") and an ordering question (use the Up and Down buttons).', 'Jump to question 10 from the map, then back.', 'Change an answer and watch the save status.'],
+    expected: ['Countdown matches the blueprint (Annotator: 40 minutes); one question at a time; the map shades answered questions.', 'Ordering uses Up/Down buttons that announce "Moved to position X of Y" (no drag and drop).', 'Status goes "Unsaved changes" → "All answers saved" within about 2 seconds.', 'Questions are not marked with asterisks (unanswered ones score zero), and never show the correct answer.'],
+    decisions: ['D-M10-40', 'D-M10-20', 'D-UI-02'],
+  }),
+  c('TC-SME-067', 'Submit the test and read the result', {
+    category: 'FUNC', priority: 'P1', pre: 'A test in progress with all questions answered as well as you can from the course.',
+    steps: ['Submit test → read the confirmation → "Yes, submit my test".', 'Read the result page.', 'Open Onboarding (from the application status or home page).'],
+    expected: ['A confirmation step before submitting.', 'Pass: "You passed" and "How you did in each section" with bands (Strong, Meets, Developing, Below), never the questions, your answers or the keys. Fail: "You didn\'t pass this time" with the date and time of the retake.', 'On a pass, the checklist item "Guidelines course and certification" is Done without you ticking anything.'],
+    decisions: ['D-M10-22', 'D-M10-24', 'D-M10-41'],
+  }),
+  c('TC-SME-068', 'Retake after 48 hours with new questions', {
+    category: 'FUNC', priority: 'P2', pre: 'A candidate who failed an attempt (answer most questions wrongly on purpose). Note a few question wordings first.',
+    steps: ['Right after the fail, open Certifications and the test page.', 'After 48 hours (or on a candidate that failed two days ago; ask the lead) take the selfie check and start the retake.', 'Compare the questions.'],
+    expected: ['Before 48 hours: "You can retake the test from <date and time>. Use the time to revisit the course." and no start button.', 'After 48 hours: "You can retake the test now. The retake has new questions." and a new selfie check.', 'No question instance repeats word for word from your earlier attempt.'],
+    decisions: ['D-M10-22', 'D-M10-18', 'D-M10-19'],
+  }),
+  c('TC-SME-069', 'Payment set-up with the simulated payout provider', {
+    category: 'FUNC', priority: 'P1', pre: 'A candidate selected on a direct-pay requisition (the demo requisition is direct pay).',
+    steps: ['Header → Payments. Read the set-up card.', 'Set up payments → the simulated payout provider page opens in a new tab → Finish and return to ADI Praxis.', 'Back on the first tab press "Check my status".', 'Open Onboarding.'],
+    expected: ['The card explains you add your tax form and payout method on the provider\'s page and "ADI Praxis never sees your bank or tax details."', 'The simulated page says it is simulated and has a Finish button; after it, the status becomes ready: "Your payment account is ready. Payments for accepted work go out weekly."', 'Nowhere in the app is a bank account, IFSC, PAN or tax form asked for or shown.', 'The checklist item "Payment set-up" is Done by itself.'],
+    decisions: ['D-M10-34', 'D-M10-36', 'D-M10-41'],
+  }),
+  c('TC-SME-070', 'Paid via a partner: nothing to set up', {
+    category: 'FUNC', priority: 'P2', pre: 'A candidate selected on a "Via partner" requisition (TC-PM-017).',
+    steps: ['Open Payments.', 'Open Onboarding.'],
+    expected: ['Payments: "The partner who put you forward pays you for this work, so there is nothing to set up here."', 'No "Payment set-up" item on the checklist.'],
+    decisions: ['D-M10-28'],
+  }),
+  c('TC-SME-071', 'Onboarding checklist: the automatic items', {
+    category: 'FUNC', priority: 'P1', pre: 'A selected candidate on a direct-pay requisition with guidelines linked, before the course.',
+    steps: ['Open Onboarding and complete every other step.', 'Read the two new items; look for a tick box or "I have read" button on them.', 'Try to finish onboarding.', 'Pass the certification and set up payments; come back.'],
+    expected: ['"Guidelines course and certification" and "Payment set-up" show "Completes automatically" with a button that goes to the right page (e.g. "Start the course", "Set up payments").', 'There is no way to tick them yourself.', 'Onboarding cannot complete while either is open.', 'Both turn Done by themselves and onboarding completes.'],
+    decisions: ['D-M10-41', 'D-M10-24'],
+  }),
+  c('TC-SME-072', 'Earnings after a task is accepted', {
+    category: 'FUNC', priority: 'P1', pre: 'A certified, onboarded SME on the direct-pay requisition who has a task accepted by a Validator (TC-E2E-008).',
+    steps: ['Payments → earnings list.', 'Ask the Validator to click Accept again, or reload several times.', 'After Finance submits the week\'s pay run (TC-FIN-005), read the list again.'],
+    expected: ['One line "Accepted task" at the rate card price (USD 40.00), dated the day of acceptance, status "Not paid yet".', 'Still exactly one line for that task.', 'The line moves to "Sent to the provider"/"In payment", then paid; the week is shown. Known limitation: the line may not show the task title.'],
+    decisions: ['D-M10-30', 'D-M10-34'],
+  }),
+  c('TC-SME-073', 'Candidate app header links; no Help button', {
+    category: 'UX', priority: 'P2', pre: 'Signed in as any candidate.',
+    steps: ['Read the header on the home page and on two other pages.', 'Look for a Help button or Support Bot on every candidate page.'],
+    expected: ['Header shows Opportunities, Certifications and Payments.', 'There is no Help button or Support Bot anywhere in the candidate app (by decision).'],
+    decisions: ['D-UI-04', 'D-M10-01'],
+  }),
+  c('TC-SME-074', 'Required-field markers across the candidate app', {
+    category: 'UX', priority: 'P2', pre: 'A new candidate. A screen reader for the last step (TalkBack or NVDA).',
+    steps: ['Check the mock sign-in form, the profile form ("Prefer a form"), the profile review, the onboarding work preferences, the careers apply form and the licence upload (if you have one).', 'On each, submit with required fields empty.', 'With the screen reader, move through one form.'],
+    expected: ['Each form has "Fields marked * are required." once, and asterisks on exactly the fields it refuses when empty.', 'The screen reader says "required" on each of them.', 'List every mismatch in one UX issue per screen.'],
+    decisions: ['D-UI-01', 'D-UI-02'],
+  }),
+  c('TC-SME-075', 'Expert reviews page for certified Experts', {
+    category: 'FUNC', priority: 'P3', pre: 'Any candidate. (A certified Expert needs a full Expert certification; coordinate with the lead.)',
+    steps: ['Open <candidate URL>/assessments as a candidate who is not a certified Expert.', 'As a certified Expert (if one exists): open a marking task and a question family.'],
+    expected: ['A non-Expert sees an empty state or a clear explanation, not an error.', 'The Expert types their own score; the model suggestion is shown "for reference only"; approving a family requires it to be accurate and supported by the cited section.'],
+    decisions: ['D-M10-21', 'D-M10-17'],
   }),
 ];

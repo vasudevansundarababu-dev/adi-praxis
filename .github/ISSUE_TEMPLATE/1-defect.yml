@@ -18,7 +18,7 @@ body:
     validations: { required: true }
   - type: dropdown
     id: persona
-    attributes: { label: Persona, options: ["SME / candidate", "Project manager", "Admin", "Reviewer", "RL Gym (API)", "Several / not role-specific"] }
+    attributes: { label: Persona, options: ["SME / candidate", "Project manager", "Admin", "Validator (Reviewer)", "Finance", "Partner (portal or Partner API)", "RL Gym (API)", "Several / not role-specific"] }
     validations: { required: true }
   - type: dropdown
     id: severity

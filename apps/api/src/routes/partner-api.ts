@@ -53,7 +53,7 @@ export const partnerApiRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; e
   app.post('/requisitions/:id/candidates', { config: { access: { partnerScope: 'candidates:write' }, rateLimit: perToken(120) }, schema: { tags: ['partner-api'], params: IdParams, body: CandidateSubmissionInput } }, async (req, reply) => {
     await runPartnerCommand(db, req, reply, async ({ tx, audit }) => {
       const c = client(req);
-      return submitCandidate(tx, { email, appUrl: config.CANDIDATE_APP_URL }, { clientId: c.clientId, ch: { partnerId: c.partnerId, sandbox: c.sandbox, channel: 'PARTNER_API' }, requisitionId: req.params.id, input: req.body }, audit);
+      return submitCandidate(tx, { email, appUrl: config.CANDIDATE_APP_URL, exposeInviteLink: config.appEnv === 'demo' }, { clientId: c.clientId, ch: { partnerId: c.partnerId, sandbox: c.sandbox, channel: 'PARTNER_API' }, requisitionId: req.params.id, input: req.body }, audit);
     });
     return reply;
   });

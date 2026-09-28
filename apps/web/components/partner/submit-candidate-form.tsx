@@ -8,7 +8,7 @@ import { StatePill } from './labels';
 import { partnerMutate } from './partner-mutate';
 
 type Job = { employer: string; title: string; start: string; end: string };
-type Result = { candidateId: string; state: string; screen: string; screenReasons: string[]; inviteExpiresAt: string | null };
+type Result = { candidateId: string; state: string; screen: string; screenReasons: string[]; inviteExpiresAt: string | null; inviteLinkForTesting?: string };
 type Duplicate = { message: string; candidateId?: string };
 
 const input = 'mt-1 block w-full rounded-md border border-line bg-surface px-3 py-2 text-fg';
@@ -117,6 +117,13 @@ export function SubmitCandidateForm({ requisitionId, requisitionTitle }: { requi
           </ul>
         )}
         <p className="mt-2 text-xs text-fg-muted">The screen is a recommendation. Only a Validator can decide that a candidate does not meet the requirements.</p>
+        {result.inviteLinkForTesting && (
+          <div className="mt-3 rounded-md border border-warning p-3 text-sm">
+            <p className="font-medium">Test environment: invite link</p>
+            <p className="mt-1 text-fg-muted">Email is simulated here, so the candidate does not receive the invite. Open this link as the candidate (in the candidate’s browser profile) to continue:</p>
+            <p className="mt-1 break-all font-mono text-xs">{result.inviteLinkForTesting}</p>
+          </div>
+        )}
         <div className="mt-4 flex flex-wrap gap-3">
           <Link href={`/partner/candidates/${result.candidateId}`} className="btn btn-primary">
             Track this candidate

@@ -10,7 +10,9 @@
 - { name: "persona:sme", color: "1d76db", description: "Candidate / subject-matter expert (candidate app)" }
 - { name: "persona:pm", color: "1d76db", description: "Project manager (console)" }
 - { name: "persona:admin", color: "1d76db", description: "Admin (console)" }
-- { name: "persona:reviewer", color: "1d76db", description: "Reviewer (console)" }
+- { name: "persona:reviewer", color: "1d76db", description: "Validator (Reviewer role, console)" }
+- { name: "persona:finance", color: "1d76db", description: "Finance (console: rate cards, pay runs, payouts)" }
+- { name: "persona:partner", color: "1d76db", description: "Staffing partner (partner portal or Partner API)" }
 - { name: "persona:rl-gym", color: "1d76db", description: "RL Gym machine client (API)" }
 - { name: "area:sign-in", color: "bfdadc", description: "Sign-in, sessions, identity check" }
 - { name: "area:profile", color: "bfdadc", description: "SME profile chat, form, review and submit" }
@@ -18,6 +20,11 @@
 - { name: "area:projects", color: "bfdadc", description: "Templates, projects, opportunities, staffing" }
 - { name: "area:authoring", color: "bfdadc", description: "Task workbench W00-W06, drafting, MCP tool calls" }
 - { name: "area:review", color: "bfdadc", description: "Task review, dataset, RL review" }
+- { name: "area:supply", color: "bfdadc", description: "Partners, requisitions, submissions, invites, careers page" }
+- { name: "area:certification", color: "bfdadc", description: "Guidelines, courses, certification tests, grading, licences" }
+- { name: "area:payments", color: "bfdadc", description: "Rate cards, earnings, pay runs, payouts, partner statements" }
+- { name: "area:support-bot", color: "bfdadc", description: "Help button / Support Bot, required-field markers, menu" }
+- { name: "area:environment", color: "bfdadc", description: "Test environment problem (e.g. Claude quota, deploy), not a product defect" }
 - { name: "area:platform", color: "bfdadc", description: "Performance, availability, security headers, accessibility, deploy" }
 - { name: "status:needs-triage", color: "ededed", description: "New: waiting for triage" }
 - { name: "status:needs-info", color: "d4c5f9", description: "The reporter or product owner must answer a question" }

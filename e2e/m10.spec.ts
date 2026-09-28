@@ -69,6 +69,7 @@ async function supply(extra: object = {}) {
 
 async function staffLogin(page: Page, email: string, password: string) {
   await page.goto(`${WEB}/login`);
+  await page.waitForLoadState('networkidle'); // let the form hydrate before submitting it
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
@@ -175,7 +176,10 @@ test('a pay run is built, confirmed by a PM, approved by Finance and submitted',
   await staffLogin(f, 'finance@e2e.local', 'e2e-finance-password');
   await f.goto(`${WEB}/payments/pay-runs`);
   await expect(f.getByRole('heading', { level: 1 })).toHaveText('Pay runs');
-  // Last week's run. On a Monday the worker may already have drafted it; then open that run instead.
+  // The week before last (the fixture's earnings), so the Monday worker job drafting last week's run never collides.
+  const twoWeeksAgo = new Date(Date.now() - 14 * 86_400_000);
+  const monday = new Date(Date.UTC(twoWeeksAgo.getUTCFullYear(), twoWeeksAgo.getUTCMonth(), twoWeeksAgo.getUTCDate() - ((twoWeeksAgo.getUTCDay() + 6) % 7)));
+  await f.getByLabel(/Week starting/).fill(monday.toISOString().slice(0, 10));
   await f.getByRole('button', { name: 'Build pay run' }).click();
   const exists = f.getByText('A pay run for this week already exists.');
   await expect(exists.or(f.getByRole('heading', { level: 1, name: /Week of/ })).first()).toBeVisible({ timeout: 30_000 });

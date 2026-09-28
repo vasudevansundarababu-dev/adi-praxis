@@ -12,12 +12,12 @@ Every product decision made while building ADI Praxis, written as what you shoul
 | [D-PL-02](#d-pl-02) | Sign-in | claude | Sessions last 12 hours for internal users and 24 hours for candidates; cookies are httpOnly, SameSite=Lax and Secure on HTTPS. | TC-SME-003, TC-SEC-001, TC-SEC-010, TC-PEN-012 |
 | [D-PL-03](#d-pl-03) | Sign-in | claude | Sign-in is rate limited to 10 attempts per minute per address. | TC-SEC-007, TC-PEN-017 |
 | [D-PL-04](#d-pl-04) | Sign-in | claude | One browser holds one console sign-in. Signing in as another role in the same browser replaces the first. | TC-PM-001, TC-SEC-004 |
-| [D-PL-05](#d-pl-05) | Roles | spec | Console areas by role: PM sees Projects and Templates; Reviewer sees Applications, Task reviews, RL reviews, Identity reviews and Conflicts; Admin sees everything plus Taxonomy, Terms, API clients, Failure codes and Users. | TC-PM-001, TC-ADM-001, TC-ADM-002, TC-ADM-003, TC-SEC-004, TC-PEN-001, TC-PEN-002, TC-PEN-003 |
-| [D-PL-06](#d-pl-06) | Security | spec | Every state change is authorised, idempotent (Idempotency-Key) and written to the audit log. | TC-ADM-002, TC-REV-003, TC-REV-012, TC-RLG-003, TC-NFR-030, TC-NFR-031, TC-SEC-009, TC-SEC-010, TC-PEN-005, TC-PEN-014 |
+| [D-PL-05](#d-pl-05) | Roles | spec | Console areas by role (updated in Release 1.1: the menu is grouped, see D-UI-03; the Reviewer role is shown as "Validator", see D-M10-03; new Finance role, see D-M10-36). PM: Home, Projects (Projects, Templates, Requisitions) and Payments (Pay runs, Rate cards). Validator: Home, Projects (Requisitions), Reviews (Applications, Task reviews, RL reviews, Identity reviews, Conflicts) and Certification (Guidelines, Certification reviews). Finance: Home and Payments. Admin: every group, including Partners and Admin (Users, Taxonomy, Terms, Failure codes, API clients). | TC-PM-001, TC-PM-013, TC-ADM-001, TC-ADM-002, TC-ADM-003, TC-ADM-021, TC-REV-030, TC-FIN-001, TC-SEC-004, TC-PEN-001, TC-PEN-002, TC-PEN-003 |
+| [D-PL-06](#d-pl-06) | Security | spec | Every state change is authorised, idempotent (Idempotency-Key) and written to the audit log. | TC-ADM-002, TC-ADM-014, TC-REV-003, TC-REV-012, TC-PTR-011, TC-FIN-004, TC-RLG-003, TC-NFR-030, TC-NFR-031, TC-SEC-009, TC-SEC-010, TC-PEN-005, TC-PEN-014 |
 | [D-PL-07](#d-pl-07) | Security | claude | The apps send a Content-Security-Policy, HSTS, X-Frame-Options DENY, nosniff, a referrer policy and a permissions policy, and hide X-Powered-By. API responses are marked no-store. | TC-SEC-002, TC-SEC-003, TC-SEC-011, TC-SEC-016, TC-PEN-004, TC-PEN-006, TC-PEN-010 |
 | [D-PL-08](#d-pl-08) | Environments | owner | Testers use a separate test environment with real Claude on Vertex AI. Google sign-in, the identity check and email are simulated there. | TC-SME-001, TC-NFR-001, TC-SEC-018 |
 | [D-PL-09](#d-pl-09) | Environments | claude | The running build is shown in the banner and at GET /api/v1/version. | TC-E2E-007 |
-| [D-PL-10](#d-pl-10) | Security | spec | Identity images and ID numbers are never stored on the platform. Task content is synthetic only. | TC-SME-002, TC-SME-013, TC-SME-042, TC-SME-047, TC-REV-008, TC-REV-014, TC-SEC-014 |
+| [D-PL-10](#d-pl-10) | Security | spec | Identity images and ID numbers are never stored on the platform. Task content is synthetic only. | TC-SME-002, TC-SME-013, TC-SME-042, TC-SME-047, TC-SME-065, TC-REV-008, TC-REV-014, TC-SEC-014, TC-SEC-027 |
 | [D-M1-01](#d-m1-01) | Templates | owner | Only the newest published version of each workflow template is offered when creating a project. | TC-E2E-006, TC-PM-002, TC-ADM-004 |
 | [D-M1-02](#d-m1-02) | Templates | owner | Publishing a template needs name, primary work, verification, human gate, time per task (TPT), skills and task mode. | TC-PM-012, TC-ADM-004 |
 | [D-M2-01](#d-m2-01) | Projects | owner | Demographic taxonomy uses standard lists: ISO 3166 countries, ISO 639-1 languages with CEFR levels, ISCED education, IANA time zones. | TC-SME-020, TC-ADM-005 |
@@ -60,7 +60,7 @@ Every product decision made while building ADI Praxis, written as what you shoul
 | [D-M5-10](#d-m5-10) | Security | claude | Machine clients (RL Gym, client API) use Admin-issued Bearer keys, shown once and stored only as hashes. | TC-ADM-007, TC-RLG-006 |
 | [D-M5-11](#d-m5-11) | Workbench | claude | Blind solve is not built in v1. | — |
 | [D-M5-12](#d-m5-12) | Workbench | spec | The workbench autosaves; after submit the task is read-only until the Reviewer asks for rework. | TC-E2E-003, TC-SME-031, TC-SME-035, TC-REV-013, TC-NFR-030 |
-| [D-M6-01](#d-m6-01) | Dataset | claude | Approved Task Records, RL review records, audit events, selection decisions and task reviews are append-only in the database. | TC-E2E-004, TC-SME-019, TC-ADM-010, TC-REV-003, TC-SEC-015, TC-PEN-013 |
+| [D-M6-01](#d-m6-01) | Dataset | claude | Approved Task Records, RL review records, audit events, selection decisions and task reviews are append-only in the database. | TC-E2E-004, TC-SME-019, TC-ADM-010, TC-REV-003, TC-FIN-008, TC-SEC-015, TC-SEC-021, TC-PEN-013 |
 | [D-M6-02](#d-m6-02) | Dataset | claude | The dataset is read-only for Admins and RL Gym (API key); PMs use the project dashboard. | TC-PM-010, TC-PM-011, TC-ADM-009, TC-RLG-005 |
 | [D-M6-03](#d-m6-03) | Dataset | claude | A nightly job verifies both hash chains and alerts on a break. | TC-ADM-009, TC-PEN-013 |
 | [D-M7-01](#d-m7-01) | RL review | claude | RL Gym sends review requests with its key; a repeated (rl_run_id, rl_task_id) returns the existing request and creates nothing. | TC-E2E-005, TC-RLG-001, TC-RLG-002, TC-RLG-003 |
@@ -74,12 +74,61 @@ Every product decision made while building ADI Praxis, written as what you shoul
 | [D-M9-06](#d-m9-06) | Drafting | claude | "Draft all" never replaces confirmed sections; redrafting one section clears its confirmation; editing a confirmed section keeps it confirmed. | TC-SME-043, TC-REV-011 |
 | [D-M9-07](#d-m9-07) | Drafting | claude | Up to 5 files per task; PDF, DOCX, TXT, VTT, SRT; 10 MB each; type from the file content, not the name; image-only PDFs refused. | TC-SME-045, TC-SME-046, TC-SEC-013, TC-PEN-016 |
 | [D-M9-08](#d-m9-08) | Drafting | claude | Likely real identifiers in a file are shown to the author with the values masked, never reach the draft, and the Reviewer sees the count. | TC-SME-047, TC-REV-011, TC-PEN-008 |
-| [D-M9-09](#d-m9-09) | Drafting | claude | Text in a document is data, never instructions; the draft is held to the KYC schema, the tool catalog and allowed values. | TC-SME-048, TC-PEN-007 |
+| [D-M9-09](#d-m9-09) | Drafting | claude | Text in a document is data, never instructions; the draft is held to the KYC schema, the tool catalog and allowed values. | TC-SME-048, TC-ADM-017, TC-SEC-024, TC-PEN-007 |
 | [D-M9-10](#d-m9-10) | Drafting | owner | If the model is unavailable, nothing is saved and the author can write by hand. | — |
 | [D-M9-11](#d-m9-11) | MCP | owner | Each KYC tool is an MCP tool with an inputSchema; each tool response is a recorded MCP tools/call (arguments + result). | TC-SME-031, TC-SME-032, TC-ADM-011, TC-REV-011, TC-RLG-007 |
 | [D-M9-12](#d-m9-12) | MCP | claude | Arguments are checked against the schema; two calls with the same tool and arguments are an error; a tool step uses its recorded call's arguments; old tasks still load. | TC-SME-032, TC-SME-033 |
 | [D-M9-13](#d-m9-13) | MCP | claude | The MCP catalog is served to Admin, PM, Reviewer and RL Gym; the replay bundle of an accepted task to Admin and RL Gym. A reference replay server exists for testing. | TC-ADM-011, TC-RLG-005, TC-RLG-007 |
 | [D-M9-14](#d-m9-14) | Dataset | claude | Dataset records carry provenance (source kinds and hashes, interview count, draft runs, confirmations, MCP catalog version), never source content. | TC-E2E-001, TC-ADM-009, TC-SEC-014 |
+| [D-M10-01](#d-m10-01) | SME supply | claude | SME supply (partners, requisitions, certification, payments) is behind a platform switch (SME_SUPPLY_ENABLED) plus a per-project switch. With the platform switch off, no M10 page, menu item, API route or background job exists; FLOW 2 works as in 1.0. It is ON in the test environment. | TC-E2E-011, TC-SME-073, TC-PM-014 |
+| [D-M10-02](#d-m10-02) | Partner portal | owner | The partner portal is part of the console app at /partner, with its own partner accounts (email and password), its own session cookie (praxis_partner) and its own single-row menu. The Partner API v1 is on the API host at /partner/v1. | TC-ADM-013, TC-PTR-001, TC-SEC-019, TC-SEC-026 |
+| [D-M10-03](#d-m10-03) | Naming | owner | The internal REVIEWER role is shown as "Validator" in every console and candidate-app text and API message. The SME tiers are Expert, Reviewer and Annotator. Code, routes and the API enum keep REVIEWER. | TC-E2E-011, TC-ADM-022, TC-REV-030 |
+| [D-M10-04](#d-m10-04) | Partner API | claude | Partner API clients use OAuth client credentials: POST /partner/v1/oauth/token returns a 1-hour bearer token. Clients are Sandbox (test data, no real candidates) or Live, with scopes requisitions:read, candidates:write, candidates:read, statements:read. Every write needs an Idempotency-Key. Sandbox candidates are never emailed; their progress is simulated with POST /partner/v1/sandbox/candidates/:id/simulate. | TC-ADM-014, TC-PTR-009, TC-PTR-011, TC-SEC-022, TC-PEN-018 |
+| [D-M10-05](#d-m10-05) | Partner API | claude | Partner webhooks are signed: header Praxis-Signature: t=<unix>,v1=<HMAC-SHA256 of "<t>.<raw body>">. Failed deliveries retry 8 times with growing gaps; a replay reuses the event id so the partner can deduplicate. The signing secret is stored encrypted and shown to the partner once. | TC-PTR-010, TC-SEC-022 |
+| [D-M10-06](#d-m10-06) | Partner API | claude | The candidate id a partner sees is the submission id. Internal candidate ids never leave the platform, so two partners can never match up each other's submissions. | TC-PTR-011, TC-PTR-012, TC-PTR-015, TC-SEC-019, TC-PEN-018 |
+| [D-M10-07](#d-m10-07) | Duplicates | owner | The first valid submission owns the person for 12 months while it is active. When it ends (withdrawn, expired, or "not met" confirmed by a Validator), a 90-day cool-off applies to every channel. The owner may put the same person forward for other requisitions. A duplicate is refused with a reason that never names the owning partner. | TC-E2E-008, TC-PTR-003, TC-PTR-005, TC-PTR-007, TC-SEC-019 |
+| [D-M10-08](#d-m10-08) | Duplicates | claude | Duplicate matching: normalised email (lower case; Gmail dots and "+tags" ignored), then normalised phone (Indian numbers without a country code get +91), then the signed-in candidate account once they sign in. | TC-PTR-005 |
+| [D-M10-09](#d-m10-09) | Careers page | claude | A requisition can accept direct applications on a public careers page (<candidate URL>/careers/requisitions/<id>). A direct application from someone a partner already owns stays credited to that partner. Applying twice for the same requisition is refused. | TC-SME-060, TC-SME-061, TC-PTR-005 |
+| [D-M10-10](#d-m10-10) | Requirement screen | claude | Every submission is invited at once, whatever the requirement screen says. The screen only recommends (Meets, May not meet, Unclear); only a Validator can confirm "not met" (one or many at once), and that ends the submission. | TC-PM-015, TC-REV-031, TC-PTR-003, TC-PTR-006, TC-PTR-008 |
+| [D-M10-11](#d-m10-11) | Invites | claude | Invites last 7 days, with a reminder on day 3; the link opens <candidate URL>/partner-invite/<token> and, after sign-in, starts the FLOW 2 application for the requisition. The link is for the person it was sent to: a second account cannot take the invitation. In the test environment email is simulated (see D-M10-42). | TC-E2E-008, TC-SME-062, TC-PTR-003, TC-PTR-015 |
+| [D-M10-12](#d-m10-12) | Partner portal | claude | The history a partner sees for each candidate (submission, requirement screen, identity, selection, certification) is append-only in the database. | TC-E2E-010, TC-REV-031, TC-PTR-006, TC-PTR-007, TC-SEC-021 |
+| [D-M10-42](#d-m10-42) | Invites | claude | In the test environment the partner sees the invite link on screen (and the Partner API returns it as inviteLinkForTesting) because email is simulated; in production the link is only emailed. | TC-E2E-008, TC-PTR-003, TC-PTR-015 |
+| [D-M10-13](#d-m10-13) | Guidelines | claude | An Admin uploads guidelines as a new version of a package (domain + task family): PDF, DOCX, Markdown or text, up to 10 MB, stored privately and split into cited sections S1…Sn. One package serves all three tiers. Generation runs in the background (worker), never while you wait on the page. | TC-E2E-009, TC-ADM-016, TC-ADM-017, TC-NFR-054 |
+| [D-M10-14](#d-m10-14) | Guidelines | claude | Everything generated (knowledge items, course modules, blueprint, question families) must cite a guidelines section; anything without a valid citation is dropped. Each generation run records its model, prompt versions and token use. In the test environment the real Claude on Vertex generates; if its quota is exhausted the run ends FAILED. | TC-E2E-009, TC-ADM-016, TC-ADM-018 |
+| [D-M10-15](#d-m10-15) | Certification | claude | Correct answers are never written by a model: each question family has an answer rule, the platform picks the variables and derives the key. Keys are stored encrypted and never reach the candidate app. | TC-ADM-018, TC-SEC-020 |
+| [D-M10-16](#d-m10-16) | Certification | claude | Each generated question passes four checks before it can be served: key from the rule, an independent solve agrees, the cited section supports it, difficulty in band; near-copies of earlier questions are refused. A failed question is discarded and regenerated (up to 3 tries); after 5 failures in a row the family is FLAGGED and cannot be approved until an Admin edits it. | TC-ADM-018, TC-ADM-020 |
+| [D-M10-17](#d-m10-17) | Certification | owner | Nothing is served to candidates until an Admin approves the tier's course, its blueprint and every question family (each with a valid sample) and publishes the tier. Expert-tier families also need a Validator's approval until the domain has two certified Experts. A published tier cannot be edited or regenerated; a change needs a new guidelines version. | TC-E2E-009, TC-SME-075, TC-PM-016, TC-ADM-019, TC-ADM-020 |
+| [D-M10-18](#d-m10-18) | Certification | claude | Test forms are assembled ahead of time and used once. Each question instance is served to exactly one person, so two candidates never get the same instance and a retake never repeats one. | TC-E2E-010, TC-SME-068, TC-NFR-054 |
+| [D-M10-19](#d-m10-19) | Certification | owner | The course opens module by module; a module is complete when its quiz scores at least 80%. The test opens after the last module. Every test attempt starts with a new selfie check (Stripe Identity; simulated in test). Only the provider reference and the result are stored, never the photo or ID. | TC-E2E-008, TC-E2E-010, TC-SME-063, TC-SME-064, TC-SME-065, TC-SME-068, TC-SEC-027 |
+| [D-M10-20](#d-m10-20) | Certification | owner | Tier defaults (editable per blueprint before approval): Annotator 25 questions, 40 minutes, 80% and no critical-rule miss; Reviewer 35 questions, 60 minutes, 85% and at least 80% of planted errors found; Expert 20 questions plus one authoring task, 120 minutes, 85% on objective items and the authoring task confirmed by people. The Expert certification needs a Reviewer certificate in the same domain. | TC-SME-066, TC-ADM-018 |
+| [D-M10-21](#d-m10-21) | Certification | claude | Written answers get a model grade as a recommendation only; every written grade needs a person to confirm it (the Expert authoring task needs two people). The result is decided only when every confirmation is in, so a model score alone never passes or refuses anyone. | TC-SME-075, TC-REV-032 |
+| [D-M10-22](#d-m10-22) | Certification | claude | A failed attempt offers a retake after 48 hours (up to 3 attempts). After the third fail a person (Validator or Admin) decides: certify, decline, or allow another retake. Candidates see pass or fail and a band per section (Strong, Meets, Developing, Below), never questions, answers or keys. | TC-E2E-010, TC-SME-067, TC-SME-068, TC-REV-032, TC-REV-033, TC-SEC-020 |
+| [D-M10-23](#d-m10-23) | Certification | claude | Integrity signals (pasting, leaving the test page) are logged for reviewers and never fail anyone on their own. A test past its deadline is submitted with the saved answers (by the page, or by a background sweep within about 10 minutes). Certificates expire after 12 months. | TC-SME-065, TC-NFR-051 |
+| [D-M10-24](#d-m10-24) | Certification | claude | Passing certifies for 12 months, starts the SME on PROBATION, tells the partner who supplied them, and completes the "Guidelines course and certification" item on the onboarding checklist. The candidate cannot tick that item themselves. | TC-E2E-008, TC-SME-063, TC-SME-067, TC-SME-071, TC-REV-033 |
+| [D-M10-25](#d-m10-25) | Certification | owner | For requisitions marked "licence required" (healthcare Experts), the candidate uploads a professional licence (number, issuing body, certificate file) and a Validator confirms it. A passed test waits until the licence is confirmed. | TC-REV-034 |
+| [D-M10-26](#d-m10-26) | Partner portal | claude | Partners see a requisition's guidelines summary (package, version, section headings) and course outline (module titles, number of questions, time limit) once the tier is published; never questions, answers or pass rules. | TC-E2E-009, TC-PTR-002 |
+| [D-M10-27](#d-m10-27) | Certification | claude | Candidate test endpoints are rate-limited per candidate session, not per network address, because candidates in one office share an address. | TC-NFR-055 |
+| [D-M10-28](#d-m10-28) | Payments | claude | Each requisition has a pay route: DIRECT (default: ADI Praxis pays the SME, and "Payment set-up" is an onboarding checklist item) or VIA_PARTNER (the partner pays its people; no payee and no earnings in Praxis). | TC-SME-070, TC-PM-014, TC-PM-017, TC-PTR-002 |
+| [D-M10-29](#d-m10-29) | Payments | claude | Rate cards are versioned and never edited: a change is a new version of the same name, and a requisition links to one version. Per-task rates by task type (Authoring, Annotation, RL review) in USD or INR. Each earning records the rate-card version it was priced at. | TC-PM-016, TC-FIN-002 |
+| [D-M10-30](#d-m10-30) | Payments | claude | An earning is written when a Validator accepts a task, dated at the acceptance, exactly once per task, for SMEs who came through a DIRECT requisition on that project. The price comes from the rate card of the SME's oldest live, invited submission on that project. RL reviews and hours earn nothing yet (not built). | TC-E2E-008, TC-SME-072, TC-PM-017 |
+| [D-M10-31](#d-m10-31) | Payments | claude | Earning entries and partner fee entries are append-only in the database. A correction is a REVERSAL entry pointing at the original; an entry is reversed at most once and a reversal is never reversed. Only Finance or an Admin reverses. | TC-FIN-008, TC-SEC-021 |
+| [D-M10-32](#d-m10-32) | Payments | owner | Pay runs are weekly, one per client per week (Monday 00:00 UTC to the next Monday), drafted by a background job on Mondays or built by Finance or a PM for a chosen Monday. One payout per SME and currency. Balances under USD 10 / INR 500, and held, failed or returned amounts, carry into the next run. Held (reported, not paid): SME account not active, an open dispute or fraud hold, standing suspended, payee not ready. | TC-FIN-003, TC-FIN-007 |
+| [D-M10-33](#d-m10-33) | Payments | claude | A PM (or Admin) confirms a pay run, then a Finance user approves it, then Finance submits it. Until a second-approver threshold is set (not set in test), one Finance approval is enough and is flagged as a single-approver action in the audit log (and "same as confirmer" if so). A Finance user paid in the run cannot approve it. Submitting re-checks payees and uses a stable key per payment, so a retried submit pays nobody twice. Approved runs can be cancelled and rebuilt; submitted runs cannot. | TC-E2E-008, TC-PM-018, TC-FIN-004, TC-FIN-005, TC-FIN-006, TC-FIN-012, TC-SEC-026 |
+| [D-M10-34](#d-m10-34) | Payments | owner | The payout provider at launch is Trolley (US entity pays all SMEs, including India, in local currency with FX recorded). In the test environment a simulated payout provider is used: payee set-up is a "Simulated payout provider" page with a Finish button, and payouts are marked by the simulation. | TC-E2E-008, TC-SME-069, TC-SME-072, TC-FIN-005 |
+| [D-M10-35](#d-m10-35) | Payments | claude | Provider webhooks are verified on the raw body with a 5-minute tolerance; one receipt per provider event id (duplicates ignored); test-mode and live-mode events never mix. Payment statuses only move forward (Submitted → Paid/Failed/Returned, Paid → Returned). A run completes when every item is final. | TC-FIN-005, TC-PEN-019 |
+| [D-M10-36](#d-m10-36) | Payments | claude | New internal role FINANCE (label Finance). Payee data in Praxis is provider, reference, status and payout currency only; bank and tax details stay with the payout provider. | TC-SME-069, TC-FIN-001, TC-SEC-026, TC-SEC-027 |
+| [D-M10-37](#d-m10-37) | Payments | claude | Daily reconciliation (and on demand) compares the provider's settlement report with our payouts; every mismatch (unknown payment, amount or currency mismatch, status mismatch, or a payment we marked Paid that is missing) becomes an open exception that Finance resolves with a note. | TC-FIN-009 |
+| [D-M10-38](#d-m10-38) | Payments | owner | Partners earn a certified-candidate fee: one fee entry per certified candidate for the supplying partner, at the partner's fee terms (set by an Admin). Without agreed terms the entry is written at zero with the note NO_FEE_TERMS. Statements are built monthly (and on demand by Finance) and shown in the partner portal with the partner's own candidate ids. Invoices are paid outside Praxis. | TC-E2E-008, TC-ADM-015, TC-PTR-012, TC-FIN-010, TC-FIN-011 |
+| [D-M10-39](#d-m10-39) | Look and feel | claude | Every M10 screen reuses the existing console and candidate-app design (cards, pills, buttons, hero bands); no new visual style. Web first: the M10 candidate screens are built for desktop and must stay usable in a phone browser (a mobile app is later). | TC-PTR-014, TC-NFR-052 |
+| [D-M10-40](#d-m10-40) | Certification | claude | Test player: one question at a time with a question map and countdown; answers save 1.5 s after a change and are retried while offline; integrity events are batched; the test submits itself at the deadline; ordering questions use keyboard-accessible Up/Down buttons (no drag and drop). | TC-SME-066, TC-NFR-050, TC-NFR-051, TC-NFR-052, TC-NFR-053 |
+| [D-M10-41](#d-m10-41) | Onboarding | claude | The onboarding checklist's "Guidelines course and certification" and "Payment set-up" items show their status and link to the course, test or payment page. They have no tick box ("Completes automatically"). The checklist cannot complete until the certification is passed and, for direct pay, the payee is ready. | TC-E2E-008, TC-SME-067, TC-SME-069, TC-SME-071 |
+| [D-UI-01](#d-ui-01) | Required fields | owner | Mandatory fields are marked on every screen of all three apps (console, partner portal, candidate app). | TC-SME-061, TC-SME-074, TC-PM-014, TC-ADM-013, TC-PTR-003, TC-PTR-004, TC-FIN-002 |
+| [D-UI-02](#d-ui-02) | Required fields | claude | Marker style: a red asterisk after the label, plus one line "Fields marked * are required." near the top of each form. The control itself carries required (or aria-required), so screen readers announce "required". The API decides what is required; optional fields are never marked. Test questions in a certification test are not marked. Some asterisks mean "required to submit or publish", not to save a draft (project wizard, opportunity brief). | TC-SME-066, TC-SME-074, TC-PM-014, TC-PTR-004 |
+| [D-UI-03](#d-ui-03) | Menu | claude | Two-level console menu. Top row groups: Home; Projects (Projects, Templates, Requisitions); Reviews (Applications, Task reviews, RL reviews, Identity reviews, Conflicts); Certification (Guidelines, Certification reviews); Partners; Payments; Admin (Users, Taxonomy, Terms, Failure codes, API clients). The second row shows the current group's pages when it has more than one. A group appears only if you can open one of its pages; clicking a group opens its first page; the current group is highlighted. The partner portal keeps a single row. | TC-E2E-011, TC-PM-001, TC-PM-013, TC-ADM-021, TC-REV-030, TC-PTR-001, TC-FIN-001 |
+| [D-UI-04](#d-ui-04) | Support Bot | owner | A Support Bot ("Help" button) is on every signed-in console and partner-portal screen, not in the candidate app. It answers from the current screen, a help pack built from the product documents, and the user's own data on screen. | TC-SME-073, TC-PM-019, TC-PTR-001, TC-PTR-013, TC-PTR-014 |
+| [D-UI-05](#d-ui-05) | Support Bot | claude | The bot sees the screen (title, headings, messages, form fields with labels, required flags and values; never password values or files) and the record on screen, fetched again with the user's own session, so it can only see what the user could already see. Secret-looking values are removed before anything reaches the model. | TC-PM-019, TC-REV-035, TC-PTR-013, TC-FIN-012, TC-SEC-022, TC-SEC-023, TC-PEN-020 |
+| [D-UI-06](#d-ui-06) | Support Bot | claude | The bot explains; it never acts, approves, selects, certifies or pays, and says who does. Screen, record and help text are data, never instructions. It does not invent rules, never reveals test answers to non-staff, and says so when unsure. | TC-PM-019, TC-REV-035, TC-PTR-013, TC-FIN-012, TC-SEC-023, TC-SEC-024, TC-PEN-020 |
+| [D-UI-07](#d-ui-07) | Support Bot | claude | The bot uses Claude on Vertex (claude-sonnet-5) for fast answers. Questions are not stored; the last 10 turns are sent back with each question. 20 questions a minute per session. Asking writes no audit entry. If the model is unavailable (e.g. quota), it says it is not available. | TC-NFR-054, TC-SEC-025, TC-PEN-020 |
 | [D-PR-01](#d-pr-01) | Process | owner | Defects are raised as GitHub issues. A nightly agent fixes triaged defects by opening pull requests; a human always merges. | TC-E2E-007 |
 | [D-PR-02](#d-pr-02) | Process | claude | Nightly: agent at 01:00 IST, build and deploy to the test environment at 02:00 IST, only if main changed. | TC-E2E-007, TC-NFR-033 |
 | [D-PR-03](#d-pr-03) | Process | claude | Security findings are reported privately and never handled by the agent. | — |
@@ -128,11 +177,11 @@ One browser holds one console sign-in. Signing in as another role in the same br
 
 **Roles** · decided by spec
 
-Console areas by role: PM sees Projects and Templates; Reviewer sees Applications, Task reviews, RL reviews, Identity reviews and Conflicts; Admin sees everything plus Taxonomy, Terms, API clients, Failure codes and Users.
+Console areas by role (updated in Release 1.1: the menu is grouped, see D-UI-03; the Reviewer role is shown as "Validator", see D-M10-03; new Finance role, see D-M10-36). PM: Home, Projects (Projects, Templates, Requisitions) and Payments (Pay runs, Rate cards). Validator: Home, Projects (Requisitions), Reviews (Applications, Task reviews, RL reviews, Identity reviews, Conflicts) and Certification (Guidelines, Certification reviews). Finance: Home and Payments. Admin: every group, including Partners and Admin (Users, Taxonomy, Terms, Failure codes, API clients).
 
-**What you should see:** The navigation bar only shows your role's areas; typing another area's URL shows the "This page is for …" explanation.
+**What you should see:** The top row of the menu only shows your role's groups; the second row only the pages of that group you can open. Typing another area's URL shows "This page is for …; you are signed in as …", never a bare 404. Role names on screen are Admin, PM, Validator and Finance.
 
-**Tested by:** [TC-PM-001](TEST-CASES.md#tc-pm-001-), [TC-ADM-001](TEST-CASES.md#tc-adm-001-), [TC-ADM-002](TEST-CASES.md#tc-adm-002-), [TC-ADM-003](TEST-CASES.md#tc-adm-003-), [TC-SEC-004](TEST-CASES.md#tc-sec-004-), [TC-PEN-001](TEST-CASES.md#tc-pen-001-), [TC-PEN-002](TEST-CASES.md#tc-pen-002-), [TC-PEN-003](TEST-CASES.md#tc-pen-003-)
+**Tested by:** [TC-PM-001](TEST-CASES.md#tc-pm-001-), [TC-PM-013](TEST-CASES.md#tc-pm-013-), [TC-ADM-001](TEST-CASES.md#tc-adm-001-), [TC-ADM-002](TEST-CASES.md#tc-adm-002-), [TC-ADM-003](TEST-CASES.md#tc-adm-003-), [TC-ADM-021](TEST-CASES.md#tc-adm-021-), [TC-REV-030](TEST-CASES.md#tc-rev-030-), [TC-FIN-001](TEST-CASES.md#tc-fin-001-), [TC-SEC-004](TEST-CASES.md#tc-sec-004-), [TC-PEN-001](TEST-CASES.md#tc-pen-001-), [TC-PEN-002](TEST-CASES.md#tc-pen-002-), [TC-PEN-003](TEST-CASES.md#tc-pen-003-)
 
 ## D-PL-06
 
@@ -142,7 +191,7 @@ Every state change is authorised, idempotent (Idempotency-Key) and written to th
 
 **What you should see:** Double-clicking a button or resubmitting a form never creates two records. Admins can trace each change to a person and time.
 
-**Tested by:** [TC-ADM-002](TEST-CASES.md#tc-adm-002-), [TC-REV-003](TEST-CASES.md#tc-rev-003-), [TC-REV-012](TEST-CASES.md#tc-rev-012-), [TC-RLG-003](TEST-CASES.md#tc-rlg-003-), [TC-NFR-030](TEST-CASES.md#tc-nfr-030-), [TC-NFR-031](TEST-CASES.md#tc-nfr-031-), [TC-SEC-009](TEST-CASES.md#tc-sec-009-), [TC-SEC-010](TEST-CASES.md#tc-sec-010-), [TC-PEN-005](TEST-CASES.md#tc-pen-005-), [TC-PEN-014](TEST-CASES.md#tc-pen-014-)
+**Tested by:** [TC-ADM-002](TEST-CASES.md#tc-adm-002-), [TC-ADM-014](TEST-CASES.md#tc-adm-014-), [TC-REV-003](TEST-CASES.md#tc-rev-003-), [TC-REV-012](TEST-CASES.md#tc-rev-012-), [TC-PTR-011](TEST-CASES.md#tc-ptr-011-), [TC-FIN-004](TEST-CASES.md#tc-fin-004-), [TC-RLG-003](TEST-CASES.md#tc-rlg-003-), [TC-NFR-030](TEST-CASES.md#tc-nfr-030-), [TC-NFR-031](TEST-CASES.md#tc-nfr-031-), [TC-SEC-009](TEST-CASES.md#tc-sec-009-), [TC-SEC-010](TEST-CASES.md#tc-sec-010-), [TC-PEN-005](TEST-CASES.md#tc-pen-005-), [TC-PEN-014](TEST-CASES.md#tc-pen-014-)
 
 ## D-PL-07
 
@@ -160,7 +209,7 @@ The apps send a Content-Security-Policy, HSTS, X-Frame-Options DENY, nosniff, a 
 
 Testers use a separate test environment with real Claude on Vertex AI. Google sign-in, the identity check and email are simulated there.
 
-**What you should see:** A yellow banner on every page says "Test environment", that data is synthetic, and shows the build (e.g. nightly-20260928-1a2b3c4). Candidate sign-in shows a mock form; the identity check shows a simulated page.
+**What you should see:** A yellow banner on every page says "Test environment", that data is synthetic, and shows the build (e.g. nightly-20260928-1a2b3c4). Candidate sign-in shows a mock form; the identity check shows a simulated page. From Release 1.1 the selfie check before each test attempt and the payout provider are simulated too (D-M10-19, D-M10-34).
 
 **Tested by:** [TC-SME-001](TEST-CASES.md#tc-sme-001-), [TC-NFR-001](TEST-CASES.md#tc-nfr-001-), [TC-SEC-018](TEST-CASES.md#tc-sec-018-)
 
@@ -182,7 +231,7 @@ Identity images and ID numbers are never stored on the platform. Task content is
 
 **What you should see:** No screen ever shows an ID number or document image from the identity check. Real-looking identifiers typed into chats or tasks are flagged or redacted.
 
-**Tested by:** [TC-SME-002](TEST-CASES.md#tc-sme-002-), [TC-SME-013](TEST-CASES.md#tc-sme-013-), [TC-SME-042](TEST-CASES.md#tc-sme-042-), [TC-SME-047](TEST-CASES.md#tc-sme-047-), [TC-REV-008](TEST-CASES.md#tc-rev-008-), [TC-REV-014](TEST-CASES.md#tc-rev-014-), [TC-SEC-014](TEST-CASES.md#tc-sec-014-)
+**Tested by:** [TC-SME-002](TEST-CASES.md#tc-sme-002-), [TC-SME-013](TEST-CASES.md#tc-sme-013-), [TC-SME-042](TEST-CASES.md#tc-sme-042-), [TC-SME-047](TEST-CASES.md#tc-sme-047-), [TC-SME-065](TEST-CASES.md#tc-sme-065-), [TC-REV-008](TEST-CASES.md#tc-rev-008-), [TC-REV-014](TEST-CASES.md#tc-rev-014-), [TC-SEC-014](TEST-CASES.md#tc-sec-014-), [TC-SEC-027](TEST-CASES.md#tc-sec-027-)
 
 ## D-M1-01
 
@@ -450,7 +499,7 @@ At acceptance the server re-checks account, identity, selection, scope, onboardi
 
 Candidate-declared conflicts block proposals until a Reviewer or Admin resolves them; a reviewer who declares a conflict can no longer see that application.
 
-**What you should see:** Conflicts appear under Review → Conflicts.
+**What you should see:** Conflicts appear under Reviews → Conflicts.
 
 **Tested by:** [TC-SME-021](TEST-CASES.md#tc-sme-021-), [TC-REV-006](TEST-CASES.md#tc-rev-006-), [TC-REV-007](TEST-CASES.md#tc-rev-007-)
 
@@ -612,7 +661,7 @@ Approved Task Records, RL review records, audit events, selection decisions and 
 
 **What you should see:** There is no edit or delete for these anywhere. Corrections append a new superseding record.
 
-**Tested by:** [TC-E2E-004](TEST-CASES.md#tc-e2e-004-), [TC-SME-019](TEST-CASES.md#tc-sme-019-), [TC-ADM-010](TEST-CASES.md#tc-adm-010-), [TC-REV-003](TEST-CASES.md#tc-rev-003-), [TC-SEC-015](TEST-CASES.md#tc-sec-015-), [TC-PEN-013](TEST-CASES.md#tc-pen-013-)
+**Tested by:** [TC-E2E-004](TEST-CASES.md#tc-e2e-004-), [TC-SME-019](TEST-CASES.md#tc-sme-019-), [TC-ADM-010](TEST-CASES.md#tc-adm-010-), [TC-REV-003](TEST-CASES.md#tc-rev-003-), [TC-FIN-008](TEST-CASES.md#tc-fin-008-), [TC-SEC-015](TEST-CASES.md#tc-sec-015-), [TC-SEC-021](TEST-CASES.md#tc-sec-021-), [TC-PEN-013](TEST-CASES.md#tc-pen-013-)
 
 ## D-M6-02
 
@@ -752,7 +801,7 @@ Text in a document is data, never instructions; the draft is held to the KYC sch
 
 **What you should see:** A document saying "ignore your instructions…" changes nothing beyond content; unknown tools never appear.
 
-**Tested by:** [TC-SME-048](TEST-CASES.md#tc-sme-048-), [TC-PEN-007](TEST-CASES.md#tc-pen-007-)
+**Tested by:** [TC-SME-048](TEST-CASES.md#tc-sme-048-), [TC-ADM-017](TEST-CASES.md#tc-adm-017-), [TC-SEC-024](TEST-CASES.md#tc-sec-024-), [TC-PEN-007](TEST-CASES.md#tc-pen-007-)
 
 ## D-M9-10
 
@@ -803,6 +852,496 @@ Dataset records carry provenance (source kinds and hashes, interview count, draf
 **What you should see:** Chain verification still passes after drafted tasks are accepted.
 
 **Tested by:** [TC-E2E-001](TEST-CASES.md#tc-e2e-001-), [TC-ADM-009](TEST-CASES.md#tc-adm-009-), [TC-SEC-014](TEST-CASES.md#tc-sec-014-)
+
+## D-M10-01
+
+**SME supply** · decided by claude
+
+SME supply (partners, requisitions, certification, payments) is behind a platform switch (SME_SUPPLY_ENABLED) plus a per-project switch. With the platform switch off, no M10 page, menu item, API route or background job exists; FLOW 2 works as in 1.0. It is ON in the test environment.
+
+**What you should see:** You see Requisitions, Certification, Partners and Payments in the console menu and Certifications and Payments in the candidate app header. A project needs "SME supply" switched on before it can have a requisition. If a page says "SME supply is not switched on", report it (S2, environment).
+
+**Tested by:** [TC-E2E-011](TEST-CASES.md#tc-e2e-011-), [TC-SME-073](TEST-CASES.md#tc-sme-073-), [TC-PM-014](TEST-CASES.md#tc-pm-014-)
+
+## D-M10-02
+
+**Partner portal** · decided by owner
+
+The partner portal is part of the console app at /partner, with its own partner accounts (email and password), its own session cookie (praxis_partner) and its own single-row menu. The Partner API v1 is on the API host at /partner/v1.
+
+**What you should see:** Partners sign in at <console URL>/partner/login. The portal menu has one row: Home, Requisitions, Candidates, Statements, API & webhooks. A partner account cannot open console pages, and a console account is not signed in to the portal.
+
+**Tested by:** [TC-ADM-013](TEST-CASES.md#tc-adm-013-), [TC-PTR-001](TEST-CASES.md#tc-ptr-001-), [TC-SEC-019](TEST-CASES.md#tc-sec-019-), [TC-SEC-026](TEST-CASES.md#tc-sec-026-)
+
+## D-M10-03
+
+**Naming** · decided by owner
+
+The internal REVIEWER role is shown as "Validator" in every console and candidate-app text and API message. The SME tiers are Expert, Reviewer and Annotator. Code, routes and the API enum keep REVIEWER.
+
+**What you should see:** Screens, menus, role pickers and messages say "Validator" for the internal person who selects applicants and reviews tasks. "Reviewer" on a screen means the SME tier only. A left-over "Reviewer" meaning the internal role is a UX defect (S4).
+
+**Tested by:** [TC-E2E-011](TEST-CASES.md#tc-e2e-011-), [TC-ADM-022](TEST-CASES.md#tc-adm-022-), [TC-REV-030](TEST-CASES.md#tc-rev-030-)
+
+## D-M10-04
+
+**Partner API** · decided by claude
+
+Partner API clients use OAuth client credentials: POST /partner/v1/oauth/token returns a 1-hour bearer token. Clients are Sandbox (test data, no real candidates) or Live, with scopes requisitions:read, candidates:write, candidates:read, statements:read. Every write needs an Idempotency-Key. Sandbox candidates are never emailed; their progress is simulated with POST /partner/v1/sandbox/candidates/:id/simulate.
+
+**What you should see:** API & webhooks → Create API client shows the client secret once. A token works for about an hour, then 401. A call outside the client's scopes is refused (403). Simulation works for sandbox clients only.
+
+**Tested by:** [TC-ADM-014](TEST-CASES.md#tc-adm-014-), [TC-PTR-009](TEST-CASES.md#tc-ptr-009-), [TC-PTR-011](TEST-CASES.md#tc-ptr-011-), [TC-SEC-022](TEST-CASES.md#tc-sec-022-), [TC-PEN-018](TEST-CASES.md#tc-pen-018-)
+
+## D-M10-05
+
+**Partner API** · decided by claude
+
+Partner webhooks are signed: header Praxis-Signature: t=<unix>,v1=<HMAC-SHA256 of "<t>.<raw body>">. Failed deliveries retry 8 times with growing gaps; a replay reuses the event id so the partner can deduplicate. The signing secret is stored encrypted and shown to the partner once.
+
+**What you should see:** API & webhooks → add a webhook shows its signing secret once. The deliveries table shows each event, attempts, last response and a Replay button.
+
+**Tested by:** [TC-PTR-010](TEST-CASES.md#tc-ptr-010-), [TC-SEC-022](TEST-CASES.md#tc-sec-022-)
+
+## D-M10-06
+
+**Partner API** · decided by claude
+
+The candidate id a partner sees is the submission id. Internal candidate ids never leave the platform, so two partners can never match up each other's submissions.
+
+**What you should see:** The candidate id in the portal, webhooks and statements differs from any id in the console or candidate app.
+
+**Tested by:** [TC-PTR-011](TEST-CASES.md#tc-ptr-011-), [TC-PTR-012](TEST-CASES.md#tc-ptr-012-), [TC-PTR-015](TEST-CASES.md#tc-ptr-015-), [TC-SEC-019](TEST-CASES.md#tc-sec-019-), [TC-PEN-018](TEST-CASES.md#tc-pen-018-)
+
+## D-M10-07
+
+**Duplicates** · decided by owner
+
+The first valid submission owns the person for 12 months while it is active. When it ends (withdrawn, expired, or "not met" confirmed by a Validator), a 90-day cool-off applies to every channel. The owner may put the same person forward for other requisitions. A duplicate is refused with a reason that never names the owning partner.
+
+**What you should see:** Submitting someone already put forward shows "This candidate was not accepted" with "This candidate is already put forward through another channel", never a partner name. The candidate page shows "You own this candidate until …".
+
+**Tested by:** [TC-E2E-008](TEST-CASES.md#tc-e2e-008-), [TC-PTR-003](TEST-CASES.md#tc-ptr-003-), [TC-PTR-005](TEST-CASES.md#tc-ptr-005-), [TC-PTR-007](TEST-CASES.md#tc-ptr-007-), [TC-SEC-019](TEST-CASES.md#tc-sec-019-)
+
+## D-M10-08
+
+**Duplicates** · decided by claude
+
+Duplicate matching: normalised email (lower case; Gmail dots and "+tags" ignored), then normalised phone (Indian numbers without a country code get +91), then the signed-in candidate account once they sign in.
+
+**What you should see:** asha.k@gmail.com, AshaK+test@gmail.com and ASHAK@gmail.com count as one person; 98765 43210 and +91 98765 43210 count as one phone.
+
+**Tested by:** [TC-PTR-005](TEST-CASES.md#tc-ptr-005-)
+
+## D-M10-09
+
+**Careers page** · decided by claude
+
+A requisition can accept direct applications on a public careers page (<candidate URL>/careers/requisitions/<id>). A direct application from someone a partner already owns stays credited to that partner. Applying twice for the same requisition is refused.
+
+**What you should see:** Signed out, the careers page shows the role and "Sign in with Google to apply". After applying you go straight into the FLOW 2 profile. A second application says "You already have an application in progress for this role, or applied recently."
+
+**Tested by:** [TC-SME-060](TEST-CASES.md#tc-sme-060-), [TC-SME-061](TEST-CASES.md#tc-sme-061-), [TC-PTR-005](TEST-CASES.md#tc-ptr-005-)
+
+## D-M10-10
+
+**Requirement screen** · decided by claude
+
+Every submission is invited at once, whatever the requirement screen says. The screen only recommends (Meets, May not meet, Unclear); only a Validator can confirm "not met" (one or many at once), and that ends the submission.
+
+**What you should see:** After submitting, the partner sees "Requirement screen: …" with "The screen is a recommendation. Only a Validator can decide …". In the console, Requisitions → a requisition → Submissions lets a Validator select rows and confirm "not met" or mark them as meeting the requirements.
+
+**Tested by:** [TC-PM-015](TEST-CASES.md#tc-pm-015-), [TC-REV-031](TEST-CASES.md#tc-rev-031-), [TC-PTR-003](TEST-CASES.md#tc-ptr-003-), [TC-PTR-006](TEST-CASES.md#tc-ptr-006-), [TC-PTR-008](TEST-CASES.md#tc-ptr-008-)
+
+## D-M10-11
+
+**Invites** · decided by claude
+
+Invites last 7 days, with a reminder on day 3; the link opens <candidate URL>/partner-invite/<token> and, after sign-in, starts the FLOW 2 application for the requisition. The link is for the person it was sent to: a second account cannot take the invitation. In the test environment email is simulated (see D-M10-42).
+
+**What you should see:** The partner's candidate page shows "Invite: Not accepted yet · expires <date>", then "Accepted" or "Expired". An invalid, ended or already-taken link shows "This link can't be used". In test the partner copies the link from the confirmation panel (D-M10-42).
+
+**Tested by:** [TC-E2E-008](TEST-CASES.md#tc-e2e-008-), [TC-SME-062](TEST-CASES.md#tc-sme-062-), [TC-PTR-003](TEST-CASES.md#tc-ptr-003-), [TC-PTR-015](TEST-CASES.md#tc-ptr-015-)
+
+## D-M10-12
+
+**Partner portal** · decided by claude
+
+The history a partner sees for each candidate (submission, requirement screen, identity, selection, certification) is append-only in the database.
+
+**What you should see:** Candidates → a candidate → history lists every change newest first with "Entries are never edited or removed." Nothing in the portal or API edits or deletes an entry.
+
+**Tested by:** [TC-E2E-010](TEST-CASES.md#tc-e2e-010-), [TC-REV-031](TEST-CASES.md#tc-rev-031-), [TC-PTR-006](TEST-CASES.md#tc-ptr-006-), [TC-PTR-007](TEST-CASES.md#tc-ptr-007-), [TC-SEC-021](TEST-CASES.md#tc-sec-021-)
+
+## D-M10-42
+
+**Invites** · decided by claude
+
+In the test environment the partner sees the invite link on screen (and the Partner API returns it as inviteLinkForTesting) because email is simulated; in production the link is only emailed.
+
+**What you should see:** After "Submit candidate" in test, a yellow-bordered box "Test environment: invite link" shows the full <candidate URL>/partner-invite/<token>; open it in the candidate's browser profile and sign in with the same email the partner submitted. Sandbox submissions get no link.
+
+**Tested by:** [TC-E2E-008](TEST-CASES.md#tc-e2e-008-), [TC-PTR-003](TEST-CASES.md#tc-ptr-003-), [TC-PTR-015](TEST-CASES.md#tc-ptr-015-)
+
+## D-M10-13
+
+**Guidelines** · decided by claude
+
+An Admin uploads guidelines as a new version of a package (domain + task family): PDF, DOCX, Markdown or text, up to 10 MB, stored privately and split into cited sections S1…Sn. One package serves all three tiers. Generation runs in the background (worker), never while you wait on the page.
+
+**What you should see:** Certification → Guidelines → New guidelines package, then upload a version. The page says "Version N uploaded (X sections). Generation has started." and shows the run status; refresh to follow it.
+
+**Tested by:** [TC-E2E-009](TEST-CASES.md#tc-e2e-009-), [TC-ADM-016](TEST-CASES.md#tc-adm-016-), [TC-ADM-017](TEST-CASES.md#tc-adm-017-), [TC-NFR-054](TEST-CASES.md#tc-nfr-054-)
+
+## D-M10-14
+
+**Guidelines** · decided by claude
+
+Everything generated (knowledge items, course modules, blueprint, question families) must cite a guidelines section; anything without a valid citation is dropped. Each generation run records its model, prompt versions and token use. In the test environment the real Claude on Vertex generates; if its quota is exhausted the run ends FAILED.
+
+**What you should see:** Every item on the knowledge map, every module and every family shows "Cites S…". The run shows model and cost (calls, tokens). A FAILED run shows its error; report quota failures once, as an environment issue.
+
+**Tested by:** [TC-E2E-009](TEST-CASES.md#tc-e2e-009-), [TC-ADM-016](TEST-CASES.md#tc-adm-016-), [TC-ADM-018](TEST-CASES.md#tc-adm-018-)
+
+## D-M10-15
+
+**Certification** · decided by claude
+
+Correct answers are never written by a model: each question family has an answer rule, the platform picks the variables and derives the key. Keys are stored encrypted and never reach the candidate app.
+
+**What you should see:** Admins see "Derived key" on sample questions. No response the candidate app receives (DevTools → Network) contains a key, a correct option or a scoring rule.
+
+**Tested by:** [TC-ADM-018](TEST-CASES.md#tc-adm-018-), [TC-SEC-020](TEST-CASES.md#tc-sec-020-)
+
+## D-M10-16
+
+**Certification** · decided by claude
+
+Each generated question passes four checks before it can be served: key from the rule, an independent solve agrees, the cited section supports it, difficulty in band; near-copies of earlier questions are refused. A failed question is discarded and regenerated (up to 3 tries); after 5 failures in a row the family is FLAGGED and cannot be approved until an Admin edits it.
+
+**What you should see:** Each family's samples show the four checks (Key from rule, Independent solve agrees, Cited section supports it, Difficulty in band) and "Near-copy of an earlier item" when relevant. A flagged family says "Flagged after repeated validation failures".
+
+**Tested by:** [TC-ADM-018](TEST-CASES.md#tc-adm-018-), [TC-ADM-020](TEST-CASES.md#tc-adm-020-)
+
+## D-M10-17
+
+**Certification** · decided by owner
+
+Nothing is served to candidates until an Admin approves the tier's course, its blueprint and every question family (each with a valid sample) and publishes the tier. Expert-tier families also need a Validator's approval until the domain has two certified Experts. A published tier cannot be edited or regenerated; a change needs a new guidelines version.
+
+**What you should see:** Publish stays unavailable with a "Still to approve" list until everything is approved. After publishing: "Candidates can start this course and test at once. To change anything later, upload a new version."
+
+**Tested by:** [TC-E2E-009](TEST-CASES.md#tc-e2e-009-), [TC-SME-075](TEST-CASES.md#tc-sme-075-), [TC-PM-016](TEST-CASES.md#tc-pm-016-), [TC-ADM-019](TEST-CASES.md#tc-adm-019-), [TC-ADM-020](TEST-CASES.md#tc-adm-020-)
+
+## D-M10-18
+
+**Certification** · decided by claude
+
+Test forms are assembled ahead of time and used once. Each question instance is served to exactly one person, so two candidates never get the same instance and a retake never repeats one.
+
+**What you should see:** Two candidates on the same tier see equivalent but differently worded questions (different names, amounts, dates). A retake shows new questions.
+
+**Tested by:** [TC-E2E-010](TEST-CASES.md#tc-e2e-010-), [TC-SME-068](TEST-CASES.md#tc-sme-068-), [TC-NFR-054](TEST-CASES.md#tc-nfr-054-)
+
+## D-M10-19
+
+**Certification** · decided by owner
+
+The course opens module by module; a module is complete when its quiz scores at least 80%. The test opens after the last module. Every test attempt starts with a new selfie check (Stripe Identity; simulated in test). Only the provider reference and the result are stored, never the photo or ID.
+
+**What you should see:** Later modules are locked until the one before is passed ("Well done: you passed this module."). The test page says "Quick selfie check … Only the result is kept; we never store your photo or ID." before "Start the test now".
+
+**Tested by:** [TC-E2E-008](TEST-CASES.md#tc-e2e-008-), [TC-E2E-010](TEST-CASES.md#tc-e2e-010-), [TC-SME-063](TEST-CASES.md#tc-sme-063-), [TC-SME-064](TEST-CASES.md#tc-sme-064-), [TC-SME-065](TEST-CASES.md#tc-sme-065-), [TC-SME-068](TEST-CASES.md#tc-sme-068-), [TC-SEC-027](TEST-CASES.md#tc-sec-027-)
+
+## D-M10-20
+
+**Certification** · decided by owner
+
+Tier defaults (editable per blueprint before approval): Annotator 25 questions, 40 minutes, 80% and no critical-rule miss; Reviewer 35 questions, 60 minutes, 85% and at least 80% of planted errors found; Expert 20 questions plus one authoring task, 120 minutes, 85% on objective items and the authoring task confirmed by people. The Expert certification needs a Reviewer certificate in the same domain.
+
+**What you should see:** The blueprint page shows length, time limit and pass rules per tier. The test countdown matches the blueprint's time limit.
+
+**Tested by:** [TC-SME-066](TEST-CASES.md#tc-sme-066-), [TC-ADM-018](TEST-CASES.md#tc-adm-018-)
+
+## D-M10-21
+
+**Certification** · decided by claude
+
+Written answers get a model grade as a recommendation only; every written grade needs a person to confirm it (the Expert authoring task needs two people). The result is decided only when every confirmation is in, so a model score alone never passes or refuses anyone.
+
+**What you should see:** Certification reviews shows "Recommendation — you decide" beside each written answer. The candidate sees "Your test is being reviewed by a person" until the grades are confirmed.
+
+**Tested by:** [TC-SME-075](TEST-CASES.md#tc-sme-075-), [TC-REV-032](TEST-CASES.md#tc-rev-032-)
+
+## D-M10-22
+
+**Certification** · decided by claude
+
+A failed attempt offers a retake after 48 hours (up to 3 attempts). After the third fail a person (Validator or Admin) decides: certify, decline, or allow another retake. Candidates see pass or fail and a band per section (Strong, Meets, Developing, Below), never questions, answers or keys.
+
+**What you should see:** "You didn't pass this time" with "You can retake the test from <date and time>". After the third fail: "You have used every attempt, so a person will now review your certification". Nobody is refused by the system alone.
+
+**Tested by:** [TC-E2E-010](TEST-CASES.md#tc-e2e-010-), [TC-SME-067](TEST-CASES.md#tc-sme-067-), [TC-SME-068](TEST-CASES.md#tc-sme-068-), [TC-REV-032](TEST-CASES.md#tc-rev-032-), [TC-REV-033](TEST-CASES.md#tc-rev-033-), [TC-SEC-020](TEST-CASES.md#tc-sec-020-)
+
+## D-M10-23
+
+**Certification** · decided by claude
+
+Integrity signals (pasting, leaving the test page) are logged for reviewers and never fail anyone on their own. A test past its deadline is submitted with the saved answers (by the page, or by a background sweep within about 10 minutes). Certificates expire after 12 months.
+
+**What you should see:** The start page says pasting and leaving the page are logged and never fail anyone on their own. When the countdown ends: "Time is up. Submitting your saved answers…".
+
+**Tested by:** [TC-SME-065](TEST-CASES.md#tc-sme-065-), [TC-NFR-051](TEST-CASES.md#tc-nfr-051-)
+
+## D-M10-24
+
+**Certification** · decided by claude
+
+Passing certifies for 12 months, starts the SME on PROBATION, tells the partner who supplied them, and completes the "Guidelines course and certification" item on the onboarding checklist. The candidate cannot tick that item themselves.
+
+**What you should see:** Result "You passed", then "Your certificate is issued. The Onboarding checklist ticks this step for you." The partner's candidate history shows the certification.
+
+**Tested by:** [TC-E2E-008](TEST-CASES.md#tc-e2e-008-), [TC-SME-063](TEST-CASES.md#tc-sme-063-), [TC-SME-067](TEST-CASES.md#tc-sme-067-), [TC-SME-071](TEST-CASES.md#tc-sme-071-), [TC-REV-033](TEST-CASES.md#tc-rev-033-)
+
+## D-M10-25
+
+**Certification** · decided by owner
+
+For requisitions marked "licence required" (healthcare Experts), the candidate uploads a professional licence (number, issuing body, certificate file) and a Validator confirms it. A passed test waits until the licence is confirmed.
+
+**What you should see:** The candidate sees a "Professional licence" upload; the Validator sees it under Certification reviews with "Confirm the professional licence before certifying."
+
+**Tested by:** [TC-REV-034](TEST-CASES.md#tc-rev-034-)
+
+## D-M10-26
+
+**Partner portal** · decided by claude
+
+Partners see a requisition's guidelines summary (package, version, section headings) and course outline (module titles, number of questions, time limit) once the tier is published; never questions, answers or pass rules.
+
+**What you should see:** Partner portal → a requisition shows the summary and outline and "Test questions, answers and scoring rules are never shared with partners." Before publishing: "The course outline is not published for this requisition yet."
+
+**Tested by:** [TC-E2E-009](TEST-CASES.md#tc-e2e-009-), [TC-PTR-002](TEST-CASES.md#tc-ptr-002-)
+
+## D-M10-27
+
+**Certification** · decided by claude
+
+Candidate test endpoints are rate-limited per candidate session, not per network address, because candidates in one office share an address.
+
+**What you should see:** Several testers in the same office can take tests at the same time without "too many requests" errors.
+
+**Tested by:** [TC-NFR-055](TEST-CASES.md#tc-nfr-055-)
+
+## D-M10-28
+
+**Payments** · decided by claude
+
+Each requisition has a pay route: DIRECT (default: ADI Praxis pays the SME, and "Payment set-up" is an onboarding checklist item) or VIA_PARTNER (the partner pays its people; no payee and no earnings in Praxis).
+
+**What you should see:** The requisition shows "Pay route: Direct: Praxis pays each SME" or "Via partner: the partner pays its people". A via-partner candidate's Payments page says there is nothing to set up.
+
+**Tested by:** [TC-SME-070](TEST-CASES.md#tc-sme-070-), [TC-PM-014](TEST-CASES.md#tc-pm-014-), [TC-PM-017](TEST-CASES.md#tc-pm-017-), [TC-PTR-002](TEST-CASES.md#tc-ptr-002-)
+
+## D-M10-29
+
+**Payments** · decided by claude
+
+Rate cards are versioned and never edited: a change is a new version of the same name, and a requisition links to one version. Per-task rates by task type (Authoring, Annotation, RL review) in USD or INR. Each earning records the rate-card version it was priced at.
+
+**What you should see:** Payments → Rate cards has no Edit button; "New rate card or version" with an existing name creates version 2. Earnings already recorded keep their version.
+
+**Tested by:** [TC-PM-016](TEST-CASES.md#tc-pm-016-), [TC-FIN-002](TEST-CASES.md#tc-fin-002-)
+
+## D-M10-30
+
+**Payments** · decided by claude
+
+An earning is written when a Validator accepts a task, dated at the acceptance, exactly once per task, for SMEs who came through a DIRECT requisition on that project. The price comes from the rate card of the SME's oldest live, invited submission on that project. RL reviews and hours earn nothing yet (not built).
+
+**What you should see:** After a task is accepted, the SME's Payments page shows one "Accepted task" line (e.g. USD 40.00 on the demo rate card) the same day. Accepting twice or replaying never adds a second line. No rate card linked = no earning.
+
+**Tested by:** [TC-E2E-008](TEST-CASES.md#tc-e2e-008-), [TC-SME-072](TEST-CASES.md#tc-sme-072-), [TC-PM-017](TEST-CASES.md#tc-pm-017-)
+
+## D-M10-31
+
+**Payments** · decided by claude
+
+Earning entries and partner fee entries are append-only in the database. A correction is a REVERSAL entry pointing at the original; an entry is reversed at most once and a reversal is never reversed. Only Finance or an Admin reverses.
+
+**What you should see:** No edit or delete anywhere for earnings or fees. Reversing adds a negative "Correction" line; the original stays. Reversing again is refused.
+
+**Tested by:** [TC-FIN-008](TEST-CASES.md#tc-fin-008-), [TC-SEC-021](TEST-CASES.md#tc-sec-021-)
+
+## D-M10-32
+
+**Payments** · decided by owner
+
+Pay runs are weekly, one per client per week (Monday 00:00 UTC to the next Monday), drafted by a background job on Mondays or built by Finance or a PM for a chosen Monday. One payout per SME and currency. Balances under USD 10 / INR 500, and held, failed or returned amounts, carry into the next run. Held (reported, not paid): SME account not active, an open dispute or fraud hold, standing suspended, payee not ready.
+
+**What you should see:** Payments → Pay runs → Build pay run asks for a Monday ("Pick a Monday: pay-run weeks start on Monday."). The run lists Entries, Held (with the reason) and Carried forward.
+
+**Tested by:** [TC-FIN-003](TEST-CASES.md#tc-fin-003-), [TC-FIN-007](TEST-CASES.md#tc-fin-007-)
+
+## D-M10-33
+
+**Payments** · decided by claude
+
+A PM (or Admin) confirms a pay run, then a Finance user approves it, then Finance submits it. Until a second-approver threshold is set (not set in test), one Finance approval is enough and is flagged as a single-approver action in the audit log (and "same as confirmer" if so). A Finance user paid in the run cannot approve it. Submitting re-checks payees and uses a stable key per payment, so a retried submit pays nobody twice. Approved runs can be cancelled and rebuilt; submitted runs cannot.
+
+**What you should see:** Before the PM confirms, Finance sees no "Approve pay run" button. After approval the run shows "Single approver" and "A single Finance approval was enough for this run because no second-approver threshold is set." Only Finance sees "Submit to payout provider".
+
+**Tested by:** [TC-E2E-008](TEST-CASES.md#tc-e2e-008-), [TC-PM-018](TEST-CASES.md#tc-pm-018-), [TC-FIN-004](TEST-CASES.md#tc-fin-004-), [TC-FIN-005](TEST-CASES.md#tc-fin-005-), [TC-FIN-006](TEST-CASES.md#tc-fin-006-), [TC-FIN-012](TEST-CASES.md#tc-fin-012-), [TC-SEC-026](TEST-CASES.md#tc-sec-026-)
+
+## D-M10-34
+
+**Payments** · decided by owner
+
+The payout provider at launch is Trolley (US entity pays all SMEs, including India, in local currency with FX recorded). In the test environment a simulated payout provider is used: payee set-up is a "Simulated payout provider" page with a Finish button, and payouts are marked by the simulation.
+
+**What you should see:** Candidate → Payments → Set up payments opens the simulated provider page; Finish returns you and the status becomes ready. After Finance submits a run, items move to Paid (or Failed) as the simulation reports back.
+
+**Tested by:** [TC-E2E-008](TEST-CASES.md#tc-e2e-008-), [TC-SME-069](TEST-CASES.md#tc-sme-069-), [TC-SME-072](TEST-CASES.md#tc-sme-072-), [TC-FIN-005](TEST-CASES.md#tc-fin-005-)
+
+## D-M10-35
+
+**Payments** · decided by claude
+
+Provider webhooks are verified on the raw body with a 5-minute tolerance; one receipt per provider event id (duplicates ignored); test-mode and live-mode events never mix. Payment statuses only move forward (Submitted → Paid/Failed/Returned, Paid → Returned). A run completes when every item is final.
+
+**What you should see:** Statuses never go backwards (a Paid item never shows Submitted again). A forged provider call is refused (security testers only).
+
+**Tested by:** [TC-FIN-005](TEST-CASES.md#tc-fin-005-), [TC-PEN-019](TEST-CASES.md#tc-pen-019-)
+
+## D-M10-36
+
+**Payments** · decided by claude
+
+New internal role FINANCE (label Finance). Payee data in Praxis is provider, reference, status and payout currency only; bank and tax details stay with the payout provider.
+
+**What you should see:** finance@praxis.demo sees Home and Payments only. No screen or API response anywhere shows a bank account, IFSC, PAN or tax form.
+
+**Tested by:** [TC-SME-069](TEST-CASES.md#tc-sme-069-), [TC-FIN-001](TEST-CASES.md#tc-fin-001-), [TC-SEC-026](TEST-CASES.md#tc-sec-026-), [TC-SEC-027](TEST-CASES.md#tc-sec-027-)
+
+## D-M10-37
+
+**Payments** · decided by claude
+
+Daily reconciliation (and on demand) compares the provider's settlement report with our payouts; every mismatch (unknown payment, amount or currency mismatch, status mismatch, or a payment we marked Paid that is missing) becomes an open exception that Finance resolves with a note.
+
+**What you should see:** Payments → Payout exceptions → Run reconciliation for a date; exceptions list kind, detail and a resolution note. With the simulated provider there are usually none.
+
+**Tested by:** [TC-FIN-009](TEST-CASES.md#tc-fin-009-)
+
+## D-M10-38
+
+**Payments** · decided by owner
+
+Partners earn a certified-candidate fee: one fee entry per certified candidate for the supplying partner, at the partner's fee terms (set by an Admin). Without agreed terms the entry is written at zero with the note NO_FEE_TERMS. Statements are built monthly (and on demand by Finance) and shown in the partner portal with the partner's own candidate ids. Invoices are paid outside Praxis.
+
+**What you should see:** Demo Staffing Partner has fee terms USD 150 ("Demo fees 2026-09"). After one of its candidates is certified, Finance → Partner statements → build for the month shows a USD 150 line; the partner sees it under Statements with its own reference.
+
+**Tested by:** [TC-E2E-008](TEST-CASES.md#tc-e2e-008-), [TC-ADM-015](TEST-CASES.md#tc-adm-015-), [TC-PTR-012](TEST-CASES.md#tc-ptr-012-), [TC-FIN-010](TEST-CASES.md#tc-fin-010-), [TC-FIN-011](TEST-CASES.md#tc-fin-011-)
+
+## D-M10-39
+
+**Look and feel** · decided by claude
+
+Every M10 screen reuses the existing console and candidate-app design (cards, pills, buttons, hero bands); no new visual style. Web first: the M10 candidate screens are built for desktop and must stay usable in a phone browser (a mobile app is later).
+
+**What you should see:** New screens look like the 1.0 screens. On a 360 px phone the course, test, payments and careers pages work without sideways scrolling of the page.
+
+**Tested by:** [TC-PTR-014](TEST-CASES.md#tc-ptr-014-), [TC-NFR-052](TEST-CASES.md#tc-nfr-052-)
+
+## D-M10-40
+
+**Certification** · decided by claude
+
+Test player: one question at a time with a question map and countdown; answers save 1.5 s after a change and are retried while offline; integrity events are batched; the test submits itself at the deadline; ordering questions use keyboard-accessible Up/Down buttons (no drag and drop).
+
+**What you should see:** The status line shows "Unsaved changes", then "All answers saved"; offline it says "Offline: your answers are kept here and will save when you reconnect". The map marks answered questions ("Shaded: answered.").
+
+**Tested by:** [TC-SME-066](TEST-CASES.md#tc-sme-066-), [TC-NFR-050](TEST-CASES.md#tc-nfr-050-), [TC-NFR-051](TEST-CASES.md#tc-nfr-051-), [TC-NFR-052](TEST-CASES.md#tc-nfr-052-), [TC-NFR-053](TEST-CASES.md#tc-nfr-053-)
+
+## D-M10-41
+
+**Onboarding** · decided by claude
+
+The onboarding checklist's "Guidelines course and certification" and "Payment set-up" items show their status and link to the course, test or payment page. They have no tick box ("Completes automatically"). The checklist cannot complete until the certification is passed and, for direct pay, the payee is ready.
+
+**What you should see:** Onboarding shows both items with "Completes automatically" and a button such as "Start the course" or "Set up payments"; they turn Done by themselves.
+
+**Tested by:** [TC-E2E-008](TEST-CASES.md#tc-e2e-008-), [TC-SME-067](TEST-CASES.md#tc-sme-067-), [TC-SME-069](TEST-CASES.md#tc-sme-069-), [TC-SME-071](TEST-CASES.md#tc-sme-071-)
+
+## D-UI-01
+
+**Required fields** · decided by owner
+
+Mandatory fields are marked on every screen of all three apps (console, partner portal, candidate app).
+
+**What you should see:** Every form with a required field shows red asterisks. Report any form where a field is required (you get an error without it) but has no asterisk, or has an asterisk but is optional.
+
+**Tested by:** [TC-SME-061](TEST-CASES.md#tc-sme-061-), [TC-SME-074](TEST-CASES.md#tc-sme-074-), [TC-PM-014](TEST-CASES.md#tc-pm-014-), [TC-ADM-013](TEST-CASES.md#tc-adm-013-), [TC-PTR-003](TEST-CASES.md#tc-ptr-003-), [TC-PTR-004](TEST-CASES.md#tc-ptr-004-), [TC-FIN-002](TEST-CASES.md#tc-fin-002-)
+
+## D-UI-02
+
+**Required fields** · decided by claude
+
+Marker style: a red asterisk after the label, plus one line "Fields marked * are required." near the top of each form. The control itself carries required (or aria-required), so screen readers announce "required". The API decides what is required; optional fields are never marked. Test questions in a certification test are not marked. Some asterisks mean "required to submit or publish", not to save a draft (project wizard, opportunity brief).
+
+**What you should see:** Asterisk after the label; the "Fields marked * are required." line once per form; a screen reader (NVDA, TalkBack, VoiceOver) reads the field as required. Some minimum lengths and formats are still only checked on submit (known gap, raise UX if it hurts).
+
+**Tested by:** [TC-SME-066](TEST-CASES.md#tc-sme-066-), [TC-SME-074](TEST-CASES.md#tc-sme-074-), [TC-PM-014](TEST-CASES.md#tc-pm-014-), [TC-PTR-004](TEST-CASES.md#tc-ptr-004-)
+
+## D-UI-03
+
+**Menu** · decided by claude
+
+Two-level console menu. Top row groups: Home; Projects (Projects, Templates, Requisitions); Reviews (Applications, Task reviews, RL reviews, Identity reviews, Conflicts); Certification (Guidelines, Certification reviews); Partners; Payments; Admin (Users, Taxonomy, Terms, Failure codes, API clients). The second row shows the current group's pages when it has more than one. A group appears only if you can open one of its pages; clicking a group opens its first page; the current group is highlighted. The partner portal keeps a single row.
+
+**What you should see:** Admin sees all seven groups. PM: Home, Projects, Payments. Validator: Home, Projects (Requisitions only, so no second row), Reviews, Certification. Finance: Home, Payments. On a phone both rows scroll sideways.
+
+**Tested by:** [TC-E2E-011](TEST-CASES.md#tc-e2e-011-), [TC-PM-001](TEST-CASES.md#tc-pm-001-), [TC-PM-013](TEST-CASES.md#tc-pm-013-), [TC-ADM-021](TEST-CASES.md#tc-adm-021-), [TC-REV-030](TEST-CASES.md#tc-rev-030-), [TC-PTR-001](TEST-CASES.md#tc-ptr-001-), [TC-FIN-001](TEST-CASES.md#tc-fin-001-)
+
+## D-UI-04
+
+**Support Bot** · decided by owner
+
+A Support Bot ("Help" button) is on every signed-in console and partner-portal screen, not in the candidate app. It answers from the current screen, a help pack built from the product documents, and the user's own data on screen.
+
+**What you should see:** A round "Help" button bottom-right opens the Support Bot panel with suggested questions such as "What do I need to fill in on this screen?". There is no Help button in the candidate app.
+
+**Tested by:** [TC-SME-073](TEST-CASES.md#tc-sme-073-), [TC-PM-019](TEST-CASES.md#tc-pm-019-), [TC-PTR-001](TEST-CASES.md#tc-ptr-001-), [TC-PTR-013](TEST-CASES.md#tc-ptr-013-), [TC-PTR-014](TEST-CASES.md#tc-ptr-014-)
+
+## D-UI-05
+
+**Support Bot** · decided by claude
+
+The bot sees the screen (title, headings, messages, form fields with labels, required flags and values; never password values or files) and the record on screen, fetched again with the user's own session, so it can only see what the user could already see. Secret-looking values are removed before anything reaches the model.
+
+**What you should see:** It can explain the fields and the record you are looking at. Asked about another partner's candidate, another project you are not on, or a secret, it says it cannot see it.
+
+**Tested by:** [TC-PM-019](TEST-CASES.md#tc-pm-019-), [TC-REV-035](TEST-CASES.md#tc-rev-035-), [TC-PTR-013](TEST-CASES.md#tc-ptr-013-), [TC-FIN-012](TEST-CASES.md#tc-fin-012-), [TC-SEC-022](TEST-CASES.md#tc-sec-022-), [TC-SEC-023](TEST-CASES.md#tc-sec-023-), [TC-PEN-020](TEST-CASES.md#tc-pen-020-)
+
+## D-UI-06
+
+**Support Bot** · decided by claude
+
+The bot explains; it never acts, approves, selects, certifies or pays, and says who does. Screen, record and help text are data, never instructions. It does not invent rules, never reveals test answers to non-staff, and says so when unsure.
+
+**What you should see:** Asking it to "approve this pay run" or "select this candidate" gets an explanation of who does that and how, and nothing changes (check the page and the audit log). Instructions hidden in a field or a question do not change its behaviour.
+
+**Tested by:** [TC-PM-019](TEST-CASES.md#tc-pm-019-), [TC-REV-035](TEST-CASES.md#tc-rev-035-), [TC-PTR-013](TEST-CASES.md#tc-ptr-013-), [TC-FIN-012](TEST-CASES.md#tc-fin-012-), [TC-SEC-023](TEST-CASES.md#tc-sec-023-), [TC-SEC-024](TEST-CASES.md#tc-sec-024-), [TC-PEN-020](TEST-CASES.md#tc-pen-020-)
+
+## D-UI-07
+
+**Support Bot** · decided by claude
+
+The bot uses Claude on Vertex (claude-sonnet-5) for fast answers. Questions are not stored; the last 10 turns are sent back with each question. 20 questions a minute per session. Asking writes no audit entry. If the model is unavailable (e.g. quota), it says it is not available.
+
+**What you should see:** After a full page reload the conversation is gone. The 21st question within a minute shows "You have asked a lot of questions in the last minute. Wait a moment, then try again." When Claude is unavailable you see a clear "not available" message, never a blank panel.
+
+**Tested by:** [TC-NFR-054](TEST-CASES.md#tc-nfr-054-), [TC-SEC-025](TEST-CASES.md#tc-sec-025-), [TC-PEN-020](TEST-CASES.md#tc-pen-020-)
 
 ## D-PR-01
 

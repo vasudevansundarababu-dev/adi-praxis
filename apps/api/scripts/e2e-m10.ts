@@ -33,7 +33,7 @@ if (cmd === 'select') {
 } else if (cmd === 'payable') {
   const u = await db.smeUser.create({ data: { clientId: client.id, displayName: 'Anika Rao', contactEmail: `anika.${Date.now()}@example.test`, identityStatus: 'VERIFIED' } });
   await db.payee.create({ data: { clientId: client.id, smeUserId: u.id, provider: 'mock', payeeRef: `R-e2e-${randomUUID().slice(0, 8)}`, status: 'READY', payoutCurrency: 'INR' } });
-  await db.earningEntry.create({ data: { clientId: client.id, smeUserId: u.id, amount: 40, currency: 'USD', kind: 'TASK', sourceType: 'E2EFixture', sourceId: randomUUID(), earnedAt: new Date(previousWeek().periodStart.getTime() + 86_400_000) } });
+  await db.earningEntry.create({ data: { clientId: client.id, smeUserId: u.id, amount: 40, currency: 'USD', kind: 'TASK', sourceType: 'E2EFixture', sourceId: randomUUID(), earnedAt: new Date(previousWeek().periodStart.getTime() - 6 * 86_400_000) } }); // two weeks ago: the Monday worker job drafts last week's run itself
   console.log(JSON.stringify({ smeUserId: u.id }));
 } else {
   throw new Error('usage: e2e-m10 select <smeUserId> | payable');

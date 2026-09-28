@@ -11,6 +11,9 @@
 # Options (environment variables):
 #   PRAXIS_VERTEX=1        Real Claude and embeddings on Vertex AI (the testers' environment); sign-in, identity
 #                          check and email stay simulated. Claude must be enabled for the project in Model Garden.
+#   PRAXIS_SME_SUPPLY=1    Switch on M10 SME supply (partners, certification, payments; docs/SME-SUPPLY.md) in the API,
+#                          worker, console and candidate app, and add its test data (Finance user, a partner with a
+#                          portal login, a rate card and an open requisition).
 #   PRAXIS_ENV_LABEL=...   Banner label, e.g. "Test environment" (default "Demo environment").
 #   PRAXIS_NAME=...        Project display name when the project is created (default "ADI Praxis").
 #   PRAXIS_BUILD=...       Build label shown in the banner and at /api/v1/version (default <commit>-<time>).
@@ -27,6 +30,7 @@ TAG=$COMMIT-$(date +%s)
 BUILD=${PRAXIS_BUILD:-$TAG}
 ENV_LABEL=${PRAXIS_ENV_LABEL:-Demo environment}
 VERTEX=${PRAXIS_VERTEX:-}
+SME_SUPPLY=${PRAXIS_SME_SUPPLY:-}
 say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 exists() { "$@" >/dev/null 2>&1; }
 # New service accounts take a little while to become visible to IAM; retry policy changes for up to ~2 minutes.
@@ -81,6 +85,10 @@ secret mock-secret "$(rand 32)"
 secret demo-admin-password "$(rand 8)"
 secret demo-pm-password "$(rand 8)"
 secret demo-reviewer-password "$(rand 8)"
+if [ -n "$SME_SUPPLY" ]; then
+  secret demo-finance-password "$(rand 8)"
+  secret demo-partner-password "$(rand 8)"
+fi
 read_secret() { gcloud secrets versions access latest --secret="$1"; }
 
 say "Cloud SQL for PostgreSQL 16 (about 10 minutes the first time)"
@@ -140,6 +148,7 @@ WORKER_HEALTH_PORT: "8080"
 PRAXIS_BUILD: "$BUILD"
 PRAXIS_COMMIT: "$COMMIT"
 YAML
+if [ -n "$SME_SUPPLY" ]; then echo 'SME_SUPPLY_ENABLED: "true"' >> "$ENVFILE"; fi
 if [ -n "$VERTEX" ]; then
   printf 'VERTEX_PROJECT_ID: %s\nVERTEX_LOCATION: "%s"\nEMBEDDING_LOCATION: "%s"\n' "$PROJECT_ID" "${VERTEX_LOCATION:-global}" "$REGION" >> "$ENVFILE"
 fi
@@ -162,14 +171,14 @@ gcloud run deploy praxis-worker --image="$REPO/api:$TAG" "${COMMON[@]}" --set-se
   --no-allow-unauthenticated --ingress=internal --port=8080 --no-cpu-throttling --min-instances=1 --max-instances=1
 for app in web candidate; do
   gcloud run deploy "praxis-$app" --image="$REPO/$app:$TAG" --region="$REGION" --service-account="$SA" \
-    --set-env-vars="^|^API_BASE_URL=$API_URL|CANDIDATE_APP_URL=$CAND_URL|PRAXIS_DEMO=1|PRAXIS_BUILD=$BUILD|PRAXIS_ENV_LABEL=$ENV_LABEL" \
+    --set-env-vars="^|^API_BASE_URL=$API_URL|CANDIDATE_APP_URL=$CAND_URL|PRAXIS_DEMO=1|PRAXIS_BUILD=$BUILD|PRAXIS_ENV_LABEL=$ENV_LABEL|SME_SUPPLY_ENABLED=${SME_SUPPLY:+true}" \
     --no-invoker-iam-check --port=8080 --min-instances=0 --max-instances=3
 done
 
 say "Demo data (users and a published KYC project)"
 gcloud run jobs deploy praxis-demo-setup --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 \
   --args=src/jobs/run.ts,demo-setup \
-  --set-secrets="$SECRETS,DEMO_ADMIN_PASSWORD=demo-admin-password:latest,DEMO_PM_PASSWORD=demo-pm-password:latest,DEMO_REVIEWER_PASSWORD=demo-reviewer-password:latest"
+  --set-secrets="$SECRETS,DEMO_ADMIN_PASSWORD=demo-admin-password:latest,DEMO_PM_PASSWORD=demo-pm-password:latest,DEMO_REVIEWER_PASSWORD=demo-reviewer-password:latest${SME_SUPPLY:+,DEMO_FINANCE_PASSWORD=demo-finance-password:latest,DEMO_PARTNER_PASSWORD=demo-partner-password:latest}"
 gcloud run jobs execute praxis-demo-setup --region="$REGION" --wait
 rm -f "$ENVFILE"
 
@@ -186,6 +195,7 @@ API docs:                      $API_URL/docs
 Admin     admin@praxis.demo     $(read_secret demo-admin-password)
 PM        pm@praxis.demo        $(read_secret demo-pm-password)
 Reviewer  reviewer@praxis.demo  $(read_secret demo-reviewer-password)
+$(if [ -n "$SME_SUPPLY" ]; then printf 'Finance   finance@praxis.demo   %s\nPartner   partner@praxis.demo   %s   (partner portal: %s/partner/login)\n' "$(read_secret demo-finance-password)" "$(read_secret demo-partner-password)" "$WEB_URL"; fi)
 Candidates: use the demo sign-in with any email.
 
 Remove everything: gcloud projects delete $PROJECT_ID

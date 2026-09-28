@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { createHmac, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { roleLabel, screenRequirements, normaliseEmail, normalisePhone } from '@praxis/shared';
+import { CandidateSubmissionInput, roleLabel, screenRequirements, normaliseEmail, normalisePhone } from '@praxis/shared';
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MockGoogleVerifier } from '../src/candidate/google';
@@ -12,7 +12,7 @@ import { processDomainEvent } from '../src/outbox/dispatcher';
 import { defaultHandlers } from '../src/outbox/handlers';
 import { emitEvent } from '../src/outbox/outbox';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
-import { remindAndExpireInvites } from '../src/supply/submissions';
+import { remindAndExpireInvites, submitCandidate } from '../src/supply/submissions';
 import { MAX_WEBHOOK_ATTEMPTS, processPartnerWebhooks, type WebhookSender } from '../src/supply/webhooks';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
@@ -288,7 +288,10 @@ describe('M10a SME supply: partners, Partner API, requisitions and submissions (
       const live = await credentials(p.portal, 'LIVE');
       const secret = await webhook(p.portal, 'LIVE');
       const who = person();
-      const id = (await api(live.token, 'POST', `/requisitions/${r}/candidates`, who)).json().candidateId;
+      const submitted = (await api(live.token, 'POST', `/requisitions/${r}/candidates`, who)).json();
+      const id = submitted.candidateId;
+      // Outside the test/demo environment the link only ever goes by email.
+      expect(submitted.inviteLinkForTesting).toBeUndefined();
       expect(email.sent).toHaveLength(1);
       const token = email.sent[0]!.text.match(/\/partner-invite\/(\S+)/)![1]!;
       expect(email.sent[0]!.to).toBe(who.email);
@@ -298,6 +301,14 @@ describe('M10a SME supply: partners, Partner API, requisitions and submissions (
       expect(red.statusCode, red.body).toBe(200);
       const e = await db.enrollment.findUniqueOrThrow({ where: { id: red.json().enrollmentId } });
       expect(e).toMatchObject({ smeUserId: c.smeUserId, status: 'DRAFT' });
+
+      // In the test/demo environment (email simulated) the partner is shown the same working link.
+      const other = person();
+      const shown = await db.$transaction((tx) => submitCandidate(tx, { email: null, appUrl: 'http://candidate.test', exposeInviteLink: true }, { clientId, ch: { partnerId: p.id, sandbox: false, channel: 'PARTNER_PORTAL' }, requisitionId: r, input: CandidateSubmissionInput.parse(other) }, async () => {}));
+      const link = shown.body.inviteLinkForTesting as string;
+      expect(link).toMatch(/^http:\/\/candidate\.test\/partner-invite\/\S+$/);
+      const c2 = await signIn(other.email);
+      expect((await post(c2.cookie, '/me/partner-invites/redeem', { token: link.split('/').pop() })).statusCode).toBe(200);
       expect((await db.supplyCandidate.findFirstOrThrow({ where: { emailNorm: who.email.toLowerCase() } })).smeUserId).toBe(c.smeUserId);
 
       // FLOW 2 changes reach the partner: identity verified, then the human selection decision.
@@ -311,8 +322,12 @@ describe('M10a SME supply: partners, Partner API, requisitions and submissions (
       await processPartnerWebhooks(db, box, receiver);
       expect(receiver.events().map((x) => x.type)).toEqual(expect.arrayContaining(['candidate.invited', 'candidate.identity_verified', 'candidate.selected']));
       expect(receiver.posts.every((x) => verify(secret, x.headers['praxis-signature']!, x.body))).toBe(true);
-      // The link works once per person; a second account cannot take the invite.
-      expect((await post((await signIn('someone.else@example.test')).cookie, '/me/partner-invites/redeem', { token })).statusCode).toBe(200);
+      // The link belongs to one person: they can open it again, but a second account cannot take the invite.
+      expect((await post(c.cookie, '/me/partner-invites/redeem', { token })).json().enrollmentId).toBe(e.id);
+      const thief = await post((await signIn('someone.else@example.test')).cookie, '/me/partner-invites/redeem', { token });
+      expect(thief.statusCode).toBe(409);
+      expect(thief.json().error).toBe('INVITE_TAKEN');
+      expect((await db.supplyCandidate.findFirstOrThrow({ where: { submissions: { some: { id } } } })).smeUserId).toBe(c.smeUserId);
     });
 
     it('a candidate below the minimum is still invited; only a Validator can confirm "not met" (bulk allowed)', async () => {

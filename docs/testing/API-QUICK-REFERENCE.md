@@ -2,7 +2,7 @@
 
 # API quick reference
 
-All 149 endpoints with who may call them, generated from the route code. Interactive documentation: `<API URL>/docs`. State changes (POST, PUT, PATCH, DELETE) need an `Idempotency-Key` header with a new UUID. Browser calls use the session cookie; RL Gym and client systems use `Authorization: Bearer <key>`.
+All 260 endpoints with who may call them, generated from the route code. Interactive documentation: `<API URL>/docs`. State changes (POST, PUT, PATCH, DELETE) need an `Idempotency-Key` header with a new UUID. Browser calls use the session cookie; RL Gym and client systems use `Authorization: Bearer <key>`.
 
 Access: `public` anyone · `authenticated` any signed-in console user · `candidate` a signed-in SME · role names = console roles · `key RL_GYM` / `key CLIENT_API` = machine keys.
 
@@ -16,10 +16,23 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | POST | `/api/v1/auth/login` | public | auth.ts |
 | POST | `/api/v1/auth/logout` | authenticated | auth.ts |
 | GET | `/api/v1/auth/me` | authenticated | auth.ts |
+| GET | `/api/v1/blueprints/:id` | ADMIN, REVIEWER | cert-admin.ts |
+| PATCH | `/api/v1/blueprints/:id` | ADMIN | cert-admin.ts |
+| POST | `/api/v1/blueprints/:id/decision` | ADMIN | cert-admin.ts |
 | GET | `/api/v1/campaigns/:id` | PM, ADMIN | campaigns.ts |
 | PATCH | `/api/v1/campaigns/:id` | PM, ADMIN | campaigns.ts |
 | POST | `/api/v1/campaigns/:id/close` | PM, ADMIN | campaigns.ts |
 | GET | `/api/v1/candidates/:id` | PM, ADMIN | candidates.ts |
+| GET | `/api/v1/candidates/:id` | partnerScope: candidates:read | partner-api.ts |
+| POST | `/api/v1/candidates/:id/withdraw` | partnerScope: candidates:write | partner-api.ts |
+| GET | `/api/v1/careers/requisitions/:id` | public | supply-candidate.ts |
+| POST | `/api/v1/certifications/:id/decision` | ADMIN, REVIEWER | cert-admin.ts |
+| POST | `/api/v1/certifications/:id/licence-decision` | ADMIN, REVIEWER | cert-admin.ts |
+| GET | `/api/v1/certifications/:id/licence-file` | ADMIN, REVIEWER | cert-admin.ts |
+| GET | `/api/v1/certifications/review-queue` | ADMIN, REVIEWER | cert-admin.ts |
+| PATCH | `/api/v1/course-modules/:id` | ADMIN | cert-admin.ts |
+| GET | `/api/v1/courses/:id` | ADMIN, REVIEWER | cert-admin.ts |
+| POST | `/api/v1/courses/:id/decision` | ADMIN | cert-admin.ts |
 | GET | `/api/v1/dataset/export` | ADMIN, key RL_GYM | dataset.ts |
 | GET | `/api/v1/dataset/records` | ADMIN, key RL_GYM | dataset.ts |
 | GET | `/api/v1/dataset/records/:id` | ADMIN, key RL_GYM | dataset.ts |
@@ -32,23 +45,47 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | POST | `/api/v1/dev/identity/:sessionId/simulate` | candidate (demo/test only) | candidate-auth.ts |
 | GET | `/api/v1/domains` | ADMIN, PM | templates.ts |
 | POST | `/api/v1/domains` | ADMIN | templates.ts |
+| GET | `/api/v1/earnings` | ADMIN, FINANCE | payments.ts |
+| POST | `/api/v1/earnings/:id/reverse` | ADMIN, FINANCE | payments.ts |
 | GET | `/api/v1/failure-reason-codes` | REVIEWER, ADMIN | rl.ts |
 | POST | `/api/v1/failure-reason-codes` | ADMIN | rl.ts |
 | PATCH | `/api/v1/failure-reason-codes/:id` | ADMIN | rl.ts |
+| GET | `/api/v1/guidelines/packages` | ADMIN, PM, REVIEWER | cert-admin.ts |
+| POST | `/api/v1/guidelines/packages` | ADMIN | cert-admin.ts |
+| POST | `/api/v1/guidelines/packages/:id/versions` | ADMIN | cert-admin.ts |
+| GET | `/api/v1/guidelines/versions/:id` | ADMIN, REVIEWER | cert-admin.ts |
+| POST | `/api/v1/guidelines/versions/:id/regenerate` | ADMIN | cert-admin.ts |
+| GET | `/api/v1/guidelines/versions/:id/source` | ADMIN | cert-admin.ts |
+| POST | `/api/v1/guidelines/versions/:id/tiers/:tier/publish` | ADMIN | cert-admin.ts |
 | GET | `/api/v1/integrations/rl-gym/results` | ADMIN, key RL_GYM | rl.ts |
 | POST | `/api/v1/integrations/rl-gym/review-requests` | ADMIN, key RL_GYM | rl.ts |
 | POST | `/api/v1/integrations/stripe/identity-webhook` | public | candidate-auth.ts |
+| POST | `/api/v1/integrations/trolley/webhook` | public | payments.ts |
+| PATCH | `/api/v1/item-families/:id` | ADMIN | cert-admin.ts |
+| POST | `/api/v1/item-families/:id/decision` | ADMIN, REVIEWER | cert-admin.ts |
+| POST | `/api/v1/item-families/:id/samples` | ADMIN | cert-admin.ts |
 | GET | `/api/v1/job-descriptions` | PM, ADMIN | job-descriptions.ts |
 | POST | `/api/v1/job-descriptions` | PM, ADMIN | job-descriptions.ts |
 | GET | `/api/v1/job-descriptions/:id` | PM, ADMIN | job-descriptions.ts |
 | PATCH | `/api/v1/job-descriptions/:id` | PM, ADMIN | job-descriptions.ts |
+| PATCH | `/api/v1/knowledge-items/:id` | ADMIN | cert-admin.ts |
 | GET | `/api/v1/mcp/kyc/tools` | ADMIN, PM, REVIEWER, key RL_GYM | dataset.ts |
 | GET | `/api/v1/me` | candidate | candidate-auth.ts |
+| GET | `/api/v1/me/assessments` | candidate | cert-candidate.ts |
+| POST | `/api/v1/me/assessments/:id/grades` | candidate | cert-candidate.ts |
 | GET | `/api/v1/me/assignments` | candidate | journey.ts |
 | GET | `/api/v1/me/assignments/:id` | candidate | journey.ts |
 | POST | `/api/v1/me/assignments/:id/accept` | candidate | journey.ts |
 | POST | `/api/v1/me/assignments/:id/decline` | candidate | journey.ts |
 | POST | `/api/v1/me/assignments/:id/open-workbench` | candidate | journey.ts |
+| GET | `/api/v1/me/certifications` | candidate | cert-candidate.ts |
+| GET | `/api/v1/me/certifications/:id/course` | candidate | cert-candidate.ts |
+| POST | `/api/v1/me/certifications/:id/licence` | candidate | cert-candidate.ts |
+| POST | `/api/v1/me/certifications/:id/modules/:moduleId/complete` | candidate | cert-candidate.ts |
+| POST | `/api/v1/me/certifications/:id/selfie` | candidate | cert-candidate.ts |
+| GET | `/api/v1/me/certifications/:id/test` | candidate | cert-candidate.ts |
+| POST | `/api/v1/me/certifications/:id/test/start` | candidate | cert-candidate.ts |
+| GET | `/api/v1/me/earnings` | candidate | payments.ts |
 | POST | `/api/v1/me/enrollments` | candidate | opportunities.ts |
 | POST | `/api/v1/me/enrollments/:id/amend` | candidate | journey.ts |
 | GET | `/api/v1/me/enrollments/:id/conversation` | candidate | profile.ts |
@@ -61,6 +98,8 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | POST | `/api/v1/me/enrollments/:id/withdraw` | candidate | journey.ts |
 | POST | `/api/v1/me/evidence` | candidate | profile.ts |
 | DELETE | `/api/v1/me/evidence/:id` | candidate | profile.ts |
+| GET | `/api/v1/me/expert-reviews` | candidate | cert-candidate.ts |
+| POST | `/api/v1/me/expert-reviews/:id/approve` | candidate | cert-candidate.ts |
 | GET | `/api/v1/me/identity` | candidate | candidate-auth.ts |
 | POST | `/api/v1/me/identity/help` | candidate | candidate-auth.ts |
 | POST | `/api/v1/me/identity/session` | candidate | candidate-auth.ts |
@@ -68,10 +107,16 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | POST | `/api/v1/me/logout` | candidate | candidate-auth.ts |
 | GET | `/api/v1/me/onboarding` | candidate | journey.ts |
 | POST | `/api/v1/me/onboarding/acknowledgements` | candidate | journey.ts |
+| POST | `/api/v1/me/partner-invites/redeem` | candidate | supply-candidate.ts |
+| GET | `/api/v1/me/payee` | candidate | payments.ts |
+| POST | `/api/v1/me/payee/mock-complete` | candidate | payments.ts |
+| POST | `/api/v1/me/payee/onboarding-link` | candidate | payments.ts |
+| POST | `/api/v1/me/payee/refresh` | candidate | payments.ts |
 | POST | `/api/v1/me/profile/corrections` | candidate | profile.ts |
 | GET | `/api/v1/me/projects` | candidate | work.ts |
 | GET | `/api/v1/me/projects/:id` | candidate | work.ts |
 | POST | `/api/v1/me/projects/:id/tasks/next` | candidate | work.ts |
+| POST | `/api/v1/me/requisitions/:id/apply` | candidate | supply-candidate.ts |
 | GET | `/api/v1/me/tasks/:id` | candidate | work.ts |
 | PUT | `/api/v1/me/tasks/:id` | candidate | work.ts |
 | POST | `/api/v1/me/tasks/:id/check` | candidate | work.ts |
@@ -85,9 +130,57 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | DELETE | `/api/v1/me/tasks/:id/sources/:sourceId` | candidate | drafting.ts |
 | GET | `/api/v1/me/tasks/:id/sources/:sourceId/file` | candidate | drafting.ts |
 | POST | `/api/v1/me/tasks/:id/submit` | candidate | work.ts |
+| PUT | `/api/v1/me/test-attempts/:id/answers` | candidate | cert-candidate.ts |
+| POST | `/api/v1/me/test-attempts/:id/integrity` | candidate | cert-candidate.ts |
+| POST | `/api/v1/me/test-attempts/:id/submit` | candidate | cert-candidate.ts |
+| POST | `/api/v1/oauth/token` | public | partner-api.ts |
 | GET | `/api/v1/openapi.json` | public | app.ts |
 | GET | `/api/v1/opportunities` | public | opportunities.ts |
 | GET | `/api/v1/opportunities/:id` | public | opportunities.ts |
+| GET | `/api/v1/partner-portal/candidates` | partner | partner-portal.ts |
+| GET | `/api/v1/partner-portal/candidates/:id` | partner | partner-portal.ts |
+| POST | `/api/v1/partner-portal/candidates/:id/withdraw` | partner | partner-portal.ts |
+| GET | `/api/v1/partner-portal/clients` | partner | partner-portal.ts |
+| POST | `/api/v1/partner-portal/clients` | partner | partner-portal.ts |
+| POST | `/api/v1/partner-portal/clients/:id/revoke` | partner | partner-portal.ts |
+| POST | `/api/v1/partner-portal/clients/:id/rotate` | partner | partner-portal.ts |
+| POST | `/api/v1/partner-portal/login` | public | partner-portal.ts |
+| POST | `/api/v1/partner-portal/logout` | partner | partner-portal.ts |
+| GET | `/api/v1/partner-portal/me` | partner | partner-portal.ts |
+| GET | `/api/v1/partner-portal/requisitions` | partner | partner-portal.ts |
+| GET | `/api/v1/partner-portal/requisitions/:id` | partner | partner-portal.ts |
+| POST | `/api/v1/partner-portal/requisitions/:id/candidates` | partner | partner-portal.ts |
+| GET | `/api/v1/partner-portal/statements` | partner | partner-portal.ts |
+| POST | `/api/v1/partner-portal/support/ask` | partner | support.ts |
+| GET | `/api/v1/partner-portal/webhook-deliveries` | partner | partner-portal.ts |
+| POST | `/api/v1/partner-portal/webhook-deliveries/:id/replay` | partner | partner-portal.ts |
+| GET | `/api/v1/partner-portal/webhooks` | partner | partner-portal.ts |
+| POST | `/api/v1/partner-portal/webhooks` | partner | partner-portal.ts |
+| POST | `/api/v1/partner-portal/webhooks/:id/disable` | partner | partner-portal.ts |
+| GET | `/api/v1/partner-statements` | ADMIN, FINANCE | payments.ts |
+| POST | `/api/v1/partner-statements/build` | ADMIN, FINANCE | payments.ts |
+| GET | `/api/v1/partner-submissions/:id` | ADMIN, PM, REVIEWER | supply-internal.ts |
+| POST | `/api/v1/partner-submissions/screen-decisions` | ADMIN, REVIEWER | supply-internal.ts |
+| GET | `/api/v1/partners` | ADMIN, PM | supply-internal.ts |
+| POST | `/api/v1/partners` | ADMIN | supply-internal.ts |
+| GET | `/api/v1/partners/:id` | ADMIN | supply-internal.ts |
+| PATCH | `/api/v1/partners/:id` | ADMIN | supply-internal.ts |
+| PUT | `/api/v1/partners/:id/fee-terms` | ADMIN | payments.ts |
+| POST | `/api/v1/partners/:id/users` | ADMIN | supply-internal.ts |
+| GET | `/api/v1/pay-holds` | ADMIN, FINANCE, REVIEWER | payments.ts |
+| POST | `/api/v1/pay-holds` | ADMIN, FINANCE, REVIEWER | payments.ts |
+| POST | `/api/v1/pay-holds/:id/release` | ADMIN, FINANCE | payments.ts |
+| GET | `/api/v1/pay-runs` | ADMIN, PM, FINANCE | payments.ts |
+| POST | `/api/v1/pay-runs` | ADMIN, PM, FINANCE | payments.ts |
+| GET | `/api/v1/pay-runs/:id` | ADMIN, PM, FINANCE | payments.ts |
+| POST | `/api/v1/pay-runs/:id/approve` | FINANCE | payments.ts |
+| POST | `/api/v1/pay-runs/:id/cancel` | ADMIN, FINANCE | payments.ts |
+| POST | `/api/v1/pay-runs/:id/confirm` | ADMIN, PM | payments.ts |
+| POST | `/api/v1/pay-runs/:id/submit` | FINANCE | payments.ts |
+| GET | `/api/v1/payout-exceptions` | ADMIN, FINANCE | payments.ts |
+| POST | `/api/v1/payout-exceptions/:id/resolve` | ADMIN, FINANCE | payments.ts |
+| POST | `/api/v1/payout-reconciliation` | ADMIN, FINANCE | payments.ts |
+| GET | `/api/v1/placements` | partnerScope: candidates:read | partner-api.ts |
 | GET | `/api/v1/projects` | PM, ADMIN | projects.ts |
 | POST | `/api/v1/projects` | PM | projects.ts |
 | GET | `/api/v1/projects/:id` | PM, ADMIN | projects.ts |
@@ -113,11 +206,25 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | GET | `/api/v1/projects/:id/reviewers` | PM, ADMIN | review.ts |
 | POST | `/api/v1/projects/:id/reviewers` | PM, ADMIN | review.ts |
 | DELETE | `/api/v1/projects/:id/reviewers/:userId` | PM, ADMIN | review.ts |
+| POST | `/api/v1/projects/:id/sme-supply` | ADMIN, PM | supply-internal.ts |
 | POST | `/api/v1/projects/:id/submit` | PM, ADMIN | projects.ts |
 | POST | `/api/v1/projects/:id/task-inputs` | ACCESS, key CLIENT_API | tasks.ts |
 | GET | `/api/v1/projects/:id/tasks` | PM, ADMIN | tasks.ts |
 | POST | `/api/v1/projects/:id/tasks/:taskId/reclaim` | PM, ADMIN | tasks.ts |
 | POST | `/api/v1/public/campaigns/:id/click` | public | campaigns.ts |
+| GET | `/api/v1/rate-cards` | ADMIN, PM, FINANCE | payments.ts |
+| POST | `/api/v1/rate-cards` | ADMIN, FINANCE | payments.ts |
+| GET | `/api/v1/requisitions` | partnerScope: requisitions:read | partner-api.ts |
+| GET | `/api/v1/requisitions` | ADMIN, PM, REVIEWER | supply-internal.ts |
+| POST | `/api/v1/requisitions` | ADMIN, PM | supply-internal.ts |
+| GET | `/api/v1/requisitions/:id` | partnerScope: requisitions:read | partner-api.ts |
+| GET | `/api/v1/requisitions/:id` | ADMIN, PM, REVIEWER | supply-internal.ts |
+| PUT | `/api/v1/requisitions/:id` | ADMIN, PM | supply-internal.ts |
+| POST | `/api/v1/requisitions/:id/candidates` | partnerScope: candidates:write | partner-api.ts |
+| PUT | `/api/v1/requisitions/:id/guidelines` | ADMIN, PM | cert-admin.ts |
+| PUT | `/api/v1/requisitions/:id/rate-card` | ADMIN, PM | payments.ts |
+| GET | `/api/v1/requisitions/:id/submissions` | ADMIN, PM, REVIEWER | supply-internal.ts |
+| POST | `/api/v1/requisitions/:id/transition` | ADMIN, PM | supply-internal.ts |
 | POST | `/api/v1/review/claims/:id/verify` | REVIEWER, ADMIN | review.ts |
 | GET | `/api/v1/review/conflicts` | REVIEWER, ADMIN | review.ts |
 | POST | `/api/v1/review/conflicts` | REVIEWER, ADMIN | review.ts |
@@ -138,6 +245,9 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | GET | `/api/v1/review/tasks/:id` | REVIEWER, ADMIN | task-review.ts |
 | POST | `/api/v1/review/tasks/:id/decision` | REVIEWER, ADMIN | task-review.ts |
 | GET | `/api/v1/review/tasks/:id/sources/:sourceId/file` | REVIEWER, ADMIN | drafting.ts |
+| POST | `/api/v1/sandbox/candidates/:id/simulate` | partnerScope: candidates:write | partner-api.ts |
+| POST | `/api/v1/sme/:id/standing` | ADMIN | cert-admin.ts |
+| POST | `/api/v1/support/ask` | ADMIN, PM, REVIEWER, FINANCE | support.ts |
 | GET | `/api/v1/templates` | ADMIN, PM | templates.ts |
 | POST | `/api/v1/templates` | ADMIN | templates.ts |
 | GET | `/api/v1/templates/:id` | ADMIN, PM | templates.ts |
@@ -148,6 +258,7 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | POST | `/api/v1/templates/:id/versions` | ADMIN | templates.ts |
 | GET | `/api/v1/terms` | ADMIN | review.ts |
 | POST | `/api/v1/terms` | ADMIN | review.ts |
+| POST | `/api/v1/test-attempts/:id/grades` | ADMIN, REVIEWER | cert-admin.ts |
 | GET | `/api/v1/users` | ADMIN | users.ts |
 | POST | `/api/v1/users` | ADMIN | users.ts |
 | PATCH | `/api/v1/users/:id/roles` | ADMIN | users.ts |

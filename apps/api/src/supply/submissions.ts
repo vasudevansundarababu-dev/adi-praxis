@@ -94,7 +94,8 @@ export async function sendInvite(tx: Tx, email: EmailSender | null, sub: Partner
  */
 export async function submitCandidate(
   tx: Tx,
-  deps: { email: EmailSender | null; appUrl: string },
+  /** exposeInviteLink: test/demo environments only, where email is simulated — the partner sees the invite link. */
+  deps: { email: EmailSender | null; appUrl: string; exposeInviteLink?: boolean },
   args: { clientId: string; ch: Channel; requisitionId: string; input: CandidateSubmissionInput; smeUserId?: string | null },
   audit: Audit,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
@@ -172,15 +173,16 @@ export async function submitCandidate(
   await tx.partnerSubmission.update({ where: { id: sub.id }, data: { screen: screen.state, screenReasons: screen.reasons } });
   await recordState(tx, sub, { dimension: 'screen', from: 'NOT_RUN', to: screen.state, reason: screen.reasons.join(' ') || null, event: null }, audit);
 
+  let token: string | null = null;
   if (args.ch.channel === 'DIRECT') {
     // The candidate applied themselves while signed in: they are "invited" and have accepted at once.
     const s2 = await tx.partnerSubmission.update({ where: { id: sub.id }, data: { state: 'INVITED', invitedAt: now, inviteAcceptedAt: now } });
     await recordState(tx, s2, { dimension: 'submission', from: 'RECEIVED', to: 'INVITED', reason: 'Applied directly', event: 'candidate.invited' }, audit);
   } else {
-    await sendInvite(tx, deps.email, { ...sub, screen: screen.state }, r, deps.appUrl, audit);
+    token = await sendInvite(tx, deps.email, { ...sub, screen: screen.state }, r, deps.appUrl, audit);
   }
   const fresh = await tx.partnerSubmission.findUniqueOrThrow({ where: { id: sub.id } });
-  return { status: 201, body: { candidateId: fresh.id, state: fresh.state, screen: fresh.screen, screenReasons: screen.reasons, ownerUntil: fresh.ownerUntil?.toISOString() ?? null, inviteExpiresAt: fresh.inviteExpiresAt?.toISOString() ?? null } };
+  return { status: 201, body: { candidateId: fresh.id, state: fresh.state, screen: fresh.screen, screenReasons: screen.reasons, ownerUntil: fresh.ownerUntil?.toISOString() ?? null, inviteExpiresAt: fresh.inviteExpiresAt?.toISOString() ?? null, ...(deps.exposeInviteLink && token ? { inviteLinkForTesting: `${deps.appUrl}/partner-invite/${token}` } : {}) } };
 }
 
 /** Current state per dimension (the latest history entry of each) and the full history, oldest first. */
@@ -244,6 +246,12 @@ export async function redeemInvite(tx: Tx, smeUserId: string, token: string, aud
   if (!s || s.sandbox) throw notFound('This invitation link is not valid.');
   if (s.state !== 'INVITED' || s.endedAt) throw new AppError(410, 'INVITE_ENDED', 'This invitation is no longer active.');
   if (s.inviteExpiresAt && s.inviteExpiresAt < new Date() && !s.inviteAcceptedAt) throw new AppError(410, 'INVITE_EXPIRED', 'This invitation has expired. Ask the person who put you forward to submit you again.');
+  // An invite belongs to one person: once an account is linked to it (or it was accepted), nobody else can use it.
+  if (s.candidate.smeUserId && s.candidate.smeUserId !== smeUserId) throw new AppError(409, 'INVITE_TAKEN', 'This invitation has already been used by another account. Sign in with the account you used before, or ask the person who put you forward.');
+  if (s.inviteAcceptedAt && s.enrollmentId) {
+    const e = await tx.enrollment.findUnique({ where: { id: s.enrollmentId } });
+    if (e && e.smeUserId !== smeUserId) throw new AppError(409, 'INVITE_TAKEN', 'This invitation has already been used by another account. Sign in with the account you used before, or ask the person who put you forward.');
+  }
   const linked = await tx.supplyCandidate.findUnique({ where: { smeUserId } });
   if (linked && linked.id !== s.candidateId) {
     const owner = await activeOwner(tx, linked.id, new Date());

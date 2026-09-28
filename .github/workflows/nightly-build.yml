@@ -73,6 +73,7 @@ jobs:
         env:
           DEPLOY_ONLY: '1'
           PRAXIS_VERTEX: '1'
+          PRAXIS_SME_SUPPLY: '1' # M10 on in the tester environment from the Release 1.1 test build (28 Sep 2026)
           PRAXIS_ENV_LABEL: Test environment
           PRAXIS_BUILD: ${{ env.LABEL }}
         run: infra/demo/deploy-demo.sh "$PROJECT" unused "$REGION"

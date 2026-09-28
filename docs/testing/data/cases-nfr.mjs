@@ -120,4 +120,41 @@ export const CASES = [
     expected: ['Times are in your local time (IST) and dates are unambiguous. Report any UTC-looking times.'],
     decisions: ['D-M4C-11'],
   }),
+  // ── Release 1.1 ──
+  c('TC-NFR-050', 'Test player: autosave and going offline', {
+    priority: 'P1', persona: 'SME', pre: 'A certification test in progress (TC-SME-066). Chrome DevTools open.',
+    steps: ['Answer two questions; watch the save status.', 'DevTools → Network → Offline. Answer three more questions; move around the map.', 'Stay on the page for 30 seconds, then set Network back to "No throttling".', 'Reload the page; then open the test in a second tab.', 'Repeat with "Slow 4G" throttling.'],
+    expected: ['Online: "All answers saved" within about 2 seconds of each change.', 'Offline: "Offline: your answers are kept here and will save when you reconnect"; you can keep working.', 'Back online, the status returns to "All answers saved" by itself; after reload every answer is still there, and the countdown continued (it did not restart).', 'On Slow 4G, saves still complete; nothing is lost.'],
+    decisions: ['D-M10-40'],
+  }),
+  c('TC-NFR-051', 'Test deadline: automatic submission', {
+    priority: 'P1', persona: 'SME', pre: 'A test you can let run out (a candidate whose result does not matter). 40 minutes for Annotator.',
+    steps: ['Answer a few questions, then leave the page open until the countdown ends.', 'On another candidate: start, answer a few questions, close the browser, and come back 15 minutes after the deadline.'],
+    expected: ['At zero: "Time is up. Submitting your saved answers…", then the result; answers can no longer be changed.', 'With the browser closed, the test is submitted with the saved answers within about 10 minutes after the deadline (plus 1 minute), and the result is waiting.'],
+    decisions: ['D-M10-23', 'D-M10-40'],
+  }),
+  c('TC-NFR-052', 'New candidate screens at phone width', {
+    priority: 'P1', persona: 'SME', pre: 'Chrome on a mid-range Android phone (360×800) or DevTools device mode; a candidate in each state if possible.',
+    steps: ['Open the careers page and apply.', 'Open Certifications, a course module with its quiz, the selfie check page, and a test (map, countdown, an ordering question).', 'Open Payments and the simulated payout page.'],
+    expected: ['No sideways scrolling of the page; buttons at least finger-sized; the countdown stays visible; the question map is usable.', 'Ordering works with the Up/Down buttons on touch.', 'The design matches the rest of the candidate app. A screen that is unusable on a phone is S2 (these screens must work in a phone browser).'],
+    decisions: ['D-M10-39', 'D-M10-40'],
+  }),
+  c('TC-NFR-053', 'Test player with the keyboard and a screen reader', {
+    priority: 'P2', persona: 'SME', pre: 'A test in progress. NVDA (Windows) or VoiceOver/TalkBack.',
+    steps: ['Using only Tab, Shift+Tab, Space, Enter and arrow keys: answer each question type, reorder steps, jump via the map, submit.', 'With the screen reader: listen to a question, the map and the time left.'],
+    expected: ['Everything works without a mouse; focus is always visible.', 'Map items are read as "Question N, answered/not answered"; moving a step announces its new position; the time left is announced sensibly (not every second).'],
+    decisions: ['D-M10-40'],
+  }),
+  c('TC-NFR-054', 'Waiting times for generation, test start and the Support Bot', {
+    priority: 'P2', persona: 'Several', pre: 'Real Claude on Vertex (answers vary). A stopwatch.',
+    steps: ['Time a guidelines generation run from upload to SUCCEEDED (TC-ADM-016).', 'Time "Start the test now" to the first question (first and second candidate on the same blueprint).', 'Time 5 Support Bot answers on different screens.'],
+    expected: ['Generation: about 10 minutes or less; the page stays usable meanwhile.', 'Test start: a few seconds when a form is ready; the first ever start may need up to about a minute ("Your test is being prepared. Wait a minute, then press Start again.").', 'Support Bot: an answer within about 10 seconds, with "Looking at this screen…" shown meanwhile.', 'Record the times; anything much slower is a UX issue with the times attached.'],
+    decisions: ['D-M10-13', 'D-M10-18', 'D-UI-07'],
+  }),
+  c('TC-NFR-055', 'Several candidates in one office take tests at once', {
+    priority: 'P2', persona: 'Several', pre: 'Three or more testers on the same office network, each with their own candidate ready for the test.',
+    steps: ['Start the tests within the same minute and answer quickly for 5 minutes.'],
+    expected: ['Nobody gets "too many requests"; saves keep working for everyone (limits are per candidate, not per office).'],
+    decisions: ['D-M10-27'],
+  }),
 ];

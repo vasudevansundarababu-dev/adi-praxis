@@ -16,7 +16,7 @@ body:
     validations: { required: true }
   - type: dropdown
     id: persona
-    attributes: { label: Persona, options: ["SME / candidate", "Project manager", "Admin", "Reviewer", "Several"] }
+    attributes: { label: Persona, options: ["SME / candidate", "Project manager", "Admin", "Validator (Reviewer)", "Finance", "Partner (portal or Partner API)", "Several"] }
     validations: { required: true }
   - type: dropdown
     id: kind

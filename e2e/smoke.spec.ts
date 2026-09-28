@@ -9,6 +9,7 @@ const PM = { email: process.env.E2E_PM_EMAIL ?? 'pm@e2e.local', password: proces
 test.describe('console smoke', () => {
   test('an Admin signs in and sees the console for their role', async ({ page }) => {
     await page.goto(`${WEB}/login`);
+    await page.waitForLoadState('networkidle'); // let the form hydrate before submitting it
     await expect(page).toHaveTitle(/ADI Praxis/);
     await page.getByLabel('Email').fill(ADMIN.email);
     await page.getByLabel('Password').fill(ADMIN.password);
@@ -26,6 +27,7 @@ test.describe('console smoke', () => {
   test('the Support Bot explains the screen, including which fields are required', async ({ page }) => {
     test.skip(EXTERNAL, 'the local mock assistant answers only in local runs');
     await page.goto(`${WEB}/login`);
+    await page.waitForLoadState('networkidle'); // let the form hydrate before submitting it
     await page.getByLabel('Email').fill(ADMIN.email);
     await page.getByLabel('Password').fill(ADMIN.password);
     await page.getByRole('button', { name: /sign in/i }).click();
@@ -46,6 +48,7 @@ test.describe('console smoke', () => {
 
   test('a PM does not see Admin areas, and a wrong password is refused', async ({ page }) => {
     await page.goto(`${WEB}/login`);
+    await page.waitForLoadState('networkidle'); // let the form hydrate before submitting it
     await page.getByLabel('Email').fill(PM.email);
     await page.getByLabel('Password').fill('not-the-password');
     await page.getByRole('button', { name: /sign in/i }).click();

@@ -2,6 +2,13 @@
 
 Decided 28 Sep 2026. Applies from release 1.0 onward.
 
+> **Update 28 Sep 2026 (owner): the tester environment moves to `main`.** From the Release 1.1 test build
+> (`docs/releases/RELEASE-1.1-TEST-BUILD.md`), `adi-praxis-test-0928` runs `main` — 1.0 plus M10 and the UI
+> usability changes — and the nightly build deploys `main`. Until a 1.0 production release is scheduled, tester
+> defects are fixed on `main` only (branch `fix/issue-<n>` from `main`, pull request into `main`, label `fixed:main`);
+> `release/1.0` stays frozen at `b0398a0`. The dual-fix rule below applies again if 1.0 is put back under test or
+> released.
+
 ## Branches
 
 | Branch | Purpose | Who merges |

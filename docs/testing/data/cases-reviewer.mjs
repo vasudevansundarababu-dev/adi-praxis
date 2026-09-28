@@ -1,5 +1,6 @@
-// Reviewer (console). Your reviewer account must be assigned to the project (PM or Admin: project → Reviewers).
-const c = (id, title, o) => ({ id, title, persona: 'Reviewer', ...o });
+// Validator (console): the internal REVIEWER role, shown as "Validator" from Release 1.1. Your Validator account must be
+// assigned to the project (PM or Admin: project → Validators).
+const c = (id, title, o) => ({ id, title, persona: 'Validator', ...o });
 
 export const CASES = [
   // ── Applications (selection) ──
@@ -41,13 +42,13 @@ export const CASES = [
   }),
   c('TC-REV-007', 'Resolve a candidate-declared conflict', {
     category: 'FUNC', priority: 'P2', pre: 'A candidate declared a conflict in onboarding (TC-SME-021).',
-    steps: ['Review → Conflicts → resolve it with a note.'],
+    steps: ['Reviews → Conflicts → resolve it with a note.'],
     expected: ['The PM can now propose the candidate.'],
     decisions: ['D-M4C-08'],
   }),
   c('TC-REV-008', 'Identity reviews (alternative checks)', {
     category: 'FUNC', priority: 'P3', pre: 'A candidate who asked for an alternative identity check (after a failed check).',
-    steps: ['Review → Identity reviews → open → decide.'],
+    steps: ['Reviews → Identity reviews → open → decide.'],
     expected: ['The screen shows the request without any ID number or image; the decision updates the candidate\'s identity status.'],
     decisions: ['D-PL-10'],
   }),
@@ -102,5 +103,42 @@ export const CASES = [
     steps: ['Open the review.'],
     expected: ['The reviewer is given the link to open; the server never fetches it.'],
     decisions: ['D-M7-02'],
+  }),
+  // ── Release 1.1: the Reviewer role is now shown as "Validator" ──
+  c('TC-REV-030', 'Validator menu and label', {
+    category: 'UX', priority: 'P1', pre: 'Signed in with a REVIEWER account (shown as Validator).',
+    steps: ['Read the top row of the menu and the second row of each group.', 'Read your role name in the header or home page.', 'Type /payments/pay-runs and /partners in the address bar.'],
+    expected: ['Top row: Home, Projects, Reviews, Certification. Projects has only Requisitions (so no second row); Reviews: Applications, Task reviews, RL reviews, Identity reviews, Conflicts; Certification: Guidelines, Certification reviews.', 'The role is shown as "Validator".', 'Payments and Partners show "This page is for …; you are signed in as Validator".'],
+    decisions: ['D-PL-05', 'D-UI-03', 'D-M10-03'],
+  }),
+  c('TC-REV-031', 'Confirm the requirement screen on submissions (one and many)', {
+    category: 'FUNC', priority: 'P1', pre: 'A requisition with submissions, one marked "may not meet" (TC-PTR-006) and one "meets".',
+    steps: ['Projects → Requisitions → the requisition → Submissions. Read Source, Requirement screen and reasons.', 'Select the "may not meet" row → confirm "not met" with a note.', 'Select two other rows → mark them as meeting the requirements.', 'Try to change the confirmed row again.'],
+    expected: ['Each row shows its source (Partner portal, Partner API, Careers page) and the screen\'s recommendation with its reason.', '"Confirmed “not met” for 1. The partner and candidate are told." The partner\'s history shows "Not met (confirmed)".', '"Marked 2 as meeting the requirements."', '"Rows already confirmed “not met” cannot be changed here." Nothing was decided before you acted.'],
+    decisions: ['D-M10-10', 'D-M10-12'],
+  }),
+  c('TC-REV-032', 'Certification reviews: confirm written grades', {
+    category: 'FUNC', priority: 'P1', pre: 'A Reviewer-tier (or Expert-tier) test with written answers has been submitted (the Reviewer tier must be published, and a candidate on a Reviewer requisition takes it; coordinate with the lead). Signed in as Validator.',
+    steps: ['Certification → Certification reviews. Filter to written answers.', 'Open one: read the item, rubric, the candidate\'s answer and the model grade.', 'Enter your own score and confirm. Double-click the confirm button.', 'Ask the candidate tester to read their result page before and after.'],
+    expected: ['The model score is labelled "Recommendation — you decide"; nothing is decided by it.', 'One confirmation is recorded ("Grade confirmed."); if a second person is needed: "Another person must confirm it too."', 'Before every grade is confirmed the candidate sees "Your test is being reviewed by a person"; after, pass or fail with section bands.', 'You never see the candidate\'s identity documents.'],
+    decisions: ['D-M10-21', 'D-M10-22'],
+  }),
+  c('TC-REV-033', 'Decide a certification after three fails', {
+    category: 'FUNC', priority: 'P2', pre: 'A candidate has failed three attempts (TC-E2E-010). Signed in as Validator.',
+    steps: ['Certification reviews → the certification waiting for a decision. Read the attempts and section bands.', 'Choose "Allow another retake" with a note. (A second tester, on another candidate: Not certified.)'],
+    expected: ['The queue explains why it is waiting (three failed attempts).', '"Decision recorded. The candidate is told." The candidate sees a retake, or "A person reviewed your attempts and decided not to certify you this time."', 'The partner who supplied the candidate sees the certification state change; a "Not certified" decision is always a person\'s.'],
+    decisions: ['D-M10-22', 'D-M10-24'],
+  }),
+  c('TC-REV-034', 'Confirm or reject a professional licence', {
+    category: 'FUNC', priority: 'P3', pre: 'A requisition with tier Expert and "licence required", and a candidate who uploaded a licence (synthetic number and issuing body; any small PDF). Needs a certified Reviewer in that domain first: coordinate with the lead.',
+    steps: ['Certification reviews → licences. Open the licence (opening the file is recorded in the audit log).', 'Reject with a note; ask the candidate to upload again; then confirm.'],
+    expected: ['The file opens only for Validators and Admins; the page says opening it is recorded.', 'After rejection the candidate sees "The Validator could not confirm your last upload…". After confirmation: "Licence confirmed." and, if the test was already passed, the candidate is certified.'],
+    decisions: ['D-M10-25'],
+  }),
+  c('TC-REV-035', 'Validator and Support Bot on a review screen', {
+    category: 'UX', priority: 'P3', pre: 'Signed in as Validator on an application or a certification review.',
+    steps: ['Help → "What should I check before I decide?"', 'Ask "Select this candidate for me" and "What did the other Validators decide on projects I am not on?"'],
+    expected: ['The answer explains the checks for this screen and says the decision is yours.', 'It does not act, and it does not reveal anything you cannot already see.'],
+    decisions: ['D-UI-05', 'D-UI-06'],
   }),
 ];

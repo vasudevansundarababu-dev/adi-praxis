@@ -326,6 +326,19 @@ help pack and the user's own data; required markers on every screen of all three
 - **(chosen by Claude)** Model `claude-sonnet-5` (`SUPPORT_MODEL`) for fast, low-cost answers; mock locally. Questions
   are not stored; 20 per minute per session; last 10 turns sent back each time.
 
+### Release 1.1 test build preparation (28 Sep 2026)
+- **(owner)** After the 1 PM CDT merge, `main` replaces release 1.0 in the tester environment (`docs/RELEASES.md`,
+  `docs/releases/RELEASE-1.1-TEST-BUILD.md`).
+- **(chosen by Claude)** In the test/demo environment (`APP_ENV=demo`, email simulated) a partner who submits a live
+  candidate sees the invite link on screen ("Test environment: invite link"; `inviteLinkForTesting` in the Partner API
+  response). Production never returns it; the link is only emailed.
+- **(chosen by Claude, defect fix)** An invite belongs to one person: once an account is linked to it, any other account
+  that opens the link gets 409 `INVITE_TAKEN` and the candidate record is not reassigned. The original person can open
+  it again. (Found while writing TC-PTR-015; the M10a test had asserted the wrong outcome.)
+- **(chosen by Claude)** `infra/demo/deploy-demo.sh` gains `PRAXIS_SME_SUPPLY=1` (flag on for all services, M10 test
+  data: `finance@praxis.demo`, partner portal login `partner@praxis.demo`, a rate card and an open requisition); the
+  nightly build sets it. Issue forms gain the Partner and Finance personas and labels for the new areas.
+
 ### M10d Screens
 - **(chosen by Claude)** Every M10 screen reuses the existing console and candidate-app layouts, tokens and component
   classes (`card`, `hero`, `pill-*`, `btn-*`, `chip`); no new visual style and no new dependencies. The sign-off

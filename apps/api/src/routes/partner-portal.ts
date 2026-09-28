@@ -74,7 +74,7 @@ export const partnerPortalRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
   });
 
   app.post('/partner-portal/requisitions/:id/candidates', { config: { access: 'partner' }, schema: { tags: ['partner-portal'], params: IdParams, body: CandidateSubmissionInput } }, async (req, reply) => {
-    await runPartnerCommand(db, req, reply, async ({ tx, actor, audit }) => submitCandidate(tx, { email, appUrl: config.CANDIDATE_APP_URL }, { clientId: actor.clientId, ch: { partnerId: actor.partnerId, sandbox: false, channel: 'PARTNER_PORTAL' }, requisitionId: req.params.id, input: req.body }, audit));
+    await runPartnerCommand(db, req, reply, async ({ tx, actor, audit }) => submitCandidate(tx, { email, appUrl: config.CANDIDATE_APP_URL, exposeInviteLink: config.appEnv === 'demo' }, { clientId: actor.clientId, ch: { partnerId: actor.partnerId, sandbox: false, channel: 'PARTNER_PORTAL' }, requisitionId: req.params.id, input: req.body }, audit));
     return reply;
   });
 

@@ -43,8 +43,13 @@ export const certCandidateRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
       await ensureCertifications(tx, smeUserId);
       return tx.certification.findMany({ where: { smeUserId }, orderBy: { createdAt: 'asc' } });
     });
+    const bps = await db.certificationBlueprint.findMany({ where: { OR: all.map((c) => ({ versionId: c.versionId, tier: c.tier })) } });
+    const testOf = (c: (typeof all)[number]) => {
+      const b = bps.find((x) => x.versionId === c.versionId && x.tier === c.tier);
+      return b ? { questions: b.itemCount + (b.authoringTask ? 1 : 0), timeLimitMinutes: b.timeLimitMinutes, authoringTask: b.authoringTask } : null;
+    };
     return {
-      items: all.map((c) => ({ id: c.id, domain: c.domain, tier: c.tier, tierLabel: TIER_LABELS[c.tier], state: c.state, attemptsUsed: c.attemptsUsed, retakeAvailableAt: c.retakeAvailableAt?.toISOString() ?? null, reviewReason: c.reviewReason, issuedAt: c.issuedAt?.toISOString() ?? null, expiresAt: c.expiresAt?.toISOString() ?? null, licenceRequired: c.licenceRequired, licenceStatus: c.licenceStatus })),
+      items: all.map((c) => ({ id: c.id, domain: c.domain, tier: c.tier, tierLabel: TIER_LABELS[c.tier], state: c.state, attemptsUsed: c.attemptsUsed, retakeAvailableAt: c.retakeAvailableAt?.toISOString() ?? null, reviewReason: c.reviewReason, issuedAt: c.issuedAt?.toISOString() ?? null, expiresAt: c.expiresAt?.toISOString() ?? null, licenceRequired: c.licenceRequired, licenceStatus: c.licenceStatus, test: testOf(c) })),
     };
   });
 
@@ -67,13 +72,17 @@ export const certCandidateRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
     return reply.status(201).send(s);
   });
 
-  app.post('/me/certifications/:id/test/start', { config: { access: 'candidate' }, schema: { tags: ['cert'], params: IdParams, body: z.object({ sessionRef: z.string().min(5).max(200) }) } }, async (req, reply) => {
+  app.post('/me/certifications/:id/test/start', { config: { access: 'candidate' }, schema: { tags: ['cert'], params: IdParams, body: z.object({ sessionRef: z.string().min(5).max(200).optional() }) } }, async (req, reply) => {
     const c = await ownCertification(db, req.params.id, req.candidate!.smeUserId);
+    // Stripe returns without the session reference: use the latest selfie check this candidate started for it.
+    const started = req.body.sessionRef ? null : await db.auditEvent.findFirst({ where: { entityType: 'Certification', entityId: c.id, actorId: c.smeUserId, action: 'cert.selfie_started' }, orderBy: { createdAt: 'desc' } });
+    const sessionRef = req.body.sessionRef ?? (started?.after as { sessionRef?: string } | null)?.sessionRef;
+    if (!sessionRef) throw new AppError(409, 'SELFIE_CHECK_REQUIRED', 'Complete the selfie check before starting the test.');
     // Outside the transaction: checks, and a form assembled now if the worker's buffer is empty.
     const { bp } = await checkCanStart(db, c);
     await ensureForm(itemDeps, bp.id, await sectionsOf(db, c.versionId));
     await runCandidateCommand(db, req, reply, async ({ tx, audit }) => {
-      const a = await startTest(tx, c, req.body.sessionRef, selfie, audit);
+      const a = await startTest(tx, c, sessionRef, selfie, audit);
       return { status: 201, body: await attemptView(tx, a) };
     });
     return reply;

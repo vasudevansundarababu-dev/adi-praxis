@@ -13,6 +13,7 @@ import type { SecretBox } from '../lib/secrets';
 import { runPartnerCommand } from '../platform/command';
 import { ClientInput, clientDto, createClient, createWebhook, revokeClient, rotateClient, WebhookInput, webhookDto } from '../supply/partners';
 import { partnerRequisitionDto } from '../supply/requisitions';
+import { partnerGuidelinesView } from '../cert/partner-view';
 import { candidateView, submitCandidate, withdraw } from '../supply/submissions';
 import { replayDelivery } from '../supply/webhooks';
 
@@ -61,7 +62,7 @@ export const partnerPortalRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
   app.get('/partner-portal/requisitions', { config: { access: 'partner' }, schema: { tags: ['partner-portal'] } }, async (req) => {
     const p = me(req);
     const rows = await db.requisition.findMany({ where: { clientId: p.clientId, allowedPartnerIds: { has: p.partnerId }, state: { in: ['OPEN', 'PAUSED', 'FILLED'] } }, orderBy: { createdAt: 'desc' } });
-    const mine = await db.partnerSubmission.groupBy({ by: ['requisitionId'], where: { partnerId: p.partnerId, sandbox: false, requisitionId: { in: rows.map((r) => r.id) } }, _count: true });
+    const mine = await db.partnerSubmission.groupBy({ by: ['requisitionId'], where: { partnerId: p.partnerId, sandbox: false, state: { not: 'DUPLICATE' }, requisitionId: { in: rows.map((r) => r.id) } }, _count: true });
     return { items: rows.map((r) => partnerRequisitionDto(r, { submitted: mine.find((m) => m.requisitionId === r.id)?._count ?? 0 })) };
   });
 
@@ -69,7 +70,7 @@ export const partnerPortalRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
     const p = me(req);
     const r = await db.requisition.findFirst({ where: { id: req.params.id, clientId: p.clientId, allowedPartnerIds: { has: p.partnerId } } });
     if (!r) throw notFound('Requisition not found');
-    return partnerRequisitionDto(r);
+    return { ...partnerRequisitionDto(r), ...(await partnerGuidelinesView(db, r)) };
   });
 
   app.post('/partner-portal/requisitions/:id/candidates', { config: { access: 'partner' }, schema: { tags: ['partner-portal'], params: IdParams, body: CandidateSubmissionInput } }, async (req, reply) => {

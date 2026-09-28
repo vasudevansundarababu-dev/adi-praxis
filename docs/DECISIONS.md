@@ -312,3 +312,30 @@ Spec: `docs/SME-SUPPLY.md` (section 0 owner decisions). Runbook: `docs/M10-BUILD
   demand) per partner and shown in the partner portal with the partner's own candidate ids.
 - **(chosen by Claude)** New internal role `FINANCE` (label Finance). Payee data in Praxis is provider, reference,
   status and payout currency only.
+
+### M10d Screens
+- **(chosen by Claude)** Every M10 screen reuses the existing console and candidate-app layouts, tokens and component
+  classes (`card`, `hero`, `pill-*`, `btn-*`, `chip`); no new visual style and no new dependencies. The sign-off
+  prototype was used for flow only.
+- **(chosen by Claude)** The partner portal is a separate route tree in `apps/web` (`/partner/login` and a
+  `/partner/(portal)` group with its own layout, header and nav), so the console layout never handles partner
+  sessions. Partner API v1 stays on the API host (`/partner/v1`); the web host's `/partner/*` is the portal.
+- **(chosen by Claude)** Console menu items for M10 (Requisitions, Certifications, Guidelines, Partners, Payments) and
+  the candidate app's Certifications and Payments links appear only when `SME_SUPPLY_ENABLED` is set in that app's own
+  environment. Reached directly with the flag off, the pages say SME supply is not switched on (the API returns 404).
+- **(chosen by Claude)** Candidate test player: one question at a time with a question map and countdown; answers
+  autosave (1.5 s after a change, retried while offline); integrity events are batched every 5 s and the candidate is
+  told they are logged and never fail anyone on their own; the test submits itself at the deadline. Ordering items use
+  keyboard-accessible Up/Down buttons (no drag and drop).
+- **(chosen by Claude)** The C07 checklist's certification and payment items show their status and link to the course,
+  test or payment page; they have no acknowledge button ("Completes automatically").
+- **(chosen by Claude)** Starting a test after a real Stripe selfie check does not need the session reference in the
+  return URL: the API uses the latest selfie check the candidate started for that certification.
+- **(chosen by Claude)** Local development and the demo: the simulated payout page completes payment set-up through
+  `POST /me/payee/mock-complete`, which exists only when the payout mock is in use.
+- **(chosen by Claude)** Written grades in the console show the model score as "Recommendation — you decide"; the
+  Expert queue in the candidate app asks the Expert to type their own score.
+- **(chosen by Claude)** Playwright smoke tests (`e2e/m10.spec.ts`) cover the partner submit flow, a candidate's
+  course → test → result, and a pay run from build to submission. Steps that are a person's FLOW 2 decision or a
+  fixture (selection, a payable SME) are set by `apps/api/scripts/e2e-m10.ts` against the e2e database only. The e2e
+  set-up now also runs the worker and points storage at the local GCS emulator.

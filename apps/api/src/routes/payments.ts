@@ -8,7 +8,7 @@ import { runCommand } from '../platform/command';
 import { buildStatements, CURRENCIES, earningDto, MINIMUM_PAYOUT, reverseEarning, statementDto } from '../pay/ledger';
 import { applyPayeeStatus, onboardingLink, payeeView } from '../pay/payees';
 import { approvePayRun, buildPayRun, cancelPayRun, confirmPayRun, payRunDto, previousWeek, processPayoutWebhook, reconcile, submitPayRun } from '../pay/payruns';
-import type { PayoutProvider } from '../pay/provider';
+import { MockPayoutProvider, type PayoutProvider } from '../pay/provider';
 
 const IdParams = z.object({ id: z.string().uuid() });
 const Money = z.string().regex(/^\d{1,8}(\.\d{1,2})?$/, 'Use an amount like 40 or 40.50');
@@ -74,6 +74,11 @@ export const paymentRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; payo
       return { status: 201, body: { id: h.id } };
     });
     return reply;
+  });
+
+  app.get('/pay-holds', { config: { access: ['ADMIN', 'FINANCE', 'REVIEWER'] }, schema: { tags: ['payments'], querystring: z.object({ smeUserId: z.string().uuid().optional(), active: z.enum(['true', 'false']).default('true') }) } }, async (req) => {
+    const rows = await db.payHold.findMany({ where: { clientId: req.actor!.clientId, ...(req.query.smeUserId ? { smeUserId: req.query.smeUserId } : {}), ...(req.query.active === 'true' ? { releasedAt: null } : {}) }, orderBy: { createdAt: 'desc' }, take: 200 });
+    return { items: rows.map((h) => ({ id: h.id, smeUserId: h.smeUserId, kind: h.kind, reason: h.reason, createdAt: h.createdAt.toISOString(), releasedAt: h.releasedAt?.toISOString() ?? null })) };
   });
 
   app.post('/pay-holds/:id/release', { config: { access: FINANCE }, schema: { tags: ['payments'], params: IdParams, body: z.object({ note: z.string().trim().min(3).max(1000) }) } }, async (req, reply) => {
@@ -178,7 +183,7 @@ export const paymentRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; payo
   });
 
   app.post('/partner-statements/build', { config: { access: FINANCE }, schema: { tags: ['payments'], body: z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) }) } }, async (req) => {
-    const made = await buildStatements(db, req.body.period, { type: 'USER', id: req.actor!.userId });
+    const made = await buildStatements(db, req.actor!.clientId, req.body.period, { type: 'USER', id: req.actor!.userId });
     return { created: made.length, ids: made.map((s) => s.id) };
   });
 
@@ -204,6 +209,18 @@ export const paymentCandidateRoutes: FastifyPluginAsyncZod<{ db: Db; payouts: Pa
     }
     return payeeView(db, req.candidate!.smeUserId);
   });
+
+  // Local development and the demo only: the mock provider's hosted page finishes set-up here (never with a real provider).
+  if (payouts instanceof MockPayoutProvider) {
+    app.post('/me/payee/mock-complete', { config: { access: 'candidate' }, schema: { tags: ['payments'], hide: true } }, async (req) => {
+      const p = await db.payee.findUnique({ where: { smeUserId: req.candidate!.smeUserId } });
+      if (!p?.payeeRef || p.provider !== 'mock') throw notFound('No mock payee to complete');
+      payouts.payeeEvent(p.payeeRef, 'READY');
+      const s = await payouts.getPayeeStatus(p.payeeRef);
+      await db.$transaction((tx) => applyPayeeStatus(tx, p, s.status, s.payoutCurrency, { type: 'SYSTEM', id: 'payout:mock' }));
+      return payeeView(db, req.candidate!.smeUserId);
+    });
+  }
 
   app.get('/me/earnings', { config: { access: 'candidate' }, schema: { tags: ['payments'] } }, async (req) => {
     const smeUserId = req.candidate!.smeUserId;

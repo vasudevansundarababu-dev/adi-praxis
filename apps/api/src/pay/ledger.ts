@@ -93,10 +93,10 @@ const monthRange = (period: string) => {
 };
 
 /** Monthly statements: one per partner with fee entries that month. Payment happens outside Praxis. Idempotent. */
-export async function buildStatements(db: Db, period: string, actor: { type: 'USER' | 'SYSTEM'; id: string }) {
+export async function buildStatements(db: Db, clientId: string, period: string, actor: { type: 'USER' | 'SYSTEM'; id: string }) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new AppError(400, 'BAD_PERIOD', 'Use a period like 2026-10.');
   const { from, to } = monthRange(period);
-  const entries = await db.partnerFeeEntry.findMany({ where: { createdAt: { gte: from, lt: to } }, orderBy: { createdAt: 'asc' } });
+  const entries = await db.partnerFeeEntry.findMany({ where: { clientId, createdAt: { gte: from, lt: to } }, orderBy: { createdAt: 'asc' } });
   const byPartner = new Map<string, typeof entries>();
   for (const e of entries) byPartner.set(e.partnerId, [...(byPartner.get(e.partnerId) ?? []), e]);
   const made = [];

@@ -17,7 +17,7 @@ Branch `m10-sme-supply`. Spec: `docs/SME-SUPPLY.md`. Runbook: `docs/M10-BUILD.md
 | M10a Foundations, partners and requisitions | done (API); portal and candidate pages come with M10d |
 | M10b Guidelines to courses and certifications | done (API); Admin and candidate screens come with M10d |
 | M10c Payments | done (API); Finance, candidate and partner screens come with M10d |
-| M10d Screens | not started |
+| M10d Screens | done (web console, partner portal, candidate app; Playwright smoke) |
 
 ## M10a — done
 
@@ -73,3 +73,40 @@ Branch `m10-sme-supply`. Spec: `docs/SME-SUPPLY.md`. Runbook: `docs/M10-BUILD.md
   - Set `TROLLEY_ACCESS_KEY`, `TROLLEY_SECRET_KEY`, `TROLLEY_WEBHOOK_SECRET` where M10 runs in production (the mock is
     refused there), and `PAYRUN_SECOND_APPROVAL_ABOVE` once a second Finance approver exists.
   - Not built: earnings from FLOW 4 (reviews are internal) and hours (no hours tracking); retainers (December 2026).
+
+## M10d — done
+
+- Console (`apps/web/app/(console)`): partners, requisitions (with submissions and screen confirmation, guidelines and
+  rate-card links), guidelines (packages, upload, version review, knowledge map, course, blueprint, item families with
+  samples and the four checks, publish), certification review queue (written grades, decisions, licences), payments
+  (pay runs, rate cards, earnings and holds, payout exceptions, partner statements). Nav and home include Finance.
+- Partner portal (`apps/web/app/partner`): sign-in, home, requisitions with guidelines summary and course outline,
+  submit a candidate, candidate tracker with history and withdraw, statements, API clients and webhooks (secrets shown
+  once, deliveries and replay).
+- Candidate app (`apps/candidate`): partner invite, careers page and apply, certifications list, course player, test
+  (selfie, player, result), licence upload, payments (payee set-up and earnings), Expert assessments and reviews; the
+  C07 checklist shows the automatic items.
+- Tests: `e2e/m10.spec.ts` (3 flows) plus the existing smoke — 6 passed, 1 skipped (deployed-only). API suite green.
+  Workspace typecheck green.
+- Open items (not blocking; for the owner to prioritise):
+  - The M10 menu items need `SME_SUPPLY_ENABLED` in the web and candidate apps' own environments (docker-compose,
+    Terraform/Cloud Run); infrastructure was not changed per the runbook.
+  - API gaps the screens work around: no CV upload on submissions; partners cannot manage their own portal users;
+    pay-run items, statements and the review queue show SME ids, not names, and there is no SME search; the project
+    list does not return `smeSupplyEnabled`; integrity events are not shown to graders; Experts can approve but not
+    reject a question family; earnings do not carry task titles.
+  - Reconciliation files a payment the platform does not know under every client with pay runs (one payout account
+    serves the platform); revisit if more than one client uses M10.
+  - Success messages after some console actions disappear when the page refreshes into the next state (the state
+    text replaces them).
+
+## Test environment note (28 Sep 2026)
+
+- Unit-test resets (`apps/api/test/helpers.ts` `resetDb`) now empty only tables that hold rows, with `DELETE` inside a
+  transaction that switches triggers off (local superuser test role), falling back to `TRUNCATE`. Truncating all ~100
+  tables before every test flooded the Postgres checkpointer with file syncs after M10 added ~30 tables.
+- On this machine the local Docker Postgres still stalls for about 15 minutes at random (checkpoints writing about one
+  buffer a second; other projects' databases share the Docker VM disk). Across the last full runs 432–433 of 434 API
+  tests passed, and each failure was a different, unrelated test that times out during a stall and passes when re-run
+  (e.g. `tasks.test.ts` + `projects.test.ts`: 66/66). Owner: run the suite in CI or after restarting Docker Desktop to
+  confirm a clean 434/434; the last clean full local run was at the M10c commit.

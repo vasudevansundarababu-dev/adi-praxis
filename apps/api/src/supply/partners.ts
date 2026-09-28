@@ -29,7 +29,7 @@ export const WebhookInput = z.object({
 
 const secret = (prefix: string) => `${prefix}_${randomBytes(24).toString('base64url')}`;
 
-export const partnerDto = (p: { id: string; name: string; status: string; businessVerification: string; contacts: unknown; allowedDomains: string[]; allowedTiers: string[]; feeTermsVersion: string | null; createdAt: Date }) => ({
+export const partnerDto = (p: { id: string; name: string; status: string; businessVerification: string; contacts: unknown; allowedDomains: string[]; allowedTiers: string[]; feeTermsVersion: string | null; certifiedFee?: { toFixed(n: number): string } | null; feeCurrency?: string; createdAt: Date }) => ({
   id: p.id,
   name: p.name,
   status: p.status,
@@ -38,6 +38,8 @@ export const partnerDto = (p: { id: string; name: string; status: string; busine
   allowedDomains: p.allowedDomains,
   allowedTiers: p.allowedTiers,
   feeTermsVersion: p.feeTermsVersion,
+  certifiedFee: p.certifiedFee?.toFixed(2) ?? null,
+  feeCurrency: p.feeCurrency ?? 'USD',
   createdAt: p.createdAt.toISOString(),
 });
 

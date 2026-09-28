@@ -1,3 +1,4 @@
+import { roleLabel } from '@praxis/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { apiGet, getCurrentUser } from '@/lib/api';
@@ -27,12 +28,28 @@ export default async function HomePage() {
       { label: 'Projects in progress', count: projects.filter((p) => p.status === 'IN_PROGRESS' || p.status === 'STAFFED').length, hint: 'Follow coverage and accepted tasks.', href: '/projects' },
     );
   }
+  // M10: only shown when SME supply is on (the endpoints answer 404 when it is off).
+  if (has('REVIEWER') || has('ADMIN')) {
+    const q = await apiGet<{ grading: { items: unknown[] }[]; certifications: unknown[] }>('/certifications/review-queue');
+    if (q.data) tiles.push({ label: 'Certification reviews', count: q.data.grading.reduce((n, a) => n + a.items.length, 0) + q.data.certifications.length, hint: 'Confirm written grades, decide certifications and check licences.', href: '/certifications' });
+  }
+  if (has('FINANCE') || has('PM') || has('ADMIN')) {
+    const runs = await apiGet<{ items: { status: string }[] }>('/pay-runs');
+    if (runs.data) {
+      const waiting = runs.data.items.filter((r) => (has('FINANCE') && (r.status === 'CONFIRMED' || r.status === 'APPROVED')) || ((has('PM') || has('ADMIN')) && r.status === 'DRAFT')).length;
+      tiles.push({ label: 'Pay runs waiting for you', count: waiting, hint: has('FINANCE') ? 'Approve and submit confirmed weekly pay runs.' : 'Confirm drafted weekly pay runs.', href: '/payments/pay-runs' });
+    }
+  }
+  if (has('FINANCE') || has('ADMIN')) {
+    const ex = await apiGet<{ items: unknown[] }>('/payout-exceptions');
+    if (ex.data) tiles.push({ label: 'Open payout exceptions', count: ex.data.items.length, hint: 'Resolve mismatches between the provider’s report and our payments.', href: '/payments/exceptions' });
+  }
   if (has('ADMIN')) tiles.push({ label: 'Templates and users', hint: 'Manage workflow templates, taxonomy, terms and people.', href: '/templates' });
 
   return (
     <div className="space-y-8">
       <section className="hero p-6 sm:p-8">
-        <p className="muted text-sm">{user.roles.map((r) => (r === 'PM' ? 'Program Manager' : r[0] + r.slice(1).toLowerCase())).join(' · ')}</p>
+        <p className="muted text-sm">{user.roles.map((r) => (r === 'PM' ? 'Program Manager' : roleLabel(r))).join(' · ')}</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">Welcome, {user.name.split(' ')[0]}</h1>
         <p className="muted mt-2 max-w-2xl">Experts write verified, synthetic tasks from your workflow templates; every selection and acceptance is made by a person.</p>
         {has('PM') && (
@@ -41,6 +58,7 @@ export default async function HomePage() {
           </Link>
         )}
       </section>
+      {tiles.length === 0 && <p className="card p-5 text-sm text-fg-muted">Nothing is waiting for you right now.</p>}
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {tiles.map((t) => (
           <li key={t.label}>

@@ -136,7 +136,9 @@ export class MockPayoutProvider implements PayoutProvider {
     return { id: `evt_${randomUUID()}`, livemode: false, kind: 'payment', paymentRef, paymentStatus: status, fx: this.fxOf(p), reason };
   }
   payeeEvent(payeeRef: string, status: ProviderPayeeStatus): PayoutEvent {
-    const p = this.payees.get(payeeRef)!;
+    // The mock keeps payees in memory; after a restart a known reference is re-created.
+    const p = this.payees.get(payeeRef) ?? { email: '', status, payoutCurrency: 'INR' };
+    this.payees.set(payeeRef, p);
     p.status = status;
     return { id: `evt_${randomUUID()}`, livemode: false, kind: 'payee', payeeRef, payeeStatus: status, payoutCurrency: p.payoutCurrency };
   }

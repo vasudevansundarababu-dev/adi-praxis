@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { call } from '@/lib/client';
 import type { OnboardingItem, OnboardingView } from '@/lib/journey-types';
+import { CERT_STATE, type CertState, type PayeeView } from '@/lib/supply-types';
 
 const input = 'mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5';
 
@@ -14,6 +15,16 @@ export function Onboarding({ initial }: { initial: OnboardingView }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const done = view.items.filter((i) => i.done).length;
+
+  // Automatic items (certification, payment set-up) complete elsewhere; this re-reads the checklist.
+  async function refresh() {
+    setPending(true);
+    setError(null);
+    const r = await call<OnboardingView>('GET', `/me/onboarding?enrollmentId=${view.enrollmentId}`);
+    setPending(false);
+    if (!r.ok) return setError(r.error);
+    setView(r.data!);
+  }
 
   async function acknowledge(item: OnboardingItem, data?: unknown) {
     setPending(true);
@@ -66,12 +77,12 @@ export function Onboarding({ initial }: { initial: OnboardingView }) {
                 {item.done ? '✓' : n + 1}
               </span>
               <span className="font-medium">{item.title}</span>
-              <span className="ml-auto text-sm text-fg-muted">{item.done ? 'Done' : 'To do'}</span>
+              <span className="ml-auto text-sm text-fg-muted">{item.done ? 'Done' : item.kind === 'certification' || item.kind === 'payee' ? 'Completes automatically' : 'To do'}</span>
             </button>
             {open === item.key && (
               <div className="border-t border-line p-4 text-sm">
                 <p className="text-fg-muted">{item.description}</p>
-                <ItemBody item={item} scope={view.scope} pending={pending} onDone={(data) => acknowledge(item, data)} />
+                <ItemBody item={item} scope={view.scope} pending={pending} onDone={(data) => acknowledge(item, data)} onRefresh={refresh} />
               </div>
             )}
           </li>
@@ -82,8 +93,12 @@ export function Onboarding({ initial }: { initial: OnboardingView }) {
   );
 }
 
-function ItemBody({ item, scope, pending, onDone }: { item: OnboardingItem; scope: OnboardingView['scope']; pending: boolean; onDone: (data?: unknown) => void }) {
+function ItemBody({ item, scope, pending, onDone, onRefresh }: { item: OnboardingItem; scope: OnboardingView['scope']; pending: boolean; onDone: (data?: unknown) => void; onRefresh: () => void }) {
   switch (item.kind) {
+    case 'certification':
+      return <CertificationItem item={item} pending={pending} onRefresh={onRefresh} />;
+    case 'payee':
+      return <PayeeItem item={item} pending={pending} onRefresh={onRefresh} />;
     case 'confirm':
       return (
         <>
@@ -137,6 +152,61 @@ function ItemBody({ item, scope, pending, onDone }: { item: OnboardingItem; scop
     case 'preferences':
       return <PreferencesForm pending={pending} initial={item.data as Prefs | null} onDone={onDone} />;
   }
+}
+
+/** M10: completes by itself when the certification is passed. The candidate follows the link; there is nothing to tick. */
+function CertificationItem({ item, pending, onRefresh }: { item: OnboardingItem; pending: boolean; onRefresh: () => void }) {
+  const data = item.data as { certificationId: string; state: CertState } | null;
+  const state = data?.state;
+  const [label, tone] = state ? CERT_STATE[state] : ['Opens when you start', ''];
+  const href = !data ? '/certifications' : state === 'NOT_STARTED' || state === 'IN_TRAINING' ? `/certifications/${data.certificationId}` : `/certifications/${data.certificationId}/test`;
+  const cta = item.done ? 'View certification' : !data || state === 'NOT_STARTED' ? 'Start the course' : state === 'IN_TRAINING' ? 'Continue the course' : state === 'TEST_READY' || state === 'RETAKE_AVAILABLE' ? 'Go to the test' : state === 'IN_TEST' ? 'Continue the test' : 'See where it stands';
+  return (
+    <>
+      <p className="mt-3 flex flex-wrap items-center gap-2">
+        Status: <span className={`pill ${tone}`}>{label}</span>
+      </p>
+      <p className="mt-2 text-fg-muted">This step ticks itself when you pass. You don’t need to confirm anything here.</p>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Link href={href} className="btn btn-primary">
+          {cta} →
+        </Link>
+        <button type="button" disabled={pending} onClick={onRefresh} className="text-link underline disabled:opacity-60">
+          Check again
+        </button>
+      </div>
+    </>
+  );
+}
+
+const PAYEE_LABEL: Record<PayeeView['status'], [string, string]> = {
+  NOT_REQUIRED: ['Not needed', ''],
+  NOT_STARTED: ['Not started', ''],
+  PENDING: ['Being checked by the payout provider', 'pill-info'],
+  READY: ['Ready', 'pill-success'],
+  BLOCKED: ['Blocked: contact support', 'pill-error'],
+};
+
+/** M10: completes by itself when the payout provider marks the account ready. */
+function PayeeItem({ item, pending, onRefresh }: { item: OnboardingItem; pending: boolean; onRefresh: () => void }) {
+  const status = ((item.data as { status?: PayeeView['status'] } | null)?.status ?? 'NOT_STARTED') as PayeeView['status'];
+  const [label, tone] = PAYEE_LABEL[status] ?? [status, ''];
+  return (
+    <>
+      <p className="mt-3 flex flex-wrap items-center gap-2">
+        Status: <span className={`pill ${tone}`}>{label}</span>
+      </p>
+      <p className="mt-2 text-fg-muted">This step ticks itself when your payment account is ready. You don’t need to confirm anything here.</p>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Link href="/payments" className="btn btn-primary">
+          {item.done ? 'View payments' : status === 'NOT_STARTED' ? 'Set up payments' : 'Open payment set-up'} →
+        </Link>
+        <button type="button" disabled={pending} onClick={onRefresh} className="text-link underline disabled:opacity-60">
+          Check again
+        </button>
+      </div>
+    </>
+  );
 }
 
 function Confirm({ pending, label, onClick }: { pending: boolean; label: string; onClick: () => void }) {

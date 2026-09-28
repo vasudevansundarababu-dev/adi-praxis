@@ -24,16 +24,24 @@ export const db: Db = createDb(TEST_DATABASE_URL);
 
 /**
  * Empties every table (keeps the migration history). Append-only tables refuse TRUNCATE unless the session opts in,
- * which only test resets do.
+ * which only test resets do. Only tables that hold rows are truncated: each TRUNCATE creates new files that the
+ * checkpointer must sync, and truncating all ~100 tables before every test fills its queue and stalls the database.
  */
 export async function resetDb() {
   const tables = await db.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
   if (tables.length === 0) return;
-  await db.$transaction([
-    db.$executeRawUnsafe(`SET LOCAL praxis.allow_truncate = 'on'`),
-    db.$executeRawUnsafe(`TRUNCATE ${tables.map((t) => `"${t.tablename}"`).join(', ')} CASCADE`),
-  ]);
+  const used = (await db.$queryRawUnsafe<{ t: string }[]>(tables.map((t) => `SELECT '${t.tablename}' AS t WHERE EXISTS (SELECT 1 FROM "${t.tablename}")`).join(' UNION ALL '))).map((u) => u.t);
+  if (used.length === 0) return;
+  const truncate = (names: string[]) => [db.$executeRawUnsafe(`SET LOCAL praxis.allow_truncate = 'on'`), db.$executeRawUnsafe(`TRUNCATE ${names.map((n) => `"${n}"`).join(', ')} CASCADE`)];
+  try {
+    // DELETE with triggers off for this transaction only (foreign keys and the append-only guard), which creates no new
+    // files. Needs the local superuser test role; the append-only guard is exercised by its own tests outside resets.
+    await db.$transaction([db.$executeRawUnsafe(`SET LOCAL session_replication_role = replica`), ...used.map((t) => db.$executeRawUnsafe(`DELETE FROM "${t}"`))]);
+  } catch {
+    // Without the privilege to skip triggers, fall back to truncating every table that holds rows.
+    await db.$transaction(truncate(used));
+  }
 }
 
 export async function createClient() {

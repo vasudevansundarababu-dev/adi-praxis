@@ -14,7 +14,8 @@ export interface EnrollmentStatusView {
 
 export interface OnboardingItem {
   key: string;
-  kind: 'confirm' | 'terms' | 'conflicts' | 'guidance' | 'preferences';
+  /** 'certification' and 'payee' (M10) complete automatically; the candidate cannot tick them. */
+  kind: 'confirm' | 'terms' | 'conflicts' | 'guidance' | 'preferences' | 'certification' | 'payee';
   title: string;
   description: string;
   done: boolean;

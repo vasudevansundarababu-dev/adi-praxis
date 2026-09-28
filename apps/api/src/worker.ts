@@ -48,7 +48,10 @@ const supplyJobs: Record<string, () => Promise<unknown>> = config.SME_SUPPLY_ENA
         return made;
       },
       'payout-reconcile': () => reconcile(db, defaultPayouts(config), new Date(Date.now() - 86_400_000)),
-      'partner-statements': () => buildStatements(db, monthOf(new Date(Date.now() - new Date().getUTCDate() * 86_400_000)), { type: 'SYSTEM', id: 'statement-schedule' }),
+      'partner-statements': async () => {
+        const period = monthOf(new Date(Date.now() - new Date().getUTCDate() * 86_400_000));
+        for (const c of await db.client.findMany({ select: { id: true } })) await buildStatements(db, c.id, period, { type: 'SYSTEM', id: 'statement-schedule' });
+      },
     }
   : {};
 const supplyQueue = config.SME_SUPPLY_ENABLED ? await scheduleRecurring(connection, [{ name: 'partner-webhooks', everyMs: 30_000 }, { name: 'partner-invites', everyMs: 3_600_000 }, { name: 'cert-forms', everyMs: 300_000 }, { name: 'cert-sweep', everyMs: 600_000 }, { name: 'pay-run-build', everyMs: 3_600_000 }, { name: 'payout-reconcile', everyMs: 86_400_000 }, { name: 'partner-statements', everyMs: 86_400_000 }]) : null;

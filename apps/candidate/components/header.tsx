@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import mark from '@praxis/shared/brand/praxis-mark-512.png';
 import { getMe } from '@/lib/api';
+import { smeSupplyEnabled } from '@/lib/features';
 import { SignOut } from './sign-out';
 
 /** Top navigation: mark + "ADI Praxis" (SPEC branding) and the account menu. */
@@ -15,10 +16,20 @@ export async function Header() {
           <Image src={mark} alt="" width={28} height={28} className="rounded" />
           ADI Praxis
         </Link>
-        <nav className="ml-auto flex items-center gap-4 text-sm">
+        <nav className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm">
           <Link href="/opportunities" className="text-link hover:underline">
             Opportunities
           </Link>
+          {me && smeSupplyEnabled() && (
+            <>
+              <Link href="/certifications" className="text-link hover:underline">
+                Certifications
+              </Link>
+              <Link href="/payments" className="text-link hover:underline">
+                Payments
+              </Link>
+            </>
+          )}
           {me ? <SignOut /> : <Link href="/sign-in" className="btn btn-primary !px-3 !py-1.5">Sign in</Link>}
         </nav>
       </div>

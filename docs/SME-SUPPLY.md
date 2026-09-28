@@ -1,7 +1,7 @@
 # M10 — SME supply, certification and payments
 
-Status: **draft, awaiting sign-off** (28 Sep 2026). Development starts only after the product owner signs off
-the UI mockups (section 12) and the payment integration (section 8). Design source: the Claude Doc
+Status: **signed off for build** (28 Sep 2026): UI approved on condition that every screen uses the existing Praxis
+console and candidate-app design; payment integration approved as recommended (Trolley). Design source: the Claude Doc
 "ADI Praxis — SME Supply, Certification & Payments Module Spec". This file wins over that doc for the build.
 
 Built on `main` (branch `m10-sme-supply`), not on `release/1.0`. See `docs/RELEASES.md`.
@@ -18,12 +18,13 @@ Launch domains: banking, healthcare, marketing.
 
 - Partners: onboarding by an Admin, OAuth client credentials, Partner API v1, signed webhooks, sandbox, portal pages.
 - Channels: Partner API, partner portal upload, direct careers page per requisition.
-- Tiers: Annotator and Reviewer (see 3.1 on the name) certified by test; Experts added by an Admin.
-- Certification: guidelines course (modules, quizzes, practice), randomized test, selfie re-check, integrity events.
+- Tiers: Expert, Reviewer and Annotator, each with its own certification (see 3.1 on the name).
+- Certification: LLM-generated course and certification per tier from the guidelines, human-approved, with dynamic
+  per-candidate test forms (section 7); selfie re-check, integrity events.
 - Payments: per-task and hourly rate cards, append-only earnings ledger, weekly pay run with approval, Trolley adapter.
 - Partner billing: certified-candidate fee, monthly statement export; invoices paid outside Praxis.
 
-**Later:** Expert retainers (December 2026), Expert authoring test with two assessors, RazorpayX for India through the
+**Later:** Expert retainers (December 2026), RazorpayX for India through the
 Indian subsidiary (expected around 26 Oct 2026), Upwork and AI-interview channels, AP integration, bonuses,
 answer-similarity detection, fraud checks beyond duplicate identity.
 
@@ -72,7 +73,7 @@ One tier per SME per domain. Defaults below are set per requisition and guidelin
 | --- | --- | --- | --- |
 | Does | Authors workflows, seeds, edge cases, failure modes, benchmarks, guidelines; settles disagreements | Reviews tasks and RL trajectories; labels failures | Annotation and structured tasks |
 | Default minimum | 8+ years in domain, senior role | 3+ years | 1+ year or relevant qualification |
-| Certified by | Admin (7-day cut); two-Expert rubric later | Test: gold tasks + planted-error trajectories | Test: gold tasks |
+| Certified by | Expert certification (section 7.2), authoring task confirmed by two Experts | Reviewer certification (7.2) | Annotator certification (7.2) |
 | Pay | Premium per task; retainer from Dec 2026 | Per task or hourly | Per task |
 
 - Promotion: volume in current tier (default 200 approved tasks), gold accuracy and reviewer agreement above the domain
@@ -134,14 +135,85 @@ Partners track progress but never act for the candidate.
 Invite not accepted within 7 days → EXPIRED (reminder at day 3). Test retakes: 48 h cooldown, max 2; after that →
 REVIEW_REQUIRED for a human. Certificates expire after 12 months.
 
-## 7. Training and certification
+## 7. Training and certification, generated from guidelines by an LLM
 
-Course per guidelines package: modules → quiz per module (unlocks the next) → practice tasks with instant feedback →
-certification test. Test forms are drawn at random from an item bank per guidelines version; item exposure tracked.
-Default pass rules: Annotator 80% on 20 gold tasks, no critical error; Reviewer SME 85% on gold plus 80% of planted
-errors found in 15 trajectories. Integrity: Stripe Identity selfie re-check at test start, time limit, paste and
-focus-change events logged. Partners see pass or fail and a score band per section. Admin authoring: modules, quizzes,
-item banks, pass rules, form preview.
+Owner requirement (28 Sep 2026): the only input is the guidelines. Praxis uses an LLM to generate the training course
+and the certification for each tier from them. Expert, Reviewer and Annotator each get their own course and their own
+certification; difficulty and pass marks rise with the tier. Tests are dynamic: no two candidates get the same
+questions, but every candidate gets equivalent questions (same competencies, same difficulty band, same weight).
+
+### 7.1 Generation pipeline (worker jobs, one per guidelines version)
+
+1. **Ingest.** An Admin uploads the guidelines (PDF, DOCX, Markdown) as a `GuidelinesPackage` version for a domain and
+   task family. Text is extracted with the existing document-text helpers and split into cited sections.
+2. **Knowledge map.** The LLM extracts rules, definitions, workflow steps, decision points, thresholds, edge cases and
+   failure modes. Every item cites the guideline section it came from. Items with no citation are dropped.
+3. **Courses, one per tier.** Modules are generated from the knowledge map at the tier's depth: explanation, worked
+   good and bad examples, a quiz, and practice items with feedback. Every module cites its sources.
+4. **Certification blueprint, one per tier.** Competencies with weights, the item families that test each one, item
+   counts, time limit and pass rules (7.2).
+5. **Item families.** A family is a reusable question template: competency, difficulty band, cognitive level, stem
+   pattern, variable slots (case facts, document ages, amounts, jurisdictions, ownership structures, planted errors),
+   the rule that derives the correct answer from the variables, distractor rationale, and the guideline citation.
+   Each family ships with 3 sample instances for review.
+6. **Human approval before publish.** An Admin (with an Expert for the Expert tier) reviews the knowledge map, each
+   course, each blueprint and every item family, and can edit, regenerate or reject any of them. Nothing is served to
+   candidates until the tier's course and certification are approved and published. Every generated artifact stores
+   the model, prompt version, guidelines version and citations, and every approval is audited.
+
+### 7.2 Tier certifications (defaults; editable per blueprint before approval)
+
+| | Annotator | Reviewer | Expert |
+| --- | --- | --- | --- |
+| Tests | Applying rules correctly | Finding violations, judging severity, justifying | Authoring tasks, critiquing flawed tasks, designing rubrics |
+| Cognitive level | Remember, apply | Analyse, evaluate | Evaluate, create |
+| Item types | Single and multiple choice, labelling, step ordering | Trajectory review with planted errors, severity rating, short justification | Critique a flawed task, write a workflow with edge cases and failure modes, write a rubric |
+| Length | 25 items, 40 min | 35 items, 60 min | 20 items + 1 authoring task, 120 min |
+| Pass rule | 80% overall; no critical-rule miss | 85% overall; at least 80% of planted errors found; no critical-rule miss | 85% on objective items; authoring task passes the rubric, confirmed by two Experts |
+| Prerequisite | None | None (Annotator certificate not required) | Reviewer certificate in the same domain |
+
+### 7.3 Dynamic, equivalent test forms
+
+- **Assembly.** Each form samples families per the blueprint, stratified by competency and difficulty band, then
+  instantiates every family with fresh variables. The LLM writes the scenario and wording for each instance.
+- **No repeats.** Each instance is served to one candidate only. Before serving, an instance is compared with every
+  instance already served from that family (embedding similarity and variable fingerprint); near-copies are discarded.
+  Retakes never repeat a family instance the candidate has seen.
+- **Validation of every generated item before it is served:**
+    1. the correct answer is derived by the family's rule, not by the generating model;
+    2. an independent solver call (separate prompt, no key) must reach the same answer;
+    3. the answer must be supported by the cited guideline section;
+    4. the item's estimated difficulty must fall in the family's band.
+  An item that fails any check is discarded and regenerated. Items that keep failing flag the family for review.
+- **Latency.** The worker keeps a small buffer of pre-validated forms per blueprint, so starting a test never waits on
+  the model. Each buffered form is used once.
+- **Fairness.** Forms are equivalent by construction (same blueprint, same bands and weights). Item statistics
+  (per-family pass rate and discrimination) are recorded; a family that behaves harder or easier than its band is
+  flagged for recalibration, and affected candidates can be re-scored or offered a retake.
+
+### 7.4 Scoring and decisions
+
+- Objective items are scored deterministically against the derived key.
+- Written answers (Reviewer justifications, Expert critiques and authoring task) are scored by an LLM grader against
+  the rubric. That score is a recommendation: a person (two Experts for the Expert authoring task) confirms it. No
+  certification is refused, and no one is excluded, on a model's judgement alone (CLAUDE.md).
+- Pass on objective-only tests (Annotator, and Reviewer when every written answer is confirmed) certifies
+  automatically; a fail offers a retake after 48 h (maximum 2), then goes to human review (section 6).
+- Integrity: Stripe Identity selfie re-check at test start, time limit, paste and focus-change events logged.
+  Partners see pass or fail and a score band per section, never items or answers.
+
+### 7.5 Model use
+
+Claude via Vertex AI, following the existing adapter pattern (`ClaudeVertex*` class plus a deterministic mock for local
+dev and tests; production refuses the mock). Separate prompts and `PROMPT_VERSION`s for extraction, course writing,
+blueprint, family writing, instance writing, solving and grading. Structured JSON output validated with zod.
+Guideline text is treated as untrusted data inside the prompts. Generation cost is logged per guidelines version.
+
+### 7.6 Admin screens
+
+Guidelines (upload, versions) → Generation run status → Knowledge map review → Course review per tier →
+Blueprint and item-family review per tier (with sample instances and "generate another sample") → Publish.
+Candidate side: course player, test player, result. Certification review queue for written answers and failures.
 
 ## 8. Payments (sign-off item)
 
@@ -187,7 +259,14 @@ item banks, pass rules, form preview.
 | `Requisition` | fields in section 4, state | Belongs to Project |
 | `PartnerSubmission` | partner_id, requisition_id, partner_ref, candidate_id, state, owner_until | Unique active owner per candidate |
 | `GuidelinesPackage` | family, tier, domain, version, status, content refs | Versioned |
-| `CourseModule`, `QuizItem`, `TestItem` | package_version, content, answer key (encrypted), exposure_count | Item bank |
+| `GuidelinesPackage` sources | files, extracted sections with anchors | Upload |
+| `GenerationRun` | package_version, stage, status, model, prompt_versions, cost | One per guidelines version |
+| `KnowledgeItem` | kind (rule, step, threshold, edge case, failure mode), text, citation, approved | |
+| `Course`, `CourseModule` | tier, package_version, status, content, citations, approved_by | One course per tier |
+| `CertificationBlueprint` | tier, package_version, competencies and weights, item counts, time limit, pass rules, status | One per tier |
+| `ItemFamily` | blueprint_id, competency, difficulty_band, cognitive_level, stem_pattern, variable_schema, answer_rule, citation, status, stats | |
+| `ItemInstance` | family_id, variables, stem, options, key (encrypted), validation results, embedding, served_to, served_at | Served once |
+| `TestForm` | blueprint_id, items[], assembled_at, used_by | Buffered, single use |
 | `TestAttempt` | candidate_id, package_version, form_items[], score, section_scores, integrity_events[], result | |
 | `Certification` | sme_id, domain, tier, package_version, state, issued_at, expires_at, decided_by | |
 | `SmeStanding` | sme_id, domain, tier, standing, metrics_snapshot, approved_by | History kept |
@@ -213,6 +292,11 @@ themselves; an assessor cannot grade a candidate from a partner they are linked 
 
 ## 12. UI screens (sign-off item)
 
+**Design:** every M10 screen uses the existing Praxis design: console layout (navy header, top nav from `lib/nav.ts`,
+gradient strip), theme tokens and component classes (`.card`, `.pill-*`, `.btn-primary`, `.btn-secondary`, `.hero`), and
+the candidate app's own layout and dark default. The partner portal reuses the console look with partner-only nav.
+No new visual language.
+
 **Web application first; the mobile app is a later add-on** (owner, 28 Sep 2026). Candidate screens are designed for desktop web and must stay usable on a phone browser; no native app work in M10.
 
 Mockups (Design canvas "ADI Praxis M10 — UI mockups for sign-off", https://claude.ai/artifact/CKynR8o85ng93ZQgJuEKvk) cover: partner portal (requisitions, submit candidate, candidate tracker, statements, API keys),
@@ -225,7 +309,12 @@ queue, pay run approval, payout exceptions. Link and sign-off date are recorded 
 - [ ] A sandbox partner can list open requisitions, submit a candidate, and receive signed webhooks for every state change.
 - [ ] A duplicate submission is rejected without revealing the owning partner.
 - [ ] A submitted candidate is invited into FLOW 2 and cannot be rejected without a human decision.
-- [ ] The course enforces module order; the test draws a random form; a failed test offers a retake after 48 h, and after two retakes goes to human review.
+- [ ] Uploading guidelines produces, per tier, a knowledge map, course, blueprint and item families with citations; nothing is served until an Admin approves and publishes.
+- [ ] Two candidates on the same blueprint never receive the same item instance; a retake never repeats an instance the candidate saw.
+- [ ] Every served item passed all four validation checks; failed items are regenerated and the family is flagged after repeated failures.
+- [ ] Expert, Reviewer and Annotator certifications apply their own lengths and pass rules; the Expert certification requires a Reviewer certificate in the domain.
+- [ ] Written answers are scored by the LLM grader as recommendations and need human confirmation; a model score alone never refuses a certification.
+- [ ] The course enforces module order; a failed test offers a retake after 48 h, and after two retakes goes to human review.
 - [ ] The C07 checklist cannot complete until certification is PASSED and, for direct pay, the payee is READY.
 - [ ] Approving a task creates exactly one earning entry at the rate-card price; replaying the event creates none.
 - [ ] Earning entries cannot be updated or deleted (database-enforced); a correction is a reversing entry.

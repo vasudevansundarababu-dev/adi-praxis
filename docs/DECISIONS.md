@@ -171,3 +171,13 @@ Owner choices: agent pull requests need a human merge; a separate test environme
 - **(chosen by Claude)** Found while writing the tests and fixed: an Admin could remove their own Admin role (now
   refused, like disabling yourself); Indian mobile numbers (+91 98765 43210) were not detected by the sensitive-data
   and synthetic-data scans (now detected).
+
+## Release 1.0 and M10 SME supply (owner, 28 Sep 2026)
+- `release/1.0` cut from `main` at `9ef51ef`; testers test 1.0; new work continues on `main`. Tester defects are fixed on
+  `release/1.0` and forward-merged into `main` (`docs/RELEASES.md`).
+- M10 (`docs/SME-SUPPLY.md`): partners supply candidates through a Praxis Partner API; training and certification stay in
+  Praxis; tiers Expert, Reviewer, Annotator; launch domains banking, healthcare, marketing.
+- Payer at launch: US entity for all SMEs including India; RazorpayX through the Indian subsidiary once operational
+  (~26 Oct 2026). Partner model: certified-candidate fee. Retainers: Experts only, December 2026.
+- Pay runs and tier promotions approved by the owner until the operations lead joins.
+- Development starts after sign-off of the UI mockups and the payment integration (pending).

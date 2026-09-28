@@ -646,6 +646,8 @@ Build in nine milestones; each ends with passing tests and a demo-able slice. Gi
 8. **M7 FLOW 4** — RL review request intake, `RL_REVIEW` tasks, trajectory review screen, verdicts with required failure comments, `RLReviewRecord`, webhook back to RL Gym (mock RL Gym for tests).
 9. **M8 GCP deployment** — Terraform for staging and production, GitHub Actions pipeline with Workload Identity Federation, Cloud Run services, Cloud SQL with pgvector, Memorystore, buckets, Cloud Armor, monitoring and alerts, 10% canary releases. A minimal staging pipeline can be stood up right after M0 so every later milestone deploys continuously.
 
+10. **M10 SME supply, certification and payments** — see `docs/SME-SUPPLY.md` (built on `main` after release 1.0 was cut; starts after UI and payment sign-off).
+
 **Suggested prompt to Claude Code**
 
 ```markdown

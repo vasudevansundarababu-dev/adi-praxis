@@ -10,6 +10,8 @@ used by a separate RL Gym platform.
 - `docs/FLOW2-SME.md` — SME candidate flow (sign-in, identity, profile, selection,
   onboarding). Wins over SPEC.md on anything candidate-facing.
 - `docs/TASK-KYC.md` — what a KYC authoring task contains, author workbench, review.
+- `docs/SME-SUPPLY.md` — M10: SME supply (partners), certification, tiers and payments. Awaiting sign-off.
+- `docs/RELEASES.md` — branches (`main`, `release/1.0`) and the rule that tester defects are fixed in both.
 - `docs/brand/` — logo. Colours and rules are in the Branding section of SPEC.md.
 
 ## How to work

@@ -50,6 +50,11 @@ const Env = z.object({
   /** FLOW 4 results to RL Gym by signed webhook. Blank URL = RL Gym pulls results instead. */
   RL_GYM_WEBHOOK_URL: z.string().default(''),
   RL_GYM_WEBHOOK_SECRET: z.string().default(''),
+  /** M10 SME supply (docs/SME-SUPPLY.md). Off by default: with it off no M10 route, job or menu item exists. */
+  SME_SUPPLY_ENABLED: z.enum(['true', 'false', '1', '0', '']).default('false').transform((v) => v === 'true' || v === '1'),
+  /** 32-byte key (base64) for secrets M10 must read back: partner webhook signing secrets, test answer keys. */
+  M10_ENCRYPTION_KEY: z.string().default(''),
+  PARTNER_API_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
 });
 
 export type Config = z.infer<typeof Env> & {
@@ -77,6 +82,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const identityMode = c.STRIPE_SECRET_KEY && c.STRIPE_IDENTITY_WEBHOOK_SECRET ? 'stripe' : 'mock';
   const assistantMode = c.VERTEX_PROJECT_ID ? 'vertex' : 'mock';
   const emailMode = c.SMTP_HOST ? 'smtp' : 'memory';
+  if (c.SME_SUPPLY_ENABLED && c.NODE_ENV === 'production' && c.APP_ENV !== 'demo' && Buffer.from(c.M10_ENCRYPTION_KEY, 'base64').length !== 32) {
+    throw new Error('Invalid configuration: SME_SUPPLY_ENABLED needs M10_ENCRYPTION_KEY (32 bytes, base64)');
+  }
   if (c.RL_GYM_WEBHOOK_URL && c.RL_GYM_WEBHOOK_SECRET.length < 32) throw new Error('Invalid configuration: RL_GYM_WEBHOOK_SECRET must be at least 32 characters when RL_GYM_WEBHOOK_URL is set');
   if (c.APP_ENV === 'demo' && (c.MOCK_SECRET === 'local-dev-mock-secret-not-for-production' || c.MOCK_SECRET.length < 32)) {
     throw new Error('Invalid configuration: a demo environment needs its own MOCK_SECRET (32+ characters)');

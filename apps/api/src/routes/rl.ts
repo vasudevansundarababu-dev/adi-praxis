@@ -126,9 +126,9 @@ export const rlRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db }) =
   app.post('/review/rl/:id/claim', { config: { access: REVIEW }, schema: { tags: ['rl'], params: IdParams } }, async (req, reply) => {
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
       const t = await rlTask(tx, actor, req.params.id);
-      if (t.status !== 'CREATED') throw new AppError(409, 'ALREADY_CLAIMED', t.reviewerId === actor.userId ? 'You already have this review.' : 'Another reviewer has this review.');
+      if (t.status !== 'CREATED') throw new AppError(409, 'ALREADY_CLAIMED', t.reviewerId === actor.userId ? 'You already have this review.' : 'Another Validator has this review.');
       const { count } = await tx.taskInstance.updateMany({ where: { id: t.id, status: 'CREATED' }, data: { status: 'IN_PROGRESS', reviewerId: actor.userId, startedAt: new Date(), assignedAt: new Date(), revision: { increment: 1 } } });
-      if (!count) throw new AppError(409, 'ALREADY_CLAIMED', 'Another reviewer has this review.');
+      if (!count) throw new AppError(409, 'ALREADY_CLAIMED', 'Another Validator has this review.');
       await tx.rLReviewRequest.update({ where: { id: t.rlReviewRequestId! }, data: { status: 'IN_REVIEW' } });
       await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'rl_review.claimed', after: { reviewerId: actor.userId } });
       return { status: 200, body: { status: 'IN_PROGRESS', revision: t.revision + 1 } };

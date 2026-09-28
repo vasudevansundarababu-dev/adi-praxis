@@ -226,7 +226,7 @@ export function StartPanel(props: { taskId: string; drafting: ReturnType<typeof 
     <section className="space-y-5" aria-labelledby="w00-h">
       <div>
         <h2 id="w00-h" className="text-lg font-semibold">How do you want to start?</h2>
-        <p className="text-sm text-fg-muted">The assistant writes a first draft of every section. You check and confirm each one; nothing is submitted until you do, and a reviewer still decides.</p>
+        <p className="text-sm text-fg-muted">The assistant writes a first draft of every section. You check and confirm each one; nothing is submitted until you do, and a Validator still decides.</p>
       </div>
       {!props.readOnly && (
         <div className="grid gap-3 sm:grid-cols-2">

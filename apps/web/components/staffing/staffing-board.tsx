@@ -161,7 +161,7 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
       </div>
 
       {data.items.length === 0 ? (
-        <p className="mt-6 text-fg-muted">No eligible experts yet. Experts appear here after they apply to this project’s opportunity, a reviewer selects them, and they finish onboarding. You can also launch a sourcing campaign below.</p>
+        <p className="mt-6 text-fg-muted">No eligible experts yet. Experts appear here after they apply to this project’s opportunity, a Validator selects them, and they finish onboarding. You can also launch a sourcing campaign below.</p>
       ) : (
         <div className="mt-3 overflow-x-auto card">
           <table className="w-full text-left text-sm">

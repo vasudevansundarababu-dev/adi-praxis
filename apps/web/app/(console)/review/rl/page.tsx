@@ -10,7 +10,7 @@ type Item = { id: string; rlRunId: string; rlTaskId: string; workflow: string; p
 /** FLOW 4 queue: one review per RL task, highest priority and earliest due first. */
 export default async function RlQueue({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const user = (await getCurrentUser())!;
-  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Reviewers and Admins" />;
+  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Validators and Admins" />;
   const done = (await searchParams).status === 'DONE';
   const { data } = await apiGet<{ items: Item[] }>(`/review/rl?status=${done ? 'DONE' : 'OPEN'}`);
   const items = data?.items ?? [];
@@ -34,7 +34,7 @@ export default async function RlQueue({ searchParams }: { searchParams: Promise<
                 <th className="px-2 py-2 font-medium">Priority</th>
                 <th className="px-2 py-2 font-medium">Due</th>
                 <th className="px-2 py-2 font-medium">Failed evals</th>
-                <th className="px-2 py-2 font-medium">Reviewer</th>
+                <th className="px-2 py-2 font-medium">Validator</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">

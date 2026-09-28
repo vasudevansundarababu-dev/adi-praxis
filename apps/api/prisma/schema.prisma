@@ -32,6 +32,8 @@ enum UserStatus {
 enum SessionAudience {
   INTERNAL
   CANDIDATE
+  /// M10 partner portal users (separate cookie praxis_partner).
+  PARTNER
 }
 
 enum ActorType {
@@ -39,6 +41,8 @@ enum ActorType {
   CANDIDATE
   SYSTEM
   SERVICE
+  /// M10: a partner portal user or a partner API client.
+  PARTNER
 }
 
 enum DomainStatus {
@@ -324,21 +328,23 @@ model User {
 
 /// Server-side sessions. Internal users now; candidates (separate audience) from M4.
 model Session {
-  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId  String          @map("client_id") @db.Uuid
-  audience  SessionAudience
-  userId    String?         @map("user_id") @db.Uuid
-  smeUserId String?         @map("sme_user_id") @db.Uuid
-  tokenHash String          @unique @map("token_hash")
-  expiresAt DateTime        @map("expires_at")
-  revokedAt DateTime?       @map("revoked_at")
-  ip        String?
-  userAgent String?         @map("user_agent")
-  createdAt DateTime        @default(now()) @map("created_at")
-  updatedAt DateTime        @updatedAt @map("updated_at")
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String          @map("client_id") @db.Uuid
+  audience      SessionAudience
+  userId        String?         @map("user_id") @db.Uuid
+  smeUserId     String?         @map("sme_user_id") @db.Uuid
+  partnerUserId String?         @map("partner_user_id") @db.Uuid
+  tokenHash     String          @unique @map("token_hash")
+  expiresAt     DateTime        @map("expires_at")
+  revokedAt     DateTime?       @map("revoked_at")
+  ip            String?
+  userAgent     String?         @map("user_agent")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
 
-  user    User?    @relation(fields: [userId], references: [id])
-  smeUser SmeUser? @relation(fields: [smeUserId], references: [id])
+  user        User?        @relation(fields: [userId], references: [id])
+  smeUser     SmeUser?     @relation(fields: [smeUserId], references: [id])
+  partnerUser PartnerUser? @relation(fields: [partnerUserId], references: [id])
 
   @@index([userId])
   @@index([smeUserId])
@@ -494,6 +500,8 @@ model Project {
   figures                 Json?
   demographicsSnapshot    Json?         @map("demographics_snapshot")
   autoLaunchCampaign      Boolean       @default(false) @map("auto_launch_campaign")
+  /// M10 per-project switch (with the global SME_SUPPLY_ENABLED flag): requisitions and partner supply.
+  smeSupplyEnabled        Boolean       @default(false) @map("sme_supply_enabled")
   openTaskCapPerCandidate Int           @default(3) @map("open_task_cap_per_candidate")
   submittedAt             DateTime?     @map("submitted_at")
   createdAt               DateTime      @default(now()) @map("created_at")
@@ -512,6 +520,7 @@ model Project {
   inputBatches       TaskInputBatch[]
   opportunity        Opportunity?
   reviewers          ProjectReviewer[]
+  requisitions       Requisition[]
   matches            ProjectMatch[]
   matchRejections    ProjectMatchRejection[]
   /// When the last FLOW 2 match run finished.
@@ -1709,4 +1718,278 @@ model TaskDraftRun {
   task TaskInstance @relation(fields: [taskInstanceId], references: [id])
 
   @@index([taskInstanceId, createdAt])
+}
+
+// ───────────────────────── M10a SME supply: partners and requisitions (docs/SME-SUPPLY.md) ─────────────────────────
+
+enum SmeTier {
+  EXPERT
+  REVIEWER_SME
+  ANNOTATOR
+}
+
+enum PartnerStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum PartnerEnvironment {
+  SANDBOX
+  LIVE
+}
+
+/// A staffing partner that supplies candidates (section 5). Onboarded by an Admin.
+model Partner {
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId             String        @map("client_id") @db.Uuid
+  name                 String
+  status               PartnerStatus @default(ACTIVE)
+  /// e.g. PENDING, VERIFIED (recorded by the Admin after checking the business).
+  businessVerification String        @default("PENDING") @map("business_verification")
+  contacts             Json          @default("[]")
+  allowedDomains       String[]      @default([]) @map("allowed_domains")
+  allowedTiers         SmeTier[]     @default([]) @map("allowed_tiers")
+  feeTermsVersion      String?       @map("fee_terms_version")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  users       PartnerUser[]
+  clients     PartnerClient[]
+  webhooks    PartnerWebhook[]
+  submissions PartnerSubmission[]
+
+  @@unique([clientId, name])
+}
+
+/// A person at a partner who signs in to the partner portal (email + password, argon2id).
+model PartnerUser {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String     @map("client_id") @db.Uuid
+  partnerId    String     @map("partner_id") @db.Uuid
+  email        String     @unique
+  name         String
+  passwordHash String     @map("password_hash")
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?  @map("last_login_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  partner  Partner   @relation(fields: [partnerId], references: [id])
+  sessions Session[]
+}
+
+/// OAuth2 client credentials for the Partner API (one or more per partner, sandbox or live). Secret stored as a hash.
+model PartnerClient {
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String             @map("client_id") @db.Uuid
+  partnerId   String             @map("partner_id") @db.Uuid
+  /// Public client id, e.g. pc_live_…
+  publicId    String             @unique @map("public_id")
+  secretHash  String             @map("secret_hash")
+  scopes      String[]
+  environment PartnerEnvironment
+  rotatedAt   DateTime?          @map("rotated_at")
+  revokedAt   DateTime?          @map("revoked_at")
+  createdAt   DateTime           @default(now()) @map("created_at")
+
+  partner Partner              @relation(fields: [partnerId], references: [id])
+  tokens  PartnerAccessToken[]
+}
+
+/// Short-lived bearer tokens issued by POST /partner/v1/oauth/token. Only the SHA-256 is stored.
+model PartnerAccessToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  clientRef String   @map("client_ref") @db.Uuid
+  tokenHash String   @unique @map("token_hash")
+  scopes    String[]
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  client PartnerClient @relation(fields: [clientRef], references: [id])
+
+  @@index([expiresAt])
+}
+
+/// A partner's webhook endpoint. The signing secret is stored encrypted (it must be available to sign).
+model PartnerWebhook {
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String             @map("client_id") @db.Uuid
+  partnerId   String             @map("partner_id") @db.Uuid
+  url         String
+  secretEnc   String             @map("secret_enc")
+  events      String[]
+  environment PartnerEnvironment
+  status      String             @default("ACTIVE")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  partner    Partner                  @relation(fields: [partnerId], references: [id])
+  deliveries PartnerWebhookDelivery[]
+}
+
+/// One event to one webhook, retried with backoff; replays create a new delivery.
+model PartnerWebhookDelivery {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String    @map("client_id") @db.Uuid
+  webhookId      String    @map("webhook_id") @db.Uuid
+  eventId        String    @map("event_id") @db.Uuid
+  eventType      String    @map("event_type")
+  payload        Json
+  status         String    @default("PENDING")
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now()) @map("next_attempt_at")
+  lastStatusCode Int?      @map("last_status_code")
+  lastError      String?   @map("last_error")
+  deliveredAt    DateTime? @map("delivered_at")
+  replayOfId     String?   @map("replay_of_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  webhook PartnerWebhook @relation(fields: [webhookId], references: [id])
+
+  @@index([status, nextAttemptAt])
+}
+
+enum RequisitionState {
+  DRAFT
+  OPEN
+  PAUSED
+  FILLED
+  CLOSED
+}
+
+/// A request for SMEs created from a project (section 4).
+model Requisition {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId            String           @map("client_id") @db.Uuid
+  projectId           String           @map("project_id") @db.Uuid
+  title               String
+  /// Partner-facing summary (never items, gold answers or scoring rules).
+  summary             String           @default("")
+  domain              String
+  tier                SmeTier
+  headcount           Int
+  startDate           DateTime?        @map("start_date") @db.Date
+  durationWeeks       Int?             @map("duration_weeks")
+  hoursPerWeek        Int?             @map("hours_per_week")
+  location            String?
+  jurisdictions       String[]         @default([])
+  languages           String[]         @default([])
+  /// { minYears, qualifications[], licenceRequired, notes }
+  minimumRequirements Json             @default("{}") @map("minimum_requirements")
+  guidelinesPackageId String?          @map("guidelines_package_id") @db.Uuid
+  guidelinesVersion   Int?             @map("guidelines_version")
+  rateCardId          String?          @map("rate_card_id") @db.Uuid
+  allowedPartnerIds   String[]         @default([]) @map("allowed_partner_ids")
+  directChannel       Boolean          @default(false) @map("direct_channel")
+  submissionDeadline  DateTime?        @map("submission_deadline")
+  maxPerPartner       Int?             @map("max_per_partner")
+  state               RequisitionState @default(DRAFT)
+  createdById         String           @map("created_by_id") @db.Uuid
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  project     Project             @relation(fields: [projectId], references: [id])
+  submissions PartnerSubmission[]
+
+  @@index([projectId])
+  @@index([state])
+}
+
+/// One person across partners and channels, matched on normalised email and phone, then on verified identity.
+model SupplyCandidate {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  emailNorm String   @map("email_norm")
+  phoneNorm String?  @map("phone_norm")
+  name      String
+  country   String?
+  /// Linked when the candidate accepts an invite and signs in (FLOW 2 SME user).
+  smeUserId String?  @unique @map("sme_user_id") @db.Uuid
+  sandbox   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  submissions PartnerSubmission[]
+
+  @@unique([clientId, sandbox, emailNorm])
+  @@index([clientId, sandbox, phoneNorm])
+}
+
+enum SubmissionState {
+  RECEIVED
+  DUPLICATE
+  INVITED
+  EXPIRED
+  WITHDRAWN
+}
+
+enum ScreenState {
+  NOT_RUN
+  MEETS
+  DOES_NOT_MEET_RECOMMENDED
+  UNCLEAR
+  CONFIRMED_NOT_MET
+}
+
+enum SubmissionChannel {
+  PARTNER_API
+  PARTNER_PORTAL
+  DIRECT
+}
+
+/// A candidate put forward for a requisition by a partner (or directly). The first valid submission owns the candidate
+/// for 12 months; duplicates are recorded with a reason that never names the owner.
+model PartnerSubmission {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId         String            @map("client_id") @db.Uuid
+  partnerId        String?           @map("partner_id") @db.Uuid
+  requisitionId    String            @map("requisition_id") @db.Uuid
+  candidateId      String            @map("candidate_id") @db.Uuid
+  channel          SubmissionChannel
+  partnerRef       String?           @map("partner_ref")
+  state            SubmissionState   @default(RECEIVED)
+  screen           ScreenState       @default(NOT_RUN)
+  screenReasons    Json              @default("[]") @map("screen_reasons")
+  screenDecidedBy  String?           @map("screen_decided_by") @db.Uuid
+  duplicateReason  String?           @map("duplicate_reason")
+  ownerUntil       DateTime?         @map("owner_until")
+  /// Submitted details: phone, experience summary, years, employment history, qualifications, attestation, consent.
+  details          Json              @default("{}")
+  cvStorageKey     String?           @map("cv_storage_key")
+  inviteTokenHash  String?           @unique @map("invite_token_hash")
+  invitedAt        DateTime?         @map("invited_at")
+  inviteExpiresAt  DateTime?         @map("invite_expires_at")
+  reminderSentAt   DateTime?         @map("reminder_sent_at")
+  inviteAcceptedAt DateTime?         @map("invite_accepted_at")
+  enrollmentId     String?           @map("enrollment_id") @db.Uuid
+  endedAt          DateTime?         @map("ended_at")
+  sandbox          Boolean           @default(false)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  partner     Partner?              @relation(fields: [partnerId], references: [id])
+  requisition Requisition           @relation(fields: [requisitionId], references: [id])
+  candidate   SupplyCandidate       @relation(fields: [candidateId], references: [id])
+  history     CandidateStateEvent[]
+
+  @@unique([partnerId, partnerRef])
+  @@index([candidateId])
+  @@index([requisitionId, state])
+}
+
+/// History of every state change per dimension (section 6), as shown to the partner. Append-only.
+model CandidateStateEvent {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  submissionId String   @map("submission_id") @db.Uuid
+  dimension    String
+  fromState    String?  @map("from_state")
+  toState      String   @map("to_state")
+  reason       String?
+  at           DateTime @default(now())
+
+  submission PartnerSubmission @relation(fields: [submissionId], references: [id])
+
+  @@index([submissionId, at])
 }

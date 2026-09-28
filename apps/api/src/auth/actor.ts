@@ -27,6 +27,27 @@ export interface CandidateActor {
   sessionId: string;
 }
 
+/** M10: a person at a staffing partner, signed in to the partner portal (cookie praxis_partner). */
+export interface PartnerUserActor {
+  type: 'PARTNER_USER';
+  partnerUserId: string;
+  partnerId: string;
+  clientId: string;
+  sessionId: string;
+}
+
+/** M10: a partner's system calling the Partner API with an OAuth2 client-credentials token. */
+export interface PartnerClientActor {
+  type: 'PARTNER_CLIENT';
+  partnerClientId: string;
+  partnerId: string;
+  clientId: string;
+  scopes: string[];
+  sandbox: boolean;
+}
+
+export type PartnerActor = PartnerUserActor | PartnerClientActor;
+
 /**
  * Access policy every route must declare in `config.access`.
  * - 'public': no session needed (health, login, OpenAPI, public opportunity pages, signed webhooks).
@@ -35,14 +56,24 @@ export interface CandidateActor {
  * - 'candidate': a signed-in candidate. Internal sessions never satisfy it, and candidate sessions never
  *   satisfy an internal policy.
  * - { roles, apiClient }: an internal user with one of the roles, or a machine client of that kind (Bearer key).
+ * - 'partner': a signed-in partner portal user (M10). Never satisfied by internal or candidate sessions.
+ * - { partnerScope }: a Partner API client token carrying that OAuth scope (M10).
  */
-export type AccessPolicy = 'public' | 'authenticated' | 'candidate' | readonly InternalRole[] | { roles: readonly InternalRole[]; apiClient: ApiClientActor['kind'] };
+export type AccessPolicy =
+  | 'public'
+  | 'authenticated'
+  | 'candidate'
+  | 'partner'
+  | readonly InternalRole[]
+  | { roles: readonly InternalRole[]; apiClient: ApiClientActor['kind'] }
+  | { partnerScope: string };
 
 declare module 'fastify' {
   interface FastifyRequest {
     actor: Actor | null;
     candidate: CandidateActor | null;
     apiClient: ApiClientActor | null;
+    partner: PartnerActor | null;
   }
   interface FastifyContextConfig {
     access?: AccessPolicy;

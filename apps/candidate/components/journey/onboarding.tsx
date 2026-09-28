@@ -125,7 +125,7 @@ function ItemBody({ item, scope, pending, onDone }: { item: OnboardingItem; scop
         <>
           <ul className="mt-3 list-disc space-y-1 pl-5">
             <li>Each task describes a realistic workflow: its states and actions, what depends on what, and how things fail and recover.</li>
-            <li>You write the rubric and the evidence a reviewer needs to check your work.</li>
+            <li>You write the rubric and the evidence a Validator needs to check your work.</li>
             <li>Use synthetic data only. Never include real customers, colleagues or employer information.</li>
             <li>Another expert reviews every task. You never approve your own.</li>
           </ul>

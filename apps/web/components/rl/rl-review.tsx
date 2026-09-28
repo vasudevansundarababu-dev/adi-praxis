@@ -57,7 +57,7 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
           Claim this review
         </button>
       )}
-      {d.status === 'IN_PROGRESS' && !d.claimedByMe && <p className="mt-4 text-sm text-warning">Another reviewer is working on this.</p>}
+      {d.status === 'IN_PROGRESS' && !d.claimedByMe && <p className="mt-4 text-sm text-warning">Another Validator is working on this.</p>}
 
       <div className="mt-6 grid gap-4 xl:grid-cols-3">
         <section aria-labelledby="src-h" className="min-w-0 card p-3 text-sm">

@@ -4,7 +4,7 @@ import Link from 'next/link';
 const ENROLLMENT: Record<string, [string, string]> = {
   DRAFT: ['Profile in progress', 'pill-info'],
   SUBMITTED: ['Submitted', 'pill-info'],
-  REVIEW_PENDING: ['With a reviewer', 'pill-info'],
+  REVIEW_PENDING: ['With a Validator', 'pill-info'],
   NEEDS_INFORMATION: ['More information requested', 'pill-warning'],
   SELECTED: ['Selected', 'pill-success'],
   NOT_SELECTED: ['Not selected this time', ''],

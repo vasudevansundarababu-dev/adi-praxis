@@ -91,7 +91,7 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
           {result.flags.length > 0 && (
             <div className="rounded-md border border-warning p-3 text-sm">
               <p className="font-medium">Possible real data</p>
-              <p className="text-fg-muted">Replace these with synthetic values (use the generator), or explain why they are not real. The reviewer sees your explanation.</p>
+              <p className="text-fg-muted">Replace these with synthetic values (use the generator), or explain why they are not real. The Validator sees your explanation.</p>
               <ul className="mt-2 space-y-2">
                 {result.flags.map((f) => (
                   <li key={f.id}>

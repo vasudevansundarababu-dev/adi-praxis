@@ -162,7 +162,7 @@ export function ProfilePanel({ state, onChange, readOnly = false }: { state: Con
 
       <section>
         <h3 className="text-sm font-semibold">Credentials</h3>
-        <p className="text-xs text-fg-muted">Shown as self-reported. Only a reviewer can mark a claim as supported by evidence.</p>
+        <p className="text-xs text-fg-muted">Shown as self-reported. Only a Validator can mark a claim as supported by evidence.</p>
         <ul className="mt-2 space-y-2">
           {p.claims.map((c) => (
             <li key={c.id} className="flex flex-wrap items-baseline gap-2 rounded-md border border-line p-2 text-sm">

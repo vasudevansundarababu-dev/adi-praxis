@@ -34,7 +34,7 @@ export const reviewRoutes: FastifyPluginAsyncZod<{ db: Db; evaluator: Suitabilit
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const p = await loadProject(tx, req.params.id, actor);
         const u = await tx.user.findFirst({ where: { id: req.body.userId, clientId: p.clientId, roles: { has: 'REVIEWER' }, status: 'ACTIVE' } });
-        if (!u) throw badRequest('Choose an active Reviewer');
+        if (!u) throw badRequest('Choose an active Validator');
         await tx.projectReviewer.upsert({ where: { projectId_userId: { projectId: p.id, userId: u.id } }, create: { clientId: p.clientId, projectId: p.id, userId: u.id, assignedById: actor.userId }, update: {} });
         await audit({ entityType: 'Project', entityId: p.id, action: 'project.reviewer_assigned', after: { userId: u.id } });
         return { status: 200, body: { userId: u.id } };
@@ -49,7 +49,7 @@ export const reviewRoutes: FastifyPluginAsyncZod<{ db: Db; evaluator: Suitabilit
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const p = await loadProject(tx, req.params.id, actor);
         const { count } = await tx.projectReviewer.deleteMany({ where: { projectId: p.id, userId: req.params.userId } });
-        if (!count) throw notFound('Reviewer not assigned');
+        if (!count) throw notFound('Validator not assigned');
         await audit({ entityType: 'Project', entityId: p.id, action: 'project.reviewer_removed', after: { userId: req.params.userId } });
         return { status: 200, body: { removed: true } };
       });

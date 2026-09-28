@@ -3,13 +3,18 @@ import fp from 'fastify-plugin';
 import type { Db } from '../db';
 import { forbidden, unauthorized } from '../lib/errors';
 import { sha256 } from '../lib/crypto';
-import type { AccessPolicy, ApiClientActor, CandidateActor } from './actor';
-import { CANDIDATE_SESSION_COOKIE, resolveCandidateSession, resolveInternalSession, SESSION_COOKIE } from './sessions';
+import type { AccessPolicy, ApiClientActor, CandidateActor, PartnerActor } from './actor';
+import { CANDIDATE_SESSION_COOKIE, PARTNER_SESSION_COOKIE, resolveCandidateSession, resolveInternalSession, resolvePartnerSession, resolvePartnerToken, SESSION_COOKIE } from './sessions';
 
 /** Pure RBAC decision, shared by the hook and unit tests. */
-export function checkAccess(policy: AccessPolicy, actor: FastifyRequest['actor'], candidate: CandidateActor | null = null, apiClient: ApiClientActor | null = null): 'ok' | 401 | 403 {
+export function checkAccess(policy: AccessPolicy, actor: FastifyRequest['actor'], candidate: CandidateActor | null = null, apiClient: ApiClientActor | null = null, partner: PartnerActor | null = null): 'ok' | 401 | 403 {
   if (policy === 'public') return 'ok';
   if (policy === 'candidate') return candidate ? 'ok' : 401;
+  if (policy === 'partner') return partner?.type === 'PARTNER_USER' ? 'ok' : 401;
+  if (typeof policy === 'object' && 'partnerScope' in policy) {
+    if (partner?.type !== 'PARTNER_CLIENT') return 401;
+    return partner.scopes.includes(policy.partnerScope) ? 'ok' : 403;
+  }
   if (typeof policy === 'object' && 'apiClient' in policy) {
     if (actor) return actor.roles.some((r) => policy.roles.includes(r)) ? 'ok' : 403;
     if (apiClient) return apiClient.kind === policy.apiClient ? 'ok' : 403;
@@ -37,6 +42,7 @@ export const rbacPlugin = fp(async (app: FastifyInstance, opts: { db: Db }) => {
   app.decorateRequest('actor', null);
   app.decorateRequest('candidate', null);
   app.decorateRequest('apiClient', null);
+  app.decorateRequest('partner', null);
 
   app.addHook('onRoute', (route) => {
     const access = (route.config as { access?: AccessPolicy } | undefined)?.access;
@@ -48,12 +54,20 @@ export const rbacPlugin = fp(async (app: FastifyInstance, opts: { db: Db }) => {
 
   app.addHook('onRequest', async (req) => {
     const policy = req.routeOptions.config?.access;
+    // Partner audiences (M10) never read internal or candidate credentials, and vice versa.
+    if (policy === 'partner') {
+      const pt = req.cookies[PARTNER_SESSION_COOKIE];
+      req.partner = pt ? await resolvePartnerSession(opts.db, pt) : null;
+    } else if (policy && typeof policy === 'object' && 'partnerScope' in policy) {
+      req.partner = await resolvePartnerToken(opts.db, req.headers.authorization);
+    }
+    const partnerPolicy = policy === 'partner' || (!!policy && typeof policy === 'object' && 'partnerScope' in policy);
     // Each audience only ever reads its own cookie.
-    if (policy === 'candidate' || policy === 'public') {
+    if (!partnerPolicy && (policy === 'candidate' || policy === 'public')) {
       const ct = req.cookies[CANDIDATE_SESSION_COOKIE];
       req.candidate = ct ? await resolveCandidateSession(opts.db, ct) : null;
     }
-    if (policy !== 'candidate') {
+    if (!partnerPolicy && policy !== 'candidate') {
       const token = req.cookies[SESSION_COOKIE];
       req.actor = token ? await resolveInternalSession(opts.db, token) : null;
     }
@@ -63,7 +77,7 @@ export const rbacPlugin = fp(async (app: FastifyInstance, opts: { db: Db }) => {
     }
 
     if (!policy) return; // 404s and swagger-ui static assets
-    const result = checkAccess(policy, req.actor, req.candidate, req.apiClient);
+    const result = checkAccess(policy, req.actor, req.candidate, req.apiClient, req.partner);
     if (result === 401) throw unauthorized();
     if (result === 403) throw forbidden();
   });

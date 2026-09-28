@@ -46,10 +46,10 @@ export default async function HomePage() {
     next = { title: 'You were selected: complete onboarding', body: 'A short checklist, then you can receive assignments.', href: `/enrollments/${selected.id}/onboarding`, cta: 'Start onboarding' };
   } else if (needsInfo) {
     stage = 2;
-    next = { title: 'The reviewer asked for more information', href: `/enrollments/${needsInfo.id}/status`, cta: 'See what’s needed' };
+    next = { title: 'The Validator asked for more information', href: `/enrollments/${needsInfo.id}/status`, cta: 'See what’s needed' };
   } else if (inReview) {
     stage = 2;
-    next = { title: 'Your application is with a reviewer', body: 'A person reviews every application. We’ll let you know when there’s a decision.', href: `/enrollments/${inReview.id}/status`, cta: 'View status' };
+    next = { title: 'Your application is with a Validator', body: 'A person reviews every application. We’ll let you know when there’s a decision.', href: `/enrollments/${inReview.id}/status`, cta: 'View status' };
   } else if (draft) {
     stage = 1;
     next = { title: 'Finish your SME profile', body: 'A few quick questions, most of them one tap.', href: `/enrollments/${draft.id}`, cta: 'Continue profile' };

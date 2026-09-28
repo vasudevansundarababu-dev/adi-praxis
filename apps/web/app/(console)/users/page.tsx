@@ -1,3 +1,4 @@
+import { roleLabel } from '@praxis/shared';
 import type { InternalUserDto } from '@praxis/shared';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
@@ -26,7 +27,7 @@ export default async function UsersPage() {
               <tr key={u.id} className="border-t border-line">
                 <td className="px-4 py-2">{u.name}</td>
                 <td className="px-4 py-2">{u.email}</td>
-                <td className="px-4 py-2">{u.roles.join(', ')}</td>
+                <td className="px-4 py-2">{u.roles.map(roleLabel).join(', ')}</td>
                 <td className="px-4 py-2">{u.status === 'ACTIVE' ? 'Active' : 'Disabled'}</td>
               </tr>
             ))}

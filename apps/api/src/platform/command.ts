@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { Actor, ApiClientActor, CandidateActor } from '../auth/actor';
+import type { Actor, ApiClientActor, CandidateActor, PartnerActor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, badRequest, unauthorized } from '../lib/errors';
@@ -43,6 +43,19 @@ export async function runCommand<T>(
   return execute(db, req, reply, { actor, actorId: actor.userId, actorType: 'USER', clientId: actor.clientId }, handler);
 }
 
+/** The same guarantees for a partner portal user or a Partner API client (M10; audited as actor type PARTNER). */
+export async function runPartnerCommand<T>(
+  db: Db,
+  req: FastifyRequest,
+  reply: FastifyReply,
+  handler: (ctx: CommandContext<PartnerActor>) => Promise<CommandResult<T>>,
+): Promise<void> {
+  const p = req.partner;
+  if (!p) throw unauthorized();
+  const actorId = p.type === 'PARTNER_USER' ? `partner-user:${p.partnerUserId}` : `partner-client:${p.partnerClientId}`;
+  return execute(db, req, reply, { actor: p, actorId, actorType: 'PARTNER', clientId: p.clientId }, handler);
+}
+
 /** The same guarantees for a signed-in candidate (separate audience; audited as actor type CANDIDATE). */
 export async function runCandidateCommand<T>(
   db: Db,
@@ -72,7 +85,7 @@ async function execute<A, T>(
   db: Db,
   req: FastifyRequest,
   reply: FastifyReply,
-  principal: { actor: A; actorId: string; actorType: 'USER' | 'CANDIDATE' | 'SERVICE'; clientId: string },
+  principal: { actor: A; actorId: string; actorType: 'USER' | 'CANDIDATE' | 'SERVICE' | 'PARTNER'; clientId: string },
   handler: (ctx: CommandContext<A>) => Promise<CommandResult<T>>,
 ): Promise<void> {
   const { actor, actorId, actorType, clientId } = principal;

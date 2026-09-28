@@ -11,7 +11,7 @@ export interface AuditInput {
 
 export interface AuditContext {
   clientId: string;
-  actorType: 'USER' | 'CANDIDATE' | 'SYSTEM' | 'SERVICE';
+  actorType: 'USER' | 'CANDIDATE' | 'SYSTEM' | 'SERVICE' | 'PARTNER';
   actorId: string | null;
   requestId?: string;
 }

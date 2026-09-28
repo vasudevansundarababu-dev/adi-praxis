@@ -1,3 +1,4 @@
+import { roleLabel } from '@praxis/shared';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { NavBrand } from '@/components/brand';
@@ -24,7 +25,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
           </Link>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <span className="hidden text-white/70 sm:inline">
-              {user.name} · {user.roles.map((r) => (r === 'PM' ? 'PM' : r[0] + r.slice(1).toLowerCase())).join(', ')}
+              {user.name} · {user.roles.map(roleLabel).join(', ')}
             </span>
             <ThemeToggle />
             <SignOutButton />

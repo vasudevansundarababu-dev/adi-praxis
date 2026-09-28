@@ -92,7 +92,7 @@ export const staffingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; geo
           const taken = new Set(counts.active.map((a) => a.candidateId));
           const ranked = await tx.projectMatch.findMany({ where: { projectId: p.id }, orderBy: { rank: 'asc' }, select: { candidateId: true } });
           ids = ranked.map((r) => r.candidateId).filter((id) => !taken.has(id)).slice(0, req.body.topN);
-          if (ids.length === 0) throw new AppError(409, 'NO_CANDIDATES', 'No eligible experts to assign yet. Experts appear after a reviewer selects them and they finish onboarding; re-run the match then, or launch sourcing.');
+          if (ids.length === 0) throw new AppError(409, 'NO_CANDIDATES', 'No eligible experts to assign yet. Experts appear after a Validator selects them and they finish onboarding; re-run the match then, or launch sourcing.');
         } else {
           ids = [...new Set(req.body.candidateIds)];
         }

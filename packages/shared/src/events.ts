@@ -17,6 +17,8 @@ export const DOMAIN_EVENTS = [
   // FLOW 2 (SME candidate flow)
   'enrollment.submitted',
   'enrollment.decided',
+  // M10 (SME supply): identity verified for an SME user; partner webhook fan-out
+  'sme.identity_verified',
   // Internal-user administration (M0)
   'user.created',
   'user.roles_changed',

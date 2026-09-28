@@ -12,7 +12,7 @@ export default async function FailureCodesPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-semibold">Failure reason codes</h1>
-      <p className="mt-1 text-sm text-fg-muted">Codes reviewers attach to failures in RL reviews. Deactivating a code hides it from new reviews; past verdicts keep it.</p>
+      <p className="mt-1 text-sm text-fg-muted">Codes Validators attach to failures in RL reviews. Deactivating a code hides it from new reviews; past verdicts keep it.</p>
       <FailureCodes initial={data?.items ?? []} />
     </div>
   );

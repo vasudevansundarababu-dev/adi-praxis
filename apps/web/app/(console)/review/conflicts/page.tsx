@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'Conflicts' };
 
 export default async function ConflictsPage() {
   const user = (await getCurrentUser())!;
-  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Reviewers and Admins" />;
+  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Validators and Admins" />;
   const { data } = await apiGet<{ items: { id: string; candidateName: string | null; enrollmentId: string | null; details: string | null; declaredAt: string }[] }>('/review/conflicts');
   return (
     <div className="max-w-3xl">

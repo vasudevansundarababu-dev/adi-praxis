@@ -186,3 +186,41 @@ Owner choices: agent pull requests need a human merge; a separate test environme
   harder by tier, with dynamic per-candidate test forms (equivalent, never identical); human approval before publish
   and human confirmation of any model-graded written answer (`docs/SME-SUPPLY.md` section 7).
 - Owner answers for the overnight build (28 Sep 2026) are in `docs/SME-SUPPLY.md` section 0; the runbook is `docs/M10-BUILD.md`.
+
+## M10 SME supply, certification and payments (build pre-approved by the owner, 28 Sep 2026)
+Spec: `docs/SME-SUPPLY.md` (section 0 owner decisions). Runbook: `docs/M10-BUILD.md`. Status: `docs/M10-STATUS.md`.
+
+### M10a Foundations, partners and requisitions
+- **(chosen by Claude)** Each slice has its own migrations (`…_m10a_…`, `…_m10b_…`, `…_m10c_…`) rather than one migration
+  for all of section 9, so each slice commits green on its own.
+- **(chosen by Claude)** `SME_SUPPLY_ENABLED` (default false) gates registration: with it off, no M10 route is
+  registered (404), no M10 event handler or job is scheduled, and no menu item is shown. A requisition also needs the
+  project's own switch (`POST /projects/:id/sme-supply`). JD matching keeps working on switched-on projects in v1.
+- **(chosen by Claude)** Partner portal users are a third session audience (`PARTNER`, cookie `praxis_partner`) on the
+  existing Session table; partner API clients get short-lived opaque bearer tokens (1 hour, stored as SHA-256) from
+  `POST /partner/v1/oauth/token` (form, JSON or HTTP Basic). Audit actor type `PARTNER` was added.
+- **(chosen by Claude)** Partner webhook signing secrets are stored encrypted (AES-256-GCM with `M10_ENCRYPTION_KEY`),
+  not hashed as section 9 says, because the platform must read them to sign each delivery. Signatures follow the RL Gym
+  format: header `Praxis-Signature: t=<unix>,v1=<HMAC-SHA256("<t>.<raw body>")>`. Deliveries retry 8 times (30 s × 4ⁿ)
+  from a worker job every 30 s; replays reuse the event id so partners can deduplicate.
+- **(chosen by Claude)** The partner-facing candidate id is the submission id; internal candidate ids never leave the
+  platform, so one partner can never correlate another partner's submissions.
+- **(chosen by Claude)** Ownership: the first valid submission owns the person for 12 months while it is active. When it
+  ends (withdrawn, expired, or "not met" confirmed by a Validator) a 90-day cool-off applies to every channel. The
+  owner may put the same person forward for other requisitions. Duplicate reasons never name the owner.
+- **(chosen by Claude)** Duplicate matching: normalised email (lower case; Gmail dots and "+tags" ignored), then
+  normalised phone (Indian numbers without a country code get +91), then — when the invite is accepted — the signed-in
+  account (verified identity). An account already owned through another partner turns the new submission into a
+  duplicate.
+- **(chosen by Claude)** A direct application (careers page) from someone a partner already owns stays credited to
+  that partner (their ownership and fee terms apply).
+- **(chosen by Claude)** Every submission is invited at once, whatever the requirement screen recommends; the screen is
+  advice for a Validator, who alone can confirm "not met" (bulk confirmation supported). Sandbox submissions are never
+  emailed; their progress is simulated with `POST /partner/v1/sandbox/candidates/:id/simulate`.
+- **(chosen by Claude)** Invites last 7 days with a reminder on day 3 (hourly worker job). The invite link opens the
+  candidate app at `/partner-invite/<token>`; after Google sign-in it starts (or resumes) the FLOW 2 application for the
+  requisition's opportunity, which must be published.
+- **(chosen by Claude)** The partner-visible history (`CandidateStateEvent`) is append-only in the database (trigger
+  and revoked UPDATE/DELETE), like the M6 tables.
+- **(chosen by Claude)** "Validator" replaces "Reviewer" for the internal role in every console and candidate-app text
+  and API message; the enum, routes and code names keep REVIEWER/review. Shared `roleLabel()` and `ROLE_LABELS`.

@@ -29,7 +29,7 @@ export function ReviewersPanel({ projectId, initial }: { projectId: string; init
 
   return (
     <section aria-labelledby="reviewers-h" className="mt-8 card p-4 text-sm">
-      <h2 id="reviewers-h" className="font-semibold">Application reviewers</h2>
+      <h2 id="reviewers-h" className="font-semibold">Validators</h2>
       <p className="mt-1 text-fg-muted">People who review candidates for this project’s pool.</p>
       {data.items.length === 0 ? (
         <p className="mt-3 text-warning">No reviewer assigned yet; only Admins can decide applications.</p>

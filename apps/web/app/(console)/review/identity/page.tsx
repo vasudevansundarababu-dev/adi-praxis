@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'Identity reviews' };
 
 export default async function IdentityReviewPage() {
   const user = (await getCurrentUser())!;
-  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Reviewers and Admins" />;
+  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Validators and Admins" />;
   const { data } = await apiGet<{ items: { smeUserId: string; displayName: string | null; reason: string | null; requestedAt: string }[] }>('/review/identity');
   return (
     <div className="max-w-3xl">

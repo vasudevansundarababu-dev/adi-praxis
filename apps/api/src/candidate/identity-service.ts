@@ -1,5 +1,6 @@
 import type { IdentityStatus, Prisma } from '@prisma/client';
 import type { Db, Tx } from '../db';
+import { emitEvent } from '../outbox/outbox';
 import { sha256 } from '../lib/crypto';
 import type { AuthoritativeStatus, IdentityProvider } from './identity-provider';
 
@@ -101,6 +102,8 @@ export async function processIdentityWebhook(
     if (o.grants) next = 'VERIFIED';
     else if (!ELIGIBLE.includes(current) && o.errorCode !== 'TEST_MODE_RESULT_IGNORED') next = o.status;
     if (next !== current) await tx.smeUser.update({ where: { id: attempt.smeUserId }, data: { identityStatus: next } });
+    // M10: partners that supplied this candidate are told (only consumed when SME supply is enabled).
+    if (next !== current && ELIGIBLE.includes(next)) await emitEvent(tx, attempt.clientId, { name: 'sme.identity_verified', aggregateType: 'SmeUser', aggregateId: attempt.smeUserId, payload: { smeUserId: attempt.smeUserId } });
 
     await tx.auditEvent.create({
       data: {

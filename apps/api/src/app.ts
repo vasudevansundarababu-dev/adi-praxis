@@ -32,6 +32,11 @@ import { taskRoutes } from './routes/tasks';
 import { taskReviewRoutes } from './routes/task-review';
 import { datasetRoutes } from './routes/dataset';
 import { draftingRoutes } from './routes/drafting';
+import { partnerApiRoutes } from './routes/partner-api';
+import { partnerPortalRoutes } from './routes/partner-portal';
+import { supplyCandidateRoutes } from './routes/supply-candidate';
+import { supplyInternalRoutes } from './routes/supply-internal';
+import { secretBox } from './lib/secrets';
 import { ClaudeVertexTaskDrafter, MockTaskDrafter, type TaskDrafter } from './tasks/drafting/drafter';
 import { rlRoutes } from './routes/rl';
 import { workRoutes } from './routes/work';
@@ -222,6 +227,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
       await v1.register(taskReviewRoutes, { db: deps.db });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
+      // M10 SME supply: nothing is registered with the flag off (docs/SME-SUPPLY.md section 13).
+      if (deps.config.SME_SUPPLY_ENABLED) {
+        const email = deps.email ?? defaultEmail(deps.config);
+        await v1.register(supplyInternalRoutes, { db: deps.db });
+        await v1.register(partnerPortalRoutes, { db: deps.db, config: deps.config, email, box: secretBox(deps.config) });
+        await v1.register(supplyCandidateRoutes, { db: deps.db, config: deps.config });
+      }
       await v1.register(datasetRoutes, { db: deps.db });
       await v1.register(rlRoutes, { db: deps.db });
       await v1.register(taskRoutes, { db: deps.db, config: deps.config, email: deps.email ?? defaultEmail(deps.config) });
@@ -242,6 +254,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     },
     { prefix: '/api/v1' },
   );
+
+  // M10 Partner API v1 for partners' systems (OAuth2 client credentials), only with SME supply enabled.
+  if (deps.config.SME_SUPPLY_ENABLED) {
+    await app.register(partnerApiRoutes, { prefix: '/partner/v1', db: deps.db, config: deps.config, email: deps.email ?? defaultEmail(deps.config) });
+  }
 
   return app;
 }

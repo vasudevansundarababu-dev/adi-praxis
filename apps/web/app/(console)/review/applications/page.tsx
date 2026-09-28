@@ -17,7 +17,7 @@ const FILTERS = [
 
 export default async function ApplicationsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const user = (await getCurrentUser())!;
-  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Reviewers and Admins" />;
+  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Validators and Admins" />;
   const { status } = await searchParams;
   const filter = FILTERS.some(([v]) => v === status) ? status! : '';
   const { data } = await apiGet<{ items: Item[] }>(`/review/enrollments${filter ? `?status=${filter}` : ''}`);

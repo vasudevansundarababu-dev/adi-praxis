@@ -13,3 +13,4 @@ export * from './tasks';
 export * from './kyc';
 export * from './mcp';
 export * from './rl';
+export * from './supply';

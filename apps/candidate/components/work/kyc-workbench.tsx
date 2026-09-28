@@ -230,7 +230,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
         <fieldset disabled={ro} className="min-w-0 space-y-4 max-md:pointer-events-none">
           {task.review && task.status === 'REWORK' && section === 'W01' && (
             <div role="status" className="rounded-md border border-warning p-3 text-sm">
-              <p className="font-medium">The reviewer asked for changes</p>
+              <p className="font-medium">The Validator asked for changes</p>
               {task.review.notes && <p className="mt-1">{task.review.notes}</p>}
               <ul className="mt-1 list-disc pl-5">
                 {task.review.comments.map((c, i) => (

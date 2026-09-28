@@ -16,6 +16,7 @@ import { ensureConversation } from '../candidate/profile-service';
 import type { Db, Tx } from '../db';
 import { sha256 } from '../lib/crypto';
 import { AppError, badRequest, notFound } from '../lib/errors';
+import type { writeAudit } from '../platform/audit';
 import { runCandidateCommand, runCommand } from '../platform/command';
 import { loadProject } from './projects';
 
@@ -321,31 +322,37 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, 
       },
     },
     async (req, reply) => {
-      await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => {
-        const o = await tx.opportunity.findFirst({ where: { id: req.body.opportunityId, clientId: actor.clientId } });
-        if (!o) throw notFound('Opportunity not found');
-        const existing = await tx.enrollment.findUnique({ where: { smeUserId_opportunityId: { smeUserId: actor.smeUserId, opportunityId: o.id } }, include: { opportunityVersion: true } });
-        if (existing) {
-          await audit({ entityType: 'Enrollment', entityId: existing.id, action: 'enrollment.resumed', after: { status: existing.status } });
-          return { status: 200, body: { id: existing.id, status: existing.status, opportunityId: o.id, version: existing.opportunityVersion.version } };
-        }
-        if (o.status !== 'PUBLISHED') throw new AppError(409, 'OPPORTUNITY_CLOSED', 'This opportunity is not accepting new applications.');
-        const v = (await latestVersion(tx, o.id))!;
-        const e = await tx.enrollment.create({ data: { clientId: o.clientId, smeUserId: actor.smeUserId, opportunityId: o.id, opportunityVersionId: v.id } });
-        await ensureConversation(tx, e.id, actor.smeUserId);
-
-        // Attribute the application to the campaign that brought the candidate, if it belongs to this project.
-        if (req.body.campaignId) {
-          const c = await tx.campaign.findFirst({ where: { id: req.body.campaignId, projectId: o.projectId } });
-          if (c) {
-            const candidate = await tx.candidate.findUnique({ where: { smeUserId: actor.smeUserId } });
-            await tx.application.create({ data: { clientId: o.clientId, campaignId: c.id, enrollmentId: e.id, candidateId: candidate?.id ?? null, source: c.channel } });
-          }
-        }
-        await audit({ entityType: 'Enrollment', entityId: e.id, action: 'enrollment.started', after: { status: 'DRAFT', opportunityVersion: v.version, campaignId: req.body.campaignId ?? null } });
-        return { status: 200, body: { id: e.id, status: e.status, opportunityId: o.id, version: v.version } };
-      });
+      await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => ({
+        status: 200,
+        body: await startOrResumeEnrollment(tx, { clientId: actor.clientId, smeUserId: actor.smeUserId, opportunityId: req.body.opportunityId, campaignId: req.body.campaignId }, audit),
+      }));
       return reply;
     },
   );
 };
+
+/** "Build my SME profile": start (or reuse) a candidate's enrollment, pinned to the opportunity's current version. */
+export async function startOrResumeEnrollment(tx: Tx, args: { clientId: string; smeUserId: string; opportunityId: string; campaignId?: string }, audit: (i: Parameters<typeof writeAudit>[2]) => Promise<void>) {
+  const o = await tx.opportunity.findFirst({ where: { id: args.opportunityId, clientId: args.clientId } });
+  if (!o) throw notFound('Opportunity not found');
+  const existing = await tx.enrollment.findUnique({ where: { smeUserId_opportunityId: { smeUserId: args.smeUserId, opportunityId: o.id } }, include: { opportunityVersion: true } });
+  if (existing) {
+    await audit({ entityType: 'Enrollment', entityId: existing.id, action: 'enrollment.resumed', after: { status: existing.status } });
+    return { id: existing.id, status: existing.status, opportunityId: o.id, version: existing.opportunityVersion.version };
+  }
+  if (o.status !== 'PUBLISHED') throw new AppError(409, 'OPPORTUNITY_CLOSED', 'This opportunity is not accepting new applications.');
+  const v = (await latestVersion(tx, o.id))!;
+  const e = await tx.enrollment.create({ data: { clientId: o.clientId, smeUserId: args.smeUserId, opportunityId: o.id, opportunityVersionId: v.id } });
+  await ensureConversation(tx, e.id, args.smeUserId);
+
+  // Attribute the application to the campaign that brought the candidate, if it belongs to this project.
+  if (args.campaignId) {
+    const c = await tx.campaign.findFirst({ where: { id: args.campaignId, projectId: o.projectId } });
+    if (c) {
+      const candidate = await tx.candidate.findUnique({ where: { smeUserId: args.smeUserId } });
+      await tx.application.create({ data: { clientId: o.clientId, campaignId: c.id, enrollmentId: e.id, candidateId: candidate?.id ?? null, source: c.channel } });
+    }
+  }
+  await audit({ entityType: 'Enrollment', entityId: e.id, action: 'enrollment.started', after: { status: 'DRAFT', opportunityVersion: v.version, campaignId: args.campaignId ?? null } });
+  return { id: e.id, status: e.status, opportunityId: o.id, version: v.version };
+}

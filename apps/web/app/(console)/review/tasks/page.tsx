@@ -10,7 +10,7 @@ type Item = { id: string; projectName: string; workflow: string; taskType: strin
 /** TASK-KYC R01: tasks awaiting review, flagged items first. */
 export default async function TaskReviewQueue() {
   const user = (await getCurrentUser())!;
-  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Reviewers and Admins" />;
+  if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Validators and Admins" />;
   const { data } = await apiGet<{ items: Item[] }>('/review/tasks');
   const items = data?.items ?? [];
   return (

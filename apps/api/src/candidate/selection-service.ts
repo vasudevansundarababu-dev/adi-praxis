@@ -120,7 +120,7 @@ export async function reviewableEnrollment(tx: Db | Tx, actor: InternalActor, en
     if (!assigned) throw notFound('Application not found');
   }
   const conflict = await tx.conflictDeclaration.findFirst({ where: { reviewerId: actor.userId, smeUserId: e.smeUserId, resolvedAt: null } });
-  if (conflict) throw forbidden('You declared a conflict with this candidate. Another reviewer must decide.');
+  if (conflict) throw forbidden('You declared a conflict with this candidate. Another Validator must decide.');
   return e;
 }
 

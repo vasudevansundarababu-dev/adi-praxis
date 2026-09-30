@@ -20,9 +20,9 @@ session; keep it open while you test.
 
 ## What's new in this build (Release 1.1 test build)
 
-The **Release 1.1 test build** was deployed on **28 Sep 2026** (banner: `test-1.1-20260928`; nightly builds after that
+The **Release 1.1 test build** was deployed on **30 Sep 2026** (banner: `test-1.1-20260930`; nightly builds after that
 show `nightly-…`). It **replaces release 1.0** in the same test environment: same URLs (section 3), same accounts, and
-all your 1.0 data is still there. Testing starts **Tuesday 29 Sep, 09:30 IST**. Read [WHATS-NEW-1.1.md](WHATS-NEW-1.1.md)
+all your 1.0 data is still there. Testing starts **Thursday 1 Oct, 09:30 IST**. Read [WHATS-NEW-1.1.md](WHATS-NEW-1.1.md)
 once before you start; it has menu paths and a 60-minute guided walkthrough.
 
 **New features, in plain words**
@@ -80,11 +80,10 @@ time and build), not once per screen, and continue with other cases.
 - Experts can approve but not reject a question family in the candidate app.
 - Some success messages disappear when the page refreshes into the next state.
 - Some minimum lengths and formats are still checked only when you submit, not on the field.
-- The GitHub issue forms may not list Partner or Finance as a persona yet: choose Partner / Finance in the persona
-  list when available; otherwise choose "Several / not role-specific". Either way start the title with `[Partner]` or
-  `[Finance]`.
+- For Partner and Finance reports, choose Partner / Finance in the persona list of the issue form and start the title
+  with `[Partner]` or `[Finance]`.
 
-**Day 1 (Tuesday 29 Sep): run in this order**
+**Day 1 (Thursday 1 Oct): run in this order**
 
 | When (IST) | Who | Cases |
 | --- | --- | --- |
@@ -133,7 +132,7 @@ Non-negotiables you should actively try to break (report any breach as **S1**):
 ## 2. Your first day
 
 1. Get from the lead tester: your console accounts (one per role, including Finance if you test payments), the partner
-   portal login if you test partners, the GitHub repository invite, and a slot in the daily schedule.
+   portal login if you test partners, the invite to the testers' GitHub repository (section 10), and a slot in the daily schedule.
 2. Set up browser profiles (section 5) and bookmark the URLs (section 3), including the partner portal.
 3. Sign in once with each role and check the yellow banner shows **Test environment** and a build number.
 4. Read the glossary (section 13), [WHATS-NEW-1.1.md](WHATS-NEW-1.1.md) and skim
@@ -303,7 +302,9 @@ curl -s -X POST "https://praxis-api-742785092638.us-central1.run.app/api/v1/inte
 
 ## 10. Reporting problems
 
-Report on GitHub: **Issues → New issue**, and pick a form:
+Report in the testers' GitHub repository **[adi-praxis-testing](https://github.com/vasudevansundarababu-dev/adi-praxis-testing)** (private; it holds this guide and the
+test cases, not the application code). You need a free GitHub account and the invite from the lead: accept it at
+https://github.com/vasudevansundarababu-dev/adi-praxis-testing/invitations, then **Issues → New issue**, and pick a form:
 
 | Form | When |
 | --- | --- |
@@ -329,7 +330,7 @@ including the "request id" when one is shown: developers use it to find the exac
 Search open issues first; if it exists, add your details as a comment instead of a new issue.
 
 **Release 1.1 notes:** start the title with `[Partner]` or `[Finance]` for those personas, and choose Partner /
-Finance in the persona list when available (until the forms are updated, choose "Several / not role-specific"). Problems of the environment itself (Claude
+Finance in the persona list. Problems of the environment itself (Claude
 unavailable, generation FAILED on quota, a page saying SME supply is not switched on) go in **one** Defect titled
 `[Environment] …`; do not file one per screen.
 
@@ -337,9 +338,10 @@ unavailable, generation FAILED on quota, a page saying SME supply is not switche
 
 1. **Triage (daily, 18:00 IST):** the lead reproduces it, sets severity and labels. Code defects that are safe to fix
    automatically get the label `agent:ready`. Questions come back to you as comments with `status:needs-info`.
-2. **Nightly agent (01:00 IST):** an AI developer (Claude) reads the issue, writes a test that shows the defect, fixes
-   it, and opens a pull request. It comments on your issue. A human developer reviews and merges it during the day.
-   If it thinks the behaviour is an agreed decision, it says so and asks the product owner (`status:decision-needed`).
+2. **Fix:** a developer (or the nightly AI agent, 01:00 IST) writes a test that shows the defect, fixes it in the code
+   repository and a human merges it. Pull requests are in the code repository, which testers cannot see; progress is
+   posted as comments and labels on your issue. If the behaviour is an agreed decision, the product owner decides
+   (`status:decision-needed`).
 3. **Nightly build (02:00 IST):** merged fixes are deployed. Your issue gets a comment "The fix is in build …, please
    verify" and the label `status:ready-to-verify`.
 4. **You verify** on the new build and comment **`/verified`** (the issue closes) or **`/failed`** plus what you saw
@@ -381,7 +383,7 @@ Do not report these as defects (you may raise an Enhancement if you think they m
 | Approved Task Dataset | The permanent, append-only store of accepted tasks used by RL Gym |
 | RL Gym | The separate platform that trains and evaluates AI agents on accepted tasks |
 | KYC / EDD / PEP / UBO | Know Your Customer / Enhanced Due Diligence / Politically Exposed Person / Ultimate Beneficial Owner |
-| Build | The version deployed, shown in the banner, e.g. `test-1.1-20260928` or `nightly-20260929-1a2b3c4` |
+| Build | The version deployed, shown in the banner, e.g. `test-1.1-20260930` or `nightly-20260929-1a2b3c4` |
 | Partner | A staffing company that puts candidates forward. It "owns" a person it submits first for 12 months |
 | Requisition | A role opened on a project for one tier and domain: headcount, requirements, allowed partners, careers page, pay route, guidelines and rate card. States: Draft, Open, Paused, Filled, Closed |
 | Requirement screen | An automatic comparison of a submission with the requisition's minimum requirements. Only a recommendation: a Validator confirms "not met" |

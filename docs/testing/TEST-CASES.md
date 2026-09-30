@@ -147,13 +147,13 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 ### TC-E2E-007 Nightly cycle: a defect you reported is fixed and you verify it
 
-**Persona:** Several · **Category:** E2E · **Priority:** P2 · **Decisions:** [D-PR-01](DECISION-REGISTER.md#d-pr-01), [D-PR-02](DECISION-REGISTER.md#d-pr-02), [D-PL-09](DECISION-REGISTER.md#d-pl-09)
+**Persona:** Several · **Category:** E2E · **Priority:** P2 · **Decisions:** [D-PR-01](DECISION-REGISTER.md#d-pr-01), [D-PR-02](DECISION-REGISTER.md#d-pr-02), [D-PR-04](DECISION-REGISTER.md#d-pr-04), [D-PL-09](DECISION-REGISTER.md#d-pl-09)
 
 **Before you start:** An issue you reported was triaged with the agent:ready label.
 
 **Steps**
 
-1. Next morning (IST), open your issue on GitHub. Read the agent's comment and the linked pull request.
+1. Next morning (IST), open your issue in the testers' repository (adi-praxis-testing). Read the latest comments and labels (the pull request itself is in the code repository, which testers cannot see).
 2. When the issue says "The fix is in build …", check the banner on the test environment shows that build.
 3. Retest. Comment /verified if it works, or /failed and what you saw.
 

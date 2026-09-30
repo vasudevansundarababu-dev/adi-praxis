@@ -108,14 +108,14 @@ export const CASES = [
     priority: 'P2',
     pre: 'An issue you reported was triaged with the agent:ready label.',
     steps: [
-      'Next morning (IST), open your issue on GitHub. Read the agent\'s comment and the linked pull request.',
+      'Next morning (IST), open your issue in the testers\' repository (adi-praxis-testing). Read the latest comments and labels (the pull request itself is in the code repository, which testers cannot see).',
       'When the issue says "The fix is in build …", check the banner on the test environment shows that build.',
       'Retest. Comment /verified if it works, or /failed and what you saw.',
     ],
     expected: [
       '/verified closes the issue with status:verified; /failed reopens it with status:reopened.',
     ],
-    decisions: ['D-PR-01', 'D-PR-02', 'D-PL-09'],
+    decisions: ['D-PR-01', 'D-PR-02', 'D-PR-04', 'D-PL-09'],
   }),
   // ── Release 1.1: SME supply, certification and payments ──
   c('TC-E2E-008', 'Full supply journey: partner puts a candidate forward → candidate certified → task earns → pay run → partner statement', {

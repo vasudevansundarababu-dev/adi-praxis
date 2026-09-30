@@ -131,6 +131,7 @@ Every product decision made while building ADI Praxis, written as what you shoul
 | [D-UI-07](#d-ui-07) | Support Bot | claude | The bot uses Claude on Vertex (claude-sonnet-5) for fast answers. Questions are not stored; the last 10 turns are sent back with each question. 20 questions a minute per session. Asking writes no audit entry. If the model is unavailable (e.g. quota), it says it is not available. | TC-NFR-054, TC-SEC-025, TC-PEN-020 |
 | [D-PR-01](#d-pr-01) | Process | owner | Defects are raised as GitHub issues. A nightly agent fixes triaged defects by opening pull requests; a human always merges. | TC-E2E-007 |
 | [D-PR-02](#d-pr-02) | Process | claude | Nightly: agent at 01:00 IST, build and deploy to the test environment at 02:00 IST, only if main changed. | TC-E2E-007, TC-NFR-033 |
+| [D-PR-04](#d-pr-04) | Process | owner | From the Release 1.1 test build (30 Sep 2026), testers report in a separate private GitHub repository, adi-praxis-testing, which holds the tester guide, test cases, decision register and issue forms but no application code. Testers get the Triage role there. | TC-E2E-007 |
 | [D-PR-03](#d-pr-03) | Process | claude | Security findings are reported privately and never handled by the agent. | — |
 
 ## D-PL-01
@@ -1362,6 +1363,16 @@ Nightly: agent at 01:00 IST, build and deploy to the test environment at 02:00 I
 **What you should see:** Each morning the banner shows a new build if anything was merged.
 
 **Tested by:** [TC-E2E-007](TEST-CASES.md#tc-e2e-007-), [TC-NFR-033](TEST-CASES.md#tc-nfr-033-)
+
+## D-PR-04
+
+**Process** · decided by owner
+
+From the Release 1.1 test build (30 Sep 2026), testers report in a separate private GitHub repository, adi-praxis-testing, which holds the tester guide, test cases, decision register and issue forms but no application code. Testers get the Triage role there.
+
+**What you should see:** You receive a GitHub invite to adi-praxis-testing. Issues, comments, labels and /verified or /failed happen there; pull requests are not visible to you.
+
+**Tested by:** [TC-E2E-007](TEST-CASES.md#tc-e2e-007-)
 
 ## D-PR-03
 

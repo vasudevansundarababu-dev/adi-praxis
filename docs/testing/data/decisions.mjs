@@ -156,5 +156,6 @@ export const DECISIONS = [
   // ── Process ──
   { id: 'D-PR-01', area: 'Process', by: 'owner', decision: 'Defects are raised as GitHub issues. A nightly agent fixes triaged defects by opening pull requests; a human always merges.', see: 'Your issue gets comments from the agent and later "The fix is in build …, please verify".' },
   { id: 'D-PR-02', area: 'Process', by: 'claude', decision: 'Nightly: agent at 01:00 IST, build and deploy to the test environment at 02:00 IST, only if main changed.', see: 'Each morning the banner shows a new build if anything was merged.' },
+  { id: 'D-PR-04', area: 'Process', by: 'owner', decision: 'From the Release 1.1 test build (30 Sep 2026), testers report in a separate private GitHub repository, adi-praxis-testing, which holds the tester guide, test cases, decision register and issue forms but no application code. Testers get the Triage role there.', see: 'You receive a GitHub invite to adi-praxis-testing. Issues, comments, labels and /verified or /failed happen there; pull requests are not visible to you.' },
   { id: 'D-PR-03', area: 'Process', by: 'claude', decision: 'Security findings are reported privately and never handled by the agent.', see: 'Use a private advisory, not an issue.' },
 ];

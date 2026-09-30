@@ -365,3 +365,13 @@ help pack and the user's own data; required markers on every screen of all three
   course → test → result, and a pay run from build to submission. Steps that are a person's FLOW 2 decision or a
   fixture (selection, a payable SME) are set by `apps/api/scripts/e2e-m10.ts` against the e2e database only. The e2e
   set-up now also runs the worker and points storage at the local GCS emulator.
+
+### Release 1.1 test build deployment (30 Sep 2026)
+
+- **(owner)** Testers report in a separate private repository, `vasudevansundarababu-dev/adi-praxis-testing` (no
+  application code; tester guide, test cases, decision register, issue forms, labels, `/verified` and `/failed`).
+  Created by `infra/test/create-tester-repo.sh`; testers get the Triage role. Tester decision D-PR-04.
+- **(owner)** `m10-sme-supply` is fast-forwarded into `main` (no pull request) on 30 Sep and deployed to
+  `adi-praxis-test-0928` as `test-1.1-20260930`; testing starts Thursday 1 Oct, 09:30 IST.
+- Open: the nightly defect agent still reads issues in the code repository only. Until it is pointed at
+  `adi-praxis-testing`, tester defects are fixed by developers.

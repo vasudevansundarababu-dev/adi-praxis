@@ -1,5 +1,9 @@
 # Release 1.1 test build: merge and tester deployment plan
 
+> **Update 30 Sep 2026:** the merge moved to Wednesday 30 Sep (fast-forward of `main`, owner's choice) and the build
+> label to `test-1.1-20260930`; testers start Thursday 1 Oct, 09:30 IST. Testers report in the private repository
+> `adi-praxis-testing` (`infra/test/create-tester-repo.sh`). The tester email is `docs/releases/TESTER-EMAIL-1.1.md`.
+
 | | |
 | --- | --- |
 | Date | Monday 28 September 2026 |

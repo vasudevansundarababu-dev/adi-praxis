@@ -2,9 +2,9 @@
 
 | | |
 | --- | --- |
-| Build | `test-1.1-20260928` in the yellow banner (later nightly builds show `nightly-YYYYMMDD-…`) |
-| Deployed | Monday 28 Sep 2026 (after the 1 PM CDT / 11:30 PM IST merge of the SME supply work) |
-| Testing starts | Tuesday 29 Sep 2026, 09:30 IST |
+| Build | `test-1.1-20260930` in the yellow banner (later nightly builds show `nightly-YYYYMMDD-…`) |
+| Deployed | Wednesday 30 Sep 2026 (after the merge of the SME supply work into `main`) |
+| Testing starts | Thursday 1 Oct 2026, 09:30 IST |
 | Environment | The same test environment and URLs as release 1.0 ([README](README.md) section 3). 1.1 **replaces** 1.0 there; your 1.0 data is kept |
 
 Read this once, then keep [README.md](README.md) and [TEST-CASES.md](TEST-CASES.md) open while you test.
@@ -118,16 +118,15 @@ Raise an Enhancement if one of these matters to users.
 
 ## 7. How to report
 
-Use GitHub **Issues → New issue** with the forms described in [README](README.md) section 10 and
+Use **Issues → New issue** in the testers' repository [adi-praxis-testing](https://github.com/vasudevansundarababu-dev/adi-praxis-testing) with the forms described in [README](README.md) section 10 and
 [TRIAGE.md](TRIAGE.md): **Defect**, **UX issue** or **Enhancement request**. Security problems go to a **private
 advisory**, never an issue.
 
-- **Build:** copy it exactly from the yellow banner (e.g. `test-1.1-20260928`, or the nightly label after the first
+- **Build:** copy it exactly from the yellow banner (e.g. `test-1.1-20260930`, or the nightly label after the first
   night). Reports without a build cannot be verified.
 - **Test case id:** e.g. TC-PTR-005, or "exploratory". Quote the decision id if the report concerns one (e.g.
   D-M10-07, D-UI-03).
-- **Persona:** start the title with `[Partner]` or `[Finance]`, and choose Partner / Finance in the persona list when
-  available (until the forms are updated, choose "Several / not role-specific").
+- **Persona:** start the title with `[Partner]` or `[Finance]`, and choose Partner / Finance in the persona list.
 - **Environment problems** (Claude unavailable, "SME supply is not switched on", demo data missing): one issue titled
   `[Environment] …`, not one per screen.
 - One problem per issue; numbered steps; expected vs actual; a screenshot; the time in IST; browser and device. Never

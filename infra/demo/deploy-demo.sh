@@ -39,7 +39,9 @@ retry() { for i in $(seq 1 12); do "$@" >/dev/null 2>&1 && return 0; sleep 10; d
 if [ -z "${DEPLOY_ONLY:-}" ]; then
 say "Project $PROJECT_ID (${PRAXIS_NAME:-ADI Praxis})"
 exists gcloud projects describe "$PROJECT_ID" || gcloud projects create "$PROJECT_ID" --name="${PRAXIS_NAME:-ADI Praxis}"
-gcloud billing projects link "$PROJECT_ID" --billing-account="$BILLING" >/dev/null
+# Link billing only when needed: re-linking an already linked project can fail with FAILED_PRECONDITION.
+[ "$(gcloud billing projects describe "$PROJECT_ID" --format='value(billingAccountName)')" = "billingAccounts/$BILLING" ] ||
+  gcloud billing projects link "$PROJECT_ID" --billing-account="$BILLING" >/dev/null
 gcloud config set project "$PROJECT_ID" >/dev/null
 PNUM=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 

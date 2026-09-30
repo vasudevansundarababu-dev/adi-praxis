@@ -8,3 +8,8 @@
 **/.terraform
 .env
 .vscode
+google-cloud-sdk
+*.tar.gz
+tester-email
+**/coverage
+**/playwright-report

@@ -23,6 +23,7 @@ if [ "$TARGET" != local ]; then
   done
 fi
 
-rm -rf out/demo-videos/raw out/demo-videos/state.json
+if [ "$TARGET" != local ]; then export VIDEO_OUT=${VIDEO_OUT:-out/demo-videos-$TARGET}; fi
+rm -rf "${VIDEO_OUT:-out/demo-videos}/raw" "${VIDEO_OUT:-out/demo-videos}/state.json"
 VIDEO_FRESH=1 npx playwright test -c e2e/demo-videos "${@:2}"
 node e2e/demo-videos/make-videos.mjs

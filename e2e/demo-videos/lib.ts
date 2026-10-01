@@ -23,7 +23,7 @@ export const USERS = {
   partner: { email: 'partner@praxis.demo', password: pw('PARTNER', 'video-partner-password'), name: 'Meera Nair (Partner)' },
 };
 
-export const OUT = path.resolve(__dirname, '../../out/demo-videos');
+export const OUT = path.resolve(__dirname, '../..', process.env.VIDEO_OUT ?? 'out/demo-videos');
 const RAW = path.join(OUT, 'raw');
 
 export const SIZE = { width: 1440, height: 900 };
@@ -199,8 +199,8 @@ export async function candidateSignIn(c: Clip, email: string, name: string, retu
 }
 
 /** A JSON API session for set-up steps that are not part of what the video shows. */
-export async function api(ctx: BrowserContext) {
-  const base = `${ENV.api}/api/v1/`;
+export async function api(ctx: BrowserContext, origin = ENV.api) {
+  const base = `${origin}/api/v1/`; // pass the app origin to use a browser session (the apps proxy /api/v1)
   const call = async (method: string, url: string, data?: unknown, headers: Record<string, string> = {}) => {
     const r = await ctx.request.fetch(base + url, { method, data, headers: { 'idempotency-key': crypto.randomUUID(), ...headers } });
     const body = await r.text();

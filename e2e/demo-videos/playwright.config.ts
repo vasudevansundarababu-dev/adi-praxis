@@ -8,11 +8,11 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: '.',
   testMatch: 'story.spec.ts',
-  timeout: 30 * 60_000,
+  timeout: 60 * 60_000,
   workers: 1,
   retries: 0,
   reporter: [['list']],
-  outputDir: '../../out/demo-videos/test-results',
+  outputDir: `../../${process.env.VIDEO_OUT ?? 'out/demo-videos'}/test-results`,
   use: {
     channel: process.env.PW_CHANNEL || undefined, // bundled Chromium: installed Chrome records a shorter frame than the viewport
     headless: true,

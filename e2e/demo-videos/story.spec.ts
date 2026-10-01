@@ -75,7 +75,7 @@ test('02 admin: guidelines to a published course and test', async ({ browser }) 
     const runs = (v.runs ?? v.generationRuns ?? []) as { status: string }[];
     if (runs.some((r) => r.status === 'FAILED')) throw new Error('generation failed');
     return runs.length && runs.every((r) => r.status === 'SUCCEEDED') ? v : null;
-  }, 20 * 60_000, 10_000);
+  }, 45 * 60_000, 15_000);
   await p.reload();
   await c.say('Generation finished', 'Each run shows its model and cost');
   await c.say('The knowledge map: rules, steps, thresholds and edge cases, each citing its section');
@@ -528,7 +528,7 @@ test('11 SME: accept the assignment and write a KYC task with the AI interview',
   }
   await c.say('Draft my task: the assistant writes a first draft of every section', 'About a minute; you can leave and come back');
   await c.click(p.getByRole('button', { name: 'Draft my task' }));
-  await expect(p.getByText('Writing your draft…')).toHaveCount(0, { timeout: 10 * 60_000 });
+  await expect(p.getByText('Writing your draft…')).toHaveCount(0, { timeout: 20 * 60_000 });
   await p.waitForLoadState('networkidle');
   const nav = p.getByRole('navigation', { name: 'Workbench sections' });
   for (const [id, say] of [
@@ -636,7 +636,7 @@ test('14 SME: course, certification test and payment set-up', async ({ browser }
   await c.click(act(p, /Start the course|Continue the course/));
   await p.waitForURL(/\/certifications\/[0-9a-f-]{36}$/);
   const certId = p.url().split('/').pop()!;
-  const me = await api(c.ctx);
+  const me = await api(c.ctx, ENV.candidate);
   for (let m = 0; m < 20; m++) {
     const course = await me.get(`me/certifications/${certId}/course`);
     const mod = (course.modules as { id: string; completed: boolean; locked: boolean; quiz?: { options: string[] }[] }[]).find((x) => !x.completed && !x.locked);
@@ -724,6 +724,9 @@ test('15 finance: rate cards, earnings, pay run, reconciliation and statements',
   await c.pause(2500);
   if (!/\/pay-runs\/[0-9a-f-]{36}/.test(p.url())) await c.click(p.getByRole('row').nth(1).getByRole('link').first());
   remember('payRunUrl', p.url());
+  // On a shared environment, only move a run forward when it pays nobody, so testers' pay runs are left alone.
+  const payments = Number((await p.getByRole('heading', { name: /^Payments \(\d+\)/ }).innerText().catch(() => '(0)')).match(/\((\d+)\)/)?.[1] ?? 0);
+  remember('payRunMayAdvance', String(ENV.local || payments === 0));
   await c.say('Payments, held amounts and balances carried to next week', 'Waiting for a PM to confirm');
   await c.end();
 
@@ -732,7 +735,7 @@ test('15 finance: rate cards, earnings, pay run, reconciliation and statements',
   await staffLogin(pmClip, 'pm');
   await pmClip.page.goto(state.payRunUrl);
   const confirm = act(pmClip.page, 'Confirm pay run');
-  if (await confirm.isVisible().catch(() => false)) {
+  if (state.payRunMayAdvance === 'true' && (await confirm.isVisible().catch(() => false))) {
     await pmClip.click(confirm);
     await pmClip.say('Confirmed: Finance can now approve it');
   }
@@ -743,24 +746,35 @@ test('15 finance: rate cards, earnings, pay run, reconciliation and statements',
   await f.title('Finance: approve, submit and reconcile', 'Finance never approves a run that pays them', 3);
   await staffLogin(f, 'finance');
   await q.goto(state.payRunUrl);
+  const advance = state.payRunMayAdvance === 'true';
+  if (!advance) await f.say('Next: Finance approves, then submits to the payout provider', 'This shared run is left for the testers');
   const approve = act(q, 'Approve pay run');
-  if (await approve.isVisible().catch(() => false)) {
+  if (advance && (await approve.isVisible().catch(() => false))) {
     await f.click(approve);
     await f.say('Approved');
   }
   const submit = act(q, 'Submit to payout provider');
-  if (await submit.isVisible().catch(() => false)) {
+  if (advance && (await submit.isVisible().catch(() => false))) {
     await f.click(submit);
     await f.say('Submitted to the payout provider', 'Payees are checked again; a retry never pays anyone twice');
   }
   await menu(f, 'Payments');
   await f.click(q.getByRole('link', { name: 'Payout exceptions', exact: true }));
   await f.say('Reconciliation compares the provider’s daily report with our payments', 'Every mismatch becomes an exception to resolve with a note');
-  await f.click(act(q, 'Run reconciliation'));
+  if (ENV.local) await f.click(act(q, 'Run reconciliation'));
   await f.pause(2500);
   await f.click(q.getByRole('link', { name: 'Partner statements', exact: true }));
   await f.say('Partner statements: one fee line for each certified candidate, built monthly');
-  await f.click(act(q, 'Build statements'));
+  if (ENV.local) await f.click(act(q, 'Build statements'));
   await f.pause(2500);
   await f.end();
+});
+
+test('16 clean-up: revoke the RL Gym key the videos created', async ({ browser }) => {
+  const admin = await staffApi(browser, 'admin');
+  const keys = await admin.get('api-clients');
+  for (const k of (keys.items ?? keys) as { id: string; name: string; revokedAt?: string | null }[]) {
+    if (k.name.startsWith(DEMO) && !k.revokedAt) await admin.post(`api-clients/${k.id}/revoke`).catch(() => {});
+  }
+  await admin.ctx.close();
 });

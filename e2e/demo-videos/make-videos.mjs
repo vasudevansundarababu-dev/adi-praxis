@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-const OUT = path.resolve(import.meta.dirname, '../../out/demo-videos');
+const OUT = path.resolve(import.meta.dirname, '../..', process.env.VIDEO_OUT ?? 'out/demo-videos');
 const RAW = path.join(OUT, 'raw');
 const TMP = path.join(OUT, 'mp4');
 

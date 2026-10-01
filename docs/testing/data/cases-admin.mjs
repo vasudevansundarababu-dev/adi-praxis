@@ -2,28 +2,28 @@
 const c = (id, title, o) => ({ id, title, persona: 'Admin', ...o });
 
 export const CASES = [
-  c('TC-ADM-001', 'Create users for each tester and role', {
-    category: 'FUNC', priority: 'P1', pre: 'Signed in as Admin.',
-    steps: ['Users → create pm.<initials>@praxis.test with role PM, reviewer.<initials>@praxis.test with REVIEWER.', 'Try a password of 11 characters, then one of 12+.', 'Sign in as the new user in another browser profile.'],
-    expected: ['Passwords under 12 characters are refused.', 'The new user signs in and sees only their role\'s areas.'],
-    decisions: ['D-PL-01', 'D-PL-05'],
+  c('TC-ADM-001', 'Create console users for each tester and role (API only: there is no Add user screen)', {
+    category: 'FUNC', priority: 'P1', pre: 'Signed in as Admin in the browser. A REST tool (Postman or curl) with the Admin session cookie (README section 9). Release 1.1 has no screen to add users: Admin → Users is read-only.',
+    steps: ['Open Admin → Users. Look for an Add, Edit or Disable control.', 'POST /api/v1/users with an Idempotency-Key and {"email":"pm.<initials>@praxis.test","name":"<initials> PM","roles":["PM"],"password":"<11 characters>"}.', 'Repeat with a password of 12 or more characters. Then create validator.<initials>@praxis.test with roles ["REVIEWER"] and finance.<initials>@praxis.test with roles ["FINANCE"].', 'POST the same email again (new Idempotency-Key); then a body with "roles": [] and a body with "roles": ["SUPERUSER"].', 'Reload Admin → Users.', 'Sign in as each new user in its own browser profile.'],
+    expected: ['Admin → Users is a read-only table (Name, Email, Roles, Status) with no Add, Edit or Disable control (known gap, ROLES-AND-ADMIN section 6).', 'A password under 12 characters is refused (400) and nothing is created; a valid body returns 201 with the user (never the password).', 'A duplicate email is refused: "A user with this email already exists" (409). Empty or unknown roles are refused (400).', 'The new users are listed with roles shown as PM, Validator and Finance and status Active.', 'Each new user signs in and sees only their role\'s menu groups (TC-PM-013, TC-REV-030, TC-FIN-001).', 'Share passwords only through the team password manager; never in GitHub, chat or the test sheet.'],
+    decisions: ['D-PL-01', 'D-PL-05', 'D-PL-06'],
   }),
-  c('TC-ADM-002', 'Change roles and deactivate a user', {
-    category: 'FUNC', priority: 'P1', pre: 'A test user signed in elsewhere.',
-    steps: ['Give the user a second role; ask them to reload.', 'Deactivate the user; ask them to click anything.'],
-    expected: ['New role areas appear after reload.', 'A deactivated user is signed out on the next request and cannot sign in again.'],
-    decisions: ['D-PL-05', 'D-PL-06'],
+  c('TC-ADM-002', 'Change a user\'s roles and disable a user (API); a disabled user is signed out everywhere', {
+    category: 'FUNC', priority: 'P1', pre: 'A user from TC-ADM-001 signed in to the console in two browsers (e.g. Chrome and Edge). Admin REST tool with session cookie. The user\'s id from GET /api/v1/users.',
+    steps: ['PATCH /api/v1/users/<id>/roles with {"roles":["PM","REVIEWER"]}. Ask the user to reload.', 'PATCH the roles back to {"roles":["PM"]}; ask them to reload again. Try {"roles":[]}.', 'PATCH /api/v1/users/<id>/status with {"status":"DISABLED"}. Ask the user to click anything in both browsers, then to sign in again.', 'With the user\'s old session cookie call GET /api/v1/auth/me.', 'PATCH the status back to {"status":"ACTIVE"}; the user signs in again.'],
+    expected: ['After adding REVIEWER the Reviews and Certification groups appear on reload; the header shows "PM, Validator". After removing it they disappear and Reviews URLs show the No access card.', 'An empty roles list is refused (400); the user keeps their roles.', 'Disabling signs the user out in every browser at the next request (back to the console sign-in page) and signing in again (correct password) is refused with "This account is disabled".', 'The old cookie gets 401.', 'After re-enabling the user can sign in again with the same password. Admin → Users shows Active / Disabled correctly at each step.', 'Each change is in the audit log (user.roles_changed, user.status_changed): the lead checks on request, there is no audit screen.'],
+    decisions: ['D-PL-05', 'D-PL-06', 'D-PL-02'],
   }),
-  c('TC-ADM-003', 'Admin cannot lock themselves out', {
-    category: 'FUNC', priority: 'P2', pre: 'Signed in as the only active Admin (use a test client, ask the lead).',
-    steps: ['Try to remove your own Admin role or deactivate yourself.'],
-    expected: ['Refused with an explanation (the platform keeps at least one active Admin).'],
+  c('TC-ADM-003', 'An Admin cannot remove their own Admin role or disable themselves', {
+    category: 'SEC', priority: 'P1', pre: 'Two Admin accounts (your own named Admin, created by the lead with roles ["ADMIN"], and a second Admin). Admin REST tool with your own session cookie; your user id from GET /api/v1/users.',
+    steps: ['PATCH /api/v1/users/<your id>/roles with {"roles":["PM"]}.', 'PATCH /api/v1/users/<your id>/status with {"status":"DISABLED"}.', 'PATCH your own roles to {"roles":["ADMIN","FINANCE"]} (keeping Admin).', 'As the second Admin, remove the Finance role from your account again.'],
+    expected: ['Removing your own Admin role is refused (409): "You cannot remove your own Admin role. Ask another Admin."', 'Disabling yourself is refused (409): "You cannot disable your own account".', 'Adding a role while keeping Admin works.', 'Another Admin can change your roles. Nothing changes after a refused request (check Admin → Users).'],
     decisions: ['D-PL-05'],
   }),
-  c('TC-ADM-004', 'Templates: create, publish, new version', {
+  c('TC-ADM-004', 'Templates: create, save, publish and start a new version', {
     category: 'FUNC', priority: 'P2', pre: 'Signed in as Admin.',
-    steps: ['Templates → New. Save with only a name, then try Publish.', 'Complete primary work, verification, human gate, TPT, skills, task mode; Publish.', 'Create a new version, change the TPT, publish it.', 'As PM, open New project.'],
-    expected: ['Publish lists what is missing.', 'New project offers only the newest published version.'],
+    steps: ['Projects → Templates → New template. Choose Domain, type Workflow name "<initials> KYC template", Create draft.', 'In the draft editor press Save draft, then Publish, with only the name filled.', 'Fill Primary work, Verification / reward, Human gate, Default TPT (try 0 and 500, then 90), Skills, Task modes, Distinct-task target, Max tasks per expert, coverage cells and edge cases. Save draft, then Publish.', 'On the published version press New version; change the Default TPT; Save draft; Publish. Read the Versions sidebar.', 'As PM, open Projects → New project, step 1.'],
+    expected: ['Missing fields are listed ("Fix these before saving:" or a publish refusal listing what is missing); TPT outside 1–480 is refused.', 'After Publish the version is read-only ("Published versions can\'t be edited").', 'New version opens an editable draft copy; the Versions sidebar lists every version with its status.', 'New project offers only the newest published version.'],
     decisions: ['D-M1-01', 'D-M1-02'],
   }),
   c('TC-ADM-005', 'Taxonomy lists', {
@@ -34,26 +34,26 @@ export const CASES = [
   }),
   c('TC-ADM-006', 'Contributor terms: new version requires acceptance again', {
     category: 'FUNC', priority: 'P2', pre: 'An onboarded expert (not yet assigned).',
-    steps: ['Terms → edit the contributor terms, save as a new version.', 'Ask a PM to assign the expert; the expert tries to Accept.'],
+    steps: ['Admin → Terms → the contributor terms → Publish new version: Title, Approved text → Publish version N.', 'Ask a PM to assign the expert; the expert tries to Accept.'],
     expected: ['Accept explains the new terms must be accepted first and links to onboarding.'],
     decisions: ['D-M4C-03', 'D-M4C-07'],
   }),
   c('TC-ADM-007', 'API clients: issue an RL Gym key', {
     category: 'SEC', priority: 'P1', pre: 'Signed in as Admin.',
-    steps: ['API clients → create "RL Gym (test <initials>)", kind RL_GYM.', 'Copy the key. Reload the page.', 'Revoke a key and try to use it.'],
-    expected: ['The key is shown once and cannot be viewed again after reload.', 'A revoked key gets 401.'],
+    steps: ['Admin → API clients → press Create key with Name empty.', 'Name "RL Gym (test <initials>)", Kind "RL Gym" → Create key. Copy the key into the password manager. Reload the page.', 'Create a second key, Kind "Client system (task inputs)".', 'Call GET /api/v1/integrations/rl-gym/results with each key (Authorization: Bearer <key>).', 'Revoke the RL Gym key (Revoke on its row) and call the same endpoint again.'],
+    expected: ['Name and Kind carry asterisks; an empty name is refused.', '"Copy this key now. It will not be shown again." with the key; after reload only the name, kind ("RL Gym" or "Client system") and created date are listed.', 'The RL Gym key gets 200; the client-system key gets 403 (wrong kind).', 'After Revoke the row shows "revoked <date>" and no Revoke button; the revoked key gets 401 at once.'],
     decisions: ['D-M5-10'],
   }),
   c('TC-ADM-008', 'Failure reason codes for RL review', {
     category: 'FUNC', priority: 'P3', pre: 'Signed in as Admin.',
-    steps: ['Failure codes → add "MISSED_BENEFICIAL_OWNER" with a label; try lowercase "bad code".', 'Retire a code.'],
-    expected: ['Only UPPER_SNAKE codes are accepted; retired codes are not offered to reviewers.'],
+    steps: ['Admin → Failure codes → Add code with Code and Label empty.', 'Code "MISSED_BENEFICIAL_OWNER", Label "Missed a beneficial owner" → Add code.', 'Type "bad code" in Code (it is upper-cased as you type) → Add code.', 'Press Deactivate on a code that a past RL verdict used; then Reactivate it; then Deactivate it again.', 'As a Validator open an RL review and the reason-code picker; open a past verdict that used the code.'],
+    expected: ['Both fields carry asterisks; empty fields are refused.', 'The new code is listed with its label.', '"BAD CODE" (with a space) is refused: codes are UPPER_SNAKE_CASE letters, digits and underscores.', 'A deactivated code is shown struck through with a Reactivate button; it is not offered for new RL reviews.', 'Past verdicts keep the code. Validators, PMs and Finance cannot open Admin → Failure codes (No access card).'],
     decisions: ['D-M7-02'],
   }),
   c('TC-ADM-009', 'Dataset: list, lineage, export, verification', {
     category: 'FUNC', priority: 'P2', pre: 'Accepted tasks exist. Signed in as Admin in the browser.',
     steps: ['Open /api/v1/dataset/records?limit=2 then /api/v1/dataset/records?after=<next>.', 'Open /api/v1/dataset/records/<id>/lineage.', 'Open /api/v1/dataset/export.', 'Open /api/v1/dataset/verification.'],
-    expected: ['Records come in chain order with paging.', 'Lineage names author, reviewer, project, template version and (for drafted tasks) provenance.', 'Export is newline-delimited JSON.', 'Verification: ok true, breaks [].'],
+    expected: ['Records come in chain order with paging.', 'Lineage names the author, the accepting Validator, the project, template version and (for drafted tasks) provenance.', 'Export is newline-delimited JSON.', 'Verification: ok true, breaks [].'],
     decisions: ['D-M5-09', 'D-M6-02', 'D-M6-03', 'D-M9-14'],
   }),
   c('TC-ADM-010', 'Dataset correction appends a new record', {
@@ -68,10 +68,10 @@ export const CASES = [
     expected: ['tools/list shows the task\'s tools with inputSchema.', 'Each recorded call returns its recorded result; changed arguments return isError "No recorded response for these arguments."'],
     decisions: ['D-M9-11', 'D-M9-13'],
   }),
-  c('TC-ADM-012', 'Admin sees everything a Reviewer sees', {
+  c('TC-ADM-012', 'Admin sees everything a Validator sees', {
     category: 'FUNC', priority: 'P3', pre: 'Signed in as Admin.',
-    steps: ['Open Applications, Task reviews, RL reviews for a project you are not assigned to.'],
-    expected: ['Admins see all projects\' queues (Reviewers only their assigned projects).'],
+    steps: ['Open Reviews → Applications, Reviews → Task reviews, Reviews → RL reviews, Identity reviews and Conflicts for a project you are not assigned to.', 'Open Certification → Certification reviews.'],
+    expected: ['Admins see every project\'s queues (Validators only their assigned projects) and can decide in them.'],
     decisions: ['D-M4C-04'],
   }),
   // ── Release 1.1: partners, guidelines and certification, menu and help ──
@@ -131,8 +131,93 @@ export const CASES = [
   }),
   c('TC-ADM-022', 'Validator label everywhere', {
     category: 'UX', priority: 'P2', pre: 'Signed in as Admin.',
-    steps: ['Users: open the role picker for a user.', 'Open a project → Validators panel.', 'Open an application and a task review; read the messages.', 'In the candidate app (any SME) read the application status and onboarding texts.'],
-    expected: ['The internal role is called "Validator" everywhere on screen. "Reviewer" appears only as the SME tier (Expert, Reviewer, Annotator).', 'Report each left-over "Reviewer" meaning the internal role as one UX issue with a list of screens (S4).'],
+    steps: ['Admin → Users: read the Roles column (the page is read-only; there is no role picker).', 'Open a project → Validators panel (its picker and empty-state message).', 'Open an application and a task review; read the messages.', 'In the candidate app (any SME) read the application status and onboarding texts.'],
+    expected: ['The internal role is called "Validator" everywhere on screen. "Reviewer" appears only as the SME tier (Expert, Reviewer, Annotator).', 'Report each left-over "Reviewer" meaning the internal role as one UX issue with a list of screens (S4). (Code currently shows "Add reviewer" and "No reviewer assigned yet; only Admins can decide applications." in the project\'s Validators panel, and "Reviewer: <comment>" on pinned rework comments in the workbench: log them if seen.)'],
     decisions: ['D-M10-03'],
+  }),
+  // ── Added in the 1.1 coverage audit (1 Oct 2026): API-only Admin functions, permissions and remaining Admin screens ──
+  c('TC-ADM-023', 'Only a PM can create a project; an Admin manages every project', {
+    category: 'SEC', priority: 'P1', pre: 'Signed in as Admin (an account without the PM role). A project owned by another PM. Admin REST tool with session cookie.',
+    steps: ['Projects → Projects: read the page and look for New project.', 'Type /projects/new in the address bar.', 'POST /api/v1/projects with a valid body (copy one from /docs) and an Idempotency-Key.', 'Open another PM\'s project: Validators, Opportunity page, Resource assignment, Progress dashboard, Tasks and invites.'],
+    expected: ['The page says "All projects." and there is no New project button (Home has no "New project →" either).', '/projects/new shows the No access card "This page is for PMs" with Go to your home page.', 'The API refuses with 403; no project is created.', 'The Admin can open and act on every project (assign Validators, publish the opportunity, assign experts, pause, resume or cancel).'],
+    decisions: ['D-PL-05'],
+  }),
+  c('TC-ADM-024', 'Admin on pay runs: build, confirm and cancel, never approve or submit', {
+    category: 'SEC', priority: 'P1', pre: 'Signed in as Admin (without the Finance role). Agree an earlier Monday with the lead (one run per week for everyone). Admin REST tool with session cookie.',
+    steps: ['Payments → Pay runs → Build pay run for the agreed Monday. Open it.', 'Confirm pay run.', 'Look for Approve pay run and Submit to payout provider.', 'POST /api/v1/pay-runs/<id>/approve and /submit with Idempotency-Keys.', 'Cancel run… with a reason of 5+ characters.'],
+    expected: ['Payments tabs: Pay runs, Rate cards, Earnings and holds, Payout exceptions, Partner statements.', 'Confirm works: "Confirmed. Finance can now approve it." and the page then says "Waiting for Finance to approve."', 'The Admin never sees Approve or Submit; the API refuses both with 403 and the run is unchanged.', 'Cancel works before submission; the run stays listed as cancelled.'],
+    decisions: ['D-M10-33', 'D-PL-05'],
+  }),
+  c('TC-ADM-025', 'Diversity taxonomy: add an attribute', {
+    category: 'FUNC', priority: 'P2', pre: 'Signed in as Admin.',
+    steps: ['Admin → Taxonomy → press Add attribute with the form empty.', 'Label "<initials> Banking segment", Key "Banking Segment", Type multiple choice, the example allowed values. Add attribute.', 'Change Key to "<initials>_banking_segment"; break the Allowed values JSON (remove a bracket). Add attribute.', 'Fix the JSON. Add attribute.', 'As PM: Projects → New project → step 4 Demographics → + Add filter.'],
+    expected: ['Label, Key, Type and Allowed values carry asterisks; missing ones are named.', 'A key that is not lower_snake_case is refused ("Use lower_snake_case").', 'Invalid JSON: "Allowed values are not valid JSON".', 'The attribute is listed with its type and values.', 'The PM can choose it as a filter.'],
+    decisions: ['D-M2-01', 'D-UI-01'],
+  }),
+  c('TC-ADM-026', 'Contributor terms: publish a new version', {
+    category: 'FUNC', priority: 'P2', pre: 'Signed in as Admin. Agree with the lead which terms document you may change (other testers\' experts must accept every new version).',
+    steps: ['Admin → Terms. Read each document\'s title, version and any "Placeholder" pill.', 'Publish new version with Title empty and Approved text "too short".', 'Title "<initials> test terms", Approved text of 20+ characters → Publish version N.', 'Ask an onboarded SME tester to open Onboarding.'],
+    expected: ['Every terms document shows its current version; placeholder text is marked "Placeholder".', 'Empty title or text under 20 characters is refused.', 'The new version number is one higher; earlier versions are kept (append-only).', 'The SME must accept the new version before their next assignment (TC-ADM-006).'],
+    decisions: ['D-M4C-03', 'D-UI-01'],
+  }),
+  c('TC-ADM-027', 'Templates: retire a workflow; existing projects keep their version', {
+    category: 'FUNC', priority: 'P2', pre: 'Your published template from TC-ADM-004 and a PM project created from it. Never retire "KYC onboarding and refresh".',
+    steps: ['Projects → Templates → your template → Retire. Read the confirmation; Cancel. Retire → Confirm retire.', 'Read the Versions sidebar and the Templates list.', 'As PM: Projects → New project, step 1. Open the existing project created from it.'],
+    expected: ['Retire asks for confirmation before anything changes.', 'The template shows as retired in the list and the Versions sidebar.', 'New projects can no longer choose it; the existing project still shows and uses its frozen version.'],
+    decisions: ['D-M1-01'],
+  }),
+  c('TC-ADM-028', 'Templates: add a domain', {
+    category: 'FUNC', priority: 'P3', pre: 'Signed in as Admin.',
+    steps: ['Projects → Templates. At the bottom press Add domain with the field empty.', 'Add domain "<initials> Insurance".', 'New template → Domain picker.', 'As PM open Projects → Templates.'],
+    expected: ['Add a domain is required (asterisk) and refused when empty.', 'The domain appears on Templates and in the New template Domain picker.', 'The PM sees no Add domain form (read only).'],
+    decisions: ['D-M1-02', 'D-UI-01'],
+  }),
+  c('TC-ADM-029', 'Client-system key: push annotation task inputs', {
+    category: 'FUNC', priority: 'P3', pre: 'A "Client system (task inputs)" key (TC-ADM-007). A PM project in Annotation task mode (TC-PM-024). A REST tool.',
+    steps: ['POST /api/v1/projects/<id>/task-inputs with Authorization: Bearer <client key>, an Idempotency-Key and a small JSON array of inputs.', 'Send a batch where one row is invalid.', 'Send with an RL Gym key, then with no key.', 'As PM open Tasks and invites.'],
+    expected: ['Valid inputs are added as queued tasks.', 'If any row fails validation nothing is added (all or nothing).', 'Wrong kind of key: 403; no key: 401.', 'The PM sees the new tasks.'],
+    decisions: ['D-M5-10', 'D-PL-06'],
+  }),
+  c('TC-ADM-030', 'Partner portal users cannot be disabled; suspending the partner is the only stop', {
+    category: 'SEC', priority: 'P2', pre: 'Your test partner from TC-ADM-013 with a portal user signed in to the portal in another browser profile. Do not suspend "Demo Staffing Partner".',
+    steps: ['Partners → your partner → Portal users: look for Disable, Remove or Reset password on the user.', 'Suspend partner → confirm. Ask the portal user to click any page, then to sign in again.', 'Reactivate partner. The portal user signs in again.'],
+    expected: ['Portal users can only be added; there is no disable or remove control (known gap: ROLES-AND-ADMIN section 6). Raise an Enhancement if your team needs it.', 'After suspension the portal session ends at the next click (back to /partner/login) and sign-in is refused with "Email or password is incorrect." (no hint that the partner is suspended).', 'After reactivation the user can sign in again; the partner\'s candidates and history are unchanged.'],
+    decisions: ['D-M10-02', 'D-M10-04'],
+  }),
+  c('TC-ADM-031', 'Partner page: settings, read-only API clients and webhooks', {
+    category: 'FUNC', priority: 'P3', pre: 'Your test partner from TC-ADM-013, whose portal user created an API client and a webhook (TC-PTR-009, TC-PTR-010, as that partner).',
+    steps: ['Partners → your partner → Settings: set Domains to "banking" and tick only Annotator; Save settings.', 'Read the API clients and webhooks sections.', 'Ask a PM to allow your partner on a requisition with tier Reviewer (or a domain other than banking) and open it; as the partner, try to submit a candidate to it.'],
+    expected: ['Settings are saved and shown on the Partners list (Domains and tiers column).', 'API clients and webhooks are listed read-only (no create, rotate or revoke here) and "Secrets are never shown here."', 'The partner cannot submit candidates to a requisition outside its domains or tiers.'],
+    decisions: ['D-M10-02', 'D-M10-04'],
+  }),
+  c('TC-ADM-032', 'Knowledge map: approve, reject, edit and mark critical', {
+    category: 'FUNC', priority: 'P2', pre: 'A SUCCEEDED generation run (TC-ADM-016) on a version with no published tier.',
+    steps: ['Open the version → Knowledge map. Filter by Kind (e.g. thresholds) and Status "To review".', 'Approve one item; Reject another.', 'Edit text on a third item, change a word, Save.', 'Mark critical on a rule.', 'As a Validator open the same version.'],
+    expected: ['Each item cites its guideline section; the filters narrow the list.', 'Status changes to Approved / Rejected and the item moves between the Status filters.', 'The edited text is saved and still cites the section.', 'The rule shows "Critical rule"; a candidate who misses it fails the test when the blueprint has "Fail on any critical-rule miss".', 'The Validator can read the knowledge map but sees no Approve, Reject, Edit text or Mark critical.'],
+    decisions: ['D-M10-14', 'D-M10-17'],
+  }),
+  c('TC-ADM-033', 'Regenerate part of a guidelines version', {
+    category: 'FUNC', priority: 'P2', pre: 'A guidelines version whose first run SUCCEEDED, with one tier published (TC-ADM-019) and one not. Known risk: Claude quota (report once as an environment issue).',
+    steps: ['On the version press Regenerate: scope Item families, For tier "Every unpublished tier". Start it.', 'While it runs, try to start a second Regenerate.', 'When it finishes, read Generation runs and the published tier.'],
+    expected: ['A new run appears (Queued → Running → Succeeded) with model and cost; "Running now: refresh to see progress" while active.', 'A second run cannot start while one is active.', 'Only the unpublished tier changed; the published tier is untouched and still frozen; regenerated families need approval again.'],
+    decisions: ['D-M10-14', 'D-M10-17'],
+  }),
+  c('TC-ADM-034', 'Approved Task Dataset API: who may read, export and verify the hash chain', {
+    category: 'SEC', priority: 'P1', pre: 'At least two accepted tasks. Session cookies for Admin, PM, Validator, Finance, a candidate and a partner; an RL Gym key (README section 9). There is no dataset screen in 1.1.',
+    steps: ['Admin: GET /api/v1/dataset/records?limit=1, /dataset/records/<id>, /dataset/records/<id>/lineage, /dataset/export, /dataset/verification.', 'RL Gym key: the same five GETs.', 'PM, Validator, Finance: GET /api/v1/dataset/records and /dataset/verification. Candidate and partner cookies: the same.', 'Admin: POST a correction (TC-ADM-010), then GET /dataset/verification again.', 'Admin: PUT, PATCH and DELETE /api/v1/dataset/records/<id>.'],
+    expected: ['Admin: all succeed; verification returns ok true with no breaks.', 'RL Gym key: records, record, lineage and export succeed; verification is Admin-only (403).', 'PM, Validator, Finance: 403. Candidate and partner: 401 or 403. No dataset content is returned to them.', 'After the correction the chain still verifies (ok true): the correction is a new record that supersedes the old one; the old record is unchanged.', 'Changing or deleting a record is impossible (404 or 405). Any successful change is S1.'],
+    decisions: ['D-M5-09', 'D-M6-01', 'D-M6-02', 'D-M6-03'],
+  }),
+  c('TC-ADM-035', 'SME standing and tier change through the API', {
+    category: 'FUNC', priority: 'P3', pre: 'A certified SME who was put forward by Demo Staffing Partner (TC-E2E-008) and their SME id (shown on a pay-run line or in Earnings and holds). Admin REST tool. Coordinate with the lead: suspending stops their work and pay.',
+    steps: ['POST /api/v1/sme/<id>/standing with {"domain":"banking","tier":"ANNOTATOR","standing":"RETRAINING","reason":"Coverage audit test"} and an Idempotency-Key.', 'Repeat with "SUSPENDED", then "ACTIVE".', 'Repeat as PM, Validator and Finance.', 'Partner: Candidates → the candidate (Standing).', 'Finance: build a pay run for a week in which the SME was suspended (agree the week with the lead).'],
+    expected: ['Each change is recorded (201) with the reason; earlier standings stay in the history (append-only).', 'Non-Admins are refused (403).', 'The partner\'s Standing column follows the change and the partner is told on suspension (and on offboarding or a tier change).', 'While suspended the SME\'s pay is held, not paid. There is no screen for standing in 1.1 (known gap).'],
+    decisions: ['D-M10-12', 'D-M10-32'],
+  }),
+  c('TC-ADM-036', 'Admin home page', {
+    category: 'UX', priority: 'P3', pre: 'Signed in as Admin.',
+    steps: ['Read Home: the greeting, your roles and the tiles.', 'Press Open → on each tile.'],
+    expected: ['"Welcome, <name>" and the role "Admin". Tiles: Applications to decide, Tasks to review, RL reviews, Projects staffing, Projects in progress, Certification reviews, Pay runs waiting for you, Open payout exceptions, Templates and users.', 'Each tile opens the right page; counts match the lists.'],
+    decisions: ['D-PL-05'],
   }),
 ];

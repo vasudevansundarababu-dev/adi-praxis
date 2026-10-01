@@ -6,7 +6,7 @@ export const CASES = [
   // ── Applications (selection) ──
   c('TC-REV-001', 'Application queue shows only assigned projects', {
     category: 'FUNC', priority: 'P1', pre: 'Two projects with applications; you are assigned to one.',
-    steps: ['Applications.', 'Open an application from the other project by URL (ask a colleague for its id).'],
+    steps: ['Reviews → Applications.', 'Open an application from the other project by URL (ask a colleague for its id).'],
     expected: ['Only your project\'s applications are listed, oldest first.', 'The other one is "not found".'],
     decisions: ['D-M4C-04'],
   }),
@@ -37,7 +37,7 @@ export const CASES = [
   c('TC-REV-006', 'Declare a conflict with a candidate', {
     category: 'FUNC', priority: 'P2', pre: 'An application.',
     steps: ['Declare a conflict with details.'],
-    expected: ['You return to the queue and can no longer open that application; another reviewer can.'],
+    expected: ['You return to the queue and can no longer open that application; another Validator can.'],
     decisions: ['D-M4C-08'],
   }),
   c('TC-REV-007', 'Resolve a candidate-declared conflict', {
@@ -48,15 +48,15 @@ export const CASES = [
   }),
   c('TC-REV-008', 'Identity reviews (alternative checks)', {
     category: 'FUNC', priority: 'P3', pre: 'A candidate who asked for an alternative identity check (after a failed check).',
-    steps: ['Reviews → Identity reviews → open → decide.'],
-    expected: ['The screen shows the request without any ID number or image; the decision updates the candidate\'s identity status.'],
+    steps: ['Reviews → Identity reviews → open the request → Record decision: Alternative method used, Notes (never ID numbers) → Verified by alternative process (or Not verified on a second request).'],
+    expected: ['The screen shows the request and the problem the candidate chose, without any ID number or image; Alternative method used is required.', 'The decision updates the candidate\'s identity status (TC-SME-078); nothing is decided automatically.'],
     decisions: ['D-PL-10'],
   }),
 
   // ── Task review ──
   c('TC-REV-010', 'Task review queue', {
     category: 'FUNC', priority: 'P1', pre: 'Submitted tasks in your project, including one you wrote as an SME with the same email (optional).',
-    steps: ['Task reviews.'],
+    steps: ['Reviews → Task reviews.'],
     expected: ['Flagged items (possible duplicate or real data) come first.', 'Tasks you authored or whose author you declared a conflict with are not listed.'],
     decisions: ['D-M5-08'],
   }),
@@ -74,7 +74,7 @@ export const CASES = [
   }),
   c('TC-REV-013', 'Request rework with comments pinned to sections', {
     category: 'FUNC', priority: 'P1', pre: 'A submitted task.',
-    steps: ['Request rework without a comment; then add comments on W03 and W04 and a note; submit.'],
+    steps: ['Decision: Request rework, without a comment; Record decision. Then add comments pinned to W03 and W04 and a note; Record decision.'],
     expected: ['Rework needs at least one comment.', 'The SME sees the comments on the right sections (TC-E2E-003).'],
     decisions: ['D-M5-12'],
   }),
@@ -94,14 +94,14 @@ export const CASES = [
   // ── RL review ──
   c('TC-REV-020', 'RL review: claim, judge, submit', {
     category: 'FUNC', priority: 'P1', pre: 'An RL review request (TC-RLG-001).',
-    steps: ['RL reviews → open → "Claim this review".', 'For each metric: agree or disagree (disagree needs a comment).', 'Choose FAIL with no comment → Submit verdict; then add a comment pinned to step 2 with a failure code; Submit verdict.'],
-    expected: ['Before claiming, the form is read-only; another reviewer sees who claimed it.', 'Missing items are listed ("A FAIL verdict needs at least one comment", "Explain why you disagree …").', 'After submit the review is done and appears in RL Gym results.'],
+    steps: ['Reviews → RL reviews → open → "Claim this review".', 'For each metric: agree or disagree (disagree needs a comment).', 'Choose FAIL with no comment → Submit verdict; then add a comment pinned to step 2 with a failure code; Submit verdict.'],
+    expected: ['Before claiming, the form is read-only; another Validator sees who claimed it.', 'Missing items are listed ("A FAIL verdict needs at least one comment", "Explain why you disagree …").', 'After submit the review is done and appears in RL Gym results.'],
     decisions: ['D-M7-02', 'D-M7-03'],
   }),
   c('TC-REV-021', 'RL review with a large trajectory (signed URL)', {
     category: 'FUNC', priority: 'P3', pre: 'A request sent with trajectories.signedUrl.',
     steps: ['Open the review.'],
-    expected: ['The reviewer is given the link to open; the server never fetches it.'],
+    expected: ['The Validator is given the link to open; the server never fetches it.'],
     decisions: ['D-M7-02'],
   }),
   // ── Release 1.1: the Reviewer role is now shown as "Validator" ──
@@ -140,5 +140,24 @@ export const CASES = [
     steps: ['Help → "What should I check before I decide?"', 'Ask "Select this candidate for me" and "What did the other Validators decide on projects I am not on?"'],
     expected: ['The answer explains the checks for this screen and says the decision is yours.', 'It does not act, and it does not reveal anything you cannot already see.'],
     decisions: ['D-UI-05', 'D-UI-06'],
+  }),
+  // ── Added in the 1.1 coverage audit (1 Oct 2026) ──
+  c('TC-REV-036', 'Pay holds: the API allows a Validator, but there is no Payments menu', {
+    category: 'SEC', priority: 'P2', pre: 'Signed in as Validator (REVIEWER only). A REST tool with your session cookie. An SME id with an unpaid earning (ask the Finance tester). Tell Finance before you start: they release the hold afterwards.',
+    steps: ['Look for Payments in the menu; type /payments/pay-runs and /payments/earnings.', 'POST /api/v1/pay-holds with {"smeUserId":"<id>","kind":"DISPUTE","reason":"Validator coverage test"} and an Idempotency-Key.', 'GET /api/v1/pay-holds?smeUserId=<id>.', 'POST /api/v1/pay-holds/<hold id>/release with {"note":"done"}.', 'GET /api/v1/earnings and /api/v1/pay-runs.'],
+    expected: ['No Payments group; both URLs show the No access card "This page is for Finance, PMs and Admins".', 'Placing a hold works (201) and is audited; the hold is listed. (Release 1.1 limit: no screen for this; the guide asks Validators to ask Finance. Raise an Enhancement if a screen is needed.)', 'Releasing is refused (403): only Finance and Admin release holds.', 'Earnings and pay runs are refused (403). Finance then releases the hold (TC-FIN-007).'],
+    decisions: ['D-M10-32', 'D-PL-05'],
+  }),
+  c('TC-REV-037', 'Guidelines for a Validator: read, approve Expert-tier families, nothing else', {
+    category: 'FUNC', priority: 'P2', pre: 'Signed in as Validator. A guidelines version in review with an Expert tier (generated by the Admin tester, TC-ADM-016).',
+    steps: ['Certification → Guidelines: open the version; read the knowledge map, a course and a blueprint.', 'On the Expert tier\'s blueprint open a family → Approve family.', 'Look for Upload, Regenerate, Edit module, Approve course, Edit length…, Approve blueprint, Reject family and Publish.', 'On the Annotator tier\'s blueprint look for Approve family.'],
+    expected: ['Everything can be read, including the samples and their four checks.', 'Approve family works on the Expert tier ("You approved"); the family still needs the Admin\'s approval.', 'None of the Admin controls is shown; only an Admin can reject a family or publish.', 'Note in your run log whether Approve family is offered on non-Expert tiers (the guide says Validators approve Expert-tier families).'],
+    decisions: ['D-M10-16', 'D-M10-17'],
+  }),
+  c('TC-REV-038', 'Validator home page', {
+    category: 'UX', priority: 'P3', pre: 'Signed in as Validator, assigned to at least one project.',
+    steps: ['Read Home and press each Open →.'],
+    expected: ['The role reads "Validator". Tiles: Applications to decide, Tasks to review, RL reviews and Certification reviews, with counts for your assigned projects only.', 'No PM, Finance or Admin tiles.'],
+    decisions: ['D-PL-05', 'D-M10-03'],
   }),
 ];

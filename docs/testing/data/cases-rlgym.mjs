@@ -6,7 +6,7 @@ export const CASES = [
   c('TC-RLG-001', 'Send a review request', {
     category: 'FUNC', priority: 'P1', pre: 'An RL Gym key; an accepted record id.',
     steps: ['POST /api/v1/integrations/rl-gym/review-requests with samples/rl-review-request.json (your record id in source_record_ids).'],
-    expected: ['201 with the request id; it appears under RL reviews for the project\'s reviewers.'],
+    expected: ['201 with the request id; it appears under Reviews → RL reviews for the project\'s Validators.'],
     decisions: ['D-M7-01'],
   }),
   c('TC-RLG-002', 'Duplicate request returns the existing one', {
@@ -29,8 +29,8 @@ export const CASES = [
   }),
   c('TC-RLG-005', 'Read the dataset with the RL Gym key', {
     category: 'FUNC', priority: 'P2', pre: 'An RL Gym key.',
-    steps: ['GET /api/v1/dataset/records, /dataset/export, /dataset/records/<id>/replay, /mcp/kyc/tools.', 'POST /api/v1/dataset/records/<id>/corrections.'],
-    expected: ['All GETs succeed; the correction is refused (401/403).'],
+    steps: ['GET /api/v1/dataset/records, /dataset/records/<id>, /dataset/records/<id>/lineage, /dataset/export, /dataset/records/<id>/replay, /mcp/kyc/tools.', 'GET /api/v1/dataset/verification.', 'POST /api/v1/dataset/records/<id>/corrections.'],
+    expected: ['All the read GETs succeed.', 'Hash-chain verification is Admin-only: the RL Gym key gets 403 (TC-ADM-034).', 'The correction is refused (401/403).'],
     decisions: ['D-M6-02', 'D-M9-13'],
   }),
   c('TC-RLG-006', 'Wrong or missing keys', {

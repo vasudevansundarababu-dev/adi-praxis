@@ -207,3 +207,19 @@ test('a pay run is built, confirmed by a PM, approved by Finance and submitted',
   expect(run.approvals).toHaveLength(1);
   expect(run.items.filter((i: { status: string }) => i.status === 'SUBMITTED').length).toBeGreaterThan(0);
 });
+
+test('a partner opens Tutorials: the partner video and guide, never the staff files', async ({ page }) => {
+  const s = await supply();
+  await page.goto(`${WEB}/partner/login`);
+  await page.waitForLoadState('networkidle');
+  await page.getByLabel('Work email').fill(s.portal.email);
+  await page.getByLabel('Password').fill(s.portal.password);
+  await page.getByRole('button', { name: /^sign in$/i }).click();
+  await page.getByRole('navigation', { name: 'Partner' }).getByRole('link', { name: 'Tutorials' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tutorials and partner guide');
+  await expect(page.locator('video')).toHaveCount(1);
+  expect((await page.request.get(`${WEB}/tutorials/files/06-staffing-partner.mp4`, { headers: { range: 'bytes=0-9' } })).status()).toBe(206);
+  expect((await page.request.get(`${WEB}/tutorials/files/ADI-Praxis-Partner-Guide.pdf`)).status()).toBe(200);
+  expect((await page.request.get(`${WEB}/tutorials/files/ADI-Praxis-User-Guide.pdf`)).status()).toBe(404);
+  expect((await page.request.get(`${WEB}/tutorials/files/02-admin.mp4`)).status()).toBe(404);
+});

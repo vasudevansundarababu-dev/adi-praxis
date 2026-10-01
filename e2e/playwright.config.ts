@@ -12,6 +12,7 @@ const env = { NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1' };
 
 export default defineConfig({
   testDir: '.',
+  testIgnore: 'demo-videos/**', // the demo video recorder has its own config
   timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
   reporter: [['list']],

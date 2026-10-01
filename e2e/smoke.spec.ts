@@ -85,3 +85,42 @@ test.describe('candidate smoke', () => {
     await expect(page.getByRole('link', { name: /Verify now/ })).toBeVisible();
   });
 });
+
+test.describe('tutorials', () => {
+  test('a signed-in PM opens Tutorials: their video first, every video and the guide play, and the files need a sign-in', async ({ page, request }) => {
+    const anonymous = await request.get(`${WEB}/tutorials/files/01-getting-started.mp4`);
+    expect(anonymous.status()).toBe(401);
+    await page.goto(`${WEB}/login`);
+    await page.waitForLoadState('networkidle');
+    await page.getByLabel('Email').fill(PM.email);
+    await page.getByLabel('Password').fill(PM.password);
+    await page.getByRole('button', { name: /sign in/i }).click();
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Tutorials' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tutorials and user guide');
+    const mine = page.getByRole('region', { name: 'Videos for your role' });
+    await expect(mine.getByRole('heading', { name: 'Getting started' })).toBeVisible();
+    await expect(mine.getByRole('heading', { name: 'Program Manager' })).toBeVisible();
+    await expect(page.locator('video')).toHaveCount(7);
+    // Range requests let the video seek; the guide opens as a PDF.
+    const part = await page.request.get(`${WEB}/tutorials/files/03-program-manager.mp4`, { headers: { range: 'bytes=0-1023' } });
+    expect(part.status()).toBe(206);
+    expect(part.headers()['content-range']).toMatch(/^bytes 0-1023\/\d+$/);
+    expect((await part.body()).length).toBe(1024);
+    const pdf = await page.request.get(`${WEB}${await page.getByRole('link', { name: 'Open the guide' }).getAttribute('href')}`);
+    expect(pdf.status()).toBe(200);
+    expect(pdf.headers()['content-type']).toBe('application/pdf');
+    expect((await page.request.get(`${WEB}/tutorials/files/../../package.json`)).status()).not.toBe(200);
+  });
+
+  test('the candidate app has a public Tutorials page with the expert video and guide', async ({ page }) => {
+    await page.goto(`${CANDIDATE}/opportunities`);
+    await page.getByRole('link', { name: 'Tutorials' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tutorials');
+    await expect(page.locator('video')).toHaveCount(1);
+    const video = await page.request.get(`${CANDIDATE}${await page.locator('video').getAttribute('src')}`, { headers: { range: 'bytes=0-99' } });
+    expect([200, 206]).toContain(video.status());
+    const pdf = await page.request.get(`${CANDIDATE}${await page.getByRole('link', { name: 'Open the guide' }).getAttribute('href')}`);
+    expect(pdf.status()).toBe(200);
+    expect(pdf.headers()['content-type']).toContain('application/pdf');
+  });
+});

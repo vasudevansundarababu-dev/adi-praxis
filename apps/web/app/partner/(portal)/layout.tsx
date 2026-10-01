@@ -13,6 +13,7 @@ const PARTNER_NAV = [
   { href: '/partner/candidates', label: 'Candidates' },
   { href: '/partner/statements', label: 'Statements' },
   { href: '/partner/integrations', label: 'API & webhooks' },
+  { href: '/partner/tutorials', label: 'Tutorials' },
 ];
 
 export default async function PartnerPortalLayout({ children }: { children: React.ReactNode }) {

@@ -61,6 +61,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'API clients', href: '/api-clients', roles: ['ADMIN'] },
     ],
   },
+  // Captioned videos and the user guide (docs/user-guide), for every console role.
+  { key: 'tutorials', label: 'Tutorials', items: [{ label: 'Tutorials', href: '/tutorials', roles: ['ADMIN', 'PM', 'REVIEWER', 'FINANCE'] }] },
 ];
 
 /** Every page, flat (older callers and tests). */

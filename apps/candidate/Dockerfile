@@ -20,6 +20,7 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=8080 HOSTNAME=0.0.0.0
 WORKDIR /app
 COPY --from=build --chown=node:node /repo/apps/candidate/.next/standalone ./
 COPY --from=build --chown=node:node /repo/apps/candidate/.next/static ./apps/candidate/.next/static
+COPY --from=build --chown=node:node /repo/apps/candidate/public ./apps/candidate/public
 USER node
 EXPOSE 8080
 CMD ["node", "apps/candidate/server.js"]

@@ -52,7 +52,7 @@ test.describe('console smoke', () => {
     await page.getByLabel('Email').fill(PM.email);
     await page.getByLabel('Password').fill('not-the-password');
     await page.getByRole('button', { name: /sign in/i }).click();
-    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.locator('form').getByRole('alert')).toBeVisible(); // the form's error, not Next's route announcer
     await page.getByLabel('Password').fill(PM.password);
     await page.getByRole('button', { name: /sign in/i }).click();
     const nav = page.getByRole('navigation', { name: 'Main' });

@@ -2,26 +2,26 @@
 
 # ADI Praxis test cases
 
-232 test cases. Priorities: **P1** must pass before production, **P2** should pass, **P3** nice to have. Categories: E2E end-to-end, FUNC functional, UX user experience, NFR non-functional, SEC security, PEN penetration testing.
+271 test cases. Priorities: **P1** must pass before production, **P2** should pass, **P3** nice to have. Categories: E2E end-to-end, FUNC functional, UX user experience, NFR non-functional, SEC security, PEN penetration testing.
 
 Before you start, read [README.md](README.md) (environment, accounts, samples, how to report). Record every run in `test-cases.csv` (a copy per tester or a shared sheet).
 
-Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in cases written for 1.0, "Reviewer" means the Validator. New in 1.1: the Partner and Finance groups, and the cases numbered TC-E2E-008 onwards, TC-SME-060 onwards, TC-PM-013 onwards, TC-ADM-013 onwards, TC-REV-030 onwards, TC-NFR-050 onwards, TC-SEC-019 onwards and TC-PEN-018 onwards. See [WHATS-NEW-1.1.md](WHATS-NEW-1.1.md) for the day 1 order.
+Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in cases written for 1.0, "Reviewer" means the Validator. New in 1.1: the Partner and Finance groups, and the cases numbered TC-E2E-008 onwards, TC-SME-060 onwards, TC-PM-013 onwards, TC-ADM-013 onwards, TC-REV-030 onwards, TC-NFR-050 onwards, TC-SEC-019 onwards and TC-PEN-018 onwards. See [WHATS-NEW-1.1.md](WHATS-NEW-1.1.md) for the day 1 order. Added by the coverage audit of 1 Oct 2026 (API-only Admin functions, permissions per role, remaining screens): TC-E2E-012, TC-SME-076 onwards, TC-PM-020 onwards, TC-ADM-023 onwards, TC-REV-036 onwards, TC-PTR-016, TC-FIN-013 and TC-SEC-028. [COVERAGE.md](COVERAGE.md) maps every screen, role and Admin function to its cases.
 
 | Group | Cases | P1 | P2 | P3 |
 | --- | ---: | ---: | ---: | ---: |
-| [End-to-end journeys](#end-to-end-journeys) | 11 | 8 | 3 | 0 |
-| [SME / candidate](#sme--candidate) | 53 | 29 | 18 | 6 |
-| [Project manager](#project-manager) | 19 | 9 | 8 | 2 |
-| [Admin](#admin) | 22 | 8 | 9 | 5 |
-| [Validator (Reviewer role)](#validator-reviewer-role) | 22 | 11 | 4 | 7 |
-| [Partner (partner portal)](#partner-partner-portal) | 15 | 8 | 6 | 1 |
-| [Finance](#finance) | 12 | 8 | 3 | 1 |
+| [End-to-end journeys](#end-to-end-journeys) | 12 | 8 | 4 | 0 |
+| [SME / candidate](#sme--candidate) | 59 | 29 | 21 | 9 |
+| [Project manager](#project-manager) | 28 | 11 | 13 | 4 |
+| [Admin](#admin) | 37 | 12 | 15 | 10 |
+| [Validator (Reviewer role)](#validator-reviewer-role) | 25 | 11 | 6 | 8 |
+| [Partner (partner portal)](#partner-partner-portal) | 17 | 8 | 7 | 2 |
+| [Finance](#finance) | 13 | 8 | 4 | 1 |
 | [RL Gym (API client)](#rl-gym-api-client) | 7 | 4 | 3 | 0 |
 | [Non-functional](#non-functional) | 24 | 11 | 11 | 2 |
-| [Security (browser checks)](#security-browser-checks) | 27 | 18 | 9 | 0 |
+| [Security (browser checks)](#security-browser-checks) | 29 | 19 | 10 | 0 |
 | [Penetration testing](#penetration-testing) | 20 | 11 | 7 | 2 |
-| **Total** | **232** | **125** | **81** | **26** |
+| **Total** | **271** | **132** | **101** | **38** |
 
 ## End-to-end journeys
 
@@ -29,21 +29,21 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Persona:** Several · **Category:** E2E · **Priority:** P1 · **Decisions:** [D-M4-01](DECISION-REGISTER.md#d-m4-01), [D-M4-02](DECISION-REGISTER.md#d-m4-02), [D-FB-01](DECISION-REGISTER.md#d-fb-01), [D-M4C-05](DECISION-REGISTER.md#d-m4c-05), [D-M4C-06](DECISION-REGISTER.md#d-m4c-06), [D-M9-01](DECISION-REGISTER.md#d-m9-01), [D-M9-03](DECISION-REGISTER.md#d-m9-03), [D-M9-05](DECISION-REGISTER.md#d-m9-05), [D-M5-09](DECISION-REGISTER.md#d-m5-09), [D-M9-14](DECISION-REGISTER.md#d-m9-14)
 
-**Before you start:** Three browser profiles (see README "Several roles at once"): PM, Reviewer, SME. The Reviewer is assigned to your project. Your project is published, STAFFING, and has a free place.
+**Before you start:** Three browser profiles (see README "Several roles at once"): PM, Validator, SME. The Validator is assigned to your project. Your project is published, STAFFING, and has a free place.
 
 **Steps**
 
 1. SME: open the candidate app, sign in with the mock form as sme.<you>.e2e1@example.test, tick 18+, continue.
 2. SME: Verify identity → Start verification → on the simulated page choose "Verified (18 or over)".
 3. SME: Opportunities → your project → "Apply: build my SME profile". Answer the six questions (tap chips where offered). Review and submit.
-4. Reviewer: Applications → the new application. Read the AI recommendation and reasons. Choose "Select for this pool", write a reason and a message, keep the approved scope, Record decision.
+4. Validator: Reviews → Applications → the new application. Read the AI recommendation and reasons. Choose "Select for this pool", write a reason and a message, keep the approved scope, Record decision.
 5. SME: open the application status page → Start onboarding. Complete all 7 steps. In Work preferences choose India and Asia/Kolkata.
-6. PM: Projects → your project → Staffing → Re-run match. Find the SME and click Assign.
+6. PM: Projects → Projects → your project → Start staffing (Resource assignment) → Re-run match. Find the SME and click Assign.
 7. SME: Home → the assignment card → Accept → Open workbench. Open the first task.
 8. SME: W00 → "Answer a short interview". Answer all 8 questions. → "Draft my task". Wait for the draft (about 1 minute with the real AI).
 9. SME: visit W01–W05. Read each section, fix anything unrealistic, click "I've checked this section" on each.
 10. SME: W06 → Run checks → tick the synthetic-data declaration → Submit for review.
-11. Reviewer: Task reviews → the task. Read "How this task was made", the checks and similar tasks. Answer the checklist. Accept.
+11. Validator: Reviews → Task reviews → the task. Read "How this task was made", the checks and similar tasks. Answer the checklist. Decision Accept → Record decision.
 12. Admin (optional): call GET /api/v1/dataset/records?projectId=<id> and GET /api/v1/dataset/verification.
 
 **Expected**
@@ -66,30 +66,30 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 2. Choose the sample file, tick the declaration, Upload.
 3. Draft my task. Wait for "Writing your draft…" to finish; the page reloads.
 4. Check and confirm W01–W05, then submit from W06.
-5. Reviewer: open the task, open the source file from "How this task was made", accept or request rework.
+5. Validator: Reviews → Task reviews → the task; open the source file from "How this task was made"; Accept or Request rework.
 
 **Expected**
 
 - The upload shows the file name, size and "characters read"; no warning (the sample has no real identifiers).
 - The draft reflects the procedure (ownership over 25%, escalation of high risk) but with invented parties.
-- The Reviewer can download the same file; the PM cannot (see TC-SEC-012).
+- The Validator can download the same file; the PM cannot (see TC-SEC-012).
 
-### TC-E2E-003 Rework loop: the Reviewer asks for changes, the expert fixes them, the Reviewer sees what changed
+### TC-E2E-003 Rework loop: the Validator requests rework, the expert fixes it, the Validator sees what changed
 
-**Persona:** Several · **Category:** E2E · **Priority:** P1 · **Decisions:** [D-M5-12](DECISION-REGISTER.md#d-m5-12)
+**Persona:** Several · **Category:** E2E · **Priority:** P1 · **Decisions:** [D-M5-12](DECISION-REGISTER.md#d-m5-12), [D-M10-03](DECISION-REGISTER.md#d-m10-03)
 
 **Before you start:** A submitted KYC task.
 
 **Steps**
 
-1. Reviewer: open the task → decision "Request rework". Add a comment pinned to W04 ("The near match must be cleared on date of birth") and a note. Submit.
-2. SME: open the task. Read the reviewer's message on W01, follow the link to W04, change the step, resubmit from W06.
-3. Reviewer: open the task again.
+1. Validator: Reviews → Task reviews → the task → Decision "Request rework". Add a comment pinned to W04 ("The near match must be cleared on date of birth") and a note. Record decision.
+2. SME: open the task. Read "The Validator asked for changes" on W01, follow the link to W04, change the step, resubmit from W06.
+3. Validator: open the task again.
 
 **Expected**
 
-- The SME sees the comment on W01 and pinned on W04; the task is editable again (status "Changes requested").
-- On resubmit, the Reviewer sees "Resubmitted after rework. Changed since the last version: W04 …" and the version number increased.
+- The SME sees the comment on W01 and pinned on W04; the task is editable again (status "Changes requested"). The pinned comment should be labelled as the Validator's (code currently prefixes it "Reviewer:": log one UX issue per D-M10-03).
+- On resubmit, the Validator sees "Resubmitted after rework. Changed since the last version: W04 …" and the version number increased.
 
 ### TC-E2E-004 Not selected, then asks for a review of the decision
 
@@ -99,16 +99,16 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Reviewer: choose "Not selected for this pool" with a task-related reason and a respectful message.
-2. SME: open the status page. Read the message. Use the option to request a review of the decision, with a short explanation.
-3. Reviewer: Applications → the application now shows as review requested → Reopen for decision → Select.
+1. Validator: Reviews → Applications → the application → "Not selected for this pool" with a task-related reason and a respectful message → Record decision.
+2. SME: open the status page. Read the message. Ask for a review: "What should the Validator know?" → Request review.
+3. Validator: Reviews → Applications → the application now shows as review requested → Reconsider → Reopen for decision → Select for this pool → Record decision.
 
 **Expected**
 
 - The SME's message is respectful and specific; it never judges the person.
 - The earlier decision stays on record in the decision history; the new decision is added, not overwritten.
 
-### TC-E2E-005 RL review loop: RL Gym sends a result, a Reviewer judges it, RL Gym pulls the verdict
+### TC-E2E-005 RL review loop: RL Gym sends a result, a Validator judges it, RL Gym pulls the verdict
 
 **Persona:** Several · **Category:** E2E · **Priority:** P1 · **Decisions:** [D-M7-01](DECISION-REGISTER.md#d-m7-01), [D-M7-02](DECISION-REGISTER.md#d-m7-02), [D-M7-03](DECISION-REGISTER.md#d-m7-03)
 
@@ -117,12 +117,12 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 **Steps**
 
 1. RL Gym: POST /api/v1/integrations/rl-gym/review-requests with the sample body in docs/testing/samples/rl-review-request.json (put your record id in source_record_ids).
-2. Reviewer: RL reviews → open the request → Claim. For each metric choose agree/disagree (comment where you disagree). Choose FAIL with a comment pinned to a trajectory step and a failure code. Submit.
+2. Validator: Reviews → RL reviews → open the request → Claim this review. For each automated eval choose Agree or Disagree (Why where you disagree). Choose fail with a comment on a trajectory step and a failure code. Submit verdict.
 3. RL Gym: GET /api/v1/integrations/rl-gym/results.
 
 **Expected**
 
-- The request appears in the RL reviews queue of Reviewers assigned to that project.
+- The request appears in the RL reviews queue of Validators assigned to that project.
 - The verdict is returned with the metric verdicts and comments; a second GET with ?after=<seq> returns nothing new.
 
 ### TC-E2E-006 A new project from scratch: template → project → opportunity → staffing
@@ -133,11 +133,11 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Admin: Templates → check "KYC onboarding and refresh" is published (or publish a new version).
-2. PM: Projects → New project. Choose the template, name it "<you> KYC <date>", distinct target 6, max per expert 3, TPT 90, dates next week, add a preferred country filter (IN). Save, then Submit.
-3. PM: Opportunity → paste a short brief (or import a PDF), confirm it, Publish.
-4. Admin or PM: assign a Reviewer to the project.
-5. PM: Staffing → Re-run match.
+1. Admin: Projects → Templates → check "KYC onboarding and refresh" is published (or publish a new version).
+2. PM: Projects → Projects → New project. Six steps: the template; name "<you> KYC <date>" and dates next week; Authoring, distinct target 6, max per expert 3, TPT 90; a preferred country filter (IN); a job description. Submit project.
+3. PM: project page → Opportunity page → fill the brief (or Import a JD document and Confirm text), Save and publish.
+4. PM (or Admin): project page → Validators → choose the Validator → Add.
+5. PM: Start staffing → Resource assignment → Re-run match.
 
 **Expected**
 
@@ -175,7 +175,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 4. Validator: Reviews → Applications → the application → Select, with reason and message → Record decision.
 5. SME: application status → Start onboarding. Complete the manual steps. Open "Guidelines course and certification" → complete every module → Go to the test → selfie check (simulated) → take the test and aim to pass → submit.
 6. SME: Payments → Set up payments → simulated payout provider → Finish. Onboarding is complete.
-7. PM: Projects → KYC authoring demo → Staffing → Re-run match → Assign the SME. SME: Home → Accept → Open workbench → write (or draft) one task and submit it (as in TC-E2E-001).
+7. PM: Projects → Projects → KYC authoring demo → Resource assignment → Re-run match → Assign the SME. SME: Home → Accept → Open workbench → write (or draft) one task and submit it (as in TC-E2E-001).
 8. Validator: Reviews → Task reviews → the task → Accept.
 9. SME: Payments → one "Accepted task" line, USD 40.00.
 10. Finance: Payments → Pay runs → Build pay run for Monday 28 Sep 2026 (or the Monday of the acceptance week). PM: open the run → Confirm pay run. Finance: Approve pay run → Submit to payout provider. Wait a few minutes and reload.
@@ -249,6 +249,29 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 - Both journeys behave exactly as in 1.0, apart from the menu, the "Validator" label and the required-field markers.
 - Without a requisition the onboarding checklist has no certification or payment items (1.0 behaviour).
 - Any difference from 1.0 behaviour is a defect; mark it "regression" in the title.
+
+### TC-E2E-012 Console user lifecycle: create a Validator by API, assign, decide, disable
+
+**Persona:** Several · **Category:** E2E · **Priority:** P2 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05), [D-M4C-04](DECISION-REGISTER.md#d-m4c-04), [D-M4C-05](DECISION-REGISTER.md#d-m4c-05), [D-PL-06](DECISION-REGISTER.md#d-pl-06)
+
+**Before you start:** Admin (REST tool with session cookie, README section 9), PM (owner of a project with a submitted application) and a fresh browser profile for the new Validator. There is no user screen in 1.1: users are managed with the API (ROLES-AND-ADMIN section 4).
+
+**Steps**
+
+1. Admin: POST /api/v1/users with {"email":"validator.<initials>.e2e12@praxis.test","name":"<initials> Validator","roles":["REVIEWER"],"password":"<12+ characters>"} and an Idempotency-Key. Admin → Users: check the new row.
+2. New Validator: sign in. Read the menu and Home; open Reviews → Applications.
+3. PM: project page → Validators → add the new Validator.
+4. New Validator: reload Reviews → Applications; decide the application (Ask for more information).
+5. Admin: PATCH /api/v1/users/<id>/status {"status":"DISABLED"}. New Validator: click anything; try to sign in again.
+6. PM: open the application's decision history. Admin: PATCH the status back to ACTIVE.
+
+**Expected**
+
+- The user is created (201) and listed as Validator, Active.
+- Before assignment the Validator sees the Reviews and Certification groups but an empty Applications queue; after assignment the project's applications appear.
+- The decision is recorded with the Validator's name; the candidate sees the question.
+- Disabling signs them out at once; sign-in is refused ("This account is disabled"). The decision they made stays on record and is never removed.
+- Re-enabling lets them sign in again. Every step is audited (the lead checks on request).
 
 ## SME / candidate
 
@@ -388,7 +411,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 **Expected**
 
 - No 30 years or "verified" appears in the profile; status does not change; the assistant stays on the question.
-- Nothing about selection changes; only a Reviewer can select.
+- Nothing about selection changes; only a Validator can select.
 
 ### TC-SME-015 Prefer a form: the same questions as a form
 
@@ -446,11 +469,11 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Open the status page before and after the Reviewer decides (selected, needs information, not selected).
+1. Open the status page before and after the Validator decides (selected, needs information, not selected).
 
 **Expected**
 
-- Each state explains what happens next and shows the Reviewer's message.
+- Each state explains what happens next and shows the Validator's message.
 - "Needs information" shows the one thing to answer and lets you answer it.
 
 ### TC-SME-019 Ask for a review of a "not selected" decision
@@ -499,7 +522,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Expected**
 
-- The PM cannot propose you until a Reviewer resolves the conflict (Reviews → Conflicts).
+- The PM cannot propose you until a Validator resolves the conflict (Reviews → Conflicts).
 
 ### TC-SME-022 Accept or decline an assignment proposal
 
@@ -653,19 +676,26 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 - Only briefs (never other authors' content) are shown, with a similarity score; flags never block submit.
 
-### TC-SME-037 Workbench on a phone is read-only
+### TC-SME-037 Workbench on a phone is read-only in every section, including W00 and W06
 
-**Persona:** SME · **Category:** UX · **Priority:** P3
+**Persona:** SME · **Category:** UX · **Priority:** P2 · **Decisions:** [D-M5-12](DECISION-REGISTER.md#d-m5-12), [D-M9-04](DECISION-REGISTER.md#d-m9-04)
 
-**Before you start:** A task, on a phone or a narrow window (< 768 px).
+**Before you start:** An onboarded SME with an untouched KYC task and a second task that is complete but not submitted. Chrome on an Android phone (360×800), or a desktop window narrower than 768 px (DevTools device toolbar).
 
 **Steps**
 
-1. Open the task on a phone.
+1. Open the untouched task on the phone. Read the note under the title.
+2. Open W01–W05 and try to type in a field or press a generator button.
+3. Open W00: choose "Start from a document", pick a file, tick the declaration and press Upload; try Draft my task and "Answer a short interview".
+4. Open the complete task → W06: try Run checks, tick the synthetic-data declaration and press Submit for review.
+5. Widen the window past 768 px and repeat one edit.
 
 **Expected**
 
-- A note says the workbench is designed for a larger screen and is read-only on a phone; nothing is cut off.
+- The note says "The workbench is designed for a larger screen. On a phone it is read-only." Nothing is cut off; the section list scrolls sideways.
+- W01–W05 cannot be edited on a phone.
+- W00 and W06 must also be read-only on a phone (docs/TASK-KYC.md: "Desktop-first; read-only on mobile"): no upload, draft, interview or submit is possible under 768 px. (Code currently lets you upload, draft and submit from W00 and W06 on a phone: log a defect for each one that works, quoting this case.)
+- Above 768 px everything is editable again and the note is gone.
 
 ### TC-SME-040 W00 is the first screen of a new KYC task
 
@@ -1157,6 +1187,110 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 - A non-Expert sees an empty state or a clear explanation, not an error.
 - The Expert types their own score; the model suggestion is shown "for reference only"; approving a family requires it to be accurate and supported by the cited section.
 
+### TC-SME-076 Withdraw an application
+
+**Persona:** SME · **Category:** FUNC · **Priority:** P3 · **Decisions:** [D-M4C-05](DECISION-REGISTER.md#d-m4c-05), [D-M6-01](DECISION-REGISTER.md#d-m6-01)
+
+**Before you start:** A submitted application that is not yet decided (a new candidate, sme.<initials>.076@example.test).
+
+**Steps**
+
+1. Open the application status page → Withdraw this application. Read the confirmation → Keep my application.
+2. Withdraw this application → Yes, withdraw.
+3. Open Home and the opportunity again. Ask a Validator to look for the application.
+
+**Expected**
+
+- The confirmation says "Withdrawing stops any pending assignments for this pool. Your history is kept. Continue?" and Keep my application changes nothing.
+- After withdrawing the status is Withdrawn and the history is kept.
+- The Validator sees it as withdrawn and cannot decide it.
+
+### TC-SME-077 Contributor terms and privacy notice pages
+
+**Persona:** SME · **Category:** UX · **Priority:** P3 · **Decisions:** [D-M4C-03](DECISION-REGISTER.md#d-m4c-03)
+
+**Before you start:** Signed out of the candidate app.
+
+**Steps**
+
+1. On Sign in, follow the "contributor terms" and "privacy notice" links.
+2. Open <candidate URL>/terms and /privacy directly; sign in and open them again.
+
+**Expected**
+
+- Both pages open signed out and signed in, with headings "Contributor terms" and "Privacy notice".
+- In this build both show placeholder text (e.g. "The approved privacy notice will be published here before candidates are invited."): not a defect in test, but it must be replaced before production (raise an Enhancement if it is not tracked).
+
+### TC-SME-078 Identity: "I need help" and the alternative process
+
+**Persona:** SME · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M4-02](DECISION-REGISTER.md#d-m4-02), [D-PL-10](DECISION-REGISTER.md#d-pl-10)
+
+**Before you start:** A new candidate (sme.<initials>.078@example.test) whose simulated check failed or was canceled (TC-SME-002). A Validator tester (TC-REV-008).
+
+**Steps**
+
+1. Verify your identity → I need help. Choose a problem (e.g. "I do not consent to the automated check") → Ask for help.
+2. Read the page and Home.
+3. Validator: Reviews → Identity reviews → Verified by alternative process.
+4. Reload the candidate app.
+
+**Expected**
+
+- The request is confirmed and the page says a person will contact you ("Help needed"); no dead end.
+- No document image, ID number or date of birth is asked for or shown anywhere.
+- After the Validator's decision the candidate shows Identity verified and can continue.
+
+### TC-SME-079 Upload a professional licence
+
+**Persona:** SME · **Category:** FUNC · **Priority:** P3 · **Decisions:** [D-M10-25](DECISION-REGISTER.md#d-m10-25), [D-UI-01](DECISION-REGISTER.md#d-ui-01)
+
+**Before you start:** A candidate on a requisition that requires a licence (tier Expert, "licence required"; coordinate with the lead, see TC-REV-034).
+
+**Steps**
+
+1. Certifications → the certification → licence upload: press upload with fields empty.
+2. Licence number "SYN-LIC-0001", Issuing body "Synthetic Banking Council", a 12 MB PDF; then a .txt; then a small PDF. Upload.
+3. Read the certification card before and after a Validator confirms or rejects it.
+
+**Expected**
+
+- Licence number, Issuing body and the file are required (asterisks).
+- Only PDF, PNG or JPG up to 10 MB is accepted; others are refused with a reason.
+- While unchecked you cannot be certified; after rejection: "The Validator could not confirm your last upload…" with a way to upload again; after confirmation the licence is shown as confirmed.
+
+### TC-SME-080 Home: journey progress and the Next step card
+
+**Persona:** SME · **Category:** UX · **Priority:** P2 · **Decisions:** [D-FB-04](DECISION-REGISTER.md#d-fb-04), [D-M10-03](DECISION-REGISTER.md#d-m10-03)
+
+**Before you start:** One candidate followed through the journey (reuse the TC-E2E-001 or TC-E2E-008 candidate).
+
+**Steps**
+
+1. After each stage (signed in, identity verified, profile submitted, selected, onboarded, assignment accepted, task submitted) open Home.
+2. Press the Next step button each time.
+
+**Expected**
+
+- The progress line (Verify identity · Build profile · Reviewer decision · Onboarding · Assignment · Write tasks) marks the current stage. The decision stage should say "Validator decision" (code currently shows "Reviewer decision": log one UX issue per D-M10-03).
+- Next step always says what to do now and opens the right page; while waiting it says what you are waiting for.
+
+### TC-SME-081 Candidate app Tutorials: the expert video and guide, before and after sign-in
+
+**Persona:** SME · **Category:** Functional · **Priority:** P3
+
+**Before you start:** A fresh private window (signed out).
+
+**Steps**
+
+1. Open the candidate app and select Tutorials in the top navigation.
+2. Play the video and open the expert guide.
+3. Sign in and select Tutorials again.
+
+**Expected**
+
+- The Tutorials page works signed out and signed in, with one video ("How experts work on ADI Praxis") and "Expert guide (PDF)".
+- The guide covers only the expert journey; it contains no console, admin or API details.
+
 ## Project manager
 
 ### TC-PM-001 Console home and navigation for a PM
@@ -1175,7 +1309,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 - Home shows counts for projects staffing and in progress.
 - Menu (Release 1.1, two levels): top row Home, Projects, Payments; the Projects group's second row shows Projects, Templates, Requisitions (see TC-PM-013).
-- Other areas show "This page is for … ; you're signed in as PM" with a way back, never a bare 404.
+- Other areas show the No access card "This page is for …" ("You’re signed in as … (PM)") with Go to your home page, never a bare 404. (Code currently returns a plain 404 "not found" page for /users: log a defect against D-PL-05 if seen.)
 
 ### TC-PM-002 Create and submit a project
 
@@ -1185,8 +1319,8 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Projects → New project.
-2. Try to save with no name; then fill: template, name, distinct target 12, max per expert 4, TPT 90, dates (Mon–Fri next two weeks), job description.
+1. Projects → Projects → New project (six steps: Template, Basics, Volume diversity and TPT, Demographics, Job description, Review and submit).
+2. Try to go on with no name; then fill: template, name, distinct target 12, max per expert 4, TPT 90, dates (Mon–Fri next two weeks), job description.
 3. Submit without a demographic filter.
 4. Add a preferred country filter (India) and submit.
 
@@ -1204,7 +1338,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Staffing → Re-run match on both projects.
+1. On each project: Resource assignment → Re-run match.
 
 **Expected**
 
@@ -1220,9 +1354,9 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Opportunity → import samples/jd-kyc-analyst.pdf.
-2. Try to Publish before confirming the extracted text.
-3. Review the extracted text, correct a word, Confirm, Publish.
+1. Project page → Opportunity page → Import a JD document: samples/jd-kyc-analyst.pdf.
+2. Try to Save and publish before confirming the extracted text.
+3. Review the extracted text, correct a word, Confirm text, Save and publish.
 4. Open the candidate app's Opportunities page.
 
 **Expected**
@@ -1253,7 +1387,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Staffing → Re-run match. Read the score breakdown.
+1. Project page → Resource assignment → Re-run match. Select a score to read the breakdown.
 2. Assign one expert.
 3. Try to assign more experts than places left.
 
@@ -1271,11 +1405,11 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Staffing → Re-run match → try "assign top".
+1. Project page → Start staffing → Re-run match → try Assign top N.
 
 **Expected**
 
-- The message explains experts appear after a reviewer selects them and they finish onboarding, and suggests sourcing.
+- The message explains experts appear after a Validator selects them and they finish onboarding, and suggests sourcing.
 
 ### TC-PM-008 Expert declines, proposal expires
 
@@ -1300,8 +1434,8 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Project → Tasks. Find a task that is assigned but not submitted.
-2. Reclaim it with reason "Stalled".
+1. Project page → Tasks and invites. Find a task that is assigned but not submitted.
+2. Reclaim… it with reason "Stalled".
 
 **Expected**
 
@@ -1315,7 +1449,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Project → Dashboard.
+1. Project page → Progress dashboard.
 
 **Expected**
 
@@ -1344,8 +1478,8 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Templates → open KYC onboarding and refresh.
-2. Look for create, edit, publish or retire controls.
+1. Projects → Templates → open KYC onboarding and refresh.
+2. Look for New template, Add domain, Save draft, Publish, New version or Retire.
 
 **Expected**
 
@@ -1361,12 +1495,14 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 **Steps**
 
 1. Read the top row of the menu; click Projects and read the second row; click Payments and read the tabs.
-2. Type /partners, /guidelines, /payments/earnings and /users in the address bar.
+2. Open Payments → Rate cards.
+3. Type /partners, /guidelines, /certifications, /review/applications, /payments/earnings, /payments/statements, /taxonomy and /users in the address bar.
 
 **Expected**
 
 - Top row: Home, Projects, Payments. Projects second row: Projects, Templates, Requisitions. Payments tabs: Pay runs and Rate cards only.
-- Each refused page shows "This page is for …; you are signed in as PM" with a way back.
+- Rate cards are read-only for a PM ("Finance creates them"; no New rate card form).
+- Each page outside the PM menu shows the No access card "This page is for …" with Go to your home page (D-PL-05). Code currently differs on three of them, log a defect for each one you see: /partners opens a read-only partner list for PMs; /guidelines opens the guidelines list for PMs (read-only); /users shows a plain 404 page.
 
 ### TC-PM-014 Create a requisition: SME supply switch, required fields, channels and pay route
 
@@ -1477,56 +1613,248 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 - Its process answers match D-M10-28 and D-M10-10.
 - It does not create anything; it tells you which button to press. No new requisition appears.
 
+### TC-PM-020 Pause, resume and cancel a project
+
+**Persona:** PM · **Category:** FUNC · **Priority:** P1 · **Decisions:** [D-PL-06](DECISION-REGISTER.md#d-pl-06), [D-M5-03](DECISION-REGISTER.md#d-m5-03)
+
+**Before you start:** Signed in as PM. Your own project In progress with an SME tester who has an open task; a second project of yours in Draft. A REST tool with your session cookie for the last step.
+
+**Steps**
+
+1. Open the in-progress project → Pause project. Ask the SME tester to open the project page and the task.
+2. Resume project. The SME reloads.
+3. On the Draft project press Cancel project; read the confirmation; cancel; then confirm.
+4. Look for Cancel project on the in-progress project; pause it, then cancel it.
+5. POST /api/v1/projects/<draft or cancelled id>/pause and /resume with Idempotency-Keys.
+
+**Expected**
+
+- Paused: the status shows Paused; the SME keeps their saved work and Get next task is disabled.
+- Resumed: In progress again; the SME can continue.
+- Cancel asks "Cancelling is final. Cancel this project?"; after confirming the project is Cancelled and read-only.
+- Cancel is offered only for Draft, Ready for staffing, Staffing and Paused projects: an in-progress project must be paused first.
+- Invalid changes are refused with 409, e.g. "A DRAFT project cannot be paused." Each change is audited.
+
+### TC-PM-021 A PM sees and edits only their own projects
+
+**Persona:** PM · **Category:** SEC · **Priority:** P1 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05), [D-M4C-04](DECISION-REGISTER.md#d-m4c-04)
+
+**Before you start:** Two PM accounts (yours and another tester's), each owning a project. Note the other project's id from its owner.
+
+**Steps**
+
+1. Projects → Projects: read the list and the sub-title.
+2. Open /projects/<other id>, then /projects/<other id>/staffing, /opportunity, /dashboard and /tasks.
+3. With a REST tool: GET /api/v1/projects/<other id> and PATCH it.
+
+**Expected**
+
+- The list says "Projects you own." and shows only yours.
+- Each URL of the other PM's project shows "not found"; nothing of it is shown.
+- The API returns 404 (or 403) and nothing changes.
+
+### TC-PM-022 Assign and remove Validators on a project
+
+**Persona:** PM · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M4C-04](DECISION-REGISTER.md#d-m4c-04), [D-M10-03](DECISION-REGISTER.md#d-m10-03)
+
+**Before you start:** Signed in as PM on your project with no Validator. A Validator account (TC-ADM-001).
+
+**Steps**
+
+1. Read the Validators panel.
+2. Choose the Validator → Add. Ask them to open Reviews → Applications.
+3. Remove them. Ask them to reload.
+
+**Expected**
+
+- With none assigned the panel warns that only Admins can decide applications. The panel and its picker should say "Validator" (code currently shows "Add reviewer" and "No reviewer assigned yet": log one UX issue per D-M10-03).
+- After Add the Validator sees this project's applications and tasks.
+- After Remove they no longer do (their earlier decisions stay on record).
+
+### TC-PM-023 Sourcing campaign: launch, apply link, counters, pause and close
+
+**Persona:** PM · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M4-03](DECISION-REGISTER.md#d-m4-03)
+
+**Before you start:** Signed in as PM on your project with a published opportunity, in Staffing. An SME tester.
+
+**Steps**
+
+1. Start staffing (or open Resource assignment) → Launch sourcing campaign. Try it first on a project whose opportunity is not published.
+2. Copy post text; find the apply link (<candidate URL>/apply/<campaign id>) in it.
+3. SME tester: open the link signed out, then sign in, verify and apply.
+4. Read Clicks, Applies, Identity done, Approved and Assigned. Pause, Resume, then Close campaign. The SME opens the link again.
+5. Open <candidate URL>/apply/not-a-real-id.
+
+**Expected**
+
+- A campaign needs a published opportunity.
+- The post text contains the tracked apply link; nothing is posted automatically (post on LinkedIn by hand).
+- The link counts a click and opens the opportunity; the application is credited to the campaign.
+- Counters go up as the candidate progresses; Pause, Resume and Close change its state.
+- A wrong id shows a not-found page, not a crash.
+
+### TC-PM-024 Task invites and annotation task inputs
+
+**Persona:** PM · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M5-04](DECISION-REGISTER.md#d-m5-04), [D-M5-01](DECISION-REGISTER.md#d-m5-01)
+
+**Before you start:** Signed in as PM on a project with an accepted expert (SME tester). For the second half, an Annotation project (step 3 Task mode "Annotation") and a small CSV of inputs.
+
+**Steps**
+
+1. Project page → Tasks and invites: read the invite for the expert. Resend it; ask the SME to open the old link and then the new one (<candidate URL>/invites/<token>).
+2. Revoke the new link; the SME opens it again.
+3. Annotation project: Add task inputs with a valid CSV; then a CSV with one bad row.
+
+**Expected**
+
+- Each invite is single-use and lasts 7 days; Resend revokes the old link (it explains it can no longer be used) and the new one opens the SME's tasks after sign-in.
+- A revoked link is refused with a way back to Home. The SME can still reach tasks from the project page (email is simulated in test, D-M5-04).
+- Valid inputs appear as tasks; a file with any invalid row adds nothing and says why.
+
+### TC-PM-025 Staffing: withdraw a proposal, release an expert, reject for this project, view profile
+
+**Persona:** PM · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M4C-02](DECISION-REGISTER.md#d-m4c-02), [D-M4C-10](DECISION-REGISTER.md#d-m4c-10), [D-PL-10](DECISION-REGISTER.md#d-pl-10)
+
+**Before you start:** Signed in as PM in Resource assignment with at least three selected, onboarded experts.
+
+**Steps**
+
+1. Assign one expert; then Withdraw proposal before they reply.
+2. Assign another; after they Accept, Release them.
+3. Reject a third for this project only, with a reason.
+4. View profile on any row.
+
+**Expected**
+
+- Withdraw: the proposal disappears from the SME's Home and the place is free again.
+- Release: the expert leaves the project and the place counts as free again (Shortfall goes up). Note what happens to their open tasks in the run log.
+- Reject: the expert is hidden from this project's board only; they stay selected for other projects.
+- View profile shows the matching record only (identity verified or not, skills, languages, availability): never identity documents, evidence files or transcripts.
+
+### TC-PM-026 Edit an open requisition: partners are told
+
+**Persona:** PM · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M10-10](DECISION-REGISTER.md#d-m10-10), [D-M10-05](DECISION-REGISTER.md#d-m10-05)
+
+**Before you start:** Your open requisition from TC-PM-014 with Demo Staffing Partner allowed. The partner tester (and, optionally, a webhook from TC-PTR-010).
+
+**Steps**
+
+1. Open the requisition → Edit. Read the note at the top.
+2. Change headcount and hours per week. Save.
+3. Partner: open the requisition; check webhook deliveries.
+4. As Finance type /requisitions/<id>/edit.
+
+**Expected**
+
+- "This requisition is open: saving tells every allowed partner about the change."
+- The changes are saved; the partner sees the new values (and a requisition-updated event).
+- Finance gets the No access card "This page is for Admins and PMs".
+
+### TC-PM-027 Opportunity page: questions, public view and closing to new applications
+
+**Persona:** PM · **Category:** FUNC · **Priority:** P3 · **Decisions:** [D-M4-03](DECISION-REGISTER.md#d-m4-03), [D-FB-03](DECISION-REGISTER.md#d-fb-03)
+
+**Before you start:** Signed in as PM on your project with a published opportunity.
+
+**Steps**
+
+1. Opportunity page: edit one generated question; then Reset to the generated questions.
+2. Try to add an eligibility criterion without the evidence expected.
+3. View public page.
+4. Close to new applications. An SME tester opens the opportunity and tries to apply.
+
+**Expected**
+
+- Reset restores the generated questions; required criterion fields are marked and enforced.
+- The public page opens in the candidate app with the published text.
+- After closing, candidates cannot start a new application; existing applications continue.
+
+### TC-PM-028 PM home page
+
+**Persona:** PM · **Category:** UX · **Priority:** P3 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05)
+
+**Before you start:** Signed in as PM.
+
+**Steps**
+
+1. Read Home.
+2. Press New project → and each tile's Open →.
+
+**Expected**
+
+- The role reads "Program Manager". Tiles: Projects staffing, Projects in progress and Pay runs waiting for you (draft runs to confirm).
+- New project → opens the six-step wizard; each tile opens the right list.
+
 ## Admin
 
-### TC-ADM-001 Create users for each tester and role
+### TC-ADM-001 Create console users for each tester and role (API only: there is no Add user screen)
 
-**Persona:** Admin · **Category:** FUNC · **Priority:** P1 · **Decisions:** [D-PL-01](DECISION-REGISTER.md#d-pl-01), [D-PL-05](DECISION-REGISTER.md#d-pl-05)
+**Persona:** Admin · **Category:** FUNC · **Priority:** P1 · **Decisions:** [D-PL-01](DECISION-REGISTER.md#d-pl-01), [D-PL-05](DECISION-REGISTER.md#d-pl-05), [D-PL-06](DECISION-REGISTER.md#d-pl-06)
 
-**Before you start:** Signed in as Admin.
-
-**Steps**
-
-1. Users → create pm.<initials>@praxis.test with role PM, reviewer.<initials>@praxis.test with REVIEWER.
-2. Try a password of 11 characters, then one of 12+.
-3. Sign in as the new user in another browser profile.
-
-**Expected**
-
-- Passwords under 12 characters are refused.
-- The new user signs in and sees only their role's areas.
-
-### TC-ADM-002 Change roles and deactivate a user
-
-**Persona:** Admin · **Category:** FUNC · **Priority:** P1 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05), [D-PL-06](DECISION-REGISTER.md#d-pl-06)
-
-**Before you start:** A test user signed in elsewhere.
+**Before you start:** Signed in as Admin in the browser. A REST tool (Postman or curl) with the Admin session cookie (README section 9). Release 1.1 has no screen to add users: Admin → Users is read-only.
 
 **Steps**
 
-1. Give the user a second role; ask them to reload.
-2. Deactivate the user; ask them to click anything.
+1. Open Admin → Users. Look for an Add, Edit or Disable control.
+2. POST /api/v1/users with an Idempotency-Key and {"email":"pm.<initials>@praxis.test","name":"<initials> PM","roles":["PM"],"password":"<11 characters>"}.
+3. Repeat with a password of 12 or more characters. Then create validator.<initials>@praxis.test with roles ["REVIEWER"] and finance.<initials>@praxis.test with roles ["FINANCE"].
+4. POST the same email again (new Idempotency-Key); then a body with "roles": [] and a body with "roles": ["SUPERUSER"].
+5. Reload Admin → Users.
+6. Sign in as each new user in its own browser profile.
 
 **Expected**
 
-- New role areas appear after reload.
-- A deactivated user is signed out on the next request and cannot sign in again.
+- Admin → Users is a read-only table (Name, Email, Roles, Status) with no Add, Edit or Disable control (known gap, ROLES-AND-ADMIN section 6).
+- A password under 12 characters is refused (400) and nothing is created; a valid body returns 201 with the user (never the password).
+- A duplicate email is refused: "A user with this email already exists" (409). Empty or unknown roles are refused (400).
+- The new users are listed with roles shown as PM, Validator and Finance and status Active.
+- Each new user signs in and sees only their role's menu groups (TC-PM-013, TC-REV-030, TC-FIN-001).
+- Share passwords only through the team password manager; never in GitHub, chat or the test sheet.
 
-### TC-ADM-003 Admin cannot lock themselves out
+### TC-ADM-002 Change a user's roles and disable a user (API); a disabled user is signed out everywhere
 
-**Persona:** Admin · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05)
+**Persona:** Admin · **Category:** FUNC · **Priority:** P1 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05), [D-PL-06](DECISION-REGISTER.md#d-pl-06), [D-PL-02](DECISION-REGISTER.md#d-pl-02)
 
-**Before you start:** Signed in as the only active Admin (use a test client, ask the lead).
+**Before you start:** A user from TC-ADM-001 signed in to the console in two browsers (e.g. Chrome and Edge). Admin REST tool with session cookie. The user's id from GET /api/v1/users.
 
 **Steps**
 
-1. Try to remove your own Admin role or deactivate yourself.
+1. PATCH /api/v1/users/<id>/roles with {"roles":["PM","REVIEWER"]}. Ask the user to reload.
+2. PATCH the roles back to {"roles":["PM"]}; ask them to reload again. Try {"roles":[]}.
+3. PATCH /api/v1/users/<id>/status with {"status":"DISABLED"}. Ask the user to click anything in both browsers, then to sign in again.
+4. With the user's old session cookie call GET /api/v1/auth/me.
+5. PATCH the status back to {"status":"ACTIVE"}; the user signs in again.
 
 **Expected**
 
-- Refused with an explanation (the platform keeps at least one active Admin).
+- After adding REVIEWER the Reviews and Certification groups appear on reload; the header shows "PM, Validator". After removing it they disappear and Reviews URLs show the No access card.
+- An empty roles list is refused (400); the user keeps their roles.
+- Disabling signs the user out in every browser at the next request (back to the console sign-in page) and signing in again (correct password) is refused with "This account is disabled".
+- The old cookie gets 401.
+- After re-enabling the user can sign in again with the same password. Admin → Users shows Active / Disabled correctly at each step.
+- Each change is in the audit log (user.roles_changed, user.status_changed): the lead checks on request, there is no audit screen.
 
-### TC-ADM-004 Templates: create, publish, new version
+### TC-ADM-003 An Admin cannot remove their own Admin role or disable themselves
+
+**Persona:** Admin · **Category:** SEC · **Priority:** P1 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05)
+
+**Before you start:** Two Admin accounts (your own named Admin, created by the lead with roles ["ADMIN"], and a second Admin). Admin REST tool with your own session cookie; your user id from GET /api/v1/users.
+
+**Steps**
+
+1. PATCH /api/v1/users/<your id>/roles with {"roles":["PM"]}.
+2. PATCH /api/v1/users/<your id>/status with {"status":"DISABLED"}.
+3. PATCH your own roles to {"roles":["ADMIN","FINANCE"]} (keeping Admin).
+4. As the second Admin, remove the Finance role from your account again.
+
+**Expected**
+
+- Removing your own Admin role is refused (409): "You cannot remove your own Admin role. Ask another Admin."
+- Disabling yourself is refused (409): "You cannot disable your own account".
+- Adding a role while keeping Admin works.
+- Another Admin can change your roles. Nothing changes after a refused request (check Admin → Users).
+
+### TC-ADM-004 Templates: create, save, publish and start a new version
 
 **Persona:** Admin · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M1-01](DECISION-REGISTER.md#d-m1-01), [D-M1-02](DECISION-REGISTER.md#d-m1-02)
 
@@ -1534,14 +1862,17 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Templates → New. Save with only a name, then try Publish.
-2. Complete primary work, verification, human gate, TPT, skills, task mode; Publish.
-3. Create a new version, change the TPT, publish it.
-4. As PM, open New project.
+1. Projects → Templates → New template. Choose Domain, type Workflow name "<initials> KYC template", Create draft.
+2. In the draft editor press Save draft, then Publish, with only the name filled.
+3. Fill Primary work, Verification / reward, Human gate, Default TPT (try 0 and 500, then 90), Skills, Task modes, Distinct-task target, Max tasks per expert, coverage cells and edge cases. Save draft, then Publish.
+4. On the published version press New version; change the Default TPT; Save draft; Publish. Read the Versions sidebar.
+5. As PM, open Projects → New project, step 1.
 
 **Expected**
 
-- Publish lists what is missing.
+- Missing fields are listed ("Fix these before saving:" or a publish refusal listing what is missing); TPT outside 1–480 is refused.
+- After Publish the version is read-only ("Published versions can't be edited").
+- New version opens an editable draft copy; the Versions sidebar lists every version with its status.
 - New project offers only the newest published version.
 
 ### TC-ADM-005 Taxonomy lists
@@ -1566,7 +1897,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Terms → edit the contributor terms, save as a new version.
+1. Admin → Terms → the contributor terms → Publish new version: Title, Approved text → Publish version N.
 2. Ask a PM to assign the expert; the expert tries to Accept.
 
 **Expected**
@@ -1581,14 +1912,18 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. API clients → create "RL Gym (test <initials>)", kind RL_GYM.
-2. Copy the key. Reload the page.
-3. Revoke a key and try to use it.
+1. Admin → API clients → press Create key with Name empty.
+2. Name "RL Gym (test <initials>)", Kind "RL Gym" → Create key. Copy the key into the password manager. Reload the page.
+3. Create a second key, Kind "Client system (task inputs)".
+4. Call GET /api/v1/integrations/rl-gym/results with each key (Authorization: Bearer <key>).
+5. Revoke the RL Gym key (Revoke on its row) and call the same endpoint again.
 
 **Expected**
 
-- The key is shown once and cannot be viewed again after reload.
-- A revoked key gets 401.
+- Name and Kind carry asterisks; an empty name is refused.
+- "Copy this key now. It will not be shown again." with the key; after reload only the name, kind ("RL Gym" or "Client system") and created date are listed.
+- The RL Gym key gets 200; the client-system key gets 403 (wrong kind).
+- After Revoke the row shows "revoked <date>" and no Revoke button; the revoked key gets 401 at once.
 
 ### TC-ADM-008 Failure reason codes for RL review
 
@@ -1598,12 +1933,19 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Failure codes → add "MISSED_BENEFICIAL_OWNER" with a label; try lowercase "bad code".
-2. Retire a code.
+1. Admin → Failure codes → Add code with Code and Label empty.
+2. Code "MISSED_BENEFICIAL_OWNER", Label "Missed a beneficial owner" → Add code.
+3. Type "bad code" in Code (it is upper-cased as you type) → Add code.
+4. Press Deactivate on a code that a past RL verdict used; then Reactivate it; then Deactivate it again.
+5. As a Validator open an RL review and the reason-code picker; open a past verdict that used the code.
 
 **Expected**
 
-- Only UPPER_SNAKE codes are accepted; retired codes are not offered to reviewers.
+- Both fields carry asterisks; empty fields are refused.
+- The new code is listed with its label.
+- "BAD CODE" (with a space) is refused: codes are UPPER_SNAKE_CASE letters, digits and underscores.
+- A deactivated code is shown struck through with a Reactivate button; it is not offered for new RL reviews.
+- Past verdicts keep the code. Validators, PMs and Finance cannot open Admin → Failure codes (No access card).
 
 ### TC-ADM-009 Dataset: list, lineage, export, verification
 
@@ -1621,7 +1963,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 **Expected**
 
 - Records come in chain order with paging.
-- Lineage names author, reviewer, project, template version and (for drafted tasks) provenance.
+- Lineage names the author, the accepting Validator, the project, template version and (for drafted tasks) provenance.
 - Export is newline-delimited JSON.
 - Verification: ok true, breaks [].
 
@@ -1658,7 +2000,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 - tools/list shows the task's tools with inputSchema.
 - Each recorded call returns its recorded result; changed arguments return isError "No recorded response for these arguments."
 
-### TC-ADM-012 Admin sees everything a Reviewer sees
+### TC-ADM-012 Admin sees everything a Validator sees
 
 **Persona:** Admin · **Category:** FUNC · **Priority:** P3 · **Decisions:** [D-M4C-04](DECISION-REGISTER.md#d-m4c-04)
 
@@ -1666,11 +2008,12 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Open Applications, Task reviews, RL reviews for a project you are not assigned to.
+1. Open Reviews → Applications, Reviews → Task reviews, Reviews → RL reviews, Identity reviews and Conflicts for a project you are not assigned to.
+2. Open Certification → Certification reviews.
 
 **Expected**
 
-- Admins see all projects' queues (Reviewers only their assigned projects).
+- Admins see every project's queues (Validators only their assigned projects) and can decide in them.
 
 ### TC-ADM-013 Partners: add a partner, portal user, domains and tiers
 
@@ -1850,15 +2193,310 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Users: open the role picker for a user.
-2. Open a project → Validators panel.
+1. Admin → Users: read the Roles column (the page is read-only; there is no role picker).
+2. Open a project → Validators panel (its picker and empty-state message).
 3. Open an application and a task review; read the messages.
 4. In the candidate app (any SME) read the application status and onboarding texts.
 
 **Expected**
 
 - The internal role is called "Validator" everywhere on screen. "Reviewer" appears only as the SME tier (Expert, Reviewer, Annotator).
-- Report each left-over "Reviewer" meaning the internal role as one UX issue with a list of screens (S4).
+- Report each left-over "Reviewer" meaning the internal role as one UX issue with a list of screens (S4). (Code currently shows "Add reviewer" and "No reviewer assigned yet; only Admins can decide applications." in the project's Validators panel, and "Reviewer: <comment>" on pinned rework comments in the workbench: log them if seen.)
+
+### TC-ADM-023 Only a PM can create a project; an Admin manages every project
+
+**Persona:** Admin · **Category:** SEC · **Priority:** P1 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05)
+
+**Before you start:** Signed in as Admin (an account without the PM role). A project owned by another PM. Admin REST tool with session cookie.
+
+**Steps**
+
+1. Projects → Projects: read the page and look for New project.
+2. Type /projects/new in the address bar.
+3. POST /api/v1/projects with a valid body (copy one from /docs) and an Idempotency-Key.
+4. Open another PM's project: Validators, Opportunity page, Resource assignment, Progress dashboard, Tasks and invites.
+
+**Expected**
+
+- The page says "All projects." and there is no New project button (Home has no "New project →" either).
+- /projects/new shows the No access card "This page is for PMs" with Go to your home page.
+- The API refuses with 403; no project is created.
+- The Admin can open and act on every project (assign Validators, publish the opportunity, assign experts, pause, resume or cancel).
+
+### TC-ADM-024 Admin on pay runs: build, confirm and cancel, never approve or submit
+
+**Persona:** Admin · **Category:** SEC · **Priority:** P1 · **Decisions:** [D-M10-33](DECISION-REGISTER.md#d-m10-33), [D-PL-05](DECISION-REGISTER.md#d-pl-05)
+
+**Before you start:** Signed in as Admin (without the Finance role). Agree an earlier Monday with the lead (one run per week for everyone). Admin REST tool with session cookie.
+
+**Steps**
+
+1. Payments → Pay runs → Build pay run for the agreed Monday. Open it.
+2. Confirm pay run.
+3. Look for Approve pay run and Submit to payout provider.
+4. POST /api/v1/pay-runs/<id>/approve and /submit with Idempotency-Keys.
+5. Cancel run… with a reason of 5+ characters.
+
+**Expected**
+
+- Payments tabs: Pay runs, Rate cards, Earnings and holds, Payout exceptions, Partner statements.
+- Confirm works: "Confirmed. Finance can now approve it." and the page then says "Waiting for Finance to approve."
+- The Admin never sees Approve or Submit; the API refuses both with 403 and the run is unchanged.
+- Cancel works before submission; the run stays listed as cancelled.
+
+### TC-ADM-025 Diversity taxonomy: add an attribute
+
+**Persona:** Admin · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M2-01](DECISION-REGISTER.md#d-m2-01), [D-UI-01](DECISION-REGISTER.md#d-ui-01)
+
+**Before you start:** Signed in as Admin.
+
+**Steps**
+
+1. Admin → Taxonomy → press Add attribute with the form empty.
+2. Label "<initials> Banking segment", Key "Banking Segment", Type multiple choice, the example allowed values. Add attribute.
+3. Change Key to "<initials>_banking_segment"; break the Allowed values JSON (remove a bracket). Add attribute.
+4. Fix the JSON. Add attribute.
+5. As PM: Projects → New project → step 4 Demographics → + Add filter.
+
+**Expected**
+
+- Label, Key, Type and Allowed values carry asterisks; missing ones are named.
+- A key that is not lower_snake_case is refused ("Use lower_snake_case").
+- Invalid JSON: "Allowed values are not valid JSON".
+- The attribute is listed with its type and values.
+- The PM can choose it as a filter.
+
+### TC-ADM-026 Contributor terms: publish a new version
+
+**Persona:** Admin · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M4C-03](DECISION-REGISTER.md#d-m4c-03), [D-UI-01](DECISION-REGISTER.md#d-ui-01)
+
+**Before you start:** Signed in as Admin. Agree with the lead which terms document you may change (other testers' experts must accept every new version).
+
+**Steps**
+
+1. Admin → Terms. Read each document's title, version and any "Placeholder" pill.
+2. Publish new version with Title empty and Approved text "too short".
+3. Title "<initials> test terms", Approved text of 20+ characters → Publish version N.
+4. Ask an onboarded SME tester to open Onboarding.
+
+**Expected**
+
+- Every terms document shows its current version; placeholder text is marked "Placeholder".
+- Empty title or text under 20 characters is refused.
+- The new version number is one higher; earlier versions are kept (append-only).
+- The SME must accept the new version before their next assignment (TC-ADM-006).
+
+### TC-ADM-027 Templates: retire a workflow; existing projects keep their version
+
+**Persona:** Admin · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M1-01](DECISION-REGISTER.md#d-m1-01)
+
+**Before you start:** Your published template from TC-ADM-004 and a PM project created from it. Never retire "KYC onboarding and refresh".
+
+**Steps**
+
+1. Projects → Templates → your template → Retire. Read the confirmation; Cancel. Retire → Confirm retire.
+2. Read the Versions sidebar and the Templates list.
+3. As PM: Projects → New project, step 1. Open the existing project created from it.
+
+**Expected**
+
+- Retire asks for confirmation before anything changes.
+- The template shows as retired in the list and the Versions sidebar.
+- New projects can no longer choose it; the existing project still shows and uses its frozen version.
+
+### TC-ADM-028 Templates: add a domain
+
+**Persona:** Admin · **Category:** FUNC · **Priority:** P3 · **Decisions:** [D-M1-02](DECISION-REGISTER.md#d-m1-02), [D-UI-01](DECISION-REGISTER.md#d-ui-01)
+
+**Before you start:** Signed in as Admin.
+
+**Steps**
+
+1. Projects → Templates. At the bottom press Add domain with the field empty.
+2. Add domain "<initials> Insurance".
+3. New template → Domain picker.
+4. As PM open Projects → Templates.
+
+**Expected**
+
+- Add a domain is required (asterisk) and refused when empty.
+- The domain appears on Templates and in the New template Domain picker.
+- The PM sees no Add domain form (read only).
+
+### TC-ADM-029 Client-system key: push annotation task inputs
+
+**Persona:** Admin · **Category:** FUNC · **Priority:** P3 · **Decisions:** [D-M5-10](DECISION-REGISTER.md#d-m5-10), [D-PL-06](DECISION-REGISTER.md#d-pl-06)
+
+**Before you start:** A "Client system (task inputs)" key (TC-ADM-007). A PM project in Annotation task mode (TC-PM-024). A REST tool.
+
+**Steps**
+
+1. POST /api/v1/projects/<id>/task-inputs with Authorization: Bearer <client key>, an Idempotency-Key and a small JSON array of inputs.
+2. Send a batch where one row is invalid.
+3. Send with an RL Gym key, then with no key.
+4. As PM open Tasks and invites.
+
+**Expected**
+
+- Valid inputs are added as queued tasks.
+- If any row fails validation nothing is added (all or nothing).
+- Wrong kind of key: 403; no key: 401.
+- The PM sees the new tasks.
+
+### TC-ADM-030 Partner portal users cannot be disabled; suspending the partner is the only stop
+
+**Persona:** Admin · **Category:** SEC · **Priority:** P2 · **Decisions:** [D-M10-02](DECISION-REGISTER.md#d-m10-02), [D-M10-04](DECISION-REGISTER.md#d-m10-04)
+
+**Before you start:** Your test partner from TC-ADM-013 with a portal user signed in to the portal in another browser profile. Do not suspend "Demo Staffing Partner".
+
+**Steps**
+
+1. Partners → your partner → Portal users: look for Disable, Remove or Reset password on the user.
+2. Suspend partner → confirm. Ask the portal user to click any page, then to sign in again.
+3. Reactivate partner. The portal user signs in again.
+
+**Expected**
+
+- Portal users can only be added; there is no disable or remove control (known gap: ROLES-AND-ADMIN section 6). Raise an Enhancement if your team needs it.
+- After suspension the portal session ends at the next click (back to /partner/login) and sign-in is refused with "Email or password is incorrect." (no hint that the partner is suspended).
+- After reactivation the user can sign in again; the partner's candidates and history are unchanged.
+
+### TC-ADM-031 Partner page: settings, read-only API clients and webhooks
+
+**Persona:** Admin · **Category:** FUNC · **Priority:** P3 · **Decisions:** [D-M10-02](DECISION-REGISTER.md#d-m10-02), [D-M10-04](DECISION-REGISTER.md#d-m10-04)
+
+**Before you start:** Your test partner from TC-ADM-013, whose portal user created an API client and a webhook (TC-PTR-009, TC-PTR-010, as that partner).
+
+**Steps**
+
+1. Partners → your partner → Settings: set Domains to "banking" and tick only Annotator; Save settings.
+2. Read the API clients and webhooks sections.
+3. Ask a PM to allow your partner on a requisition with tier Reviewer (or a domain other than banking) and open it; as the partner, try to submit a candidate to it.
+
+**Expected**
+
+- Settings are saved and shown on the Partners list (Domains and tiers column).
+- API clients and webhooks are listed read-only (no create, rotate or revoke here) and "Secrets are never shown here."
+- The partner cannot submit candidates to a requisition outside its domains or tiers.
+
+### TC-ADM-032 Knowledge map: approve, reject, edit and mark critical
+
+**Persona:** Admin · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M10-14](DECISION-REGISTER.md#d-m10-14), [D-M10-17](DECISION-REGISTER.md#d-m10-17)
+
+**Before you start:** A SUCCEEDED generation run (TC-ADM-016) on a version with no published tier.
+
+**Steps**
+
+1. Open the version → Knowledge map. Filter by Kind (e.g. thresholds) and Status "To review".
+2. Approve one item; Reject another.
+3. Edit text on a third item, change a word, Save.
+4. Mark critical on a rule.
+5. As a Validator open the same version.
+
+**Expected**
+
+- Each item cites its guideline section; the filters narrow the list.
+- Status changes to Approved / Rejected and the item moves between the Status filters.
+- The edited text is saved and still cites the section.
+- The rule shows "Critical rule"; a candidate who misses it fails the test when the blueprint has "Fail on any critical-rule miss".
+- The Validator can read the knowledge map but sees no Approve, Reject, Edit text or Mark critical.
+
+### TC-ADM-033 Regenerate part of a guidelines version
+
+**Persona:** Admin · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M10-14](DECISION-REGISTER.md#d-m10-14), [D-M10-17](DECISION-REGISTER.md#d-m10-17)
+
+**Before you start:** A guidelines version whose first run SUCCEEDED, with one tier published (TC-ADM-019) and one not. Known risk: Claude quota (report once as an environment issue).
+
+**Steps**
+
+1. On the version press Regenerate: scope Item families, For tier "Every unpublished tier". Start it.
+2. While it runs, try to start a second Regenerate.
+3. When it finishes, read Generation runs and the published tier.
+
+**Expected**
+
+- A new run appears (Queued → Running → Succeeded) with model and cost; "Running now: refresh to see progress" while active.
+- A second run cannot start while one is active.
+- Only the unpublished tier changed; the published tier is untouched and still frozen; regenerated families need approval again.
+
+### TC-ADM-034 Approved Task Dataset API: who may read, export and verify the hash chain
+
+**Persona:** Admin · **Category:** SEC · **Priority:** P1 · **Decisions:** [D-M5-09](DECISION-REGISTER.md#d-m5-09), [D-M6-01](DECISION-REGISTER.md#d-m6-01), [D-M6-02](DECISION-REGISTER.md#d-m6-02), [D-M6-03](DECISION-REGISTER.md#d-m6-03)
+
+**Before you start:** At least two accepted tasks. Session cookies for Admin, PM, Validator, Finance, a candidate and a partner; an RL Gym key (README section 9). There is no dataset screen in 1.1.
+
+**Steps**
+
+1. Admin: GET /api/v1/dataset/records?limit=1, /dataset/records/<id>, /dataset/records/<id>/lineage, /dataset/export, /dataset/verification.
+2. RL Gym key: the same five GETs.
+3. PM, Validator, Finance: GET /api/v1/dataset/records and /dataset/verification. Candidate and partner cookies: the same.
+4. Admin: POST a correction (TC-ADM-010), then GET /dataset/verification again.
+5. Admin: PUT, PATCH and DELETE /api/v1/dataset/records/<id>.
+
+**Expected**
+
+- Admin: all succeed; verification returns ok true with no breaks.
+- RL Gym key: records, record, lineage and export succeed; verification is Admin-only (403).
+- PM, Validator, Finance: 403. Candidate and partner: 401 or 403. No dataset content is returned to them.
+- After the correction the chain still verifies (ok true): the correction is a new record that supersedes the old one; the old record is unchanged.
+- Changing or deleting a record is impossible (404 or 405). Any successful change is S1.
+
+### TC-ADM-035 SME standing and tier change through the API
+
+**Persona:** Admin · **Category:** FUNC · **Priority:** P3 · **Decisions:** [D-M10-12](DECISION-REGISTER.md#d-m10-12), [D-M10-32](DECISION-REGISTER.md#d-m10-32)
+
+**Before you start:** A certified SME who was put forward by Demo Staffing Partner (TC-E2E-008) and their SME id (shown on a pay-run line or in Earnings and holds). Admin REST tool. Coordinate with the lead: suspending stops their work and pay.
+
+**Steps**
+
+1. POST /api/v1/sme/<id>/standing with {"domain":"banking","tier":"ANNOTATOR","standing":"RETRAINING","reason":"Coverage audit test"} and an Idempotency-Key.
+2. Repeat with "SUSPENDED", then "ACTIVE".
+3. Repeat as PM, Validator and Finance.
+4. Partner: Candidates → the candidate (Standing).
+5. Finance: build a pay run for a week in which the SME was suspended (agree the week with the lead).
+
+**Expected**
+
+- Each change is recorded (201) with the reason; earlier standings stay in the history (append-only).
+- Non-Admins are refused (403).
+- The partner's Standing column follows the change and the partner is told on suspension (and on offboarding or a tier change).
+- While suspended the SME's pay is held, not paid. There is no screen for standing in 1.1 (known gap).
+
+### TC-ADM-036 Admin home page
+
+**Persona:** Admin · **Category:** UX · **Priority:** P3 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05)
+
+**Before you start:** Signed in as Admin.
+
+**Steps**
+
+1. Read Home: the greeting, your roles and the tiles.
+2. Press Open → on each tile.
+
+**Expected**
+
+- "Welcome, <name>" and the role "Admin". Tiles: Applications to decide, Tasks to review, RL reviews, Projects staffing, Projects in progress, Certification reviews, Pay runs waiting for you, Open payout exceptions, Templates and users.
+- Each tile opens the right page; counts match the lists.
+
+### TC-ADM-037 Tutorials in the console: videos for your role and the user guide
+
+**Persona:** Admin · **Category:** Functional · **Priority:** P2
+
+**Before you start:** Sign in once as each console role: Admin, PM, Validator, Finance.
+
+**Steps**
+
+1. Select Tutorials on the top row of the menu.
+2. Read the "For your role" section, then "Other roles".
+3. Play each video for a few seconds and drag the progress bar to the middle.
+4. Select "Open the guide".
+
+**Expected**
+
+- Every role sees the Tutorials group. The page is titled "Tutorials and user guide".
+- "For your role" shows Getting started plus the video for your role (Admin, Program Manager, Validator or Finance); the other videos are under "Other roles". Seven videos in all.
+- Each video plays with captions and can jump to any point.
+- The user guide PDF opens in a new tab.
 
 ## Validator (Reviewer role)
 
@@ -1870,7 +2508,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Applications.
+1. Reviews → Applications.
 2. Open an application from the other project by URL (ask a colleague for its id).
 
 **Expected**
@@ -1956,7 +2594,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Expected**
 
-- You return to the queue and can no longer open that application; another reviewer can.
+- You return to the queue and can no longer open that application; another Validator can.
 
 ### TC-REV-007 Resolve a candidate-declared conflict
 
@@ -1980,11 +2618,12 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Reviews → Identity reviews → open → decide.
+1. Reviews → Identity reviews → open the request → Record decision: Alternative method used, Notes (never ID numbers) → Verified by alternative process (or Not verified on a second request).
 
 **Expected**
 
-- The screen shows the request without any ID number or image; the decision updates the candidate's identity status.
+- The screen shows the request and the problem the candidate chose, without any ID number or image; Alternative method used is required.
+- The decision updates the candidate's identity status (TC-SME-078); nothing is decided automatically.
 
 ### TC-REV-010 Task review queue
 
@@ -1994,7 +2633,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Task reviews.
+1. Reviews → Task reviews.
 
 **Expected**
 
@@ -2044,7 +2683,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Request rework without a comment; then add comments on W03 and W04 and a note; submit.
+1. Decision: Request rework, without a comment; Record decision. Then add comments pinned to W03 and W04 and a note; Record decision.
 
 **Expected**
 
@@ -2089,13 +2728,13 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. RL reviews → open → "Claim this review".
+1. Reviews → RL reviews → open → "Claim this review".
 2. For each metric: agree or disagree (disagree needs a comment).
 3. Choose FAIL with no comment → Submit verdict; then add a comment pinned to step 2 with a failure code; Submit verdict.
 
 **Expected**
 
-- Before claiming, the form is read-only; another reviewer sees who claimed it.
+- Before claiming, the form is read-only; another Validator sees who claimed it.
 - Missing items are listed ("A FAIL verdict needs at least one comment", "Explain why you disagree …").
 - After submit the review is done and appears in RL Gym results.
 
@@ -2111,7 +2750,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Expected**
 
-- The reviewer is given the link to open; the server never fetches it.
+- The Validator is given the link to open; the server never fetches it.
 
 ### TC-REV-030 Validator menu and label
 
@@ -2219,6 +2858,62 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 - The answer explains the checks for this screen and says the decision is yours.
 - It does not act, and it does not reveal anything you cannot already see.
+
+### TC-REV-036 Pay holds: the API allows a Validator, but there is no Payments menu
+
+**Persona:** Validator · **Category:** SEC · **Priority:** P2 · **Decisions:** [D-M10-32](DECISION-REGISTER.md#d-m10-32), [D-PL-05](DECISION-REGISTER.md#d-pl-05)
+
+**Before you start:** Signed in as Validator (REVIEWER only). A REST tool with your session cookie. An SME id with an unpaid earning (ask the Finance tester). Tell Finance before you start: they release the hold afterwards.
+
+**Steps**
+
+1. Look for Payments in the menu; type /payments/pay-runs and /payments/earnings.
+2. POST /api/v1/pay-holds with {"smeUserId":"<id>","kind":"DISPUTE","reason":"Validator coverage test"} and an Idempotency-Key.
+3. GET /api/v1/pay-holds?smeUserId=<id>.
+4. POST /api/v1/pay-holds/<hold id>/release with {"note":"done"}.
+5. GET /api/v1/earnings and /api/v1/pay-runs.
+
+**Expected**
+
+- No Payments group; both URLs show the No access card "This page is for Finance, PMs and Admins".
+- Placing a hold works (201) and is audited; the hold is listed. (Release 1.1 limit: no screen for this; the guide asks Validators to ask Finance. Raise an Enhancement if a screen is needed.)
+- Releasing is refused (403): only Finance and Admin release holds.
+- Earnings and pay runs are refused (403). Finance then releases the hold (TC-FIN-007).
+
+### TC-REV-037 Guidelines for a Validator: read, approve Expert-tier families, nothing else
+
+**Persona:** Validator · **Category:** FUNC · **Priority:** P2 · **Decisions:** [D-M10-16](DECISION-REGISTER.md#d-m10-16), [D-M10-17](DECISION-REGISTER.md#d-m10-17)
+
+**Before you start:** Signed in as Validator. A guidelines version in review with an Expert tier (generated by the Admin tester, TC-ADM-016).
+
+**Steps**
+
+1. Certification → Guidelines: open the version; read the knowledge map, a course and a blueprint.
+2. On the Expert tier's blueprint open a family → Approve family.
+3. Look for Upload, Regenerate, Edit module, Approve course, Edit length…, Approve blueprint, Reject family and Publish.
+4. On the Annotator tier's blueprint look for Approve family.
+
+**Expected**
+
+- Everything can be read, including the samples and their four checks.
+- Approve family works on the Expert tier ("You approved"); the family still needs the Admin's approval.
+- None of the Admin controls is shown; only an Admin can reject a family or publish.
+- Note in your run log whether Approve family is offered on non-Expert tiers (the guide says Validators approve Expert-tier families).
+
+### TC-REV-038 Validator home page
+
+**Persona:** Validator · **Category:** UX · **Priority:** P3 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05), [D-M10-03](DECISION-REGISTER.md#d-m10-03)
+
+**Before you start:** Signed in as Validator, assigned to at least one project.
+
+**Steps**
+
+1. Read Home and press each Open →.
+
+**Expected**
+
+- The role reads "Validator". Tiles: Applications to decide, Tasks to review, RL reviews and Certification reviews, with counts for your assigned projects only.
+- No PM, Finance or Admin tiles.
 
 ## Partner (partner portal)
 
@@ -2410,6 +3105,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 2. Submit a sandbox candidate through the API (TC-PTR-011) to cause events.
 3. Read the deliveries table; press Replay on one delivery.
 4. On the inspection site compare the event id and the Praxis-Signature header of the original and the replay.
+5. Disable the webhook (read the confirmation), then cause another sandbox event.
 
 **Expected**
 
@@ -2417,6 +3113,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 - The signing secret is shown once.
 - Deliveries show event, status (Queued/Delivered), attempts and last response.
 - The replay carries the same event id; the header has the form t=<unix time>,v1=<signature>.
+- Disable asks "Disable? No more deliveries go to this URL."; afterwards the webhook shows Disabled and no new deliveries go to it.
 
 ### TC-PTR-011 Partner API v1 with a sandbox client
 
@@ -2517,6 +3214,45 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 - SME 2 cannot take over the invitation: the link is refused ("This link can't be used") and the partner's candidate stays linked to SME 1. If SME 2 gets in, or the candidate moves to SME 2, report it as a Defect (S2; it breaks D-M10-11).
 - API: a live submission returns inviteLinkForTesting with the same kind of link; sandbox submissions return none. In production this box and field never appear (D-M10-42): if you ever see them outside the Test environment banner, report S1 privately.
 
+### TC-PTR-016 The Partner API lives at /partner/v1, not /api/v1; portal and API credentials do not mix
+
+**Persona:** Partner · **Category:** SEC · **Priority:** P2 · **Decisions:** [D-M10-02](DECISION-REGISTER.md#d-m10-02), [D-M10-04](DECISION-REGISTER.md#d-m10-04)
+
+**Before you start:** A sandbox client id and secret (TC-PTR-009) and a token from POST <API URL>/partner/v1/oauth/token. The partner portal cookie praxis_partner (README section 9). curl or Postman.
+
+**Steps**
+
+1. GET <API URL>/partner/v1/requisitions with the Bearer token.
+2. GET <API URL>/api/v1/requisitions and <API URL>/api/v1/partner-portal/requisitions with the same Bearer token.
+3. POST <API URL>/api/v1/oauth/token with the client credentials.
+4. GET <API URL>/partner/v1/requisitions with only the praxis_partner cookie (no token).
+5. Compare with docs/testing/API-QUICK-REFERENCE.md (Partner API rows).
+
+**Expected**
+
+- /partner/v1 works with the token.
+- The token is refused on /api/v1 paths (401 or 403); the portal API needs the portal cookie.
+- There is no token endpoint under /api/v1 (404).
+- The portal cookie does not authorise the Partner API (401).
+- The quick reference lists the Partner API under /partner/v1 with the scope each call needs. Any document that tells partners to use /api/v1 for the Partner API is a documentation defect.
+
+### TC-PTR-017 Partner portal Tutorials: the partner video and guide
+
+**Persona:** Partner · **Category:** Functional · **Priority:** P3
+
+**Before you start:** Signed in to the partner portal as partner@praxis.demo.
+
+**Steps**
+
+1. Select Tutorials in the portal menu.
+2. Play the video and open the guide.
+3. In the same browser, open <console URL>/tutorials/files/ADI-Praxis-User-Guide.pdf and /tutorials/files/02-admin.mp4.
+
+**Expected**
+
+- The page is titled "Tutorials and partner guide" and shows one video (Staffing partner) and the partner guide PDF.
+- The staff guide and staff videos are refused (Not found): partners only get partner material.
+
 ## Finance
 
 ### TC-FIN-001 Finance menu, home and what Finance cannot open
@@ -2529,13 +3265,13 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 1. Read the menu and the home page.
 2. Open Payments and read the tabs.
-3. Type /projects, /review/applications, /partners and /users in the address bar.
+3. Type /projects, /templates, /requisitions, /review/applications, /certifications, /guidelines, /partners, /api-clients and /users in the address bar.
 
 **Expected**
 
-- Menu: Home and Payments only. Your role shows as "Finance".
+- Menu: Home and Payments only (no second row; Payments has its own tabs). Your role shows as "Finance". Home tiles: Pay runs waiting for you (runs to approve or submit) and Open payout exceptions.
 - Payments tabs: Pay runs, Rate cards, Earnings and holds, Payout exceptions, Partner statements.
-- Every other area shows "This page is for …; you are signed in as Finance" with a way back, never a bare 404 or an error.
+- Every other area shows the No access card "This page is for …" with Go to your home page, never a bare 404, an empty page or an error (D-PL-05). Code currently differs on three, log a defect for each you see: /projects and /templates open an empty list ("No projects yet.") instead of the No access card, and /users shows a plain 404 page.
 
 ### TC-FIN-002 Rate cards: create, new version, never edited
 
@@ -2742,6 +3478,25 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 - Answers match D-M10-32 and D-M10-33 and the run on screen.
 - It does not approve; it says Finance approves with the button. The run is unchanged after reload.
 
+### TC-FIN-013 Finance cannot approve a pay run that pays them
+
+**Persona:** Finance · **Category:** SEC · **Priority:** P2 · **Decisions:** [D-M10-33](DECISION-REGISTER.md#d-m10-33), [D-PL-05](DECISION-REGISTER.md#d-pl-05)
+
+**Before you start:** Coordinate with the lead (takes a day). The lead creates a Finance account finance.<initials>.self@example.test (POST /api/v1/users, TC-ADM-001). The same email is used to sign in to the candidate app as an SME on the direct-pay demo requisition, who completes onboarding and payment set-up and has one task accepted (TC-E2E-008 steps). A second Finance user (finance@praxis.demo). An earlier Monday agreed with the lead.
+
+**Steps**
+
+1. Finance (self): build the pay run for the week of the acceptance; a PM confirms it.
+2. Finance (self): open the run → Approve pay run. Read the note above the buttons.
+3. With a REST tool, POST /api/v1/pay-runs/<id>/approve as Finance (self).
+4. The second Finance user approves.
+
+**Expected**
+
+- The page says "You cannot approve a run that pays you. Approving checks this and says so."
+- Approving is refused (403): "You are paid in this run; another Finance approver must approve it." The run stays Confirmed.
+- The second Finance user can approve; the run shows who approved. Cancel the run afterwards if the week is needed by others.
+
 ## RL Gym (API client)
 
 ### TC-RLG-001 Send a review request
@@ -2756,7 +3511,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Expected**
 
-- 201 with the request id; it appears under RL reviews for the project's reviewers.
+- 201 with the request id; it appears under Reviews → RL reviews for the project's Validators.
 
 ### TC-RLG-002 Duplicate request returns the existing one
 
@@ -2809,12 +3564,15 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. GET /api/v1/dataset/records, /dataset/export, /dataset/records/<id>/replay, /mcp/kyc/tools.
-2. POST /api/v1/dataset/records/<id>/corrections.
+1. GET /api/v1/dataset/records, /dataset/records/<id>, /dataset/records/<id>/lineage, /dataset/export, /dataset/records/<id>/replay, /mcp/kyc/tools.
+2. GET /api/v1/dataset/verification.
+3. POST /api/v1/dataset/records/<id>/corrections.
 
 **Expected**
 
-- All GETs succeed; the correction is refused (401/403).
+- All the read GETs succeed.
+- Hash-chain verification is Admin-only: the RL Gym key gets 403 (TC-ADM-034).
+- The correction is refused (401/403).
 
 ### TC-RLG-006 Wrong or missing keys
 
@@ -3268,11 +4026,11 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. As PM, SME and Reviewer, open every console URL listed in README "Console map" and every /api/v1 path in docs/testing/API-QUICK-REFERENCE.md that is not for your role.
+1. As PM, Validator, Finance, SME and partner, open every console URL in docs/user-guide/ROLES-AND-ADMIN.md section 3 (and docs/testing/COVERAGE.md) that is not for your role, and every /api/v1 path in docs/testing/API-QUICK-REFERENCE.md that is not for your role.
 
 **Expected**
 
-- Pages show the "This page is for …" explanation; API calls return 401 (not signed in) or 403 (wrong role). No data from another role is ever shown.
+- Pages show the No access card ("This page is for …") with Go to your home page; API calls return 401 (not signed in) or 403 (wrong role). No data from another role is ever shown. Known page-guard differences are listed in TC-SEC-028.
 
 ### TC-SEC-005 Another candidate's data (horizontal privilege)
 
@@ -3288,11 +4046,11 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 - All are "not found" (404) for A; nothing of B's is shown.
 
-### TC-SEC-006 Reviewer of another project (horizontal privilege)
+### TC-SEC-006 Validator of another project (horizontal privilege)
 
 **Persona:** Several · **Category:** SEC · **Priority:** P1 · **Decisions:** [D-M4C-04](DECISION-REGISTER.md#d-m4c-04), [D-M9-02](DECISION-REGISTER.md#d-m9-02)
 
-**Before you start:** A reviewer not assigned to project X; an application, task and source file from X.
+**Before you start:** A Validator not assigned to project X; an application, task and source file from X.
 
 **Steps**
 
@@ -3368,18 +4126,18 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Enter <img src=x onerror=alert(1)> and "><script>alert(2)</script> into: candidate display name, chat answers, interview answers, W02 business context, a party name, a tool response, a reviewer comment, a project name, a decision message.
-2. View each where others see it (reviewer screens, PM screens, lists).
+1. Enter <img src=x onerror=alert(1)> and "><script>alert(2)</script> into: candidate display name, chat answers, interview answers, W02 business context, a party name, a tool response, a Validator comment, a project name, a decision message.
+2. View each where others see it (Validator screens, PM screens, lists).
 
 **Expected**
 
 - The text is shown literally; no alert ever runs; no broken layout.
 
-### TC-SEC-012 Source files are private to author, project Reviewers and Admins
+### TC-SEC-012 Source files are private to author, project Validators and Admins
 
 **Persona:** Several · **Category:** SEC · **Priority:** P1 · **Decisions:** [D-M9-02](DECISION-REGISTER.md#d-m9-02)
 
-**Before you start:** A drafted task with a source file; accounts for the author, a project reviewer, an unassigned reviewer, a PM, another candidate.
+**Before you start:** A drafted task with a source file; accounts for the author, a project Validator, an unassigned Validator, a PM, another candidate.
 
 **Steps**
 
@@ -3387,7 +4145,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Expected**
 
-- Only the author, the assigned reviewer and Admins get the file; each reviewer/admin opening is in the audit log (task.source.opened). Others get 401/403/404. Responses are Cache-Control: private, no-store.
+- Only the author, the assigned Validator and Admins get the file; each Validator/Admin opening is in the audit log (task.source.opened). Others get 401/403/404. Responses are Cache-Control: private, no-store.
 
 ### TC-SEC-013 Uploaded file names and types cannot be abused
 
@@ -3454,12 +4212,12 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Steps**
 
-1. Try the reviewer endpoints (/api/v1/review/…) with the candidate cookie.
+1. Try the Validator endpoints (/api/v1/review/…) with the candidate cookie.
 2. Try to send extra fields like "status":"SELECTED" or "evidenceLevel":"VERIFIED" to candidate endpoints.
 
 **Expected**
 
-- Reviewer endpoints: 401/403. Extra fields are ignored or rejected; nothing changes.
+- Validator endpoints: 401/403. Extra fields are ignored or rejected; nothing changes.
 
 ### TC-SEC-018 Mock sign-in exists only in demo/test
 
@@ -3638,6 +4396,47 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 - Only the provider, a reference, a status and the payout currency for payees; only a reference and the result for selfie checks. No bank account, IFSC, PAN, tax form, photo or ID number anywhere. Any such value is S1.
 
+### TC-SEC-028 Page guards match the menu: no page opens for a role that has no menu entry for it
+
+**Persona:** Several · **Category:** SEC · **Priority:** P1 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05), [D-UI-03](DECISION-REGISTER.md#d-ui-03)
+
+**Before you start:** One browser profile per role: Admin, PM (without other roles), Validator (REVIEWER only), Finance. Expected per D-PL-05 and docs/user-guide/ROLES-AND-ADMIN.md section 3. The notes in brackets say what the code currently does: when you see it, log one defect per page naming this case.
+
+**Steps**
+
+1. PM: type /guidelines, /certifications, /partners, /partners/<id of Demo Staffing Partner>, /review/tasks, /payments/earnings, /taxonomy, /terms, /failure-codes, /api-clients, /users.
+2. Validator: type /projects, /projects/new, /templates, /templates/new, /requisitions/new, /payments/pay-runs, /payments/rate-cards, /partners, /users.
+3. Finance: type /projects, /templates, /requisitions, /review/applications, /guidelines, /partners, /api-clients, /users.
+4. Admin: type /projects/new.
+5. For each, note the page you get: No access card, empty page, plain 404 or the real page.
+
+**Expected**
+
+- Every page outside your role's menu shows the No access card "This page is for …" with Go to your home page; never a bare 404, an empty list or the page itself.
+- PM: /guidelines (code currently lets PMs in, read-only list) and /partners (code currently shows PMs a read-only partner list) should be refused; Partners → a partner is refused ("This page is for Admins").
+- Validator and Finance: /projects and /templates should be refused (code currently opens an empty "Projects" / "Templates" page because only the API refuses).
+- Every non-Admin: /users should show the No access card (code currently shows a plain 404 page).
+- Admin: /projects/new shows "This page is for PMs" (by design: only a PM creates projects).
+- No data of another role appears on any of these pages; if it does, that is S2 or higher.
+
+### TC-SEC-029 Tutorial files need a console or partner sign-in and cannot be reached outside their folder
+
+**Persona:** Several · **Category:** Security · **Priority:** P2
+
+**Before you start:** A private window, signed out; then a partner session.
+
+**Steps**
+
+1. Signed out, open <console URL>/tutorials/files/01-getting-started.mp4 and /tutorials/files/ADI-Praxis-User-Guide.pdf.
+2. Try /tutorials/files/..%2F..%2Fpackage.json and other names that are not in the Tutorials page.
+3. Sign in as a partner and repeat step 1.
+
+**Expected**
+
+- Signed out: 401 "Sign in to watch the tutorials."
+- Unknown names and path tricks: Not found; nothing outside the tutorials folder is ever returned.
+- Partner: staff files are Not found; only the partner video and guide are served.
+
 ## Penetration testing
 
 ### TC-PEN-001 Reconnaissance and attack surface
@@ -3674,7 +4473,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Persona:** Pen tester · **Category:** PEN · **Priority:** P1 · **Decisions:** [D-PL-05](DECISION-REGISTER.md#d-pl-05)
 
-**Before you start:** PM and Reviewer sessions.
+**Before you start:** PM and Validator sessions.
 
 **Steps**
 
@@ -3765,7 +4564,7 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 
 **Persona:** Pen tester · **Category:** PEN · **Priority:** P1 · **Decisions:** [D-M4C-07](DECISION-REGISTER.md#d-m4c-07), [D-M5-01](DECISION-REGISTER.md#d-m5-01), [D-M9-04](DECISION-REGISTER.md#d-m9-04), [D-M9-05](DECISION-REGISTER.md#d-m9-05)
 
-**Before you start:** Candidate, PM and Reviewer sessions.
+**Before you start:** Candidate, PM and Validator sessions.
 
 **Steps**
 

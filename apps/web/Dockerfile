@@ -20,6 +20,8 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=8080 HOSTNAME=0.0.0.0
 WORKDIR /app
 COPY --from=build --chown=node:node /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=node:node /repo/apps/web/.next/static ./apps/web/.next/static
+# Tutorial videos and guides, served after a sign-in check by app/tutorials/files (not public).
+COPY --from=build --chown=node:node /repo/apps/web/tutorials ./apps/web/tutorials
 USER node
 EXPOSE 8080
 CMD ["node", "apps/web/server.js"]

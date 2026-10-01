@@ -1,0 +1,130 @@
+<title>ADI Praxis Handbook</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: a release handbook. Header band, then videos by role (start-here first), the guide, and demo accounts. */
+:root {
+  --bg: #f5f7fb; --surface: #ffffff; --ink: #14213a; --muted: #55627a; --line: #d9e0ec;
+  --brand: #123a6b; --accent: #1d6fb8; --band: #0b2246; --band-ink: #eaf1fb; --chip: #e6eef9;
+  --display: "Manrope", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0c1424; --surface: #131e33; --ink: #e5ecf7; --muted: #9cabc3; --line: #26344f;
+  --brand: #8fb8ec; --accent: #5ea2e6; --band: #081733; --band-ink: #e5ecf7; --chip: #1c2a45; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0c1424; --surface: #131e33; --ink: #e5ecf7; --muted: #9cabc3; --line: #26344f;
+  --brand: #8fb8ec; --accent: #5ea2e6; --band: #081733; --band-ink: #e5ecf7; --chip: #1c2a45; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; }
+header.band { background: var(--band); color: var(--band-ink); padding-block: 40px 34px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; opacity: .8; }
+h1 { font: 800 clamp(30px, 5vw, 46px)/1.1 var(--display); margin: 12px 0 10px; text-wrap: balance; }
+header p { max-width: 64ch; margin: 0; opacity: .9; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 18px; font: 13px var(--mono); opacity: .85; }
+main { display: grid; gap: 48px; padding-block: 40px 64px; }
+h2 { font: 700 24px/1.2 var(--display); color: var(--brand); margin: 0 0 6px; }
+.lede { color: var(--muted); margin: 0 0 20px; max-width: 70ch; }
+.videos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 20px; }
+.video { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.video.start { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+video { width: 100%; max-width: 100%; aspect-ratio: 1440 / 900; background: #000; display: block; }
+.vbody { padding: 14px 16px 16px; display: grid; gap: 6px; align-content: start; }
+.vbody h3 { font: 700 17px/1.3 var(--display); margin: 0; }
+.vbody p { margin: 0; color: var(--muted); font-size: 15px; }
+.len { font: 12px var(--mono); color: var(--accent); }
+.guide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 28px; align-items: start; }
+.pdf { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: grid; gap: 10px; }
+.btn { display: inline-block; justify-self: start; background: var(--accent); color: #fff; text-decoration: none; font: 700 15px var(--display); padding: 10px 16px; border-radius: 8px; }
+.btn:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+ol.chapters { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+ol.chapters b { font-family: var(--display); }
+.tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 700 13px var(--display); color: var(--muted); letter-spacing: .03em; }
+tr:last-child td { border-bottom: 0; }
+code { font: 13px var(--mono); background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+.note { border-left: 4px solid var(--accent); background: var(--surface); padding: 14px 18px; border-radius: 0 10px 10px 0; color: var(--muted); }
+.note p { margin: 0 0 6px; } .note p:last-child { margin: 0; }
+footer { color: var(--muted); font-size: 14px; padding-block: 0 40px; }
+@media (max-width: 760px) { .video.start, .guide { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+
+<header class="band">
+  <div class="wrap">
+    <div class="eyebrow">ADI-Labs · Release 1.1 · test build test-1.1-20260930</div>
+    <h1>ADI Praxis Handbook</h1>
+    <p>How each person uses ADI Praxis, shown in short captioned videos and written up in the user guide. Experts write synthetic KYC tasks; Validators decide; accepted tasks feed the dataset RL Gym trains on.</p>
+    <div class="meta"><span>7 role videos</span><span>Captioned, no sound</span><span>User guide PDF · 11 chapters</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+<main>
+  <section aria-labelledby="v-h">
+    <h2 id="v-h">Videos</h2>
+    <p class="lede">Each video follows the same story: Ravi is put forward by a staffing partner and takes the certification; Asha applies directly and writes a KYC task with the AI interview. Start with Getting started, then watch the video for your role.</p>
+    <div class="videos">
+      <article class="video start">
+        <video controls preload="metadata" src="videos/01-getting-started.mp4"></video>
+        <div class="vbody"><span class="len">Start here · 1:29</span><h3>Getting started</h3><p>Signing in to the console, Home, the two-level menu, and the Help button. Where partners and experts sign in.</p></div>
+      </article>
+      <article class="video"><video controls preload="metadata" src="videos/02-admin.mp4"></video>
+        <div class="vbody"><span class="len">Admin · 3:27</span><h3>Admin</h3><p>Guidelines to a published course and test, then partners, users, taxonomy, terms, failure codes and API keys.</p></div></article>
+      <article class="video"><video controls preload="metadata" src="videos/03-program-manager.mp4"></video>
+        <div class="vbody"><span class="len">Program Manager · 3:47</span><h3>Program Manager</h3><p>The six-step project wizard, Validators, the opportunity page, a requisition, staffing, and confirming the pay run.</p></div></article>
+      <article class="video"><video controls preload="metadata" src="videos/04-validator.mp4"></video>
+        <div class="vbody"><span class="len">Validator · 2:53</span><h3>Validator</h3><p>Selecting applicants, reviewing and accepting a KYC task, and giving a verdict on an RL Gym result.</p></div></article>
+      <article class="video"><video controls preload="metadata" src="videos/07-expert-sme.mp4"></video>
+        <div class="vbody"><span class="len">Expert · 8:33</span><h3>Expert (SME)</h3><p>Invite, identity check, profile chat, onboarding, writing a task with the AI interview, the course and test, and payment set-up.</p></div></article>
+      <article class="video"><video controls preload="metadata" src="videos/06-staffing-partner.mp4"></video>
+        <div class="vbody"><span class="len">Partner · 1:32</span><h3>Staffing partner</h3><p>Reading a requisition, putting a candidate forward, tracking them, statements, and the API page.</p></div></article>
+      <article class="video"><video controls preload="metadata" src="videos/05-finance.mp4"></video>
+        <div class="vbody"><span class="len">Finance · 1:56</span><h3>Finance</h3><p>Rate cards, earnings and holds, the weekly pay run from build to submission, reconciliation and statements.</p></div></article>
+    </div>
+  </section>
+
+  <section aria-labelledby="g-h" class="guide">
+    <div class="pdf">
+      <h2 id="g-h">User guide</h2>
+      <p class="lede" style="margin:0">Step-by-step instructions for every screen, quoting the exact labels you see. One chapter per role.</p>
+      <a class="btn" href="ADI-Praxis-User-Guide.pdf" target="_blank" rel="noopener">Open the PDF</a>
+    </div>
+    <ol class="chapters">
+      <li><b>Getting started.</b> The three apps, signing in, the menu, Help, common messages.</li>
+      <li><b>Admin.</b> Templates, guidelines, courses and tests, partners, users, terms, keys.</li>
+      <li><b>Program Manager.</b> Projects, opportunity pages, staffing, requisitions, progress.</li>
+      <li><b>Validator.</b> Applications, task reviews, RL reviews, certification reviews.</li>
+      <li><b>Finance.</b> Rate cards, earnings and holds, pay runs, reconciliation, statements.</li>
+      <li><b>Staffing partner.</b> Requisitions, submitting candidates, tracking, statements, API.</li>
+      <li><b>Expert (SME).</b> Applying, identity, profile, onboarding, certification, KYC tasks, payments.</li>
+      <li><b>Roles, user IDs and admin functions.</b> Who can do what, and every Admin function.</li>
+      <li><b>Troubleshooting and FAQ.</b></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="a-h">
+    <h2 id="a-h">Demo accounts</h2>
+    <p class="lede">The same user IDs work in the test and demo environments. Passwords are kept in Google Secret Manager; ask the platform owner. Never share them in email or chat.</p>
+    <div class="tablebox"><table>
+      <thead><tr><th>User ID</th><th>Role</th><th>Signs in at</th></tr></thead>
+      <tbody>
+        <tr><td><code>admin@praxis.demo</code></td><td>Admin</td><td>Console</td></tr>
+        <tr><td><code>pm@praxis.demo</code></td><td>Program Manager (Pat Morgan)</td><td>Console</td></tr>
+        <tr><td><code>reviewer@praxis.demo</code></td><td>Validator (Riley Chen)</td><td>Console</td></tr>
+        <tr><td><code>finance@praxis.demo</code></td><td>Finance (Farah Iqbal)</td><td>Console</td></tr>
+        <tr><td><code>partner@praxis.demo</code></td><td>Partner user, Demo Staffing Partner (Meera Nair)</td><td>Partner portal: console address + <code>/partner/login</code></td></tr>
+        <tr><td>Any new email</td><td>Expert (SME)</td><td>Candidate app, simulated Google sign-in</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="note" aria-label="About these recordings">
+    <p>All data in the videos is synthetic. Sign-in, the identity and selfie checks, email and payouts are simulated, as in every test environment.</p>
+    <p>The certification answers in the Expert video are chosen without knowing them, so the result shown is whatever they earn.</p>
+  </section>
+</main>
+<footer>ADI Praxis by ADI-Labs · Release 1.1 · Recorded __RECORDED__</footer>
+</div>

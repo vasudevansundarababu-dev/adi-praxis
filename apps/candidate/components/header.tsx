@@ -30,6 +30,9 @@ export async function Header() {
               </Link>
             </>
           )}
+          <Link href="/tutorials" className="text-link hover:underline">
+            Tutorials
+          </Link>
           {me ? <SignOut /> : <Link href="/sign-in" className="btn btn-primary !px-3 !py-1.5">Sign in</Link>}
         </nav>
       </div>

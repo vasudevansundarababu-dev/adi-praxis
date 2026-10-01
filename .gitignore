@@ -5,6 +5,7 @@ dist/
 .next-verify/
 .next-verify-dev/
 .next-e2e/
+.next-video/
 test-results/
 playwright-report/
 out/

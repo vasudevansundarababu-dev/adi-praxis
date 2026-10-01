@@ -6,8 +6,8 @@ const c = (id, title, o) => ({ id, title, persona: 'Finance', ...o });
 export const CASES = [
   c('TC-FIN-001', 'Finance menu, home and what Finance cannot open', {
     category: 'FUNC', priority: 'P1', pre: 'Signed in as Finance.',
-    steps: ['Read the menu and the home page.', 'Open Payments and read the tabs.', 'Type /projects, /review/applications, /partners and /users in the address bar.'],
-    expected: ['Menu: Home and Payments only. Your role shows as "Finance".', 'Payments tabs: Pay runs, Rate cards, Earnings and holds, Payout exceptions, Partner statements.', 'Every other area shows "This page is for …; you are signed in as Finance" with a way back, never a bare 404 or an error.'],
+    steps: ['Read the menu and the home page.', 'Open Payments and read the tabs.', 'Type /projects, /templates, /requisitions, /review/applications, /certifications, /guidelines, /partners, /api-clients and /users in the address bar.'],
+    expected: ['Menu: Home and Payments only (no second row; Payments has its own tabs). Your role shows as "Finance". Home tiles: Pay runs waiting for you (runs to approve or submit) and Open payout exceptions.', 'Payments tabs: Pay runs, Rate cards, Earnings and holds, Payout exceptions, Partner statements.', 'Every other area shows the No access card "This page is for …" with Go to your home page, never a bare 404, an empty page or an error (D-PL-05). Code currently differs on three, log a defect for each you see: /projects and /templates open an empty list ("No projects yet.") instead of the No access card, and /users shows a plain 404 page.'],
     decisions: ['D-PL-05', 'D-UI-03', 'D-M10-36'],
   }),
   c('TC-FIN-002', 'Rate cards: create, new version, never edited', {
@@ -75,5 +75,12 @@ export const CASES = [
     steps: ['Help → "Why can\'t I do this step yet?" on a run waiting for a PM.', 'Ask: "What does single approver mean here?" and "Which SMEs are held and why?"', 'Ask: "Approve this pay run for me." Then reload the run page.'],
     expected: ['It explains that a PM must confirm first, using this run\'s real state.', 'Answers match D-M10-32 and D-M10-33 and the run on screen.', 'It does not approve; it says Finance approves with the button. The run is unchanged after reload.'],
     decisions: ['D-UI-05', 'D-UI-06', 'D-M10-33'],
+  }),
+  // ── Added in the 1.1 coverage audit (1 Oct 2026) ──
+  c('TC-FIN-013', 'Finance cannot approve a pay run that pays them', {
+    category: 'SEC', priority: 'P2', pre: 'Coordinate with the lead (takes a day). The lead creates a Finance account finance.<initials>.self@example.test (POST /api/v1/users, TC-ADM-001). The same email is used to sign in to the candidate app as an SME on the direct-pay demo requisition, who completes onboarding and payment set-up and has one task accepted (TC-E2E-008 steps). A second Finance user (finance@praxis.demo). An earlier Monday agreed with the lead.',
+    steps: ['Finance (self): build the pay run for the week of the acceptance; a PM confirms it.', 'Finance (self): open the run → Approve pay run. Read the note above the buttons.', 'With a REST tool, POST /api/v1/pay-runs/<id>/approve as Finance (self).', 'The second Finance user approves.'],
+    expected: ['The page says "You cannot approve a run that pays you. Approving checks this and says so."', 'Approving is refused (403): "You are paid in this run; another Finance approver must approve it." The run stays Confirmed.', 'The second Finance user can approve; the run shows who approved. Cancel the run afterwards if the week is needed by others.'],
+    decisions: ['D-M10-33', 'D-PL-05'],
   }),
 ];

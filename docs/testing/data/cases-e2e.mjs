@@ -4,19 +4,19 @@ const c = (id, title, o) => ({ id, title, persona: 'Several', category: 'E2E', .
 export const CASES = [
   c('TC-E2E-001', 'Full journey: a new expert is recruited, onboarded, drafts a KYC task from an interview, and it is accepted into the dataset', {
     priority: 'P1',
-    pre: 'Three browser profiles (see README "Several roles at once"): PM, Reviewer, SME. The Reviewer is assigned to your project. Your project is published, STAFFING, and has a free place.',
+    pre: 'Three browser profiles (see README "Several roles at once"): PM, Validator, SME. The Validator is assigned to your project. Your project is published, STAFFING, and has a free place.',
     steps: [
       'SME: open the candidate app, sign in with the mock form as sme.<you>.e2e1@example.test, tick 18+, continue.',
       'SME: Verify identity → Start verification → on the simulated page choose "Verified (18 or over)".',
       'SME: Opportunities → your project → "Apply: build my SME profile". Answer the six questions (tap chips where offered). Review and submit.',
-      'Reviewer: Applications → the new application. Read the AI recommendation and reasons. Choose "Select for this pool", write a reason and a message, keep the approved scope, Record decision.',
+      'Validator: Reviews → Applications → the new application. Read the AI recommendation and reasons. Choose "Select for this pool", write a reason and a message, keep the approved scope, Record decision.',
       'SME: open the application status page → Start onboarding. Complete all 7 steps. In Work preferences choose India and Asia/Kolkata.',
-      'PM: Projects → your project → Staffing → Re-run match. Find the SME and click Assign.',
+      'PM: Projects → Projects → your project → Start staffing (Resource assignment) → Re-run match. Find the SME and click Assign.',
       'SME: Home → the assignment card → Accept → Open workbench. Open the first task.',
       'SME: W00 → "Answer a short interview". Answer all 8 questions. → "Draft my task". Wait for the draft (about 1 minute with the real AI).',
       'SME: visit W01–W05. Read each section, fix anything unrealistic, click "I\'ve checked this section" on each.',
       'SME: W06 → Run checks → tick the synthetic-data declaration → Submit for review.',
-      'Reviewer: Task reviews → the task. Read "How this task was made", the checks and similar tasks. Answer the checklist. Accept.',
+      'Validator: Reviews → Task reviews → the task. Read "How this task was made", the checks and similar tasks. Answer the checklist. Decision Accept → Record decision.',
       'Admin (optional): call GET /api/v1/dataset/records?projectId=<id> and GET /api/v1/dataset/verification.',
     ],
     expected: [
@@ -36,36 +36,36 @@ export const CASES = [
       'Choose the sample file, tick the declaration, Upload.',
       'Draft my task. Wait for "Writing your draft…" to finish; the page reloads.',
       'Check and confirm W01–W05, then submit from W06.',
-      'Reviewer: open the task, open the source file from "How this task was made", accept or request rework.',
+      'Validator: Reviews → Task reviews → the task; open the source file from "How this task was made"; Accept or Request rework.',
     ],
     expected: [
       'The upload shows the file name, size and "characters read"; no warning (the sample has no real identifiers).',
       'The draft reflects the procedure (ownership over 25%, escalation of high risk) but with invented parties.',
-      'The Reviewer can download the same file; the PM cannot (see TC-SEC-012).',
+      'The Validator can download the same file; the PM cannot (see TC-SEC-012).',
     ],
     decisions: ['D-M9-01', 'D-M9-02', 'D-M9-04', 'D-M9-05'],
   }),
-  c('TC-E2E-003', 'Rework loop: the Reviewer asks for changes, the expert fixes them, the Reviewer sees what changed', {
+  c('TC-E2E-003', 'Rework loop: the Validator requests rework, the expert fixes it, the Validator sees what changed', {
     priority: 'P1',
     pre: 'A submitted KYC task.',
     steps: [
-      'Reviewer: open the task → decision "Request rework". Add a comment pinned to W04 ("The near match must be cleared on date of birth") and a note. Submit.',
-      'SME: open the task. Read the reviewer\'s message on W01, follow the link to W04, change the step, resubmit from W06.',
-      'Reviewer: open the task again.',
+      'Validator: Reviews → Task reviews → the task → Decision "Request rework". Add a comment pinned to W04 ("The near match must be cleared on date of birth") and a note. Record decision.',
+      'SME: open the task. Read "The Validator asked for changes" on W01, follow the link to W04, change the step, resubmit from W06.',
+      'Validator: open the task again.',
     ],
     expected: [
-      'The SME sees the comment on W01 and pinned on W04; the task is editable again (status "Changes requested").',
-      'On resubmit, the Reviewer sees "Resubmitted after rework. Changed since the last version: W04 …" and the version number increased.',
+      'The SME sees the comment on W01 and pinned on W04; the task is editable again (status "Changes requested"). The pinned comment should be labelled as the Validator\'s (code currently prefixes it "Reviewer:": log one UX issue per D-M10-03).',
+      'On resubmit, the Validator sees "Resubmitted after rework. Changed since the last version: W04 …" and the version number increased.',
     ],
-    decisions: ['D-M5-12'],
+    decisions: ['D-M5-12', 'D-M10-03'],
   }),
   c('TC-E2E-004', 'Not selected, then asks for a review of the decision', {
     priority: 'P2',
     pre: 'A submitted application.',
     steps: [
-      'Reviewer: choose "Not selected for this pool" with a task-related reason and a respectful message.',
-      'SME: open the status page. Read the message. Use the option to request a review of the decision, with a short explanation.',
-      'Reviewer: Applications → the application now shows as review requested → Reopen for decision → Select.',
+      'Validator: Reviews → Applications → the application → "Not selected for this pool" with a task-related reason and a respectful message → Record decision.',
+      'SME: open the status page. Read the message. Ask for a review: "What should the Validator know?" → Request review.',
+      'Validator: Reviews → Applications → the application now shows as review requested → Reconsider → Reopen for decision → Select for this pool → Record decision.',
     ],
     expected: [
       'The SME\'s message is respectful and specific; it never judges the person.',
@@ -73,16 +73,16 @@ export const CASES = [
     ],
     decisions: ['D-M4C-05', 'D-M6-01'],
   }),
-  c('TC-E2E-005', 'RL review loop: RL Gym sends a result, a Reviewer judges it, RL Gym pulls the verdict', {
+  c('TC-E2E-005', 'RL review loop: RL Gym sends a result, a Validator judges it, RL Gym pulls the verdict', {
     priority: 'P1',
     pre: 'At least one accepted task (its dataset record id). An RL Gym API key from Admin → API clients. A tool that sends HTTP requests (curl or Postman).',
     steps: [
       'RL Gym: POST /api/v1/integrations/rl-gym/review-requests with the sample body in docs/testing/samples/rl-review-request.json (put your record id in source_record_ids).',
-      'Reviewer: RL reviews → open the request → Claim. For each metric choose agree/disagree (comment where you disagree). Choose FAIL with a comment pinned to a trajectory step and a failure code. Submit.',
+      'Validator: Reviews → RL reviews → open the request → Claim this review. For each automated eval choose Agree or Disagree (Why where you disagree). Choose fail with a comment on a trajectory step and a failure code. Submit verdict.',
       'RL Gym: GET /api/v1/integrations/rl-gym/results.',
     ],
     expected: [
-      'The request appears in the RL reviews queue of Reviewers assigned to that project.',
+      'The request appears in the RL reviews queue of Validators assigned to that project.',
       'The verdict is returned with the metric verdicts and comments; a second GET with ?after=<seq> returns nothing new.',
     ],
     decisions: ['D-M7-01', 'D-M7-02', 'D-M7-03'],
@@ -91,11 +91,11 @@ export const CASES = [
     priority: 'P2',
     pre: 'Admin and PM accounts.',
     steps: [
-      'Admin: Templates → check "KYC onboarding and refresh" is published (or publish a new version).',
-      'PM: Projects → New project. Choose the template, name it "<you> KYC <date>", distinct target 6, max per expert 3, TPT 90, dates next week, add a preferred country filter (IN). Save, then Submit.',
-      'PM: Opportunity → paste a short brief (or import a PDF), confirm it, Publish.',
-      'Admin or PM: assign a Reviewer to the project.',
-      'PM: Staffing → Re-run match.',
+      'Admin: Projects → Templates → check "KYC onboarding and refresh" is published (or publish a new version).',
+      'PM: Projects → Projects → New project. Six steps: the template; name "<you> KYC <date>" and dates next week; Authoring, distinct target 6, max per expert 3, TPT 90; a preferred country filter (IN); a job description. Submit project.',
+      'PM: project page → Opportunity page → fill the brief (or Import a JD document and Confirm text), Save and publish.',
+      'PM (or Admin): project page → Validators → choose the Validator → Add.',
+      'PM: Start staffing → Resource assignment → Re-run match.',
     ],
     expected: [
       'Submit shows the calculated number of workers needed.',
@@ -128,7 +128,7 @@ export const CASES = [
       'Validator: Reviews → Applications → the application → Select, with reason and message → Record decision.',
       'SME: application status → Start onboarding. Complete the manual steps. Open "Guidelines course and certification" → complete every module → Go to the test → selfie check (simulated) → take the test and aim to pass → submit.',
       'SME: Payments → Set up payments → simulated payout provider → Finish. Onboarding is complete.',
-      'PM: Projects → KYC authoring demo → Staffing → Re-run match → Assign the SME. SME: Home → Accept → Open workbench → write (or draft) one task and submit it (as in TC-E2E-001).',
+      'PM: Projects → Projects → KYC authoring demo → Resource assignment → Re-run match → Assign the SME. SME: Home → Accept → Open workbench → write (or draft) one task and submit it (as in TC-E2E-001).',
       'Validator: Reviews → Task reviews → the task → Accept.',
       'SME: Payments → one "Accepted task" line, USD 40.00.',
       'Finance: Payments → Pay runs → Build pay run for Monday 28 Sep 2026 (or the Monday of the acceptance week). PM: open the run → Confirm pay run. Finance: Approve pay run → Submit to payout provider. Wait a few minutes and reload.',
@@ -187,5 +187,26 @@ export const CASES = [
     steps: ['Run TC-E2E-001 end to end, using the new menu (Reviews → Applications, Reviews → Task reviews, Projects → Projects).', 'Run TC-E2E-003 (rework loop).'],
     expected: ['Both journeys behave exactly as in 1.0, apart from the menu, the "Validator" label and the required-field markers.', 'Without a requisition the onboarding checklist has no certification or payment items (1.0 behaviour).', 'Any difference from 1.0 behaviour is a defect; mark it "regression" in the title.'],
     decisions: ['D-M10-01', 'D-M10-03', 'D-UI-03'],
+  }),
+  // ── Added in the 1.1 coverage audit (1 Oct 2026) ──
+  c('TC-E2E-012', 'Console user lifecycle: create a Validator by API, assign, decide, disable', {
+    priority: 'P2',
+    pre: 'Admin (REST tool with session cookie, README section 9), PM (owner of a project with a submitted application) and a fresh browser profile for the new Validator. There is no user screen in 1.1: users are managed with the API (ROLES-AND-ADMIN section 4).',
+    steps: [
+      'Admin: POST /api/v1/users with {"email":"validator.<initials>.e2e12@praxis.test","name":"<initials> Validator","roles":["REVIEWER"],"password":"<12+ characters>"} and an Idempotency-Key. Admin → Users: check the new row.',
+      'New Validator: sign in. Read the menu and Home; open Reviews → Applications.',
+      'PM: project page → Validators → add the new Validator.',
+      'New Validator: reload Reviews → Applications; decide the application (Ask for more information).',
+      'Admin: PATCH /api/v1/users/<id>/status {"status":"DISABLED"}. New Validator: click anything; try to sign in again.',
+      'PM: open the application\'s decision history. Admin: PATCH the status back to ACTIVE.',
+    ],
+    expected: [
+      'The user is created (201) and listed as Validator, Active.',
+      'Before assignment the Validator sees the Reviews and Certification groups but an empty Applications queue; after assignment the project\'s applications appear.',
+      'The decision is recorded with the Validator\'s name; the candidate sees the question.',
+      'Disabling signs them out at once; sign-in is refused ("This account is disabled"). The decision they made stays on record and is never removed.',
+      'Re-enabling lets them sign in again. Every step is audited (the lead checks on request).',
+    ],
+    decisions: ['D-PL-05', 'D-M4C-04', 'D-M4C-05', 'D-PL-06'],
   }),
 ];

@@ -23,8 +23,8 @@ export const CASES = [
   }),
   c('TC-SEC-004', 'Role access by URL (vertical privilege)', {
     priority: 'P1', pre: 'One browser profile per role.',
-    steps: ['As PM, SME and Reviewer, open every console URL listed in README "Console map" and every /api/v1 path in docs/testing/API-QUICK-REFERENCE.md that is not for your role.'],
-    expected: ['Pages show the "This page is for …" explanation; API calls return 401 (not signed in) or 403 (wrong role). No data from another role is ever shown.'],
+    steps: ['As PM, Validator, Finance, SME and partner, open every console URL in docs/user-guide/ROLES-AND-ADMIN.md section 3 (and docs/testing/COVERAGE.md) that is not for your role, and every /api/v1 path in docs/testing/API-QUICK-REFERENCE.md that is not for your role.'],
+    expected: ['Pages show the No access card ("This page is for …") with Go to your home page; API calls return 401 (not signed in) or 403 (wrong role). No data from another role is ever shown. Known page-guard differences are listed in TC-SEC-028.'],
     decisions: ['D-PL-05', 'D-PL-04'],
   }),
   c('TC-SEC-005', 'Another candidate\'s data (horizontal privilege)', {
@@ -33,8 +33,8 @@ export const CASES = [
     expected: ['All are "not found" (404) for A; nothing of B\'s is shown.'],
     decisions: ['D-M9-02'],
   }),
-  c('TC-SEC-006', 'Reviewer of another project (horizontal privilege)', {
-    priority: 'P1', pre: 'A reviewer not assigned to project X; an application, task and source file from X.',
+  c('TC-SEC-006', 'Validator of another project (horizontal privilege)', {
+    priority: 'P1', pre: 'A Validator not assigned to project X; an application, task and source file from X.',
     steps: ['Open /review/applications/<id>, /review/tasks/<id>, and /api/v1/review/tasks/<id>/sources/<sourceId>/file.'],
     expected: ['Not found (404) for each.'],
     decisions: ['D-M4C-04', 'D-M9-02'],
@@ -65,14 +65,14 @@ export const CASES = [
   }),
   c('TC-SEC-011', 'Script injection in text fields (stored XSS)', {
     priority: 'P1', pre: 'Any role.',
-    steps: ['Enter <img src=x onerror=alert(1)> and "><script>alert(2)</script> into: candidate display name, chat answers, interview answers, W02 business context, a party name, a tool response, a reviewer comment, a project name, a decision message.', 'View each where others see it (reviewer screens, PM screens, lists).'],
+    steps: ['Enter <img src=x onerror=alert(1)> and "><script>alert(2)</script> into: candidate display name, chat answers, interview answers, W02 business context, a party name, a tool response, a Validator comment, a project name, a decision message.', 'View each where others see it (Validator screens, PM screens, lists).'],
     expected: ['The text is shown literally; no alert ever runs; no broken layout.'],
     decisions: ['D-PL-07'],
   }),
-  c('TC-SEC-012', 'Source files are private to author, project Reviewers and Admins', {
-    priority: 'P1', pre: 'A drafted task with a source file; accounts for the author, a project reviewer, an unassigned reviewer, a PM, another candidate.',
+  c('TC-SEC-012', 'Source files are private to author, project Validators and Admins', {
+    priority: 'P1', pre: 'A drafted task with a source file; accounts for the author, a project Validator, an unassigned Validator, a PM, another candidate.',
     steps: ['Each opens the file URL (author: /api/v1/me/tasks/<t>/sources/<s>/file; others: /api/v1/review/tasks/<t>/sources/<s>/file).'],
-    expected: ['Only the author, the assigned reviewer and Admins get the file; each reviewer/admin opening is in the audit log (task.source.opened). Others get 401/403/404. Responses are Cache-Control: private, no-store.'],
+    expected: ['Only the author, the assigned Validator and Admins get the file; each Validator/Admin opening is in the audit log (task.source.opened). Others get 401/403/404. Responses are Cache-Control: private, no-store.'],
     decisions: ['D-M9-02'],
   }),
   c('TC-SEC-013', 'Uploaded file names and types cannot be abused', {
@@ -101,8 +101,8 @@ export const CASES = [
   }),
   c('TC-SEC-017', 'Candidates cannot change their own status or evidence level', {
     priority: 'P1', pre: 'Candidate cookie; REST tool.',
-    steps: ['Try the reviewer endpoints (/api/v1/review/…) with the candidate cookie.', 'Try to send extra fields like "status":"SELECTED" or "evidenceLevel":"VERIFIED" to candidate endpoints.'],
-    expected: ['Reviewer endpoints: 401/403. Extra fields are ignored or rejected; nothing changes.'],
+    steps: ['Try the Validator endpoints (/api/v1/review/…) with the candidate cookie.', 'Try to send extra fields like "status":"SELECTED" or "evidenceLevel":"VERIFIED" to candidate endpoints.'],
+    expected: ['Validator endpoints: 401/403. Extra fields are ignored or rejected; nothing changes.'],
     decisions: ['D-M4C-05', 'D-FB-02'],
   }),
   c('TC-SEC-018', 'Mock sign-in exists only in demo/test', {
@@ -165,5 +165,17 @@ export const CASES = [
     steps: ['As the candidate, as Finance and as Admin, look through Payments, the pay run lines, the candidate record and the certification review.', 'In DevTools, search the responses of those pages for "account", "ifsc", "pan", "tax", "selfie", "image".'],
     expected: ['Only the provider, a reference, a status and the payout currency for payees; only a reference and the result for selfie checks. No bank account, IFSC, PAN, tax form, photo or ID number anywhere. Any such value is S1.'],
     decisions: ['D-M10-36', 'D-M10-19', 'D-PL-10'],
+  }),
+  // ── Added in the 1.1 coverage audit (1 Oct 2026) ──
+  c('TC-SEC-028', 'Page guards match the menu: no page opens for a role that has no menu entry for it', {
+    priority: 'P1', pre: 'One browser profile per role: Admin, PM (without other roles), Validator (REVIEWER only), Finance. Expected per D-PL-05 and docs/user-guide/ROLES-AND-ADMIN.md section 3. The notes in brackets say what the code currently does: when you see it, log one defect per page naming this case.',
+    steps: ['PM: type /guidelines, /certifications, /partners, /partners/<id of Demo Staffing Partner>, /review/tasks, /payments/earnings, /taxonomy, /terms, /failure-codes, /api-clients, /users.', 'Validator: type /projects, /projects/new, /templates, /templates/new, /requisitions/new, /payments/pay-runs, /payments/rate-cards, /partners, /users.', 'Finance: type /projects, /templates, /requisitions, /review/applications, /guidelines, /partners, /api-clients, /users.', 'Admin: type /projects/new.', 'For each, note the page you get: No access card, empty page, plain 404 or the real page.'],
+    expected: ['Every page outside your role\'s menu shows the No access card "This page is for …" with Go to your home page; never a bare 404, an empty list or the page itself.', 'PM: /guidelines (code currently lets PMs in, read-only list) and /partners (code currently shows PMs a read-only partner list) should be refused; Partners → a partner is refused ("This page is for Admins").', 'Validator and Finance: /projects and /templates should be refused (code currently opens an empty "Projects" / "Templates" page because only the API refuses).', 'Every non-Admin: /users should show the No access card (code currently shows a plain 404 page).', 'Admin: /projects/new shows "This page is for PMs" (by design: only a PM creates projects).', 'No data of another role appears on any of these pages; if it does, that is S2 or higher.'],
+    decisions: ['D-PL-05', 'D-UI-03'],
+  }),
+  c('TC-SEC-029', 'Tutorial files need a console or partner sign-in and cannot be reached outside their folder', {
+    category: 'Security', priority: 'P2', pre: 'A private window, signed out; then a partner session.',
+    steps: ['Signed out, open <console URL>/tutorials/files/01-getting-started.mp4 and /tutorials/files/ADI-Praxis-User-Guide.pdf.', 'Try /tutorials/files/..%2F..%2Fpackage.json and other names that are not in the Tutorials page.', 'Sign in as a partner and repeat step 1.'],
+    expected: ['Signed out: 401 "Sign in to watch the tutorials."', 'Unknown names and path tricks: Not found; nothing outside the tutorials folder is ever returned.', 'Partner: staff files are Not found; only the partner video and guide are served.'],
   }),
 ];

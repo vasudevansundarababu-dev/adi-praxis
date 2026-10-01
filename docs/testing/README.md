@@ -9,6 +9,7 @@ session; keep it open while you test.
 | File | What it is |
 | --- | --- |
 | `README.md` | This guide |
+| [../user-guide/](../user-guide/README.md) | The user guide: how each role uses every screen (read the chapter for the persona you test) |
 | [WHATS-NEW-1.1.md](WHATS-NEW-1.1.md) | Briefing for the Release 1.1 test build: what changed, menu paths, a 60-minute guided walkthrough |
 | [TEST-CASES.md](TEST-CASES.md) | All test cases, by persona, with steps and expected results |
 | [test-cases.csv](test-cases.csv) | The same cases as a spreadsheet to record your runs (open in Excel or import into Google Sheets) |
@@ -76,6 +77,9 @@ time and build), not once per screen, and continue with other cases.
   review queue), and there is no SME search; holds are placed by SME id.
 - Partners cannot upload a **CV** with a submission.
 - Partners **cannot manage their own portal users**; an Admin adds them (Partners → a partner → Portal users).
+- No screens for console **user management** (add, change roles, disable), the **audit log**, the **Approved Task
+  Dataset** or **SME standing**: these are API only (TC-ADM-001 to 003, TC-ADM-034, TC-ADM-035). Partner **portal users
+  cannot be disabled**; suspend the partner instead (TC-ADM-030).
 - Earnings lines do not show the task title; integrity events (paste, leaving the page) are not shown to graders yet.
 - Experts can approve but not reject a question family in the candidate app.
 - Some success messages disappear when the page refreshes into the next state.
@@ -140,6 +144,7 @@ Non-negotiables you should actively try to break (report any breach as **S1**):
 5. Run **TC-E2E-001** together with another tester (one plays SME, the other Validator and PM). It takes about an
    hour and shows you the whole product. Then follow the **day 1 order** in "What's new" above.
 6. Copy `test-cases.csv` into your own sheet (or the team's shared Google Sheet) and start on your assigned group.
+   [COVERAGE.md](COVERAGE.md) shows which cases cover each screen, role and Admin function, and what is not covered yet.
 
 ## 3. The test environment
 
@@ -173,8 +178,12 @@ Non-negotiables you should actively try to break (report any breach as **S1**):
 
 ## 4. Accounts
 
-**Console users** (Admin, PM, Validator, Finance): the lead tester creates named accounts for each tester in Admin →
-Users, e.g. `pm.pk@praxis.test`, `reviewer.pk@praxis.test` (role Validator), `finance.pk@praxis.test`. Passwords are
+**Console users** (Admin, PM, Validator, Finance): the lead tester creates named accounts for each tester with the
+API, because Admin → Users is a read-only list in 1.1 (no Add, Edit or Disable screen): `POST /api/v1/users` with an
+Admin session cookie, an `Idempotency-Key` and `{"email","name","roles","password"}` (roles `PM`, `REVIEWER` for
+Validator, `FINANCE`, `ADMIN`), e.g. `pm.pk@praxis.test`, `validator.pk@praxis.test`, `finance.pk@praxis.test`. Roles
+change with `PATCH /api/v1/users/<id>/roles` and accounts are disabled with `PATCH /api/v1/users/<id>/status` (see
+TC-ADM-001 to TC-ADM-003 and [ROLES-AND-ADMIN.md](../user-guide/ROLES-AND-ADMIN.md#4-admin-functions)). Passwords are
 at least 12 characters; share them only in the team password manager, never in GitHub or chat. The built-in accounts
 `admin@praxis.demo`, `pm@praxis.demo`, `reviewer@praxis.demo` (Validator) and, new in 1.1, `finance@praxis.demo` are
 shared: the lead gives out their passwords (from Secret Manager) when a case needs them, e.g. the PM who owns the
@@ -289,7 +298,8 @@ Some tests call the API directly. Use Postman (desktop app) or `curl`.
   `POST https://praxis-api-742785092638.us-central1.run.app/partner/v1/oauth/token` (grant_type=client_credentials),
   then send `Authorization: Bearer <token>` to `/partner/v1/...` (TC-PTR-011). Tokens last one hour.
 - **Every POST, PUT, PATCH and DELETE** needs a header `Idempotency-Key: <a new UUID>` (Postman: `{{$guid}}`).
-- See [API-QUICK-REFERENCE.md](API-QUICK-REFERENCE.md) for every endpoint and who may call it, and `https://praxis-api-742785092638.us-central1.run.app/docs`
+- See [API-QUICK-REFERENCE.md](API-QUICK-REFERENCE.md) for every endpoint and who may call it (the Partner API is listed
+  under `/partner/v1`; everything else is under `/api/v1`), and `https://praxis-api-742785092638.us-central1.run.app/docs`
   for request and response shapes.
 
 Example (RL Gym request, macOS/Linux):

@@ -53,3 +53,16 @@ takes about 30 minutes locally and longer on the test environment, where Claude 
 
 To add or change a caption, edit `c.say('…')` in `e2e/demo-videos/story.spec.ts`. To re-record with a human voice,
 use the captions as the script.
+
+## Sharing outside the repository
+
+`node e2e/demo-videos/package.mjs` (after `make-videos.mjs`) builds two things:
+
+- `out/handbook/`: a handbook page (`page.html`, or `index.html` to open locally) with the role videos at web size,
+  the guide PDF and the demo user IDs.
+- `out/ADI-Praxis-1.1-Handbook.zip`: the same, plus the full-quality videos and the 23-minute full walkthrough. Put
+  this zip on a shared Google Drive or SharePoint folder for people outside the platform team.
+
+The handbook is also published as a private page on claude.ai (https://claude.ai/artifact/9kAo1if3WiSXVMmHEXxDdN).
+Share it from the page's Share menu. After re-recording, run `package.mjs` again and republish the page to the same
+link.

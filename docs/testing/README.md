@@ -9,6 +9,7 @@ session; keep it open while you test.
 | File | What it is |
 | --- | --- |
 | `README.md` | This guide |
+| [../user-guide/](../user-guide/README.md) | The user guide: how each role uses every screen (read the chapter for the persona you test) |
 | [WHATS-NEW-1.1.md](WHATS-NEW-1.1.md) | Briefing for the Release 1.1 test build: what changed, menu paths, a 60-minute guided walkthrough |
 | [TEST-CASES.md](TEST-CASES.md) | All test cases, by persona, with steps and expected results |
 | [test-cases.csv](test-cases.csv) | The same cases as a spreadsheet to record your runs (open in Excel or import into Google Sheets) |

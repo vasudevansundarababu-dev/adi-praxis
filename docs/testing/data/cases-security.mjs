@@ -173,4 +173,9 @@ export const CASES = [
     expected: ['Every page outside your role\'s menu shows the No access card "This page is for …" with Go to your home page; never a bare 404, an empty list or the page itself.', 'PM: /guidelines (code currently lets PMs in, read-only list) and /partners (code currently shows PMs a read-only partner list) should be refused; Partners → a partner is refused ("This page is for Admins").', 'Validator and Finance: /projects and /templates should be refused (code currently opens an empty "Projects" / "Templates" page because only the API refuses).', 'Every non-Admin: /users should show the No access card (code currently shows a plain 404 page).', 'Admin: /projects/new shows "This page is for PMs" (by design: only a PM creates projects).', 'No data of another role appears on any of these pages; if it does, that is S2 or higher.'],
     decisions: ['D-PL-05', 'D-UI-03'],
   }),
+  c('TC-SEC-029', 'Tutorial files need a console or partner sign-in and cannot be reached outside their folder', {
+    category: 'Security', priority: 'P2', pre: 'A private window, signed out; then a partner session.',
+    steps: ['Signed out, open <console URL>/tutorials/files/01-getting-started.mp4 and /tutorials/files/ADI-Praxis-User-Guide.pdf.', 'Try /tutorials/files/..%2F..%2Fpackage.json and other names that are not in the Tutorials page.', 'Sign in as a partner and repeat step 1.'],
+    expected: ['Signed out: 401 "Sign in to watch the tutorials."', 'Unknown names and path tricks: Not found; nothing outside the tutorials folder is ever returned.', 'Partner: staff files are Not found; only the partner video and guide are served.'],
+  }),
 ];

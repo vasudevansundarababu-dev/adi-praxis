@@ -8,7 +8,16 @@ import path from 'node:path';
 
 const DIR = import.meta.dirname;
 const OUT = path.resolve(DIR, '../../out/user-guide');
-const CHAPTERS = ['README.md', '01-getting-started.md', '02-admin.md', '03-pm.md', '04-validator.md', '05-finance.md', '06-partner.md', '07-sme.md', 'ROLES-AND-ADMIN.md', '08-troubleshooting.md', 'VIDEOS.md'];
+// Variants: the full guide for ADI-Labs staff, and short guides for experts and staffing partners (the in-app
+// Tutorials pages; they leave out internal admin details). Usage: build-pdf.mjs [full|expert|partner]
+const VARIANTS = {
+  full: { file: 'ADI-Praxis-User-Guide', title: 'ADI Praxis user guide', sub: 'Release 1.1 · for Admins, Program Managers, Validators, Finance, staffing partners and experts', chapters: ['README.md', '01-getting-started.md', '02-admin.md', '03-pm.md', '04-validator.md', '05-finance.md', '06-partner.md', '07-sme.md', 'ROLES-AND-ADMIN.md', '08-troubleshooting.md', 'VIDEOS.md'] },
+  expert: { file: 'ADI-Praxis-Expert-Guide', title: 'ADI Praxis expert guide', sub: 'Release 1.1 · for subject-matter experts who write tasks', chapters: ['07-sme.md'] },
+  partner: { file: 'ADI-Praxis-Partner-Guide', title: 'ADI Praxis partner guide', sub: 'Release 1.1 · for staffing partners', chapters: ['06-partner.md'] },
+};
+const V = VARIANTS[process.argv[2] ?? 'full'];
+if (!V) throw new Error(`unknown variant ${process.argv[2]}: use full, expert or partner`);
+const CHAPTERS = V.chapters;
 const anchor = (t) => t.toLowerCase().replace(/<[^>]+>/g, '').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-');
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -76,7 +85,7 @@ function render(md, file) {
 const body = CHAPTERS.map((f) => render(readFileSync(path.join(DIR, f), 'utf8'), f)).join('\n');
 const logo = readFileSync(path.resolve(DIR, '../brand/ADI-Labs-Icon.png')).toString('base64');
 const date = new Date().toISOString().slice(0, 10);
-const page = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>ADI Praxis user guide</title><style>
+const page = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${V.title}</title><style>
   @page { size: A4; margin: 18mm 16mm 20mm; }
   body { font: 10.5pt/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1b2433; }
   .cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
@@ -93,15 +102,15 @@ const page = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>
   blockquote { margin: 10px 0; padding: 6px 12px; border-left: 4px solid #f5a524; background: #fff8ea; }
   a { color: #1d5fa8; text-decoration: none; }
 </style></head><body>
-<div class="cover"><img src="data:image/png;base64,${logo}" alt=""><h1>ADI Praxis user guide</h1>
-<p>Release 1.1 · for Admins, Program Managers, Validators, Finance, staffing partners and experts</p><p>ADI-Labs · ${date}</p></div>
+<div class="cover"><img src="data:image/png;base64,${logo}" alt=""><h1>${V.title}</h1>
+<p>${V.sub}</p><p>ADI-Labs · ${date}</p></div>
 ${body}</body></html>`;
 
 mkdirSync(OUT, { recursive: true });
-writeFileSync(path.join(OUT, 'ADI-Praxis-User-Guide.html'), page);
+writeFileSync(path.join(OUT, `${V.file}.html`), page);
 const browser = await chromium.launch();
 const p = await browser.newPage();
 await p.setContent(page, { waitUntil: 'load' });
-await p.pdf({ path: path.join(OUT, 'ADI-Praxis-User-Guide.pdf'), format: 'A4', printBackground: true, displayHeaderFooter: true, headerTemplate: '<span></span>', footerTemplate: '<div style="font-size:8px;width:100%;text-align:center;color:#778">ADI Praxis user guide · release 1.1 · page <span class="pageNumber"></span> of <span class="totalPages"></span></div>', margin: { top: '18mm', bottom: '20mm', left: '16mm', right: '16mm' } });
+await p.pdf({ path: path.join(OUT, `${V.file}.pdf`), format: 'A4', printBackground: true, displayHeaderFooter: true, headerTemplate: '<span></span>', footerTemplate: `<div style="font-size:8px;width:100%;text-align:center;color:#778">${V.title} · release 1.1 · page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`, margin: { top: '18mm', bottom: '20mm', left: '16mm', right: '16mm' } });
 await browser.close();
-console.log(`wrote ${path.join(OUT, 'ADI-Praxis-User-Guide.pdf')}`);
+console.log(`wrote ${path.join(OUT, `${V.file}.pdf`)}`);

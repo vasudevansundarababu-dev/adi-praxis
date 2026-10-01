@@ -102,4 +102,9 @@ export const CASES = [
     expected: ['/partner/v1 works with the token.', 'The token is refused on /api/v1 paths (401 or 403); the portal API needs the portal cookie.', 'There is no token endpoint under /api/v1 (404).', 'The portal cookie does not authorise the Partner API (401).', 'The quick reference lists the Partner API under /partner/v1 with the scope each call needs. Any document that tells partners to use /api/v1 for the Partner API is a documentation defect.'],
     decisions: ['D-M10-02', 'D-M10-04'],
   }),
+  c('TC-PTR-017', 'Partner portal Tutorials: the partner video and guide', {
+    category: 'Functional', priority: 'P3', pre: 'Signed in to the partner portal as partner@praxis.demo.',
+    steps: ['Select Tutorials in the portal menu.', 'Play the video and open the guide.', 'In the same browser, open <console URL>/tutorials/files/ADI-Praxis-User-Guide.pdf and /tutorials/files/02-admin.mp4.'],
+    expected: ['The page is titled "Tutorials and partner guide" and shows one video (Staffing partner) and the partner guide PDF.', 'The staff guide and staff videos are refused (Not found): partners only get partner material.'],
+  }),
 ];

@@ -365,4 +365,9 @@ export const CASES = [
     expected: ['The progress line (Verify identity · Build profile · Reviewer decision · Onboarding · Assignment · Write tasks) marks the current stage. The decision stage should say "Validator decision" (code currently shows "Reviewer decision": log one UX issue per D-M10-03).', 'Next step always says what to do now and opens the right page; while waiting it says what you are waiting for.'],
     decisions: ['D-FB-04', 'D-M10-03'],
   }),
+  c('TC-SME-081', 'Candidate app Tutorials: the expert video and guide, before and after sign-in', {
+    category: 'Functional', priority: 'P3', pre: 'A fresh private window (signed out).',
+    steps: ['Open the candidate app and select Tutorials in the top navigation.', 'Play the video and open the expert guide.', 'Sign in and select Tutorials again.'],
+    expected: ['The Tutorials page works signed out and signed in, with one video ("How experts work on ADI Praxis") and "Expert guide (PDF)".', 'The guide covers only the expert journey; it contains no console, admin or API details.'],
+  }),
 ];

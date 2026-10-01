@@ -66,7 +66,19 @@ Support Bot is not available right now".
 
 The candidate app has no Help button.
 
-## 1.6 Status labels you will see often
+## 1.6 Tutorials (videos and this guide)
+
+Every app has a **Tutorials** page with short captioned videos and this guide as a PDF.
+
+| App | Where | What you get |
+| --- | --- | --- |
+| Console | **Tutorials** on the top row of the menu | "For your role" first (Getting started and your role's video), then the other roles; the full user guide |
+| Partner portal | **Tutorials** in the portal menu | The staffing partner video and the partner guide |
+| Candidate app | **Tutorials** in the top navigation (also when signed out) | The expert video and the expert guide |
+
+Console and partner tutorials need a sign-in; the candidate app's are public so people can see the work before applying.
+
+## 1.7 Status labels you will see often
 
 | Area | Labels |
 | --- | --- |
@@ -77,7 +89,7 @@ The candidate app has no Help button.
 | Certification | Not started, Course in progress, Ready for the test, Test in progress, Certified, Retake available, With a person for review, Not certified, Expired |
 | Pay run | Draft → Confirmed → Approved → Submitted → Completed (or Cancelled) |
 
-## 1.7 Reporting a problem (testers)
+## 1.8 Reporting a problem (testers)
 
 Follow [docs/testing/README.md](../testing/README.md): one problem per report, the build from the banner, the user ID
 (never the password), steps, what you expected and what you saw, and a screenshot.

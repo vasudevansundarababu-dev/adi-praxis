@@ -336,6 +336,10 @@
 "TC-SME-080","SME / candidate","SME","UX","P2","Home: journey progress and the Next step card","One candidate followed through the journey (reuse the TC-E2E-001 or TC-E2E-008 candidate).","1. After each stage (signed in, identity verified, profile submitted, selected, onboarded, assignment accepted, task submitted) open Home.
 2. Press the Next step button each time.","- The progress line (Verify identity · Build profile · Reviewer decision · Onboarding · Assignment · Write tasks) marks the current stage. The decision stage should say ""Validator decision"" (code currently shows ""Reviewer decision"": log one UX issue per D-M10-03).
 - Next step always says what to do now and opens the right page; while waiting it says what you are waiting for.","D-FB-04 D-M10-03","Not run","","","","",""
+"TC-SME-081","SME / candidate","SME","Functional","P3","Candidate app Tutorials: the expert video and guide, before and after sign-in","A fresh private window (signed out).","1. Open the candidate app and select Tutorials in the top navigation.
+2. Play the video and open the expert guide.
+3. Sign in and select Tutorials again.","- The Tutorials page works signed out and signed in, with one video (""How experts work on ADI Praxis"") and ""Expert guide (PDF)"".
+- The guide covers only the expert journey; it contains no console, admin or API details.","","Not run","","","","",""
 "TC-PM-001","Project manager","PM","FUNC","P2","Console home and navigation for a PM","Signed in as PM.","1. Read the home dashboard.
 2. Note the navigation items.
 3. Type /users and /review/applications in the address bar.","- Home shows counts for projects staffing and in progress.
@@ -687,6 +691,13 @@
 "TC-ADM-036","Admin","Admin","UX","P3","Admin home page","Signed in as Admin.","1. Read Home: the greeting, your roles and the tiles.
 2. Press Open → on each tile.","- ""Welcome, <name>"" and the role ""Admin"". Tiles: Applications to decide, Tasks to review, RL reviews, Projects staffing, Projects in progress, Certification reviews, Pay runs waiting for you, Open payout exceptions, Templates and users.
 - Each tile opens the right page; counts match the lists.","D-PL-05","Not run","","","","",""
+"TC-ADM-037","Admin","Admin","Functional","P2","Tutorials in the console: videos for your role and the user guide","Sign in once as each console role: Admin, PM, Validator, Finance.","1. Select Tutorials on the top row of the menu.
+2. Read the ""For your role"" section, then ""Other roles"".
+3. Play each video for a few seconds and drag the progress bar to the middle.
+4. Select ""Open the guide"".","- Every role sees the Tutorials group. The page is titled ""Tutorials and user guide"".
+- ""For your role"" shows Getting started plus the video for your role (Admin, Program Manager, Validator or Finance); the other videos are under ""Other roles"". Seven videos in all.
+- Each video plays with captions and can jump to any point.
+- The user guide PDF opens in a new tab.","","Not run","","","","",""
 "TC-REV-001","Validator (Reviewer role)","Validator","FUNC","P1","Application queue shows only assigned projects","Two projects with applications; you are assigned to one.","1. Reviews → Applications.
 2. Open an application from the other project by URL (ask a colleague for its id).","- Only your project's applications are listed, oldest first.
 - The other one is ""not found"".","D-M4C-04","Not run","","","","",""
@@ -888,6 +899,10 @@
 - There is no token endpoint under /api/v1 (404).
 - The portal cookie does not authorise the Partner API (401).
 - The quick reference lists the Partner API under /partner/v1 with the scope each call needs. Any document that tells partners to use /api/v1 for the Partner API is a documentation defect.","D-M10-02 D-M10-04","Not run","","","","",""
+"TC-PTR-017","Partner (partner portal)","Partner","Functional","P3","Partner portal Tutorials: the partner video and guide","Signed in to the partner portal as partner@praxis.demo.","1. Select Tutorials in the portal menu.
+2. Play the video and open the guide.
+3. In the same browser, open <console URL>/tutorials/files/ADI-Praxis-User-Guide.pdf and /tutorials/files/02-admin.mp4.","- The page is titled ""Tutorials and partner guide"" and shows one video (Staffing partner) and the partner guide PDF.
+- The staff guide and staff videos are refused (Not found): partners only get partner material.","","Not run","","","","",""
 "TC-FIN-001","Finance","Finance","FUNC","P1","Finance menu, home and what Finance cannot open","Signed in as Finance.","1. Read the menu and the home page.
 2. Open Payments and read the tabs.
 3. Type /projects, /templates, /requisitions, /review/applications, /certifications, /guidelines, /partners, /api-clients and /users in the address bar.","- Menu: Home and Payments only (no second row; Payments has its own tabs). Your role shows as ""Finance"". Home tiles: Pay runs waiting for you (runs to approve or submit) and Open payout exceptions.
@@ -1110,6 +1125,11 @@
 - Every non-Admin: /users should show the No access card (code currently shows a plain 404 page).
 - Admin: /projects/new shows ""This page is for PMs"" (by design: only a PM creates projects).
 - No data of another role appears on any of these pages; if it does, that is S2 or higher.","D-PL-05 D-UI-03","Not run","","","","",""
+"TC-SEC-029","Security (browser checks)","Several","Security","P2","Tutorial files need a console or partner sign-in and cannot be reached outside their folder","A private window, signed out; then a partner session.","1. Signed out, open <console URL>/tutorials/files/01-getting-started.mp4 and /tutorials/files/ADI-Praxis-User-Guide.pdf.
+2. Try /tutorials/files/..%2F..%2Fpackage.json and other names that are not in the Tutorials page.
+3. Sign in as a partner and repeat step 1.","- Signed out: 401 ""Sign in to watch the tutorials.""
+- Unknown names and path tricks: Not found; nothing outside the tutorials folder is ever returned.
+- Partner: staff files are Not found; only the partner video and guide are served.","","Not run","","","","",""
 "TC-PEN-001","Penetration testing","Pen tester","PEN","P1","Reconnaissance and attack surface","PENTEST.md read and signed off.","1. Map the three hosts (console, candidate app, API), /api/v1/openapi.json and /docs.
 2. Spider both apps authenticated per role with OWASP ZAP (or Burp Suite Community).","- A list of endpoints per role, matched against API-QUICK-REFERENCE.md. Undocumented endpoints are findings.","D-PL-05","Not run","","","","",""
 "TC-PEN-002","Penetration testing","Pen tester","PEN","P1","A01 Broken access control: IDOR sweep","Two accounts per role; ids collected in TC-PEN-001.","1. Replay every object URL of user A with user B's session (Burp Autorize or ZAP Access Control add-on): enrollments, tasks, sources, drafts, reviews, projects, RL reviews, API clients.

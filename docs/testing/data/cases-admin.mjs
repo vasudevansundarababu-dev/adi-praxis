@@ -220,4 +220,9 @@ export const CASES = [
     expected: ['"Welcome, <name>" and the role "Admin". Tiles: Applications to decide, Tasks to review, RL reviews, Projects staffing, Projects in progress, Certification reviews, Pay runs waiting for you, Open payout exceptions, Templates and users.', 'Each tile opens the right page; counts match the lists.'],
     decisions: ['D-PL-05'],
   }),
+  c('TC-ADM-037', 'Tutorials in the console: videos for your role and the user guide', {
+    category: 'Functional', priority: 'P2', pre: 'Sign in once as each console role: Admin, PM, Validator, Finance.',
+    steps: ['Select Tutorials on the top row of the menu.', 'Read the "For your role" section, then "Other roles".', 'Play each video for a few seconds and drag the progress bar to the middle.', 'Select "Open the guide".'],
+    expected: ['Every role sees the Tutorials group. The page is titled "Tutorials and user guide".', '"For your role" shows Getting started plus the video for your role (Admin, Program Manager, Validator or Finance); the other videos are under "Other roles". Seven videos in all.', 'Each video plays with captions and can jump to any point.', 'The user guide PDF opens in a new tab.'],
+  }),
 ];

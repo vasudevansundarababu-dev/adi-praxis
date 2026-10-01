@@ -54,6 +54,13 @@ takes about 30 minutes locally and longer on the test environment, where Claude 
 To add or change a caption, edit `c.say('…')` in `e2e/demo-videos/story.spec.ts`. To re-record with a human voice,
 use the captions as the script.
 
+## In the apps
+
+The videos and guides are built into the apps (see [Getting started, section 1.6](01-getting-started.md#16-tutorials-videos-and-this-guide)):
+the console's **Tutorials** page (all videos, full guide), the partner portal's (partner video and guide) and the
+candidate app's (expert video and guide). `package.mjs` copies them to `apps/web/tutorials/` (served only after a
+sign-in check) and `apps/candidate/public/tutorials/`. After re-recording, run it again and commit the new files.
+
 ## Sharing outside the repository
 
 `node e2e/demo-videos/package.mjs` (after `make-videos.mjs`) builds two things:

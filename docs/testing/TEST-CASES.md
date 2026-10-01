@@ -2,7 +2,7 @@
 
 # ADI Praxis test cases
 
-267 test cases. Priorities: **P1** must pass before production, **P2** should pass, **P3** nice to have. Categories: E2E end-to-end, FUNC functional, UX user experience, NFR non-functional, SEC security, PEN penetration testing.
+271 test cases. Priorities: **P1** must pass before production, **P2** should pass, **P3** nice to have. Categories: E2E end-to-end, FUNC functional, UX user experience, NFR non-functional, SEC security, PEN penetration testing.
 
 Before you start, read [README.md](README.md) (environment, accounts, samples, how to report). Record every run in `test-cases.csv` (a copy per tester or a shared sheet).
 
@@ -11,17 +11,17 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 | Group | Cases | P1 | P2 | P3 |
 | --- | ---: | ---: | ---: | ---: |
 | [End-to-end journeys](#end-to-end-journeys) | 12 | 8 | 4 | 0 |
-| [SME / candidate](#sme--candidate) | 58 | 29 | 21 | 8 |
+| [SME / candidate](#sme--candidate) | 59 | 29 | 21 | 9 |
 | [Project manager](#project-manager) | 28 | 11 | 13 | 4 |
-| [Admin](#admin) | 36 | 12 | 14 | 10 |
+| [Admin](#admin) | 37 | 12 | 15 | 10 |
 | [Validator (Reviewer role)](#validator-reviewer-role) | 25 | 11 | 6 | 8 |
-| [Partner (partner portal)](#partner-partner-portal) | 16 | 8 | 7 | 1 |
+| [Partner (partner portal)](#partner-partner-portal) | 17 | 8 | 7 | 2 |
 | [Finance](#finance) | 13 | 8 | 4 | 1 |
 | [RL Gym (API client)](#rl-gym-api-client) | 7 | 4 | 3 | 0 |
 | [Non-functional](#non-functional) | 24 | 11 | 11 | 2 |
-| [Security (browser checks)](#security-browser-checks) | 28 | 19 | 9 | 0 |
+| [Security (browser checks)](#security-browser-checks) | 29 | 19 | 10 | 0 |
 | [Penetration testing](#penetration-testing) | 20 | 11 | 7 | 2 |
-| **Total** | **267** | **132** | **99** | **36** |
+| **Total** | **271** | **132** | **101** | **38** |
 
 ## End-to-end journeys
 
@@ -1274,6 +1274,23 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 - The progress line (Verify identity · Build profile · Reviewer decision · Onboarding · Assignment · Write tasks) marks the current stage. The decision stage should say "Validator decision" (code currently shows "Reviewer decision": log one UX issue per D-M10-03).
 - Next step always says what to do now and opens the right page; while waiting it says what you are waiting for.
 
+### TC-SME-081 Candidate app Tutorials: the expert video and guide, before and after sign-in
+
+**Persona:** SME · **Category:** Functional · **Priority:** P3
+
+**Before you start:** A fresh private window (signed out).
+
+**Steps**
+
+1. Open the candidate app and select Tutorials in the top navigation.
+2. Play the video and open the expert guide.
+3. Sign in and select Tutorials again.
+
+**Expected**
+
+- The Tutorials page works signed out and signed in, with one video ("How experts work on ADI Praxis") and "Expert guide (PDF)".
+- The guide covers only the expert journey; it contains no console, admin or API details.
+
 ## Project manager
 
 ### TC-PM-001 Console home and navigation for a PM
@@ -2461,6 +2478,26 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 - "Welcome, <name>" and the role "Admin". Tiles: Applications to decide, Tasks to review, RL reviews, Projects staffing, Projects in progress, Certification reviews, Pay runs waiting for you, Open payout exceptions, Templates and users.
 - Each tile opens the right page; counts match the lists.
 
+### TC-ADM-037 Tutorials in the console: videos for your role and the user guide
+
+**Persona:** Admin · **Category:** Functional · **Priority:** P2
+
+**Before you start:** Sign in once as each console role: Admin, PM, Validator, Finance.
+
+**Steps**
+
+1. Select Tutorials on the top row of the menu.
+2. Read the "For your role" section, then "Other roles".
+3. Play each video for a few seconds and drag the progress bar to the middle.
+4. Select "Open the guide".
+
+**Expected**
+
+- Every role sees the Tutorials group. The page is titled "Tutorials and user guide".
+- "For your role" shows Getting started plus the video for your role (Admin, Program Manager, Validator or Finance); the other videos are under "Other roles". Seven videos in all.
+- Each video plays with captions and can jump to any point.
+- The user guide PDF opens in a new tab.
+
 ## Validator (Reviewer role)
 
 ### TC-REV-001 Application queue shows only assigned projects
@@ -3198,6 +3235,23 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 - There is no token endpoint under /api/v1 (404).
 - The portal cookie does not authorise the Partner API (401).
 - The quick reference lists the Partner API under /partner/v1 with the scope each call needs. Any document that tells partners to use /api/v1 for the Partner API is a documentation defect.
+
+### TC-PTR-017 Partner portal Tutorials: the partner video and guide
+
+**Persona:** Partner · **Category:** Functional · **Priority:** P3
+
+**Before you start:** Signed in to the partner portal as partner@praxis.demo.
+
+**Steps**
+
+1. Select Tutorials in the portal menu.
+2. Play the video and open the guide.
+3. In the same browser, open <console URL>/tutorials/files/ADI-Praxis-User-Guide.pdf and /tutorials/files/02-admin.mp4.
+
+**Expected**
+
+- The page is titled "Tutorials and partner guide" and shows one video (Staffing partner) and the partner guide PDF.
+- The staff guide and staff videos are refused (Not found): partners only get partner material.
 
 ## Finance
 
@@ -4364,6 +4418,24 @@ Release 1.1: the internal Reviewer role is shown as **Validator** on screen; in 
 - Every non-Admin: /users should show the No access card (code currently shows a plain 404 page).
 - Admin: /projects/new shows "This page is for PMs" (by design: only a PM creates projects).
 - No data of another role appears on any of these pages; if it does, that is S2 or higher.
+
+### TC-SEC-029 Tutorial files need a console or partner sign-in and cannot be reached outside their folder
+
+**Persona:** Several · **Category:** Security · **Priority:** P2
+
+**Before you start:** A private window, signed out; then a partner session.
+
+**Steps**
+
+1. Signed out, open <console URL>/tutorials/files/01-getting-started.mp4 and /tutorials/files/ADI-Praxis-User-Guide.pdf.
+2. Try /tutorials/files/..%2F..%2Fpackage.json and other names that are not in the Tutorials page.
+3. Sign in as a partner and repeat step 1.
+
+**Expected**
+
+- Signed out: 401 "Sign in to watch the tutorials."
+- Unknown names and path tricks: Not found; nothing outside the tutorials folder is ever returned.
+- Partner: staff files are Not found; only the partner video and guide are served.
 
 ## Penetration testing
 

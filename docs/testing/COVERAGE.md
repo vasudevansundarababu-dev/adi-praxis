@@ -4,7 +4,7 @@
 
 Which test cases cover each screen, role and Admin function. Generated from `docs/testing/data/coverage.mjs`; the build fails if a case id is unknown, and lists below any page in the code that has no entry. Sources: [the user guide](../user-guide/README.md), [ROLES-AND-ADMIN.md](../user-guide/ROLES-AND-ADMIN.md) and `apps/web/lib/nav.ts`.
 
-80 screens mapped of 80 pages in the code · 21 Admin functions · 8 roles · 267 test cases.
+83 screens mapped of 83 pages in the code · 21 Admin functions · 8 roles · 271 test cases.
 
 ## Console (Admin, PM, Validator, Finance)
 
@@ -54,6 +54,7 @@ Which test cases cover each screen, role and Admin function. Generated from `doc
 | Admin → Terms | `/terms` | [TC-ADM-006](TEST-CASES.md#tc-adm-006-contributor-terms-new-version-requires-acceptance-again), [TC-ADM-026](TEST-CASES.md#tc-adm-026-contributor-terms-publish-a-new-version) |
 | Admin → Failure codes | `/failure-codes` | [TC-ADM-008](TEST-CASES.md#tc-adm-008-failure-reason-codes-for-rl-review) |
 | Admin → API clients | `/api-clients` | [TC-ADM-007](TEST-CASES.md#tc-adm-007-api-clients-issue-an-rl-gym-key), [TC-ADM-029](TEST-CASES.md#tc-adm-029-client-system-key-push-annotation-task-inputs) |
+| Tutorials (videos and user guide) | `/tutorials` | [TC-ADM-037](TEST-CASES.md#tc-adm-037-tutorials-in-the-console-videos-for-your-role-and-the-user-guide), [TC-SEC-029](TEST-CASES.md#tc-sec-029-tutorial-files-need-a-console-or-partner-sign-in-and-cannot-be-reached-outside-their-folder) |
 
 ## Partner portal
 
@@ -68,6 +69,7 @@ Which test cases cover each screen, role and Admin function. Generated from `doc
 | Candidate (history, withdraw) | `/partner/candidates/:id` | [TC-PTR-007](TEST-CASES.md#tc-ptr-007-follow-a-candidate-tracker-history-and-withdraw), [TC-PTR-015](TEST-CASES.md#tc-ptr-015-test-environment-only-the-invite-link-is-shown-and-works-for-one-person), [TC-ADM-035](TEST-CASES.md#tc-adm-035-sme-standing-and-tier-change-through-the-api) |
 | Statements | `/partner/statements` | [TC-PTR-012](TEST-CASES.md#tc-ptr-012-statements-with-the-partners-own-candidate-ids) |
 | API & webhooks | `/partner/integrations` | [TC-PTR-009](TEST-CASES.md#tc-ptr-009-api-clients-sandbox-key-secret-shown-once-rotate-and-revoke), [TC-PTR-010](TEST-CASES.md#tc-ptr-010-webhooks-add-signing-secret-deliveries-and-replay), [TC-SEC-022](TEST-CASES.md#tc-sec-022-secrets-are-shown-once-and-never-again) |
+| Tutorials (partner video and guide) | `/partner/tutorials` | [TC-PTR-017](TEST-CASES.md#tc-ptr-017-partner-portal-tutorials-the-partner-video-and-guide), [TC-SEC-029](TEST-CASES.md#tc-sec-029-tutorial-files-need-a-console-or-partner-sign-in-and-cannot-be-reached-outside-their-folder) |
 
 ## Candidate app (SMEs)
 
@@ -78,6 +80,7 @@ Which test cases cover each screen, role and Admin function. Generated from `doc
 | Verify your identity, I need help | `/verify` | [TC-SME-002](TEST-CASES.md#tc-sme-002-identity-check-outcomes-verified-failed-needs-more-input-processing), [TC-SME-078](TEST-CASES.md#tc-sme-078-identity-i-need-help-and-the-alternative-process) |
 | Simulated identity result (test only) | `/dev/identity/:sessionId` | [TC-SME-002](TEST-CASES.md#tc-sme-002-identity-check-outcomes-verified-failed-needs-more-input-processing), [TC-SEC-018](TEST-CASES.md#tc-sec-018-mock-sign-in-exists-only-in-demotest) |
 | Home (journey, Next step, assignments) | `/home` | [TC-SME-080](TEST-CASES.md#tc-sme-080-home-journey-progress-and-the-next-step-card), [TC-SME-022](TEST-CASES.md#tc-sme-022-accept-or-decline-an-assignment-proposal) |
+| Tutorials (expert video and guide) | `/tutorials` | [TC-SME-081](TEST-CASES.md#tc-sme-081-candidate-app-tutorials-the-expert-video-and-guide-before-and-after-sign-in) |
 | Opportunities | `/opportunities` | [TC-SME-010](TEST-CASES.md#tc-sme-010-browse-opportunities-and-read-one-before-applying) |
 | Opportunity | `/opportunities/:id` | [TC-SME-010](TEST-CASES.md#tc-sme-010-browse-opportunities-and-read-one-before-applying), [TC-PM-027](TEST-CASES.md#tc-pm-027-opportunity-page-questions-public-view-and-closing-to-new-applications) |
 | Sourcing campaign apply link | `/apply/:campaignId` | [TC-PM-023](TEST-CASES.md#tc-pm-023-sourcing-campaign-launch-apply-link-counters-pause-and-close) |

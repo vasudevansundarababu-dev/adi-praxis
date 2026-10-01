@@ -55,6 +55,7 @@ export const SCREENS = [
   { app: 'console', route: '/terms', name: 'Admin → Terms', cases: ['TC-ADM-006', 'TC-ADM-026'] },
   { app: 'console', route: '/failure-codes', name: 'Admin → Failure codes', cases: ['TC-ADM-008'] },
   { app: 'console', route: '/api-clients', name: 'Admin → API clients', cases: ['TC-ADM-007', 'TC-ADM-029'] },
+  { app: 'console', route: '/tutorials', name: 'Tutorials (videos and user guide)', cases: ['TC-ADM-037', 'TC-SEC-029'] },
   // ── Partner portal ──
   { app: 'partner', route: '/partner/login', name: 'Partner sign-in', cases: ['TC-PTR-001', 'TC-ADM-030'] },
   { app: 'partner', route: '/partner', name: 'Partner home', cases: ['TC-PTR-001'] },
@@ -65,12 +66,14 @@ export const SCREENS = [
   { app: 'partner', route: '/partner/candidates/:id', name: 'Candidate (history, withdraw)', cases: ['TC-PTR-007', 'TC-PTR-015', 'TC-ADM-035'] },
   { app: 'partner', route: '/partner/statements', name: 'Statements', cases: ['TC-PTR-012'] },
   { app: 'partner', route: '/partner/integrations', name: 'API & webhooks', cases: ['TC-PTR-009', 'TC-PTR-010', 'TC-SEC-022'] },
+  { app: 'partner', route: '/partner/tutorials', name: 'Tutorials (partner video and guide)', cases: ['TC-PTR-017', 'TC-SEC-029'] },
   // ── Candidate app ──
   { app: 'candidate', route: '/', name: 'Landing page', cases: ['TC-SME-001'] },
   { app: 'candidate', route: '/sign-in', name: 'Sign in (mock Google, 18+)', cases: ['TC-SME-001', 'TC-SME-003', 'TC-SME-077'] },
   { app: 'candidate', route: '/verify', name: 'Verify your identity, I need help', cases: ['TC-SME-002', 'TC-SME-078'] },
   { app: 'candidate', route: '/dev/identity/:sessionId', name: 'Simulated identity result (test only)', cases: ['TC-SME-002', 'TC-SEC-018'] },
   { app: 'candidate', route: '/home', name: 'Home (journey, Next step, assignments)', cases: ['TC-SME-080', 'TC-SME-022'] },
+  { app: 'candidate', route: '/tutorials', name: 'Tutorials (expert video and guide)', cases: ['TC-SME-081'] },
   { app: 'candidate', route: '/opportunities', name: 'Opportunities', cases: ['TC-SME-010'] },
   { app: 'candidate', route: '/opportunities/:id', name: 'Opportunity', cases: ['TC-SME-010', 'TC-PM-027'] },
   { app: 'candidate', route: '/apply/:campaignId', name: 'Sourcing campaign apply link', cases: ['TC-PM-023'] },

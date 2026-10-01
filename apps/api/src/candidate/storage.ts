@@ -17,7 +17,9 @@ export class GcsStorage implements ObjectStorage {
     if (!exists) await this.bucket.create();
   }
   async put(key: string, data: Buffer, contentType: string) {
-    await this.bucket.file(key).save(data, { contentType, resumable: false, private: true });
+    // No per-object ACL: deployed buckets use uniform bucket-level access and public access prevention, which keep
+    // every object private and refuse legacy ACLs (a `private: true` save fails there with "Cannot insert legacy ACL").
+    await this.bucket.file(key).save(data, { contentType, resumable: false });
   }
   async get(key: string) {
     const [buf] = await this.bucket.file(key).download();

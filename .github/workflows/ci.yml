@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  pull-requests: read # dorny/paths-filter lists a pull request's changed files
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -24,6 +25,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Generate the Prisma client (typecheck and tests need its types)
+        run: pnpm --filter @praxis/api db:generate
       - name: Start Postgres (pgvector), Redis, Mailpit and the GCS emulator
         run: docker compose up -d --wait
       - run: pnpm -r typecheck

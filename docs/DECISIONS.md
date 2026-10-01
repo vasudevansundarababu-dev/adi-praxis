@@ -375,3 +375,24 @@ help pack and the user's own data; required markers on every screen of all three
   `adi-praxis-test-0928` as `test-1.1-20260930`; testing starts Thursday 1 Oct, 09:30 IST.
 - Open: the nightly defect agent still reads issues in the code repository only. Until it is pointed at
   `adi-praxis-testing`, tester defects are fixed by developers.
+
+### User guide, test-case audit and demo videos (1 Oct 2026)
+
+- **(owner)** The user guide lives in `docs/user-guide/` (one chapter per role, plus roles, user IDs and admin
+  functions) and is also built as a PDF (`node docs/user-guide/build-pdf.mjs` → `out/user-guide/`). The existing test
+  cases are audited and extended rather than replaced. The demo videos are recorded on the testers' environment.
+- **(chosen by Claude)** The guide documents release 1.1 as built. Where the build has no screen (user management,
+  audit log, dataset, SME standing) the guide says so and gives the API, instead of describing screens that do not
+  exist. Passwords are never written in the guide; it points to Secret Manager.
+- **(chosen by Claude)** Demo videos are scripted Playwright recordings (`e2e/demo-videos/`) with on-screen captions,
+  a visible cursor and title cards, and no voiceover. They are re-runnable for each release. The MP4s are written to
+  `out/demo-videos/` and are not committed, because they are large. Data the videos create is named `[Demo video] …`.
+- **(chosen by Claude)** The video story uses two experts. Asha applies directly and writes a task. Ravi comes through
+  a partner and takes the certification. Answer keys stay on the server, so a scripted candidate cannot be sure to
+  pass, and a non-certified requisition applicant cannot be assigned work. The certification result shown is whatever
+  the script's answers earn. Steps that are not the point of a clip are done off camera through the same UI or API: the
+  second expert's profile and onboarding, approving the remaining knowledge items and item families, and learning
+  module-quiz answers.
+- **(chosen by Claude)** The videos are rehearsed on a local copy of the demo environment
+  (`e2e/demo-videos/local-stack.sh`: its own database `praxis_video` and ports 3500/3501/4500), so a running
+  `pnpm dev` is not disturbed.

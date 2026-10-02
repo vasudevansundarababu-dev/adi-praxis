@@ -2,7 +2,7 @@
 
 # API quick reference
 
-All 263 endpoints with who may call them, generated from the route code. Interactive documentation: `<API URL>/docs`. State changes (POST, PUT, PATCH, DELETE) need an `Idempotency-Key` header with a new UUID. Browser calls use the session cookie; RL Gym and client systems use `Authorization: Bearer <key>`.
+All 268 endpoints with who may call them, generated from the route code. Interactive documentation: `<API URL>/docs`. State changes (POST, PUT, PATCH, DELETE) need an `Idempotency-Key` header with a new UUID. Browser calls use the session cookie; RL Gym and client systems use `Authorization: Bearer <key>`.
 
 Access: `public` anyone · `authenticated` any signed-in console user · `candidate` a signed-in SME · `partner` a signed-in partner portal user (cookie `praxis_partner`) · role names = console roles (`REVIEWER` is shown as Validator) · `key RL_GYM` / `key CLIENT_API` = machine keys from Admin → API clients · `Partner API token, scope …` = an OAuth token from `POST /partner/v1/oauth/token` with that scope.
 
@@ -13,6 +13,7 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | GET | `/api/v1/api-clients` | ADMIN | tasks.ts |
 | POST | `/api/v1/api-clients` | ADMIN | tasks.ts |
 | POST | `/api/v1/api-clients/:id/revoke` | ADMIN | tasks.ts |
+| POST | `/api/v1/auth/change-password` | authenticated | auth.ts |
 | POST | `/api/v1/auth/dev/google-token` | public (demo/test only) | candidate-auth.ts |
 | POST | `/api/v1/auth/google` | public | candidate-auth.ts |
 | POST | `/api/v1/auth/login` | public | auth.ts |
@@ -139,6 +140,7 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | GET | `/api/v1/partner-portal/candidates` | partner | partner-portal.ts |
 | GET | `/api/v1/partner-portal/candidates/:id` | partner | partner-portal.ts |
 | POST | `/api/v1/partner-portal/candidates/:id/withdraw` | partner | partner-portal.ts |
+| POST | `/api/v1/partner-portal/change-password` | partner | partner-portal.ts |
 | GET | `/api/v1/partner-portal/clients` | partner | partner-portal.ts |
 | POST | `/api/v1/partner-portal/clients` | partner | partner-portal.ts |
 | POST | `/api/v1/partner-portal/clients/:id/revoke` | partner | partner-portal.ts |
@@ -166,6 +168,8 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | PATCH | `/api/v1/partners/:id` | ADMIN | supply-internal.ts |
 | PUT | `/api/v1/partners/:id/fee-terms` | ADMIN | payments.ts |
 | POST | `/api/v1/partners/:id/users` | ADMIN | supply-internal.ts |
+| POST | `/api/v1/partners/:id/users/:userId/password-reset` | ADMIN | supply-internal.ts |
+| PATCH | `/api/v1/partners/:id/users/:userId/status` | ADMIN | supply-internal.ts |
 | GET | `/api/v1/pay-holds` | ADMIN, FINANCE, REVIEWER | payments.ts |
 | POST | `/api/v1/pay-holds` | ADMIN, FINANCE, REVIEWER | payments.ts |
 | POST | `/api/v1/pay-holds/:id/release` | ADMIN, FINANCE | payments.ts |
@@ -258,6 +262,7 @@ Access: `public` anyone · `authenticated` any signed-in console user · `candid
 | POST | `/api/v1/test-attempts/:id/grades` | ADMIN, REVIEWER | cert-admin.ts |
 | GET | `/api/v1/users` | ADMIN | users.ts |
 | POST | `/api/v1/users` | ADMIN | users.ts |
+| POST | `/api/v1/users/:id/password-reset` | ADMIN | users.ts |
 | PATCH | `/api/v1/users/:id/roles` | ADMIN | users.ts |
 | PATCH | `/api/v1/users/:id/status` | ADMIN | users.ts |
 | GET | `/api/v1/version` | public | app.ts |

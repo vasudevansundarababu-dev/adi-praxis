@@ -11,7 +11,9 @@ You can work in the **partner portal** (this chapter) or through the **Partner A
 1. Open `<console address>/partner/login`. You see **"Sign in to the partner portal"**.
 2. Enter **Work email \*** and **Password \*** → **Sign in**.
 
-Your ADI Praxis partner manager (an Admin) creates your account and gives you the first password. If your company is
+Your ADI Praxis partner manager (an Admin) creates your account and gives you a temporary password. At your first
+sign-in you are asked to **Choose your own password** (at least 12 characters). Use **Change password** in the portal
+header to change it later. If you forget it, ask your partner manager to reset it. If your company is
 suspended you cannot sign in. "The partner portal is not switched on here" means SME supply is off in that
 environment.
 

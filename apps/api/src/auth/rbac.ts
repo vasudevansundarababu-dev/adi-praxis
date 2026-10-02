@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import type { Db } from '../db';
-import { forbidden, unauthorized } from '../lib/errors';
+import { AppError, forbidden, unauthorized } from '../lib/errors';
 import { sha256 } from '../lib/crypto';
 import type { AccessPolicy, ApiClientActor, CandidateActor, PartnerActor } from './actor';
 import { CANDIDATE_SESSION_COOKIE, PARTNER_SESSION_COOKIE, resolveCandidateSession, resolveInternalSession, resolvePartnerSession, resolvePartnerToken, SESSION_COOKIE } from './sessions';
@@ -80,5 +80,10 @@ export const rbacPlugin = fp(async (app: FastifyInstance, opts: { db: Db }) => {
     const result = checkAccess(policy, req.actor, req.candidate, req.apiClient, req.partner);
     if (result === 401) throw unauthorized();
     if (result === 403) throw forbidden();
+    // A temporary password from an Admin must be replaced before anything else (enforced here, not only on screen).
+    const temporary = (policy !== 'public' && req.actor?.mustChangePassword) || (req.partner?.type === 'PARTNER_USER' && req.partner.mustChangePassword);
+    if (temporary && !req.routeOptions.config?.allowTemporaryPassword) {
+      throw new AppError(403, 'PASSWORD_CHANGE_REQUIRED', 'Choose a new password before you continue.');
+    }
   });
 });

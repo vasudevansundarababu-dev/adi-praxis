@@ -28,6 +28,10 @@ build when you report a problem.
 | "Sign-in failed" or the server's reason | Wrong email or password, or the account is disabled |
 | "Could not reach the server. Check your connection and try again." | Network problem |
 
+**First sign-in.** If an Admin gave you a temporary password, you are taken to **Choose your own password**: enter
+the temporary password, then a new one (at least 12 characters) twice, and select **Save new password**. Until you
+do, nothing else opens. To change your password later, select **Change password** in the header.
+
 Your session lasts 12 hours. Select **Sign out** (top right) when you finish. **Dark theme / Light theme** switches
 colours.
 

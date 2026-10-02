@@ -316,6 +316,8 @@ model User {
   roles        InternalRole[]
   status       UserStatus     @default(ACTIVE)
   passwordHash String         @map("password_hash")
+  /// Set when an Admin issues a temporary password; the user must choose their own before doing anything else.
+  mustChangePassword Boolean  @default(false) @map("must_change_password")
   lastLoginAt  DateTime?      @map("last_login_at")
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
@@ -1774,6 +1776,8 @@ model PartnerUser {
   email        String     @unique
   name         String
   passwordHash String     @map("password_hash")
+  /// Set when an Admin issues a temporary password; the partner user must choose their own first.
+  mustChangePassword Boolean @default(false) @map("must_change_password")
   status       UserStatus @default(ACTIVE)
   lastLoginAt  DateTime?  @map("last_login_at")
   createdAt    DateTime   @default(now()) @map("created_at")

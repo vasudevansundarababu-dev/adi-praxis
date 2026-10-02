@@ -111,22 +111,38 @@ A PM then links the package to a requisition ([PM chapter](03-pm.md#36-requisiti
   partner** restores it.
 - **Fee terms**: **Fee per certified candidate \***, **Currency \*** (USD or INR), **Terms version \*** → **Save fee
   terms**. New terms apply to candidates certified from now on. Without terms, fees are recorded at zero.
-- **Portal users**: **Name \***, **Email \***, **Initial password (12+ characters) \*** → **Add user**. Give the
-  password to the person through a secure channel. Portal users cannot be disabled yet; suspend the partner instead.
+- **Portal users**: **Name \***, **Email \*** → **Add user**. Praxis shows a **temporary password** once (**Copy**);
+  pass it on through your password manager. The person chooses their own password at first sign-in. Each user has
+  **Reset password** (new temporary password, signed out at once) and **Disable** / **Enable**.
 - **API clients and webhooks** are read-only here; the partner manages them in the portal.
 
-## 2.4 Console users
+## 2.4 Console users and passwords
 
-**Admin → Users** lists everyone with their roles (Admin, PM, Validator, Finance) and status. **There is no screen yet
-to add users, change roles or disable accounts.** Use the API with an Admin session or ask the platform team:
+**Admin → Users** lists everyone with their roles (Admin, PM, Validator, Finance), status and last sign-in.
 
-| To | Call |
+**Add a user**
+
+1. Under **Add a user** fill **Name \***, **Email \*** and tick one or more **Roles \***. Select **Add user**.
+2. Praxis shows **Temporary password for *email*** once, for example `kq7m-xt4p-9wzn-r2hc`. Select **Copy**.
+3. Pass it on through your password manager (for example 1Password), never by email or chat. Then select
+   **I have stored it — hide**. If it is lost, reset the password.
+4. The person signs in at the console with the temporary password and is taken straight to **Choose your own
+   password**. Until they do, the platform refuses everything else. The row shows a **Temporary password** pill until
+   then.
+
+**Other actions on each row**
+
+| Action | What happens |
 | --- | --- |
-| Add a user | `POST /api/v1/users` with `email`, `name`, `roles` (for example `["PM"]`) and an initial `password` |
-| Change roles | `PATCH /api/v1/users/{id}/roles` with `roles` |
-| Disable or re-enable | `PATCH /api/v1/users/{id}/status` with `status` `DISABLED` or `ACTIVE` (signs the user out everywhere) |
+| **Edit roles** → tick roles → **Save roles** | Takes effect at once. You cannot remove your own Admin role |
+| **Reset password** → **Yes, reset** | A new temporary password is shown once; the person is signed out everywhere and must choose a new password |
+| **Disable** / **Enable** | A disabled person is signed out everywhere and cannot sign in. You cannot disable yourself |
 
-You cannot remove your own Admin role or disable yourself.
+**Your own password**: select **Change password** in the console header. Enter your current password and a new one
+(at least 12 characters, not containing your email name). Your other sessions are signed out.
+
+The same actions exist in the API (`POST /api/v1/users`, `POST /api/v1/users/{id}/password-reset`,
+`PATCH /api/v1/users/{id}/roles`, `PATCH /api/v1/users/{id}/status`).
 
 ## 2.5 Diversity taxonomy, terms, failure codes and API keys
 

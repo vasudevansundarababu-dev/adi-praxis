@@ -178,13 +178,12 @@ Non-negotiables you should actively try to break (report any breach as **S1**):
 
 ## 4. Accounts
 
-**Console users** (Admin, PM, Validator, Finance): the lead tester creates named accounts for each tester with the
-API, because Admin → Users is a read-only list in 1.1 (no Add, Edit or Disable screen): `POST /api/v1/users` with an
-Admin session cookie, an `Idempotency-Key` and `{"email","name","roles","password"}` (roles `PM`, `REVIEWER` for
-Validator, `FINANCE`, `ADMIN`), e.g. `pm.pk@praxis.test`, `validator.pk@praxis.test`, `finance.pk@praxis.test`. Roles
-change with `PATCH /api/v1/users/<id>/roles` and accounts are disabled with `PATCH /api/v1/users/<id>/status` (see
-TC-ADM-001 to TC-ADM-003 and [ROLES-AND-ADMIN.md](../user-guide/ROLES-AND-ADMIN.md#4-admin-functions)). Passwords are
-at least 12 characters; share them only in the team password manager, never in GitHub or chat. The built-in accounts
+**Console users** (Admin, PM, Validator, Finance): the lead tester creates named accounts for each tester in
+**Admin → Users → Add a user** (name, email, roles), e.g. `pm.pk@praxis.test`, `validator.pk@praxis.test`,
+`finance.pk@praxis.test`. Praxis shows a temporary password once; the lead passes it on in the team password manager,
+and the tester chooses their own password at first sign-in. **Reset password** and **Disable** are on each row (see
+TC-ADM-001 to TC-ADM-003 and [ROLES-AND-ADMIN.md](../user-guide/ROLES-AND-ADMIN.md#4-admin-functions)). Never share
+passwords in GitHub or chat. The built-in accounts
 `admin@praxis.demo`, `pm@praxis.demo`, `reviewer@praxis.demo` (Validator) and, new in 1.1, `finance@praxis.demo` are
 shared: the lead gives out their passwords (from Secret Manager) when a case needs them, e.g. the PM who owns the
 "KYC authoring demo" project is `pm@praxis.demo`.

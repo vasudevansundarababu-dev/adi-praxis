@@ -17,7 +17,8 @@ export const PartnerInput = z.object({
   feeTermsVersion: z.string().trim().max(60).nullable().default(null),
 });
 
-export const PartnerUserInput = z.object({ email: z.string().trim().email().max(320), name: z.string().trim().min(1).max(200), password: z.string().min(12).max(200) });
+// Leave out password to have Praxis generate a temporary one (returned once); the user changes it at first sign-in.
+export const PartnerUserInput = z.object({ email: z.string().trim().email().max(320), name: z.string().trim().min(1).max(200), password: z.string().min(12).max(200).optional(), requirePasswordChange: z.boolean().default(true) });
 
 export const ClientInput = z.object({ environment: z.enum(['SANDBOX', 'LIVE']), scopes: z.array(z.enum(PARTNER_SCOPES)).min(1).default([...PARTNER_SCOPES]) });
 

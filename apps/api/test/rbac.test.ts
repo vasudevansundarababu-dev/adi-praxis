@@ -12,6 +12,7 @@ const actor = (roles: InternalRole[]): InternalActor => ({
   clientId: randomUUID(),
   roles,
   sessionId: randomUUID(),
+  mustChangePassword: false,
 });
 
 describe('RBAC decision (unit)', () => {

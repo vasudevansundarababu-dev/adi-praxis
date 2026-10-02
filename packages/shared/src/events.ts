@@ -25,5 +25,6 @@ export const DOMAIN_EVENTS = [
   'user.created',
   'user.roles_changed',
   'user.status_changed',
+  'user.password_reset',
 ] as const;
 export type DomainEventName = (typeof DOMAIN_EVENTS)[number];

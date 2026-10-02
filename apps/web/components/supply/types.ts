@@ -24,7 +24,7 @@ export interface PartnerRow {
 }
 
 export interface PartnerDetail extends Omit<PartnerRow, 'users' | 'clients' | 'submissions'> {
-  users: { id: string; email: string; name: string; status: string; lastLoginAt: string | null }[];
+  users: { id: string; email: string; name: string; status: string; mustChangePassword: boolean; lastLoginAt: string | null }[];
   clients: { id: string; clientId: string; scopes: string[]; environment: string; rotatedAt: string | null; revokedAt: string | null; createdAt: string }[];
   webhooks: { id: string; url: string; events: string[]; environment: string; status: string }[];
 }

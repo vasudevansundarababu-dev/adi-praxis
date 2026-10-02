@@ -11,6 +11,8 @@ import { navGroupsFor } from '@/lib/nav';
 export default async function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
+  // A temporary password from an Admin must be replaced first (the API refuses everything else until then).
+  if (user.mustChangePassword) redirect('/change-password');
 
   return (
     <div className="min-h-screen bg-surface">
@@ -30,6 +32,9 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
               {user.name} · {user.roles.map(roleLabel).join(', ')}
             </span>
             <ThemeToggle />
+            <Link href="/change-password" className="hidden text-white/80 hover:text-white hover:underline sm:inline">
+              Change password
+            </Link>
             <SignOutButton />
           </div>
         </div>

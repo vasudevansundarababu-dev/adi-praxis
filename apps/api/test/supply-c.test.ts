@@ -81,7 +81,7 @@ describe('M10c payments: earnings, pay runs, payouts, reconciliation and partner
   async function livePartner() {
     const p = (await post(admin, '/partners', { name: `Partner ${randomUUID().slice(0, 4)}`, businessVerification: 'VERIFIED', allowedDomains: ['banking'], allowedTiers: ['ANNOTATOR', 'REVIEWER_SME', 'EXPERT'] })).json();
     const userEmail = `ops.${randomUUID().slice(0, 6)}@partner.example`;
-    await post(admin, `/partners/${p.id}/users`, { email: userEmail, name: 'Ops Lead', password: 'partner-password-1' });
+    await post(admin, `/partners/${p.id}/users`, { email: userEmail, name: 'Ops Lead', password: 'partner-password-1', requirePasswordChange: false });
     const res = await app.inject({ method: 'POST', url: '/api/v1/partner-portal/login', payload: { email: userEmail, password: 'partner-password-1' } });
     const portal = `praxis_partner=${res.cookies.find((c) => c.name === 'praxis_partner')!.value}`;
     const c = (await post(portal, '/partner-portal/clients', { environment: 'LIVE' })).json();

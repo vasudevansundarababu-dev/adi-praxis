@@ -41,7 +41,7 @@ describe('Support Bot', () => {
   async function partner(name: string) {
     const p = (await app.inject({ method: 'POST', url: '/api/v1/partners', headers: { cookie: admin, ...idem() }, payload: { name, businessVerification: 'VERIFIED', allowedDomains: ['banking'], allowedTiers: ['ANNOTATOR'] } })).json();
     const email = `ops.${randomUUID().slice(0, 6)}@partner.example`;
-    await app.inject({ method: 'POST', url: `/api/v1/partners/${p.id}/users`, headers: { cookie: admin, ...idem() }, payload: { email, name: 'Ops Lead', password: 'partner-password-1' } });
+    await app.inject({ method: 'POST', url: `/api/v1/partners/${p.id}/users`, headers: { cookie: admin, ...idem() }, payload: { email, name: 'Ops Lead', password: 'partner-password-1', requirePasswordChange: false } });
     const res = await app.inject({ method: 'POST', url: '/api/v1/partner-portal/login', payload: { email, password: 'partner-password-1' } });
     return { id: p.id as string, cookie: `praxis_partner=${res.cookies.find((c) => c.name === 'praxis_partner')!.value}` };
   }

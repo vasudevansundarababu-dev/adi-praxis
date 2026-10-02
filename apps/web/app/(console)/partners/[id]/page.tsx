@@ -1,7 +1,8 @@
 import { TIER_LABELS } from '@praxis/shared';
 import type { Metadata } from 'next';
 import { NoAccess } from '@/components/no-access';
-import { FeeTermsForm, PartnerSettings, PartnerUserForm } from '@/components/supply/partner-forms';
+import { FeeTermsForm, PartnerSettings } from '@/components/supply/partner-forms';
+import { PortalUsers } from '@/components/supply/portal-users';
 import type { PartnerDetail } from '@/components/supply/types';
 import { BackLink, Facts, fmtDate, fmtDateTime, NotFoundCard, StatePill, TD, TH } from '@/components/supply/ui';
 import { apiGet, getCurrentUser } from '@/lib/api';
@@ -41,33 +42,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
       <section className="card p-4">
         <h2 className="font-semibold">Portal users</h2>
         <p className="mt-1 text-sm text-fg-muted">People at the partner who sign in to the partner portal. They see only their own partner’s requisitions, candidates and statements.</p>
-        {p.users.length === 0 ? (
-          <p className="mt-3 text-sm text-fg-muted">No users yet.</p>
-        ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-line text-fg-muted">
-                <tr>
-                  <th className={TH}>Name</th>
-                  <th className={TH}>Email</th>
-                  <th className={TH}>Status</th>
-                  <th className={TH}>Last sign-in</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {p.users.map((u) => (
-                  <tr key={u.id}>
-                    <td className={TD}>{u.name}</td>
-                    <td className={TD}>{u.email}</td>
-                    <td className={TD}><StatePill state={u.status} /></td>
-                    <td className={TD}>{fmtDateTime(u.lastLoginAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <PartnerUserForm partnerId={p.id} />
+        <PortalUsers partnerId={p.id} users={p.users} />
       </section>
 
       <section className="card p-4">

@@ -5,6 +5,8 @@
 | "No access — This page is for …" | Your role may not use that page | Use the menu; ask an Admin for the role if you need it |
 | A second tab signed me out or switched user | One browser holds one sign-in | Use a separate browser profile or private window per role |
 | "Too many attempts. Wait a minute and try again." | Sign-in limit | Wait a minute |
+| "Choose your own password" appears after sign-in | You signed in with a temporary password | Enter it and choose a new one (12+ characters); nothing else opens until you do |
+| I forgot my password (console or partner portal) | | Ask an Admin to **Reset password**; you get a new temporary password |
 | "SME supply is not switched on" | Partners, certification and payments are off in this environment | Ask the platform team |
 | The Support Bot says it is not available | Claude quota or outage in the test environment | Report it once as `[Environment] Claude unavailable …` |
 | Guideline generation ends **Failed** | Same as above | Use **Regenerate** later |
@@ -22,8 +24,8 @@
 | Partner: **Submit a candidate** is missing | The requisition is not open, the deadline passed, or you reached the limit | Check the requisition |
 | Partner: the candidate got no invite email (test) | Email is simulated in test | Use the "Test environment: invite link" box |
 
-**How do I get a console account?** An Admin creates it (release 1.1 has no self-sign-up and no user screen; see
-[Roles and admin](ROLES-AND-ADMIN.md#4-admin-functions)).
+**How do I get a console account?** An Admin adds you under **Admin → Users** and passes you a temporary password;
+you choose your own at first sign-in.
 
 **Can AI reject me or my task?** No. AI recommends; a Validator decides every selection, grade, certification and task.
 

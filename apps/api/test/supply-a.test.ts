@@ -87,7 +87,7 @@ describe('M10a SME supply: partners, Partner API, requisitions and submissions (
   async function partner(name = `Partner ${randomUUID().slice(0, 4)}`) {
     const p = (await post(admin, '/partners', { name, businessVerification: 'VERIFIED', allowedDomains: ['banking'], allowedTiers: ['ANNOTATOR', 'REVIEWER_SME', 'EXPERT'] })).json();
     const userEmail = `ops.${randomUUID().slice(0, 6)}@partner.example`;
-    expect((await post(admin, `/partners/${p.id}/users`, { email: userEmail, name: 'Ops Lead', password: 'partner-password-1' })).statusCode).toBe(201);
+    expect((await post(admin, `/partners/${p.id}/users`, { email: userEmail, name: 'Ops Lead', password: 'partner-password-1', requirePasswordChange: false })).statusCode).toBe(201);
     const res = await app.inject({ method: 'POST', url: '/api/v1/partner-portal/login', payload: { email: userEmail, password: 'partner-password-1' } });
     expect(res.statusCode, res.body).toBe(200);
     const portal = `praxis_partner=${res.cookies.find((c) => c.name === 'praxis_partner')!.value}`;

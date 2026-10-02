@@ -124,3 +124,56 @@ test.describe('tutorials', () => {
     expect(pdf.headers()['content-type']).toContain('application/pdf');
   });
 });
+
+test.describe('user administration', () => {
+  test('an Admin adds a user with a temporary password; the user must choose their own at first sign-in; a reset ends their access', async ({ browser }) => {
+    const adminCtx = await browser.newContext();
+    const page = await adminCtx.newPage();
+    await page.goto(`${WEB}/login`);
+    await page.waitForLoadState('networkidle');
+    await page.getByLabel('Email').fill(ADMIN.email);
+    await page.getByLabel('Password').fill(ADMIN.password);
+    await page.getByRole('button', { name: /sign in/i }).click();
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Admin' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Users');
+    const email = `new.validator.${Date.now()}@e2e.local`;
+    await page.locator('#new-user-name').fill('Nina Validator');
+    await page.locator('#new-user-email').fill(email);
+    await page.getByLabel('Validator').last().check();
+    await page.getByRole('button', { name: 'Add user' }).click();
+    const box = page.getByRole('status').filter({ hasText: `Temporary password for ${email}` });
+    await expect(box).toBeVisible();
+    const temporary = (await box.locator('code').innerText()).trim();
+    expect(temporary).toMatch(/^[a-z2-9]{4}(-[a-z2-9]{4}){3}$/);
+    await box.getByRole('button', { name: 'I have stored it — hide' }).click();
+    await expect(page.getByRole('row').filter({ hasText: email }).getByText('Temporary password')).toBeVisible();
+
+    // The new user signs in with the temporary password and is sent to choose their own.
+    const userCtx = await browser.newContext();
+    const u = await userCtx.newPage();
+    await u.goto(`${WEB}/login`);
+    await u.waitForLoadState('networkidle');
+    await u.getByLabel('Email').fill(email);
+    await u.getByLabel('Password').fill(temporary);
+    await u.getByRole('button', { name: /sign in/i }).click();
+    await expect(u.getByRole('heading', { name: 'Choose your own password' })).toBeVisible({ timeout: 30_000 });
+    await u.goto(`${WEB}/review/applications`);
+    await expect(u).toHaveURL(/\/change-password$/);
+    await u.getByLabel('Current or temporary password').fill(temporary);
+    await u.getByLabel('New password', { exact: false }).first().fill('nina-own-long-passphrase');
+    await u.getByLabel('Confirm new password').fill('nina-own-long-passphrase');
+    await u.getByRole('button', { name: 'Save new password' }).click();
+    await expect(u.getByRole('heading', { name: /Welcome, Nina/ })).toBeVisible({ timeout: 30_000 });
+
+    // The Admin resets it: the user is signed out at once and the old password stops working.
+    await page.reload();
+    const row = page.getByRole('row').filter({ hasText: email });
+    await row.getByRole('button', { name: 'Reset password' }).click();
+    await row.getByRole('button', { name: 'Yes, reset' }).click();
+    await expect(page.getByRole('status').filter({ hasText: `Temporary password for ${email}` })).toBeVisible();
+    await u.goto(`${WEB}/review/applications`);
+    await expect(u).toHaveURL(/\/login$/);
+    await adminCtx.close();
+    await userCtx.close();
+  });
+});

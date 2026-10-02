@@ -151,13 +151,13 @@ export const userRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db })
         if (before.id === actor.userId) throw conflict('Use "Change password" to change your own password.');
         const temporaryPassword = generateTemporaryPassword();
         const user = await tx.user.update({ where: { id: before.id }, data: { passwordHash: await hashPassword(temporaryPassword), mustChangePassword: true } });
+        // Signed out everywhere in the same transaction, before the response: whoever had the old password loses access at once.
+        await tx.session.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
         // The secret itself is never written to the audit log or the event.
         await audit({ entityType: 'User', entityId: user.id, action: 'user.password_reset', after: { mustChangePassword: true } });
         await emit({ name: 'user.password_reset', aggregateType: 'User', aggregateId: user.id, payload: { userId: user.id } });
         return { status: 200, body: { ...toUserDto(user), temporaryPassword }, replayBody: toUserDto(user) };
       });
-      // A reset signs the user out everywhere: whoever had the old password loses access at once.
-      if (reply.statusCode === 200) await revokeAllUserSessions(db, req.params.id);
       return reply;
     },
   );

@@ -99,17 +99,18 @@ page. One browser holds one sign-in: use a separate browser profile or a private
 
 | Function | Where in the console | API | Notes |
 | --- | --- | --- | --- |
-| List console users | Admin → Users | `GET /api/v1/users` | Read-only table |
-| Create a console user (email, name, roles, password) | **No screen yet** | `POST /api/v1/users` | No invite email. The Admin sets a first password and passes it on privately |
-| Change a user's roles | **No screen yet** | `PATCH /api/v1/users/:id/roles` | Cannot remove your own Admin role |
-| Disable or re-enable a user | **No screen yet** | `PATCH /api/v1/users/:id/status` | Disabling signs the user out everywhere; not allowed on yourself |
+| List console users | Admin → Users | `GET /api/v1/users` | Roles, status, last sign-in, temporary-password flag |
+| Create a console user (email, name, roles) | Admin → Users → Add a user | `POST /api/v1/users` | Praxis shows a temporary password once; the user must choose their own at first sign-in |
+| Change a user's roles | Admin → Users → Edit roles | `PATCH /api/v1/users/:id/roles` | Cannot remove your own Admin role |
+| Disable or re-enable a user | Admin → Users → Disable / Enable | `PATCH /api/v1/users/:id/status` | Disabling signs the user out everywhere; not allowed on yourself |
+| Reset a user's password | Admin → Users → Reset password | `POST /api/v1/users/:id/password-reset` | New temporary password shown once; the user is signed out everywhere and must choose a new one; not on yourself |
 | Domains and templates: create, edit draft, new version, publish, retire, history | Projects → Templates | `/api/v1/domains`, `/api/v1/templates…` | PMs read only. A project can only use a published template |
 | Demographic taxonomy (diversity attributes) | Admin → Taxonomy | `POST /api/v1/demographic-attributes` | |
 | Contributor terms (versions candidates accept) | Admin → Terms | `GET/POST /api/v1/terms` | |
 | RL failure reason codes: add, deactivate | Admin → Failure codes | `POST/PATCH /api/v1/failure-reason-codes` | |
 | Machine API keys (RL Gym, client API): create, revoke | Admin → API clients | `/api/v1/api-clients` | The key is shown once only; it is stored as a hash |
 | Partners: onboard, edit, suspend | Partners → Partners | `POST /api/v1/partners`, `PATCH /api/v1/partners/:id` | Suspending revokes the partner's API tokens |
-| Partner portal users: add | Partners → a partner → Portal users | `POST /api/v1/partners/:id/users` | No way yet to disable a portal user |
+| Partner portal users: add, reset password, disable or enable | Partners → a partner → Portal users | `POST /api/v1/partners/:id/users`, `POST …/users/:userId/password-reset`, `PATCH …/users/:userId/status` | Temporary password shown once; changed at first sign-in |
 | Partner fee terms | Partners → a partner | `PUT /api/v1/partners/:id/fee-terms` | |
 | Guidelines: create package, upload version, view source, regenerate, edit knowledge items | Certification → Guidelines | `/api/v1/guidelines…` | Claude drafts; the Admin approves everything |
 | Course: edit modules, approve or reject | Guidelines → a version → Course | `/api/v1/courses…` | |
@@ -124,7 +125,7 @@ page. One browser holds one sign-in: use a separate browser profile or a private
 
 | To stop… | Do this |
 | --- | --- |
-| A person signing in to the console | Disable the user (API) |
+| A person signing in to the console | Admin → Users → Disable |
 | A staffing partner | Suspend the partner (also revokes its API tokens) |
 | A machine client (RL Gym, client API) | Revoke its API key |
 | A project or campaign | Pause or cancel it (PM or Admin) |
@@ -136,7 +137,7 @@ page. One browser holds one sign-in: use a separate browser profile or a private
 
 | Who | How |
 | --- | --- |
-| Admin, PM, Validator, Finance | Open the console, enter email and password, **Sign in**. Sessions last 12 hours. Sign-in attempts are rate-limited (10 a minute by default) |
+| Admin, PM, Validator, Finance | Open the console, enter email and password, **Sign in**. With a temporary password from an Admin you are taken to **Choose your own password** first. Sessions last 12 hours. Sign-in attempts are rate-limited (10 a minute by default) |
 | Partner user | Open `<console>/partner/login`, enter email and password. Refused if the user or the partner is suspended |
 | Candidate (test and demo) | Open the candidate app, **Sign in**. The mock Google form asks for an email and a name and, the first time, to confirm you are 18 or older. Use a new email for each new candidate |
 | Candidate (production) | Real Google sign-in. Accounts are matched by Google account, never merged by email |
@@ -147,8 +148,5 @@ page. One browser holds one sign-in: use a separate browser profile or a private
 
 These are real limits of the current build, not mistakes in this guide. If one matters to you, raise an Enhancement.
 
-- No screen to create console users, change roles, or disable users: use the API (section 4). Until a screen exists,
-  the lead tester creates tester accounts with `POST /api/v1/users`.
 - No screen for the audit log, the Approved Task Dataset, or SME standing.
-- Partner portal users cannot be disabled; suspend the whole partner instead.
 - The Partner API lives under `/partner/v1`, not `/api/v1`.

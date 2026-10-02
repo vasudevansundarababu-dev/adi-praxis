@@ -107,4 +107,9 @@ export const CASES = [
     steps: ['Select Tutorials in the portal menu.', 'Play the video and open the guide.', 'In the same browser, open <console URL>/tutorials/files/ADI-Praxis-User-Guide.pdf and /tutorials/files/02-admin.mp4.'],
     expected: ['The page is titled "Tutorials and partner guide" and shows one video (Staffing partner) and the partner guide PDF.', 'The staff guide and staff videos are refused (Not found): partners only get partner material.'],
   }),
+  c('TC-PTR-018', 'Portal users: temporary password, first sign-in, reset and disable', {
+    category: 'FUNC', priority: 'P2', pre: 'Admin in one browser profile; a second profile for the new partner user.',
+    steps: ['As Admin open Partners → Demo Staffing Partner → Portal users. Add "<initials> Ops" with email ops.<initials>@partner.example. Copy the temporary password.', 'In the second profile sign in at /partner/login with it and choose your own password.', 'As Admin press Reset password on that user, then Disable, then Enable.'],
+    expected: ['A "Temporary password for <email>" box appears once; the user is listed with a "Temporary password" pill.', 'The partner user lands on "Choose your own password" and nothing else in the portal opens until they save one; then the portal Home opens.', 'Reset signs them out and shows a new temporary password once; Disable signs them out and blocks sign-in; Enable lets them in again. The partner itself stays active.'],
+  }),
 ];

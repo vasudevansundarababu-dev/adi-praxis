@@ -396,3 +396,26 @@ help pack and the user's own data; required markers on every screen of all three
 - **(chosen by Claude)** The videos are rehearsed on a local copy of the demo environment
   (`e2e/demo-videos/local-stack.sh`: its own database `praxis_video` and ports 3500/3501/4500), so a running
   `pnpm dev` is not disturbed.
+
+### Console user management and temporary passwords (2 Oct 2026)
+
+- **(owner)** Admins create console users, and partner portal users, from the console and give them a password. Each
+  person changes it at their first sign-in. 1Password is integrated later.
+- **(chosen by Claude)** Praxis generates the temporary password (16 characters from an unambiguous alphabet, about 80
+  bits, shown as four groups). It is shown to the Admin once, like API keys. It is stored only as an argon2 hash and is
+  never returned on an idempotent replay, written to the audit log or emitted in an event. It is **not emailed**: the
+  tester rules forbid passwords in email, and the Admin passes it on through a password manager. The 1Password
+  integration slots in at that "copy" step.
+- **(chosen by Claude)** While a user has a temporary password, the API refuses everything except "who am I",
+  sign-out and change-password (403 `PASSWORD_CHANGE_REQUIRED`). This is enforced in the RBAC hook, not only by
+  redirecting in the UI.
+- **(chosen by Claude)** A password reset issues a new temporary password and signs the person out everywhere. Admins
+  cannot reset their own password; they use Change password. Changing your password signs out your other sessions.
+  New passwords need at least 12 characters, must differ from the current one, and must not contain the email name.
+  NIST SP 800-63B favours length over composition rules, so there are no composition rules.
+- **(chosen by Claude)** Admin → Users also gets Edit roles and Disable / Enable, so user management no longer needs
+  the API. Partner portal users get Reset password and Disable / Enable, closing the "cannot disable a portal user"
+  gap.
+- **(chosen by Claude)** An Admin may still set a known password through the API, with `requirePasswordChange` on by
+  default. Test fixtures and the shared demo account `partner@praxis.demo` turn it off. The shared demo console
+  accounts are created by the seed and demo job, not the API, so they are unaffected.

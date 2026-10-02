@@ -468,34 +468,30 @@
 "TC-PM-028","Project manager","PM","UX","P3","PM home page","Signed in as PM.","1. Read Home.
 2. Press New project → and each tile's Open →.","- The role reads ""Program Manager"". Tiles: Projects staffing, Projects in progress and Pay runs waiting for you (draft runs to confirm).
 - New project → opens the six-step wizard; each tile opens the right list.","D-PL-05","Not run","","","","",""
-"TC-ADM-001","Admin","Admin","FUNC","P1","Create console users for each tester and role (API only: there is no Add user screen)","Signed in as Admin in the browser. A REST tool (Postman or curl) with the Admin session cookie (README section 9). Release 1.1 has no screen to add users: Admin → Users is read-only.","1. Open Admin → Users. Look for an Add, Edit or Disable control.
-2. POST /api/v1/users with an Idempotency-Key and {""email"":""pm.<initials>@praxis.test"",""name"":""<initials> PM"",""roles"":[""PM""],""password"":""<11 characters>""}.
-3. Repeat with a password of 12 or more characters. Then create validator.<initials>@praxis.test with roles [""REVIEWER""] and finance.<initials>@praxis.test with roles [""FINANCE""].
-4. POST the same email again (new Idempotency-Key); then a body with ""roles"": [] and a body with ""roles"": [""SUPERUSER""].
-5. Reload Admin → Users.
-6. Sign in as each new user in its own browser profile.","- Admin → Users is a read-only table (Name, Email, Roles, Status) with no Add, Edit or Disable control (known gap, ROLES-AND-ADMIN section 6).
-- A password under 12 characters is refused (400) and nothing is created; a valid body returns 201 with the user (never the password).
-- A duplicate email is refused: ""A user with this email already exists"" (409). Empty or unknown roles are refused (400).
-- The new users are listed with roles shown as PM, Validator and Finance and status Active.
-- Each new user signs in and sees only their role's menu groups (TC-PM-013, TC-REV-030, TC-FIN-001).
-- Share passwords only through the team password manager; never in GitHub, chat or the test sheet.","D-PL-01 D-PL-05 D-PL-06","Not run","","","","",""
-"TC-ADM-002","Admin","Admin","FUNC","P1","Change a user's roles and disable a user (API); a disabled user is signed out everywhere","A user from TC-ADM-001 signed in to the console in two browsers (e.g. Chrome and Edge). Admin REST tool with session cookie. The user's id from GET /api/v1/users.","1. PATCH /api/v1/users/<id>/roles with {""roles"":[""PM"",""REVIEWER""]}. Ask the user to reload.
-2. PATCH the roles back to {""roles"":[""PM""]}; ask them to reload again. Try {""roles"":[]}.
-3. PATCH /api/v1/users/<id>/status with {""status"":""DISABLED""}. Ask the user to click anything in both browsers, then to sign in again.
-4. With the user's old session cookie call GET /api/v1/auth/me.
-5. PATCH the status back to {""status"":""ACTIVE""}; the user signs in again.","- After adding REVIEWER the Reviews and Certification groups appear on reload; the header shows ""PM, Validator"". After removing it they disappear and Reviews URLs show the No access card.
-- An empty roles list is refused (400); the user keeps their roles.
-- Disabling signs the user out in every browser at the next request (back to the console sign-in page) and signing in again (correct password) is refused with ""This account is disabled"".
-- The old cookie gets 401.
-- After re-enabling the user can sign in again with the same password. Admin → Users shows Active / Disabled correctly at each step.
-- Each change is in the audit log (user.roles_changed, user.status_changed): the lead checks on request, there is no audit screen.","D-PL-05 D-PL-06 D-PL-02","Not run","","","","",""
-"TC-ADM-003","Admin","Admin","SEC","P1","An Admin cannot remove their own Admin role or disable themselves","Two Admin accounts (your own named Admin, created by the lead with roles [""ADMIN""], and a second Admin). Admin REST tool with your own session cookie; your user id from GET /api/v1/users.","1. PATCH /api/v1/users/<your id>/roles with {""roles"":[""PM""]}.
-2. PATCH /api/v1/users/<your id>/status with {""status"":""DISABLED""}.
-3. PATCH your own roles to {""roles"":[""ADMIN"",""FINANCE""]} (keeping Admin).
-4. As the second Admin, remove the Finance role from your account again.","- Removing your own Admin role is refused (409): ""You cannot remove your own Admin role. Ask another Admin.""
-- Disabling yourself is refused (409): ""You cannot disable your own account"".
-- Adding a role while keeping Admin works.
-- Another Admin can change your roles. Nothing changes after a refused request (check Admin → Users).","D-PL-05","Not run","","","","",""
+"TC-ADM-001","Admin","Admin","FUNC","P1","Add console users for each tester and role; each gets a temporary password","Signed in as Admin. A second browser profile for each new user.","1. Open Admin → Users. Under ""Add a user"" press Add user with the name, email or roles missing.
+2. Add pm.<initials>@praxis.test (name ""<initials> PM"", role PM). Read the box that appears; press Copy, then ""I have stored it — hide"".
+3. Add validator.<initials>@praxis.test (Validator) and finance.<initials>@praxis.test (Finance).
+4. Add pm.<initials>@praxis.test again.
+5. Reload Admin → Users.","- Add user stays disabled until name, email and at least one role are filled.
+- A yellow box ""Temporary password for <email>"" shows a password like kq7m-xt4p-9wzn-r2hc once, with Copy, and says to pass it on through a password manager, never by email or chat. After hiding it, it is never shown again (reload: gone).
+- Each user is listed with their role (PM, Validator, Finance), status Active, ""Never"" signed in, and a ""Temporary password"" pill.
+- A duplicate email is refused: ""A user with this email already exists"".
+- Share the temporary passwords only in the team password manager; never in GitHub, chat or the test sheet.","D-PL-01 D-PL-05 D-PL-06","Not run","","","","",""
+"TC-ADM-002","Admin","Admin","FUNC","P1","Edit roles and disable or enable a user; a disabled user is signed out everywhere","A user from TC-ADM-001 who has chosen their own password, signed in to the console in two browsers.","1. On their row press Edit roles, tick Validator as well, Save roles. Ask the user to reload.
+2. Edit roles again: untick everything (Save roles stays disabled), then leave only PM and save.
+3. Press Disable. Ask the user to click anything in both browsers, then to sign in again.
+4. Press Enable; the user signs in again.","- After adding Validator the Reviews and Certification groups appear on reload; the header shows ""PM, Validator"". After removing it they disappear and Reviews URLs show the No access card.
+- A user must keep at least one role.
+- Disabling shows ""<email> is disabled and signed out everywhere.""; both browsers go back to the sign-in page at the next click and signing in is refused (""This account is disabled"").
+- After Enable the user signs in with their own password. Each change is in the audit log (user.roles_changed, user.status_changed).","D-PL-05 D-PL-06 D-PL-02","Not run","","","","",""
+"TC-ADM-003","Admin","Admin","SEC","P1","An Admin cannot remove their own Admin role, disable themselves or reset their own password","Your own named Admin account and a second Admin.","1. On your own row (""(you)"") look for Disable and Reset password.
+2. Edit roles on your own row: untick Admin, Save roles.
+3. Edit roles on your own row: keep Admin, add Finance, save.
+4. As the second Admin, remove Finance from your account again.
+5. With a REST tool: POST /api/v1/users/<your id>/password-reset and PATCH /api/v1/users/<your id>/status {""status"":""DISABLED""}.","- Your own row has no Disable or Reset password (use Change password in the header).
+- Removing your own Admin role is refused: ""You cannot remove your own Admin role. Ask another Admin.""
+- Adding a role while keeping Admin works; another Admin can change your roles.
+- The API refuses both (409). Nothing changes after a refused request.","D-PL-05","Not run","","","","",""
 "TC-ADM-004","Admin","Admin","FUNC","P2","Templates: create, save, publish and start a new version","Signed in as Admin.","1. Projects → Templates → New template. Choose Domain, type Workflow name ""<initials> KYC template"", Create draft.
 2. In the draft editor press Save draft, then Publish, with only the name filled.
 3. Fill Primary work, Verification / reward, Human gate, Default TPT (try 0 and 500, then 90), Skills, Task modes, Distinct-task target, Max tasks per expert, coverage cells and edge cases. Save draft, then Publish.
@@ -647,9 +643,9 @@
 - If any row fails validation nothing is added (all or nothing).
 - Wrong kind of key: 403; no key: 401.
 - The PM sees the new tasks.","D-M5-10 D-PL-06","Not run","","","","",""
-"TC-ADM-030","Admin","Admin","SEC","P2","Partner portal users cannot be disabled; suspending the partner is the only stop","Your test partner from TC-ADM-013 with a portal user signed in to the portal in another browser profile. Do not suspend ""Demo Staffing Partner"".","1. Partners → your partner → Portal users: look for Disable, Remove or Reset password on the user.
+"TC-ADM-030","Admin","Admin","SEC","P2","Suspending a partner stops all its portal users; one user can also be disabled on its own","Your test partner from TC-ADM-013 with a portal user signed in to the portal in another browser profile. Do not suspend ""Demo Staffing Partner"".","1. Partners → your partner → Portal users: press Disable on one user, ask them to click any page, then Enable.
 2. Suspend partner → confirm. Ask the portal user to click any page, then to sign in again.
-3. Reactivate partner. The portal user signs in again.","- Portal users can only be added; there is no disable or remove control (known gap: ROLES-AND-ADMIN section 6). Raise an Enhancement if your team needs it.
+3. Reactivate partner. The portal user signs in again.","- Disable signs that one user out at the next click and blocks sign-in; Enable lets them in again; the partner and its other users are unaffected.
 - After suspension the portal session ends at the next click (back to /partner/login) and sign-in is refused with ""Email or password is incorrect."" (no hint that the partner is suspended).
 - After reactivation the user can sign in again; the partner's candidates and history are unchanged.","D-M10-02 D-M10-04","Not run","","","","",""
 "TC-ADM-031","Admin","Admin","FUNC","P3","Partner page: settings, read-only API clients and webhooks","Your test partner from TC-ADM-013, whose portal user created an API client and a webhook (TC-PTR-009, TC-PTR-010, as that partner).","1. Partners → your partner → Settings: set Domains to ""banking"" and tick only Annotator; Save settings.
@@ -698,6 +694,16 @@
 - ""For your role"" shows Getting started plus the video for your role (Admin, Program Manager, Validator or Finance); the other videos are under ""Other roles"". Seven videos in all.
 - Each video plays with captions and can jump to any point.
 - The user guide PDF opens in a new tab.","","Not run","","","","",""
+"TC-ADM-038","Admin","Admin","FUNC","P1","First sign-in with a temporary password, password reset, and changing your own password","A user just added in TC-ADM-001 (temporary password in the password manager). Their own browser profile.","1. Sign in with the temporary password.
+2. Try to open /projects or /review/applications by URL.
+3. Choose your own password: try the wrong current password, a new password under 12 characters, two different new passwords, and a password containing your email name; then a valid one.
+4. Sign out and sign in with the new password; then try the temporary password.
+5. As Admin press Reset password on this user, then ""Yes, reset"". The user clicks anything.
+6. The user signs in with the new temporary password, chooses another password, then uses Change password in the header to change it again.","- After sign-in the user lands on ""Choose your own password"" with a welcome line; every other page sends them back there.
+- Errors: ""Your current password is not correct."", ""Use at least 12 characters."", ""The two new passwords do not match."", ""Do not use your email address in your password.""
+- After saving, Home opens. The temporary password no longer works; the new one does. The Admin's row loses the Temporary password pill.
+- Reset shows a new temporary password once; the user is signed out at once and must choose a new password again.
+- Change password in the header works the same way and signs out the user's other sessions.","D-PL-05 D-PL-06","Not run","","","","",""
 "TC-REV-001","Validator (Reviewer role)","Validator","FUNC","P1","Application queue shows only assigned projects","Two projects with applications; you are assigned to one.","1. Reviews → Applications.
 2. Open an application from the other project by URL (ask a colleague for its id).","- Only your project's applications are listed, oldest first.
 - The other one is ""not found"".","D-M4C-04","Not run","","","","",""
@@ -903,6 +909,11 @@
 2. Play the video and open the guide.
 3. In the same browser, open <console URL>/tutorials/files/ADI-Praxis-User-Guide.pdf and /tutorials/files/02-admin.mp4.","- The page is titled ""Tutorials and partner guide"" and shows one video (Staffing partner) and the partner guide PDF.
 - The staff guide and staff videos are refused (Not found): partners only get partner material.","","Not run","","","","",""
+"TC-PTR-018","Partner (partner portal)","Partner","FUNC","P2","Portal users: temporary password, first sign-in, reset and disable","Admin in one browser profile; a second profile for the new partner user.","1. As Admin open Partners → Demo Staffing Partner → Portal users. Add ""<initials> Ops"" with email ops.<initials>@partner.example. Copy the temporary password.
+2. In the second profile sign in at /partner/login with it and choose your own password.
+3. As Admin press Reset password on that user, then Disable, then Enable.","- A ""Temporary password for <email>"" box appears once; the user is listed with a ""Temporary password"" pill.
+- The partner user lands on ""Choose your own password"" and nothing else in the portal opens until they save one; then the portal Home opens.
+- Reset signs them out and shows a new temporary password once; Disable signs them out and blocks sign-in; Enable lets them in again. The partner itself stays active.","","Not run","","","","",""
 "TC-FIN-001","Finance","Finance","FUNC","P1","Finance menu, home and what Finance cannot open","Signed in as Finance.","1. Read the menu and the home page.
 2. Open Payments and read the tabs.
 3. Type /projects, /templates, /requisitions, /review/applications, /certifications, /guidelines, /partners, /api-clients and /users in the address bar.","- Menu: Home and Payments only (no second row; Payments has its own tabs). Your role shows as ""Finance"". Home tiles: Pay runs waiting for you (runs to approve or submit) and Open payout exceptions.
@@ -1130,6 +1141,10 @@
 3. Sign in as a partner and repeat step 1.","- Signed out: 401 ""Sign in to watch the tutorials.""
 - Unknown names and path tricks: Not found; nothing outside the tutorials folder is ever returned.
 - Partner: staff files are Not found; only the partner video and guide are served.","","Not run","","","","",""
+"TC-SEC-030","Security (browser checks)","Several","Security","P1","A temporary password opens nothing but ""who am I"", sign-out and change-password, in the API too","A console user and a partner user who still have a temporary password (TC-ADM-001, TC-PTR-018). A REST tool with their session cookies.","1. With the console user's cookie call GET /api/v1/auth/me, GET /api/v1/projects, GET /api/v1/review/applications, POST /api/v1/support/ask.
+2. With the partner user's cookie call GET /api/v1/partner-portal/me and GET /api/v1/partner-portal/requisitions.
+3. Check the audit log entries for the reset and the change (the lead).","- auth/me and partner-portal/me answer (with ""mustChangePassword"": true); every other call is refused with 403 PASSWORD_CHANGE_REQUIRED ""Choose a new password before you continue.""
+- The temporary password never appears in any API response other than the one that created it, nor in the audit log or events.","","Not run","","","","",""
 "TC-PEN-001","Penetration testing","Pen tester","PEN","P1","Reconnaissance and attack surface","PENTEST.md read and signed off.","1. Map the three hosts (console, candidate app, API), /api/v1/openapi.json and /docs.
 2. Spider both apps authenticated per role with OWASP ZAP (or Burp Suite Community).","- A list of endpoints per role, matched against API-QUICK-REFERENCE.md. Undocumented endpoints are findings.","D-PL-05","Not run","","","","",""
 "TC-PEN-002","Penetration testing","Pen tester","PEN","P1","A01 Broken access control: IDOR sweep","Two accounts per role; ids collected in TC-PEN-001.","1. Replay every object URL of user A with user B's session (Burp Autorize or ZAP Access Control add-on): enrollments, tasks, sources, drafts, reviews, projects, RL reviews, API clients.

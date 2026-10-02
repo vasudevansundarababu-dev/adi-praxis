@@ -56,6 +56,7 @@ export const SCREENS = [
   { app: 'console', route: '/failure-codes', name: 'Admin → Failure codes', cases: ['TC-ADM-008'] },
   { app: 'console', route: '/api-clients', name: 'Admin → API clients', cases: ['TC-ADM-007', 'TC-ADM-029'] },
   { app: 'console', route: '/tutorials', name: 'Tutorials (videos and user guide)', cases: ['TC-ADM-037', 'TC-SEC-029'] },
+  { app: 'console', route: '/change-password', name: 'Change password (and first sign-in with a temporary password)', cases: ['TC-ADM-038', 'TC-SEC-030'] },
   // ── Partner portal ──
   { app: 'partner', route: '/partner/login', name: 'Partner sign-in', cases: ['TC-PTR-001', 'TC-ADM-030'] },
   { app: 'partner', route: '/partner', name: 'Partner home', cases: ['TC-PTR-001'] },
@@ -67,6 +68,7 @@ export const SCREENS = [
   { app: 'partner', route: '/partner/statements', name: 'Statements', cases: ['TC-PTR-012'] },
   { app: 'partner', route: '/partner/integrations', name: 'API & webhooks', cases: ['TC-PTR-009', 'TC-PTR-010', 'TC-SEC-022'] },
   { app: 'partner', route: '/partner/tutorials', name: 'Tutorials (partner video and guide)', cases: ['TC-PTR-017', 'TC-SEC-029'] },
+  { app: 'partner', route: '/partner/change-password', name: 'Change password (and first sign-in with a temporary password)', cases: ['TC-PTR-018', 'TC-SEC-030'] },
   // ── Candidate app ──
   { app: 'candidate', route: '/', name: 'Landing page', cases: ['TC-SME-001'] },
   { app: 'candidate', route: '/sign-in', name: 'Sign in (mock Google, 18+)', cases: ['TC-SME-001', 'TC-SME-003', 'TC-SME-077'] },
@@ -101,16 +103,17 @@ export const SCREENS = [
 // docs/user-guide/ROLES-AND-ADMIN.md section 4, one row per Admin function.
 export const ADMIN_FUNCTIONS = [
   { fn: 'List console users', where: 'Admin → Users', api: 'GET /api/v1/users', cases: ['TC-ADM-001', 'TC-ADM-002'] },
-  { fn: 'Create a console user', where: 'No screen (API only)', api: 'POST /api/v1/users', cases: ['TC-ADM-001', 'TC-E2E-012', 'TC-SEC-010'] },
-  { fn: 'Change a user\'s roles (not your own Admin role)', where: 'No screen (API only)', api: 'PATCH /api/v1/users/:id/roles', cases: ['TC-ADM-002', 'TC-ADM-003', 'TC-PEN-003'] },
-  { fn: 'Disable or re-enable a user (signs out everywhere; not yourself)', where: 'No screen (API only)', api: 'PATCH /api/v1/users/:id/status', cases: ['TC-ADM-002', 'TC-ADM-003', 'TC-E2E-012'] },
+  { fn: 'Create a console user', where: 'Admin → Users → Add a user (temporary password)', api: 'POST /api/v1/users', cases: ['TC-ADM-001', 'TC-ADM-038', 'TC-E2E-012', 'TC-SEC-010'] },
+  { fn: 'Reset a user\'s password (signs out everywhere; not yourself)', where: 'Admin → Users → Reset password', api: 'POST /api/v1/users/:id/password-reset', cases: ['TC-ADM-038', 'TC-ADM-003', 'TC-SEC-030'] },
+  { fn: 'Change a user\'s roles (not your own Admin role)', where: 'Admin → Users → Edit roles', api: 'PATCH /api/v1/users/:id/roles', cases: ['TC-ADM-002', 'TC-ADM-003', 'TC-PEN-003'] },
+  { fn: 'Disable or re-enable a user (signs out everywhere; not yourself)', where: 'Admin → Users → Disable / Enable', api: 'PATCH /api/v1/users/:id/status', cases: ['TC-ADM-002', 'TC-ADM-003', 'TC-E2E-012'] },
   { fn: 'Domains and templates: create, edit draft, new version, publish, retire, history', where: 'Projects → Templates', api: '/api/v1/domains, /api/v1/templates…', cases: ['TC-ADM-004', 'TC-ADM-027', 'TC-ADM-028', 'TC-PM-012'] },
   { fn: 'Demographic taxonomy', where: 'Admin → Taxonomy', api: 'POST /api/v1/demographic-attributes', cases: ['TC-ADM-005', 'TC-ADM-025'] },
   { fn: 'Contributor terms (new version)', where: 'Admin → Terms', api: 'GET/POST /api/v1/terms', cases: ['TC-ADM-006', 'TC-ADM-026'] },
   { fn: 'RL failure reason codes: add, deactivate', where: 'Admin → Failure codes', api: 'POST/PATCH /api/v1/failure-reason-codes', cases: ['TC-ADM-008'] },
   { fn: 'Machine API keys: create, revoke', where: 'Admin → API clients', api: '/api/v1/api-clients', cases: ['TC-ADM-007', 'TC-ADM-029', 'TC-RLG-006'] },
   { fn: 'Partners: onboard, edit, suspend', where: 'Partners → Partners', api: 'POST /api/v1/partners, PATCH /api/v1/partners/:id', cases: ['TC-ADM-013', 'TC-ADM-014', 'TC-ADM-031'] },
-  { fn: 'Partner portal users: add (no disable)', where: 'Partners → a partner → Portal users', api: 'POST /api/v1/partners/:id/users', cases: ['TC-ADM-013', 'TC-ADM-030'] },
+  { fn: 'Partner portal users: add, reset password, disable or enable', where: 'Partners → a partner → Portal users', api: 'POST /api/v1/partners/:id/users, …/password-reset, PATCH …/status', cases: ['TC-ADM-013', 'TC-ADM-030', 'TC-PTR-018'] },
   { fn: 'Partner fee terms', where: 'Partners → a partner', api: 'PUT /api/v1/partners/:id/fee-terms', cases: ['TC-ADM-015', 'TC-FIN-011'] },
   { fn: 'Guidelines: package, upload, source, regenerate, knowledge items', where: 'Certification → Guidelines', api: '/api/v1/guidelines…', cases: ['TC-ADM-016', 'TC-ADM-017', 'TC-ADM-032', 'TC-ADM-033'] },
   { fn: 'Course: edit modules, approve or reject', where: 'Guidelines → a version → Course', api: '/api/v1/courses…', cases: ['TC-ADM-018', 'TC-ADM-019'] },

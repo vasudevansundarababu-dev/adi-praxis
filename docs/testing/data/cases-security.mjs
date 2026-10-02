@@ -178,4 +178,9 @@ export const CASES = [
     steps: ['Signed out, open <console URL>/tutorials/files/01-getting-started.mp4 and /tutorials/files/ADI-Praxis-User-Guide.pdf.', 'Try /tutorials/files/..%2F..%2Fpackage.json and other names that are not in the Tutorials page.', 'Sign in as a partner and repeat step 1.'],
     expected: ['Signed out: 401 "Sign in to watch the tutorials."', 'Unknown names and path tricks: Not found; nothing outside the tutorials folder is ever returned.', 'Partner: staff files are Not found; only the partner video and guide are served.'],
   }),
+  c('TC-SEC-030', 'A temporary password opens nothing but "who am I", sign-out and change-password, in the API too', {
+    category: 'Security', priority: 'P1', pre: 'A console user and a partner user who still have a temporary password (TC-ADM-001, TC-PTR-018). A REST tool with their session cookies.',
+    steps: ['With the console user\'s cookie call GET /api/v1/auth/me, GET /api/v1/projects, GET /api/v1/review/applications, POST /api/v1/support/ask.', 'With the partner user\'s cookie call GET /api/v1/partner-portal/me and GET /api/v1/partner-portal/requisitions.', 'Check the audit log entries for the reset and the change (the lead).'],
+    expected: ['auth/me and partner-portal/me answer (with "mustChangePassword": true); every other call is refused with 403 PASSWORD_CHANGE_REQUIRED "Choose a new password before you continue."', 'The temporary password never appears in any API response other than the one that created it, nor in the audit log or events.'],
+  }),
 ];

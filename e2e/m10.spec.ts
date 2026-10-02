@@ -61,7 +61,7 @@ async function supply(extra: object = {}) {
   await ok(pm.post(`projects/${p.id}/sme-supply`, { data: { enabled: true }, headers: idem() }));
   const partner = await ok(admin.post('partners', { data: { name: `Lotus Staffing ${tag}`, businessVerification: 'VERIFIED', allowedDomains: ['banking'], allowedTiers: ['ANNOTATOR', 'REVIEWER_SME', 'EXPERT'] }, headers: idem() }));
   const portal = { email: `ops.${tag}@partner.example`, password: 'partner-password-1' };
-  await ok(admin.post(`partners/${partner.id}/users`, { data: { email: portal.email, name: 'Meera Nair', password: portal.password }, headers: idem() }));
+  await ok(admin.post(`partners/${partner.id}/users`, { data: { email: portal.email, name: 'Meera Nair', password: portal.password, requirePasswordChange: false }, headers: idem() }));
   const r = await ok(pm.post('requisitions', { data: { projectId: p.id, title: `KYC annotators ${tag}`, summary: 'Label KYC onboarding decisions.', domain: 'banking', tier: 'ANNOTATOR', headcount: 10, languages: ['en'], jurisdictions: ['IN'], minimumRequirements: { minYears: 2, qualifications: [], licenceRequired: false }, allowedPartnerIds: [partner.id], maxPerPartner: 50, ...extra }, headers: idem() }));
   await ok(pm.post(`requisitions/${r.id}/transition`, { data: { to: 'OPEN' }, headers: idem() }));
   return { requisitionId: r.id as string, title: r.title as string, partnerId: partner.id as string, portal };
@@ -222,4 +222,31 @@ test('a partner opens Tutorials: the partner video and guide, never the staff fi
   expect((await page.request.get(`${WEB}/tutorials/files/ADI-Praxis-Partner-Guide.pdf`)).status()).toBe(200);
   expect((await page.request.get(`${WEB}/tutorials/files/ADI-Praxis-User-Guide.pdf`)).status()).toBe(404);
   expect((await page.request.get(`${WEB}/tutorials/files/02-admin.mp4`)).status()).toBe(404);
+});
+
+test('an Admin adds a partner portal user with a temporary password; the partner chooses their own at first sign-in', async ({ browser }) => {
+  const s = await supply();
+  const page = await browser.newPage();
+  await staffLogin(page, 'admin@e2e.local', 'e2e-admin-password');
+  await page.goto(`${WEB}/partners/${s.partnerId}`);
+  const email = `ops2.${Date.now()}@partner.example`;
+  await page.locator('#portal-user-name').fill('Ravi Ops');
+  await page.locator('#portal-user-email').fill(email);
+  await page.getByRole('button', { name: 'Add user' }).click();
+  const box = page.getByRole('status').filter({ hasText: `Temporary password for ${email}` });
+  await expect(box).toBeVisible();
+  const temporary = (await box.locator('code').innerText()).trim();
+
+  const p = await browser.newPage();
+  await p.goto(`${WEB}/partner/login`);
+  await p.waitForLoadState('networkidle');
+  await p.getByLabel('Work email').fill(email);
+  await p.getByLabel('Password').fill(temporary);
+  await p.getByRole('button', { name: /^sign in$/i }).click();
+  await expect(p.getByRole('heading', { name: 'Choose your own password' })).toBeVisible({ timeout: 30_000 });
+  await p.getByLabel('Current or temporary password').fill(temporary);
+  await p.getByLabel('New password', { exact: false }).first().fill('ravi-partner-passphrase');
+  await p.getByLabel('Confirm new password').fill('ravi-partner-passphrase');
+  await p.getByRole('button', { name: 'Save new password' }).click();
+  await expect(p.getByRole('heading', { name: /Welcome, Ravi/ })).toBeVisible({ timeout: 30_000 });
 });

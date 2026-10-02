@@ -19,6 +19,8 @@ const PARTNER_NAV = [
 export default async function PartnerPortalLayout({ children }: { children: React.ReactNode }) {
   const me = await getPartnerMe();
   if (!me) redirect('/partner/login');
+  // A temporary password from ADI Praxis must be replaced first (the API refuses everything else until then).
+  if (me.user.mustChangePassword) redirect('/partner/change-password');
 
   return (
     <div className="min-h-screen bg-surface">
@@ -39,6 +41,9 @@ export default async function PartnerPortalLayout({ children }: { children: Reac
               {me.user.name} · {me.partner.name}
             </span>
             <ThemeToggle />
+            <Link href="/partner/change-password" className="hidden text-white/80 hover:text-white hover:underline sm:inline">
+              Change password
+            </Link>
             <PartnerSignOutButton />
           </div>
         </div>

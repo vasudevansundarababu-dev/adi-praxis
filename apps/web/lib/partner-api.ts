@@ -19,7 +19,7 @@ export async function partnerGet<T>(path: string): Promise<{ status: number; dat
 // ── Response shapes (mirror apps/api/src/routes/partner-portal.ts) ──
 
 export type PartnerMe = {
-  user: { id: string; email: string; name: string };
+  user: { id: string; email: string; name: string; mustChangePassword: boolean };
   partner: { id: string; name: string; allowedDomains: string[]; allowedTiers: string[] };
 };
 

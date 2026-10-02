@@ -1,8 +1,8 @@
 import { RequisitionInput, REQUISITION_STATES } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { hashPassword } from '../auth/password';
-import type { Db } from '../db';
+import { generateTemporaryPassword, hashPassword } from '../auth/password';
+import type { Db, Tx } from '../db';
 import { AppError, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { clientDto, partnerDto, PartnerInput, PartnerUserInput } from '../supply/partners';
@@ -40,7 +40,7 @@ export const supplyInternalRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (ap
     if (!p) throw notFound('Partner not found');
     return {
       ...partnerDto(p),
-      users: p.users.map((u) => ({ id: u.id, email: u.email, name: u.name, status: u.status, lastLoginAt: u.lastLoginAt?.toISOString() ?? null })),
+      users: p.users.map((u) => ({ id: u.id, email: u.email, name: u.name, status: u.status, mustChangePassword: u.mustChangePassword, lastLoginAt: u.lastLoginAt?.toISOString() ?? null })),
       clients: p.clients.map(clientDto),
       webhooks: p.webhooks.map((w) => ({ id: w.id, url: w.url, events: w.events, environment: w.environment, status: w.status })),
     };
@@ -74,9 +74,45 @@ export const supplyInternalRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (ap
       if (!p) throw notFound('Partner not found');
       const email = req.body.email.toLowerCase();
       if ((await tx.partnerUser.findUnique({ where: { email } })) || (await tx.user.findUnique({ where: { email } }))) throw new AppError(409, 'EMAIL_IN_USE', 'This email already has an account.');
-      const u = await tx.partnerUser.create({ data: { clientId: p.clientId, partnerId: p.id, email, name: req.body.name, passwordHash: await hashPassword(req.body.password) } });
+      const temporaryPassword = req.body.password ? undefined : generateTemporaryPassword();
+      const u = await tx.partnerUser.create({ data: { clientId: p.clientId, partnerId: p.id, email, name: req.body.name, passwordHash: await hashPassword(req.body.password ?? temporaryPassword!), mustChangePassword: req.body.requirePasswordChange } });
       await audit({ entityType: 'PartnerUser', entityId: u.id, action: 'partner.user_created', after: { partnerId: p.id, email } });
-      return { status: 201, body: { id: u.id, email: u.email, name: u.name, status: u.status } };
+      const body = { id: u.id, email: u.email, name: u.name, status: u.status, mustChangePassword: u.mustChangePassword };
+      // The temporary password is shown once; a replay never returns it.
+      return { status: 201, body: { ...body, temporaryPassword }, replayBody: body };
+    });
+    return reply;
+  });
+
+  const UserParams = z.object({ id: z.string().uuid(), userId: z.string().uuid() });
+  async function portalUser(tx: Tx, clientId: string, partnerId: string, userId: string) {
+    const u = await tx.partnerUser.findFirst({ where: { id: userId, partnerId, clientId } });
+    if (!u) throw notFound('Portal user not found');
+    return u;
+  }
+
+  // A new temporary password for a portal user; their sessions end at once.
+  app.post('/partners/:id/users/:userId/password-reset', { config: { access: ADMIN }, schema: { tags: ['supply'], params: UserParams } }, async (req, reply) => {
+    await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+      const u = await portalUser(tx, actor.clientId, req.params.id, req.params.userId);
+      const temporaryPassword = generateTemporaryPassword();
+      await tx.partnerUser.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(temporaryPassword), mustChangePassword: true } });
+      await tx.session.updateMany({ where: { partnerUserId: u.id, revokedAt: null }, data: { revokedAt: new Date() } });
+      await audit({ entityType: 'PartnerUser', entityId: u.id, action: 'partner.user_password_reset', after: { mustChangePassword: true } });
+      const body = { id: u.id, email: u.email, name: u.name, status: u.status, mustChangePassword: true };
+      return { status: 200, body: { ...body, temporaryPassword }, replayBody: body };
+    });
+    return reply;
+  });
+
+  // Disable or re-enable one portal user (disabling ends their sessions) without suspending the whole partner.
+  app.patch('/partners/:id/users/:userId/status', { config: { access: ADMIN }, schema: { tags: ['supply'], params: UserParams, body: z.object({ status: z.enum(['ACTIVE', 'DISABLED']) }) } }, async (req, reply) => {
+    await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+      const u = await portalUser(tx, actor.clientId, req.params.id, req.params.userId);
+      const updated = await tx.partnerUser.update({ where: { id: u.id }, data: { status: req.body.status } });
+      if (req.body.status === 'DISABLED') await tx.session.updateMany({ where: { partnerUserId: u.id, revokedAt: null }, data: { revokedAt: new Date() } });
+      await audit({ entityType: 'PartnerUser', entityId: u.id, action: 'partner.user_status_changed', before: { status: u.status }, after: { status: updated.status } });
+      return { status: 200, body: { id: updated.id, email: updated.email, name: updated.name, status: updated.status, mustChangePassword: updated.mustChangePassword } };
     });
     return reply;
   });

@@ -7,6 +7,8 @@ export interface InternalActor {
   clientId: string;
   roles: InternalRole[];
   sessionId: string;
+  /** Signed in with a temporary password: only "who am I", sign-out and change-password are allowed. */
+  mustChangePassword: boolean;
 }
 
 export type Actor = InternalActor;
@@ -34,6 +36,8 @@ export interface PartnerUserActor {
   partnerId: string;
   clientId: string;
   sessionId: string;
+  /** Signed in with a temporary password: only "who am I", sign-out and change-password are allowed. */
+  mustChangePassword: boolean;
 }
 
 /** M10: a partner's system calling the Partner API with an OAuth2 client-credentials token. */
@@ -77,5 +81,7 @@ declare module 'fastify' {
   }
   interface FastifyContextConfig {
     access?: AccessPolicy;
+    /** Reachable while the user still has a temporary password (me, logout, change-password). */
+    allowTemporaryPassword?: boolean;
   }
 }

@@ -79,7 +79,7 @@ async function supplySetup(db: Db, clientId: string, env: NodeJS.ProcessEnv, cal
   let partner = partners.find((x) => x.name === 'Demo Staffing Partner');
   if (!partner) {
     partner = (await call('a', 'POST', '/partners', { name: 'Demo Staffing Partner', businessVerification: 'VERIFIED', allowedDomains: ['banking'], allowedTiers: ['ANNOTATOR', 'REVIEWER_SME', 'EXPERT'] })) as { id: string; name: string };
-    await call('a', 'POST', `/partners/${partner.id}/users`, { email: 'partner@praxis.demo', name: 'Meera Nair', password: partnerPw });
+    await call('a', 'POST', `/partners/${partner.id}/users`, { email: 'partner@praxis.demo', name: 'Meera Nair', password: partnerPw, requirePasswordChange: false });
     await call('a', 'PUT', `/partners/${partner.id}/fee-terms`, { certifiedFee: '150', feeCurrency: 'USD', feeTermsVersion: 'Demo fees 2026-09' });
   }
   const cards = (await call('a', 'GET', '/rate-cards')).items as { id: string; name: string }[];

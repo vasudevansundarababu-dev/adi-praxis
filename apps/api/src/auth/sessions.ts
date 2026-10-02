@@ -49,6 +49,7 @@ export async function resolveInternalSession(db: Db, token: string): Promise<Int
     clientId: session.user.clientId,
     roles: session.user.roles,
     sessionId: session.id,
+    mustChangePassword: session.user.mustChangePassword,
   };
 }
 
@@ -111,7 +112,7 @@ export async function createPartnerSession(db: Db, args: { partnerUserId: string
 export async function resolvePartnerSession(db: Db, token: string): Promise<PartnerUserActor | null> {
   const s = await db.session.findUnique({ where: { tokenHash: sha256(token) }, include: { partnerUser: { include: { partner: true } } } });
   if (!s || s.audience !== 'PARTNER' || s.revokedAt || s.expiresAt <= new Date() || !s.partnerUser || s.partnerUser.status !== 'ACTIVE' || s.partnerUser.partner.status !== 'ACTIVE') return null;
-  return { type: 'PARTNER_USER', partnerUserId: s.partnerUser.id, partnerId: s.partnerUser.partnerId, clientId: s.clientId, sessionId: s.id };
+  return { type: 'PARTNER_USER', partnerUserId: s.partnerUser.id, partnerId: s.partnerUser.partnerId, clientId: s.clientId, sessionId: s.id, mustChangePassword: s.partnerUser.mustChangePassword };
 }
 
 /** A Partner API bearer token (OAuth2 client credentials). Only the SHA-256 of the token is stored. */

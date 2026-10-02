@@ -3,12 +3,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { PartnerUserActor } from '../auth/actor';
 import { statementDto } from '../pay/ledger';
-import { getDummyHash, verifyPassword } from '../auth/password';
+import { ChangePasswordRequest } from '@praxis/shared';
+import { getDummyHash, hashPassword, verifyPassword } from '../auth/password';
 import { createPartnerSession, PARTNER_SESSION_COOKIE, revokeSession } from '../auth/sessions';
 import type { Config } from '../config';
 import type { Db } from '../db';
 import type { EmailSender } from '../lib/email';
-import { notFound, unauthorized } from '../lib/errors';
+import { AppError, badRequest, notFound, unauthorized } from '../lib/errors';
 import type { SecretBox } from '../lib/secrets';
 import { runPartnerCommand } from '../platform/command';
 import { ClientInput, clientDto, createClient, createWebhook, revokeClient, rotateClient, WebhookInput, webhookDto } from '../supply/partners';
@@ -38,19 +39,34 @@ export const partnerPortalRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
       await db.partnerUser.update({ where: { id: u.id }, data: { lastLoginAt: new Date() } });
       await db.auditEvent.create({ data: { clientId: u.partner.clientId, actorType: 'PARTNER', actorId: `partner-user:${u.id}`, entityType: 'PartnerUser', entityId: u.id, action: 'partner.user_signed_in' } });
       reply.setCookie(PARTNER_SESSION_COOKIE, token, { ...cookieOptions, expires: expiresAt });
-      return { user: { id: u.id, email: u.email, name: u.name }, partner: { id: u.partner.id, name: u.partner.name } };
+      return { user: { id: u.id, email: u.email, name: u.name, mustChangePassword: u.mustChangePassword }, partner: { id: u.partner.id, name: u.partner.name } };
     },
   );
 
-  app.post('/partner-portal/logout', { config: { access: 'partner' }, schema: { tags: ['partner-portal'] } }, async (req, reply) => {
+  app.post('/partner-portal/logout', { config: { access: 'partner', allowTemporaryPassword: true }, schema: { tags: ['partner-portal'] } }, async (req, reply) => {
     await revokeSession(db, me(req).sessionId);
     reply.clearCookie(PARTNER_SESSION_COOKIE, cookieOptions);
     return { ok: true };
   });
 
-  app.get('/partner-portal/me', { config: { access: 'partner' }, schema: { tags: ['partner-portal'] } }, async (req) => {
+  app.get('/partner-portal/me', { config: { access: 'partner', allowTemporaryPassword: true }, schema: { tags: ['partner-portal'] } }, async (req) => {
     const u = await db.partnerUser.findUniqueOrThrow({ where: { id: me(req).partnerUserId }, include: { partner: true } });
-    return { user: { id: u.id, email: u.email, name: u.name }, partner: { id: u.partner.id, name: u.partner.name, allowedDomains: u.partner.allowedDomains, allowedTiers: u.partner.allowedTiers } };
+    return { user: { id: u.id, email: u.email, name: u.name, mustChangePassword: u.mustChangePassword }, partner: { id: u.partner.id, name: u.partner.name, allowedDomains: u.partner.allowedDomains, allowedTiers: u.partner.allowedTiers } };
+  });
+
+  // Change your own password (and replace a temporary one an Admin issued). Other sessions are signed out.
+  app.post('/partner-portal/change-password', { config: { access: 'partner', allowTemporaryPassword: true, rateLimit: { max: config.LOGIN_RATE_LIMIT_PER_MINUTE, timeWindow: '1 minute' } }, schema: { tags: ['partner-portal'], body: ChangePasswordRequest } }, async (req, reply) => {
+    await runPartnerCommand(db, req, reply, async ({ tx, audit }) => {
+      const u = await tx.partnerUser.findUniqueOrThrow({ where: { id: me(req).partnerUserId } });
+      if (!(await verifyPassword(u.passwordHash, req.body.currentPassword))) throw new AppError(400, 'WRONG_PASSWORD', 'Your current password is not correct.');
+      if (req.body.newPassword === req.body.currentPassword) throw badRequest('Choose a password different from the current one.');
+      if (req.body.newPassword.toLowerCase().includes(u.email.split('@')[0]!.toLowerCase())) throw badRequest('Do not use your email address in your password.');
+      await tx.partnerUser.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(req.body.newPassword), mustChangePassword: false } });
+      await tx.session.updateMany({ where: { partnerUserId: u.id, revokedAt: null, id: { not: me(req).sessionId } }, data: { revokedAt: new Date() } });
+      await audit({ entityType: 'PartnerUser', entityId: u.id, action: 'partner.user_password_changed', before: { mustChangePassword: u.mustChangePassword }, after: { mustChangePassword: false } });
+      return { status: 200, body: { user: { id: u.id, email: u.email, name: u.name, mustChangePassword: false } } };
+    });
+    return reply;
   });
 
   // M10c: monthly certified-candidate fee statements (payment happens outside Praxis).

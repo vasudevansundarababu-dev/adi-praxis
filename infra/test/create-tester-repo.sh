@@ -28,6 +28,11 @@ if [ -n "$DRY_RUN" ]; then WORK="$DRY_RUN"; mkdir -p "$WORK"; else WORK="$(mktem
 mkdir -p "$WORK/docs/testing" "$WORK/.github/ISSUE_TEMPLATE" "$WORK/.github/workflows"
 cp "$ROOT"/docs/testing/*.md "$ROOT"/docs/testing/test-cases.csv "$WORK/docs/testing/"
 cp -R "$ROOT/docs/testing/samples" "$WORK/docs/testing/"
+# The user guide (Markdown chapters and the PDFs testers can download; the same videos are in each app's Tutorials).
+mkdir -p "$WORK/docs/user-guide"
+cp "$ROOT"/docs/user-guide/*.md "$WORK/docs/user-guide/"
+for v in full expert partner; do node "$ROOT/docs/user-guide/build-pdf.mjs" "$v" >/dev/null; done
+cp "$ROOT"/out/user-guide/*.pdf "$WORK/docs/user-guide/"
 cp "$ROOT"/.github/ISSUE_TEMPLATE/*.yml "$WORK/.github/ISSUE_TEMPLATE/"
 cp "$ROOT/.github/labels.yml" "$WORK/.github/"
 cp "$ROOT/.github/workflows/labels.yml" "$ROOT/.github/workflows/issue-commands.yml" "$WORK/.github/workflows/"
@@ -42,7 +47,9 @@ cat > "$WORK/README.md" <<EOF
 
 Defect tracker for the ADI Praxis test environment. There is no application code here.
 
-1. Read the [tester guide](docs/testing/README.md) and [what's new in 1.1](docs/testing/WHATS-NEW-1.1.md).
+1. Read the [tester guide](docs/testing/README.md) and [what's new in 1.1](docs/testing/WHATS-NEW-1.1.md). The
+   [user guide](docs/user-guide/README.md) ([PDF](docs/user-guide/ADI-Praxis-User-Guide.pdf)) shows how each role uses
+   every screen; the same guide and captioned videos are on the **Tutorials** page in each app.
 2. Run the cases in [TEST-CASES.md](docs/testing/TEST-CASES.md) (also [test-cases.csv](docs/testing/test-cases.csv)).
    Check the [decision register](docs/testing/DECISION-REGISTER.md) before reporting agreed behaviour as a defect.
 3. Report problems in **Issues → New issue** and pick a form (Defect, UX issue, Enhancement request).

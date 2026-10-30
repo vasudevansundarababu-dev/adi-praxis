@@ -6,7 +6,7 @@ Adds structured synthetic executable authoring to the existing task autosave, su
 
 Administrators can download approved tasks with exact payload/hash and source lineage in an optional `praxis.anvil.export.v1` envelope. The original NDJSON export and historical approved-record hash format are preserved. Private source uploads are not automatically exported. Draft software examples use a separate explicitly labeled download path, never a fabricated approval or rights grant.
 
-The demo setup reuses the existing deployment infrastructure and creates two clearly labeled synthetic DRAFT projects with unassigned CREATED examples. It is idempotent and audits creation/reuse. Staffing, contributor onboarding, author submission and independent human review remain required for approved dataset publication. No customer project or historical evidence is backfilled. No database migration is introduced.
+The demo setup reuses the existing deployment infrastructure and creates two clearly labeled synthetic READY_FOR_STAFFING projects with unassigned CREATED examples. It is idempotent and audits creation/reuse. Staffing, contributor onboarding, author submission and independent human review remain required for approved dataset publication. No customer project or historical evidence is backfilled. No database migration is introduced.
 
 Validation covers both schemas, hidden/future evidence availability, state projection, references, author save/submit/review/export, lineage envelopes, cross-tenant access denial, correction immutability and draft setup idempotency. Browser smoke includes the new approved-export screen. See the integration evidence report for final counts, deployed image/version identifiers and non-destructive deployed checks.
 

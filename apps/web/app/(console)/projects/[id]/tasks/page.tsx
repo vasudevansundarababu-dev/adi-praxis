@@ -21,7 +21,7 @@ export default async function ProjectTasksPage({ params }: { params: Promise<{ i
       <p className="mt-1 text-sm text-fg-muted">
         TPT is a planning and pay target ({tasks?.tptMinutes ?? '—'} min): tasks never expire on it. Reclaim a stalled task to return it to the queue.
       </p>
-      {project.status === 'DRAFT' && project.name.startsWith('SYNTHETIC TEST — ') && <p className="mt-4 rounded-md border border-line p-3 text-sm">This example is an unassigned software test draft. It has no human task approval or reviewed rights clearance. <a className="text-link underline" href={`/api/v1/projects/${id}/synthetic-example`}>Download synthetic draft for Anvil qualification</a>. Staff the project, author and submit the task, then obtain independent review to enter the approved dataset.</p>}
+      {project.status === 'READY_FOR_STAFFING' && project.name.startsWith('SYNTHETIC TEST — ') && <p className="mt-4 rounded-md border border-line p-3 text-sm">This example is an unassigned software test draft. It has no human task approval or reviewed rights clearance. <a className="text-link underline" href={`/api/v1/projects/${id}/synthetic-example`}>Download synthetic draft for Anvil qualification</a>. Staff the project, author and submit the task, then obtain independent review to enter the approved dataset.</p>}
       {project.taskMode === 'ANNOTATION' && <InputUpload projectId={id} />}
       <TaskTable projectId={id} tptMinutes={tasks?.tptMinutes ?? null} initial={tasks?.items ?? []} />
       <InvitesPanel projectId={id} initial={invites?.items ?? []} />

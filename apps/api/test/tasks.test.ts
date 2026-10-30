@@ -465,7 +465,7 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
     expect(draftExport.json()).toEqual((stagedTask.output as { praxisContract: unknown }).praxisContract);
     const projects = await db.project.findMany({ where: { name: 'SYNTHETIC TEST — Harbor marketing decisions' } });
     expect(projects).toHaveLength(1);
-    expect(projects[0]!.status).toBe('DRAFT');
+    expect(projects[0]!.status).toBe('READY_FOR_STAFFING');
     const drafts = await db.taskInstance.findMany({ where: { projectId: projects[0]!.id } });
     expect(drafts).toHaveLength(1);
     expect(drafts[0]).toMatchObject({ status: 'CREATED', assignedToId: null, reviewerId: null });

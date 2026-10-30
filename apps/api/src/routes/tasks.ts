@@ -85,7 +85,7 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
   // Explicit software-fixture path, kept distinct from the approved dataset export.
   app.get('/projects/:id/synthetic-example', { config: { access: ACCESS }, schema: { tags: ['tasks'], params: IdParams } }, async (req, reply) => {
     const p = await loadProject(db, req.params.id, req.actor!);
-    if (!['local', 'demo'].includes(config.appEnv) || p.status !== 'DRAFT' || !p.name.startsWith('SYNTHETIC TEST — ') || p.template.workflowName !== EXECUTABLE_WORKFLOW) throw notFound('Synthetic draft not found');
+    if (!['local', 'demo'].includes(config.appEnv) || p.status !== 'READY_FOR_STAFFING' || !p.name.startsWith('SYNTHETIC TEST — ') || p.template.workflowName !== EXECUTABLE_WORKFLOW) throw notFound('Synthetic draft not found');
     const t = await db.taskInstance.findFirst({ where: { projectId: p.id, clientId: p.clientId, taskType: 'AUTHORING', status: 'CREATED', assignedToId: null } });
     if (!t || !(t.input as { syntheticExample?: boolean }).syntheticExample) throw notFound('Synthetic draft not found');
     const contract = (t.output as Record<string, unknown>).praxisContract;
@@ -99,7 +99,7 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
     if (!['local', 'demo'].includes(config.appEnv)) throw new AppError(409, 'DEMO_ONLY', 'Synthetic fixture setup is available only in local/demo environments.');
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
       const p = await loadProject(tx, req.params.id, actor);
-      if (p.status !== 'DRAFT' || !p.name.startsWith('SYNTHETIC TEST — ') || p.template.workflowName !== EXECUTABLE_WORKFLOW) throw new AppError(409, 'DEMO_PROJECT_REQUIRED', 'Use a clearly labeled draft synthetic decision project.');
+      if (p.status !== 'READY_FOR_STAFFING' || !p.name.startsWith('SYNTHETIC TEST — ') || p.template.workflowName !== EXECUTABLE_WORKFLOW) throw new AppError(409, 'DEMO_PROJECT_REQUIRED', 'Use a clearly labeled synthetic decision project prepared for staffing.');
       await tx.$executeRaw`SELECT 1 FROM "Project" WHERE id = ${p.id}::uuid FOR UPDATE`;
       const existing = await tx.taskInstance.findFirst({ where: { projectId: p.id, taskType: 'AUTHORING' } });
       if (existing) {

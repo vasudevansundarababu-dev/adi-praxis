@@ -66,6 +66,11 @@ export function ProjectSummary({
           Opportunity page
         </Link>
       )}
+      {p.status === 'READY_FOR_STAFFING' && p.name.startsWith('SYNTHETIC TEST — ') && (
+        <Link href={`/projects/${p.id}/tasks`} className="ml-3 mt-6 inline-block btn btn-secondary">
+          Tasks and invites
+        </Link>
+      )}
       {['STAFFING', 'STAFFED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED'].includes(p.status) && (
         <>
           <Link href={`/projects/${p.id}/dashboard`} className="ml-3 mt-6 inline-block btn btn-secondary">

@@ -145,7 +145,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
     const t = await ownTask(db, req.params.id, req.candidate!.smeUserId);
     const mine = JSON.stringify(t.coverageTags ?? null);
     const recent = await db.approvedTaskRecord.findMany({
-      where: { workflow: t.project.template.workflowName, supersedesId: null, taskMode: 'AUTHORING' },
+      where: { clientId: t.clientId, workflow: t.project.template.workflowName, supersedesId: null, taskMode: 'AUTHORING' },
       orderBy: { seq: 'desc' },
       take: 20,
       select: { output: true, coverageTags: true },

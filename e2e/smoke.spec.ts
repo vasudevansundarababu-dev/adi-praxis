@@ -22,6 +22,9 @@ test.describe('console smoke', () => {
     await page.getByRole('navigation', { name: 'Projects pages' }).getByRole('link', { name: 'Templates' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/templates/i);
     await expect(nav.getByRole('link', { name: 'Projects' })).toHaveAttribute('aria-current', 'true');
+    await page.getByRole('navigation', { name: 'Projects pages' }).getByRole('link', { name: 'Approved exports' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Approved task exports');
+    await expect(page.getByRole('link', { name: 'Download existing NDJSON dataset' })).toBeVisible();
   });
 
   test('the Support Bot explains the screen, including which fields are required', async ({ page }) => {

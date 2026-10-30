@@ -1,4 +1,5 @@
 import type { Prisma, TaskInstance } from '@prisma/client';
+import { praxisContractChecks } from '@praxis/shared';
 import type { CoverageTags, SubmitTaskRequest, TaskCheck } from '@praxis/shared';
 import type { Db, Tx } from '../db';
 import { AppError } from '../lib/errors';
@@ -28,7 +29,7 @@ export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 
   const def = definitionFor(template);
   const output = (task.output ?? {}) as Record<string, unknown>;
   const slot = task.taskType === 'AUTHORING' ? ((task.input as { slot?: SlotRef }).slot ?? null) : null;
-  const checks: TaskCheck[] = [...coverageChecks(template, slot, output), ...def.validateSubmission(template, output, slot), ...draftingChecks(task)];
+  const checks: TaskCheck[] = [...coverageChecks(template, slot, output), ...(def.key === 'kyc-onboarding-v1' ? praxisContractChecks(output) : []), ...def.validateSubmission(template, output, slot), ...draftingChecks(task)];
   const coverage: CoverageTags | null = task.taskType === 'AUTHORING' ? finalCoverage(slot, output) : null;
   return {
     project,

@@ -1,0 +1,465 @@
+{
+  "$defs": {
+    "Action": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "description"
+      ],
+      "title": "Action",
+      "type": "object"
+    },
+    "Binding": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "json_equals",
+            "json_number_min",
+            "json_number_max"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "field": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Field",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "kind",
+        "field",
+        "value"
+      ],
+      "title": "Binding",
+      "type": "object"
+    },
+    "Constraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "hard_failure": {
+          "title": "Hard Failure",
+          "type": "boolean"
+        },
+        "binding": {
+          "$ref": "#/$defs/Binding"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "hard_failure",
+        "binding"
+      ],
+      "title": "Constraint",
+      "type": "object"
+    },
+    "Criterion": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "weight_bps": {
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Weight Bps",
+          "type": "integer"
+        },
+        "binding": {
+          "$ref": "#/$defs/Binding"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "weight_bps",
+        "binding"
+      ],
+      "title": "Criterion",
+      "type": "object"
+    },
+    "Deliverable": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "const": "output.json",
+          "title": "Path",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "description"
+      ],
+      "title": "Deliverable",
+      "type": "object"
+    },
+    "Environment": {
+      "additionalProperties": false,
+      "properties": {
+        "binding": {
+          "const": "structured-decision-v1",
+          "title": "Binding",
+          "type": "string"
+        },
+        "initial_state": {
+          "additionalProperties": true,
+          "title": "Initial State",
+          "type": "object"
+        }
+      },
+      "required": [
+        "binding",
+        "initial_state"
+      ],
+      "title": "Environment",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "visibility": {
+          "enum": [
+            "actor",
+            "private"
+          ],
+          "title": "Visibility",
+          "type": "string"
+        },
+        "content": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "visibility",
+        "content"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "const": "synthetic",
+          "title": "Classification",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "rights": {
+          "$ref": "#/$defs/Rights"
+        },
+        "review": {
+          "$ref": "#/$defs/Review"
+        }
+      },
+      "required": [
+        "classification",
+        "source",
+        "rights",
+        "review"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "Review": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "draft",
+            "approved"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reviewer_ref": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Reviewer Ref",
+          "type": "string"
+        },
+        "reviewed_revision_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Reviewed Revision Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "reviewer_ref",
+        "reviewed_revision_id"
+      ],
+      "title": "Review",
+      "type": "object"
+    },
+    "Rights": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "const": "declared",
+          "title": "Status",
+          "type": "string"
+        },
+        "basis": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "basis"
+      ],
+      "title": "Rights",
+      "type": "object"
+    },
+    "Rubric": {
+      "additionalProperties": false,
+      "properties": {
+        "criteria": {
+          "items": {
+            "$ref": "#/$defs/Criterion"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Criteria",
+          "type": "array"
+        },
+        "reference_output": {
+          "additionalProperties": true,
+          "title": "Reference Output",
+          "type": "object"
+        }
+      },
+      "required": [
+        "criteria",
+        "reference_output"
+      ],
+      "title": "Rubric",
+      "type": "object"
+    },
+    "Stage": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "instruction": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Instruction",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "completion": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Completion",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "instruction",
+        "evidence_ids",
+        "completion"
+      ],
+      "title": "Stage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "praxis.anvil.task.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+      "title": "Task Id",
+      "type": "string"
+    },
+    "task_version": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+      "title": "Task Version",
+      "type": "string"
+    },
+    "revision_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+      "title": "Revision Id",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 20000,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "objective": {
+      "maxLength": 20000,
+      "minLength": 1,
+      "title": "Objective",
+      "type": "string"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/Evidence"
+      },
+      "maxItems": 100,
+      "title": "Evidence",
+      "type": "array"
+    },
+    "constraints": {
+      "items": {
+        "$ref": "#/$defs/Constraint"
+      },
+      "maxItems": 50,
+      "title": "Constraints",
+      "type": "array"
+    },
+    "environment": {
+      "$ref": "#/$defs/Environment"
+    },
+    "actions": {
+      "items": {
+        "$ref": "#/$defs/Action"
+      },
+      "maxItems": 50,
+      "minItems": 1,
+      "title": "Actions",
+      "type": "array"
+    },
+    "stages": {
+      "items": {
+        "$ref": "#/$defs/Stage"
+      },
+      "maxItems": 1,
+      "minItems": 1,
+      "title": "Stages",
+      "type": "array"
+    },
+    "deliverables": {
+      "items": {
+        "$ref": "#/$defs/Deliverable"
+      },
+      "maxItems": 1,
+      "minItems": 1,
+      "title": "Deliverables",
+      "type": "array"
+    },
+    "rubric": {
+      "$ref": "#/$defs/Rubric"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    }
+  },
+  "required": [
+    "schema_version",
+    "task_id",
+    "task_version",
+    "revision_id",
+    "title",
+    "objective",
+    "evidence",
+    "constraints",
+    "environment",
+    "actions",
+    "stages",
+    "deliverables",
+    "rubric",
+    "provenance"
+  ],
+  "title": "PraxisTask",
+  "type": "object"
+}

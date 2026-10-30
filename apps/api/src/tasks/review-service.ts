@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { coverageStatus, CoverageDimensions, CoverageQuotas, effectiveCoverage, mayApprove, type CoverageTags } from '@praxis/shared';
+import { praxisContractChecks, EXECUTABLE_WORKFLOW, coverageStatus, CoverageDimensions, CoverageQuotas, effectiveCoverage, mayApprove, type CoverageTags } from '@praxis/shared';
 import { z } from 'zod';
 import type { InternalActor } from '../auth/actor';
 import type { Db, Tx } from '../db';
@@ -87,6 +87,10 @@ export async function decideTask(tx: Tx, actor: InternalActor, taskId: string, b
   const expectedDup = body.decision === 'ACCEPT' ? 'ACCEPT_AS_DISTINCT' : body.decision === 'REWORK' ? 'REWORK' : body.rejectReason === 'DUPLICATE' ? 'REJECT_DUPLICATE' : null;
   if (flaggedDuplicate && expectedDup && body.duplicateDecision !== expectedDup) {
     throw new AppError(400, 'DUPLICATE_DECISION_REQUIRED', 'This task was flagged as a likely duplicate: confirm your duplicate decision.');
+  }
+  if (body.decision === 'ACCEPT') {
+    const issues = praxisContractChecks((t.output ?? {}) as Record<string, unknown>, t.project.template.workflowName === EXECUTABLE_WORKFLOW).filter((c) => !c.ok);
+    if (issues.length) throw new AppError(422, 'CONTRACT_INVALID', 'Executable contract needs attention before acceptance.', { checks: issues });
   }
   const version = t.submissions.at(-1)?.version ?? 1;
   const now = new Date();

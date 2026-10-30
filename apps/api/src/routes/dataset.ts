@@ -1,10 +1,11 @@
 import type { ApprovedTaskRecord, Prisma } from '@prisma/client';
-import { KYC_MCP_CATALOG_VERSION, KYC_MCP_TOOLS, replayBundle, type KycTask } from '@praxis/shared';
+import { praxisContractIssues, KYC_MCP_CATALOG_VERSION, KYC_MCP_TOOLS, replayBundle, type KycTask } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db, Tx } from '../db';
 import { appendRecord, baseOf, recordContent, recordHash } from '../dataset/approved-records';
 import { verifyApprovedChain } from '../dataset/verify';
+import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 
@@ -78,6 +79,23 @@ export const datasetRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
     };
   });
 
+  // Exact, versioned payload only. Sources/uploads are deliberately not joined into this export.
+  app.get('/dataset/records/:id/praxis-contract', { config: { access: READ }, schema: { tags: ['dataset'], params: IdParams, querystring: z.object({ envelope: z.enum(['true', 'false']).default('false') }) } }, async (req, reply) => {
+    const r = await findRecord(db, clientOf(req), req.params.id);
+    const contract = (r.output as Record<string, unknown>).praxisContract;
+    if (!contract) throw new AppError(409, 'NO_EXECUTABLE_CONTRACT', 'This record has no executable contract. Author a structured decision task first.');
+    const issues = praxisContractIssues(contract);
+    if (issues.length) throw new AppError(422, 'CONTRACT_INVALID', 'Export blocked: executable contract is invalid.', { issues });
+    if (recordHash(recordContent(baseOf(r)), r.prevHash) !== r.contentHash) throw new AppError(409, 'RECORD_INTEGRITY', 'Export blocked: source record hash does not verify.');
+    const payload = stableStringify(contract);
+    const envelope = { schema_version: 'praxis.anvil.export.v1', source: { record_id: r.id, record_hash: r.contentHash, project_id: r.projectId, client_id: r.clientId, submission_time: r.submittedAt.toISOString(), reviewer_id: r.reviewerId, review_decision_time: r.reviewDecisionAt.toISOString() }, payload_json: payload, payload_sha256: sha256(payload) };
+    return reply.header('content-type', 'application/json')
+      .header('content-disposition', `attachment; filename="praxis-${r.id}${req.query.envelope === 'true' ? '-with-lineage' : ''}.json"`)
+      .header('x-praxis-payload-sha256', sha256(payload))
+      .header('x-praxis-record-id', r.id).header('x-praxis-record-hash', r.contentHash)
+      .header('x-praxis-schema-version', (contract as { schema_version: string }).schema_version).send(req.query.envelope === 'true' ? stableStringify(envelope) : payload);
+  });
+
   // TASK-DRAFTING section 5: the task's MCP tools and recorded calls, enough to replay it on an MCP server.
   app.get('/dataset/records/:id/replay', { config: { access: READ }, schema: { tags: ['dataset'], params: IdParams } }, async (req) => {
     const r = await findRecord(db, clientOf(req), req.params.id);
@@ -113,6 +131,17 @@ export const datasetRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const r = await findRecord(tx, actor.clientId, req.params.id);
         if (await tx.approvedTaskRecord.count({ where: { supersedesId: r.id } })) throw new AppError(409, 'ALREADY_SUPERSEDED', 'This record was already corrected; correct the latest version.');
+        const previous = r.output as Record<string, unknown>;
+        if (previous && Object.hasOwn(previous, 'praxisContract') && req.body.output && !Object.hasOwn(req.body.output, 'praxisContract')) throw new AppError(422, 'CONTRACT_REQUIRED', 'A correction must retain the executable contract.');
+        if (previous?.praxisContract && req.body.output?.praxisContract && stableStringify(previous.praxisContract) !== stableStringify(req.body.output.praxisContract)) {
+          const before = previous.praxisContract as { task_id: string; revision_id: string; task_version: string };
+          const after = req.body.output.praxisContract as { task_id: string; revision_id: string; task_version: string };
+          const issues = [];
+          if (before.task_id !== after.task_id) issues.push({ path: 'task_id', message: 'A correction must preserve the logical task ID' });
+          if (before.revision_id === after.revision_id) issues.push({ path: 'revision_id', message: 'Changed executable content requires a new immutable revision ID' });
+          if (before.task_version === after.task_version) issues.push({ path: 'task_version', message: 'Changed executable content requires a new task version' });
+          if (issues.length) throw new AppError(422, 'CONTRACT_REVISION_REQUIRED', 'Executable corrections must preserve identity and advance version/revision.', { issues });
+        }
         const base = baseOf(r);
         const next = await appendRecord(tx, {
           ...base,

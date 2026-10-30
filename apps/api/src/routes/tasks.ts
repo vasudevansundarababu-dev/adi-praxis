@@ -1,17 +1,17 @@
 import '@fastify/multipart';
 import type { Prisma } from '@prisma/client';
-import { ReclaimRequest, TASK_STATUSES } from '@praxis/shared';
+import { EXECUTABLE_WORKFLOW, praxisContractIssues, PRAXIS_STAGED_EXAMPLE, PRAXIS_SYNTHETIC_EXAMPLE, ReclaimRequest, TASK_STATUSES } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Config } from '../config';
 import type { Db, Tx } from '../db';
 import type { EmailSender } from '../lib/email';
-import { newToken, sha256 } from '../lib/crypto';
+import { newToken, sha256, stableStringify } from '../lib/crypto';
 import { AppError, badRequest, notFound } from '../lib/errors';
 import { runCommand, runStaffOrServiceCommand } from '../platform/command';
 import { definitionFor } from '../tasks/definitions';
 import { createInvite, sendInvite } from '../tasks/invites';
-import { EXPERT_TASK_TYPES, reclaimTask, templateRef } from '../tasks/task-service';
+import { EXPERT_TASK_TYPES, ensureSlots, reclaimTask, templateRef } from '../tasks/task-service';
 import { loadProject } from './projects';
 
 const IdParams = z.object({ id: z.string().uuid() });
@@ -81,6 +81,45 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
       };
     },
   );
+
+  // Explicit software-fixture path, kept distinct from the approved dataset export.
+  app.get('/projects/:id/synthetic-example', { config: { access: ACCESS }, schema: { tags: ['tasks'], params: IdParams } }, async (req, reply) => {
+    const p = await loadProject(db, req.params.id, req.actor!);
+    if (!['local', 'demo'].includes(config.appEnv) || p.status !== 'DRAFT' || !p.name.startsWith('SYNTHETIC TEST — ') || p.template.workflowName !== EXECUTABLE_WORKFLOW) throw notFound('Synthetic draft not found');
+    const t = await db.taskInstance.findFirst({ where: { projectId: p.id, clientId: p.clientId, taskType: 'AUTHORING', status: 'CREATED', assignedToId: null } });
+    if (!t || !(t.input as { syntheticExample?: boolean }).syntheticExample) throw notFound('Synthetic draft not found');
+    const contract = (t.output as Record<string, unknown>).praxisContract;
+    const issues = praxisContractIssues(contract);
+    if (issues.length) throw new AppError(422, 'CONTRACT_INVALID', 'Synthetic draft is invalid.', { issues });
+    const payload = stableStringify(contract);
+    return reply.header('content-type', 'application/json').header('content-disposition', `attachment; filename="synthetic-draft-${t.id}.json"`).header('x-praxis-review-status', 'draft').header('x-praxis-task-instance-id', t.id).header('x-praxis-task-revision', String(t.revision)).header('x-praxis-payload-sha256', sha256(payload)).send(payload);
+  });
+
+  app.post('/projects/:id/synthetic-example', { config: { access: ACCESS }, schema: { tags: ['tasks'], params: IdParams } }, async (req, reply) => {
+    if (!['local', 'demo'].includes(config.appEnv)) throw new AppError(409, 'DEMO_ONLY', 'Synthetic fixture setup is available only in local/demo environments.');
+    await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+      const p = await loadProject(tx, req.params.id, actor);
+      if (p.status !== 'DRAFT' || !p.name.startsWith('SYNTHETIC TEST — ') || p.template.workflowName !== EXECUTABLE_WORKFLOW) throw new AppError(409, 'DEMO_PROJECT_REQUIRED', 'Use a clearly labeled draft synthetic decision project.');
+      await tx.$executeRaw`SELECT 1 FROM "Project" WHERE id = ${p.id}::uuid FOR UPDATE`;
+      const existing = await tx.taskInstance.findFirst({ where: { projectId: p.id, taskType: 'AUTHORING' } });
+      if (existing) {
+        await audit({ entityType: 'TaskInstance', entityId: existing.id, action: 'task.synthetic_example_reused', after: { projectId: p.id, status: existing.status } });
+        return { status: 200, body: { taskId: existing.id, status: existing.status, synthetic: true } };
+      }
+      await ensureSlots(tx, p.id);
+      const slot = await tx.coverageSlot.findFirstOrThrow({ where: { projectId: p.id }, orderBy: { position: 'asc' } });
+      const cov = slot.coverageTags as { tags: Record<string, string>; edgeCase: string | null };
+      const contract = structuredClone(p.name.includes('staged') ? PRAXIS_STAGED_EXAMPLE : PRAXIS_SYNTHETIC_EXAMPLE);
+      contract.task_id = `SYN-${p.id}`;
+      contract.revision_id = `revision-${p.id}`;
+      contract.provenance.review.reviewed_revision_id = contract.revision_id;
+      const output = { header: { title: contract.title, coverageTags: cov.tags, edgeCase: cov.edgeCase }, praxisContract: contract };
+      const t = await tx.taskInstance.create({ data: { clientId: p.clientId, projectId: p.id, taskType: 'AUTHORING', slotId: slot.id, input: { syntheticExample: true, slot: { id: slot.id, brief: slot.brief, ...cov, isOpen: slot.isOpen } }, output } });
+      await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.synthetic_example_created', after: { projectId: p.id, status: 'CREATED', sourceReview: 'draft' } });
+      return { status: 201, body: { taskId: t.id, status: t.status, synthetic: true } };
+    });
+    return reply;
+  });
 
   app.post(
     '/projects/:id/tasks/:taskId/reclaim',

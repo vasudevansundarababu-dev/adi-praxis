@@ -1,3 +1,5 @@
+import { executableDemoSetup } from '../src/jobs/demo-setup';
+import { writeFileSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -19,7 +21,7 @@ import { createDomainEventsQueue, createDomainEventsWorker, startOutboxPoller } 
 import { redisConnection } from '../src/lib/redis';
 import { WebhookRlGymClient } from '../src/rl/rl-gym';
 import { TEST_REDIS_URL } from './env';
-import { KYC_EXAMPLE_TASK } from '@praxis/shared';
+import { PRAXIS_STAGED_EXAMPLE, PRAXIS_SYNTHETIC_EXAMPLE, KYC_EXAMPLE_TASK } from '@praxis/shared';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
 const SECRET = 'test-mock-secret';
@@ -444,6 +446,33 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
     });
   });
 
+  it('creates the synthetic demo configuration idempotently without inventing a human approval', async () => {
+    const call = async (who: string, method: string, path: string, payload?: unknown) => {
+      const response = await app.inject({ method: method as 'GET' | 'POST', url: `/api/v1${path}`, headers: { cookie: who === 'a' ? admin : pm, ...idem() }, ...(method === 'GET' ? {} : { payload: payload as object }) });
+      expect(response.statusCode, response.body).toBeLessThan(300);
+      return response.json();
+    };
+    await executableDemoSetup(call, () => undefined);
+    await executableDemoSetup(call, () => undefined);
+    await executableDemoSetup(call, () => undefined, true);
+    await executableDemoSetup(call, () => undefined, true);
+    const staged = await db.project.findFirstOrThrow({ where: { name: 'SYNTHETIC TEST — Harbor staged marketing decisions' } });
+    const stagedTask = await db.taskInstance.findFirstOrThrow({ where: { projectId: staged.id } });
+    expect(stagedTask.output).toMatchObject({ praxisContract: { schema_version: 'praxis.anvil.task.v2' } });
+    const draftExport = await get(pm, `/projects/${staged.id}/synthetic-example`);
+    expect(draftExport.statusCode).toBe(200);
+    expect(draftExport.headers['x-praxis-review-status']).toBe('draft');
+    expect(draftExport.json()).toEqual((stagedTask.output as { praxisContract: unknown }).praxisContract);
+    const projects = await db.project.findMany({ where: { name: 'SYNTHETIC TEST — Harbor marketing decisions' } });
+    expect(projects).toHaveLength(1);
+    expect(projects[0]!.status).toBe('DRAFT');
+    const drafts = await db.taskInstance.findMany({ where: { projectId: projects[0]!.id } });
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]).toMatchObject({ status: 'CREATED', assignedToId: null, reviewerId: null });
+    expect(await db.taskReview.count()).toBe(0);
+    expect(await db.approvedTaskRecord.count()).toBe(0);
+  });
+
   describe('KYC authoring (docs/TASK-KYC.md)', () => {
     async function kycTask() {
       const templateId = await template('AUTHORING', 'KYC onboarding and refresh', [{ name: 'Complex or circular ownership', quota: 1, required: true }]);
@@ -524,6 +553,56 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
       const t = (await get(cookie, `/review/tasks/${id}`)).json();
       return post(cookie, `/review/tasks/${id}/decision`, { expectedRevision: t.revision, checklist: allTrue, ...decision });
     };
+
+    it.each([PRAXIS_SYNTHETIC_EXAMPLE, PRAXIS_STAGED_EXAMPLE])('authentically saves, submits, reviews and exports $schema_version with tenant isolation', async (sample) => {
+      const { a, tasks } = await setup();
+      const t = tasks.find((x) => !x.slot!.isOpen)!;
+      const output = { ...body('Synthetic marketing decision'), praxisContract: structuredClone(sample) };
+      expect((await save(a, t.id, output)).statusCode).toBe(200);
+      const checked = (await post(a.cookie, `/me/tasks/${t.id}/check`)).json();
+      const flags = Object.fromEntries(checked.flags.map((f: { id: string }) => [f.id, 'Original synthetic integration fixture; no customer data.']));
+      const view = await task(a, t.id);
+      const submitted = await post(a.cookie, `/me/tasks/${t.id}/submit`, { expectedRevision: view.revision, syntheticDeclaration: true, flagExplanations: flags });
+      expect(submitted.statusCode, submitted.body).toBe(200);
+      const decision = await decide(t.id, { decision: 'ACCEPT' });
+      expect(decision.statusCode, decision.body).toBe(200);
+      const recordId = decision.json().recordId;
+      const exp = await get(admin, `/dataset/records/${recordId}/praxis-contract`);
+      expect(exp.statusCode, exp.body).toBe(200);
+      expect(exp.json()).toEqual(output.praxisContract);
+      const envelope = await get(admin, `/dataset/records/${recordId}/praxis-contract?envelope=true`);
+      expect(envelope.statusCode).toBe(200);
+      expect(envelope.json()).toMatchObject({ schema_version: 'praxis.anvil.export.v1', source: { record_id: recordId, client_id: clientId }, payload_json: exp.body, payload_sha256: exp.headers['x-praxis-payload-sha256'] });
+      expect(exp.headers['x-praxis-record-id']).toBe(recordId);
+      if (process.env.PRAXIS_CAPTURE_EXPORT) {
+        const path = sample.schema_version.endsWith('v2') ? process.env.PRAXIS_CAPTURE_EXPORT.replace(/\.json$/, '-staged.json') : process.env.PRAXIS_CAPTURE_EXPORT;
+        writeFileSync(path, exp.body);
+        writeFileSync(path.replace(/\.json$/, '-envelope.json'), envelope.body);
+        writeFileSync(path + '.receipt.json', JSON.stringify({ test_only: true, approval_classification: 'automated_test_identities', source_record_id: recordId, source_record_hash: exp.headers['x-praxis-record-hash'], payload_sha256: exp.headers['x-praxis-payload-sha256'], schema_version: sample.schema_version }, null, 2));
+      }
+
+      expect(exp.headers['x-praxis-payload-sha256']).toMatch(/^[a-f0-9]{64}$/);
+      expect((await get(pm, `/dataset/records/${recordId}/praxis-contract`)).statusCode).toBe(403);
+      const outsider = await db.client.create({ data: { name: 'Other tenant executable test' } });
+      const foreign = await createUser(outsider.id, ['ADMIN']);
+      const foreignCookie = await login(app, foreign.email);
+      expect((await get(foreignCookie, `/dataset/records/${recordId}/praxis-contract`)).statusCode).toBe(404);
+      const bad = structuredClone(output);
+      bad.praxisContract.environment.binding = 'shell' as 'structured-decision-v1';
+      const correction = await post(admin, `/dataset/records/${recordId}/corrections`, { reason: 'Unsupported runtime', output: bad });
+      expect(correction.statusCode, correction.body).toBe(422);
+      expect(await db.approvedTaskRecord.count()).toBe(1);
+      expect((await verifyApprovedChain(db)).breaks).toEqual([]);
+      const corrected = structuredClone(output);
+      corrected.praxisContract.title = 'Revised synthetic decision title';
+      corrected.praxisContract.task_version = '9.0.0';
+      corrected.praxisContract.revision_id = 'corrected-revision';
+      corrected.praxisContract.provenance.review.reviewed_revision_id = 'corrected-revision';
+      expect((await post(admin, `/dataset/records/${recordId}/corrections`, { reason: 'Update synthetic example', output: corrected })).statusCode).toBe(201);
+      expect((await get(admin, `/dataset/records/${recordId}/praxis-contract`)).body).toBe(exp.body);
+      expect((await verifyApprovedChain(db)).breaks).toEqual([]);
+
+    });
 
     it('accepting a task writes exactly one ApprovedTaskRecord with full lineage, chained to the previous record', async () => {
       const { projectId, a, tasks } = await setup();

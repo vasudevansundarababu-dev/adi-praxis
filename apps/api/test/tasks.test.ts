@@ -448,6 +448,13 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
 
   it('creates the synthetic demo configuration idempotently without inventing a human approval', async () => {
     const call = async (who: string, method: string, path: string, payload?: unknown) => {
+      if (method === 'POST' && path.endsWith('/synthetic-example')) {
+        const status = (await get(pm, path.replace('/synthetic-example', '/tasks'))).json();
+        if (status.items.length === 0) {
+          expect(status).toMatchObject({ syntheticDraftCanCreate: true, syntheticDraftAvailable: false });
+          expect((await get(pm, path)).statusCode).toBe(404);
+        } else expect(status).toMatchObject({ syntheticDraftCanCreate: false, syntheticDraftAvailable: true });
+      }
       const response = await app.inject({ method: method as 'GET' | 'POST', url: `/api/v1${path}`, headers: { cookie: who === 'a' ? admin : pm, ...idem() }, ...(method === 'GET' ? {} : { payload: payload as object }) });
       expect(response.statusCode, response.body).toBeLessThan(300);
       return response.json();
@@ -471,6 +478,16 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
     expect(drafts[0]).toMatchObject({ status: 'CREATED', assignedToId: null, reviewerId: null });
     expect(await db.taskReview.count()).toBe(0);
     expect(await db.approvedTaskRecord.count()).toBe(0);
+    const foreignClient = await db.client.create({ data: { name: 'Foreign synthetic fixture tenant' } });
+    const foreignUser = await createUser(foreignClient.id, ['ADMIN']);
+    const foreignCookie = await login(app, foreignUser.email);
+    expect((await get(foreignCookie, `/projects/${staged.id}/tasks`)).statusCode).toBe(404);
+    expect((await post(foreignCookie, `/projects/${staged.id}/synthetic-example`)).statusCode).toBe(404);
+    await db.taskInstance.update({ where: { id: stagedTask.id }, data: { input: {} } });
+    expect((await get(pm, `/projects/${staged.id}/tasks`)).json()).toMatchObject({ syntheticDraftCanCreate: false, syntheticDraftAvailable: false });
+    expect((await post(pm, `/projects/${staged.id}/synthetic-example`)).json().error).toBe('EXISTING_TASK');
+    expect(await db.taskInstance.count({ where: { projectId: staged.id } })).toBe(1);
+    expect((await db.taskInstance.findUniqueOrThrow({ where: { id: stagedTask.id } })).output).toEqual(stagedTask.output);
   });
 
   describe('KYC authoring (docs/TASK-KYC.md)', () => {

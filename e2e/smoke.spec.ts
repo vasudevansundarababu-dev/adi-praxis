@@ -84,11 +84,14 @@ test('a prepared synthetic project exposes its unapproved draft download in the 
   const date = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
   const project = await call('POST', '/projects', { templateId: template.id, name: `SYNTHETIC TEST — staged UI ${randomUUID().slice(0, 8)}`, distinctTarget: 1, maxPerExpert: 1, tptMinutes: 30, startDate: date(1), endDate: date(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: false }] });
   await call('POST', `/projects/${project.id}/submit`);
-  const draft = await call('POST', `/projects/${project.id}/synthetic-example`);
-  expect(draft.status).toBe('CREATED');
   await page.goto(`${WEB}/projects/${project.id}`);
   await page.getByRole('link', { name: 'Tasks and invites' }).click();
   const download = page.getByRole('link', { name: 'Download synthetic draft for Anvil qualification' });
+  await expect(download).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Tasks (0)', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Create synthetic draft', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Tasks (1)', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Create synthetic draft', exact: true })).toHaveCount(0);
   await expect(download).toBeVisible();
   const response = await page.request.get(`${WEB}${await download.getAttribute('href')}`);
   expect(response.headers()['x-praxis-review-status']).toBe('draft');

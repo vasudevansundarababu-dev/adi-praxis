@@ -63,7 +63,11 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
         orderBy: [{ status: 'asc' }, { assignedAt: 'asc' }],
         take: 2000,
       });
+      const eligible = ['local', 'demo'].includes(config.appEnv) && p.status === 'READY_FOR_STAFFING' && p.taskMode === 'AUTHORING' && p.name.startsWith('SYNTHETIC TEST — ') && p.template.workflowName === EXECUTABLE_WORKFLOW;
+      const available = eligible && tasks.some((t) => t.status === 'CREATED' && !t.assignedToId && (t.input as { syntheticExample?: boolean }).syntheticExample === true && praxisContractIssues((t.output as Record<string, unknown> | null)?.praxisContract).length === 0);
       return {
+        syntheticDraftCanCreate: eligible && tasks.length === 0,
+        syntheticDraftAvailable: available,
         tptMinutes: p.tptMinutes,
         items: tasks.map((t) => ({
           id: t.id,
@@ -85,7 +89,7 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
   // Explicit software-fixture path, kept distinct from the approved dataset export.
   app.get('/projects/:id/synthetic-example', { config: { access: ACCESS }, schema: { tags: ['tasks'], params: IdParams } }, async (req, reply) => {
     const p = await loadProject(db, req.params.id, req.actor!);
-    if (!['local', 'demo'].includes(config.appEnv) || p.status !== 'READY_FOR_STAFFING' || !p.name.startsWith('SYNTHETIC TEST — ') || p.template.workflowName !== EXECUTABLE_WORKFLOW) throw notFound('Synthetic draft not found');
+    if (!['local', 'demo'].includes(config.appEnv) || p.taskMode !== 'AUTHORING' || p.status !== 'READY_FOR_STAFFING' || !p.name.startsWith('SYNTHETIC TEST — ') || p.template.workflowName !== EXECUTABLE_WORKFLOW) throw notFound('Synthetic draft not found');
     const t = await db.taskInstance.findFirst({ where: { projectId: p.id, clientId: p.clientId, taskType: 'AUTHORING', status: 'CREATED', assignedToId: null } });
     if (!t || !(t.input as { syntheticExample?: boolean }).syntheticExample) throw notFound('Synthetic draft not found');
     const contract = (t.output as Record<string, unknown>).praxisContract;
@@ -98,11 +102,13 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
   app.post('/projects/:id/synthetic-example', { config: { access: ACCESS }, schema: { tags: ['tasks'], params: IdParams } }, async (req, reply) => {
     if (!['local', 'demo'].includes(config.appEnv)) throw new AppError(409, 'DEMO_ONLY', 'Synthetic fixture setup is available only in local/demo environments.');
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
-      const p = await loadProject(tx, req.params.id, actor);
-      if (p.status !== 'READY_FOR_STAFFING' || !p.name.startsWith('SYNTHETIC TEST — ') || p.template.workflowName !== EXECUTABLE_WORKFLOW) throw new AppError(409, 'DEMO_PROJECT_REQUIRED', 'Use a clearly labeled synthetic decision project prepared for staffing.');
+      let p = await loadProject(tx, req.params.id, actor);
       await tx.$executeRaw`SELECT 1 FROM "Project" WHERE id = ${p.id}::uuid FOR UPDATE`;
+      p = await loadProject(tx, req.params.id, actor);
+      if (p.taskMode !== 'AUTHORING' || p.status !== 'READY_FOR_STAFFING' || !p.name.startsWith('SYNTHETIC TEST — ') || p.template.workflowName !== EXECUTABLE_WORKFLOW) throw new AppError(409, 'DEMO_PROJECT_REQUIRED', 'Use a clearly labeled synthetic decision project prepared for staffing.');
       const existing = await tx.taskInstance.findFirst({ where: { projectId: p.id, taskType: 'AUTHORING' } });
       if (existing) {
+        if (existing.status !== 'CREATED' || existing.assignedToId || !(existing.input as { syntheticExample?: boolean }).syntheticExample || praxisContractIssues((existing.output as Record<string, unknown> | null)?.praxisContract).length) throw new AppError(409, 'EXISTING_TASK', 'This project already contains work. Existing tasks are preserved; no synthetic draft was created.');
         await audit({ entityType: 'TaskInstance', entityId: existing.id, action: 'task.synthetic_example_reused', after: { projectId: p.id, status: existing.status } });
         return { status: 200, body: { taskId: existing.id, status: existing.status, synthetic: true } };
       }

@@ -17,3 +17,5 @@ The existing demo setup job idempotently creates a clearly labeled synthetic Mar
 The four earlier Library specification references were not re-materialized in this implementation. This is a frozen executable increment, not a claim that all 230 field mappings or the complete original staged intake specification have been reconciled.
 
 The explicitly labeled software-fixture route `GET /projects/:id/synthetic-example` downloads an unassigned CREATED synthetic example only in local/demo READY_FOR_STAFFING test projects. It is separate from accepted-record export and carries draft status/task identity/hash headers. PMs can download it from Tasks and invites for non-human software qualification. It must never be treated as an approved dataset record or a rights grant.
+
+Empty prepared projects show **Create synthetic draft** on Tasks and invites. This is an explicit authenticated command, followed by a refresh. The download link appears only after the API confirms a valid unassigned synthetic draft exists. Repeated creation reuses that same draft; unrelated or assigned work is never overwritten or labeled synthetic.

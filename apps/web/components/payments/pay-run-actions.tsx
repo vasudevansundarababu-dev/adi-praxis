@@ -45,18 +45,20 @@ export function PayRunActions({ run: r, roles, userId }: { run: PayRunDto; roles
   const [reason, setReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const has = (x: string) => roles.includes(x);
-  const canConfirm = (has('PM') || has('ADMIN')) && r.status === 'DRAFT';
+  const canRelease = has('ADMIN') && ['DRAFT', 'CONFIRMED'].includes(r.status);
+  const canConfirm = !has('ADMIN') && has('PM') && r.status === 'DRAFT';
   const alreadyApproved = (r.approvals ?? []).some((x) => x.userId === userId);
-  const canApprove = has('FINANCE') && r.status === 'CONFIRMED';
-  const canSubmit = has('FINANCE') && r.status === 'APPROVED';
+  const canApprove = !has('ADMIN') && has('FINANCE') && r.status === 'CONFIRMED';
+  const canSubmit = (has('ADMIN') || has('FINANCE')) && r.status === 'APPROVED';
   const canCancel = (has('FINANCE') || has('ADMIN')) && ['DRAFT', 'CONFIRMED', 'APPROVED'].includes(r.status);
   const waiting =
-    r.status === 'DRAFT' && !canConfirm ? 'Waiting for a PM to confirm.' : r.status === 'CONFIRMED' && !has('FINANCE') ? 'Waiting for Finance to approve.' : r.status === 'APPROVED' && !has('FINANCE') ? 'Waiting for Finance to submit.' : null;
-  if (!canConfirm && !canApprove && !canSubmit && !canCancel) return waiting ? <p className="card p-4 text-sm text-fg-muted">{waiting}</p> : null;
+    !has('ADMIN') && r.status === 'DRAFT' && !canConfirm ? 'Waiting for a PM to confirm.' : r.status === 'CONFIRMED' && !has('ADMIN') && !has('FINANCE') ? 'Waiting for Finance to approve.' : r.status === 'APPROVED' && !has('ADMIN') && !has('FINANCE') ? 'Waiting for Finance to submit.' : null;
+  if (!canRelease && !canConfirm && !canApprove && !canSubmit && !canCancel) return waiting ? <p className="card p-4 text-sm text-fg-muted">{waiting}</p> : null;
 
   return (
     <section className="card space-y-3 p-4 text-sm" aria-label="Pay run actions">
       <div className="flex flex-wrap gap-2">
+        {canRelease && <button type="button" disabled={a.pending} onClick={() => a.run('POST', `/pay-runs/${r.id}/release`, undefined, { success: 'Released by Admin. No payment sent; submit explicitly when ready.' })} className="btn btn-primary">Release pay run</button>}
         {canConfirm && (
           <button type="button" disabled={a.pending} onClick={() => a.run('POST', `/pay-runs/${r.id}/confirm`, undefined, { success: 'Confirmed. Finance can now approve it.' })} className="btn btn-primary">
             Confirm pay run

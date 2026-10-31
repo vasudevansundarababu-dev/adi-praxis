@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ProjectSummary } from '@/components/projects/summary';
 import { ProjectWizard } from '@/components/projects/wizard';
-import { apiGet } from '@/lib/api';
+import { apiGet, getCurrentUser } from '@/lib/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { data } = await apiGet<ProjectDto>(`/projects/${(await params).id}`);
@@ -26,7 +26,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   if (project.status !== 'DRAFT') {
     const { data: reviewers } = await apiGet<{ items: { userId: string; name: string; email: string }[]; available: { userId: string; name: string; email: string }[] }>(`/projects/${id}/reviewers`);
-    return <ProjectSummary project={project} template={own.data} attributes={attributes} jobDescriptions={jobDescriptions} reviewers={reviewers} />;
+    return <ProjectSummary project={project} template={own.data} attributes={attributes} jobDescriptions={jobDescriptions} reviewers={(await getCurrentUser())?.roles.includes('ADMIN') ? null : reviewers} />;
   }
   // A draft may reference a template that is no longer offered; keep it selectable so the PM sees why submit fails.
   const templates = t.data?.items ?? [];

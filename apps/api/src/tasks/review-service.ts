@@ -59,7 +59,7 @@ export async function reviewableTask(tx: Db | Tx, actor: InternalActor, taskId: 
     const conflict = await tx.conflictDeclaration.findFirst({ where: { reviewerId: actor.userId, smeUserId: author.id, resolvedAt: null } });
     const authorKey = (author.contactEmail ?? author.id).toLowerCase();
     const reviewerKey = me.email.toLowerCase();
-    if (!mayApprove({ authorId: authorKey, approverId: reviewerKey, conflicts: conflict ? [{ a: authorKey, b: reviewerKey }] : [] })) {
+    if (conflict || (!actor.roles.includes('ADMIN') && !mayApprove({ authorId: authorKey, approverId: reviewerKey, conflicts: [] }))) {
       throw forbidden('You cannot review this task: you wrote it, or you declared a conflict with its author.');
     }
   }

@@ -44,7 +44,7 @@ export default async function CertificationsPage() {
                 <ol className="mt-3 space-y-4">
                   {a.items.map((i, n) => (
                     <li key={i.itemId}>
-                      <GradeItem attemptId={a.attemptId} item={i} n={n + 1} userId={user.id} />
+                      <GradeItem attemptId={a.attemptId} item={i} n={n + 1} userId={user.id} isAdmin={user.roles.includes('ADMIN')} />
                     </li>
                   ))}
                 </ol>

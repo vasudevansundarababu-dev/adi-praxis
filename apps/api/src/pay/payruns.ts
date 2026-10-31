@@ -118,6 +118,18 @@ export async function approvePayRun(tx: Tx, config: Config, actor: { clientId: s
   return u;
 }
 
+/** One explicit Admin release replaces PM/Finance sign-offs; no transfer occurs here. */
+export async function releasePayRun(tx: Tx, actor: { clientId: string; userId: string; email: string }, id: string, audit: Audit) {
+  const run = await lockRun(tx, actor.clientId, id);
+  if (!['DRAFT', 'CONFIRMED'].includes(run.status)) throw new AppError(409, 'NOT_RELEASABLE', 'Only a draft or confirmed pay run can be released.');
+  const payees = await tx.payoutItem.findMany({ where: { payRunId: id, status: 'PENDING' }, select: { smeUserId: true } });
+  const paid = await tx.smeUser.findMany({ where: { id: { in: payees.map((p) => p.smeUserId) } }, select: { contactEmail: true } });
+  if (paid.some((u) => u.contactEmail?.toLowerCase() === actor.email.toLowerCase())) throw new AppError(403, 'APPROVER_IS_PAYEE', 'You are paid in this run; another Admin must release it.');
+  const u = await tx.payRun.update({ where: { id }, data: { status: 'APPROVED' } });
+  await audit({ entityType: 'PayRun', entityId: id, action: 'pay_run.admin_released', before: { status: run.status }, after: { status: u.status, policy: 'admin-only', totals: run.totals } });
+  return u;
+}
+
 export async function cancelPayRun(tx: Tx, clientId: string, id: string, reason: string, audit: Audit) {
   const run = await lockRun(tx, clientId, id);
   if (!['DRAFT', 'CONFIRMED', 'APPROVED'].includes(run.status)) throw new AppError(409, 'CANNOT_CANCEL', 'Submitted pay runs cannot be cancelled.');

@@ -691,7 +691,12 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
       expect((await get(selfCookie, `/review/tasks/${t.id}`)).statusCode).toBe(403);
       await db.conflictDeclaration.create({ data: { clientId, smeUserId: a.smeUserId, reviewerId, employerDescription: 'Same team', details: 'Same team' } });
       expect((await get(reviewer, '/review/tasks')).json().items).toEqual([]);
-      expect((await decide(t.id, { decision: 'ACCEPT' }, admin)).statusCode).toBe(200);
+      // A real Admin action replaces the separate-person workflow gate; no Reviewer role is added.
+      await db.user.update({ where: { id: self.id }, data: { roles: ['ADMIN'] } });
+      const adminSelf = await login(app, self.email);
+      expect((await get(adminSelf, '/review/tasks')).json().items.map((x: { id: string }) => x.id)).toContain(t.id);
+      expect((await decide(t.id, { decision: 'ACCEPT' }, adminSelf)).statusCode).toBe(200);
+      expect((await db.taskReview.findFirstOrThrow({ where: { taskInstanceId: t.id } })).reviewerId).toBe(self.id);
     });
 
     it('a flagged duplicate needs an explicit duplicate decision; rejecting it releases the slot', async () => {

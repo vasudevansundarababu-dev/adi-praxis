@@ -292,6 +292,30 @@ describe('M10c payments: earnings, pay runs, payouts, reconciliation and partner
       expect(actions).toEqual(expect.arrayContaining(['pay_hold.placed', 'pay_run.built', 'pay_run.confirmed', 'pay_run.approved', 'pay_run.submitted']));
     });
 
+    it('Admin releases directly without PM/Finance sign-offs; release sends no money and preserves history', async () => {
+      const { projectId, partner, r } = await setup();
+      const s = await sme(r, partner);
+      await readyPayee(s);
+      await acceptedTask(projectId, s, 'AUTHORING', lastWeek());
+      const run = (await post(admin, '/pay-runs', {})).json();
+      expect((await post(pm, `/pay-runs/${run.id}/release`)).statusCode).toBe(403);
+      const other = await db.client.create({ data: { name: 'Other tenant' } });
+      const foreign = await login(app, (await createUser(other.id, ['ADMIN'])).email);
+      expect((await post(foreign, `/pay-runs/${run.id}/release`)).statusCode).toBe(404);
+      const selfPaid = await login(app, (await createUser(clientId, ['ADMIN'], s.email)).email);
+      expect((await post(selfPaid, `/pay-runs/${run.id}/release`)).json().error).toBe('APPROVER_IS_PAYEE');
+      expect((await db.payRun.findUniqueOrThrow({ where: { id: run.id } })).status).toBe('DRAFT');
+      const released = await post(admin, `/pay-runs/${run.id}/release`);
+      expect(released.statusCode, released.body).toBe(200);
+      expect(released.json().status).toBe('APPROVED');
+      expect(released.json().approvals ?? []).toEqual([]);
+      expect(released.json().confirmedBy).toBeNull();
+      expect(payouts.batches.size).toBe(0);
+      expect((await db.auditEvent.findFirstOrThrow({ where: { entityId: run.id, action: 'pay_run.admin_released' } })).actorId).toBe(adminId);
+      expect((await post(admin, `/pay-runs/${run.id}/submit`)).statusCode).toBe(200);
+      expect(payouts.batches.size).toBe(1);
+    });
+
     it('above the configured amount a second, different Finance approver is needed; an approver who is paid in the run is refused', async () => {
       const strict = await buildApp({ config: testConfig({ SME_SUPPLY_ENABLED: 'true', PAYRUN_SECOND_APPROVAL_ABOVE: '30' }), db, pingRedis: async () => true, google, identity: new MockIdentityProvider(SECRET, 'http://candidate.test'), resolveClientId: async () => clientId, selectionGate: stubSelectionGate, email, payouts });
       const { projectId, partner, r } = await setup();

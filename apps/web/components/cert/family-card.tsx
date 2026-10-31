@@ -168,7 +168,6 @@ export function FamilyCard({ family: f, competencyName, expertTier, isAdmin, use
   const mine = approvals.some((x) => x.userId === userId);
   const flagged = f.status === 'FLAGGED';
   const hasAdmin = approvals.some((x) => x.role === 'ADMIN');
-  const hasSecond = approvals.some((x) => x.role === 'REVIEWER' || x.role === 'EXPERT');
   const stats = f.stats ?? {};
 
   return (
@@ -202,7 +201,7 @@ export function FamilyCard({ family: f, competencyName, expertTier, isAdmin, use
         {expertTier && (
           <ul className="mt-1 flex flex-wrap gap-2">
             <li className={`pill ${hasAdmin ? 'pill-success' : ''}`}>Admin {hasAdmin ? 'approved' : 'needed'}</li>
-            <li className={`pill ${hasSecond ? 'pill-success' : ''}`}>Validator or Expert {hasSecond ? 'approved' : 'needed'}</li>
+            <li>Admin decision is sufficient for every tier.</li>
           </ul>
         )}
         <ul className="mt-1 text-xs text-fg-muted">
@@ -234,7 +233,7 @@ export function FamilyCard({ family: f, competencyName, expertTier, isAdmin, use
             Note (optional)
             <input value={note} onChange={(e) => setNote(e.target.value)} className={input} />
           </label>
-          <button type="button" disabled={a.pending || flagged || f.samples.length === 0 || mine || f.status === 'APPROVED'} onClick={() => a.run('POST', `/item-families/${f.id}/decision`, { decision: 'APPROVE', note: note.trim() }, { success: 'Approval recorded.' })} className="btn btn-primary">
+          <button type="button" disabled={a.pending || flagged || f.samples.length === 0 || (mine && !isAdmin) || f.status === 'APPROVED'} onClick={() => a.run('POST', `/item-families/${f.id}/decision`, { decision: 'APPROVE', note: note.trim() }, { success: 'Approval recorded.' })} className="btn btn-primary">
             {mine ? 'You approved' : 'Approve family'}
           </button>
           {isAdmin && (

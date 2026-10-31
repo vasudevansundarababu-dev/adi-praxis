@@ -20,6 +20,10 @@ test.describe('console smoke', () => {
     await expect(nav.getByRole('link', { name: 'Projects' })).toBeVisible({ timeout: 30_000 });
     await expect(nav.getByRole('link', { name: 'Admin' })).toBeVisible();
     await nav.getByRole('link', { name: 'Projects' }).click();
+    await expect(page.getByRole('link', { name: /new project/i })).toBeVisible();
+    await page.getByRole('link', { name: /new project/i }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(/project/i);
+    await nav.getByRole('link', { name: 'Projects' }).click();
     await page.getByRole('navigation', { name: 'Projects pages' }).getByRole('link', { name: 'Templates' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/templates/i);
     await expect(nav.getByRole('link', { name: 'Projects' })).toHaveAttribute('aria-current', 'true');
@@ -77,9 +81,8 @@ test('a prepared synthetic project exposes its unapproved draft download in the 
   const domain = domains.items.find((d: { name: string }) => d.name === 'Marketing') ?? await call('POST', '/domains', { name: 'Marketing' });
   const templates = await call('GET', '/templates');
   let template = templates.items.find((t: { workflowName: string; domainId: string }) => t.workflowName === 'Structured decision authoring' && t.domainId === domain.id);
-  if (!template) template = await call('POST', '/templates', { domainId: domain.id, workflowName: 'Structured decision authoring', primaryWork: 'Original synthetic marketing decision.', verificationCriteria: 'Explicit executable rules and references.', humanGate: 'Independent author and reviewer actions required.', defaultTptMinutes: 30, skills: ['Marketing'], taskModes: ['AUTHORING'], openSlotShare: 0, coverageDimensions: { dimensions: [{ key: 'scenario', label: 'Scenario', values: ['launch'] }], cells: [{ tags: { scenario: 'launch' }, quota: 1, required: true }] }, edgeCaseCatalog: [] });
+  if (!template) template = await call('POST', '/templates', { domainId: domain.id, workflowName: 'Structured decision authoring', primaryWork: 'Original synthetic marketing decision.', verificationCriteria: 'Explicit executable rules and references.', humanGate: 'Admin acceptance records the actual decision.', defaultTptMinutes: 30, skills: ['Marketing'], taskModes: ['AUTHORING'], openSlotShare: 0, coverageDimensions: { dimensions: [{ key: 'scenario', label: 'Scenario', values: ['launch'] }], cells: [{ tags: { scenario: 'launch' }, quota: 1, required: true }] }, edgeCaseCatalog: [] });
   if (template.status === 'DRAFT') await call('POST', `/templates/${template.id}/publish`);
-  await call('POST', '/auth/login', PM);
   const jd = await call('POST', '/job-descriptions', { title: 'Synthetic marketing author', responsibilities: 'Author original fictional tasks.', skills: ['Marketing'], wagePerTask: 1, wageCurrency: 'USD', locationType: 'REMOTE' });
   const date = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
   const project = await call('POST', '/projects', { templateId: template.id, name: `SYNTHETIC TEST — staged UI ${randomUUID().slice(0, 8)}`, distinctTarget: 1, maxPerExpert: 1, tptMinutes: 30, startDate: date(1), endDate: date(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: false }] });
@@ -176,7 +179,8 @@ test.describe('user administration', () => {
     const email = `new.validator.${Date.now()}@e2e.local`;
     await page.locator('#new-user-name').fill('Nina Validator');
     await page.locator('#new-user-email').fill(email);
-    await page.getByLabel('Validator').last().check();
+    await expect(page.getByLabel('Validator', { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel('Admin', { exact: true }).last()).toBeChecked();
     await page.getByRole('button', { name: 'Add user' }).click();
     const box = page.getByRole('status').filter({ hasText: `Temporary password for ${email}` });
     await expect(box).toBeVisible();

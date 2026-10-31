@@ -1,3 +1,5 @@
+> Current operational policy: [Admin workflow](ADMIN-WORKFLOW.md) supersedes the legacy multiple-role sign-offs below. Admin alone operates Praxis; historic records and recipient checks remain intact.
+
 # M10 — SME supply, certification and payments
 
 Status: **signed off for build** (28 Sep 2026): UI approved on condition that every screen uses the existing Praxis

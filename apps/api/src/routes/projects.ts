@@ -173,7 +173,7 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
 
   app.post(
     '/projects',
-    { config: { access: ['PM'] }, schema: { tags: ['projects'], body: CreateProjectRequest, response: { 201: ProjectDto } } },
+    { config: { access: ['PM', 'ADMIN'] }, schema: { tags: ['projects'], body: CreateProjectRequest, response: { 201: ProjectDto } } },
     async (req, reply) => {
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const t = await offerableTemplate(tx, req.body.templateId, actor.clientId);

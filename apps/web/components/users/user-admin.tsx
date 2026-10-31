@@ -1,6 +1,6 @@
 'use client';
 
-import { INTERNAL_ROLES, roleLabel, type InternalRole, type InternalUserDto } from '@praxis/shared';
+import { roleLabel, type InternalRole, type InternalUserDto } from '@praxis/shared';
 import { useState } from 'react';
 import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, useAction } from '@/components/supply/action';
@@ -12,7 +12,7 @@ const TD = 'px-4 py-2 align-top';
 function RoleBoxes({ value, onChange, idPrefix }: { value: InternalRole[]; onChange: (r: InternalRole[]) => void; idPrefix: string }) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1">
-      {INTERNAL_ROLES.map((r) => (
+      {(['ADMIN'] as InternalRole[]).map((r) => (
         <label key={r} htmlFor={`${idPrefix}-${r}`} className="inline-flex items-center gap-1.5">
           <input id={`${idPrefix}-${r}`} type="checkbox" checked={value.includes(r)} onChange={(e) => onChange(e.target.checked ? [...value, r] : value.filter((x) => x !== r))} />
           {roleLabel(r)}
@@ -28,7 +28,7 @@ export function UserAdmin({ users, meId, signInAt }: { users: InternalUserDto[];
   const [issued, setIssued] = useState<Issued | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [roles, setRoles] = useState<InternalRole[]>([]);
+  const [roles, setRoles] = useState<InternalRole[]>(['ADMIN']);
   const [editing, setEditing] = useState<string | null>(null);
   const [editRoles, setEditRoles] = useState<InternalRole[]>([]);
   const [confirmReset, setConfirmReset] = useState<string | null>(null);
@@ -40,7 +40,7 @@ export function UserAdmin({ users, meId, signInAt }: { users: InternalUserDto[];
       setIssued({ email: res.data.email, password: res.data.temporaryPassword });
       setName('');
       setEmail('');
-      setRoles([]);
+      setRoles(['ADMIN']);
     }
   }
 

@@ -1,3 +1,7 @@
+## Admin workflow update
+
+[Admin workflow policy](../ADMIN-WORKFLOW.md) replaces separate internal sign-offs with real Admin actions. Draft examples remain directly downloadable; accepted exports preserve the actual Admin decision and historical hashes. Anvil approval controls are unchanged.
+
 # Praxis to Anvil executable handoff
 
 Initial build: `test-1.2-praxis-harbor-20261030` (single and staged structured decisions; live model verification remains separate).

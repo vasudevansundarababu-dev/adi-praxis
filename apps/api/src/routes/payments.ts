@@ -7,7 +7,7 @@ import { AppError, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { buildStatements, CURRENCIES, earningDto, MINIMUM_PAYOUT, reverseEarning, statementDto } from '../pay/ledger';
 import { applyPayeeStatus, onboardingLink, payeeView } from '../pay/payees';
-import { approvePayRun, buildPayRun, cancelPayRun, confirmPayRun, payRunDto, previousWeek, processPayoutWebhook, reconcile, submitPayRun } from '../pay/payruns';
+import { releasePayRun, approvePayRun, buildPayRun, cancelPayRun, confirmPayRun, payRunDto, previousWeek, processPayoutWebhook, reconcile, submitPayRun } from '../pay/payruns';
 import { MockPayoutProvider, type PayoutProvider } from '../pay/provider';
 
 const IdParams = z.object({ id: z.string().uuid() });
@@ -118,6 +118,14 @@ export const paymentRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; payo
     return reply;
   });
 
+  app.post('/pay-runs/:id/release', { config: { access: ['ADMIN'] }, schema: { tags: ['payments'], params: IdParams } }, async (req, reply) => {
+    await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+      const u = await tx.user.findUniqueOrThrow({ where: { id: actor.userId } });
+      return { status: 200, body: payRunDto(await releasePayRun(tx, { clientId: actor.clientId, userId: actor.userId, email: u.email }, req.params.id, audit)) };
+    });
+    return reply;
+  });
+
   app.post('/pay-runs/:id/confirm', { config: { access: ['ADMIN', 'PM'] }, schema: { tags: ['payments'], params: IdParams } }, async (req, reply) => {
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => ({ status: 200, body: payRunDto(await confirmPayRun(tx, actor.clientId, req.params.id, actor.userId, audit)) }));
     return reply;
@@ -137,7 +145,7 @@ export const paymentRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; payo
   });
 
   // Submission calls the provider, so it runs outside a request transaction; it is idempotent by status and per-item keys.
-  app.post('/pay-runs/:id/submit', { config: { access: ['FINANCE'] }, schema: { tags: ['payments'], params: IdParams } }, async (req) => {
+  app.post('/pay-runs/:id/submit', { config: { access: ['FINANCE', 'ADMIN'] }, schema: { tags: ['payments'], params: IdParams } }, async (req) => {
     const r = await submitPayRun(db, payouts, { clientId: req.actor!.clientId, userId: req.actor!.userId }, req.params.id);
     return payRunDto({ ...r, items: await db.payoutItem.findMany({ where: { payRunId: r.id }, orderBy: { createdAt: 'asc' } }) });
   });

@@ -212,7 +212,7 @@ export function SyntheticDraftPanel({ projectId, canCreate, available }: { proje
     setPending(false);
   }
   return <section className="mt-4 rounded-md border border-line p-3 text-sm">
-    <p>This software test example has no human task approval or reviewed rights clearance. Staff the project, author and submit the task, then obtain independent review to enter the approved dataset.</p>
+    <p>This software test example has no human task approval or reviewed rights clearance. Staff the project, author and submit the task, then use an Admin acceptance decision to enter the dataset.</p>
     {canCreate && <button type="button" disabled={pending} className="mt-3 btn btn-secondary disabled:opacity-50" onClick={create}>{pending ? 'Creating draft…' : 'Create synthetic draft'}</button>}
     {available && <a className="mt-3 inline-block text-link underline" href={`/api/v1/projects/${projectId}/synthetic-example`}>Download synthetic draft for Anvil qualification</a>}
     {error && <p role="alert" className="mt-2 text-error">{error}</p>}

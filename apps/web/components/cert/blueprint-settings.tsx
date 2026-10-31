@@ -61,8 +61,8 @@ export function BlueprintSettings({ blueprint: b }: { blueprint: BlueprintDetail
             <input type="number" min={0} max={1} step={0.05} value={rules.writtenPassScore} onChange={(e) => setRules({ ...rules, writtenPassScore: Number(e.target.value) })} className={input} />
           </label>
           <label className="block">
-            People confirming each authoring grade
-            <input type="number" min={1} max={3} value={rules.confirmationsRequired} onChange={(e) => setRules({ ...rules, confirmationsRequired: Number(e.target.value) })} className={input} />
+            Legacy assessor confirmations (Admin needs one)
+            <input type="number" min={1} max={3} title="Admin finalization needs one decision regardless of this legacy setting" value={rules.confirmationsRequired} onChange={(e) => setRules({ ...rules, confirmationsRequired: Number(e.target.value) })} className={input} />
           </label>
         </div>
         <div className="flex flex-wrap gap-4">

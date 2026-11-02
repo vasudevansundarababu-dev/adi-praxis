@@ -1,0 +1,8 @@
+.request { margin: 24px auto 0; max-width: 380px; text-align: left; font-size: 14px; }
+.link { color: #8ee1d1; background: none; border: 0; padding: 8px 0; text-decoration: underline; cursor: pointer; font: inherit; }
+.panel { margin-top: 12px; padding: 20px; border: 1px solid #dbe4e9; border-radius: 8px; background: #fff; color: #1a2c3d; }
+.request p { font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+.request label { display: block; margin-bottom: 6px; font-weight: 600; }
+.request input { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid #b6c7d1; border-radius: 6px; margin-bottom: 12px; background: #fff; color: #1a2c3d; }
+.submit { display: inline-block; background: #096f61; color: #fff; border: 0; border-radius: 6px; padding: 10px 16px; font: inherit; cursor: pointer; text-decoration: none; }
+.link:focus-visible, .submit:focus-visible, .request input:focus-visible { outline: 3px solid #4d9dce; outline-offset: 3px; }

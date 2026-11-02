@@ -1,5 +1,12 @@
 # Praxis modules and distinctive features
 
+The console and partner login pages provide **Request access or password help**.
+Enter your email, choose **Open email request**, and send the prefilled request to
+**admin@adi-labs.ai** from your email app. A configured email app is required;
+otherwise email the administrator directly. Do not include passwords. Administrators
+arrange access manually; this link does not send mail, create accounts or reset
+passwords automatically. Candidate Google sign-in is a separate flow.
+
 Praxis converts domain expertise into versioned, synthetic tasks with a human acceptance
 record. Anvil separately qualifies and executes exported tasks. “Distinctive” here means
 concrete product behavior, not a claim of competitive uniqueness.

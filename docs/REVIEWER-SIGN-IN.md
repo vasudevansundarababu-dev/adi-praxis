@@ -13,6 +13,13 @@ is an entry-point check, not a newly performed first-login or live-provider test
 
 ## Console steps
 
+The console and partner login pages provide **Request access or password help**.
+Enter your email, choose **Open email request**, and send the prefilled request to
+**admin@adi-labs.ai** from your email app. A configured email app is required;
+otherwise email the administrator directly. Do not include passwords. Administrators
+arrange access manually; this link does not send mail, create accounts or reset
+passwords automatically. Candidate Google sign-in is a separate flow.
+
 1. Open the console and use your assigned account when prompted. An existing session
    may open Home immediately. Credentials are provided privately, never in this guide.
 2. If issued a temporary password, choose your own through the required first-sign-in

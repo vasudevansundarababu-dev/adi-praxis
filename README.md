@@ -11,6 +11,13 @@ Anvil rights approval or permission to spend money.
 
 ## Review the implementation
 
+The console and partner login pages provide **Request access or password help**.
+Enter your email, choose **Open email request**, and send the prefilled request to
+**admin@adi-labs.ai** from your email app. A configured email app is required;
+otherwise email the administrator directly. Do not include passwords. Administrators
+arrange access manually; this link does not send mail, create accounts or reset
+passwords automatically. Candidate Google sign-in is a separate flow.
+
 **YC review:** [module definitions and features](docs/MODULE-GUIDE.md) ·
 [30-day product/recruiting roadmap](docs/30-DAY-ROADMAP.md) ·
 [verified hosted URLs and sign-in](docs/REVIEWER-SIGN-IN.md).

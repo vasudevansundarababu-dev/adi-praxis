@@ -388,6 +388,18 @@ describe('M10a SME supply: partners, Partner API, requisitions and submissions (
       expect(res.statusCode, res.body).toBe(200);
       const s = await db.partnerSubmission.findFirstOrThrow({ where: { requisitionId: r } });
       expect(s).toMatchObject({ channel: 'DIRECT', state: 'INVITED', partnerId: null, enrollmentId: res.json().enrollmentId });
+      const confirmed = await post(validator, '/partner-submissions/screen-decisions', { submissionIds: [s.id], decision: 'CONFIRM_NOT_MET', note: 'Below minimum requirements' });
+      expect(confirmed.statusCode, confirmed.body).toBe(200);
+      const frozen = await db.partnerSubmission.findUniqueOrThrow({ where: { id: s.id } });
+      const auditCount = await db.auditEvent.count({ where: { entityId: s.id } });
+      const repeated = await post(validator, '/partner-submissions/screen-decisions', { submissionIds: [s.id], decision: 'CONFIRM_NOT_MET', note: 'Below minimum requirements' });
+      expect(repeated.statusCode, repeated.body).toBe(409);
+      expect(repeated.json().error).toBe('SCREEN_DECISION_FINAL');
+      const reverse = await post(validator, '/partner-submissions/screen-decisions', { submissionIds: [s.id], decision: 'MEETS', note: 'Try changing final Careers row' });
+      expect(reverse.statusCode, reverse.body).toBe(409);
+      expect(reverse.json().error).toBe('SCREEN_DECISION_FINAL');
+      expect(await db.partnerSubmission.findUniqueOrThrow({ where: { id: s.id } })).toEqual(frozen);
+      expect(await db.auditEvent.count({ where: { entityId: s.id } })).toBe(auditCount);
     });
   });
 

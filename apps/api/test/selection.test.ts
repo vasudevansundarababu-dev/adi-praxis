@@ -200,6 +200,24 @@ describe('M4c: selection, onboarding and assignment acceptance (FLOW2 CF-19 to C
       expect(audit.after).toMatchObject({ recommendation: 'NOT_FIT_RECOMMENDED', status: 'SELECTED' });
     });
 
+    it('#173: unsubmitted applications and their evidence are private even for an assigned reviewer or Admin', async () => {
+      const c = await enroll(await signUp());
+      await completeViaForm(c);
+      const before = await db.enrollment.findUniqueOrThrow({ where: { id: c.enrollmentId } });
+      expect(before.status).toBe('DRAFT');
+      for (const cookie of [reviewer, admin]) {
+        expect((await get(cookie, `/review/enrollments/${c.enrollmentId}`)).statusCode).toBe(404);
+        expect((await get(cookie, `/review/evidence/${randomUUID()}?enrollmentId=${c.enrollmentId}`)).statusCode).toBe(404);
+        expect((await decide(c, 'SELECTED', {}, cookie)).statusCode).toBe(404);
+      }
+      expect((await get(reviewer, '/review/enrollments')).json().items).toEqual([]);
+      expect(await db.enrollment.findUniqueOrThrow({ where: { id: c.enrollmentId } })).toEqual(before);
+      expect(await db.selectionDecision.count({ where: { enrollmentId: c.enrollmentId } })).toBe(0);
+      await submit(c);
+      await deliverSubmitted(c);
+      expect((await get(reviewer, `/review/enrollments/${c.enrollmentId}`)).statusCode).toBe(200);
+    });
+
     it('the queue shows assigned pools only; the decision needs REVIEWER or ADMIN, and a candidate cannot call it', async () => {
       const c = await reviewPending();
       const q = (await get(reviewer, '/review/enrollments')).json();

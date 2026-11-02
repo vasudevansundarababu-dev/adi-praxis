@@ -2,6 +2,23 @@
 
 ## Active request and checkpoint
 
+### Daytime YC demo release — 2 November 2026
+
+User explicitly requested active build/demo preparation before 11:00 America/Chicago,
+overriding daytime monitoring-only for this work. #173 now refuses unsubmitted/DRAFT
+applications with no frozen profile or submission time for both assigned Validator
+and Admin. Shared review authorization also fences evidence and claim/review operations.
+Regression verifies no decision/state mutation and a positive submitted-profile read.
+
+#164 Careers-origin initial confirmation and MEETS reversal pass locally. A separate
+reproducible failure was found: fresh-key repeat CONFIRM_NOT_MET returned a no-audit
+command exception. Final rows now reject every new decision with SCREEN_DECISION_FINAL;
+same-key idempotency replays remain handled before execution. This covers the reproduced
+failure without claiming the tester's exact MEETS 500 is reproduced. Retest still needed.
+Targeted selection/supply tests: 54 passed. Full API: 479 passed / 29 files;
+all-package typecheck and production build passed. No paid calls or live candidate
+decisions. Deployment evidence follows only after actual rollout checks.
+
 ### Sixth batch deployed — 2 November 2026, morning handoff
 
 Verified runtime commit `f40e540f`, build `tester-f40e540f-20261102`, image tag

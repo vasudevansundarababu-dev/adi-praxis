@@ -5,7 +5,7 @@ import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { GoogleIdTokenVerifier, MockGoogleVerifier } from '../src/candidate/google';
 import { isAdult, MockIdentityProvider } from '../src/candidate/identity-provider';
-import { processIdentityWebhook } from '../src/candidate/identity-service';
+import { applicationBlockReason, processIdentityWebhook } from '../src/candidate/identity-service';
 import { loadConfig } from '../src/config';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { processDomainEvent } from '../src/outbox/dispatcher';
@@ -268,6 +268,33 @@ describe('M4a: sourcing, candidate sign-in, identity, opportunity', () => {
       expect(isAdult({ day: 26, month: 9, year: 2008 }, new Date('2026-09-26'))).toBe(true);
       expect(isAdult({ day: 27, month: 9, year: 2008 }, new Date('2026-09-26'))).toBe(false);
       expect(isAdult(null)).toBeNull();
+    });
+
+    it('#50: a confirmed under-18 result blocks application start/resume and pending checks cannot hide it', async () => {
+      const a = await signIn();
+      const { opportunityId } = await staffingProjectWithOpportunity();
+      const existing = (await post(a.cookie, '/me/enrollments', { opportunityId })).json();
+      const attempt = await startIdentity(a.cookie);
+      const result = identity.simulate(attempt, { status: 'verified', adult: false });
+      await deliver(result.rawBody, result.signature);
+      expect((await get(a.cookie, '/me')).json().applicationBlockReason).toMatch(/18 or over/);
+      expect((await post(a.cookie, '/me/enrollments', { opportunityId })).json().error).toBe('AGE_RESTRICTION');
+      const s = (await get(a.cookie, `/me/enrollments/${existing.id}/conversation`)).json();
+      const submit = await post(a.cookie, `/me/enrollments/${existing.id}/submit`, { expectedRevision: s.session.revision, confirmAccuracy: true, evidencePermission: true });
+      expect(submit.statusCode).toBe(403);
+      expect(submit.json().message).toMatch(/18 or over/);
+      const fresh = await staffingProjectWithOpportunity();
+      expect((await post(a.cookie, '/me/enrollments', { opportunityId: fresh.opportunityId })).statusCode).toBe(403);
+      expect(await db.enrollment.count()).toBe(1);
+      const pending = await startIdentity(a.cookie);
+      expect((await get(a.cookie, '/me')).json().applicationBlockReason).toMatch(/18 or over/);
+      expect((await post(a.cookie, '/me/enrollments', { opportunityId: fresh.opportunityId })).statusCode).toBe(403);
+      // A test-only result must not impose a live restriction where live checks are required.
+      expect(await applicationBlockReason(db, a.res.json().id, true)).toBeNull();
+      const adult = identity.simulate(pending, { status: 'verified', adult: true });
+      await deliver(adult.rawBody, adult.signature);
+      expect((await get(a.cookie, '/me')).json().applicationBlockReason).toBeNull();
+      expect((await post(a.cookie, '/me/enrollments', { opportunityId: fresh.opportunityId })).statusCode).toBe(200);
     });
 
     it('CF-06: "needs more input" allows a retry and keeps saved progress', async () => {

@@ -68,6 +68,7 @@ export const journeyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; sele
     return {
       id: e.id,
       status: e.status,
+      submittedAt: e.submittedAt?.toISOString() ?? null,
       statusText: STATUS_TEXT[e.status],
       title: (e.opportunityVersion.brief as { title?: string }).title ?? '',
       // Explanations appear only after a human decision (C06); no model output is shown to candidates.

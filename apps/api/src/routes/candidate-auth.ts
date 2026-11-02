@@ -9,7 +9,7 @@ import type { GoogleVerifier } from '../candidate/google';
 import { MockGoogleVerifier } from '../candidate/google';
 import type { IdentityProvider } from '../candidate/identity-provider';
 import { MockIdentityProvider } from '../candidate/identity-provider';
-import { ELIGIBLE, identityProblemText, latestAttempt, processIdentityWebhook } from '../candidate/identity-service';
+import { applicationBlockReason, ELIGIBLE, identityProblemText, latestAttempt, processIdentityWebhook } from '../candidate/identity-service';
 import type { Config } from '../config';
 import type { Db, Tx } from '../db';
 import { AppError, notFound, unauthorized } from '../lib/errors';
@@ -34,7 +34,7 @@ function identityReviewScope(actor: InternalActor): Prisma.SmeUserWhereInput {
   }) };
 }
 
-async function meDto(tx: Db | Tx, smeUserId: string): Promise<z.infer<typeof CandidateMeDto>> {
+async function meDto(tx: Db | Tx, smeUserId: string, requireLive: boolean): Promise<z.infer<typeof CandidateMeDto>> {
   const u = await tx.smeUser.findUniqueOrThrow({
     where: { id: smeUserId },
     include: { enrollments: { include: { opportunityVersion: true }, orderBy: { createdAt: 'desc' } } },
@@ -55,6 +55,7 @@ async function meDto(tx: Db | Tx, smeUserId: string): Promise<z.infer<typeof Can
     identityStatus: u.identityStatus,
     identityLabel,
     identityProblem: eligible ? null : identityProblemText(attempt?.errorCode ?? null),
+    applicationBlockReason: await applicationBlockReason(tx, smeUserId, requireLive),
     nextStep: !eligible ? 'VERIFY_IDENTITY' : draft ? 'CONTINUE_PROFILE' : 'CHOOSE_OPPORTUNITY',
     enrollments: u.enrollments.map((e) => ({
       id: e.id,
@@ -119,12 +120,12 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
         userAgent: req.headers['user-agent'],
       });
       reply.setCookie(CANDIDATE_SESSION_COOKIE, token, { ...cookieOptions, expires: expiresAt });
-      return meDto(db, user.id);
+      return meDto(db, user.id, config.requireLiveIdentity);
     },
   );
 
   app.get('/me', { config: { access: 'candidate' }, schema: { tags: ['candidate'], response: { 200: CandidateMeDto } } }, async (req) =>
-    meDto(db, req.candidate!.smeUserId),
+    meDto(db, req.candidate!.smeUserId, config.requireLiveIdentity),
   );
 
   app.post('/me/logout', { config: { access: 'candidate' }, schema: { tags: ['candidate'], response: { 204: z.null() } } }, async (req, reply) => {
@@ -135,7 +136,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
 
   // ── C02 identity ──
   app.get('/me/identity', { config: { access: 'candidate' }, schema: { tags: ['candidate'], response: { 200: IdentityDto } } }, async (req) => {
-    const me = await meDto(db, req.candidate!.smeUserId);
+    const me = await meDto(db, req.candidate!.smeUserId, config.requireLiveIdentity);
     const a = await latestAttempt(db, req.candidate!.smeUserId);
     return {
       identityStatus: me.identityStatus,
@@ -191,7 +192,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
         });
         await tx.smeUser.update({ where: { id: u.id }, data: { identityStatus: 'MANUAL_REVIEW_REQUIRED' } });
         await audit({ entityType: 'SmeUser', entityId: u.id, action: 'identity.help_requested', before: { identityStatus: u.identityStatus }, after: { identityStatus: 'MANUAL_REVIEW_REQUIRED', reason: req.body.reason, note: req.body.note ?? null } });
-        return { status: 200, body: await meDto(tx, u.id) };
+        return { status: 200, body: await meDto(tx, u.id, config.requireLiveIdentity) };
       });
       return reply;
     },

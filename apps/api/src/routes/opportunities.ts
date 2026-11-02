@@ -14,6 +14,8 @@ import { z } from 'zod';
 import { extractDocumentText, MAX_DOCUMENT_BYTES } from '../candidate/document-text';
 import { ensureConversation } from '../candidate/profile-service';
 import type { Db, Tx } from '../db';
+import type { Config } from '../config';
+import { applicationBlockReason } from '../candidate/identity-service';
 import { sha256 } from '../lib/crypto';
 import { AppError, badRequest, notFound } from '../lib/errors';
 import type { writeAudit } from '../platform/audit';
@@ -118,7 +120,7 @@ async function ownerView(tx: Db | Tx, projectId: string): Promise<z.infer<typeof
 }
 
 /** FLOW2-SME C03: the project's SME opportunity (owner side) and its public, candidate-safe page. */
-export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db }) => {
+export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }> = async (app, { db, config }) => {
   const ownedProject = async (tx: Db | Tx, id: string, actor: Parameters<typeof loadProject>[2]) => {
     const p = await loadProject(tx, id, actor);
     if (!OPEN_PROJECT.includes(p.status)) throw new AppError(409, 'PROJECT_NOT_OPEN', `Opportunities are managed once a project is submitted (this one is ${p.status}).`);
@@ -324,7 +326,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, 
     async (req, reply) => {
       await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => ({
         status: 200,
-        body: await startOrResumeEnrollment(tx, { clientId: actor.clientId, smeUserId: actor.smeUserId, opportunityId: req.body.opportunityId, campaignId: req.body.campaignId }, audit),
+        body: await startOrResumeEnrollment(tx, { clientId: actor.clientId, smeUserId: actor.smeUserId, opportunityId: req.body.opportunityId, campaignId: req.body.campaignId, requireLiveIdentity: config.requireLiveIdentity }, audit),
       }));
       return reply;
     },
@@ -332,7 +334,9 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, 
 };
 
 /** "Build my SME profile": start (or reuse) a candidate's enrollment, pinned to the opportunity's current version. */
-export async function startOrResumeEnrollment(tx: Tx, args: { clientId: string; smeUserId: string; opportunityId: string; campaignId?: string }, audit: (i: Parameters<typeof writeAudit>[2]) => Promise<void>) {
+export async function startOrResumeEnrollment(tx: Tx, args: { clientId: string; smeUserId: string; opportunityId: string; campaignId?: string; requireLiveIdentity: boolean }, audit: (i: Parameters<typeof writeAudit>[2]) => Promise<void>) {
+  const blocked = await applicationBlockReason(tx, args.smeUserId, args.requireLiveIdentity);
+  if (blocked) throw new AppError(403, 'AGE_RESTRICTION', blocked);
   const o = await tx.opportunity.findFirst({ where: { id: args.opportunityId, clientId: args.clientId } });
   if (!o) throw notFound('Opportunity not found');
   const existing = await tx.enrollment.findUnique({ where: { smeUserId_opportunityId: { smeUserId: args.smeUserId, opportunityId: o.id } }, include: { opportunityVersion: true } });

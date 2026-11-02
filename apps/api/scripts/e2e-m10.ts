@@ -20,7 +20,7 @@ const admin = await db.user.findFirstOrThrow({ where: { clientId: client.id, rol
 if (cmd === 'select') {
   const smeUserId = arg!;
   await db.smeUser.update({ where: { id: smeUserId }, data: { identityStatus: 'VERIFIED' } });
-  const enrollments = await db.enrollment.findMany({ where: { smeUserId, status: { in: ['DRAFT', 'SUBMITTED'] } } });
+  const enrollments = await db.enrollment.findMany({ where: { smeUserId, status: { in: ['DRAFT', 'SUBMITTED', 'REVIEW_PENDING'] } } });
   for (const e of enrollments) {
     const last = await db.profileVersion.findFirst({ where: { smeUserId }, orderBy: { version: 'desc' } });
     const pv = await db.profileVersion.create({ data: { clientId: client.id, smeUserId, enrollmentId: e.id, version: (last?.version ?? 0) + 1, data: {}, contentHash: randomUUID(), submittedAt: new Date() } });

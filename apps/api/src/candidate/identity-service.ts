@@ -6,6 +6,17 @@ import type { AuthoritativeStatus, IdentityProvider } from './identity-provider'
 
 export const ELIGIBLE: IdentityStatus[] = ['VERIFIED', 'ALTERNATIVE_VERIFIED'];
 
+/** Pending/restarted checks must not hide the most recent authoritative age result. */
+export async function applicationBlockReason(tx: Db | Tx, smeUserId: string, requireLive: boolean): Promise<string | null> {
+  const user = await tx.smeUser.findUniqueOrThrow({ where: { id: smeUserId } });
+  if (ELIGIBLE.includes(user.identityStatus)) return null;
+  const age = await tx.identityAttempt.findFirst({
+    where: { smeUserId, adultConfirmed: { not: null }, checkedAt: { not: null }, ...(requireLive ? { livemode: true } : {}) },
+    orderBy: [{ checkedAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+  });
+  return age?.adultConfirmed === false ? identityProblemText('UNDER_18') : null;
+}
+
 /** Candidate-facing text for an attempt's reason code. Never frames an identity problem as an expertise judgement. */
 export function identityProblemText(code: string | null): string | null {
   if (!code) return null;

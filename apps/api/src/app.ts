@@ -280,10 +280,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         selectionGate,
       });
       await v1.register(candidateRoutes, { db: deps.db });
-      await v1.register(opportunityRoutes, { db: deps.db });
+      await v1.register(opportunityRoutes, { db: deps.db, config: deps.config });
       await v1.register(campaignRoutes, { db: deps.db, config: deps.config });
       await v1.register(profileRoutes, {
         db: deps.db,
+        requireLiveIdentity: deps.config.requireLiveIdentity,
         assistant: deps.assistant ?? defaultAssistant(deps.config),
         storage,
         scanner: deps.scanner ?? stubScanner,

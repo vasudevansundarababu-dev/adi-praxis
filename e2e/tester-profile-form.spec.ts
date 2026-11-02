@@ -74,6 +74,23 @@ test('manual answers redact sensitive identifiers and cleared answers cannot be 
   const saved = await (await page.request.get(candidateBase + '/api/v1/me/enrollments/' + enrollment.id + '/conversation')).json();
   expect(saved.profile.fields.work_example).toBeUndefined();
   expect(saved.readiness.canSubmit).toBe(false);
+  await page.goto(path + '/status');
+  await expect(page.getByRole('link', { name: 'Continue your draft profile', exact: true })).toBeVisible();
+  const progress = page.getByRole('list', { name: 'Your progress' });
+  await expect(progress.locator('li').nth(0)).toHaveAttribute('data-state', 'current');
+  await expect(progress.locator('li').nth(1)).toHaveAttribute('data-state', 'todo');
+  const identitySession = await cp('/me/identity/session');
+  const identityId = new URL(identitySession.url).pathname.split('/').pop();
+  await cp(`/dev/identity/${identityId}/simulate`, { status: 'verified', adult: true });
+  const fields = [...new Set<string>(saved.questions.flatMap((q: { fields: string[] }) => q.fields).filter((key: string) => key !== 'roles'))];
+  const complete = await cp('/me/profile/corrections', { enrollmentId: enrollment.id, expectedRevision: saved.session.revision,
+    fields: fields.map((fieldKey) => ({ fieldKey, action: 'EDIT', value: fieldKey.endsWith('_years') || fieldKey === 'hours_per_week' ? 10 : `Generic answer for ${fieldKey}` })),
+    roles: [{ action: 'ADD', role: { title: 'KYC analyst', start: '2020-01', end: null } }],
+  });
+  await cp(`/me/enrollments/${enrollment.id}/submit`, { expectedRevision: complete.session.revision, confirmAccuracy: true, evidencePermission: true });
+  await page.goto(path + '/review');
+  await expect(page.getByRole('heading', { name: 'Profile submitted', exact: true })).toBeVisible();
+  await expect(page.getByText(/was submitted on \d{1,2} [A-Z][a-z]{2,3} \d{4} \(UTC\)/)).toBeVisible();
   // The existing guarded e2e-only fixture supplies the unrelated selection precondition.
   execFileSync('pnpm', ['--silent', '--filter', '@praxis/api', 'exec', 'tsx', 'scripts/e2e-m10.ts', 'select', signed.id], { encoding: 'utf8' });
   await page.goto(path + '/onboarding');
@@ -86,4 +103,23 @@ test('manual answers redact sensitive identifiers and cleared answers cannot be 
   await expect(secondLanguage.locator('option[value="en"]')).toHaveAttribute('disabled', '');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('button', { name: /Work preferences Done/ })).toBeVisible();
+  const minorToken = await cp('/auth/dev/google-token', { email: `minor.${randomUUID()}@example.test`, name: 'Age check fixture' });
+  await cp('/auth/google', { credential: minorToken.credential, adultAttested: true });
+  const minorSession = await cp('/me/identity/session');
+  const minorId = new URL(minorSession.url).pathname.split('/').pop();
+  await cp(`/dev/identity/${minorId}/simulate`, { status: 'verified', adult: false });
+  await page.goto(`${candidateBase}/opportunities/${detail.opportunityId}?start=1`);
+  await expect(page.getByText('Contributors must be 18 or over. This is not a judgement about your expertise.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Apply: build my SME profile/ })).toHaveCount(0);
+  const withdrawnToken = await cp('/auth/dev/google-token', { email: `withdrawn.${randomUUID()}@example.test`, name: 'Withdrawn draft fixture' });
+  await cp('/auth/google', { credential: withdrawnToken.credential, adultAttested: true });
+  const withdrawn = await cp('/me/enrollments', { opportunityId: detail.opportunityId });
+  await cp(`/me/enrollments/${withdrawn.id}/withdraw`);
+  await page.goto(`${candidateBase}/enrollments/${withdrawn.id}/status`);
+  await expect(page.getByRole('link', { name: 'View your saved draft profile', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View the profile you submitted', exact: true })).toHaveCount(0);
+  await page.getByRole('link', { name: 'View your saved draft profile', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Saved draft profile', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Profile submitted', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add role', exact: true })).toHaveCount(0);
 });

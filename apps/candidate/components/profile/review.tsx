@@ -8,7 +8,7 @@ import type { ConversationState } from '@/lib/profile-types';
 import { ProfilePanel } from './profile-panel';
 
 /** C05 — review profile and evidence, then an explicit submit. Saving never submits (CF-18). */
-export function Review({ initial, identityLabel, identityEligible }: { initial: ConversationState; identityLabel: string; identityEligible: boolean }) {
+export function Review({ initial, identityLabel, identityEligible, identityBlockReason }: { initial: ConversationState; identityLabel: string; identityEligible: boolean; identityBlockReason?: string | null }) {
   const [state, setState] = useState(initial);
   const [accuracy, setAccuracy] = useState(false);
   const [permission, setPermission] = useState(false);
@@ -65,11 +65,19 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
     setError({ text: res.message, items: [...(d?.unconfirmed ?? []).map((x) => `Confirm: ${x}`), ...(d?.problems ?? []), ...(d?.unanswered ?? []).map((x) => `Answer: ${x}`)] });
   }
 
+  if (submitted && state.enrollment.status === 'WITHDRAWN' && !state.enrollment.submittedAt) {
+    return <div className="max-w-2xl">
+      <h1 className="text-2xl font-semibold">Saved draft profile</h1>
+      <p className="mt-3">This application was withdrawn. Your draft was not submitted.</p>
+      <ProfilePanel state={state} onChange={setState} readOnly />
+      <Link href="/home" className="mt-6 inline-block btn btn-primary">Back to home</Link>
+    </div>;
+  }
   if (submitted) {
     return (
       <div className="max-w-2xl">
         <h1 className="text-2xl font-semibold">Profile submitted</h1>
-        <p className="mt-3">Thank you. Your profile for <strong>{state.enrollment.title}</strong> was submitted{state.enrollment.submittedAt ? ` on ${new Date(state.enrollment.submittedAt).toLocaleDateString()}` : ''}.</p>
+        <p className="mt-3">Thank you. Your profile for <strong>{state.enrollment.title}</strong> was submitted{state.enrollment.submittedAt ? ` on ${new Date(state.enrollment.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })} (UTC)` : ''}.</p>
         <p className="mt-2 text-fg-muted">A person reviews every application; software does not make the decision. We’ll let you know the outcome, and if we need more information we’ll ask a specific question.</p>
         <Link href="/home" className="mt-6 inline-block btn btn-primary">Back to home</Link>
       </div>
@@ -99,7 +107,7 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
               You marked some requirements as not known or not disclosed: {r.requiredGaps.join('; ')}. {r.canSubmit ? 'You can still submit.' : 'Complete the remaining items above before submitting.'} The Validator may ask for more information; this is not a rejection.
             </p>
           )}
-          <p className="mt-3 text-sm">Identity: <strong>{identityLabel}</strong>{identityEligible ? '' : ' (finish verification before submitting; your profile stays saved)'}</p>
+          <p className="mt-3 text-sm">Identity: <strong>{identityLabel}</strong>{identityEligible ? '' : ` (${identityBlockReason ?? 'finish verification before submitting; your profile stays saved'})`}</p>
         </section>
 
         <section className="mt-6">

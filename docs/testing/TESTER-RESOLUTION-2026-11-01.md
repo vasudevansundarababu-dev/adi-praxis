@@ -48,6 +48,35 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+### Fourth batch — 2 November, 03:25 America/Chicago
+
+Implemented #50: confirmed under-18 candidates cannot start/resume an opportunity
+application or submit a profile. Opportunity/home/review screens explain the restriction
+instead of inviting an impossible verification step. Direct and partner-invite entry
+paths use the same application check. Pending/restarted checks cannot mask the most
+recent authoritative age result. A later valid adult verification restores access;
+existing approved alternative verification remains honored. Test-only results are
+ignored by the restriction query when live verification is required. No DOB is stored.
+
+Implemented #52/#57: status progress uses actual identity eligibility and submittedAt;
+unsubmitted drafts are not marked completed. Draft/withdrawn links describe saved drafts,
+and a withdrawn never-submitted draft opens as read-only saved content, not a false
+submission confirmation. Implemented #60: submitted-profile dates use explicit en-GB
+month names and UTC on server/client, removing numeric-date ambiguity.
+
+Passed: targeted API suites 70 tests; full API suite 477/477 in 29 files; full browser
+suite 16 passed / one deployment-only skip with clean exit; final focused browser flow
+1/1 after the withdrawn destination correction; final all-package typecheck/build.
+Initial full-browser assertions passed but cleanup stalled (runner terminated, exit 143);
+all manually owned API clients/pages now close, and the clean full rerun passed. An
+earlier local fixture missed the worker's REVIEW_PENDING transition; the guarded e2e-only
+selection fixture now accepts that precondition. Production review gates are unchanged.
+
+No paid calls, real identity decisions, issue closures or main merge. Backup
+1793610984231 succeeded. No tester issue/comment changes were found. This batch is not
+yet deployed at this checkpoint; create a clean isolated release checkout and verify
+the existing target after rollout. Next unfinished groups remain #113 and workbench.
+
 ### Third batch deployed — 2 November 2026
 
 Release `94dc7963` / `tester-94dc7963-20261102`, image tag `94dc7963-1793607676`,

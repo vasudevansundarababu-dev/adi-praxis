@@ -254,7 +254,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
       '/auth/dev/google-token',
       {
         config: { access: 'public' },
-        schema: { hide: true, body: z.object({ email: z.string().email(), name: z.string().trim().min(1).max(200) }), response: { 200: z.object({ credential: z.string() }) } },
+        schema: { tags: ['demo-only'], body: z.object({ email: z.string().email(), name: z.string().trim().min(1).max(200) }), response: { 200: z.object({ credential: z.string() }) } },
       },
       async (req) => ({ credential: google.mint({ subject: `mock-${req.body.email.toLowerCase()}`, email: req.body.email, name: req.body.name }) }),
     );
@@ -265,7 +265,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
       {
         config: { access: 'candidate' },
         schema: {
-          hide: true,
+          tags: ['demo-only'],
           params: z.object({ sessionId: z.string() }),
           body: z.object({ status: z.enum(['verified', 'requires_input', 'processing', 'canceled']), adult: z.boolean().optional(), errorCode: z.string().optional() }),
           response: { 200: z.object({ result: z.string() }) },

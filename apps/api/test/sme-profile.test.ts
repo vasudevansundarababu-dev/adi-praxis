@@ -247,6 +247,17 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
   });
 
   describe('CF-13 real customer or restricted employer data', () => {
+    it('redacts manual form corrections before profile persistence and leaves them unconfirmed (#47)', async () => {
+      const c = await candidate();
+      const response = await correct(c, { fields: [{ fieldKey: 'work_example', action: 'EDIT', value: 'Checked account 12345678, IBAN GB82 WEST 1234 5698 7654 32, PAN ABCDE1234F, Aadhaar 2345 6789 0123.' }] });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().profile.fields.work_example.status).toBe('PROPOSED');
+      const stored = await db.profileVersion.findMany({ where: { enrollmentId: c.enrollmentId } });
+      expect(JSON.stringify(stored)).not.toMatch(/12345678|GB82 WEST|ABCDE1234F|2345 6789 0123/);
+      expect(JSON.stringify(stored)).toContain('[removed:');
+      expect(assistant.calls).toHaveLength(0);
+    });
+
     it('stops collection, stores only a redacted copy and never sends it to the model', async () => {
       const c = await candidate();
       const res = await send(c, { content: 'Customer John Smith, account number 12345678, IBAN GB82 WEST 1234 5698 7654 32, called on 020 7946 0958.' });

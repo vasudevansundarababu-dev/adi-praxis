@@ -48,6 +48,42 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+### Night checkpoint — 1 November, 23:30 America/Chicago
+
+First batch is implemented locally; not yet pushed or deployed. It covers product API
+error envelopes (#67, #161), signed-bigint dataset cursor validation (#158, #159),
+unknown write fields (#117), API audience documentation and demo-only reference entries
+(#66, documentation portion of #155), and bounded same-origin request handling.
+Manual profile corrections now redact sensitive identifiers before persistence (#47).
+Form clearing sends CLEAR rather than silently ignoring empty edits (#76, #78); saved
+server values replace typed values and the router cache is refreshed (#77 mitigation).
+Review copy now reflects the real submission blockers (#51).
+
+Evidence so far:
+
+- `pnpm typecheck`: all five packages passed after both implementation groups.
+- `pnpm --filter @praxis/shared test`: 126 passed, including five proxy tests.
+- `pnpm --filter @praxis/api test`: 467 passed before the profile changes.
+- `pnpm --filter @praxis/api exec vitest run test/tester-profile-corrections.test.ts`:
+  five passed after repairing missing request metadata in the initial test fixture.
+- `pnpm --filter @praxis/api exec vitest run test/sme-profile.test.ts`: 31 passed,
+  including real endpoint/database privacy verification with a controlled assistant.
+- First browser run: eight passed, two failed, one skipped, three not run. A configuration
+  cleanup triggered Next dev restarts during that run; rerun started with stable files.
+  Do not count either failure as resolved until the rerun exits successfully.
+- No paid model calls, production data edits, issue closures or deployment in this batch.
+
+Follow-up: browser suite now exits successfully: **15 passed, one deployment-only check
+skipped**. Explicit API-context disposal fixes the prior teardown stall. Both same-origin
+proxies passed 2 MiB and 10 MiB request checks and unknown-route envelope checks.
+`pnpm build` passed for all production packages. No paid providers were invoked.
+
+Remaining verification: browser
+regression for form clearing and request-size handling, final diff review, exact matrix
+updates, PR and backed-up deployment. #155's untested partner-token observation remains
+unverified. Encoded-NUL API checks do not establish that retired candidate `/jobs` routes
+in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk scrubbed.
+
 | Issue | Report | Current status | Change / test evidence |
 | --- | --- | --- | --- |
 | [#1](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/1) | Testing | Closed in tester repository; not claimed as new fix | — |
@@ -96,7 +132,7 @@ separately requested. Resume here after interruption; do not repeat completed YC
 | [#44](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/44) | Adi Labs/ [DEF-048] Job URL containing an encoded null character causes a server error | Pending detailed reproduction | — |
 | [#45](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/45) | Adi Labs/ [DEF-049] Non-Latin resume file names are replaced with underscores | Pending detailed reproduction | — |
 | [#46](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/46) | Adi Labs/ [DEF-050] Valid PDF with a very long file name is rejected with a misleading message | Pending detailed reproduction | — |
-| [#47](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/47) | Praxis / SME / Profile form saves bank account, IBAN, PAN and Aadhaar numbers without redaction | Pending detailed reproduction | — |
+| [#47](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/47) | Praxis / SME / Profile form saves bank account, IBAN, PAN and Aadhaar numbers without redaction | Implemented; persistence test passed; browser retest pending | Manual correction redaction; sme-profile.test.ts, 31 passed. |
 | [#48](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/48) | Praxis / SME / AI profile chat fails on every answer with "I couldn't process that answer just now" | Pending detailed reproduction | — |
 | [#49](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/49) | Praxis / SME / Evidence upload of 10 MB or more fails with a server error and only "Upload failed" | Pending detailed reproduction | — |
 | [#50](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/50) | Praxis / SME / Under-18 candidate can still start an application and is told to "finish identity verification" | Pending detailed reproduction | — |
@@ -115,8 +151,8 @@ separately requested. Resume here after interruption; do not repeat completed YC
 | [#63](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/63) | Praxis / SME / Home and the status page describe the same application differently | Pending detailed reproduction | — |
 | [#64](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/64) | Praxis / SME / Unknown pages show a plain white 404 with no way back | Pending detailed reproduction | — |
 | [#65](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/65) | Praxis / SME / Missing 18+ tick is only checked by the server and logs a console error | Pending detailed reproduction | — |
-| [#66](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/66) | Praxis / SME / Mock sign-in and identity simulator endpoints are missing from the API reference | Pending detailed reproduction | — |
-| [#67](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/67) | Praxis / SME / API error reveals the server framework (FST_ERR_CTP_EMPTY_JSON_BODY) | Source gap confirmed; fix pending | — |
+| [#66](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/66) | Praxis / SME / Mock sign-in and identity simulator endpoints are missing from the API reference | Implemented; API regression passed | Mock-only reference entries tested. |
+| [#67](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/67) | Praxis / SME / API error reveals the server framework (FST_ERR_CTP_EMPTY_JSON_BODY) | Implemented; API regression passed | Safe framework error envelope; exact empty-JSON case pending. |
 | [#68](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/68) | Praxis / Validator / Validator can open Projects and Templates pages, which show misleading empty states | Pending detailed reproduction | — |
 | [#69](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/69) | Praxis / Validator / Identity reviews lists candidates from all projects to a Validator assigned to none | Pending detailed reproduction | — |
 | [#70](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/70) | Praxis / Validator / Identity reviews page throws a React error and shows ambiguous dates | Pending detailed reproduction | — |
@@ -125,9 +161,9 @@ separately requested. Resume here after interruption; do not repeat completed YC
 | [#73](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/73) | Praxis / Validator / Console sign-in and change-password pages do not show the test-environment banner | Pending detailed reproduction | — |
 | [#74](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/74) | Praxis / SME / Credential fields accept meaningless values such as "555tw" and "235234" for every credential type | Pending detailed reproduction | — |
 | [#75](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/75) | Praxis / SME / A role with no dates is accepted as "? to now" and can only be removed, not edited | Pending detailed reproduction | — |
-| [#76](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/76) | Praxis / SME / Clearing answers in the profile form is silently ignored and the old answers stay "Confirmed by you" | Pending detailed reproduction | — |
-| [#77](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/77) | Praxis / SME / Conversation page can show no answered questions right after the form is saved (Intermittent) | Pending detailed reproduction | — |
-| [#78](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/78) | Praxis / SME / Profile can be submitted after the SME cleared mandatory answers; the cleared answers are submitted | Pending detailed reproduction | — |
+| [#76](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/76) | Praxis / SME / Clearing answers in the profile form is silently ignored and the old answers stay "Confirmed by you" | Implemented; browser retest pending | Blank edits send CLEAR; controlled server values. |
+| [#77](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/77) | Praxis / SME / Conversation page can show no answered questions right after the form is saved (Intermittent) | Mitigation; intermittent retest pending | Router cache refreshed after save. |
+| [#78](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/78) | Praxis / SME / Profile can be submitted after the SME cleared mandatory answers; the cleared answers are submitted | Implemented; browser retest pending | Clearing root cause shared with #76; submission gating retained. |
 | [#79](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/79) | Adi Labs/ [DEF-051] Links inside text on the Journey page are distinguishable only by colour | Pending detailed reproduction | — |
 | [#80](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/80) | Adi Labs/ [DEF-052] Small text on the login page is below the minimum colour contrast | Pending detailed reproduction | — |
 | [#81](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/81) | Adi Labs/ [DEF-053] Pages send no basic security headers (CSP, frame protection, nosniff, Referrer-Policy) | Pending detailed reproduction | — |
@@ -166,7 +202,7 @@ separately requested. Resume here after interruption; do not repeat completed YC
 | [#114](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/114) | Praxis / SME / Work preferences accepts a time zone that does not exist | Pending detailed reproduction | — |
 | [#115](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/115) | Praxis / SME / Work preferences accepts a language level that does not exist | Pending detailed reproduction | — |
 | [#116](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/116) | Praxis / PM / Project accepts a demographic filter on an attribute that does not exist | Pending detailed reproduction | — |
-| [#117](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/117) | Praxis / PM / Write endpoints accept unknown extra fields although the API document forbids them | Pending detailed reproduction | — |
+| [#117](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/117) | Praxis / PM / Write endpoints accept unknown extra fields although the API document forbids them | Implemented; API regression passed | Strict write objects; unknown fields rejected. |
 | [#118](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/118) | Praxis / Finance / A pay run can be built for a week in 1999 while a week in 2035 is refused | Pending detailed reproduction | — |
 | [#119](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/119) | Praxis / Finance / A COMPLETED pay run can be submitted again (200 instead of 409) | Pending detailed reproduction | — |
 | [#120](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/120) | Praxis / Validator / Decision form pre-selects "Select for this pool": typing a reason and message alone selects the candidate | Pending detailed reproduction | — |
@@ -200,14 +236,14 @@ separately requested. Resume here after interruption; do not repeat completed YC
 | [#148](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/148) | Praxis / PM / Job description import shows no progress and its result message appears at the very bottom of the page | Pending detailed reproduction | — |
 | [#149](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/149) | Praxis / PM / An empty Resource assignment board does not say why a selected, onboarded expert is missing | Pending detailed reproduction | — |
 | [#150](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/150) | Praxis / PM / Identical job descriptions can be created twice and both show in the "Use an existing job description" list | Pending detailed reproduction | — |
-| [#151](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/151) | Praxis / All roles / Login rate limiting is reported to start only after the 20th failed attempt, not after 10 as specified | QA report says not reproduced; independent verification pending | — |
+| [#151](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/151) | Praxis / All roles / Login rate limiting is reported to start only after the 20th failed attempt, not after 10 as specified | Not reproduced; regression passed | Eleventh login attempt returns 429. |
 | [#152](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/152) | Praxis / SME / Opening a partner invite link gives no clear message that the invitation was accepted | Pending detailed reproduction | — |
 | [#153](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/153) | Praxis / Partner / The Partner portal Support Bot answers every message and preset question with "not available right now" | Pending detailed reproduction | — |
 | [#154](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/154) | Praxis / Partner / Resubmitting a withdrawn candidate says "already submitted" and does not mention the 90-day cool-off | Pending detailed reproduction | — |
-| [#155](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/155) | Praxis / API / The API reference does not declare which authentication each endpoint needs (e.g. GET /partner-statements) | Source gap confirmed; fix pending | — |
+| [#155](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/155) | Praxis / API / The API reference does not declare which authentication each endpoint needs (e.g. GET /partner-statements) | Documentation tested; token behavior unverified | Operation audiences and error responses documented; no token-auth change. |
 | [#156](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/156) | Praxis / Admin / The Users list is cut off and the hidden part can only be reached with a two-finger horizontal scroll | Pending detailed reproduction | — |
 | [#157](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/157) | Praxis / Admin / Clicking Admin while the Tutorial page is still loading changes the URL to /users but keeps showing the Tutorial content | Pending detailed reproduction | — |
-| [#158](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/158) | Praxis / Admin / The dataset "after" parameter answers 500 "Something went wrong" for a very large number | Source gap confirmed; fix pending | — |
-| [#159](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/159) | Praxis / Admin / The dataset "after" parameter accepts -1 and an empty value and returns the data instead of a 400 | Source gap confirmed; fix pending | — |
+| [#158](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/158) | Praxis / Admin / The dataset "after" parameter answers 500 "Something went wrong" for a very large number | Implemented; API regression passed | Bounded signed-bigint cursors. |
+| [#159](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/159) | Praxis / Admin / The dataset "after" parameter accepts -1 and an empty value and returns the data instead of a 400 | Implemented; API regression passed | Empty and negative cursors rejected. |
 | [#160](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/160) | Praxis / API / A 10 MB JSON body is answered with HTTP 500 and the plain text "Internal Server Error", with no request id | Pending detailed reproduction | — |
-| [#161](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/161) | Praxis / API / An unknown API route returns the default framework error with no request id | Source gap confirmed; fix pending | — |
+| [#161](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/161) | Praxis / API / An unknown API route returns the default framework error with no request id | Implemented; API regression passed | Custom NOT_FOUND envelope with request ID. |

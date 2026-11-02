@@ -8,12 +8,14 @@ import { Prisma } from '@prisma/client';
 import Fastify, { type FastifyInstance } from 'fastify';
 import {
   jsonSchemaTransform,
+  hasZodFastifySchemaValidationErrors,
   serializerCompiler,
   validatorCompiler,
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 import { randomUUID } from 'node:crypto';
 import './auth/actor';
+import { z } from 'zod';
 import { rbacPlugin } from './auth/rbac';
 import type { Config } from './config';
 import type { Db } from './db';
@@ -170,11 +172,24 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     },
   }).withTypeProvider<ZodTypeProvider>();
 
-  app.setValidatorCompiler(validatorCompiler);
+  app.setValidatorCompiler((definition) => {
+    const schema = definition.schema as unknown as z.ZodTypeAny;
+    return validatorCompiler({ ...definition,
+      schema: definition.httpPart === 'body' && schema instanceof z.ZodObject && schema._def.unknownKeys === 'strip'
+        ? schema.strict() : schema,
+    });
+  });
   app.setSerializerCompiler(serializerCompiler);
 
   app.addHook('onSend', async (req, reply) => {
     reply.header('x-request-id', req.id);
+  });
+
+  app.setNotFoundHandler((req, reply) => reply.status(404).send({
+    error: 'NOT_FOUND', message: 'This API route was not found.', requestId: String(req.id),
+  }));
+  app.addHook('onRequest', async (req) => {
+    if (/%00/i.test(req.url) || req.url.includes('\0')) throw new AppError(400, 'INVALID_ADDRESS', 'This address contains an invalid character.');
   });
 
   app.setErrorHandler((err, req, reply) => {
@@ -188,11 +203,20 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       return reply.status(409).send({ error: 'CONFLICT', message: 'A record with these values already exists', requestId });
     }
     const e = err as { validation?: unknown; statusCode?: number; code?: string; message: string };
+    if (hasZodFastifySchemaValidationErrors(err)) {
+      const fields = [...new Set(err.validation.flatMap((v) => v.params.issue.code === 'unrecognized_keys'
+        ? v.params.issue.keys : v.params.issue.path.map(String)).filter((v) => /^[a-zA-Z0-9_.-]{1,60}$/.test(v)))].slice(0, 10);
+      const unknown = err.validation.some((v) => v.params.issue.code === 'unrecognized_keys');
+      const message = fields.length ? `${unknown ? 'Unknown fields' : 'Check these fields'}: ${fields.join(', ')}.` : 'Some values are invalid. Check the fields and try again.';
+      return reply.status(400).send({ error: 'VALIDATION_FAILED', message, requestId, details: { fields } });
+    }
     if (e.validation) {
-      return reply.status(400).send({ error: 'VALIDATION_FAILED', message: e.message, requestId });
+      return reply.status(400).send({ error: 'VALIDATION_FAILED', message: 'Some values are invalid. Check the fields and try again.', requestId });
     }
     if (e.statusCode && e.statusCode < 500) {
-      return reply.status(e.statusCode).send({ error: e.code ?? 'BAD_REQUEST', message: e.message, requestId });
+      const code = e.statusCode === 413 ? 'REQUEST_TOO_LARGE' : e.statusCode === 429 ? 'RATE_LIMITED' : 'BAD_REQUEST';
+      const message = e.statusCode === 413 ? 'This request is too large. Reduce its size and try again.' : e.statusCode === 429 ? 'Too many requests. Wait a minute and try again.' : 'This request could not be read. Check its contents and try again.';
+      return reply.status(e.statusCode).send({ error: code, message, requestId });
     }
     req.log.error({ err }, 'unhandled error');
     return reply.status(500).send({ error: 'INTERNAL', message: 'Something went wrong', requestId });
@@ -223,7 +247,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       info: { title: 'ADI Praxis API', version: '0.1.0' },
       servers: [{ url: '/' }],
       components: {
-        securitySchemes: { session: { type: 'apiKey', in: 'cookie', name: 'praxis_session' } },
+        securitySchemes: {
+          session: { type: 'apiKey', in: 'cookie', name: 'praxis_session' },
+          candidateSession: { type: 'apiKey', in: 'cookie', name: 'praxis_candidate' },
+          partnerSession: { type: 'apiKey', in: 'cookie', name: 'praxis_partner' },
+          serviceToken: { type: 'http', scheme: 'bearer', bearerFormat: 'API key' },
+          partnerOAuth: { type: 'oauth2', flows: { clientCredentials: { tokenUrl: '/partner/v1/oauth/token', scopes: { 'requisitions:read': 'Read requisitions', 'candidates:read': 'Read candidates and placements', 'candidates:write': 'Submit or withdraw candidates' } } } },
+        },
       },
     },
     transform: jsonSchemaTransform,

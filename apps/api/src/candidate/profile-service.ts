@@ -19,6 +19,7 @@ import {
   type QuestionDef,
 } from '@praxis/shared';
 import { randomUUID } from 'node:crypto';
+import { detectSensitive } from './sensitive';
 import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, notFound } from '../lib/errors';
@@ -215,6 +216,30 @@ export function applyCorrections(p: ProfileData, c: CorrectionsRequest, allowedF
     if (ch.action === 'REMOVE') next.claims.splice(i, 1);
     // The evidence level stays SELF_REPORTED whatever the candidate sends (CF-16).
     else next.claims[i] = { ...next.claims[i]!, ...(ch.action === 'EDIT' ? ch.claim : {}), status: 'CONFIRMED', evidenceLevel: 'SELF_REPORTED' };
+  }
+  // The form/correction path must have the same privacy boundary as conversational input.
+  const scrub = (value: FieldValue | null): FieldValue | null => typeof value === 'string'
+    ? detectSensitive(value).redacted : Array.isArray(value) ? value.map((v) => detectSensitive(v).redacted) : value;
+  for (const field of Object.values(next.fields)) {
+    const value = scrub(field.value);
+    const conflict = scrub(field.conflictWith);
+    if (stableStringify(value) !== stableStringify(field.value) || stableStringify(conflict) !== stableStringify(field.conflictWith)) {
+      field.value = value;
+      field.conflictWith = conflict;
+      field.status = 'PROPOSED';
+      field.sources = [...field.sources, 'sensitive-data-removed'];
+    }
+  }
+  for (const item of [...next.roles, ...next.claims]) {
+    const keys = 'title' in item ? ['title', 'employerType', 'employerName'] : ['value', 'issuer'];
+    let changed = false;
+    for (const key of keys) {
+      const value = (item as unknown as Record<string, unknown>)[key];
+      if (typeof value !== 'string') continue;
+      const clean = detectSensitive(value).redacted;
+      if (clean !== value) { Object.assign(item, { [key]: clean }); changed = true; }
+    }
+    if (changed) { item.status = 'PROPOSED'; item.sources = [...item.sources, 'sensitive-data-removed']; }
   }
   return ProfileData.parse(next);
 }

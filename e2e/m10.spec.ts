@@ -49,6 +49,10 @@ test.beforeAll(async () => {
   validator = await staff('validator@e2e.local', 'e2e-validator-password');
 });
 
+test.afterAll(async () => {
+  await Promise.all([admin?.dispose(), pm?.dispose(), validator?.dispose()]);
+});
+
 /** A published STAFFING project with SME supply on, a partner with a portal user, and an open requisition. */
 async function supply(extra: object = {}) {
   const tag = randomUUID().slice(0, 6);

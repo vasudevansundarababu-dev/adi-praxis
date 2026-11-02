@@ -18,7 +18,7 @@ const ListQuery = z.object({
   projectId: z.string().uuid().optional(),
   workflow: z.string().max(200).optional(),
   /** Records after this sequence number (cursor). */
-  after: z.coerce.bigint().optional(),
+  after: z.string().regex(/^(0|[1-9]\d{0,18})$/, 'Use a non-negative integer cursor.').transform((v) => BigInt(v)).refine((v) => v <= 9223372036854775807n, 'Cursor is out of range.').optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),
 });
 

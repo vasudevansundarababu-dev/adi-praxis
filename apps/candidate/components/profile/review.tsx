@@ -85,7 +85,7 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
           )}
           {r.requiredGaps.length > 0 && (
             <p className="mt-3 text-sm">
-              You marked some requirements as not known or not disclosed: {r.requiredGaps.join('; ')}. You can still submit. The Validator may ask for more information; this is not a rejection.
+              You marked some requirements as not known or not disclosed: {r.requiredGaps.join('; ')}. {r.canSubmit ? 'You can still submit.' : 'Complete the remaining items above before submitting.'} The Validator may ask for more information; this is not a rejection.
             </p>
           )}
           <p className="mt-3 text-sm">Identity: <strong>{identityLabel}</strong>{identityEligible ? '' : ' (finish verification before submitting; your profile stays saved)'}</p>

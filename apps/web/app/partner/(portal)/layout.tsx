@@ -25,7 +25,7 @@ export default async function PartnerPortalLayout({ children }: { children: Reac
   return (
     <div className="min-h-screen bg-surface">
       {process.env.PRAXIS_DEMO === '1' && (
-        <p role="note" className="bg-warning px-4 py-1 text-center text-xs font-medium text-black">
+        <p role="note" className="bg-warning px-4 py-1 text-center text-xs font-medium text-white dark:text-black">
           {process.env.PRAXIS_ENV_LABEL ?? 'Demo environment'}: synthetic data only.
           {process.env.PRAXIS_BUILD && <span className="ml-2 font-mono">Build {process.env.PRAXIS_BUILD}</span>}
         </p>

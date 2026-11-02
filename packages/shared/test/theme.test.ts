@@ -35,6 +35,21 @@ describe('theme tokens', () => {
       }
       expect(contrast(t.onPrimary, t.primary)).toBeGreaterThanOrEqual(4.5);
     });
+    it(`${theme}: status pills remain readable over tinted elevated cards (#169)`, () => {
+      const elevated = theme === 'dark' ? '#2C2E36' : '#FFFFFF';
+      for (const base of [t.bg, t.surface, elevated]) {
+        expect(contrast(t.textMuted, base)).toBeGreaterThanOrEqual(4.5);
+        for (const tint of [t.textMuted, t.link, t.success, t.warning, t.error, t.accent]) {
+          const background = '#' + [1, 3, 5].map((i) => Math.round(
+            parseInt(tint.slice(i, i + 2), 16) * 0.14 + parseInt(base.slice(i, i + 2), 16) * 0.86,
+          ).toString(16).padStart(2, '0')).join('');
+          expect(contrast(t.text, background)).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    });
+    it(`${theme}: build banner foreground meets AA (#170)`, () => {
+      expect(contrast(theme === 'dark' ? '#000000' : '#FFFFFF', t.warning)).toBeGreaterThanOrEqual(4.5);
+    });
   }
 
   it('theme.css defines the same values as tokens.ts', () => {

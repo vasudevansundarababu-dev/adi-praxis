@@ -2,6 +2,26 @@
 
 ## Active request and checkpoint
 
+### YC review UX follow-up — 2 November 2026
+
+Implemented #167 evidence links in a separate tab with noopener/noreferrer and an
+accessible new-tab notice; #171 keyboard-focusable named comparison/JSON scroll areas;
+#172 deterministic en-GB decision timestamps explicitly labeled UTC. Native browser
+behavior remains to be inspected after rollout; no unsupported browser-pass claim.
+#146 dark muted text now clears AA on elevated cards; #169 status text uses high-
+contrast foreground while colored dots/backgrounds retain status; #170 banners use
+white text on light warning brown and black on dark yellow. Brand colors unchanged.
+
+Passed `pnpm --filter @praxis/shared test` (130 tests/11 files), `pnpm typecheck`,
+`pnpm build`, `git diff --check`. New objective contrast regressions cover both themes,
+all six pill tints over background/surface/elevated cards, and banner foregrounds.
+Backend unchanged from the last 479-pass suite; not repeated for this UI-only slice.
+Deployment/browser verification pending. No model calls, identity decisions or issue
+closures. Three new YC golden demo projects each contain one real unassigned CREATED
+annotation task prepared via authenticated PM APIs. Actor-visible material only;
+synthetic/admin-prepared labels retained, with no fabricated SME authorship/acceptance
+or v3 approved-export lineage. Actual receipts remain in ignored local monitor state.
+
 ### Daytime YC demo release — 2 November 2026
 
 Deployed commit d6ddd09c / demo-d6ddd09c-20261102 after SQL backup1793629628953

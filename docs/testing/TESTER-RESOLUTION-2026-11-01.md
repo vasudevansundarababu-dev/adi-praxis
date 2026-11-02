@@ -48,6 +48,34 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+### Second batch deployed — 2 November 2026
+
+Verified release `bb8d7952` / `tester-bb8d7952-20261102`, image tag
+`bb8d7952-1793603675`. Backup `1793603592772` succeeded before rollout; Cloud Build
+`7acf8cac-ef36-4701-9e98-c949b9054ca2` and migration execution
+`praxis-migrate-9bf79` succeeded. DEPLOY_ONLY=1 / SKIP_DEMO_SETUP=1; no reseeding,
+paid calls, issue closures or main merge. All four services Ready, 100% traffic:
+API `praxis-api-00010-zhw`, worker `praxis-worker-00010-xwb`, console
+`praxis-web-00010-d56`, candidate `praxis-candidate-00010-drf`.
+
+Post-deployment: exact commit/build, database/Redis readiness, both sign-in pages,
+existing PM sign-in, API and both proxy unknown-route envelopes passed. Private service
+snapshots confirm all environment settings unchanged except release metadata. Existing
+Admin credential limitation from batch one remains; it was not retried or reset.
+Local meaningful regressions: 475 API tests, one expanded browser flow, all-package
+typecheck and production build passed. No real identity decisions were made for a smoke test.
+
+Verified additional fixes: #59 (reversed role dates), #62 (separate evidence-upload activity),
+#69 (identity-review project scope). #160 is additionally verified against the live exact
+reported endpoint with an existing PM session: 2 MiB and 10 MiB POST /projects return
+413 REQUEST_TOO_LARGE with request IDs; this behavior came from batch one's proxy fix.
+
+Scope question emailed to admin@adi-labs.ai for #44, #81 and #130, whose reports explicitly
+point to the different ADI Interview staging application. Leave them unverified until the
+user/testers clarify the intended app. Other Praxis work is independent and can continue.
+Resume remaining candidate UX/validation, then workbench/finance/partner matrix groups;
+do not redeploy these unchanged batches. PR #5 remains draft while the backlog continues.
+
 ### Second batch — 2 November, 01:15 America/Chicago
 
 Implemented #69: project-scoped identity queue and decision authorization; Admins retain
@@ -201,7 +229,7 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#41](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/41) | Adi Labs/ [DEF-044] Every Save draft adds a new revision and timeline entry, even when nothing has changed | Pending detailed reproduction | — |
 | [#42](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/42) | Adi Labs/ [DEF-046] Added evidence cannot be removed or archived | Pending detailed reproduction | — |
 | [#43](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/43) | Adi Labs/ [DEF-047] Not-found pages show an unrelated 'version conflict' message | Pending detailed reproduction | — |
-| [#44](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/44) | Adi Labs/ [DEF-048] Job URL containing an encoded null character causes a server error | Pending detailed reproduction | — |
+| [#44](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/44) | Adi Labs/ [DEF-048] Job URL containing an encoded null character causes a server error | Scope clarification emailed; unverified | Report points to ADI Interview staging; absent current Praxis route. |
 | [#45](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/45) | Adi Labs/ [DEF-049] Non-Latin resume file names are replaced with underscores | Pending detailed reproduction | — |
 | [#46](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/46) | Adi Labs/ [DEF-050] Valid PDF with a very long file name is rejected with a misleading message | Pending detailed reproduction | — |
 | [#47](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/47) | Praxis / SME / Profile form saves bank account, IBAN, PAN and Aadhaar numbers without redaction | Implemented; persistence test passed; browser retest pending | Manual correction redaction; sme-profile.test.ts, 31 passed. |
@@ -216,17 +244,17 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#56](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/56) | Praxis / SME / Apply button stays active after applying or withdrawing and silently reopens the old application | Pending detailed reproduction | — |
 | [#57](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/57) | Praxis / SME / Draft and withdrawn applications show "View the profile you submitted" | Pending detailed reproduction | — |
 | [#58](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/58) | Praxis / SME / Sign-in shows raw validation messages such as "body/name String must contain at least 1 character(s)" | Pending detailed reproduction | — |
-| [#59](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/59) | Praxis / SME / A role whose end month is before its start month is saved as "Confirmed by you" | Pending detailed reproduction | — |
+| [#59](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/59) | Praxis / SME / A role whose end month is before its start month is saved as "Confirmed by you" | Fixed; tested and deployed | ADD/EDIT reversed date rejection; persistence regression; release bb8d7952. |
 | [#60](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/60) | Praxis / SME / Submission date is ambiguous and changes format ("9/10/2026" then "10/9/2026") | Pending detailed reproduction | — |
 | [#61](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/61) | Praxis / SME / Chat greeting shows "Hi S.." for names that start with an initial | Pending detailed reproduction | — |
-| [#62](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/62) | Praxis / SME / "Confirm and submit" changes to "Submitting..." while an evidence file uploads | Pending detailed reproduction | — |
+| [#62](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/62) | Praxis / SME / "Confirm and submit" changes to "Submitting..." while an evidence file uploads | Fixed; tested and deployed | Separate upload state and indeterminate progress; held-upload/failure browser regression; bb8d7952. |
 | [#63](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/63) | Praxis / SME / Home and the status page describe the same application differently | Pending detailed reproduction | — |
 | [#64](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/64) | Praxis / SME / Unknown pages show a plain white 404 with no way back | Pending detailed reproduction | — |
 | [#65](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/65) | Praxis / SME / Missing 18+ tick is only checked by the server and logs a console error | Pending detailed reproduction | — |
 | [#66](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/66) | Praxis / SME / Mock sign-in and identity simulator endpoints are missing from the API reference | Implemented; API regression passed | Mock-only reference entries tested. |
 | [#67](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/67) | Praxis / SME / API error reveals the server framework (FST_ERR_CTP_EMPTY_JSON_BODY) | Implemented; API regression passed | Safe framework error envelope; exact empty-JSON case pending. |
 | [#68](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/68) | Praxis / Validator / Validator can open Projects and Templates pages, which show misleading empty states | Pending detailed reproduction | — |
-| [#69](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/69) | Praxis / Validator / Identity reviews lists candidates from all projects to a Validator assigned to none | Pending detailed reproduction | — |
+| [#69](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/69) | Praxis / Validator / Identity reviews lists candidates from all projects to a Validator assigned to none | Fixed; tested and deployed | Queue/decision project scope; unassigned, revoked and cross-tenant regression; bb8d7952. |
 | [#70](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/70) | Praxis / Validator / Identity reviews page throws a React error and shows ambiguous dates | Pending detailed reproduction | — |
 | [#71](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/71) | Praxis / Validator / Opening an application that is not available shows a bare 404 page with no way back | Pending detailed reproduction | — |
 | [#72](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/72) | Praxis / Validator / Validator with no project assignment gets no hint why the queue is empty | Pending detailed reproduction | — |
@@ -238,7 +266,7 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#78](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/78) | Praxis / SME / Profile can be submitted after the SME cleared mandatory answers; the cleared answers are submitted | Implemented; browser retest pending | Clearing root cause shared with #76; submission gating retained. |
 | [#79](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/79) | Adi Labs/ [DEF-051] Links inside text on the Journey page are distinguishable only by colour | Pending detailed reproduction | — |
 | [#80](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/80) | Adi Labs/ [DEF-052] Small text on the login page is below the minimum colour contrast | Pending detailed reproduction | — |
-| [#81](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/81) | Adi Labs/ [DEF-053] Pages send no basic security headers (CSP, frame protection, nosniff, Referrer-Policy) | Pending detailed reproduction | — |
+| [#81](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/81) | Adi Labs/ [DEF-053] Pages send no basic security headers (CSP, frame protection, nosniff, Referrer-Policy) | Scope clarification emailed; unverified | Report points to ADI Interview staging; do not claim current Praxis headers fix another app. |
 | [#82](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/82) | Adi Labs/ [DEF-054] No Strict-Transport-Security (HSTS) header on pages or API | Pending detailed reproduction | — |
 | [#83](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/83) | Adi Labs/ [DEF-055] Pages reveal the server framework in the X-Powered-By header | Pending detailed reproduction | — |
 | [#84](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/84) | Adi Labs/ [DEF-056] 'Continue to Profile' on the Identity Verified page opens a job application instead of the profile | Pending detailed reproduction | — |
@@ -287,7 +315,7 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#127](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/127) | Praxis / SME / Numerical inputs do not allow the default zero to be fully erased | Pending detailed reproduction | — |
 | [#128](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/128) | Praxis / SME / Submission status message remains unchanged after validator review | Pending detailed reproduction | — |
 | [#129](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/129) | Praxis / SME / Task counts remain inconsistent after a not-accepted task is replaced | Pending detailed reproduction | — |
-| [#130](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/130) | Adi Labs/ [AL-DEF-064] Application id containing an encoded null character (%00) causes a server error (500) | Pending detailed reproduction | — |
+| [#130](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/130) | Adi Labs/ [AL-DEF-064] Application id containing an encoded null character (%00) causes a server error (500) | Scope clarification emailed; unverified | Report points to ADI Interview staging; absent current Praxis route. |
 | [#131](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/131) | Praxis / Finance / Payout reconciliation runs for a future date instead of refusing it | Pending detailed reproduction | — |
 | [#132](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/132) | Praxis / Finance / Partner statements can be built for a future month | Pending detailed reproduction | — |
 | [#133](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/133) | Praxis / PM / New-project wizard shows raw server validation text for invalid numbers | Pending detailed reproduction | — |
@@ -317,5 +345,5 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#157](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/157) | Praxis / Admin / Clicking Admin while the Tutorial page is still loading changes the URL to /users but keeps showing the Tutorial content | Pending detailed reproduction | — |
 | [#158](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/158) | Praxis / Admin / The dataset "after" parameter answers 500 "Something went wrong" for a very large number | Implemented; API regression passed | Bounded signed-bigint cursors. |
 | [#159](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/159) | Praxis / Admin / The dataset "after" parameter accepts -1 and an empty value and returns the data instead of a 400 | Implemented; API regression passed | Empty and negative cursors rejected. |
-| [#160](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/160) | Praxis / API / A 10 MB JSON body is answered with HTTP 500 and the plain text "Internal Server Error", with no request id | Pending detailed reproduction | — |
+| [#160](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/160) | Praxis / API / A 10 MB JSON body is answered with HTTP 500 and the plain text "Internal Server Error", with no request id | Fixed; live endpoint verified | Bounded proxy from first batch; live PM POST /projects 2/10 MiB both 413 with requestId. |
 | [#161](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/161) | Praxis / API / An unknown API route returns the default framework error with no request id | Implemented; API regression passed | Custom NOT_FOUND envelope with request ID. |

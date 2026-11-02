@@ -102,6 +102,11 @@ unverified. Synthetic examples and scripted results are not model-performance ev
 
 ## Hosted demo
 
+The verified YC release is `ddc8446b` / `yc-ddc8446b-20261101`.
+[Review the published application release](https://github.com/vasudevansundarababu-dev/adi-praxis/tree/codex/praxis-anvil-harbor).
+The default branch also contains these reviewer documents; its application code was
+not replaced as part of this documentation update.
+
 - [Praxis console](https://praxis-web-yu2jtyqhea-uc.a.run.app)
 - [Candidate application](https://praxis-candidate-yu2jtyqhea-uc.a.run.app)
 

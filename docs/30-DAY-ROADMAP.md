@@ -78,8 +78,8 @@ data licence or research validation is claimed. Use names publicly only with per
 Every accepted sample needs stable task/revision IDs; expert authorship and domain;
 synthetic or properly licensed provenance; actor/private visibility; executable
 constraints, deliverables and rubric; passing/failing validation cases; rights/privacy
-clearance; and a recorded qualified professor/guide review where required by the
-publication standard. Author declarations alone do not satisfy that review.
+clearance; and a recorded qualified professor/guide review before publication.
+Author declarations alone do not satisfy that review.
 
 Track authored, submitted, reworked, accepted, reviewed and published counts separately,
 alongside independent task families, variants, reviewer agreement and unresolved gaps.

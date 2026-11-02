@@ -97,6 +97,6 @@ do not imply a rerun of the whole application test suite at the later source rev
 
 The automated Anvil → Praxis SME review assignment → Anvil result API loop is roadmap
 work. Marketing, Banking and Commerce targets are 200–500 independently expert-authored
-samples each with documented professor/guide verification where required. Existing
+samples each with documented professor/guide verification before publication. Existing
 Banking goldens are synthetic software references. Proposed Wharton/Harvard/Bodhium
 and Banking-network channels are not endorsements or confirmed partnerships.

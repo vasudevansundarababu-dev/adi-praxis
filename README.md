@@ -9,7 +9,15 @@ Praxis supplies tasks. **ADI Anvil** independently validates imports, qualifies 
 packages, executes evaluations and retains diagnostic results. An export is not an
 Anvil rights approval or permission to spend money.
 
-## Review the implementation
+## YC review
+
+Start with these three documents:
+
+- [YC summary — one-page founder brief](docs/YC-REVIEW.md)
+- [Module guide — definitions and distinctive features](docs/MODULE-GUIDE.md)
+- [30-day roadmap — product delivery and expert taskbanks](docs/30-DAY-ROADMAP.md)
+
+[Hosted application URLs and sign-in steps](docs/REVIEWER-SIGN-IN.md).
 
 The console and partner login pages provide **Request access or password help**.
 Enter your email, choose **Open email request**, and send the prefilled request to
@@ -18,9 +26,7 @@ otherwise email the administrator directly. Do not include passwords. Administra
 arrange access manually; this link does not send mail, create accounts or reset
 passwords automatically. Candidate Google sign-in is a separate flow.
 
-**YC review:** [module definitions and features](docs/MODULE-GUIDE.md) ·
-[30-day product/recruiting roadmap](docs/30-DAY-ROADMAP.md) ·
-[verified hosted URLs and sign-in](docs/REVIEWER-SIGN-IN.md).
+## Review the implementation
 
 Start with [module definitions and distinctive features](docs/MODULE-GUIDE.md) for a
 product-by-product walkthrough of projects, staffing, expert onboarding, task authoring,

@@ -2,6 +2,36 @@
 
 ## Active request and checkpoint
 
+### Sixth batch deployed — 2 November 2026, morning handoff
+
+Verified runtime commit `f40e540f`, build `tester-f40e540f-20261102`, image tag
+`f40e540f-1793619217`; clean staging `/private/tmp/praxis-tester-release-f40e540f`.
+Database backup `1793619128950`, Cloud Build `ff186032-8cde-4807-bf4a-b846ad0aa6a4`
+and migration `praxis-migrate-m6c5f` all succeeded. Ready revisions serving 100%:
+API `praxis-api-00014-ffv`, worker `praxis-worker-00014-t6t`, console
+`praxis-web-00014-wtv`, candidate `praxis-candidate-00014-hqp`.
+Private before/after snapshots show environment values unchanged except release
+metadata. `DEPLOY_ONLY=1 SKIP_DEMO_SETUP=1`; no user/data reseeding or paid calls.
+
+Deployed checks passed: exact commit/build, DB/Redis readiness, both sign-in pages,
+existing PM login and consistent product 404 envelopes on API and both proxies.
+Issue-specific evidence is local: #121 and #168 browser regressions passed; #164
+decision guard passed in targeted/full API tests, but the original reported 500 still
+needs tester confirmation. No real review/identity decisions were made in GCP.
+API 478 passed / 29 files; focused browser 5 passed; typecheck/build/diff check passed.
+Full browser not repeated this batch (previous 17 passed / 1 deployment-only skip).
+Saved Admin credentials remain unmodified; authenticated deployed dataset tests not run.
+
+PR #5 is updated and remains draft; no issues closed and no main/default-branch change.
+Verified issue coverage is now 25 reports; #164 is a separate qualified guard, not
+counted as reproduced/fixed. Nine new reports (#162–#170) were inventoried; seven
+remain unimplemented, #168 is repaired and #164 is qualified above. The older backlog
+is also incomplete. Next independent work: #167 evidence links must preserve the
+decision-form tab; then finance pagination #163 and shared contrast #169/#170.
+Scope email for older ADI Interview #44/#81/#130 still awaits reply. Stop implementation
+at 06:00 America/Chicago; daytime monitor/triage only, then resume this durable state
+in the next authorized night window. Preserve unrelated generated configs and SDK files.
+
 ### Sixth batch — 2 November, 05:32 America/Chicago
 
 New reports #162–#170 bring the inventory to 170 (initial baseline remains 161).
@@ -523,7 +553,7 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#118](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/118) | Praxis / Finance / A pay run can be built for a week in 1999 while a week in 2035 is refused | Pending detailed reproduction | — |
 | [#119](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/119) | Praxis / Finance / A COMPLETED pay run can be submitted again (200 instead of 409) | Pending detailed reproduction | — |
 | [#120](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/120) | Praxis / Validator / Decision form pre-selects "Select for this pool": typing a reason and message alone selects the candidate | Pending detailed reproduction | — |
-| [#121](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/121) | Praxis / SME / Workbench edit is lost without warning when leaving with the "←" link within ~2.5 s of typing | Pending detailed reproduction | — |
+| [#121](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/121) | Praxis / SME / Workbench edit is lost without warning when leaving with the "←" link within ~2.5 s of typing | Fixed; browser regression passed and deployed | f40e540f; marked Back link waits for serialized latest draft save; failures retain edits. |
 | [#122](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/122) | Praxis / SME / W06 "Possible real data" check never flags a passport number in party identifiers (PAN is flagged) | Pending detailed reproduction | — |
 | [#123](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/123) | Praxis / SME / Workbench says "On a phone it is read-only" but its fields can still be edited and saved with keyboard focus | Fixed; tested and deployed | Viewport/native-control and autosave guards; keyboard/resize/desktop positive-control browser regression; 453b42de. |
 | [#124](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/124) | Praxis / PM / Candidate row numbering is not updated after rejecting a candidate | Pending detailed reproduction | — |

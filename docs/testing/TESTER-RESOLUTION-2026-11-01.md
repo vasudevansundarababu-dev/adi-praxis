@@ -48,6 +48,35 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+### Deployed batch — 2 November 2026
+
+First tested batch deployed successfully to the existing four GCP services. Release
+commit `bddecadc`, build `tester-bddecadc-20261102`, image tag `bddecadc-1793599892`.
+Cloud Build `b43d68bd-c8c1-42b7-a6f0-60671380ff31` succeeded; migration execution
+`praxis-migrate-5brkw` completed successfully. Backup `1793599794285` was SUCCESSFUL
+before rollout. DEPLOY_ONLY=1 and SKIP_DEMO_SETUP=1 preserved existing users/data;
+private before/after snapshots confirm runtime environment values unchanged except
+release build/commit metadata.
+
+Ready revisions: API `praxis-api-00009-6t9`, worker `praxis-worker-00009-679`, console
+`praxis-web-00009-b8f`, candidate `praxis-candidate-00009-s5x`, each serving 100% traffic.
+Deployed checks passed: exact version/build, database/Redis readiness, both sign-in pages,
+existing PM sign-in/session cookie, unknown-route product envelopes on API and both apps,
+unknown write fields (400) and oversized JSON (413) through both apps, OpenAPI operation
+authentication and mock-only entries. No paid calls, reseeding or issue closures.
+
+Limitations: the saved demo Admin password returned 401; it was not reset or substituted.
+Authenticated deployed dataset checks were therefore not run; local real-database cursor
+regressions passed. First Python smoke attempt failed on its local CA bundle; rerun with
+the system CA bundle passed TLS verification. No TLS checks were disabled.
+
+Verified fixes in this batch: #47, #66, #67, #76, #78, #117, #158, #159, #161.
+#51 has corrected readiness guidance; #77 remains a mitigation awaiting intermittent
+retest; #155 has verified authentication documentation but its separate partner-token
+observation remains unverified. No claim that all reports are resolved. PR #5 remains
+draft as the backlog continues. Next group: identity-review project access (#69),
+evidence upload state/progress (#62), role date validation (#59), then remaining matrix.
+
 ### Follow-up checkpoint — 2 November, 00:15 America/Chicago
 
 Hourly inventory refresh: no new/reopened reports or changed comment cursors.

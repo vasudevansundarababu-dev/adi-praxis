@@ -48,6 +48,34 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+### Fifth batch deployed — 2 November 2026
+
+Clean release `453b42de` / `tester-453b42de-20261102`, image tag
+`453b42de-1793615180`; checkout `/private/tmp/praxis-tester-release-453b42de`.
+Backup `1793615005477`, Cloud Build `87c30b17-20de-40d7-8a36-37bf5dae9a13` and
+migration `praxis-migrate-sngvk` succeeded. Ready/100% traffic revisions: API
+`praxis-api-00013-bd9`, worker `praxis-worker-00013-z6q`, console
+`praxis-web-00013-clt`, candidate `praxis-candidate-00013-jgc`.
+Before/after environment comparison matches except release metadata; DEPLOY_ONLY=1 /
+SKIP_DEMO_SETUP=1 preserved users/data. Deployed exact version, DB/Redis readiness,
+both sign-in pages, existing PM sign-in and API/proxy product 404 checks all passed.
+
+Additional verified reports #113 and #123. Local full API 478 passed, full browser
+17 passed / one deployment-only skip, all-package typecheck/build passed. Browser saves
+for the workbench fixture are intercepted and are UI checks, not production permission or
+model-performance evidence. Original profile hashes/versions remain unchanged in the
+resubmission regression. No paid calls, live identity decisions, issue closures or main
+merge. Existing Admin credential limitation and app-scope email question remain unchanged.
+
+Next: #121 lost edits on in-app back navigation. TaskPage owns the back link while
+useAutosave lives in its child; beforeunload does not protect that client navigation.
+The current save clears dirty before awaiting, so an in-flight save also needs guarding
+and serialization. Preserve optimistic revision checks, idempotency and active-time
+accounting. The guarded workbench UI fixture can test delayed saves and captured payloads;
+backend authority remains covered separately by real API tests. Then continue remaining
+workbench/finance/partner matrix. Night deadline remains 06:00 America/Chicago; do not
+restart an eight-hour clock. Keep all generated/unrelated edits and SDK artifacts intact.
+
 ### Fifth batch — 2 November, 04:25 America/Chicago
 
 Implemented #113: NEEDS_INFORMATION resubmission returns 409 PROFILE_UNCHANGED until
@@ -438,7 +466,7 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#110](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/110) | Praxis / SME / Accepted task is marked read-only without explaining why | Pending detailed reproduction | — |
 | [#111](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/111) | Praxis / SME / Required text fields accept special characters and numbers as input without meaningful validation | Pending detailed reproduction | — |
 | [#112](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/112) | Praxis / SME / Validation message points to W06 instead of identifying the W03 evidence issue | Pending detailed reproduction | — |
-| [#113](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/113) | Praxis / SME / After "More information requested" the SME can resubmit without updating the profile | Pending detailed reproduction | — |
+| [#113](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/113) | Praxis / SME / After "More information requested" the SME can resubmit without updating the profile | Fixed; tested and deployed | Transactional answer-change gate; unchanged/provenance-only rejection, rollback and frozen-history regressions; 453b42de. |
 | [#114](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/114) | Praxis / SME / Work preferences accepts a time zone that does not exist | Fixed; tested and deployed | IANA choice validation with known-alias canonicalization; invalid timezone creates no acknowledgement; 94dc7963. |
 | [#115](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/115) | Praxis / SME / Work preferences accepts a language level that does not exist | Fixed; tested and deployed | CEFR choice validation; invalid proficiency creates no acknowledgement; 94dc7963. |
 | [#116](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/116) | Praxis / PM / Project accepts a demographic filter on an attribute that does not exist | Pending detailed reproduction | — |
@@ -448,7 +476,7 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#120](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/120) | Praxis / Validator / Decision form pre-selects "Select for this pool": typing a reason and message alone selects the candidate | Pending detailed reproduction | — |
 | [#121](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/121) | Praxis / SME / Workbench edit is lost without warning when leaving with the "←" link within ~2.5 s of typing | Pending detailed reproduction | — |
 | [#122](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/122) | Praxis / SME / W06 "Possible real data" check never flags a passport number in party identifiers (PAN is flagged) | Pending detailed reproduction | — |
-| [#123](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/123) | Praxis / SME / Workbench says "On a phone it is read-only" but its fields can still be edited and saved with keyboard focus | Pending detailed reproduction | — |
+| [#123](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/123) | Praxis / SME / Workbench says "On a phone it is read-only" but its fields can still be edited and saved with keyboard focus | Fixed; tested and deployed | Viewport/native-control and autosave guards; keyboard/resize/desktop positive-control browser regression; 453b42de. |
 | [#124](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/124) | Praxis / PM / Candidate row numbering is not updated after rejecting a candidate | Pending detailed reproduction | — |
 | [#125](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/125) | Praxis / PM / Rejection confirmation message uses success styling | Pending detailed reproduction | — |
 | [#126](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/126) | Praxis / SME / Required repeatable fields are not marked as mandatory before clicking Add | Pending detailed reproduction | — |

@@ -221,9 +221,9 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
       <p className="text-sm text-fg-muted">{slot?.brief}</p>
       <p className="mt-2 rounded-md border border-line p-2 text-xs text-fg-muted md:hidden">The workbench is designed for a larger screen. On a phone it is read-only.</p>
 
-      <div className="mt-4 grid gap-6 md:grid-cols-[13rem_1fr]">
-        <nav aria-label="Workbench sections" className="md:sticky md:top-4 md:self-start">
-          <ol className="flex gap-2 overflow-x-auto md:flex-col">
+      <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-[13rem_minmax(0,1fr)]">
+        <nav aria-label="Workbench sections" className="min-w-0 md:sticky md:top-4 md:self-start">
+          <ol className="relative flex gap-2 overflow-x-auto md:flex-col">
             {draftable && (
               <li>
                 <button type="button" onClick={() => setSection('W00')} aria-current={section === 'W00' ? 'step' : undefined} className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm md:whitespace-normal ${section === 'W00' ? 'bg-surface font-semibold' : ''}`}>

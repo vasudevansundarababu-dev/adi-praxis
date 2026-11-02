@@ -222,6 +222,9 @@ export async function withdraw(tx: Tx, partnerId: string, id: string, audit: Aud
 export async function decideScreen(tx: Tx, clientId: string, ids: string[], decision: 'CONFIRM_NOT_MET' | 'MEETS', note: string, deciderId: string, audit: Audit) {
   const subs = await tx.partnerSubmission.findMany({ where: { id: { in: ids }, clientId } });
   if (subs.length !== new Set(ids).size) throw notFound('Submission not found');
+  if (decision === 'MEETS' && subs.some((s) => s.screen === 'CONFIRMED_NOT_MET')) {
+    throw new AppError(409, 'SCREEN_DECISION_FINAL', 'Rows already confirmed not met cannot be changed here.');
+  }
   const out = [];
   for (const s of subs) {
     if (s.screen === 'CONFIRMED_NOT_MET') {

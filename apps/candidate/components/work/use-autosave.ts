@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export type SaveState = { kind: 'idle' | 'saving' | 'saved' | 'error' | 'conflict'; at?: string; message?: string };
 
@@ -9,6 +10,7 @@ export type SaveState = { kind: 'idle' | 'saving' | 'saved' | 'error' | 'conflic
  * page is visible and the author did something in the last minute). Stale revisions surface as a conflict.
  */
 export function useAutosave<T extends Record<string, unknown>>(taskId: string, initial: T, initialRevision: number, readOnly: boolean) {
+  const router = useRouter();
   const [value, setValue] = useState<T>(initial);
   const [revision, setRevision] = useState(initialRevision);
   const [state, setState] = useState<SaveState>({ kind: 'idle' });
@@ -17,7 +19,10 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
   const lastInput = useRef(Date.now());
   const rev = useRef(initialRevision);
   const latest = useRef(value);
-  latest.current = value;
+  const readonlyNow = useRef(readOnly);
+  readonlyNow.current = readOnly;
+  const inFlight = useRef<Promise<boolean> | null>(null);
+  const navigating = useRef(false);
 
   useEffect(() => {
     if (readOnly) return;
@@ -38,33 +43,51 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
 
   // PUT is not in the shared browser helper, so this uses fetch directly (same Idempotency-Key rule).
   const put = useCallback(async () => {
-    if (readOnly || !dirty.current) return true;
-    dirty.current = false;
-    setState({ kind: 'saving' });
-    const delta = Math.min(600, active.current);
-    try {
-      const res = await fetch(`/api/v1/me/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
-        body: JSON.stringify({ output: latest.current, activeSecondsDelta: delta, expectedRevision: rev.current }),
-      });
-      const body = await res.json().catch(() => null);
-      if (res.ok) {
-        active.current -= delta;
-        rev.current = body.revision;
-        setRevision(body.revision);
-        setState({ kind: 'saved', at: body.savedAt });
-        return true;
+    // A flush drains edits made during a request, using each acknowledged revision once.
+    while (true) {
+      if (inFlight.current) {
+        if (!(await inFlight.current)) return false;
+        continue;
       }
-      dirty.current = true;
-      setState({ kind: body?.error === 'STALE_REVISION' ? 'conflict' : 'error', message: body?.message ?? 'Could not save' });
-      return false;
-    } catch {
-      dirty.current = true;
-      setState({ kind: 'error', message: 'Offline: your changes are kept here and will save when you reconnect.' });
-      return false;
+      if (!dirty.current) return true;
+      if (readonlyNow.current) {
+        setState({ kind: 'error', message: 'Your edits are unsaved. Return to an editable view to save before leaving.' });
+        return false;
+      }
+      dirty.current = false;
+      setState({ kind: 'saving' });
+      const delta = Math.min(600, active.current);
+      const expectedRevision = rev.current;
+      const payload = JSON.stringify({ output: latest.current, activeSecondsDelta: delta, expectedRevision });
+      const request = (async () => {
+        try {
+          const res = await fetch(`/api/v1/me/tasks/${taskId}`, {
+            method: 'PUT', headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() }, body: payload,
+          });
+          const body = await res.json().catch(() => null);
+          if (res.ok && body?.revision === expectedRevision + 1 && typeof body.savedAt === 'string') {
+            active.current -= delta;
+            rev.current = body.revision;
+            setRevision(body.revision);
+            if (!dirty.current) setState({ kind: 'saved', at: body.savedAt });
+            return true;
+          }
+          dirty.current = true;
+          setState({ kind: res.ok || body?.error === 'STALE_REVISION' ? 'conflict' : 'error', message: res.ok ? 'Save confirmation could not be verified. Reload before continuing.' : body?.message ?? 'Could not save' });
+          return false;
+        } catch {
+          dirty.current = true;
+          setState({ kind: 'error', message: 'Offline: your changes are kept here and will save when you reconnect.' });
+          return false;
+        }
+      })();
+      inFlight.current = request;
+      let saved: boolean;
+      try { saved = await request; }
+      finally { if (inFlight.current === request) inFlight.current = null; }
+      if (!saved) return false;
     }
-  }, [readOnly, taskId]);
+  }, [taskId]);
 
   useEffect(() => {
     if (readOnly || !dirty.current) return;
@@ -81,17 +104,42 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
 
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
-      if (dirty.current) e.preventDefault();
+      if (dirty.current || inFlight.current) { e.preventDefault(); e.returnValue = ''; }
     };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, []);
 
+  // The workbench's in-app back link does not trigger beforeunload.
+  useEffect(() => {
+    let active = true;
+    const leave = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || (!dirty.current && !inFlight.current)) return;
+      const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[data-save-before-leaving]') : null;
+      if (!anchor || anchor.hasAttribute('download') || (anchor.target && anchor.target !== '_self')) return;
+      const destination = new URL(anchor.href, window.location.href);
+      if (destination.origin !== window.location.origin) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (navigating.current) return;
+      navigating.current = true;
+      void put().then((saved) => {
+        navigating.current = false;
+        if (saved && active) router.push(destination.pathname + destination.search + destination.hash);
+      });
+    };
+    document.addEventListener('click', leave, true);
+    return () => { active = false; document.removeEventListener('click', leave, true); };
+  }, [put, router]);
+
   const update = useCallback((next: T | ((prev: T) => T)) => {
-    if (readOnly) return;
+    if (readonlyNow.current) return;
     dirty.current = true;
-    setValue(next);
-  }, [readOnly]);
+    const updated = typeof next === 'function' ? next(latest.current) : next;
+    latest.current = updated;
+    setValue(updated);
+    setState((s) => s.kind === 'saved' ? { kind: 'idle' } : s);
+  }, []);
 
   return { value, update, revision, currentRevision: useCallback(() => rev.current, []), state, flush: put };
 }

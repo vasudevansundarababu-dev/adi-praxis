@@ -2,6 +2,55 @@
 
 ## Active request and checkpoint
 
+### Sixth batch — 2 November, 05:32 America/Chicago
+
+New reports #162–#170 bring the inventory to 170 (initial baseline remains 161).
+No issues are closed. This checkpoint precedes rollout; deployed runtime remains
+453b42de until the subsequent deployment evidence says otherwise.
+
+- #121: the workbench Back link waits for the latest draft save. PUTs are serialized,
+  edits made during a request are drained with the next acknowledged revision, and
+  conflicts/invalid acknowledgements retain edits and prevent navigation. Scope is
+  this marked Back link plus native unload warning, not every browser-history action.
+- #168: reproduced document width 1621px at a 360px viewport. Constrained grid tracks,
+  allowed the section rail to shrink, and contained positioned accessibility labels
+  inside its scroll container. Regression checks no document overflow and W06 access
+  at 360/640px; the existing phone read-only/desktop-edit positive control remains.
+- #164: reject attempts to reverse CONFIRMED_NOT_MET with 409 SCREEN_DECISION_FINAL
+  before any bulk writes. Original reported 500 was not reproduced: inspected source
+  silently returned the finalized row. Regression verifies 409, unchanged rows and
+  unchanged audit count. Tester confirmation of the original deployed case is pending.
+
+Passed: `pnpm exec playwright test -c e2e tester-workbench.spec.ts` (5 tests, 22.2s),
+including immediate departure, edits during in-flight save, conflict and malformed
+acknowledgement; targeted `vitest run test/supply-a.test.ts` (19 tests).
+Initial overflow regressions failed as expected; first grid-only repair still failed
+because absolutely positioned screen-reader labels escaped the rail. Both were fixed
+before the final passing run. Full API/typecheck/build results are recorded below
+once complete. Final checks passed: `pnpm --filter @praxis/api test` (478 tests,
+29 files), `pnpm typecheck`, `pnpm build` and `git diff --check`.
+Full browser suite was not repeated for this batch; prior full run
+was 17 passed / 1 deployment-only skip. No paid calls or real identity decisions.
+
+New issue triage: #162 mock credential replay needs policy/reproduction review;
+#163 pay-run pagination, #165 duplicate-application guidance, #166 decline-reason
+visibility, #167 evidence-link navigation and #169/#170 contrast remain unimplemented.
+#168 is locally reproduced/repaired; #164 has the qualified guard above. Existing
+scope email for ADI Interview reports #44/#81/#130 has no reply. Preserve the older
+unverified backlog and continue at the next authorized night window after 06:00.
+
+| New report | Status at this checkpoint | Evidence / next step |
+| --- | --- | --- |
+| [#162](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/162) | Pending | Mock credential replay policy and production-boundary review. |
+| [#163](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/163) | Pending | Pay-run list pagination beyond 60 rows. |
+| [#164](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/164) | Guard tested locally; original 500 unverified | Final decision reversal returns 409; no row/audit mutation. |
+| [#165](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/165) | Pending | Candidate duplicate-application wording/resume destination. |
+| [#166](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/166) | Pending | PM staffing decline-reason visibility. |
+| [#167](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/167) | Source confirmed; pending | Evidence link currently replaces decision-form tab. |
+| [#168](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/168) | Reproduced; browser regression passed locally | Document width and last section reachability at 360/640px. |
+| [#169](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/169) | Pending | Dark-theme pill contrast. |
+| [#170](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/170) | Pending | Build-chip warning contrast. |
+
 User authorized analysis/fixes for all issues in `vasudevansundarababu-dev/adi-praxis-testing`,
 a reviewed Praxis PR, and deployment to the existing GCP test environment. They also
 requested ongoing monitoring and authorized input-request emails to admin@adi-labs.ai.

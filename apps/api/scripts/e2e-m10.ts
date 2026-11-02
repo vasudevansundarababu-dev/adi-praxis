@@ -41,7 +41,7 @@ if (cmd === 'select') {
   const candidate = await db.candidate.upsert({ where: { smeUserId: user.id }, create: { clientId: client.id, smeUserId: user.id, specialties: [], jurisdictions: [], skills: [] }, update: {} });
   const domain = await db.domain.findFirst({ where: { clientId: client.id, name: 'Banking' } }) ?? await db.domain.create({ data: { clientId: client.id, name: 'Banking' } });
   const template = await db.template.findFirst({ where: { clientId: client.id, domainId: domain.id, workflowName: 'KYC onboarding and refresh' } }) ?? await db.template.create({ data: { clientId: client.id, domainId: domain.id, lineageId: randomUUID(), workflowName: 'KYC onboarding and refresh', status: 'PUBLISHED', skills: [], taskModes: ['AUTHORING'] } });
-  const project = await db.project.create({ data: { clientId: client.id, ownerId: admin.id, templateId: template.id, templateVersion: template.version, name: 'SYNTHETIC workbench UI fixture', status: 'IN_PROGRESS' } });
+  const project = await db.project.create({ data: { clientId: client.id, ownerId: admin.id, templateId: template.id, templateVersion: template.version, name: `SYNTHETIC workbench UI fixture ${randomUUID()}`, status: 'IN_PROGRESS' } });
   const task = await db.taskInstance.create({ data: { clientId: client.id, projectId: project.id, taskType: 'AUTHORING', assignedToId: candidate.id, status: 'IN_PROGRESS', output: { header: { title: 'SYNTHETIC workbench UI fixture' } } } });
   console.log(JSON.stringify({ taskId: task.id, projectId: project.id }));
 } else {

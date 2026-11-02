@@ -353,6 +353,11 @@ describe('M10a SME supply: partners, Partner API, requisitions and submissions (
       const audit = await db.auditEvent.findMany({ where: { entityId: ids[0]!, action: 'supply.screen.confirmed_not_met' } });
       expect(audit).toHaveLength(1);
       expect(audit[0]!.actorType).toBe('USER');
+      const reverse = await post(validator, '/partner-submissions/screen-decisions', { submissionIds: ids, decision: 'MEETS', note: 'Try changing a final row' });
+      expect(reverse.statusCode).toBe(409);
+      expect(reverse.json().error).toBe('SCREEN_DECISION_FINAL');
+      expect((await db.partnerSubmission.findMany({ where: { id: { in: ids } } })).every((s) => s.screen === 'CONFIRMED_NOT_MET')).toBe(true);
+      expect(await db.auditEvent.count({ where: { entityId: ids[0]!, action: 'supply.screen.confirmed_not_met' } })).toBe(1);
     });
 
     it('invites: a reminder on day 3, expiry on day 7 (then the link no longer works)', async () => {

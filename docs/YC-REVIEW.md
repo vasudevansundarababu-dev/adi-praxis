@@ -42,6 +42,20 @@ coverage or proof of a current passing full suite. No code-coverage percentage i
 
 ## Publication preparation
 
+### YC deployment verified, 1 November2026 (America/Chicago)
+
+Application commit `ddc8446b`, build `yc-ddc8446b-20261101` deployed to the four existing
+Cloud Run services. Cloud Build10a125b2-c9e4-47f5-8fe0-cd40507092a1 succeeded; migration
+execution `praxis-migrate-2qpbs` succeeded. Console login and candidate endpoints return200;
+the version endpoint reports the exact build and commit; `/readyz` confirms PostgreSQL
+and Redis. The attempted `/api/v1/health` and `/healthz` paths returned404 and are not
+counted as passing checks. SQL backup1793593073237 completed successfully before migration.
+No user/database reset or demo setup ran. Local typechecks,121 shared tests and452 API
+tests passed before rollout. No live Vertex call or email/payout test was made.
+Current smoke checks are unauthenticated availability/version checks; user sign-in uses
+existing assigned accounts. The read-only branch/tag history scan found no actual provider
+keys/private keys; only the reviewed release branch was pushed, excluding local Codex refs.
+
 Existing remote: `https://github.com/vasudevansundarababu-dev/adi-praxis.git`.
 The user subsequently authorized public publication and an existing-target GCP release
 on1 November2026. The earlier documentation-only restriction is superseded for this

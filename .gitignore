@@ -9,6 +9,7 @@ dist/
 test-results/
 playwright-report/
 out/
+tester-email*/
 coverage/
 *.tsbuildinfo
 .env

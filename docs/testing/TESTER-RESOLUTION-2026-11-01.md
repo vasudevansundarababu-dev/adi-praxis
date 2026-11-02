@@ -48,6 +48,40 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+### Third batch deployed — 2 November 2026
+
+Release `94dc7963` / `tester-94dc7963-20261102`, image tag `94dc7963-1793607676`,
+built from clean detached checkout `/private/tmp/praxis-tester-release-94dc7963`.
+Backup `1793607314505` succeeded before rollout. Clean Cloud Build
+`2542564e-f34b-4300-801e-329d2e2db774` and migration `praxis-migrate-bn69s` succeeded.
+All services Ready/100% traffic: API `praxis-api-00011-gpp`, worker
+`praxis-worker-00011-qhc`, console `praxis-web-00011-2dj`, candidate
+`praxis-candidate-00011-z2n`. Existing runtime environment values are unchanged except
+release metadata. DEPLOY_ONLY=1 / SKIP_DEMO_SETUP=1; users/data preserved.
+
+Passed post-deployment: exact commit/build, DB/Redis readiness, both sign-in pages,
+existing PM sign-in and product 404 envelopes on API and both app proxies. No paid calls
+or real identity decisions. Local suite: 476 API tests, expanded browser journey,
+all-package typecheck/build passed. Additional verified reports: #49, #101, #114, #115.
+No issues closed. Existing Admin credential limitation remains; not reset or retried.
+
+Release packaging correction: working-folder uploads included ignored output and tester
+email artifacts, plus generated config changes. Initial third build
+`75c1fc4e-43f6-4234-b432-35276931c6a7` was cancelled before migrations/rollout. The clean
+replacement uploaded only 616 files / 49.5 MiB instead of 734 / 607.4 MiB. No local files
+were discarded. `.gcloudignore` now includes `.gitignore` and excludes tester-email*,
+.local and desktop metadata; filename audit finds zero output/email/log artifacts.
+Prior source archives were not deleted; their bucket has uniform access controls and
+no public IAM binding. No IAM policy changes were made for this packaging correction.
+
+For future releases, build from a clean isolated checkout of the reviewed commit, not
+the working folder. Preserve the original checkout's unrelated/generated edits and SDK.
+Next work: candidate eligibility (#50), status/journey clarity (#52/#57/#60), unchanged
+resubmission (#113), then workbench and finance/partner matrix. Scope question email is
+still awaiting reply; latest inventory/comment refresh found no changes and REST comment
+counts confirm all comments were fetched for all 161 reports. Content hashes are stored
+only in ignored monitor state to distinguish substantive edits from timestamp noise.
+
 ### Third batch — 2 November, 02:20 America/Chicago
 
 Implemented #49: browser rejects evidence larger than 10 MiB before dispatch; file input
@@ -257,7 +291,7 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#46](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/46) | Adi Labs/ [DEF-050] Valid PDF with a very long file name is rejected with a misleading message | Pending detailed reproduction | — |
 | [#47](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/47) | Praxis / SME / Profile form saves bank account, IBAN, PAN and Aadhaar numbers without redaction | Implemented; persistence test passed; browser retest pending | Manual correction redaction; sme-profile.test.ts, 31 passed. |
 | [#48](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/48) | Praxis / SME / AI profile chat fails on every answer with "I couldn't process that answer just now" | Pending detailed reproduction | — |
-| [#49](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/49) | Praxis / SME / Evidence upload of 10 MB or more fails with a server error and only "Upload failed" | Pending detailed reproduction | — |
+| [#49](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/49) | Praxis / SME / Evidence upload of 10 MB or more fails with a server error and only "Upload failed" | Fixed; tested and deployed | 10 MiB accepted; larger files rejected before browser dispatch; API boundary and same-file retry tests; 94dc7963. |
 | [#50](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/50) | Praxis / SME / Under-18 candidate can still start an application and is told to "finish identity verification" | Pending detailed reproduction | — |
 | [#51](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/51) | Praxis / SME / Review page says "You can still submit" but Confirm and submit stays disabled when questions are skipped | Pending detailed reproduction | — |
 | [#52](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/52) | Praxis / SME / Application status page shows "Verify identity" and "Build profile" as done when they are not | Pending detailed reproduction | — |
@@ -309,7 +343,7 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#98](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/98) | Praxis / SME / Evidence upload control looks the same when disabled and enabled, with no button styling | Pending detailed reproduction | — |
 | [#99](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/99) | Praxis / Finance / Cancelled pay run's week range changes after creating another draft for the same week | Pending detailed reproduction | — |
 | [#100](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/100) | Praxis / Validator / Retry assessment provides no clear progress or completion feedback | Pending detailed reproduction | — |
-| [#101](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/101) | Praxis / SME / Duplicate language entries are accepted | Pending detailed reproduction | — |
+| [#101](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/101) | Praxis / SME / Duplicate language entries are accepted | Fixed; tested and deployed | Unique-language UI and API validation; checklist unchanged on invalid data; 94dc7963. |
 | [#102](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/102) | Praxis / SME / Completed onboarding incorrectly prompts user to start onboarding again | Pending detailed reproduction | — |
 | [#103](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/103) | Praxis / SME / Home page incorrectly shows onboarding as pending after completion | Pending detailed reproduction | — |
 | [#104](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/104) | Praxis / PM / Completed and selected SME is not available for assignment | Pending detailed reproduction | — |
@@ -322,8 +356,8 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#111](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/111) | Praxis / SME / Required text fields accept special characters and numbers as input without meaningful validation | Pending detailed reproduction | — |
 | [#112](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/112) | Praxis / SME / Validation message points to W06 instead of identifying the W03 evidence issue | Pending detailed reproduction | — |
 | [#113](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/113) | Praxis / SME / After "More information requested" the SME can resubmit without updating the profile | Pending detailed reproduction | — |
-| [#114](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/114) | Praxis / SME / Work preferences accepts a time zone that does not exist | Pending detailed reproduction | — |
-| [#115](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/115) | Praxis / SME / Work preferences accepts a language level that does not exist | Pending detailed reproduction | — |
+| [#114](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/114) | Praxis / SME / Work preferences accepts a time zone that does not exist | Fixed; tested and deployed | IANA choice validation with known-alias canonicalization; invalid timezone creates no acknowledgement; 94dc7963. |
+| [#115](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/115) | Praxis / SME / Work preferences accepts a language level that does not exist | Fixed; tested and deployed | CEFR choice validation; invalid proficiency creates no acknowledgement; 94dc7963. |
 | [#116](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/116) | Praxis / PM / Project accepts a demographic filter on an attribute that does not exist | Pending detailed reproduction | — |
 | [#117](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/117) | Praxis / PM / Write endpoints accept unknown extra fields although the API document forbids them | Implemented; API regression passed | Strict write objects; unknown fields rejected. |
 | [#118](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/118) | Praxis / Finance / A pay run can be built for a week in 1999 while a week in 2035 is refused | Pending detailed reproduction | — |

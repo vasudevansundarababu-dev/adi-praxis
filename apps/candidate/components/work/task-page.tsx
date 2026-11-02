@@ -11,9 +11,9 @@ import { SubmitPanel } from './submit-panel';
 import { useAutosave, type SaveState } from './use-autosave';
 
 export function SaveIndicator({ state, readOnly }: { state: SaveState; readOnly: boolean }) {
-  if (readOnly) return <span className="rounded-full border border-line px-2 py-0.5 text-xs">Read-only</span>;
+  if (readOnly && state.kind !== 'error' && state.kind !== 'conflict') return <span className="rounded-full border border-line px-2 py-0.5 text-xs">Read-only</span>;
   const text =
-    state.kind === 'saving' ? 'Saving…' : state.kind === 'saved' ? `Saved ${new Date(state.at!).toLocaleTimeString()}` : state.kind === 'conflict' ? 'Changed in another window: reload to continue' : state.kind === 'error' ? state.message : 'All changes save automatically';
+    state.kind === 'saving' ? 'Saving…' : state.kind === 'saved' ? `Saved ${new Date(state.at!).toLocaleTimeString()}` : state.kind === 'conflict' ? state.message ?? 'Changed in another window: reload to continue' : state.kind === 'error' ? state.message : 'All changes save automatically';
   return (
     <span aria-live="polite" className={`text-xs ${state.kind === 'error' || state.kind === 'conflict' ? 'text-error' : 'text-fg-muted'}`}>
       {text}
@@ -27,7 +27,7 @@ export function TaskPage({ task }: { task: TaskView }) {
   const done = () => router.push(`/projects/${task.projectId}?submitted=${task.id}`);
   return (
     <div>
-      <Link href={`/projects/${task.projectId}`} className="text-sm text-link hover:underline">
+      <Link href={`/projects/${task.projectId}`} data-save-before-leaving className="text-sm text-link hover:underline">
         ← {task.projectName}
       </Link>
       <p className="mt-1 text-xs text-fg-muted">

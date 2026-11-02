@@ -23,7 +23,7 @@ import {
   type KycTask,
   type KycToolResponse,
 } from '@praxis/shared';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { Req, RequiredNote } from '@/components/required';
 import type { TaskView } from '@/lib/work-types';
 import { SectionDraftBanner, StartPanel, useDrafting } from './drafting';
@@ -32,6 +32,13 @@ import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
 
 const input = 'mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5 disabled:opacity-70';
+const PHONE_QUERY = '(max-width: 767px)';
+const phoneSnapshot = () => window.matchMedia(PHONE_QUERY).matches;
+const subscribePhone = (notify: () => void) => {
+  const query = window.matchMedia(PHONE_QUERY);
+  query.addEventListener('change', notify);
+  return () => query.removeEventListener('change', notify);
+};
 const label = (s: string) => s.toLowerCase().replace(/_/g, ' ');
 const nextId = (prefix: string, ids: string[]) => {
   let n = 1;
@@ -172,7 +179,10 @@ function RecordedCall({ r, setR, tools }: { r: KycToolResponse; setR: (next: Kyc
 /** TASK-KYC section 4: the guided author workbench W01 to W06, with autosave and a progress rail. Desktop-first. */
 export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitted: () => void }) {
   const slot = task.input.slot ?? null;
-  const { value, update, currentRevision, state, flush } = useAutosave<KycTask & Record<string, unknown>>(task.id, (task.output ?? { header: {} }) as KycTask & Record<string, unknown>, task.revision, task.readOnly);
+  // Fail closed during hydration, then follow the same breakpoint as the phone notice.
+  const phone = useSyncExternalStore(subscribePhone, phoneSnapshot, () => true);
+  const readOnly = task.readOnly || phone;
+  const { value, update, currentRevision, state, flush } = useAutosave<KycTask & Record<string, unknown>>(task.id, (task.output ?? { header: {} }) as KycTask & Record<string, unknown>, task.revision, readOnly);
   // M9: KYC authoring tasks can start from a document, a transcript or an AI interview (W00).
   const draftable = task.definition === 'kyc-onboarding-v1' && task.taskType === 'AUTHORING';
   const drafting = useDrafting(task.id, draftable);
@@ -181,7 +191,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
   const drafted = drafting.view?.sections ?? {};
   const [sample, setSample] = useState<{ source: string; output: KycTask | null } | null>(null);
   // While a draft is being written the editor is paused, so nothing typed is lost when the draft lands.
-  const ro = task.readOnly || drafting.running;
+  const ro = readOnly || drafting.running;
   const gen = useMemo(() => syntheticGenerator(`${task.id}:${Date.now()}`), [task.id]);
   const checks = useMemo(() => kycChecks(value, slot ? { edgeCase: slot.edgeCase, isOpen: slot.isOpen } : null), [value, slot]);
   const sectionOk = (id: string) => checks.filter((c) => c.section === id).every((c) => c.ok || c.severity === 'warning');
@@ -211,9 +221,9 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
       <p className="text-sm text-fg-muted">{slot?.brief}</p>
       <p className="mt-2 rounded-md border border-line p-2 text-xs text-fg-muted md:hidden">The workbench is designed for a larger screen. On a phone it is read-only.</p>
 
-      <div className="mt-4 grid gap-6 md:grid-cols-[13rem_1fr]">
-        <nav aria-label="Workbench sections" className="md:sticky md:top-4 md:self-start">
-          <ol className="flex gap-2 overflow-x-auto md:flex-col">
+      <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-[13rem_minmax(0,1fr)]">
+        <nav aria-label="Workbench sections" className="min-w-0 md:sticky md:top-4 md:self-start">
+          <ol className="relative flex gap-2 overflow-x-auto md:flex-col">
             {draftable && (
               <li>
                 <button type="button" onClick={() => setSection('W00')} aria-current={section === 'W00' ? 'step' : undefined} className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm md:whitespace-normal ${section === 'W00' ? 'bg-surface font-semibold' : ''}`}>
@@ -262,7 +272,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
           )}
 
           {section !== 'W00' && section !== 'W06' && <RequiredNote />}
-          {section !== 'W00' && section !== 'W06' && <SectionDraftBanner taskId={task.id} section={section} state={drafted[section]} running={drafting.running} readOnly={task.readOnly} onChanged={() => void drafting.load()} beforeDraft={flush} />}
+          {section !== 'W00' && section !== 'W06' && <SectionDraftBanner taskId={task.id} section={section} state={drafted[section]} running={drafting.running} readOnly={ro} onChanged={() => void drafting.load()} beforeDraft={flush} />}
 
           {section === 'W01' && (
             <section className="space-y-4">
@@ -530,7 +540,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
             </ul>
           )}
         </fieldset>
-        {section === 'W00' && <StartPanel taskId={task.id} drafting={drafting} onBlank={() => setSection('W01')} beforeDraft={flush} readOnly={task.readOnly} />}
+        {section === 'W00' && <StartPanel taskId={task.id} drafting={drafting} onBlank={() => setSection('W01')} beforeDraft={flush} readOnly={ro} />}
         {/* W06 sits in the same column as the other sections (outside the fieldset so its own controls stay usable). */}
         {section === 'W06' && !ro && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={setSection} />}
         {section === 'W06' && ro && <p>This task is read-only.</p>}

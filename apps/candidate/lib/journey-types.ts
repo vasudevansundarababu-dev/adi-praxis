@@ -1,6 +1,7 @@
 export interface EnrollmentStatusView {
   id: string;
   status: string;
+  submittedAt: string | null;
   statusText: string;
   title: string;
   message: string | null;

@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./theme": "./theme/tokens.ts",
+    "./api-proxy": "./src/api-proxy.ts",
     "./theme/theme.css": "./theme/theme.css",
     "./brand/*": "./brand/*",
     "./security-headers": {

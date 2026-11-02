@@ -132,6 +132,7 @@ export const CandidateMeDto = z.object({
   /** Scoped badge text, e.g. "Identity verified" or "Identity verified (alternative process)". */
   identityLabel: z.string(),
   identityProblem: z.string().nullable(),
+  applicationBlockReason: z.string().nullable(),
   nextStep: CandidateNextStep,
   enrollments: z.array(
     z.object({ id: z.string().uuid(), opportunityId: z.string().uuid(), title: z.string(), status: z.string() }),

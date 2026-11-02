@@ -1,4 +1,4 @@
-import { expect, request as pwRequest, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, request as pwRequest, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
@@ -25,8 +25,16 @@ First check the company registry for the customer. Then resolve the ownership st
 
 const fixture = (...args: string[]) => JSON.parse(execFileSync('pnpm', ['--silent', '--filter', '@praxis/api', 'exec', 'tsx', 'scripts/e2e-m10.ts', ...args], { encoding: 'utf8' }).trim().split('\n').pop()!);
 
+const apiContexts: APIRequestContext[] = [];
+const manualPages: Page[] = [];
+async function manualPage(browser: Browser) {
+  const page = await browser.newPage();
+  manualPages.push(page);
+  return page;
+}
 async function staff(email: string, password: string) {
   const ctx = await pwRequest.newContext({ baseURL: `${API}/api/v1/`, extraHTTPHeaders: {} });
+  apiContexts.push(ctx);
   const res = await ctx.post('auth/login', { data: { email, password } });
   expect(res.status(), await res.text()).toBe(200);
   return ctx;
@@ -47,6 +55,13 @@ test.beforeAll(async () => {
   admin = await staff('admin@e2e.local', 'e2e-admin-password');
   pm = await staff('pm@e2e.local', 'e2e-pm-password');
   validator = await staff('validator@e2e.local', 'e2e-validator-password');
+});
+
+test.afterAll(async () => {
+  await Promise.all(apiContexts.splice(0).map((context) => context.dispose()));
+});
+test.afterEach(async () => {
+  await Promise.all(manualPages.splice(0).map((page) => page.context().close()));
 });
 
 /** A published STAFFING project with SME supply on, a partner with a portal user, and an open requisition. */
@@ -172,7 +187,7 @@ test('a candidate completes the course, takes the test and sees the result', asy
 
 test('a pay run is built, confirmed by a PM, approved by Finance and submitted', async ({ browser }) => {
   fixture('payable');
-  const f = await browser.newPage();
+  const f = await manualPage(browser);
   await staffLogin(f, 'finance@e2e.local', 'e2e-finance-password');
   await f.goto(`${WEB}/payments/pay-runs`);
   await expect(f.getByRole('heading', { level: 1 })).toHaveText('Pay runs');
@@ -189,7 +204,7 @@ test('a pay run is built, confirmed by a PM, approved by Finance and submitted',
   // Finance cannot approve before a PM confirms.
   await expect(f.getByRole('button', { name: 'Approve pay run' })).toHaveCount(0);
 
-  const p = await browser.newPage();
+  const p = await manualPage(browser);
   await staffLogin(p, 'pm@e2e.local', 'e2e-pm-password');
   await p.goto(runUrl);
   await p.getByRole('button', { name: 'Confirm pay run' }).click();
@@ -226,7 +241,7 @@ test('a partner opens Tutorials: the partner video and guide, never the staff fi
 
 test('an Admin adds a partner portal user with a temporary password; the partner chooses their own at first sign-in', async ({ browser }) => {
   const s = await supply();
-  const page = await browser.newPage();
+  const page = await manualPage(browser);
   await staffLogin(page, 'admin@e2e.local', 'e2e-admin-password');
   await page.goto(`${WEB}/partners/${s.partnerId}`);
   const email = `ops2.${Date.now()}@partner.example`;
@@ -237,7 +252,7 @@ test('an Admin adds a partner portal user with a temporary password; the partner
   await expect(box).toBeVisible();
   const temporary = (await box.locator('code').innerText()).trim();
 
-  const p = await browser.newPage();
+  const p = await manualPage(browser);
   await p.goto(`${WEB}/partner/login`);
   await p.waitForLoadState('networkidle');
   await p.getByLabel('Work email').fill(email);

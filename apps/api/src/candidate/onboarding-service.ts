@@ -5,6 +5,9 @@ import {
   identityEligible,
   ISO_COUNTRIES,
   ISO_LANGUAGES,
+  IANA_TIME_ZONES,
+  canonicalTimeZone,
+  CEFR_LEVELS,
   ONBOARDING_ITEMS,
   PreferencesAnswer,
   ProfileData,
@@ -119,7 +122,11 @@ export async function acknowledge(
       if (!p.success) throw badRequest('Complete your country, languages, time zone and weekly hours.');
       if (!COUNTRIES.has(p.data.country)) throw badRequest('Choose a valid country.');
       if (p.data.languages.some((l) => !LANGUAGES.has(l.language))) throw badRequest('Choose valid languages.');
-      data = p.data;
+      if (p.data.languages.some((l) => !CEFR_LEVELS.some((level) => level.value === l.level))) throw badRequest('Choose a listed proficiency level for each language.');
+      if (new Set(p.data.languages.map((l) => l.language)).size !== p.data.languages.length) throw badRequest('Choose each language only once.');
+      const timezone = canonicalTimeZone(p.data.timezone);
+      if (!IANA_TIME_ZONES.includes(timezone)) throw badRequest('Choose a listed time zone.');
+      data = { ...p.data, timezone };
       break;
     }
     default:

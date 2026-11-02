@@ -34,7 +34,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
   const campaignId = campaign && /^[0-9a-f-]{36}$/i.test(campaign) ? campaign : undefined;
 
   const apply =
-    o.status === 'PUBLISHED' ? (
+    me?.applicationBlockReason ? <p role="status" className="mt-4 rounded-md border border-line p-3 text-sm">{me.applicationBlockReason}</p> : o.status === 'PUBLISHED' ? (
       <StartProfileButton opportunityId={o.id} campaignId={campaignId} signedIn={!!me} autoStart={start === '1'} />
     ) : (
       <p className="mt-4 rounded-md border border-line p-3 text-sm">This opportunity is closed to new applications.</p>

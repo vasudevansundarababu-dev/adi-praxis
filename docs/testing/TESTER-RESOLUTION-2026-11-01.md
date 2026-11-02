@@ -48,6 +48,34 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+### Fifth batch — 2 November, 04:25 America/Chicago
+
+Implemented #113: NEEDS_INFORMATION resubmission returns 409 PROFILE_UNCHANGED until
+answers change. A separate deterministic answer projection excludes provenance-only
+changes, generated episode/claim IDs and ordering. The existing immutable profileHash
+is unchanged and still covers full provenance. Regression covers direct resubmission
+without an amendment, unchanged-value editing, transaction rollback/no extra version or
+assessment, successful changed-answer resubmission, and exact preservation of the frozen
+original profile/decision history.
+
+Implemented #123: phone workbench uses a subscribed viewport state, native disabled
+controls and an autosave update guard; draft actions obey the same read-only state.
+Hydration starts read-only. A guarded local UI fixture verifies keyboard attempts cannot
+change values or issue saves on phone, desktop editing invokes autosave, and resizing
+back restores read-only behavior. Browser saves are intercepted for this UI-only fixture;
+staffing/identity/permission gates in the running app are not bypassed or changed.
+
+Passed: targeted selection suite 34 tests; all-package typecheck; full API 478/478 in
+29 files; full browser 17 passed / one deployment-only skip, clean exit after slow shutdown
+(5.7 minutes); production build. Initial test helper incorrectly expected the success-only
+submit helper to return a response; corrected to the real request helper. The initial
+workbench query omitted the accessible required suffix; corrected to the actual label.
+An optional bounded diagnostic run was stopped when the original full run completed;
+it is not counted as a passing test. No paid calls, production identity decisions,
+issue closures or main merge. This batch is not deployed at this checkpoint. Continue
+with successful backup verification, clean release checkout and actual rollout checks.
+No new tester changes or reply to the pending scope email were found.
+
 ### Fourth batch deployed — 2 November 2026
 
 Clean release commit `d1eaa89d`, build `tester-d1eaa89d-20261102`, image tag

@@ -18,6 +18,7 @@ import {
   policyFor,
   processCandidateTurn,
   profileHash,
+  sameProfileAnswers,
 } from '../candidate/profile-service';
 import { detectSensitive } from '../candidate/sensitive';
 import { applicationBlockReason } from '../candidate/identity-service';
@@ -271,6 +272,12 @@ export const profileRoutes: FastifyPluginAsyncZod<ProfileDeps> = async (app, dep
         if (e.status === 'NEEDS_INFORMATION') await ensureAmendmentDraft(tx, e);
         const draft = (await draftProfile(tx, e.id))!;
         const profile = ProfileData.parse(draft.data);
+        if (e.status === 'NEEDS_INFORMATION' && e.profileVersionId) {
+          const previous = await tx.profileVersion.findUniqueOrThrow({ where: { id: e.profileVersionId } });
+          if (sameProfileAnswers(profile, ProfileData.parse(previous.data))) {
+            throw new AppError(409, 'PROFILE_UNCHANGED', 'Update your profile to address the requested information before resubmitting. Your earlier submission is unchanged.');
+          }
+        }
         const ready = readiness(policy, profile, criteria);
         if (!ready.canSubmit) {
           throw new AppError(422, 'PROFILE_INCOMPLETE', 'Some items need your attention before you can submit.', ready);

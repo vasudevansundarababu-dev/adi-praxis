@@ -311,6 +311,40 @@ describe('M4c: selection, onboarding and assignment acceptance (FLOW2 CF-19 to C
       expect((await db.enrollment.findUniqueOrThrow({ where: { id: c.enrollmentId } })).status).toBe('REVIEW_PENDING');
     });
 
+    it('#113: unchanged resubmission and provenance-only edits cannot replace the frozen submission', async () => {
+      const c = await reviewPending();
+      const first = await db.enrollment.findUniqueOrThrow({ where: { id: c.enrollmentId } });
+      const frozen = await db.profileVersion.findUniqueOrThrow({ where: { id: first.profileVersionId! } });
+      await decide(c, 'NEEDS_INFORMATION', { informationRequest: 'Describe the EDD cases you led.' });
+      const session = await db.conversationSession.findUniqueOrThrow({ where: { enrollmentId: c.enrollmentId } });
+      const attempt = await post(c.cookie, `/me/enrollments/${c.enrollmentId}/submit`, { expectedRevision: session.revision, confirmAccuracy: true, evidencePermission: true });
+      expect(attempt.statusCode).toBe(409);
+      expect(attempt.json().error).toBe('PROFILE_UNCHANGED');
+      expect(await db.profileVersion.count({ where: { enrollmentId: c.enrollmentId } })).toBe(1);
+      expect((await db.conversationSession.findUniqueOrThrow({ where: { id: session.id } })).revision).toBe(session.revision);
+      expect((await db.enrollment.findUniqueOrThrow({ where: { id: c.enrollmentId } }))).toMatchObject({ status: 'NEEDS_INFORMATION', profileVersionId: frozen.id });
+      expect(await db.suitabilityAssessment.count({ where: { enrollmentId: c.enrollmentId } })).toBe(1);
+
+      await post(c.cookie, `/me/enrollments/${c.enrollmentId}/amend`);
+      let s = await state(c);
+      const key = s.questions[0].fields[0];
+      const unchanged = s.profile.fields[key].value;
+      await post(c.cookie, '/me/profile/corrections', { enrollmentId: c.enrollmentId, expectedRevision: s.session.revision, fields: [{ fieldKey: key, action: 'EDIT', value: unchanged }] });
+      s = await state(c);
+      const unchangedSubmit = await post(c.cookie, `/me/enrollments/${c.enrollmentId}/submit`, { expectedRevision: s.session.revision, confirmAccuracy: true, evidencePermission: true });
+      expect(unchangedSubmit.statusCode).toBe(409);
+      expect(unchangedSubmit.json().error).toBe('PROFILE_UNCHANGED');
+      expect(await db.profileVersion.findUniqueOrThrow({ where: { id: frozen.id } })).toEqual(frozen);
+      s = await state(c);
+      await post(c.cookie, '/me/profile/corrections', { enrollmentId: c.enrollmentId, expectedRevision: s.session.revision, fields: [{ fieldKey: key, action: 'EDIT', value: 'Additional generic details about the EDD cases I led.' }] });
+      await submit(c);
+      const final = await db.enrollment.findUniqueOrThrow({ where: { id: c.enrollmentId } });
+      expect(final.profileVersionId).not.toBe(frozen.id);
+      expect(await db.profileVersion.findUniqueOrThrow({ where: { id: frozen.id } })).toEqual(frozen);
+      expect(await db.selectionDecision.count({ where: { enrollmentId: c.enrollmentId } })).toBe(1);
+      expect(await db.suitabilityAssessment.count({ where: { enrollmentId: c.enrollmentId } })).toBe(2);
+    });
+
     it('a stale assessment for an older version is superseded after resubmission', async () => {
       const c = await enroll(await signUp());
       await completeViaForm(c);

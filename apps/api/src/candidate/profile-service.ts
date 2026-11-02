@@ -408,3 +408,20 @@ export async function processCandidateTurn(deps: MessageDeps, enrollmentId: stri
 
 /** Content hash of a frozen profile (FLOW2 section 11: profile version content hash). */
 export const profileHash = (p: ProfileData) => sha256(stableStringify(p));
+
+/** Separate answer comparison; the immutable profile hash above still includes all provenance. */
+export function sameProfileAnswers(a: ProfileData, b: ProfileData): boolean {
+  const value = (v: FieldValue | null) => Array.isArray(v) ? [...new Set(v.map((s) => s.trim()))].sort() : typeof v === 'string' ? v.trim() : v;
+  const order = (x: unknown, y: unknown) => {
+    const left = stableStringify(x), right = stableStringify(y);
+    return left < right ? -1 : left > right ? 1 : 0;
+  };
+  const answers = (p: ProfileData) => ({
+    fields: Object.fromEntries(Object.entries(p.fields).map(([key, f]) => [key, { value: value(f.value), status: f.status, approximate: f.approximate }])),
+    roles: p.roles.map((r) => ({ title: r.title.trim(), employerType: r.employerType.trim(), employerName: r.employerName?.trim() ?? null,
+      start: r.start, end: r.end, approximate: r.approximate, specialtyRelevant: r.specialtyRelevant, responsibility: r.responsibility, status: r.status })).sort(order),
+    claims: p.claims.map((c) => ({ type: c.type, value: c.value.trim(), issuer: c.issuer?.trim() ?? null,
+      validFrom: c.validFrom, expiresAt: c.expiresAt, evidenceIds: [...c.evidenceIds].sort(), status: c.status })).sort(order),
+  });
+  return stableStringify(answers(a)) === stableStringify(answers(b));
+}

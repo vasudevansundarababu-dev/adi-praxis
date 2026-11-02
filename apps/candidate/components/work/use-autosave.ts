@@ -88,9 +88,10 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
   }, []);
 
   const update = useCallback((next: T | ((prev: T) => T)) => {
+    if (readOnly) return;
     dirty.current = true;
     setValue(next);
-  }, []);
+  }, [readOnly]);
 
   return { value, update, revision, currentRevision: useCallback(() => rev.current, []), state, flush: put };
 }

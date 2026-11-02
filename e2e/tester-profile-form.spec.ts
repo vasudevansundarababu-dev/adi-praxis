@@ -1,0 +1,52 @@
+import { randomUUID } from 'node:crypto';
+import { expect, test } from '@playwright/test';
+
+test('manual answers redact sensitive identifiers and cleared answers cannot be submitted (#47 #76 #78)', async ({ page, request }) => {
+  test.skip(!!process.env.E2E_WEB_URL, 'local isolated fixtures only; no paid calls');
+  const base = 'http://localhost:3300/api/v1';
+  const post = async (path: string, data: object = {}) => {
+    const response = await request.post(base + path, { data, headers: { 'idempotency-key': randomUUID() } });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    return response.json();
+  };
+  await post('/auth/login', { email: 'admin@e2e.local', password: 'e2e-admin-password' });
+  const domain = await post('/domains', { name: 'Banking ' + randomUUID().slice(0, 8) });
+  const template = await post('/templates', { domainId: domain.id, workflowName: 'KYC onboarding', primaryWork: 'x', verificationCriteria: 'x', humanGate: 'x', defaultTptMinutes: 60, skills: ['KYC'], taskModes: ['AUTHORING'] });
+  await post(`/templates/${template.id}/publish`);
+  const jd = await post('/job-descriptions', { title: 'KYC author', responsibilities: 'Author synthetic cases.', skills: ['KYC'], wagePerTask: 1, wageCurrency: 'USD', locationType: 'REMOTE' });
+  const date = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+  const project = await post('/projects', { templateId: template.id, name: 'FORM REGRESSION ' + randomUUID(), distinctTarget: 8, maxPerExpert: 4, tptMinutes: 60, startDate: date(1), endDate: date(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: true }] });
+  for (const action of ['submit', 'match', 'opportunity/publish']) await post(`/projects/${project.id}/${action}`);
+  const detail = await (await request.get(base + `/projects/${project.id}/opportunity`)).json();
+  const candidateBase = 'http://localhost:3301';
+  const cp = async (path: string, data: object = {}) => {
+    const response = await page.request.post(candidateBase + '/api/v1' + path, { data, headers: { 'idempotency-key': randomUUID() } });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    return response.json();
+  };
+  const token = await cp('/auth/dev/google-token', { email: `form.${randomUUID()}@example.test`, name: 'Form Tester' });
+  await cp('/auth/google', { credential: token.credential, adultAttested: true });
+  const enrollment = await cp('/me/enrollments', { opportunityId: detail.opportunityId });
+  const path = `${candidateBase}/enrollments/${enrollment.id}`;
+  await page.goto(path + '/form');
+  const answer = page.locator('#f-work_example');
+  await expect(answer).toBeVisible();
+  await answer.fill('Checked account 12345678 and PAN ABCDE1234F.');
+  await page.getByRole('button', { name: 'Save answers' }).click();
+  await expect(page.getByRole('status')).toContainText('sensitive identifiers removed');
+  await expect(answer).not.toHaveValue(/12345678|ABCDE1234F/);
+  await expect(answer).toHaveValue(/\[removed:/);
+  await answer.fill('A generic synthetic case.');
+  await page.getByRole('button', { name: 'Save answers' }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved.');
+  await answer.fill('');
+  await page.getByRole('button', { name: 'Save answers' }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved.');
+  await page.goto(path + '/review');
+  await expect(page.getByRole('button', { name: 'Confirm and submit', exact: true })).toBeDisabled();
+  await page.goto(path + '/form');
+  await expect(answer).toHaveValue('');
+  const saved = await (await page.request.get(candidateBase + '/api/v1/me/enrollments/' + enrollment.id + '/conversation')).json();
+  expect(saved.profile.fields.work_example).toBeUndefined();
+  expect(saved.readiness.canSubmit).toBe(false);
+});

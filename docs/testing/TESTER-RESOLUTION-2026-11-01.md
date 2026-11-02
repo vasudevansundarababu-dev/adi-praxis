@@ -48,6 +48,20 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+### Follow-up checkpoint — 2 November, 00:15 America/Chicago
+
+Hourly inventory refresh: no new/reopened reports or changed comment cursors.
+Dedicated local browser regression `tester-profile-form.spec.ts`: **1 passed**. It
+uses the actual candidate form to save sensitive identifiers, checks redacted values
+replace typed input, edits to a generic answer, clears it, navigates to review, verifies
+submission is disabled, reopens the form and checks the persisted answer is absent.
+This supplies browser evidence for #47, #76 and #78; #77 remains an intermittent retest.
+Initial fixture used the wrong opportunity response field and failed before reaching the
+form; corrected to the documented opportunityId and passed without product changes.
+Production source/build is unchanged from the previously verified batch.
+GCP login is valid; pre-rollout service snapshots are stored privately. On-demand database
+backup is in progress. No rollout or new issue closure is claimed at this checkpoint.
+
 Current published checkpoint: implementation commit `6d1d7078`, draft
 [PR #5](https://github.com/vasudevansundarababu-dev/adi-praxis/pull/5), based on the
 existing release branch. Main is unchanged. No tester issue is closed and no new rollout

@@ -48,6 +48,32 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+### Fourth batch deployed — 2 November 2026
+
+Clean release commit `d1eaa89d`, build `tester-d1eaa89d-20261102`, image tag
+`d1eaa89d-1793611641`; source checkout `/private/tmp/praxis-tester-release-d1eaa89d`.
+Backup `1793610984231`, Cloud Build `e2a4a49d-f837-49ca-86db-edb9dd16dad5` and
+migration `praxis-migrate-wj8kv` all succeeded. Ready/100% traffic revisions:
+API `praxis-api-00012-znt`, worker `praxis-worker-00012-6mb`, console
+`praxis-web-00012-zrm`, candidate `praxis-candidate-00012-bln`.
+Private before/after snapshots confirm existing environment values preserved except
+build/commit metadata. DEPLOY_ONLY=1 / SKIP_DEMO_SETUP=1; no reseeding or paid calls.
+
+Passed deployed checks: exact commit/build, DB/Redis readiness, both sign-in pages,
+existing PM sign-in and consistent product 404s on API and both proxies. Local tests
+establish #50 age restrictions, #52 truthful progress, #57 draft/withdrawn wording and
+read-only saved destination, #60 explicit UTC submission date. Full API 477 passed;
+full browser 16 passed / one deployment-only skip; final focused browser 1 passed;
+all-package typecheck/build passed. No real identity decisions were made for smoke tests.
+
+No issues closed or main merge; PR #5 remains draft while backlog work continues.
+The existing Admin credential limitation remains unchanged. Next milestone is #113:
+reject unchanged NEEDS_INFORMATION resubmission without changing immutable profile hashes
+or prior versions. Compare substantive answers separately from provenance so simply
+reconfirming the same value cannot bypass the check. Then continue workbench/finance.
+Scope clarification email still has no reply. Preserve generated Next config edits,
+SDK artifacts and all unrelated work; continue using clean release checkouts.
+
 ### Fourth batch — 2 November, 03:25 America/Chicago
 
 Implemented #50: confirmed under-18 candidates cannot start/resume an opportunity
@@ -321,17 +347,17 @@ in #44/#130 are fixed. Historical already-saved sensitive data has not been bulk
 | [#47](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/47) | Praxis / SME / Profile form saves bank account, IBAN, PAN and Aadhaar numbers without redaction | Implemented; persistence test passed; browser retest pending | Manual correction redaction; sme-profile.test.ts, 31 passed. |
 | [#48](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/48) | Praxis / SME / AI profile chat fails on every answer with "I couldn't process that answer just now" | Pending detailed reproduction | — |
 | [#49](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/49) | Praxis / SME / Evidence upload of 10 MB or more fails with a server error and only "Upload failed" | Fixed; tested and deployed | 10 MiB accepted; larger files rejected before browser dispatch; API boundary and same-file retry tests; 94dc7963. |
-| [#50](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/50) | Praxis / SME / Under-18 candidate can still start an application and is told to "finish identity verification" | Pending detailed reproduction | — |
+| [#50](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/50) | Praxis / SME / Under-18 candidate can still start an application and is told to "finish identity verification" | Fixed; tested and deployed | Start/resume/submit age checks; pending rechecks and later adult result regression; UI notice; d1eaa89d. |
 | [#51](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/51) | Praxis / SME / Review page says "You can still submit" but Confirm and submit stays disabled when questions are skipped | Pending detailed reproduction | — |
-| [#52](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/52) | Praxis / SME / Application status page shows "Verify identity" and "Build profile" as done when they are not | Pending detailed reproduction | — |
+| [#52](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/52) | Praxis / SME / Application status page shows "Verify identity" and "Build profile" as done when they are not | Fixed; tested and deployed | Status progress derives from identity eligibility and actual submittedAt; draft browser checks; d1eaa89d. |
 | [#53](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/53) | Praxis / SME / Payments page says "The partner who put you forward pays you" to an SME who applied directly | Pending detailed reproduction | — |
 | [#54](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/54) | Praxis / SME / Contributor terms and privacy notice are placeholders although sign-in says the SME agrees to them | Pending detailed reproduction | — |
 | [#55](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/55) | Praxis / SME / Sign-in name accepts numbers only, emoji and HTML markup | Pending detailed reproduction | — |
 | [#56](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/56) | Praxis / SME / Apply button stays active after applying or withdrawing and silently reopens the old application | Pending detailed reproduction | — |
-| [#57](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/57) | Praxis / SME / Draft and withdrawn applications show "View the profile you submitted" | Pending detailed reproduction | — |
+| [#57](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/57) | Praxis / SME / Draft and withdrawn applications show "View the profile you submitted" | Fixed; tested and deployed | Draft/withdrawn labels and read-only never-submitted destination; browser regression; d1eaa89d. |
 | [#58](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/58) | Praxis / SME / Sign-in shows raw validation messages such as "body/name String must contain at least 1 character(s)" | Pending detailed reproduction | — |
 | [#59](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/59) | Praxis / SME / A role whose end month is before its start month is saved as "Confirmed by you" | Fixed; tested and deployed | ADD/EDIT reversed date rejection; persistence regression; release bb8d7952. |
-| [#60](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/60) | Praxis / SME / Submission date is ambiguous and changes format ("9/10/2026" then "10/9/2026") | Pending detailed reproduction | — |
+| [#60](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/60) | Praxis / SME / Submission date is ambiguous and changes format ("9/10/2026" then "10/9/2026") | Fixed; tested and deployed | Explicit en-GB month name and UTC in submitted confirmation; real submission browser check; d1eaa89d. |
 | [#61](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/61) | Praxis / SME / Chat greeting shows "Hi S.." for names that start with an initial | Pending detailed reproduction | — |
 | [#62](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/62) | Praxis / SME / "Confirm and submit" changes to "Submitting..." while an evidence file uploads | Fixed; tested and deployed | Separate upload state and indeterminate progress; held-upload/failure browser regression; bb8d7952. |
 | [#63](https://github.com/vasudevansundarababu-dev/adi-praxis-testing/issues/63) | Praxis / SME / Home and the status page describe the same application differently | Pending detailed reproduction | — |

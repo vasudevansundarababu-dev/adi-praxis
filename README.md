@@ -11,6 +11,14 @@ Anvil rights approval or permission to spend money.
 
 ## Review the implementation
 
+**YC review:** [module definitions and features](docs/MODULE-GUIDE.md) ·
+[30-day product/recruiting roadmap](docs/30-DAY-ROADMAP.md) ·
+[verified hosted URLs and sign-in](docs/REVIEWER-SIGN-IN.md).
+
+Start with [module definitions and distinctive features](docs/MODULE-GUIDE.md) for a
+product-by-product walkthrough of projects, staffing, expert onboarding, task authoring,
+review, approved exports, certification, partners, payments and administration.
+
 | Start here | Purpose |
 | --- | --- |
 | [Architecture](docs/ARCHITECTURE.md) | Components, trust boundaries, durable data and execution flow |
@@ -116,3 +124,8 @@ email are simulated. It uses Cloud Run, Cloud SQL and Redis in `us-central1`; it
 from the private-network Terraform production target. See [release evidence](docs/YC-REVIEW.md)
 for the verified version and checks. Existing-host deployments set `DEPLOY_ONLY=1` and
 `SKIP_DEMO_SETUP=1` to preserve users and avoid reseeding. Back up the database first.
+
+The planned next API integration sends completed Anvil runs into Praxis as SME review
+assignments and returns submitted reviews to Anvil. The 30-day roadmap targets
+200–500 expert-authored samples per domain in Marketing, Banking and Commerce.
+These are targets; no professor participation or institutional partnership is claimed.

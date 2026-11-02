@@ -82,6 +82,21 @@ https://praxis-web-yu2jtyqhea-uc.a.run.app. It is a test/demo configuration with
 Vertex AI and simulated candidate identity/sign-in/email. Cloud SQL currently has
 public IPv4 and automated backups disabled; a successful on-demand pre-release backup
 is required before migrations. This differs from the private Terraform target.
-The pending release must record the newly verified version and smoke results here.
+Later releases require their own verified build and smoke evidence; the original release above remains historical.
 Share credentials privately; never add passwords,
 keys, session cookies or sign-in tokens to this repository.
+
+## Module and roadmap documentation — 2 November 2026
+
+Added module definitions/distinctive features, a shared 30-day product/recruiting plan,
+and verified hosted entry/sign-in guidance. The console and candidate page displayed
+`demo-a03cb10d-20261102` in browser checks. Existing authenticated console access and
+the explicitly simulated candidate form were inspected; no fresh candidate account,
+new payment, external message or model call was made. These documentation-only changes
+do not imply a rerun of the whole application test suite at the later source revision.
+
+The automated Anvil → Praxis SME review assignment → Anvil result API loop is roadmap
+work. Marketing, Banking and Commerce targets are 200–500 independently expert-authored
+samples each with documented professor/guide verification where required. Existing
+Banking goldens are synthetic software references. Proposed Wharton/Harvard/Bodhium
+and Banking-network channels are not endorsements or confirmed partnerships.

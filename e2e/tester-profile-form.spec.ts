@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 
 test('manual answers redact sensitive identifiers and cleared answers cannot be submitted (#47 #76 #78)', async ({ page, request }) => {
@@ -25,7 +26,7 @@ test('manual answers redact sensitive identifiers and cleared answers cannot be 
     return response.json();
   };
   const token = await cp('/auth/dev/google-token', { email: `form.${randomUUID()}@example.test`, name: 'Form Tester' });
-  await cp('/auth/google', { credential: token.credential, adultAttested: true });
+  const signed = await cp('/auth/google', { credential: token.credential, adultAttested: true });
   const enrollment = await cp('/me/enrollments', { opportunityId: detail.opportunityId });
   const path = `${candidateBase}/enrollments/${enrollment.id}`;
   await page.goto(path + '/form');
@@ -45,12 +46,18 @@ test('manual answers redact sensitive identifiers and cleared answers cannot be 
   await page.goto(path + '/review');
   await expect(page.getByRole('button', { name: 'Confirm and submit', exact: true })).toBeDisabled();
   let releaseUpload!: () => void;
+  let uploads = 0;
   const held = new Promise<void>((resolve) => { releaseUpload = resolve; });
   await page.route('**/api/v1/me/evidence', async (route) => {
+    uploads++;
     await held;
     await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Controlled upload failure' }) });
   });
   await page.getByLabel('I have permission to share these files for qualification review.').check();
+  await page.getByLabel('Evidence file').setInputFiles({ name: 'oversized.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(12 * 1024 * 1024) });
+  await expect(page.getByText('This file is larger than 10 MB. Choose a smaller file.', { exact: true })).toBeVisible();
+  expect(uploads).toBe(0);
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
   await page.getByLabel('Evidence file').setInputFiles({ name: 'synthetic.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic fixture') });
   await expect(page.getByRole('progressbar', { name: 'Evidence upload in progress' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Confirm and submit', exact: true })).toBeDisabled();
@@ -59,9 +66,24 @@ test('manual answers redact sensitive identifiers and cleared answers cannot be 
   await expect(page.getByRole('progressbar')).toHaveCount(0);
   await expect(page.getByText('Controlled upload failure', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Evidence file')).toBeEnabled();
+  await expect(page.getByLabel('Evidence file')).toHaveValue('');
+  await page.getByLabel('Evidence file').setInputFiles({ name: 'synthetic.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic fixture') });
+  await expect.poll(() => uploads).toBe(2);
   await page.goto(path + '/form');
   await expect(answer).toHaveValue('');
   const saved = await (await page.request.get(candidateBase + '/api/v1/me/enrollments/' + enrollment.id + '/conversation')).json();
   expect(saved.profile.fields.work_example).toBeUndefined();
   expect(saved.readiness.canSubmit).toBe(false);
+  // The existing guarded e2e-only fixture supplies the unrelated selection precondition.
+  execFileSync('pnpm', ['--silent', '--filter', '@praxis/api', 'exec', 'tsx', 'scripts/e2e-m10.ts', 'select', signed.id], { encoding: 'utf8' });
+  await page.goto(path + '/onboarding');
+  await page.getByRole('button', { name: /Work preferences/ }).click();
+  await page.getByLabel('Country you work from', { exact: false }).selectOption('GB');
+  await page.getByLabel('Time zone', { exact: false }).selectOption('Europe/London');
+  await page.getByRole('button', { name: 'Add a language', exact: true }).click();
+  const secondLanguage = page.getByRole('combobox', { name: 'Language 2', exact: true });
+  expect(await secondLanguage.inputValue()).not.toBe('en');
+  await expect(secondLanguage.locator('option[value="en"]')).toHaveAttribute('disabled', '');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Work preferences Done/ })).toBeVisible();
 });

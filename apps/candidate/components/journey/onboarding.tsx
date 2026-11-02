@@ -305,7 +305,7 @@ function PreferencesForm({ pending, initial, onDone }: { pending: boolean; initi
               <span className="sr-only">Language {i + 1}</span>
               <select required value={l.language} onChange={(e) => setLang(i, { language: e.target.value })} className={input}>
                 {ISO_LANGUAGES.map(([c, name]) => (
-                  <option key={c} value={c}>
+                  <option key={c} value={c} disabled={p.languages.some((other, j) => j !== i && other.language === c)}>
                     {name}
                   </option>
                 ))}
@@ -329,7 +329,10 @@ function PreferencesForm({ pending, initial, onDone }: { pending: boolean; initi
           </div>
         ))}
         {p.languages.length < 10 && (
-          <button type="button" onClick={() => setP({ ...p, languages: [...p.languages, { language: 'en', level: 'B2' }] })} className="text-link">
+          <button type="button" onClick={() => {
+            const language = ISO_LANGUAGES.find(([code]) => !p.languages.some((l) => l.language === code))?.[0];
+            if (language) setP({ ...p, languages: [...p.languages, { language, level: 'B2' }] });
+          }} className="text-link">
             Add a language
           </button>
         )}

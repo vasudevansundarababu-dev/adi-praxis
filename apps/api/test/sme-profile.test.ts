@@ -482,6 +482,20 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
     };
     const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64)]);
 
+    it('#49: accepts exactly 10 MiB and refuses larger evidence with a product error', async () => {
+      const c = await candidate();
+      const exact = Buffer.alloc(10 * 1024 * 1024);
+      PNG.copy(exact);
+      expect((await upload(c.cookie, exact, 'boundary.png')).statusCode).toBe(201);
+      for (const extra of [1, 2 * 1024 * 1024]) {
+        const response = await upload(c.cookie, Buffer.concat([exact, Buffer.alloc(extra)]), 'oversized.png');
+        expect(response.statusCode).toBe(413);
+        expect(response.json()).toMatchObject({ requestId: expect.any(String) });
+        expect(response.body).not.toContain('FST_');
+      }
+      expect(await db.evidenceArtifact.count()).toBe(1);
+    });
+
     it('stores permitted files privately under a generated key, checked by signature', async () => {
       const c = await candidate();
       const res = await upload(c.cookie, PNG, '../../etc/passwd.png');

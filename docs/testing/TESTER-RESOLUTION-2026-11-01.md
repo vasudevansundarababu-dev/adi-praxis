@@ -48,6 +48,29 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+### Third batch — 2 November, 02:20 America/Chicago
+
+Implemented #49: browser rejects evidence larger than 10 MiB before dispatch; file input
+resets after success/failure so the same file can be chosen again. Exactly 10 MiB remains
+allowed. API boundary test accepts a valid-signature 10 MiB fixture and refuses 10 MiB+1
+and 12 MiB with product 413 errors; only the accepted artifact is persisted. The proxy
+and API error-envelope repairs from the first batch remain part of this behavior.
+
+Implemented #101/#114/#115: onboarding rejects duplicate languages, undefined proficiency
+levels and unknown time zones, using the same CEFR/IANA choices as the screen. Known
+time-zone aliases are canonicalized. Invalid preferences create no acknowledgement and
+leave the checklist incomplete. The language selector disables already selected options
+and adds an unused language. Existing stored records are not rewritten.
+
+Passed: all-package typecheck and production build; targeted API suites 66 tests; latest
+full API suite 476/476 in 29 files; expanded real-browser flow 1/1 for privacy, clearing,
+oversized rejection with zero requests, same-file retry and unique-language onboarding.
+Initial new browser assertions used an exact wrapping-label query and an unsupported
+disabled-option matcher; corrected to the actual accessible combobox and native disabled
+attribute. Product behavior was unchanged by those test corrections. No paid calls.
+This batch is not yet deployed at this checkpoint. No tester updates or email reply to
+the existing app-scope question were found. Continue backed-up rollout and release checks.
+
 ### Second batch deployed — 2 November 2026
 
 Verified release `bb8d7952` / `tester-bb8d7952-20261102`, image tag

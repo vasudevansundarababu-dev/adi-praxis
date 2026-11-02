@@ -21,6 +21,10 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
   const submitted = !state.editable;
 
   async function upload(file: File) {
+    if (file.size > 10 * 1024 * 1024) {
+      setError({ text: 'This file is larger than 10 MB. Choose a smaller file.' });
+      return;
+    }
     const form = new FormData();
     form.append('permission', String(uploadPermission));
     form.append('file', file);
@@ -105,7 +109,11 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
             <input type="checkbox" checked={uploadPermission} onChange={(e) => setUploadPermission(e.target.checked)} className="mt-1" />
             I have permission to share these files for qualification review.
           </label>
-          <input type="file" aria-label="Evidence file" disabled={!uploadPermission || pending || uploadPending} accept=".pdf,.docx,.png,.jpg,.jpeg" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} className="mt-2 text-sm" />
+          <input type="file" aria-label="Evidence file" disabled={!uploadPermission || pending || uploadPending} accept=".pdf,.docx,.png,.jpg,.jpeg" onChange={(e) => {
+            const input = e.currentTarget;
+            const file = input.files?.[0];
+            if (file) void upload(file).finally(() => { input.value = ''; });
+          }} className="mt-2 text-sm" />
           {uploadPending && <div role="status" className="mt-2 text-sm"><progress aria-label="Evidence upload in progress" className="mr-2" />Uploading evidence… Your profile has not been submitted.</div>}
           <ul className="mt-3 space-y-2">
             {state.evidence.map((x) => (

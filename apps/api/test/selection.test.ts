@@ -374,6 +374,15 @@ describe('M4c: selection, onboarding and assignment acceptance (FLOW2 CF-19 to C
       // Terms must be the current version, and answers must be valid.
       expect((await post(c.cookie, '/me/onboarding/acknowledgements', { enrollmentId: c.enrollmentId, itemKey: 'terms:data_use', termsHash: 'a'.repeat(64) })).json().error).toBe('TERMS_CHANGED');
       expect((await ack(c, 'preferences', { data: { ...preferences, country: 'XX' } })).statusCode).toBe(400);
+      for (const invalid of [
+        { ...preferences, timezone: 'Mars/Phobos' },
+        { ...preferences, languages: [{ language: 'en', level: 'GODLIKE' }] },
+        { ...preferences, languages: [{ language: 'en', level: 'C2' }, { language: 'en', level: 'B2' }] },
+      ]) {
+        expect((await ack(c, 'preferences', { data: invalid })).statusCode).toBe(400);
+        expect((await onboarding(c)).items.find((i: { key: string }) => i.key === 'preferences').done).toBe(false);
+        expect(await db.onboardingAcknowledgement.count({ where: { itemKey: 'preferences' } })).toBe(0);
+      }
       expect((await ack(c, 'conflicts', { data: { hasConflicts: true, authorizedToContribute: true } })).statusCode).toBe(400);
     });
 

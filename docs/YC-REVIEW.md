@@ -43,9 +43,10 @@ coverage or proof of a current passing full suite. No code-coverage percentage i
 ## Publication preparation
 
 Existing remote: `https://github.com/vasudevansundarababu-dev/adi-praxis.git`.
-Its visibility and deployed revision have not been verified by this task. No push,
-remote change, public repository creation, deployment or visibility change is authorized
-by this preparation. Preserve existing release branches and unrelated work.
+The user subsequently authorized public publication and an existing-target GCP release
+on1 November2026. The earlier documentation-only restriction is superseded for this
+release. Preserve existing release branches and unrelated work; publish only explicitly
+reviewed Git branches, never local Codex checkpoint refs or untracked SDK artifacts.
 
 The tracked-file scan checked 607 baseline paths for private-key blocks, common provider-token
 formats, service-account JSON and credential-bearing URLs. No private key, provider-token
@@ -62,6 +63,11 @@ raw logs belong in reviewer docs. A fresh dependency install, production build, 
 rerun in this documentation task. Live payout qualification, broad intake field mapping,
 Praxis v3 authoring and current GCP sign-in verification remain outside these results.
 
-GCP URL and sign-in handoff are deferred until the active Anvil build finishes and
-the deployed versions are checked. Share credentials privately; never add passwords,
+The existing GCP target is `adi-praxis-test-0928/us-central1`, with console at
+https://praxis-web-yu2jtyqhea-uc.a.run.app. It is a test/demo configuration with real
+Vertex AI and simulated candidate identity/sign-in/email. Cloud SQL currently has
+public IPv4 and automated backups disabled; a successful on-demand pre-release backup
+is required before migrations. This differs from the private Terraform target.
+The pending release must record the newly verified version and smoke results here.
+Share credentials privately; never add passwords,
 keys, session cookies or sign-in tokens to this repository.

@@ -100,5 +100,14 @@ Earlier M10 records include intermittent database stalls and an incomplete final
 rerun. Live payout compatibility and the full original intake field mapping remain
 unverified. Synthetic examples and scripted results are not model-performance evidence.
 
-Verified GCP URLs and safe sign-in instructions will be added after the current Anvil
-build and deployment verification finish. Credentials belong in a private handoff.
+## Hosted demo
+
+- [Praxis console](https://praxis-web-yu2jtyqhea-uc.a.run.app)
+- [Candidate application](https://praxis-candidate-yu2jtyqhea-uc.a.run.app)
+
+Use an assigned account; passwords are never published. This existing GCP deployment is
+a **test/demo environment**: Vertex AI is real, while candidate identity/sign-in and
+email are simulated. It uses Cloud Run, Cloud SQL and Redis in `us-central1`; it differs
+from the private-network Terraform production target. See [release evidence](docs/YC-REVIEW.md)
+for the verified version and checks. Existing-host deployments set `DEPLOY_ONLY=1` and
+`SKIP_DEMO_SETUP=1` to preserve users and avoid reseeding. Back up the database first.

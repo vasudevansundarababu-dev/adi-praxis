@@ -15,6 +15,7 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
   const [future, setFuture] = useState(false);
   const [error, setError] = useState<{ text: string; items?: string[] } | null>(null);
   const [pending, setPending] = useState(false);
+  const [uploadPending, setUploadPending] = useState(false);
   const [uploadPermission, setUploadPermission] = useState(false);
   const r = state.readiness;
   const submitted = !state.editable;
@@ -23,13 +24,19 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
     const form = new FormData();
     form.append('permission', String(uploadPermission));
     form.append('file', file);
-    setPending(true);
-    const res = await fetch('/api/v1/me/evidence', { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: form });
-    setPending(false);
-    const body = await res.json().catch(() => null);
-    if (!res.ok) return setError({ text: body?.message ?? 'Upload failed' });
-    const fresh = await loadState(state.enrollment.id);
-    if (fresh.ok) setState(fresh.data);
+    setUploadPending(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/me/evidence', { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: form });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) return setError({ text: body?.message ?? 'Upload failed' });
+      const fresh = await loadState(state.enrollment.id);
+      if (fresh.ok) setState(fresh.data);
+    } catch {
+      setError({ text: 'The upload could not finish. Check your connection and try again.' });
+    } finally {
+      setUploadPending(false);
+    }
   }
   async function removeEvidence(id: string) {
     const res = await fetch(`/api/v1/me/evidence/${id}`, { method: 'DELETE', headers: { 'idempotency-key': crypto.randomUUID() } });
@@ -98,7 +105,8 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
             <input type="checkbox" checked={uploadPermission} onChange={(e) => setUploadPermission(e.target.checked)} className="mt-1" />
             I have permission to share these files for qualification review.
           </label>
-          <input type="file" aria-label="Evidence file" disabled={!uploadPermission || pending} accept=".pdf,.docx,.png,.jpg,.jpeg" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} className="mt-2 text-sm" />
+          <input type="file" aria-label="Evidence file" disabled={!uploadPermission || pending || uploadPending} accept=".pdf,.docx,.png,.jpg,.jpeg" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} className="mt-2 text-sm" />
+          {uploadPending && <div role="status" className="mt-2 text-sm"><progress aria-label="Evidence upload in progress" className="mr-2" />Uploading evidence… Your profile has not been submitted.</div>}
           <ul className="mt-3 space-y-2">
             {state.evidence.map((x) => (
               <li key={x.id} className="flex flex-wrap items-center gap-3 rounded-md border border-line p-2 text-sm">
@@ -143,7 +151,7 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
               {error.items && error.items.length > 0 && <ul className="mt-1 list-disc pl-5">{error.items.map((x) => <li key={x}>{x}</li>)}</ul>}
             </div>
           )}
-          <button type="button" disabled={pending || !accuracy || !permission || !r.canSubmit || !identityEligible} onClick={submit} className="btn btn-primary disabled:opacity-50">
+          <button type="button" disabled={pending || uploadPending || !accuracy || !permission || !r.canSubmit || !identityEligible} onClick={submit} className="btn btn-primary disabled:opacity-50">
             {pending ? 'Submitting…' : 'Confirm and submit'}
           </button>
         </section>

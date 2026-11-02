@@ -196,6 +196,10 @@ export function applyCorrections(p: ProfileData, c: CorrectionsRequest, allowedF
   }
   for (const ch of c.roles) {
     const i = next.roles.findIndex((r) => r.id === ch.id);
+    const role = ch.action === 'ADD' ? ch.role : { ...next.roles[i], ...(ch.action === 'EDIT' ? ch.role : {}) };
+    if (ch.action !== 'REMOVE' && role?.start && role.end && role.end < role.start) {
+      throw new AppError(400, 'INVALID_ROLE_DATES', 'The end month must be on or after the start month.');
+    }
     if (ch.action === 'ADD') {
       if (!ch.role?.title) throw new AppError(400, 'VALUE_REQUIRED', 'A role needs a title');
       next.roles.push({ employerType: '', employerName: null, approximate: false, specialtyRelevant: true, responsibility: null, ...ch.role, start: ch.role.start ?? null, end: ch.role.end ?? null, id: randomUUID(), status: 'CONFIRMED', sources: ['candidate-edit'], reused: false });

@@ -247,6 +247,20 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
   });
 
   describe('CF-13 real customer or restricted employer data', () => {
+    it('#59: rejects reversed role dates on add and edit without saving the invalid role', async () => {
+      const c = await candidate();
+      const invalid = await correct(c, { roles: [{ action: 'ADD', role: { title: 'Senior EDD reviewer', start: '2022-06', end: '2019-01' } }] });
+      expect(invalid.statusCode).toBe(400);
+      expect(invalid.json().error).toBe('INVALID_ROLE_DATES');
+      expect((await state(c)).profile.roles).toEqual([]);
+      const valid = await correct(c, { roles: [{ action: 'ADD', role: { title: 'Senior EDD reviewer', start: '2022-06', end: '2022-06' } }] });
+      expect(valid.statusCode).toBe(200);
+      const role = valid.json().profile.roles[0];
+      const changed = await correct(c, { roles: [{ action: 'EDIT', id: role.id, role: { end: '2019-01' } }] });
+      expect(changed.statusCode).toBe(400);
+      expect((await state(c)).profile.roles[0]).toMatchObject({ id: role.id, start: '2022-06', end: '2022-06' });
+    });
+
     it('redacts manual form corrections before profile persistence and leaves them unconfirmed (#47)', async () => {
       const c = await candidate();
       const response = await correct(c, { fields: [{ fieldKey: 'work_example', action: 'EDIT', value: 'Checked account 12345678, IBAN GB82 WEST 1234 5698 7654 32, PAN ABCDE1234F, Aadhaar 2345 6789 0123.' }] });

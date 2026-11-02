@@ -1,5 +1,7 @@
 import { CandidateMeDto, GoogleSignInRequest, IDENTITY_HELP_REASONS, identityEligible } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type { Prisma } from '@prisma/client';
+import type { InternalActor } from '../auth/actor';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { CANDIDATE_SESSION_COOKIE, createCandidateSession, revokeSession } from '../auth/sessions';
@@ -20,6 +22,16 @@ export interface CandidateDeps {
   identity: IdentityProvider;
   /** The single v1 client candidates sign up under (multi-tenant later). */
   resolveClientId: () => Promise<string>;
+}
+
+// Identity help before a project enrollment is handled by an Admin. Validators may
+// see or decide only for applicants in their assigned project pools.
+function identityReviewScope(actor: InternalActor): Prisma.SmeUserWhereInput {
+  return { clientId: actor.clientId, ...(actor.roles.includes('ADMIN') ? {} : {
+    enrollments: { some: { clientId: actor.clientId, status: { not: 'WITHDRAWN' }, opportunity: {
+      project: { clientId: actor.clientId, reviewers: { some: { userId: actor.userId } } },
+    } } },
+  }) };
 }
 
 async function meDto(tx: Db | Tx, smeUserId: string): Promise<z.infer<typeof CandidateMeDto>> {
@@ -205,7 +217,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
     { config: { access: ['REVIEWER', 'ADMIN'] }, schema: { tags: ['candidate'], response: { 200: z.object({ items: z.array(z.object({ smeUserId: z.string(), displayName: z.string().nullable(), reason: z.string().nullable(), requestedAt: z.string() })) }) } } },
     async (req) => {
       const users = await db.smeUser.findMany({
-        where: { clientId: req.actor!.clientId, identityStatus: 'MANUAL_REVIEW_REQUIRED' },
+        where: { ...identityReviewScope(req.actor!), identityStatus: 'MANUAL_REVIEW_REQUIRED' },
         include: { identityAttempts: { orderBy: { createdAt: 'desc' }, take: 1 } },
         orderBy: { updatedAt: 'asc' },
       });
@@ -233,7 +245,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
     },
     async (req, reply) => {
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
-        const u = await tx.smeUser.findFirst({ where: { id: req.params.smeUserId, clientId: actor.clientId } });
+        const u = await tx.smeUser.findFirst({ where: { id: req.params.smeUserId, ...identityReviewScope(actor) } });
         if (!u) throw notFound('Candidate not found');
         if (u.identityStatus !== 'MANUAL_REVIEW_REQUIRED') throw new AppError(409, 'NOT_AWAITING_REVIEW', 'This candidate is not awaiting an identity review.');
         const next = req.body.outcome === 'ALTERNATIVE_VERIFIED' ? 'ALTERNATIVE_VERIFIED' : 'REQUIRES_INPUT';

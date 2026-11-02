@@ -44,6 +44,21 @@ test('manual answers redact sensitive identifiers and cleared answers cannot be 
   await expect(page.getByRole('status')).toHaveText('Saved.');
   await page.goto(path + '/review');
   await expect(page.getByRole('button', { name: 'Confirm and submit', exact: true })).toBeDisabled();
+  let releaseUpload!: () => void;
+  const held = new Promise<void>((resolve) => { releaseUpload = resolve; });
+  await page.route('**/api/v1/me/evidence', async (route) => {
+    await held;
+    await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Controlled upload failure' }) });
+  });
+  await page.getByLabel('I have permission to share these files for qualification review.').check();
+  await page.getByLabel('Evidence file').setInputFiles({ name: 'synthetic.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic fixture') });
+  await expect(page.getByRole('progressbar', { name: 'Evidence upload in progress' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Confirm and submit', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Submitting…', exact: true })).toHaveCount(0);
+  releaseUpload();
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
+  await expect(page.getByText('Controlled upload failure', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Evidence file')).toBeEnabled();
   await page.goto(path + '/form');
   await expect(answer).toHaveValue('');
   const saved = await (await page.request.get(candidateBase + '/api/v1/me/enrollments/' + enrollment.id + '/conversation')).json();

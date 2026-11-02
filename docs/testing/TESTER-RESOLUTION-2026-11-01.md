@@ -48,6 +48,24 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+### Second batch — 2 November, 01:15 America/Chicago
+
+Implemented #69: project-scoped identity queue and decision authorization; Admins retain
+tenant-scoped pre-enrollment handling. Regression covers unassigned denial, assigned
+access, revoked assignment denial without state change, reassignment, cross-tenant denial
+and successful authorized decision. Implemented #59: reversed role dates are rejected on
+add/edit without replacing saved state; equal start/end month remains valid.
+Implemented #62: upload activity has separate state, an indeterminate progress indicator
+and failure recovery; submission keeps its label and is disabled while uploading.
+
+Checks passed: all-package `pnpm typecheck`; full API suite **475/475 in 29 files**;
+focused real-form browser regression **1/1**, including held upload, unchanged submit label,
+controlled failure and enabled retry; all-package `pnpm build`. Earlier targeted API run
+67/67 passed before the final role-date case was added; full run includes the final case.
+No paid calls. This batch is not deployed at this checkpoint; first batch remains live.
+The hourly issue/comment refresh found no changes. Preserve generated Next config files
+and unrelated SDK artifacts. Continue with backed-up rollout and exact release checks.
+
 ### Deployed batch — 2 November 2026
 
 First tested batch deployed successfully to the existing four GCP services. Release

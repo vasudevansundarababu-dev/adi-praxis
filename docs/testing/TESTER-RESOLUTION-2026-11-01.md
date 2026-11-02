@@ -4,6 +4,14 @@
 
 ### Daytime YC demo release — 2 November 2026
 
+Deployed commit d6ddd09c / demo-d6ddd09c-20261102 after SQL backup1793629628953
+SUCCESSFUL. Cloud Build9cf7b4f5-f230-4400-909d-57317a8bbfed and migration succeeded;
+all four services report ready/100% traffic. Actual version, DB/Redis readiness,
+console/candidate sign-in, existing PM login and product404 checks passed.
+No main merge or issue closures. #173 is regression-tested/deployed; #164's reproduced
+repeat-final-decision failure is repaired, but the tester's distinct Careers MEETS
+500 remains qualified pending retest rather than declared reproduced/fixed.
+
 User explicitly requested active build/demo preparation before 11:00 America/Chicago,
 overriding daytime monitoring-only for this work. #173 now refuses unsubmitted/DRAFT
 applications with no frozen profile or submission time for both assigned Validator

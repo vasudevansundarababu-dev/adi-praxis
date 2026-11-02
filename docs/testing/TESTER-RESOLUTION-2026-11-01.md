@@ -48,6 +48,17 @@ separately requested. Resume here after interruption; do not repeat completed YC
 
 ## Issue matrix
 
+Current published checkpoint: implementation commit `6d1d7078`, draft
+[PR #5](https://github.com/vasudevansundarababu-dev/adi-praxis/pull/5), based on the
+existing release branch. Main is unchanged. No tester issue is closed and no new rollout
+has occurred. Final API-contract rerun: 15 passed, including authenticated candidate
+empty-JSON handling (the first attempt correctly rejected an internal audience with 401;
+the test fixture was corrected rather than weakening authentication).
+
+Resume with dedicated form-browser clearing/privacy checks, final batch review and a
+backed-up deployment to existing targets; then continue the remaining root-cause groups.
+Unstaged Next-generated tsconfig changes and unrelated SDK artifacts remain untouched.
+
 ### Night checkpoint — 1 November, 23:30 America/Chicago
 
 First batch is implemented locally; not yet pushed or deployed. It covers product API

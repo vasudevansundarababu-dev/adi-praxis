@@ -5,13 +5,13 @@ import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { GoogleIdTokenVerifier, MockGoogleVerifier } from '../src/candidate/google';
 import { isAdult, MockIdentityProvider } from '../src/candidate/identity-provider';
-import { processIdentityWebhook } from '../src/candidate/identity-service';
+import { applicationBlockReason, processIdentityWebhook } from '../src/candidate/identity-service';
 import { loadConfig } from '../src/config';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { processDomainEvent } from '../src/outbox/dispatcher';
 import { defaultHandlers } from '../src/outbox/handlers';
 import { TEST_DATABASE_URL, TEST_REDIS_URL } from './env';
-import { createCandidate, createUser, db, idem, login, resetDb, testConfig } from './helpers';
+import { createCandidate, createClient, createUser, db, idem, login, resetDb, testConfig } from './helpers';
 import { docxWithText, pdfWithText } from './documents';
 
 const SECRET = 'test-mock-secret';
@@ -24,6 +24,7 @@ describe('M4a: sourcing, candidate sign-in, identity, opportunity', () => {
   let admin: string;
   let pm: string;
   let reviewer: string;
+  let reviewerId: string;
 
   beforeAll(async () => {
     google = new MockGoogleVerifier(SECRET);
@@ -38,7 +39,9 @@ describe('M4a: sourcing, candidate sign-in, identity, opportunity', () => {
     clientId = client.id;
     admin = await login(app, 'admin@test.local', 'admin-password-123');
     pm = await login(app, (await createUser(clientId, ['PM'])).email);
-    reviewer = await login(app, (await createUser(clientId, ['REVIEWER'])).email);
+    const reviewerUser = await createUser(clientId, ['REVIEWER']);
+    reviewerId = reviewerUser.id;
+    reviewer = await login(app, reviewerUser.email);
   });
 
   afterAll(async () => {
@@ -267,6 +270,33 @@ describe('M4a: sourcing, candidate sign-in, identity, opportunity', () => {
       expect(isAdult(null)).toBeNull();
     });
 
+    it('#50: a confirmed under-18 result blocks application start/resume and pending checks cannot hide it', async () => {
+      const a = await signIn();
+      const { opportunityId } = await staffingProjectWithOpportunity();
+      const existing = (await post(a.cookie, '/me/enrollments', { opportunityId })).json();
+      const attempt = await startIdentity(a.cookie);
+      const result = identity.simulate(attempt, { status: 'verified', adult: false });
+      await deliver(result.rawBody, result.signature);
+      expect((await get(a.cookie, '/me')).json().applicationBlockReason).toMatch(/18 or over/);
+      expect((await post(a.cookie, '/me/enrollments', { opportunityId })).json().error).toBe('AGE_RESTRICTION');
+      const s = (await get(a.cookie, `/me/enrollments/${existing.id}/conversation`)).json();
+      const submit = await post(a.cookie, `/me/enrollments/${existing.id}/submit`, { expectedRevision: s.session.revision, confirmAccuracy: true, evidencePermission: true });
+      expect(submit.statusCode).toBe(403);
+      expect(submit.json().message).toMatch(/18 or over/);
+      const fresh = await staffingProjectWithOpportunity();
+      expect((await post(a.cookie, '/me/enrollments', { opportunityId: fresh.opportunityId })).statusCode).toBe(403);
+      expect(await db.enrollment.count()).toBe(1);
+      const pending = await startIdentity(a.cookie);
+      expect((await get(a.cookie, '/me')).json().applicationBlockReason).toMatch(/18 or over/);
+      expect((await post(a.cookie, '/me/enrollments', { opportunityId: fresh.opportunityId })).statusCode).toBe(403);
+      // A test-only result must not impose a live restriction where live checks are required.
+      expect(await applicationBlockReason(db, a.res.json().id, true)).toBeNull();
+      const adult = identity.simulate(pending, { status: 'verified', adult: true });
+      await deliver(adult.rawBody, adult.signature);
+      expect((await get(a.cookie, '/me')).json().applicationBlockReason).toBeNull();
+      expect((await post(a.cookie, '/me/enrollments', { opportunityId: fresh.opportunityId })).statusCode).toBe(200);
+    });
+
     it('CF-06: "needs more input" allows a retry and keeps saved progress', async () => {
       const { cookie } = await signIn();
       const { opportunityId } = await staffingProjectWithOpportunity();
@@ -285,12 +315,37 @@ describe('M4a: sourcing, candidate sign-in, identity, opportunity', () => {
       const { res, cookie } = await signIn();
       const help = await post(cookie, '/me/identity/help', { reason: 'UNSUPPORTED_COUNTRY', note: 'My ID type is not listed' });
       expect(help.json()).toMatchObject({ identityStatus: 'MANUAL_REVIEW_REQUIRED', identityProblem: expect.stringMatching(/alternative/) });
-      const queue = (await get(reviewer, '/review/identity')).json().items;
+      const queue = (await get(admin, '/review/identity')).json().items;
       expect(queue).toEqual([expect.objectContaining({ smeUserId: res.json().id, reason: 'UNSUPPORTED_COUNTRY' })]);
       expect((await get(pm, '/review/identity')).statusCode).toBe(403);
-      const d = await post(reviewer, `/review/identity/${res.json().id}/decision`, { outcome: 'ALTERNATIVE_VERIFIED', method: 'Live video check with the document shown, not recorded' });
+      const d = await post(admin, `/review/identity/${res.json().id}/decision`, { outcome: 'ALTERNATIVE_VERIFIED', method: 'Live video check with the document shown, not recorded' });
       expect(d.json().identityStatus).toBe('ALTERNATIVE_VERIFIED');
       expect((await get(cookie, '/me')).json().identityLabel).toBe('Identity verified (alternative process)');
+      expect(await db.alternativeIdentityCheck.count()).toBe(1);
+    });
+
+    it('#69: identity queue and decisions require a current project assignment', async () => {
+      const { res, cookie } = await signIn();
+      const { projectId, opportunityId } = await staffingProjectWithOpportunity();
+      await post(cookie, '/me/enrollments', { opportunityId });
+      await post(cookie, '/me/identity/help', { reason: 'UNSUPPORTED_COUNTRY' });
+      const decision = `/review/identity/${res.json().id}/decision`;
+      const body = { outcome: 'ALTERNATIVE_VERIFIED', method: 'Approved alternative process' };
+      expect((await get(reviewer, '/review/identity')).json().items).toEqual([]);
+      expect((await post(reviewer, decision, body)).statusCode).toBe(404);
+      expect(await db.alternativeIdentityCheck.count()).toBe(0);
+      await post(admin, `/projects/${projectId}/reviewers`, { userId: reviewerId });
+      expect((await get(reviewer, '/review/identity')).json().items).toEqual([expect.objectContaining({ smeUserId: res.json().id })]);
+      await db.projectReviewer.deleteMany({ where: { projectId, userId: reviewerId } });
+      expect((await post(reviewer, decision, body)).statusCode).toBe(404);
+      expect((await get(cookie, '/me')).json().identityStatus).toBe('MANUAL_REVIEW_REQUIRED');
+      await post(admin, `/projects/${projectId}/reviewers`, { userId: reviewerId });
+      expect((await post(reviewer, decision, body)).statusCode).toBe(200);
+      expect(await db.alternativeIdentityCheck.count()).toBe(1);
+      const foreign = await db.smeUser.create({ data: { clientId: (await createClient()).id, displayName: 'Other tenant', identityStatus: 'MANUAL_REVIEW_REQUIRED' } });
+      expect((await get(admin, '/review/identity')).json().items).toEqual([]);
+      expect((await post(admin, `/review/identity/${foreign.id}/decision`, body)).statusCode).toBe(404);
+      expect((await post(reviewer, `/review/identity/${foreign.id}/decision`, body)).statusCode).toBe(404);
       expect(await db.alternativeIdentityCheck.count()).toBe(1);
     });
 

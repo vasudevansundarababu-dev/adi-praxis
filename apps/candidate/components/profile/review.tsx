@@ -8,28 +8,39 @@ import type { ConversationState } from '@/lib/profile-types';
 import { ProfilePanel } from './profile-panel';
 
 /** C05 — review profile and evidence, then an explicit submit. Saving never submits (CF-18). */
-export function Review({ initial, identityLabel, identityEligible }: { initial: ConversationState; identityLabel: string; identityEligible: boolean }) {
+export function Review({ initial, identityLabel, identityEligible, identityBlockReason }: { initial: ConversationState; identityLabel: string; identityEligible: boolean; identityBlockReason?: string | null }) {
   const [state, setState] = useState(initial);
   const [accuracy, setAccuracy] = useState(false);
   const [permission, setPermission] = useState(false);
   const [future, setFuture] = useState(false);
   const [error, setError] = useState<{ text: string; items?: string[] } | null>(null);
   const [pending, setPending] = useState(false);
+  const [uploadPending, setUploadPending] = useState(false);
   const [uploadPermission, setUploadPermission] = useState(false);
   const r = state.readiness;
   const submitted = !state.editable;
 
   async function upload(file: File) {
+    if (file.size > 10 * 1024 * 1024) {
+      setError({ text: 'This file is larger than 10 MB. Choose a smaller file.' });
+      return;
+    }
     const form = new FormData();
     form.append('permission', String(uploadPermission));
     form.append('file', file);
-    setPending(true);
-    const res = await fetch('/api/v1/me/evidence', { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: form });
-    setPending(false);
-    const body = await res.json().catch(() => null);
-    if (!res.ok) return setError({ text: body?.message ?? 'Upload failed' });
-    const fresh = await loadState(state.enrollment.id);
-    if (fresh.ok) setState(fresh.data);
+    setUploadPending(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/me/evidence', { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: form });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) return setError({ text: body?.message ?? 'Upload failed' });
+      const fresh = await loadState(state.enrollment.id);
+      if (fresh.ok) setState(fresh.data);
+    } catch {
+      setError({ text: 'The upload could not finish. Check your connection and try again.' });
+    } finally {
+      setUploadPending(false);
+    }
   }
   async function removeEvidence(id: string) {
     const res = await fetch(`/api/v1/me/evidence/${id}`, { method: 'DELETE', headers: { 'idempotency-key': crypto.randomUUID() } });
@@ -54,11 +65,19 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
     setError({ text: res.message, items: [...(d?.unconfirmed ?? []).map((x) => `Confirm: ${x}`), ...(d?.problems ?? []), ...(d?.unanswered ?? []).map((x) => `Answer: ${x}`)] });
   }
 
+  if (submitted && state.enrollment.status === 'WITHDRAWN' && !state.enrollment.submittedAt) {
+    return <div className="max-w-2xl">
+      <h1 className="text-2xl font-semibold">Saved draft profile</h1>
+      <p className="mt-3">This application was withdrawn. Your draft was not submitted.</p>
+      <ProfilePanel state={state} onChange={setState} readOnly />
+      <Link href="/home" className="mt-6 inline-block btn btn-primary">Back to home</Link>
+    </div>;
+  }
   if (submitted) {
     return (
       <div className="max-w-2xl">
         <h1 className="text-2xl font-semibold">Profile submitted</h1>
-        <p className="mt-3">Thank you. Your profile for <strong>{state.enrollment.title}</strong> was submitted{state.enrollment.submittedAt ? ` on ${new Date(state.enrollment.submittedAt).toLocaleDateString()}` : ''}.</p>
+        <p className="mt-3">Thank you. Your profile for <strong>{state.enrollment.title}</strong> was submitted{state.enrollment.submittedAt ? ` on ${new Date(state.enrollment.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })} (UTC)` : ''}.</p>
         <p className="mt-2 text-fg-muted">A person reviews every application; software does not make the decision. We’ll let you know the outcome, and if we need more information we’ll ask a specific question.</p>
         <Link href="/home" className="mt-6 inline-block btn btn-primary">Back to home</Link>
       </div>
@@ -85,10 +104,10 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
           )}
           {r.requiredGaps.length > 0 && (
             <p className="mt-3 text-sm">
-              You marked some requirements as not known or not disclosed: {r.requiredGaps.join('; ')}. You can still submit. The Validator may ask for more information; this is not a rejection.
+              You marked some requirements as not known or not disclosed: {r.requiredGaps.join('; ')}. {r.canSubmit ? 'You can still submit.' : 'Complete the remaining items above before submitting.'} The Validator may ask for more information; this is not a rejection.
             </p>
           )}
-          <p className="mt-3 text-sm">Identity: <strong>{identityLabel}</strong>{identityEligible ? '' : ' (finish verification before submitting; your profile stays saved)'}</p>
+          <p className="mt-3 text-sm">Identity: <strong>{identityLabel}</strong>{identityEligible ? '' : ` (${identityBlockReason ?? 'finish verification before submitting; your profile stays saved'})`}</p>
         </section>
 
         <section className="mt-6">
@@ -98,7 +117,12 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
             <input type="checkbox" checked={uploadPermission} onChange={(e) => setUploadPermission(e.target.checked)} className="mt-1" />
             I have permission to share these files for qualification review.
           </label>
-          <input type="file" aria-label="Evidence file" disabled={!uploadPermission || pending} accept=".pdf,.docx,.png,.jpg,.jpeg" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} className="mt-2 text-sm" />
+          <input type="file" aria-label="Evidence file" disabled={!uploadPermission || pending || uploadPending} accept=".pdf,.docx,.png,.jpg,.jpeg" onChange={(e) => {
+            const input = e.currentTarget;
+            const file = input.files?.[0];
+            if (file) void upload(file).finally(() => { input.value = ''; });
+          }} className="mt-2 text-sm" />
+          {uploadPending && <div role="status" className="mt-2 text-sm"><progress aria-label="Evidence upload in progress" className="mr-2" />Uploading evidence… Your profile has not been submitted.</div>}
           <ul className="mt-3 space-y-2">
             {state.evidence.map((x) => (
               <li key={x.id} className="flex flex-wrap items-center gap-3 rounded-md border border-line p-2 text-sm">
@@ -143,7 +167,7 @@ export function Review({ initial, identityLabel, identityEligible }: { initial: 
               {error.items && error.items.length > 0 && <ul className="mt-1 list-disc pl-5">{error.items.map((x) => <li key={x}>{x}</li>)}</ul>}
             </div>
           )}
-          <button type="button" disabled={pending || !accuracy || !permission || !r.canSubmit || !identityEligible} onClick={submit} className="btn btn-primary disabled:opacity-50">
+          <button type="button" disabled={pending || uploadPending || !accuracy || !permission || !r.canSubmit || !identityEligible} onClick={submit} className="btn btn-primary disabled:opacity-50">
             {pending ? 'Submitting…' : 'Confirm and submit'}
           </button>
         </section>

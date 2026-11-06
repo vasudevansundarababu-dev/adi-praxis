@@ -19,6 +19,7 @@ import {
   type QuestionDef,
 } from '@praxis/shared';
 import { randomUUID } from 'node:crypto';
+import { detectSensitive } from './sensitive';
 import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, notFound } from '../lib/errors';
@@ -195,6 +196,10 @@ export function applyCorrections(p: ProfileData, c: CorrectionsRequest, allowedF
   }
   for (const ch of c.roles) {
     const i = next.roles.findIndex((r) => r.id === ch.id);
+    const role = ch.action === 'ADD' ? ch.role : { ...next.roles[i], ...(ch.action === 'EDIT' ? ch.role : {}) };
+    if (ch.action !== 'REMOVE' && role?.start && role.end && role.end < role.start) {
+      throw new AppError(400, 'INVALID_ROLE_DATES', 'The end month must be on or after the start month.');
+    }
     if (ch.action === 'ADD') {
       if (!ch.role?.title) throw new AppError(400, 'VALUE_REQUIRED', 'A role needs a title');
       next.roles.push({ employerType: '', employerName: null, approximate: false, specialtyRelevant: true, responsibility: null, ...ch.role, start: ch.role.start ?? null, end: ch.role.end ?? null, id: randomUUID(), status: 'CONFIRMED', sources: ['candidate-edit'], reused: false });
@@ -215,6 +220,30 @@ export function applyCorrections(p: ProfileData, c: CorrectionsRequest, allowedF
     if (ch.action === 'REMOVE') next.claims.splice(i, 1);
     // The evidence level stays SELF_REPORTED whatever the candidate sends (CF-16).
     else next.claims[i] = { ...next.claims[i]!, ...(ch.action === 'EDIT' ? ch.claim : {}), status: 'CONFIRMED', evidenceLevel: 'SELF_REPORTED' };
+  }
+  // The form/correction path must have the same privacy boundary as conversational input.
+  const scrub = (value: FieldValue | null): FieldValue | null => typeof value === 'string'
+    ? detectSensitive(value).redacted : Array.isArray(value) ? value.map((v) => detectSensitive(v).redacted) : value;
+  for (const field of Object.values(next.fields)) {
+    const value = scrub(field.value);
+    const conflict = scrub(field.conflictWith);
+    if (stableStringify(value) !== stableStringify(field.value) || stableStringify(conflict) !== stableStringify(field.conflictWith)) {
+      field.value = value;
+      field.conflictWith = conflict;
+      field.status = 'PROPOSED';
+      field.sources = [...field.sources, 'sensitive-data-removed'];
+    }
+  }
+  for (const item of [...next.roles, ...next.claims]) {
+    const keys = 'title' in item ? ['title', 'employerType', 'employerName'] : ['value', 'issuer'];
+    let changed = false;
+    for (const key of keys) {
+      const value = (item as unknown as Record<string, unknown>)[key];
+      if (typeof value !== 'string') continue;
+      const clean = detectSensitive(value).redacted;
+      if (clean !== value) { Object.assign(item, { [key]: clean }); changed = true; }
+    }
+    if (changed) { item.status = 'PROPOSED'; item.sources = [...item.sources, 'sensitive-data-removed']; }
   }
   return ProfileData.parse(next);
 }
@@ -379,3 +408,20 @@ export async function processCandidateTurn(deps: MessageDeps, enrollmentId: stri
 
 /** Content hash of a frozen profile (FLOW2 section 11: profile version content hash). */
 export const profileHash = (p: ProfileData) => sha256(stableStringify(p));
+
+/** Separate answer comparison; the immutable profile hash above still includes all provenance. */
+export function sameProfileAnswers(a: ProfileData, b: ProfileData): boolean {
+  const value = (v: FieldValue | null) => Array.isArray(v) ? [...new Set(v.map((s) => s.trim()))].sort() : typeof v === 'string' ? v.trim() : v;
+  const order = (x: unknown, y: unknown) => {
+    const left = stableStringify(x), right = stableStringify(y);
+    return left < right ? -1 : left > right ? 1 : 0;
+  };
+  const answers = (p: ProfileData) => ({
+    fields: Object.fromEntries(Object.entries(p.fields).map(([key, f]) => [key, { value: value(f.value), status: f.status, approximate: f.approximate }])),
+    roles: p.roles.map((r) => ({ title: r.title.trim(), employerType: r.employerType.trim(), employerName: r.employerName?.trim() ?? null,
+      start: r.start, end: r.end, approximate: r.approximate, specialtyRelevant: r.specialtyRelevant, responsibility: r.responsibility, status: r.status })).sort(order),
+    claims: p.claims.map((c) => ({ type: c.type, value: c.value.trim(), issuer: c.issuer?.trim() ?? null,
+      validFrom: c.validFrom, expiresAt: c.expiresAt, evidenceIds: [...c.evidenceIds].sort(), status: c.status })).sort(order),
+  });
+  return stableStringify(answers(a)) === stableStringify(answers(b));
+}

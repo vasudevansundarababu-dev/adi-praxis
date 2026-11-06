@@ -18,8 +18,10 @@ import {
   policyFor,
   processCandidateTurn,
   profileHash,
+  sameProfileAnswers,
 } from '../candidate/profile-service';
 import { detectSensitive } from '../candidate/sensitive';
+import { applicationBlockReason } from '../candidate/identity-service';
 import type { MalwareScanner, ObjectStorage } from '../candidate/storage';
 import type { Db } from '../db';
 import { sha256 } from '../lib/crypto';
@@ -30,6 +32,7 @@ import { runCandidateCommand } from '../platform/command';
 
 export interface ProfileDeps {
   db: Db;
+  requireLiveIdentity: boolean;
   assistant: ProfileAssistant;
   storage: ObjectStorage;
   scanner: MalwareScanner;
@@ -254,6 +257,8 @@ export const profileRoutes: FastifyPluginAsyncZod<ProfileDeps> = async (app, dep
     async (req, reply) => {
       await runCandidateCommand(db, req, reply, async ({ tx, actor, audit, emit }) => {
         const e = await ownEnrollment(tx, req.params.id, actor.smeUserId);
+        const blocked = await applicationBlockReason(tx, actor.smeUserId, deps.requireLiveIdentity);
+        if (blocked) throw new AppError(403, 'AGE_RESTRICTION', blocked);
         if (!(EDITABLE_ENROLLMENT as readonly string[]).includes(e.status)) throw new AppError(409, 'ALREADY_SUBMITTED', 'This profile has already been submitted.');
         if (!identityEligible(e.smeUser.identityStatus)) {
           throw new AppError(409, 'IDENTITY_REQUIRED', 'Finish identity verification before submitting. Your profile is saved.');
@@ -267,6 +272,12 @@ export const profileRoutes: FastifyPluginAsyncZod<ProfileDeps> = async (app, dep
         if (e.status === 'NEEDS_INFORMATION') await ensureAmendmentDraft(tx, e);
         const draft = (await draftProfile(tx, e.id))!;
         const profile = ProfileData.parse(draft.data);
+        if (e.status === 'NEEDS_INFORMATION' && e.profileVersionId) {
+          const previous = await tx.profileVersion.findUniqueOrThrow({ where: { id: e.profileVersionId } });
+          if (sameProfileAnswers(profile, ProfileData.parse(previous.data))) {
+            throw new AppError(409, 'PROFILE_UNCHANGED', 'Update your profile to address the requested information before resubmitting. Your earlier submission is unchanged.');
+          }
+        }
         const ready = readiness(policy, profile, criteria);
         if (!ready.canSubmit) {
           throw new AppError(422, 'PROFILE_INCOMPLETE', 'Some items need your attention before you can submit.', ready);

@@ -8,9 +8,9 @@ import { apiGet } from '@/lib/api';
 export const metadata: Metadata = { title: 'Pay runs' };
 
 const NEXT_STEP: Record<string, string> = {
-  DRAFT: 'PM confirms',
-  CONFIRMED: 'Finance approves',
-  APPROVED: 'Finance submits',
+  DRAFT: 'Admin releases',
+  CONFIRMED: 'Admin releases',
+  APPROVED: 'Ready to submit',
   SUBMITTED: 'Waiting for the provider',
   COMPLETED: 'Done',
   CANCELLED: '—',
@@ -25,7 +25,7 @@ export default async function PayRunsPage() {
     <div>
       <h1 className="text-2xl font-semibold">Pay runs</h1>
       <p className="mt-1 max-w-3xl text-sm text-fg-muted">
-        One run per week, built on Mondays for the previous Monday to Sunday. A PM confirms it, Finance approves and submits it. Held and small balances carry into the next run.
+        One run per week, built on Mondays for the previous Monday to Sunday. Admin releases it and submits it. Release sends no payment; submission is a separate action. Held and small balances carry into the next run.
       </p>
       <BuildPayRunForm />
       {items.length === 0 ? (

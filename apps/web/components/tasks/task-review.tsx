@@ -310,13 +310,13 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <div>
                       <p className="font-medium">This task</p>
-                      <pre className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-line p-2 text-xs">{d.text}</pre>
+                      <pre tabIndex={0} aria-label="This task text" className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-line p-2 text-xs">{d.text}</pre>
                     </div>
                     <div>
                       <p className="font-medium">
                         Closest match · {match.project} · {match.status?.toLowerCase()}
                       </p>
-                      <pre className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-line p-2 text-xs">{match.text ?? '(content unavailable)'}</pre>
+                      <pre tabIndex={0} aria-label="Closest match text" className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-line p-2 text-xs">{match.text ?? '(content unavailable)'}</pre>
                     </div>
                   </div>
                 )}
@@ -326,7 +326,7 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
 
           <section aria-labelledby="task-h" className="card p-4">
             <h2 id="task-h" className="font-semibold">Task</h2>
-            {kyc ? <KycView t={d.output as KycTask} /> : <pre className="mt-2 max-h-[40rem] overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(d.taskType === 'ANNOTATION' ? { input: d.input, output: d.output } : d.output, null, 2)}</pre>}
+            {kyc ? <KycView t={d.output as KycTask} /> : <pre tabIndex={0} aria-label="Task JSON" className="mt-2 max-h-[40rem] overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(d.taskType === 'ANNOTATION' ? { input: d.input, output: d.output } : d.output, null, 2)}</pre>}
           </section>
 
           {d.reviews.length > 0 && (

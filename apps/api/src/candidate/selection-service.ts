@@ -114,7 +114,7 @@ export async function reviewableEnrollment(tx: Db | Tx, actor: InternalActor, en
     where: { id: enrollmentId, clientId: actor.clientId },
     include: { opportunity: true, opportunityVersion: true, smeUser: true },
   });
-  if (!e) throw notFound('Application not found');
+  if (!e || e.status === 'DRAFT' || !e.profileVersionId || !e.submittedAt) throw notFound('Application not found');
   if (!actor.roles.includes('ADMIN')) {
     const assigned = await tx.projectReviewer.findUnique({ where: { projectId_userId: { projectId: e.opportunity.projectId, userId: actor.userId } } });
     if (!assigned) throw notFound('Application not found');

@@ -16,7 +16,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
   if (!data) notFound();
   return (
     <main className="mx-auto max-w-6xl px-4 py-6">
-      <Review initial={data} identityLabel={me.identityLabel} identityEligible={identityEligible(me.identityStatus)} />
+      <Review initial={data} identityLabel={me.identityLabel} identityEligible={identityEligible(me.identityStatus)} identityBlockReason={me.applicationBlockReason} />
     </main>
   );
 }

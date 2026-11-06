@@ -36,8 +36,8 @@ export default async function HomePage() {
   if (has('FINANCE') || has('PM') || has('ADMIN')) {
     const runs = await apiGet<{ items: { status: string }[] }>('/pay-runs');
     if (runs.data) {
-      const waiting = runs.data.items.filter((r) => (has('FINANCE') && (r.status === 'CONFIRMED' || r.status === 'APPROVED')) || ((has('PM') || has('ADMIN')) && r.status === 'DRAFT')).length;
-      tiles.push({ label: 'Pay runs waiting for you', count: waiting, hint: has('FINANCE') ? 'Approve and submit confirmed weekly pay runs.' : 'Confirm drafted weekly pay runs.', href: '/payments/pay-runs' });
+      const waiting = runs.data.items.filter((r) => ((has('ADMIN') || has('FINANCE')) && (r.status === 'CONFIRMED' || r.status === 'APPROVED')) || ((has('PM') || has('ADMIN')) && r.status === 'DRAFT')).length;
+      tiles.push({ label: 'Pay runs waiting for you', count: waiting, hint: has('ADMIN') ? 'Release and submit weekly pay runs.' : has('FINANCE') ? 'Approve and submit confirmed weekly pay runs.' : 'Confirm drafted weekly pay runs.', href: '/payments/pay-runs' });
     }
   }
   if (has('FINANCE') || has('ADMIN')) {
@@ -52,7 +52,7 @@ export default async function HomePage() {
         <p className="muted text-sm">{user.roles.map((r) => (r === 'PM' ? 'Program Manager' : roleLabel(r))).join(' · ')}</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">Welcome, {user.name.split(' ')[0]}</h1>
         <p className="muted mt-2 max-w-2xl">Experts write verified, synthetic tasks from your workflow templates; every selection and acceptance is made by a person.</p>
-        {has('PM') && (
+        {(has('ADMIN') || has('PM')) && (
           <Link href="/projects/new" className="btn mt-5 bg-white text-brand-navy shadow-lg hover:bg-white/90">
             New project →
           </Link>

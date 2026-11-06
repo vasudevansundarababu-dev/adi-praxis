@@ -2,6 +2,7 @@
 
 import { FIELD_DEFS } from '@praxis/shared';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Req, RequiredNote } from '@/components/required';
 import { correct } from '@/lib/profile-client';
@@ -14,6 +15,7 @@ type Answer = { kind: 'value'; raw: string } | { kind: 'UNKNOWN' | 'DECLINE' | '
  * confirmed answers. Roles are added on the profile panel of the conversation or review page.
  */
 export function FormFallback({ initial }: { initial: ConversationState }) {
+  const router = useRouter();
   const [state, setState] = useState(initial);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -27,7 +29,7 @@ export function FormFallback({ initial }: { initial: ConversationState }) {
     e.preventDefault();
     const fields = Object.entries(answers).flatMap(([fieldKey, a]): { fieldKey: string; action: string; value?: unknown }[] => {
       if (a.kind !== 'value') return [{ fieldKey, action: a.kind }];
-      if (!a.raw.trim()) return [];
+      if (!a.raw.trim()) return [{ fieldKey, action: 'CLEAR' }];
       const kind = fieldKind(fieldKey);
       const value = kind === 'number' ? Number(a.raw) : kind === 'list' ? a.raw.split(',').map((s) => s.trim()).filter(Boolean) : a.raw.trim();
       return [{ fieldKey, action: 'EDIT', value }];
@@ -36,7 +38,9 @@ export function FormFallback({ initial }: { initial: ConversationState }) {
     if (!r.ok) return setMessage({ ok: false, text: r.message });
     setState(r.data);
     setAnswers({});
-    setMessage({ ok: true, text: 'Saved.' });
+    router.refresh();
+    setMessage({ ok: true, text: JSON.stringify(r.data.profile).includes('[removed:')
+      ? 'Saved with sensitive identifiers removed. Please describe the work in general terms and confirm the corrected answers.' : 'Saved.' });
   }
 
   return (
@@ -61,9 +65,9 @@ export function FormFallback({ initial }: { initial: ConversationState }) {
               <div key={f} className="mt-3">
                 <label htmlFor={`f-${f}`} className="block text-sm">{state.fieldLabels[f] ?? f}{status ? ` · currently: ${status.toLowerCase()}` : ''}</label>
                 {fieldKind(f) === 'text' ? (
-                  <textarea id={`f-${f}`} aria-required={q.required || undefined} rows={3} defaultValue={currentText(f)} onChange={(e) => setAnswers({ ...answers, [f]: { kind: 'value', raw: e.target.value } })} className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm" />
+                  <textarea id={`f-${f}`} aria-required={q.required || undefined} rows={3} value={a ? a.kind === 'value' ? a.raw : '' : currentText(f)} onChange={(e) => setAnswers({ ...answers, [f]: { kind: 'value', raw: e.target.value } })} className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm" />
                 ) : (
-                  <input id={`f-${f}`} aria-required={q.required || undefined} type={fieldKind(f) === 'number' ? 'number' : 'text'} defaultValue={currentText(f)} onChange={(e) => setAnswers({ ...answers, [f]: { kind: 'value', raw: e.target.value } })} className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm" />
+                  <input id={`f-${f}`} aria-required={q.required || undefined} type={fieldKind(f) === 'number' ? 'number' : 'text'} value={a ? a.kind === 'value' ? a.raw : '' : currentText(f)} onChange={(e) => setAnswers({ ...answers, [f]: { kind: 'value', raw: e.target.value } })} className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm" />
                 )}
                 <div className="mt-1 flex flex-wrap gap-4 text-xs">
                   {(['UNKNOWN', 'DECLINE', ...(q.required ? [] : ['SKIP' as const])] as ('UNKNOWN' | 'DECLINE' | 'SKIP')[]).map((k) => (

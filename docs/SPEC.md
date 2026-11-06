@@ -1,3 +1,7 @@
+# Current Admin workflow policy
+
+See [ADMIN-WORKFLOW.md](ADMIN-WORKFLOW.md): Admin alone can operate Praxis. It supersedes the legacy multi-role sign-off requirements below; historical roles and records are preserved.
+
 # ADI Praxis — Software Specification
 
 Sep 26, 2026 · @Vasudevan Sundarababu

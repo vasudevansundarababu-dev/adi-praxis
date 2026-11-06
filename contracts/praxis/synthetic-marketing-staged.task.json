@@ -1,0 +1,300 @@
+{
+  "schema_version": "praxis.anvil.task.v2",
+  "task_id": "SYN-MKT-STAGED-001",
+  "task_version": "2.0.0",
+  "revision_id": "syn-mkt-staged-r1",
+  "title": "Synthetic staged launch allocation",
+  "objective": "Manage a fictional campaign across sequential decisions. Read each revealed observation and current state, then write output.json. Only a passing decision advances the environment.",
+  "evidence": [
+    {
+      "id": "ev-channel-costs",
+      "visibility": "actor",
+      "content": "Fictional campaign: search costs $40 per qualified lead; social costs $100. Available budget is $1000. Evidence identifier: ev-channel-costs."
+    },
+    {
+      "id": "ev-private-note",
+      "visibility": "private",
+      "content": "Verifier-only synthetic canary: PRIVATE-NORTHSTAR-739. This note is never actor material."
+    },
+    {
+      "id": "ev-budget-update",
+      "visibility": "future",
+      "reveal_stage_id": "stage-revise",
+      "content": "FUTURE-NORTHSTAR-482: budget has been reduced to $600 after the first commitment. Revise spend to $600 and report prior_spend_usd from state.committed_spend. Cite ev-budget-update."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "final-rule-budget",
+      "description": "Spend no more than 600 USD.",
+      "hard_failure": true,
+      "binding": {
+        "kind": "json_number_max",
+        "field": "spend_usd",
+        "value": 600
+      }
+    },
+    {
+      "id": "final-rule-positive",
+      "description": "Spend must be nonnegative.",
+      "hard_failure": true,
+      "binding": {
+        "kind": "json_number_min",
+        "field": "spend_usd",
+        "value": 0
+      }
+    }
+  ],
+  "environment": {
+    "binding": "staged-decision-v1",
+    "initial_state": {
+      "budget_usd": 1000,
+      "fictional": true
+    }
+  },
+  "actions": [
+    {
+      "id": "action-submit",
+      "description": "Write a final JSON decision to /workspace/output.json; there are no external side effects.",
+      "kind": "submit_json"
+    }
+  ],
+  "stages": [
+    {
+      "id": "stage-commit",
+      "instruction": "Choose the most efficient channel and commit the available 1000 USD budget. Cite ev-channel-costs.",
+      "evidence_ids": [
+        "ev-channel-costs"
+      ],
+      "completion": "submit_output_json",
+      "action_id": "action-submit",
+      "constraints": [
+        {
+          "id": "s1-rule-budget",
+          "description": "Spend no more than 1000 USD.",
+          "hard_failure": true,
+          "binding": {
+            "kind": "json_number_max",
+            "field": "spend_usd",
+            "value": 1000
+          }
+        },
+        {
+          "id": "s1-rule-positive",
+          "description": "Spend must be nonnegative.",
+          "hard_failure": true,
+          "binding": {
+            "kind": "json_number_min",
+            "field": "spend_usd",
+            "value": 0
+          }
+        }
+      ],
+      "rubric": {
+        "criteria": [
+          {
+            "id": "s1-channel",
+            "description": "Check channel against the supplied evidence and state.",
+            "weight_bps": 4000,
+            "binding": {
+              "kind": "json_equals",
+              "field": "channel",
+              "value": "search"
+            }
+          },
+          {
+            "id": "s1-evidence",
+            "description": "Check evidence_id against the supplied evidence and state.",
+            "weight_bps": 4000,
+            "binding": {
+              "kind": "json_equals",
+              "field": "evidence_id",
+              "value": "ev-channel-costs"
+            }
+          },
+          {
+            "id": "s1-use-budget",
+            "description": "Check spend_usd against the supplied evidence and state.",
+            "weight_bps": 2000,
+            "binding": {
+              "kind": "json_equals",
+              "field": "spend_usd",
+              "value": 1000
+            }
+          }
+        ],
+        "reference_output": {
+          "channel": "search",
+          "spend_usd": 1000,
+          "evidence_id": "ev-channel-costs"
+        }
+      },
+      "state_updates": [
+        {
+          "id": "update-commit",
+          "key": "committed_spend",
+          "from_field": "spend_usd"
+        }
+      ]
+    },
+    {
+      "id": "stage-revise",
+      "instruction": "Inspect the newly revealed observation and prior state. Revise your allocation, preserving the prior commitment in prior_spend_usd.",
+      "evidence_ids": [
+        "ev-channel-costs",
+        "ev-budget-update"
+      ],
+      "completion": "submit_output_json",
+      "action_id": "action-submit",
+      "constraints": [
+        {
+          "id": "s2-rule-budget",
+          "description": "Spend no more than 600 USD.",
+          "hard_failure": true,
+          "binding": {
+            "kind": "json_number_max",
+            "field": "spend_usd",
+            "value": 600
+          }
+        },
+        {
+          "id": "s2-rule-positive",
+          "description": "Spend must be nonnegative.",
+          "hard_failure": true,
+          "binding": {
+            "kind": "json_number_min",
+            "field": "spend_usd",
+            "value": 0
+          }
+        }
+      ],
+      "rubric": {
+        "criteria": [
+          {
+            "id": "s2-channel",
+            "description": "Check channel against the supplied evidence and state.",
+            "weight_bps": 3000,
+            "binding": {
+              "kind": "json_equals",
+              "field": "channel",
+              "value": "search"
+            }
+          },
+          {
+            "id": "s2-evidence",
+            "description": "Check evidence_id against the supplied evidence and state.",
+            "weight_bps": 2000,
+            "binding": {
+              "kind": "json_equals",
+              "field": "evidence_id",
+              "value": "ev-budget-update"
+            }
+          },
+          {
+            "id": "s2-prior",
+            "description": "Check prior_spend_usd against the supplied evidence and state.",
+            "weight_bps": 3000,
+            "binding": {
+              "kind": "json_equals",
+              "field": "prior_spend_usd",
+              "value": 1000
+            }
+          },
+          {
+            "id": "s2-utilize",
+            "description": "Check spend_usd against the supplied evidence and state.",
+            "weight_bps": 2000,
+            "binding": {
+              "kind": "json_equals",
+              "field": "spend_usd",
+              "value": 600
+            }
+          }
+        ],
+        "reference_output": {
+          "channel": "search",
+          "spend_usd": 600,
+          "evidence_id": "ev-budget-update",
+          "prior_spend_usd": 1000
+        }
+      },
+      "state_updates": [
+        {
+          "id": "update-final",
+          "key": "final_spend",
+          "from_field": "spend_usd"
+        }
+      ]
+    }
+  ],
+  "deliverables": [
+    {
+      "id": "deliverable-decision",
+      "path": "output.json",
+      "description": "Each stage writes output.json. The revision stage includes prior_spend_usd read from state.json."
+    }
+  ],
+  "rubric": {
+    "criteria": [
+      {
+        "id": "final-channel",
+        "description": "Check channel against the supplied evidence and state.",
+        "weight_bps": 3000,
+        "binding": {
+          "kind": "json_equals",
+          "field": "channel",
+          "value": "search"
+        }
+      },
+      {
+        "id": "final-evidence",
+        "description": "Check evidence_id against the supplied evidence and state.",
+        "weight_bps": 2000,
+        "binding": {
+          "kind": "json_equals",
+          "field": "evidence_id",
+          "value": "ev-budget-update"
+        }
+      },
+      {
+        "id": "final-prior",
+        "description": "Check prior_spend_usd against the supplied evidence and state.",
+        "weight_bps": 3000,
+        "binding": {
+          "kind": "json_equals",
+          "field": "prior_spend_usd",
+          "value": 1000
+        }
+      },
+      {
+        "id": "final-utilize",
+        "description": "Check spend_usd against the supplied evidence and state.",
+        "weight_bps": 2000,
+        "binding": {
+          "kind": "json_equals",
+          "field": "spend_usd",
+          "value": 600
+        }
+      }
+    ],
+    "reference_output": {
+      "channel": "search",
+      "spend_usd": 600,
+      "evidence_id": "ev-budget-update",
+      "prior_spend_usd": 1000
+    }
+  },
+  "provenance": {
+    "classification": "synthetic",
+    "source": "Original ADI development example. Fictional company and data; no customer material.",
+    "rights": {
+      "status": "declared",
+      "basis": "Original synthetic software test authored for this integration. This declaration is not reviewed rights clearance."
+    },
+    "review": {
+      "status": "draft",
+      "reviewer_ref": "not-reviewed",
+      "reviewed_revision_id": "syn-mkt-staged-r1"
+    }
+  }
+}

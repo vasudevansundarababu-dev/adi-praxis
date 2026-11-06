@@ -28,7 +28,7 @@ export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, {
       orderBy: { submittedAt: 'asc' },
     });
     const items = rows
-      .filter((t) => !t.assignedTo?.smeUser || (!conflicted.has(t.assignedTo.smeUserId) && t.assignedTo.smeUser.contactEmail?.toLowerCase() !== me.email.toLowerCase()))
+      .filter((t) => !t.assignedTo?.smeUser || (!conflicted.has(t.assignedTo.smeUserId) && (actor.roles.includes('ADMIN') || t.assignedTo.smeUser.contactEmail?.toLowerCase() !== me.email.toLowerCase())))
       .map((t) => {
         const checks = t.checks as StoredChecks | null;
         return {

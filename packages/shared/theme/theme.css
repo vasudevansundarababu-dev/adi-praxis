@@ -59,7 +59,7 @@
   --praxis-bg: #212227;
   --praxis-surface: #2a2c33;
   --praxis-text: #e6eaee;
-  --praxis-text-muted: #8597a3;
+  --praxis-text-muted: #8a9ca8;
   --praxis-border: #3a3d46;
   --praxis-link: #5aa3e6;
   --praxis-focus: #5aa3e6;
@@ -132,9 +132,9 @@ body {
     line-height: 20px;
     white-space: nowrap;
     background: color-mix(in srgb, var(--pill, var(--praxis-text-muted)) 14%, transparent);
-    color: var(--pill, var(--praxis-text-muted));
+    color: var(--praxis-text);
   }
-  .pill::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+  .pill::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: var(--pill, var(--praxis-text-muted)); }
   .pill-info { --pill: var(--praxis-link); }
   .pill-success { --pill: var(--praxis-success); }
   .pill-warning { --pill: var(--praxis-warning); }

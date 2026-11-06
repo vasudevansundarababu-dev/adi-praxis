@@ -1,87 +1,25 @@
-# YC repository review — 1 November 2026
+# ADI Praxis
+## Founder brief | 2 November 2026
 
-Application source reviewed at `960555fe`, branch `codex/praxis-anvil-harbor`.
-This documentation check-in does not change runtime code, deploy or publish a repository.
-The authoritative application Git root is `adi-praxis/adi-praxis`; outer-folder archives,
-`praxis-deploy` and `praxis-fix-gcs` are not dependencies or authoritative source copies.
+**Expert task authoring that makes real-world business judgment usable for AI evaluation.**
 
-## Verification in this review
+### The problem
+AI tests are only as trustworthy as the tasks and grading rules behind them. A plausible question can miss the operating constraints, exceptions and evidence that an experienced practitioner uses. Without knowing who authored a task and who verified its rules, a large dataset can scale uncertainty instead of useful judgment.
 
-| Command | Result |
-| --- | --- |
-| `pnpm --filter @praxis/shared test` | 121 passed in 10 files, including 20 Praxis contract tests |
-| `pnpm typecheck` | Passed across all five workspace packages/apps |
-| `pnpm --filter @praxis/mcp-replay test` | 2 passed |
-| `pnpm --filter @praxis/api test -- test/taskflow.test.ts test/dataset.test.ts test/rbac.test.ts` | 452 passed in 27 files, 93.80s; this invocation ran the full API suite rather than filtering files |
-| `pnpm test:e2e` | 13 assertions passed, 1 deployed-only check skipped; shutdown stalled and the owned runner was interrupted after 3.3m, exit 130. Overall command incomplete |
-| Local Markdown target check; `git diff --check` | Passed for the three documentation files |
+### What we are building
+Praxis is a domain-expert task-authoring platform. It structures business work into tasks, evidence, rules, rubrics, constraints and expected deliverables that Anvil can test. Our task-sourcing work draws on conversations with CMOs, SEO analysts, campaign managers, and KYC and compliance managers at banks across geographies. The goal is to capture how real decisions are made, rather than rely only on generic or model-generated questions.
 
-The browser run logged a null-user `roles` access at
-`apps/web/app/(console)/review/applications/page.tsx:20` during the session-reset
-journey. The redirect assertion passed, but this logged defect and the shutdown hang
-remain unresolved; neither is hidden by the passing assertions. Only the owned test
-runner was interrupted. Generated Next.js E2E configuration changes were restored to
-their clean starting contents; no application source change was made.
+### Scale, trust and business context
+**Scale:** A repeatable authoring and review process lets many experts contribute while preserving consistent task structure. We aim to build Marketing, Banking and Commerce taskbanks of 200-500 independently expert-authored samples per domain, using Banking KYC/AML and fraud as reference use cases. These are recruitment and publication targets, not completed collections.
 
-The historical
-[M10 status](M10-STATUS.md) records earlier results and intermittent local database
-stalls; those counts must not be represented as fresh passes at this revision.
-The [Release 1.1 coverage map](testing/COVERAGE.md) is manual case mapping, not automated
-coverage or proof of a current passing full suite. No code-coverage percentage is claimed.
+**Trust and integrity:** Our production verification standard requires rigorous SME onboarding: identity, relevant experience, domain fit, conflicts and contribution rights. Each task should receive documented expert verification before publication. We intend to involve senior specialists, including retired Federal Reserve or RBI officials where engaged, and professors or guides suited to the task. Participation is not regulatory approval or institutional endorsement. Production-grade verification and the full review process remain milestones to complete.
 
-## Reviewer paths
+**Business context and compliance:** Experts author the rules, rubrics and constraints that distinguish a valid answer from an unsafe or impractical one. Reviews should identify the applicable jurisdiction, policy or legal source, exceptions and review date. Version history, review decisions and permission boundaries create a trail that can be examined and updated. This supports compliance review; it does not guarantee compliance with every law.
 
-- [Shared executable-contract tests](../packages/shared/test/praxis-contract.test.ts)
-  cover validation and single/staged fixture boundaries.
-- [Task flow](../apps/api/test/taskflow.test.ts), [task/dataset workflow](../apps/api/test/tasks.test.ts)
-  and [access controls](../apps/api/test/rbac.test.ts) cover durable human decisions,
-  exports and authorization. Tests use a dedicated test database.
-- [Browser smoke](../e2e/smoke.spec.ts) and [M10 journeys](../e2e/m10.spec.ts) exercise UI flows.
-- [Synthetic export fixtures](../contracts/praxis/) contain no customer cases.
-- [Architecture](ARCHITECTURE.md) describes the implemented components and export boundary.
+### Why this can be different
+Our intended advantage combines access to practitioners with a verifiable authoring process. A collection of questions alone cannot establish the author's qualifications, the rule's business basis or the review behind a grading decision. Praxis is designed to preserve those connections as contributions scale. Proposed recruiting channels include the Bodhium network for Marketing and our Banking network; university and former-regulator participation must be confirmed individually.
 
-## Publication preparation
+### Progress and next milestones
+The current platform supports structured authoring, review and versioned exports for Anvil, with synthetic reference tasks. Over the next 30 days, we will focus on remaining functionality, expert recruitment, verification and the planned Anvil run-to-SME-review-to-Anvil feedback loop. Beyond December 2026, the broader product roadmap includes proposed Prammana and Thinking Machines integrations; scope and partner participation are unconfirmed.
 
-### YC deployment verified, 1 November2026 (America/Chicago)
-
-Application commit `ddc8446b`, build `yc-ddc8446b-20261101` deployed to the four existing
-Cloud Run services. Cloud Build10a125b2-c9e4-47f5-8fe0-cd40507092a1 succeeded; migration
-execution `praxis-migrate-2qpbs` succeeded. Console login and candidate endpoints return200;
-the version endpoint reports the exact build and commit; `/readyz` confirms PostgreSQL
-and Redis. The attempted `/api/v1/health` and `/healthz` paths returned404 and are not
-counted as passing checks. SQL backup1793593073237 completed successfully before migration.
-No user/database reset or demo setup ran. Local typechecks,121 shared tests and452 API
-tests passed before rollout. No live Vertex call or email/payout test was made.
-Current smoke checks are unauthenticated availability/version checks; user sign-in uses
-existing assigned accounts. The read-only branch/tag history scan found no actual provider
-keys/private keys; only the reviewed release branch was pushed, excluding local Codex refs.
-
-Existing remote: `https://github.com/vasudevansundarababu-dev/adi-praxis.git`.
-The user subsequently authorized public publication and an existing-target GCP release
-on1 November2026. The earlier documentation-only restriction is superseded for this
-release. Preserve existing release branches and unrelated work; publish only explicitly
-reviewed Git branches, never local Codex checkpoint refs or untracked SDK artifacts.
-
-The tracked-file scan checked 607 baseline paths for private-key blocks, common provider-token
-formats, service-account JSON and credential-bearing URLs. No private key, provider-token
-or service-account match was found. The ten URL matches are loopback-only development/test
-defaults or Terraform interpolation expressions, not discovered live credentials. This
-is a scoped working-tree scan, not a guarantee
-about Git history or all possible secrets/private data. Office document XML was also
-scanned (11 parts, no provider-token/private-key matches). Tutorial PDFs/video contents
-were inventoried but not visually reviewed; this is not a public-media clearance.
-
-Local `.env`, build outputs and test results remain ignored. Two pre-existing untracked
-Google Cloud SDK artifacts must stay outside the checkpoint. No local credentials or
-raw logs belong in reviewer docs. A fresh dependency install, production build, live-provider test and remote CI were not
-rerun in this documentation task. Live payout qualification, broad intake field mapping,
-Praxis v3 authoring and current GCP sign-in verification remain outside these results.
-
-The existing GCP target is `adi-praxis-test-0928/us-central1`, with console at
-https://praxis-web-yu2jtyqhea-uc.a.run.app. It is a test/demo configuration with real
-Vertex AI and simulated candidate identity/sign-in/email. Cloud SQL currently has
-public IPv4 and automated backups disabled; a successful on-demand pre-release backup
-is required before migrations. This differs from the private Terraform target.
-The pending release must record the newly verified version and smoke results here.
-Share credentials privately; never add passwords,
-keys, session cookies or sign-in tokens to this repository.
+**Together: Praxis establishes the business test. Anvil shows where the model meets it, fails it and needs further investigation.**

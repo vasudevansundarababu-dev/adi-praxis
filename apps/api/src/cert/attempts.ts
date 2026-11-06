@@ -328,7 +328,8 @@ export async function confirmGrade(tx: Tx, args: { attemptId: string; itemId: st
   const g = grading[args.itemId];
   if (!g?.written) throw notFound('Written answer not found');
   const who = args.confirmer.kind === 'INTERNAL' ? args.confirmer.userId : args.confirmer.smeUserId;
-  if ((g.confirmations ?? []).some((c) => c.by === who)) throw new AppError(409, 'ALREADY_CONFIRMED', 'You already confirmed this grade; a different person must confirm too.');
+  const adminDecision = args.confirmer.kind === 'INTERNAL' && args.confirmer.roles.includes('ADMIN');
+  if (!adminDecision && (g.confirmations ?? []).some((c) => c.by === who)) throw new AppError(409, 'ALREADY_CONFIRMED', 'You already confirmed this grade; a different person must confirm too.');
   const item = await tx.itemInstance.findUniqueOrThrow({ where: { id: args.itemId }, include: { family: true } });
   const authoring = item.family.itemType === 'AUTHORING';
   const domain = a.certification.domain;
@@ -341,20 +342,21 @@ export async function confirmGrade(tx: Tx, args: { attemptId: string; itemId: st
     const theirs = await tx.supplyCandidate.findUnique({ where: { smeUserId: a.smeUserId }, include: { submissions: { select: { partnerId: true } } } });
     const shared = (mine?.submissions ?? []).some((s) => s.partnerId && (theirs?.submissions ?? []).some((t) => t.partnerId === s.partnerId));
     if (shared) throw new AppError(403, 'CONFLICT_PARTNER', 'You are linked to the same partner as this candidate; another Expert must confirm.');
-  } else if (authoring && experts >= 2) {
+  } else if (!adminDecision && authoring && experts >= 2) {
     throw new AppError(403, 'EXPERTS_REQUIRED', 'This domain has certified Experts: two of them confirm the authoring task.');
   }
   const role = args.confirmer.kind === 'INTERNAL' ? (args.confirmer.roles.includes('ADMIN') ? 'ADMIN' : 'REVIEWER') : 'EXPERT';
   const confirmations = [...(g.confirmations ?? []), { by: who, kind: args.confirmer.kind, role, score: args.score, at: new Date().toISOString() }];
   // Until the domain has two certified Experts, the authoring task needs an Admin and a Validator.
-  if (authoring && args.confirmer.kind === 'INTERNAL' && confirmations.length >= 2) {
+  if (!adminDecision && authoring && args.confirmer.kind === 'INTERNAL' && confirmations.length >= 2) {
     const roles = new Set(confirmations.map((c) => c.role));
     if (!(roles.has('ADMIN') && roles.has('REVIEWER'))) throw new AppError(409, 'SECOND_ROLE_NEEDED', 'The second confirmation must come from the other role (Admin and Validator).');
   }
-  const done = confirmations.length >= (g.required ?? 1);
-  grading[args.itemId] = { ...g, confirmations, confirmedScore: done ? confirmations.reduce((n, c) => n + c.score, 0) / confirmations.length : null };
+  const required = adminDecision ? 1 : (g.required ?? 1);
+  const done = confirmations.length >= required;
+  grading[args.itemId] = { ...g, required, confirmations, confirmedScore: adminDecision ? args.score : done ? confirmations.reduce((n, c) => n + c.score, 0) / confirmations.length : null };
   await tx.testAttempt.update({ where: { id: a.id }, data: { grading: grading as Prisma.InputJsonValue } });
-  return { done, confirmations: confirmations.length, required: g.required ?? 1 };
+  return { done, confirmations: confirmations.length, required };
 }
 
 /** A person decides a certification under review: certify, not certified, or allow another retake. */

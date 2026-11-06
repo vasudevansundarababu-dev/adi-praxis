@@ -116,6 +116,12 @@ Use Stripe Identity VerificationSessions rather than treating payment onboarding
 
 UI: Not started; Continue verification; Processing; Verified; More information needed; Canceled; Help needed. “More information needed” offers a supported retry and help. Unsupported documents/countries, consent issues and technical failures lead to support or an approved alternative identity process, not an expertise rejection. Never label a manual alternative as “Stripe verified.” [Stripe verification outcomes](https://docs.stripe.com/identity/handle-verification-outcomes)
 
+Identity-review access follows project assignment: a Validator can list and decide only
+for candidates with a non-withdrawn enrollment in a currently assigned project. Admins
+handle requests before enrollment and other unassigned requests within their own tenant.
+The decision endpoint rechecks the same scope as the queue; revoking assignment removes
+both permissions immediately. This does not grant access to another tenant's candidates.
+
 Server-side authenticated provider status is authoritative, not a browser success redirect. Verify webhook signatures using the original request body, `Stripe-Signature` and the endpoint secret. Persist deduplicated receipts, reconcile the correct account/session and distinguish test from live mode. [Stripe webhook verification](https://docs.stripe.com/webhooks/signature)
 
 Store only necessary session references, check/status summary, timestamps and operational reason codes. Identity images, ID numbers, dates of birth and raw selfie data do not enter the chatbot, credential evidence bundle, suitability model or task-matching profile. Do not download them to the platform merely because an API permits access. Identity data and expertise data have separate access and retention policies.

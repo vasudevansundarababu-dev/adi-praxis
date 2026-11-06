@@ -118,10 +118,8 @@ describe('M10b guidelines, courses and certification (docs/SME-SUPPLY.md section
     for (const f of bp.families.filter((x: { status: string }) => x.status === 'DRAFT')) {
       const a = await post(admin, `/item-families/${f.id}/decision`, { decision: 'APPROVE' });
       expect(a.statusCode, a.body).toBe(200);
-      if (tier === 'EXPERT') {
-        expect(a.json().status).toBe('DRAFT');
-        expect((await post(validator, `/item-families/${f.id}/decision`, { decision: 'APPROVE' })).json().status).toBe('APPROVED');
-      } else expect(a.json().status).toBe('APPROVED');
+      expect(a.json().status).toBe('APPROVED');
+      expect(a.json().approvals).toEqual([expect.objectContaining({ role: 'ADMIN' })]);
     }
     const res = await post(admin, `/guidelines/versions/${versionId}/tiers/${tier}/publish`);
     expect(res.statusCode, res.body).toBe(200);
@@ -586,7 +584,7 @@ describe('M10b guidelines, courses and certification (docs/SME-SUPPLY.md section
       expect(await db.auditEvent.count({ where: { action: 'cert.grade_confirmed', entityId: t.attemptId } })).toBe(written.length);
     });
 
-    it('the Expert authoring task needs two confirmations from an Admin and a Validator until the domain has two certified Experts', async () => {
+    it('Admin alone finalizes Expert authoring grades without a Validator', async () => {
       const { packageId, versionId } = await guidelines();
       await publishTier(versionId, 'EXPERT');
       const partner = await livePartner();
@@ -601,11 +599,7 @@ describe('M10b guidelines, courses and certification (docs/SME-SUPPLY.md section
       expect((await answerAll(c, t, true, long)).status).toBe('NEEDS_REVIEW');
       const authoring = t.items.find((i) => i.itemType === 'AUTHORING')!;
       for (const w of t.items.filter((i) => i.itemType === 'CRITIQUE')) expect((await post(admin, `/test-attempts/${t.attemptId}/grades`, { itemId: w.id, score: 0.9 })).statusCode).toBe(200);
-      // First confirmation by a Validator; a second Validator is refused (the other role must confirm).
-      expect((await post(validator, `/test-attempts/${t.attemptId}/grades`, { itemId: authoring.id, score: 0.9 })).json()).toMatchObject({ done: false, confirmations: 1, required: 2 });
-      expect((await db.testAttempt.findUniqueOrThrow({ where: { id: t.attemptId } })).status).toBe('NEEDS_REVIEW');
-      expect((await post(validator2, `/test-attempts/${t.attemptId}/grades`, { itemId: authoring.id, score: 0.9 })).json().error).toBe('SECOND_ROLE_NEEDED');
-      expect((await post(admin, `/test-attempts/${t.attemptId}/grades`, { itemId: authoring.id, score: 0.8 })).json()).toMatchObject({ done: true, confirmations: 2 });
+      expect((await post(admin, `/test-attempts/${t.attemptId}/grades`, { itemId: authoring.id, score: 0.8 })).json()).toMatchObject({ done: true, confirmations: 1, required: 1 });
       expect((await db.testAttempt.findUniqueOrThrow({ where: { id: t.attemptId } })).status).toBe('PASSED');
       expect((await certState(certId)).state).toBe('PASSED');
     });

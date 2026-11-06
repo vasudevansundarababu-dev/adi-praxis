@@ -1,3 +1,4 @@
+import { EXECUTABLE_WORKFLOW } from '@praxis/shared';
 import { hashPassword } from '../auth/password';
 import type { Db } from '../db';
 import { seed } from '../../prisma/seed';
@@ -29,6 +30,9 @@ export async function demoSetup(db: Db, env: NodeJS.ProcessEnv, log: (level: str
   }
   await call('a', 'POST', '/auth/login', { email: 'admin@praxis.demo', password: pw.admin });
   await call('p', 'POST', '/auth/login', { email: 'pm@praxis.demo', password: pw.pm });
+
+  await executableDemoSetup(call, log);
+  await executableDemoSetup(call, log, true);
 
   if ((await call('p', 'GET', '/projects')).items.some((p: { name: string }) => p.name === 'KYC authoring demo')) {
     log('info', 'demo project already exists');
@@ -110,4 +114,34 @@ async function supplySetup(db: Db, clientId: string, env: NodeJS.ProcessEnv, cal
   await call('p', 'PUT', `/requisitions/${r.id}/rate-card`, { rateCardId: card.id });
   await call('p', 'POST', `/requisitions/${r.id}/transition`, { to: 'OPEN' });
   log('info', 'SME supply demo data ready', { partnerId: partner.id, requisitionId: r.id });
+}
+
+/** Creates only reviewable demo configuration through public APIs. No task or rights approval is fabricated. */
+export async function executableDemoSetup(call: Call, log: (level: string, message: string, extra?: object) => void, staged = false) {
+  const name = staged ? 'SYNTHETIC TEST — Harbor staged marketing decisions' : 'SYNTHETIC TEST — Harbor marketing decisions';
+  const existing = (await call('p', 'GET', '/projects')).items.find((p: { name: string }) => p.name === name);
+  if (existing) {
+    if (existing.status === 'DRAFT') await call('p', 'POST', `/projects/${existing.id}/submit`);
+    if (['DRAFT', 'READY_FOR_STAFFING'].includes(existing.status)) await call('p', 'POST', `/projects/${existing.id}/synthetic-example`);
+    return;
+  }
+  const domains = (await call('a', 'GET', '/domains')).items;
+  const domain = domains.find((d: { name: string }) => d.name === 'Marketing') ?? await call('a', 'POST', '/domains', { name: 'Marketing' });
+  let t = (await call('a', 'GET', '/templates')).items.find((x: { workflowName: string; domainId: string }) => x.workflowName === EXECUTABLE_WORKFLOW && x.domainId === domain.id);
+  if (!t) t = await call('a', 'POST', '/templates', {
+    domainId: domain.id, workflowName: EXECUTABLE_WORKFLOW,
+    primaryWork: 'Author original synthetic marketing decisions using explicit executable rules. Single or sequential stages submit output.json with explicit grading and state projection.',
+    verificationCriteria: 'Reference output satisfies every constraint and rubric binding. Hard failures zero the final reward in Anvil.',
+    humanGate: 'Independent task review and separate rights review are required. This setup does not approve any authored task.',
+    defaultTptMinutes: 30, skills: ['Marketing'], taskModes: ['AUTHORING'], openSlotShare: 0,
+    coverageDimensions: { dimensions: [{ key: 'scenario', label: 'Scenario', values: ['launch_allocation'] }], cells: [{ tags: { scenario: 'launch_allocation' }, quota: 1, required: true }] },
+    edgeCaseCatalog: [], defaultDistinctTarget: 1, defaultMaxPerExpert: 1,
+  });
+  if (t.status === 'DRAFT') await call('a', 'POST', `/templates/${t.id}/publish`);
+  const jd = await call('p', 'POST', '/job-descriptions', { title: 'Synthetic marketing task author', responsibilities: 'Use the built-in synthetic decision example, inspect and edit the constraints, reference answer and rubric, and submit for independent human review.', skills: ['Marketing'], wagePerTask: 1, wageCurrency: 'USD', locationType: 'REMOTE' });
+  const d = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+  const project = await call('p', 'POST', '/projects', { templateId: t.id, name, distinctTarget: 1, maxPerExpert: 1, tptMinutes: 30, startDate: d(1), endDate: d(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] });
+  await call('p', 'POST', `/projects/${project.id}/submit`);
+  const example = await call('p', 'POST', `/projects/${project.id}/synthetic-example`);
+  log('info', 'synthetic executable draft created; awaits staffing and real author/reviewer actions', { projectId: project.id, templateId: t.id, taskId: example.taskId });
 }

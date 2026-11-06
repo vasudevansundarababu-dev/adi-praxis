@@ -1,0 +1,28 @@
+{
+  "schema_version": "praxis.anvil.task.v1",
+  "task_id": "SYN-MKT-ALLOCATION-001",
+  "task_version": "1.0.0",
+  "revision_id": "syn-mkt-allocation-r1",
+  "title": "Synthetic launch allocation decision",
+  "objective": "Choose a launch channel and spend for fictional Northstar Flow. Write /workspace/output.json with channel, spend_usd and evidence_id fields. Maximize qualified leads while staying within the spending ceiling.",
+  "evidence": [
+    {"id": "ev-channel-costs", "visibility": "actor", "content": "Fictional campaign: search costs $40 per qualified lead; social costs $100. Available budget is $1000. Evidence identifier: ev-channel-costs."},
+    {"id": "ev-private-note", "visibility": "private", "content": "Verifier-only synthetic canary: PRIVATE-NORTHSTAR-739. This note is never actor material."}
+  ],
+  "constraints": [
+    {"id": "rule-budget", "description": "Spend no more than $1000.", "hard_failure": true, "binding": {"kind": "json_number_max", "field": "spend_usd", "value": 1000}},
+    {"id": "rule-nonnegative", "description": "Spend must be nonnegative.", "hard_failure": true, "binding": {"kind": "json_number_min", "field": "spend_usd", "value": 0}}
+  ],
+  "environment": {"binding": "structured-decision-v1", "initial_state": {"budget_usd": 1000, "fictional": true}},
+  "actions": [{"id": "action-submit", "description": "Write a final JSON decision to /workspace/output.json; there are no external side effects."}],
+  "stages": [{"id": "stage-decision", "instruction": "Inspect the provided channel evidence and submit the decision.", "evidence_ids": ["ev-channel-costs"], "completion": "Write /workspace/output.json"}],
+  "deliverables": [{"id": "deliverable-decision", "path": "output.json", "description": "JSON object containing channel (string), spend_usd (number), evidence_id (string)."}],
+  "rubric": {
+    "criteria": [
+      {"id": "criterion-channel", "description": "Select the more efficient channel.", "weight_bps": 6000, "binding": {"kind": "json_equals", "field": "channel", "value": "search"}},
+      {"id": "criterion-evidence", "description": "Cite the supplied evidence identifier.", "weight_bps": 4000, "binding": {"kind": "json_equals", "field": "evidence_id", "value": "ev-channel-costs"}}
+    ],
+    "reference_output": {"channel": "search", "spend_usd": 1000, "evidence_id": "ev-channel-costs"}
+  },
+  "provenance": {"classification": "synthetic", "source": "Original ADI development example. Fictional company and data; no customer material.", "rights": {"status": "declared", "basis": "Original synthetic software test authored for this integration. This declaration is not reviewed rights clearance."}, "review": {"status": "draft", "reviewer_ref": "not-reviewed", "reviewed_revision_id": "syn-mkt-allocation-r1"}}
+}

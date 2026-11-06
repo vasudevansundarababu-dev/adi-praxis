@@ -61,7 +61,7 @@ export default async function BlueprintPage({ params }: { params: Promise<{ id: 
         <h2 className="text-lg font-semibold">Item families ({b.families.length})</h2>
         <p className="mt-1 max-w-3xl text-sm text-fg-muted">
           Approve every family, with at least one valid sample, before publishing.
-          {expert ? ' Expert-tier families need an Admin and a Validator (or, once the domain has two certified Experts, an Expert).' : ' An Admin approves each family.'}
+          {' An Admin decision is sufficient for every tier; no additional Validator or Expert sign-off is required.'}
         </p>
         <ul className="mt-3 space-y-4">
           {b.families.map((f) => (

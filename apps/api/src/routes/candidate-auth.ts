@@ -1,5 +1,7 @@
 import { CandidateMeDto, GoogleSignInRequest, IDENTITY_HELP_REASONS, identityEligible } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type { Prisma } from '@prisma/client';
+import type { InternalActor } from '../auth/actor';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { CANDIDATE_SESSION_COOKIE, createCandidateSession, revokeSession } from '../auth/sessions';
@@ -7,7 +9,7 @@ import type { GoogleVerifier } from '../candidate/google';
 import { MockGoogleVerifier } from '../candidate/google';
 import type { IdentityProvider } from '../candidate/identity-provider';
 import { MockIdentityProvider } from '../candidate/identity-provider';
-import { ELIGIBLE, identityProblemText, latestAttempt, processIdentityWebhook } from '../candidate/identity-service';
+import { applicationBlockReason, ELIGIBLE, identityProblemText, latestAttempt, processIdentityWebhook } from '../candidate/identity-service';
 import type { Config } from '../config';
 import type { Db, Tx } from '../db';
 import { AppError, notFound, unauthorized } from '../lib/errors';
@@ -22,7 +24,17 @@ export interface CandidateDeps {
   resolveClientId: () => Promise<string>;
 }
 
-async function meDto(tx: Db | Tx, smeUserId: string): Promise<z.infer<typeof CandidateMeDto>> {
+// Identity help before a project enrollment is handled by an Admin. Validators may
+// see or decide only for applicants in their assigned project pools.
+function identityReviewScope(actor: InternalActor): Prisma.SmeUserWhereInput {
+  return { clientId: actor.clientId, ...(actor.roles.includes('ADMIN') ? {} : {
+    enrollments: { some: { clientId: actor.clientId, status: { not: 'WITHDRAWN' }, opportunity: {
+      project: { clientId: actor.clientId, reviewers: { some: { userId: actor.userId } } },
+    } } },
+  }) };
+}
+
+async function meDto(tx: Db | Tx, smeUserId: string, requireLive: boolean): Promise<z.infer<typeof CandidateMeDto>> {
   const u = await tx.smeUser.findUniqueOrThrow({
     where: { id: smeUserId },
     include: { enrollments: { include: { opportunityVersion: true }, orderBy: { createdAt: 'desc' } } },
@@ -43,6 +55,7 @@ async function meDto(tx: Db | Tx, smeUserId: string): Promise<z.infer<typeof Can
     identityStatus: u.identityStatus,
     identityLabel,
     identityProblem: eligible ? null : identityProblemText(attempt?.errorCode ?? null),
+    applicationBlockReason: await applicationBlockReason(tx, smeUserId, requireLive),
     nextStep: !eligible ? 'VERIFY_IDENTITY' : draft ? 'CONTINUE_PROFILE' : 'CHOOSE_OPPORTUNITY',
     enrollments: u.enrollments.map((e) => ({
       id: e.id,
@@ -107,12 +120,12 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
         userAgent: req.headers['user-agent'],
       });
       reply.setCookie(CANDIDATE_SESSION_COOKIE, token, { ...cookieOptions, expires: expiresAt });
-      return meDto(db, user.id);
+      return meDto(db, user.id, config.requireLiveIdentity);
     },
   );
 
   app.get('/me', { config: { access: 'candidate' }, schema: { tags: ['candidate'], response: { 200: CandidateMeDto } } }, async (req) =>
-    meDto(db, req.candidate!.smeUserId),
+    meDto(db, req.candidate!.smeUserId, config.requireLiveIdentity),
   );
 
   app.post('/me/logout', { config: { access: 'candidate' }, schema: { tags: ['candidate'], response: { 204: z.null() } } }, async (req, reply) => {
@@ -123,7 +136,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
 
   // ── C02 identity ──
   app.get('/me/identity', { config: { access: 'candidate' }, schema: { tags: ['candidate'], response: { 200: IdentityDto } } }, async (req) => {
-    const me = await meDto(db, req.candidate!.smeUserId);
+    const me = await meDto(db, req.candidate!.smeUserId, config.requireLiveIdentity);
     const a = await latestAttempt(db, req.candidate!.smeUserId);
     return {
       identityStatus: me.identityStatus,
@@ -179,7 +192,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
         });
         await tx.smeUser.update({ where: { id: u.id }, data: { identityStatus: 'MANUAL_REVIEW_REQUIRED' } });
         await audit({ entityType: 'SmeUser', entityId: u.id, action: 'identity.help_requested', before: { identityStatus: u.identityStatus }, after: { identityStatus: 'MANUAL_REVIEW_REQUIRED', reason: req.body.reason, note: req.body.note ?? null } });
-        return { status: 200, body: await meDto(tx, u.id) };
+        return { status: 200, body: await meDto(tx, u.id, config.requireLiveIdentity) };
       });
       return reply;
     },
@@ -205,7 +218,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
     { config: { access: ['REVIEWER', 'ADMIN'] }, schema: { tags: ['candidate'], response: { 200: z.object({ items: z.array(z.object({ smeUserId: z.string(), displayName: z.string().nullable(), reason: z.string().nullable(), requestedAt: z.string() })) }) } } },
     async (req) => {
       const users = await db.smeUser.findMany({
-        where: { clientId: req.actor!.clientId, identityStatus: 'MANUAL_REVIEW_REQUIRED' },
+        where: { ...identityReviewScope(req.actor!), identityStatus: 'MANUAL_REVIEW_REQUIRED' },
         include: { identityAttempts: { orderBy: { createdAt: 'desc' }, take: 1 } },
         orderBy: { updatedAt: 'asc' },
       });
@@ -233,7 +246,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
     },
     async (req, reply) => {
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
-        const u = await tx.smeUser.findFirst({ where: { id: req.params.smeUserId, clientId: actor.clientId } });
+        const u = await tx.smeUser.findFirst({ where: { id: req.params.smeUserId, ...identityReviewScope(actor) } });
         if (!u) throw notFound('Candidate not found');
         if (u.identityStatus !== 'MANUAL_REVIEW_REQUIRED') throw new AppError(409, 'NOT_AWAITING_REVIEW', 'This candidate is not awaiting an identity review.');
         const next = req.body.outcome === 'ALTERNATIVE_VERIFIED' ? 'ALTERNATIVE_VERIFIED' : 'REQUIRES_INPUT';
@@ -254,7 +267,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
       '/auth/dev/google-token',
       {
         config: { access: 'public' },
-        schema: { hide: true, body: z.object({ email: z.string().email(), name: z.string().trim().min(1).max(200) }), response: { 200: z.object({ credential: z.string() }) } },
+        schema: { tags: ['demo-only'], body: z.object({ email: z.string().email(), name: z.string().trim().min(1).max(200) }), response: { 200: z.object({ credential: z.string() }) } },
       },
       async (req) => ({ credential: google.mint({ subject: `mock-${req.body.email.toLowerCase()}`, email: req.body.email, name: req.body.name }) }),
     );
@@ -265,7 +278,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
       {
         config: { access: 'candidate' },
         schema: {
-          hide: true,
+          tags: ['demo-only'],
           params: z.object({ sessionId: z.string() }),
           body: z.object({ status: z.enum(['verified', 'requires_input', 'processing', 'canceled']), adult: z.boolean().optional(), errorCode: z.string().optional() }),
           response: { 200: z.object({ result: z.string() }) },

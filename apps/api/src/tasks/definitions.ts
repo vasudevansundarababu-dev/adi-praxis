@@ -1,4 +1,4 @@
-import { kycCanonicalText, kycChecks, kycKeyInputs, type CoverageTags, type KycTask, type TaskCheck } from '@praxis/shared';
+import { EXECUTABLE_WORKFLOW, praxisContractIssues, praxisContractChecks, kycCanonicalText, kycChecks, kycKeyInputs, type CoverageTags, type KycTask, type TaskCheck } from '@praxis/shared';
 
 export interface TemplateRef {
   workflowName: string;
@@ -38,7 +38,7 @@ const strings = (v: unknown): string[] =>
 export const genericDefinition: TaskDefinition = {
   key: 'generic',
   validateTaskInput: (_t, data) => (data && typeof data === 'object' && !Array.isArray(data) ? [] : ['Each input must be a JSON object']),
-  validateSubmission: () => [],
+  validateSubmission: (_t, output) => praxisContractChecks(output),
   canonicalText: (output) => strings(output).join('\n'),
   keyInputs: () => [],
 };
@@ -89,3 +89,5 @@ export function coverageChecks(template: TemplateRef, slot: SlotRef | null, outp
   }
   return checks;
 }
+
+registerDefinition('Marketing', EXECUTABLE_WORKFLOW, { ...genericDefinition, key: 'praxis-contract-v1', validateTaskInput: (_t, input) => praxisContractIssues((input as Record<string, unknown> | null)?.praxisContract).map((i) => `${i.path}: ${i.message}`), validateSubmission: (_t, output) => praxisContractChecks(output, true) });

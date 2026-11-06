@@ -1,3 +1,5 @@
+import { praxisContractIssues, EXECUTABLE_WORKFLOW } from '@praxis/shared';
+import { AppError } from '../lib/errors';
 import type { ApprovedTaskRecord, Prisma } from '@prisma/client';
 import type { Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
@@ -82,6 +84,11 @@ type RecordBase = Omit<ApprovedTaskRecord, 'id' | 'seq' | 'createdAt' | 'content
 
 /** Appends one record to the hash chain: under the chain lock, prev_hash is the latest record's content_hash. */
 export async function appendRecord(tx: Tx, base: RecordBase) {
+  const output = base.output as Record<string, unknown>;
+  if (base.workflow === EXECUTABLE_WORKFLOW || (output && Object.hasOwn(output, 'praxisContract'))) {
+    const issues = praxisContractIssues(output.praxisContract);
+    if (issues.length) throw new AppError(422, 'CONTRACT_INVALID', 'Executable contract needs attention.', { issues });
+  }
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CHAIN_LOCK})`;
   const prev = await tx.approvedTaskRecord.findFirst({ orderBy: { seq: 'desc' }, select: { contentHash: true } });
   const prevHash = prev?.contentHash ?? null;

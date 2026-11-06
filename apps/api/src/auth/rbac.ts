@@ -3,6 +3,7 @@ import fp from 'fastify-plugin';
 import type { Db } from '../db';
 import { AppError, forbidden, unauthorized } from '../lib/errors';
 import { sha256 } from '../lib/crypto';
+import { ErrorDto } from '@praxis/shared';
 import type { AccessPolicy, ApiClientActor, CandidateActor, PartnerActor } from './actor';
 import { CANDIDATE_SESSION_COOKIE, PARTNER_SESSION_COOKIE, resolveCandidateSession, resolveInternalSession, resolvePartnerSession, resolvePartnerToken, SESSION_COOKIE } from './sessions';
 
@@ -50,6 +51,15 @@ export const rbacPlugin = fp(async (app: FastifyInstance, opts: { db: Db }) => {
     if (!access) {
       throw new Error(`Route ${route.method} ${route.url} has no access policy (config.access)`);
     }
+    const security: Record<string, string[]>[] = access === 'public' ? []
+      : access === 'candidate' ? [{ candidateSession: [] }]
+      : access === 'partner' ? [{ partnerSession: [] }]
+      : typeof access === 'object' && 'partnerScope' in access ? [{ partnerOAuth: [access.partnerScope] }]
+      : typeof access === 'object' && 'apiClient' in access ? [{ session: [] }, { serviceToken: [] }]
+      : [{ session: [] }];
+    route.schema = { ...route.schema, security, ...(access !== 'public' ? {
+      response: { 401: ErrorDto, 403: ErrorDto, ...(route.schema?.response as Record<string, unknown> | undefined) },
+    } : {}) };
   });
 
   app.addHook('onRequest', async (req) => {

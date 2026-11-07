@@ -3,7 +3,7 @@
 | Item | Value |
 | --- | --- |
 | Status | **Draft for owner approval (Gate 3: plan).** Coding starts only after approval. |
-| Implements | [PRD](../prd/PRD-TEMPLATES-META-COMPILER.md) (approved 7 Nov) and [architecture](../architecture/ARCH-TEMPLATES-META-COMPILER.md) (Gate 2, for review 8 Nov) |
+| Implements | [PRD](../prd/PRD-TEMPLATES-META-COMPILER.md) (approved 7 Nov) and [architecture](../architecture/ARCH-TEMPLATES-META-COMPILER.md) (approved 8 Nov) |
 | Target | Phases A and B in production by **16 Nov 2026**; Phase C after, with separate approval |
 | OpenHands budget | **$600** cap for Phases A + B (owner, 7 Nov). Alerts at $300 and $480; stop at $600 unless raised |
 | Prepared by | OpenHands agent (Planner role), 7 Nov 2026 |

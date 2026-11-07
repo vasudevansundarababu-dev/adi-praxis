@@ -161,6 +161,7 @@ describe('J3 judge job after task verification', () => {
   let clientId: string;
   let adminId: string;
   let admin: string;
+  let smeCookie = '';
 
   async function committed(judged = true) {
     const bp = judged ? judgedExampleBlueprint(`studio-${randomUUID().slice(0, 8)}`) : undefined;
@@ -173,6 +174,7 @@ describe('J3 judge job after task verification', () => {
     await db.smeUser.update({ where: { id: smeUserId }, data: { identityStatus: 'VERIFIED', contactEmail: email } });
     const c = await db.candidate.create({ data: { clientId, smeUserId, country: 'GB', languages: [{ language: 'en', level: 'C2' }], specialties: ['Marketing'], skills: ['Marketing'], jurisdictions: [], domainExperienceYears: 8, hoursPerWeek: 20, timezone: 'Europe/London', lastValidatedAt: new Date() } });
     const cookie = `praxis_candidate=${res.cookies.find((x) => x.name === 'praxis_candidate')!.value}`;
+    smeCookie = cookie;
     await db.projectAssignment.create({ data: { clientId, projectId: project.id, candidateId: c.id } });
     const { verificationId } = await generateAndVerify(http, admin, deployWork, t.id);
     const studioKey = (await http.post(admin, `/templates/${t.id}/deployments`, { verificationRunId: verificationId, projectId: project.id, smeCandidateId: c.id })).json().studioKey as string;
@@ -289,6 +291,39 @@ describe('J3 judge job after task verification', () => {
     await processTaskJudge({ db, storage, config: capped(1, 0.5), judge: paid }, id);
     expect(await judgeOf(id)).toMatchObject({ status: 'NOT_MEASURED', error: expect.stringMatching(/daily generation budget/) });
     expect(calls).toBe(0);
+  });
+
+  it('J4: Admin and Reviewer read the judge result with criterion text; PM, Finance, SMEs and other clients cannot', async () => {
+    const id = await committed();
+    await work();
+    const row = await db.smeAuthoredTask.findUniqueOrThrow({ where: { id } });
+    const reviewerUser = await createUser(clientId, ['REVIEWER']);
+    await db.projectReviewer.create({ data: { clientId, projectId: row.projectId, userId: reviewerUser.id, assignedById: adminId } });
+    const reviewer = await login(app, reviewerUser.email);
+    const pm = await login(app, (await createUser(clientId, ['PM'])).email);
+    const finance = await login(app, (await createUser(clientId, ['FINANCE'])).email);
+    const unassigned = await login(app, (await createUser(clientId, ['REVIEWER'])).email);
+
+    const res = await http.get(admin, `/studio-tasks/${id}/judge`);
+    expect(res.statusCode, res.body).toBe(200);
+    const memo = res.json().judge.milestones.find((m: { milestoneId: string }) => m.milestoneId === 'memo');
+    expect(res.json().judge).toMatchObject({ status: 'MEASURED', score: 1, provider: 'mock', model: 'mock-judge-1', costUsd: 0 });
+    expect(memo).toMatchObject({ weight: 20, pointsEarned: 6, pointsPossible: 6 });
+    expect(memo.criteria[0]).toMatchObject({ num: 1, category: 'Budget', text: 'ANSWERKEY-ONE: states the budget of 4200 credits', points: 2, awarded: 2, passed: true });
+    expect((await http.get(reviewer, `/studio-tasks/${id}/judge`)).statusCode).toBe(200);
+    expect((await http.get(reviewer, `/review/tasks/${row.taskInstanceId}/judge`)).json()).toEqual(res.json());
+    expect((await http.get(admin, `/review/tasks/${row.taskInstanceId}/judge`)).statusCode).toBe(200);
+    expect((await http.get(unassigned, `/review/tasks/${row.taskInstanceId}/judge`)).statusCode).toBe(404);
+    for (const who of [pm, finance]) {
+      expect((await http.get(who, `/studio-tasks/${id}/judge`)).statusCode).toBe(403);
+      expect((await http.get(who, `/review/tasks/${row.taskInstanceId}/judge`)).statusCode).toBe(403);
+    }
+    // Signed out, or an SME's candidate session: no access.
+    for (const cookie of ['', smeCookie]) expect((await http.get(cookie, `/studio-tasks/${id}/judge`)).statusCode).toBe(401);
+    // Another client's Admin gets 404.
+    const otherAdmin = await login(app, (await createUser((await createClient()).id, ['ADMIN'])).email);
+    expect((await http.get(otherAdmin, `/studio-tasks/${id}/judge`)).statusCode).toBe(404);
+    expect((await http.get(otherAdmin, `/review/tasks/${row.taskInstanceId}/judge`)).statusCode).toBe(404);
   });
 
   it('records not measured when the runner returned no output files', async () => {

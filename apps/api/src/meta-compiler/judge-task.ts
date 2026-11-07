@@ -132,3 +132,58 @@ export async function processTaskJudge(w: TaskJudgeDeps, authoredTaskId: string)
     throw err;
   }
 }
+
+const JudgeViewCriterion = z.object({ num: z.number(), category: z.string(), text: z.string(), points: z.number(), awarded: z.number(), passed: z.boolean(), evidence: z.string() });
+/** Admin and Reviewer view of a task's judge result (J4), with each criterion's text from the committed bundle. */
+export const JudgeViewResponse = z.object({
+  judge: z
+    .object({
+      status: z.enum(['MEASURED', 'NOT_MEASURED']),
+      provider: z.string(),
+      model: z.string(),
+      score: z.number().nullable(),
+      costUsd: z.number(),
+      judgedAt: z.string(),
+      error: z.string().nullable(),
+      milestones: z.array(z.object({ milestoneId: z.string(), weight: z.number(), pointsEarned: z.number(), pointsPossible: z.number(), truncated: z.boolean(), criteria: z.array(JudgeViewCriterion) })),
+    })
+    .nullable(),
+});
+export type JudgeViewResponse = z.infer<typeof JudgeViewResponse>;
+
+export async function judgeView(storage: ObjectStorage, t: { bundleRef: string; bundleSha256: string; verificationEvidence: unknown }): Promise<JudgeViewResponse> {
+  const j = ((t.verificationEvidence ?? {}) as { judge?: TaskJudgeEvidence }).judge;
+  if (!j) return { judge: null };
+  let specs: JudgeFile[] = [];
+  try {
+    const bytes = await storage.get(t.bundleRef);
+    if (createHash('sha256').update(bytes).digest('hex') === t.bundleSha256) specs = judgeFilesOf(bytes);
+  } catch {
+    // Without the bundle the scores still show; only the criterion text is missing.
+  }
+  return {
+    judge: {
+      status: j.status,
+      provider: j.provider,
+      model: j.model,
+      score: j.score,
+      costUsd: j.costUsd,
+      judgedAt: j.judgedAt,
+      error: j.error,
+      milestones: j.milestones.map((m) => {
+        const spec = specs.find((s) => s.milestone_id === m.milestoneId);
+        return {
+          milestoneId: m.milestoneId,
+          weight: m.weight,
+          pointsEarned: m.pointsEarned,
+          pointsPossible: m.pointsPossible,
+          truncated: m.truncated,
+          criteria: m.criteria.map((c) => {
+            const k = spec?.criteria.find((x) => x.num === c.num);
+            return { num: c.num, category: k?.category ?? '', text: k?.text ?? '', points: k?.points ?? 0, awarded: c.awarded, passed: c.passed, evidence: c.evidence };
+          }),
+        };
+      }),
+    },
+  };
+}

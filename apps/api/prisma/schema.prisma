@@ -58,6 +58,47 @@ enum TemplateStatus {
   RETIRED
 }
 
+enum ExecutionMode {
+  HERMETIC_MCP
+  HERMETIC_GRAPH
+  HERMETIC_SQL
+}
+
+enum GenerationMode {
+  BLUEPRINT
+  FULL_CODE
+}
+
+enum DrafterProvider {
+  claude
+  gemini
+  mock
+}
+
+enum MetaCompilerRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CAPPED
+}
+
+enum StudioDeploymentStatus {
+  ACTIVE
+  STOPPED
+  FAILED
+}
+
+enum StudioRuntime {
+  SHARED
+  ISOLATED
+}
+
+enum DataClassification {
+  SYNTHETIC
+  REAL_PUBLIC
+}
+
 enum TaskMode {
   AUTHORING
   ANNOTATION
@@ -309,18 +350,18 @@ model Client {
 
 /// Internal users: Admin, PM, Reviewer. One user may hold several roles.
 model User {
-  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId     String         @map("client_id") @db.Uuid
-  email        String         @unique
-  name         String
-  roles        InternalRole[]
-  status       UserStatus     @default(ACTIVE)
-  passwordHash String         @map("password_hash")
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String         @map("client_id") @db.Uuid
+  email              String         @unique
+  name               String
+  roles              InternalRole[]
+  status             UserStatus     @default(ACTIVE)
+  passwordHash       String         @map("password_hash")
   /// Set when an Admin issues a temporary password; the user must choose their own before doing anything else.
-  mustChangePassword Boolean  @default(false) @map("must_change_password")
-  lastLoginAt  DateTime?      @map("last_login_at")
-  createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime       @updatedAt @map("updated_at")
+  mustChangePassword Boolean        @default(false) @map("must_change_password")
+  lastLoginAt        DateTime?      @map("last_login_at")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
 
   client        Client            @relation(fields: [clientId], references: [id])
   sessions      Session[]
@@ -378,8 +419,9 @@ model Domain {
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
 
-  client    Client     @relation(fields: [clientId], references: [id])
+  client    Client              @relation(fields: [clientId], references: [id])
   templates Template[]
+  presets   ElicitationPreset[]
 
   @@unique([clientId, name])
 }
@@ -414,12 +456,22 @@ model Template {
   similarityThreshold   Decimal        @default(0.90) @map("similarity_threshold") @db.Decimal(4, 3)
   publishedAt           DateTime?      @map("published_at")
   retiredAt             DateTime?      @map("retired_at")
+  /// Harbor blueprint (packages/shared/src/blueprint). Null for templates outside the Meta-Compiler catalog.
+  blueprint             Json?
+  blueprintRevision     Int            @default(0) @map("blueprint_revision")
+  executionMode         ExecutionMode? @map("execution_mode")
+  variantOfId           String?        @map("variant_of_id") @db.Uuid
   createdAt             DateTime       @default(now()) @map("created_at")
   updatedAt             DateTime       @updatedAt @map("updated_at")
 
-  domain    Domain          @relation(fields: [domainId], references: [id])
-  defaultJd JobDescription? @relation("TemplateDefaultJd", fields: [defaultJdId], references: [id])
-  projects  Project[]
+  domain           Domain                  @relation(fields: [domainId], references: [id])
+  defaultJd        JobDescription?         @relation("TemplateDefaultJd", fields: [defaultJdId], references: [id])
+  variantOf        Template?               @relation("TemplateVariant", fields: [variantOfId], references: [id])
+  variants         Template[]              @relation("TemplateVariant")
+  projects         Project[]
+  generationRuns   CompilerGenerationRun[]
+  deployments      StudioDeployment[]
+  smeAuthoredTasks SmeAuthoredTask[]
 
   @@unique([lineageId, version])
   @@index([clientId, status])
@@ -520,6 +572,8 @@ model Project {
   campaigns          Campaign[]
   assignments        ProjectAssignment[]
   tasks              TaskInstance[]
+  studioDeployments  StudioDeployment[]
+  smeAuthoredTasks   SmeAuthoredTask[]
   slots              CoverageSlot[]
   inputBatches       TaskInputBatch[]
   opportunity        Opportunity?
@@ -585,12 +639,14 @@ model Candidate {
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
 
-  smeUser      SmeUser                 @relation(fields: [smeUserId], references: [id])
-  applications Application[]
-  assignments  ProjectAssignment[]
-  tasks        TaskInstance[]
-  matches      ProjectMatch[]
-  rejections   ProjectMatchRejection[]
+  smeUser           SmeUser                 @relation(fields: [smeUserId], references: [id])
+  applications      Application[]
+  assignments       ProjectAssignment[]
+  studioDeployments StudioDeployment[]
+  smeAuthoredTasks  SmeAuthoredTask[]
+  tasks             TaskInstance[]
+  matches           ProjectMatch[]
+  rejections        ProjectMatchRejection[]
 
   @@index([clientId])
   @@index([country])
@@ -822,6 +878,7 @@ model TaskInstance {
   updatedAt           DateTime                    @updatedAt @map("updated_at")
 
   submissions       TaskSubmission[]
+  smeAuthoredTasks  SmeAuthoredTask[]
   sources           TaskSource[]
   interviewTurns    TaskInterviewTurn[]
   draftRuns         TaskDraftRun[]
@@ -1770,18 +1827,18 @@ model Partner {
 
 /// A person at a partner who signs in to the partner portal (email + password, argon2id).
 model PartnerUser {
-  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId     String     @map("client_id") @db.Uuid
-  partnerId    String     @map("partner_id") @db.Uuid
-  email        String     @unique
-  name         String
-  passwordHash String     @map("password_hash")
+  id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String     @map("client_id") @db.Uuid
+  partnerId          String     @map("partner_id") @db.Uuid
+  email              String     @unique
+  name               String
+  passwordHash       String     @map("password_hash")
   /// Set when an Admin issues a temporary password; the partner user must choose their own first.
-  mustChangePassword Boolean @default(false) @map("must_change_password")
-  status       UserStatus @default(ACTIVE)
-  lastLoginAt  DateTime?  @map("last_login_at")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
+  mustChangePassword Boolean    @default(false) @map("must_change_password")
+  status             UserStatus @default(ACTIVE)
+  lastLoginAt        DateTime?  @map("last_login_at")
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
 
   partner  Partner   @relation(fields: [partnerId], references: [id])
   sessions Session[]
@@ -2557,4 +2614,152 @@ model PartnerStatement {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([partnerId, period])
+}
+
+// Templates Meta-Compiler (docs/architecture/ARCH-TEMPLATES-META-COMPILER.md section 3.2)
+
+/// Per-domain, Admin-editable custom-field presets for the Guided Elicitation Assistant (D7).
+model ElicitationPreset {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  domainId  String   @map("domain_id") @db.Uuid
+  label     String
+  /// A CustomField from the shared blueprint schema.
+  field     Json
+  sortOrder Int      @default(0) @map("sort_order")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  domain Domain @relation(fields: [domainId], references: [id])
+
+  @@unique([domainId, label])
+  @@index([clientId, domainId])
+}
+
+/// Screen 3 Step 1. Idempotent on (template, prompt hash, mode, model) (S3-03).
+model CompilerGenerationRun {
+  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId         String                @map("client_id") @db.Uuid
+  templateId       String                @map("template_id") @db.Uuid
+  templateVersion  Int                   @map("template_version")
+  mode             GenerationMode        @default(BLUEPRINT)
+  provider         DrafterProvider
+  model            String
+  promptHash       String                @map("prompt_hash")
+  status           MetaCompilerRunStatus @default(QUEUED)
+  /// { ui, backend, message }
+  progress         Json                  @default("{\"ui\":0,\"backend\":0,\"message\":\"Queued\"}")
+  estimatedCostUsd Decimal?              @map("estimated_cost_usd") @db.Decimal(10, 4)
+  actualCostUsd    Decimal?              @map("actual_cost_usd") @db.Decimal(10, 4)
+  inputTokens      Int?                  @map("input_tokens")
+  outputTokens     Int?                  @map("output_tokens")
+  outputRef        String?               @map("output_ref")
+  outputSha256     String?               @map("output_sha256")
+  logRef           String?               @map("log_ref")
+  error            String?
+  requestedById    String                @map("requested_by_id") @db.Uuid
+  startedAt        DateTime?             @map("started_at")
+  finishedAt       DateTime?             @map("finished_at")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  template      Template                  @relation(fields: [templateId], references: [id])
+  verifications CompilerVerificationRun[]
+
+  @@unique([templateId, promptHash, mode, model])
+  @@index([clientId, createdAt])
+}
+
+/// Screen 3 Step 2. Scores are measured by the sandbox runner and stored with evidence (D-12).
+model CompilerVerificationRun {
+  id                String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String                @map("client_id") @db.Uuid
+  generationRunId   String                @map("generation_run_id") @db.Uuid
+  status            MetaCompilerRunStatus @default(QUEUED)
+  /// [{ id, passed, value, evidence }] for checks 01-05.
+  checks            Json                  @default("[]")
+  zeroBaselineScore Decimal?              @map("zero_baseline_score") @db.Decimal(4, 2)
+  oracleScore       Decimal?              @map("oracle_score") @db.Decimal(4, 2)
+  bundleRef         String?               @map("bundle_ref")
+  bundleSha256      String?               @map("bundle_sha256")
+  runnerRef         String?               @map("runner_ref")
+  logRef            String?               @map("log_ref")
+  error             String?
+  requestedById     String                @map("requested_by_id") @db.Uuid
+  startedAt         DateTime?             @map("started_at")
+  finishedAt        DateTime?             @map("finished_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+
+  generationRun CompilerGenerationRun @relation(fields: [generationRunId], references: [id])
+  deployments   StudioDeployment[]
+
+  @@index([clientId, generationRunId])
+}
+
+/// One studio per (template lineage, project, SME); studioKey survives redeploys (D14, S3-09).
+model StudioDeployment {
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String                 @map("client_id") @db.Uuid
+  templateId        String                 @map("template_id") @db.Uuid
+  templateLineageId String                 @map("template_lineage_id") @db.Uuid
+  templateVersion   Int                    @map("template_version")
+  projectId         String                 @map("project_id") @db.Uuid
+  candidateId       String                 @map("candidate_id") @db.Uuid
+  verificationRunId String                 @map("verification_run_id") @db.Uuid
+  studioKey         String                 @unique @map("studio_key")
+  status            StudioDeploymentStatus @default(ACTIVE)
+  runtime           StudioRuntime          @default(SHARED)
+  deployedById      String                 @map("deployed_by_id") @db.Uuid
+  stoppedAt         DateTime?              @map("stopped_at")
+  stoppedById       String?                @map("stopped_by_id") @db.Uuid
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+
+  template         Template                @relation(fields: [templateId], references: [id])
+  project          Project                 @relation(fields: [projectId], references: [id])
+  candidate        Candidate               @relation(fields: [candidateId], references: [id])
+  verificationRun  CompilerVerificationRun @relation(fields: [verificationRunId], references: [id])
+  smeAuthoredTasks SmeAuthoredTask[]
+
+  @@unique([templateLineageId, projectId, candidateId])
+  @@index([clientId, status])
+}
+
+/// PDF §7.1 sme_authored_tasks, linked to the existing task chain (D8 = A, D-11, D-13). taskJson, bundleSha256 and
+/// dataClassification are immutable after insert (database trigger).
+model SmeAuthoredTask {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId             String             @map("client_id") @db.Uuid
+  taskInstanceId       String             @map("task_instance_id") @db.Uuid
+  submissionVersion    Int                @map("submission_version")
+  deploymentId         String             @map("deployment_id") @db.Uuid
+  templateId           String             @map("template_id") @db.Uuid
+  templateVersion      Int                @map("template_version")
+  projectId            String             @map("project_id") @db.Uuid
+  candidateId          String             @map("candidate_id") @db.Uuid
+  externalTaskId       String             @unique @map("external_task_id")
+  title                String
+  tptEstimate          String?            @map("tpt_estimate")
+  executionMode        ExecutionMode      @map("execution_mode")
+  taskJson             Json               @map("task_json")
+  bundleRef            String             @map("bundle_ref")
+  bundleSha256         String             @map("bundle_sha256")
+  zeroBaselineScore    Decimal?           @map("zero_baseline_score") @db.Decimal(4, 2)
+  oracleScore          Decimal?           @map("oracle_score") @db.Decimal(4, 2)
+  verificationEvidence Json?              @map("verification_evidence")
+  dataClassification   DataClassification @map("data_classification")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  taskInstance TaskInstance     @relation(fields: [taskInstanceId], references: [id])
+  deployment   StudioDeployment @relation(fields: [deploymentId], references: [id])
+  template     Template         @relation(fields: [templateId], references: [id])
+  project      Project          @relation(fields: [projectId], references: [id])
+  candidate    Candidate        @relation(fields: [candidateId], references: [id])
+
+  @@unique([taskInstanceId, submissionVersion])
+  @@index([clientId, createdAt])
+  @@index([clientId, deploymentId])
 }

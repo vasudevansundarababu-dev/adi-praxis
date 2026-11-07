@@ -1,6 +1,7 @@
-import { Prisma, type Domain, type PrismaClient, type Template } from '@prisma/client';
+import { Prisma, type AuditEvent, type Domain, type PrismaClient, type Template } from '@prisma/client';
 import { publishProblems, sectionProblems, validSectionCount, BLUEPRINT_SECTIONS, type HarborBlueprint } from '@praxis/shared';
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { CATALOG_V2, RETIRED_DOMAINS, loadCatalogBlueprint, normaliseName } from './index';
 
 /**
@@ -25,6 +26,7 @@ export type CatalogChangeAction =
   | 'template.created'
   | 'template.published'
   | 'template.version_created'
+  | 'template.reinstated'
   | 'template.retired'
   | typeof CATALOG_V2_REVERSED;
 
@@ -166,6 +168,7 @@ async function seedInto(tx: Db, clientId: string, plan: CatalogPlan, apply: bool
 
     const existing = domain ? lineages(await tx.template.findMany({ where: { clientId, domainId: domain.id } })) : [];
     const used = await projectCounts(tx, existing.flat().map((t) => t.id));
+    const lastEvents = await lastCatalogEvents(tx, clientId, existing.map((vs) => vs[0]!.id));
     const domainName = domain?.name ?? d.name;
 
     for (const w of CATALOG_V2.find((c) => c.name === d.name)!.workflows) {
@@ -194,14 +197,34 @@ async function seedInto(tx: Db, clientId: string, plan: CatalogPlan, apply: bool
         continue;
       }
 
-      const latest = versions[0]!;
+      let latest = versions[0]!;
+      const reinstate = reinstatable(latest, lastEvents.get(latest.id));
+      if (reinstate) {
+        if (apply) {
+          const { count } = await tx.template.updateMany({
+            where: { id: latest.id, status: 'RETIRED' },
+            data: { status: reinstate.status, retiredAt: null, ...(reinstate.status === 'PUBLISHED' ? { publishedAt: new Date() } : {}) },
+          });
+          if (count !== 1) throw new Error(`Template ${latest.id} changed while catalog-v2 was running; run it again`);
+        }
+        await rec.change(
+          { action: 'template.reinstated', entityType: 'Template', entityId: latest.id, domain: domainName, workflowName: latest.workflowName, version: latest.version, from: 'RETIRED', to: reinstate.status },
+          { status: 'RETIRED', publishedAt: iso(latest.publishedAt), retiredAt: iso(latest.retiredAt) },
+          { reinstatedFrom: reinstate.eventId },
+        );
+        latest = { ...latest, status: reinstate.status };
+      }
       const reused: CatalogNote = { kind: 'reused', entityType: 'Template', entityId: latest.id, domain: domainName, workflowName: latest.workflowName, version: latest.version, status: latest.status, detail: `lineage ${latest.lineageId} reused for "${w.workflowName}"` };
       if (!bp) {
-        rec.note(reused);
+        if (!reinstate) rec.note(reused);
         continue;
       }
-      if (versions.some((v) => v.blueprint !== null)) {
-        rec.note({ ...reused, kind: 'blueprint_present', detail: 'a version of this workflow already holds a blueprint; unchanged' });
+
+      // A draft holding the unchanged catalog blueprint (left by a reverse) is published as it is.
+      const catalogDraft = latest.status === 'DRAFT' && latest.blueprint !== null && isDeepStrictEqual(latest.blueprint, JSON.parse(JSON.stringify(bp)));
+      const earlier = catalogDraft ? versions.slice(1) : versions;
+      if (earlier.some((v) => v.blueprint !== null) || (latest.blueprint !== null && !catalogDraft)) {
+        if (!reinstate) rec.note({ ...reused, kind: 'blueprint_present', detail: 'a version of this workflow already holds a blueprint; unchanged' });
         continue;
       }
 
@@ -212,14 +235,18 @@ async function seedInto(tx: Db, clientId: string, plan: CatalogPlan, apply: bool
         }
         if (apply) {
           const { count } = await tx.template.updateMany({
-            where: { id: latest.id, status: 'DRAFT', blueprint: { equals: Prisma.DbNull } },
-            data: { ...templateFieldsFromBlueprint(bp), blueprintRevision: latest.blueprintRevision + 1, status: 'PUBLISHED', publishedAt: new Date() },
+            where: { id: latest.id, status: 'DRAFT', ...(catalogDraft ? {} : { blueprint: { equals: Prisma.DbNull } }) },
+            data: {
+              ...(catalogDraft ? {} : { ...templateFieldsFromBlueprint(bp), blueprintRevision: latest.blueprintRevision + 1 }),
+              status: 'PUBLISHED',
+              publishedAt: new Date(),
+            },
           });
           if (count !== 1) throw new Error(`Template ${latest.id} changed while catalog-v2 was running; run it again`);
         }
         await rec.change(
           { action: 'template.published', entityType: 'Template', entityId: latest.id, domain: domainName, workflowName: latest.workflowName, version: latest.version, from: 'DRAFT', to: 'PUBLISHED' },
-          { status: 'DRAFT', publishedAt: null, retiredAt: iso(latest.retiredAt), fields: overwrittenFields(latest) },
+          { status: 'DRAFT', publishedAt: null, retiredAt: iso(latest.retiredAt), ...(catalogDraft ? {} : { fields: overwrittenFields(latest) }) },
           { blueprint: w.blueprint },
         );
         continue;
@@ -250,6 +277,25 @@ async function seedInto(tx: Db, clientId: string, plan: CatalogPlan, apply: bool
       );
     }
   }
+}
+
+async function lastCatalogEvents(tx: Db, clientId: string, entityIds: string[]): Promise<Map<string, AuditEvent>> {
+  const events = await tx.auditEvent.findMany({
+    where: { clientId, actorType: 'SYSTEM', actorId: CATALOG_V2_ACTOR, entityId: { in: entityIds } },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  return new Map(events.map((e) => [e.entityId, e]));
+}
+
+/**
+ * A catalog workflow that a `--reverse` retired (its last catalog-v2 event is that reversal) is put back to the status
+ * it had before the reversal, so running the job again after a reverse restores the catalog. Rows an Admin retired
+ * are left alone.
+ */
+function reinstatable(t: Template, last: AuditEvent | undefined): { status: 'DRAFT' | 'PUBLISHED'; eventId: string } | null {
+  if (t.status !== 'RETIRED' || last?.action !== CATALOG_V2_REVERSED) return null;
+  const status = (last.before as { status?: string } | null)?.status;
+  return status === 'DRAFT' || status === 'PUBLISHED' ? { status, eventId: last.id } : null;
 }
 
 function overwrittenFields(t: Template) {

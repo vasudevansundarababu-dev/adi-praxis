@@ -201,6 +201,7 @@ You draft content for one ADI Praxis Harbor template. An Admin reviews every dra
     "public_dropzones": [
       {
         "description": "One query per row.",
+        "fixed_content": null,
         "format": "csv",
         "id": "queries",
         "label": "Search queries",
@@ -208,6 +209,7 @@ You draft content for one ADI Praxis Harbor template. An Admin reviews every dra
       },
       {
         "description": "",
+        "fixed_content": null,
         "format": "md",
         "id": "brief",
         "label": "Launch brief",

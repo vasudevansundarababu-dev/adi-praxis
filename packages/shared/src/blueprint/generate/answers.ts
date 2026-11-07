@@ -49,7 +49,7 @@ export function resolveAnswers(bp: HarborBlueprint, answers: StudioAnswers | nul
   const rules = new Set(a.invariantRuleIds);
   return {
     fields: Object.fromEntries(allCustomFields(bp).map((f) => [f.field_id, pick(a.fields, f.field_id, f.default_value) ?? f.default_value])),
-    inputs: Object.fromEntries(bp.step_2_data_panels.public_dropzones.map((z) => [z.id, pick(a.inputs, z.id, '')])),
+    inputs: Object.fromEntries(bp.step_2_data_panels.public_dropzones.map((z) => [z.id, z.fixed_content ?? pick(a.inputs, z.id, '')])),
     oracleRows: a.oracleRows.map((r) => ({ cells: [...r.cells], tag: r.tag })),
     sliders: Object.fromEntries(bp.step_3_mcp_simulators.widgets.map((w) => [w.key, pick(a.sliders, w.key, w.default)])),
     enabledRuleIds: bp.step_4_invariant_catalog.rules.filter((r) => rules.has(r.id)).map((r) => r.id),

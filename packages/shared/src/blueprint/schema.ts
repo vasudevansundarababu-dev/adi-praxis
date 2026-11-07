@@ -71,6 +71,8 @@ export const Dropzone = z.object({
   target_path: z.string().trim().max(300),
   format: z.enum(DATAPANEL_FORMATS),
   description: z.string().max(2000).default(''),
+  /** Admin-fixed file content (e.g. case exhibits). When set, every task gets exactly this and the SME cannot change it. */
+  fixed_content: z.string().max(200_000).nullable().default(null),
 });
 
 export const OracleAnnotator = z.object({

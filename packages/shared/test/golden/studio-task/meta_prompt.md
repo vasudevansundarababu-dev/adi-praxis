@@ -308,6 +308,7 @@ You draft content for one ADI Praxis Harbor template. An Admin reviews every dra
     "milestones": [
       {
         "id": "intent_f1",
+        "judge": null,
         "label": "Keyword intent",
         "verifier_body": "plan = env_state['outputs'].get('intent.csv') or []\npredicted = [r['keyword'] for r in plan if r.get('intent') == 'BUY']\nexpected = tagged(ground_truth['keyword_intent.csv'], 'BUY', key='keyword')\nassert f1_set_match(predicted, expected) \u003e= 0.99",
         "verifier_template": "f1_set_match",
@@ -315,6 +316,7 @@ You draft content for one ADI Praxis Harbor template. An Admin reviews every dra
       },
       {
         "id": "budget",
+        "judge": null,
         "label": "Budget allocation",
         "verifier_body": "weeks = [c for c in env_state['calls'] if c['tool'] == 'set_week_budget']\nassert len(weeks) == 4",
         "verifier_template": "lp_solver_ceiling",

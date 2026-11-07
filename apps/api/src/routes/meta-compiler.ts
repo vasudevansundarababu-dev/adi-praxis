@@ -37,7 +37,7 @@ async function lockLineage(tx: Tx, lineageId: string) {
 const notEditable = (status: string) => new AppError(409, 'TEMPLATE_NOT_EDITABLE', `Only drafts can be edited (this version is ${status}). Create a new version to change it.`);
 
 /** Panel 0 is today's catalog fields (D11b): saving the blueprint keeps the template columns that publish and FLOW 1 read in step. */
-function catalogColumns(bp: HarborBlueprint): Prisma.TemplateUncheckedUpdateInput {
+export function catalogColumns(bp: HarborBlueprint): Prisma.TemplateUncheckedUpdateInput {
   const c = bp.catalog;
   return {
     primaryWork: c.primary_work || null,

@@ -10,6 +10,7 @@ import { DockerRunner, MockRunner, pytestScore, readTarGz, SandboxJobRunner, typ
 import { resolveDeps, tarGz } from '../src/meta-compiler/deps';
 import { MockContentDrafter } from '../src/meta-compiler/drafter';
 import { metaCompilerHandlers } from '../src/meta-compiler/handlers';
+import { MockJudge } from '../src/meta-compiler/judge';
 import { processDomainEvent } from '../src/outbox/dispatcher';
 import { HandlerRegistry } from '../src/outbox/handlers';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
@@ -36,7 +37,7 @@ describe('A6 Harbor runner and verification runs (S3-04, S3-05, D-12)', () => {
   }
   async function work() {
     const registry = new HandlerRegistry();
-    for (const h of metaCompilerHandlers({ config, storage, drafters: () => new MockContentDrafter(), deps: resolveDeps(), runner })) registry.register(h);
+    for (const h of metaCompilerHandlers({ config, storage, drafters: () => new MockContentDrafter(), deps: resolveDeps(), runner, judge: new MockJudge() })) registry.register(h);
     for (const ev of await db.outboxEvent.findMany({ where: { name: { in: ['compiler.generation_requested', 'compiler.verification_requested'] } }, orderBy: { createdAt: 'asc' } })) await processDomainEvent(db, registry, ev.id);
   }
   async function generated(bp?: HarborBlueprint) {

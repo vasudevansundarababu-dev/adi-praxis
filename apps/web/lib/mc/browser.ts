@@ -33,6 +33,24 @@ export type ProposeFieldResult = {
 export type ModelsResponse = { items: ModelOption[]; liveAi: boolean; codegenEnabled: boolean };
 export type DeploymentTarget = { id: string; name: string; templateVersion: number; smes: Array<{ candidateId: string; displayName: string | null; email: string | null }> };
 export type StudioTaskDetail = SmeAuthoredTaskDto & { taskJson: unknown };
+/** GET /studio-tasks/:id/judge (Admin, Reviewer): the post-commit LLM judge result. */
+export type JudgeView = {
+  status: 'MEASURED' | 'NOT_MEASURED';
+  provider: string;
+  model: string;
+  score: number | null;
+  costUsd: number;
+  judgedAt: string;
+  error: string | null;
+  milestones: Array<{
+    milestoneId: string;
+    weight: number;
+    pointsEarned: number;
+    pointsPossible: number;
+    truncated: boolean;
+    criteria: Array<{ num: number; category: string; text: string; points: number; awarded: number; passed: boolean; evidence: string }>;
+  }>;
+};
 
 async function call<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown, idempotencyKey?: string): Promise<McResult<T>> {
   try {
@@ -63,6 +81,7 @@ export const mcBrowser = {
   deploy: (id: string, body: { verificationRunId: string; projectId: string; smeCandidateId: string }, key: string) => call<StudioDeploymentDto>('POST', `/templates/${id}/deployments`, body, key),
   deployments: (id: string) => call<{ items: StudioDeploymentDto[] }>('GET', `/templates/${id}/deployments`),
   studioTask: (id: string) => call<StudioTaskDetail>('GET', `/studio-tasks/${id}`),
+  studioTaskJudge: (id: string) => call<{ judge: JudgeView | null }>('GET', `/studio-tasks/${id}/judge`),
   bundleUrl: (id: string) => `${MC_BROWSER_BASE}/studio-tasks/${id}/bundle`,
   exportUrl: () => `${MC_BROWSER_BASE}/studio-tasks/export`,
 };

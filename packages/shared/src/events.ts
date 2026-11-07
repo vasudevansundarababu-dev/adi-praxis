@@ -30,5 +30,7 @@ export const DOMAIN_EVENTS = [
   'compiler.generation_requested',
   'compiler.verification_requested',
   'studio.task_committed',
+  // Post-commit LLM judge: enqueued when per-task verification has recorded measured scores.
+  'studio.task_verified',
 ] as const;
 export type DomainEventName = (typeof DOMAIN_EVENTS)[number];

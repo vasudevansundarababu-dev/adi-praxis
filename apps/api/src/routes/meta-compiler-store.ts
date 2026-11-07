@@ -8,10 +8,14 @@ import type { ObjectStorage } from '../candidate/storage';
 import type { Db } from '../db';
 import { AppError, notFound } from '../lib/errors';
 import { auditRead } from '../meta-compiler/audit';
+import { judgeView, JudgeViewResponse } from '../meta-compiler/judge-task';
+import { reviewableTask } from '../tasks/review-service';
 import { authoredTaskDto, authoredTaskInclude, type AuthoredTaskRow } from '../meta-compiler/task-store';
 
 const IdParams = z.object({ id: z.string().uuid() });
 const ADMIN = ['ADMIN'] as const;
+/** The judge result is for the people who decide on the task (Admin, Reviewer); never SMEs. */
+const JUDGE_READERS = ['ADMIN', 'REVIEWER'] as const;
 
 const ListQuery = z.object({
   templateId: z.string().uuid().optional(),
@@ -84,6 +88,21 @@ export const metaCompilerStoreRoutes: FastifyPluginAsyncZod<{ db: Db; storage: O
     const t = await db.smeAuthoredTask.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId }, include: authoredTaskInclude });
     if (!t) throw notFound('Task not found');
     return detail(t);
+  });
+
+  app.get('/studio-tasks/:id/judge', { config: { access: JUDGE_READERS }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 200: JudgeViewResponse } } }, async (req) => {
+    const t = await db.smeAuthoredTask.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
+    if (!t) throw notFound('Task not found');
+    return judgeView(storage, t);
+  });
+
+  /** The judge result of a task instance's latest studio submission, for the Reviewer's task review page. */
+  app.get('/review/tasks/:id/judge', { config: { access: JUDGE_READERS }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 200: JudgeViewResponse } } }, async (req) => {
+    // Same checks as the review page: client scope, and never the task's own author or a conflicted Reviewer.
+    const task = await reviewableTask(db, req.actor!, req.params.id);
+    const t = await db.smeAuthoredTask.findFirst({ where: { taskInstanceId: task.id, clientId: req.actor!.clientId }, orderBy: { submissionVersion: 'desc' } });
+    if (!t) throw notFound('Task not found');
+    return judgeView(storage, t);
   });
 
   app.get('/studio-tasks/:id/bundle', { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams } }, async (req, reply) => {

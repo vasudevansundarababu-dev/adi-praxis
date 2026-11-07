@@ -10,6 +10,7 @@ import { resolveDeps } from '../src/meta-compiler/deps';
 import { MockContentDrafter, type ContentDrafter, type DraftPrompt, type DrafterFactory } from '../src/meta-compiler/drafter';
 import { GenerationOutput, loadGenerationOutput } from '../src/meta-compiler/generation';
 import { metaCompilerHandlers } from '../src/meta-compiler/handlers';
+import { MockJudge } from '../src/meta-compiler/judge';
 import { processDomainEvent } from '../src/outbox/dispatcher';
 import { HandlerRegistry } from '../src/outbox/handlers';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
@@ -53,7 +54,7 @@ describe('A5 generation runs (S3-01 to S3-03, S3-08, S3-11, NFR-13)', () => {
   }
   async function work() {
     const registry = new HandlerRegistry();
-    for (const h of metaCompilerHandlers({ config, storage, drafters: (c) => drafters(c), deps: resolveDeps(), runner: new MockRunner(storage) })) registry.register(h);
+    for (const h of metaCompilerHandlers({ config, storage, drafters: (c) => drafters(c), deps: resolveDeps(), runner: new MockRunner(storage), judge: new MockJudge() })) registry.register(h);
     for (const ev of await db.outboxEvent.findMany({ where: { name: 'compiler.generation_requested' }, orderBy: { createdAt: 'asc' } })) await processDomainEvent(db, registry, ev.id);
   }
   const generate = (id: string, body: object = { provider: 'mock', model: 'mock-drafter-1' }) => http.post(admin, `/templates/${id}/generations`, body);

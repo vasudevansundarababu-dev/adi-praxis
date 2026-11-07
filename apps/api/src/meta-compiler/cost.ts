@@ -3,17 +3,20 @@ import type { Db, Tx } from '../db';
 
 /** Audit action recorded for every field proposal; its cost counts toward the client's daily budget. */
 export const FIELD_PROPOSED = 'meta_compiler.field_proposed';
+/** Audit actions of the post-commit judge job; their `costUsd` also counts toward the daily budget. */
+export const TASK_JUDGED = 'studio.task_judged';
+export const TASK_JUDGE_FAILED = 'studio.task_judge_failed';
 
 const startOfUtcDay = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
-/** What the client has spent on Meta-Compiler model calls today (UTC): generation runs plus field proposals. */
+/** What the client has spent on Meta-Compiler model calls today (UTC): generation runs, field proposals and judge jobs. */
 export async function spentTodayUsd(tx: Db | Tx, clientId: string, now = new Date()): Promise<number> {
   const since = startOfUtcDay(now);
   const [runs, proposals] = await Promise.all([
     tx.compilerGenerationRun.aggregate({ where: { clientId, createdAt: { gte: since } }, _sum: { actualCostUsd: true } }),
     tx.$queryRaw<{ total: string | null }[]>`
       SELECT SUM((after->>'costUsd')::numeric)::text AS total FROM "AuditEvent"
-      WHERE client_id = ${clientId}::uuid AND action = ${FIELD_PROPOSED} AND created_at >= ${since}`,
+      WHERE client_id = ${clientId}::uuid AND action IN (${FIELD_PROPOSED}, ${TASK_JUDGED}, ${TASK_JUDGE_FAILED}) AND created_at >= ${since}`,
   ]);
   return Number(runs._sum.actualCostUsd ?? 0) + Number(proposals[0]?.total ?? 0);
 }

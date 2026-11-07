@@ -9,7 +9,8 @@ import { CATALOG_V2, RETIRED_DOMAINS, loadCatalogBlueprint, normaliseName } from
  * - `seedCatalogV2` upserts the mockup catalog: reuses existing lineages by normalised name, creates the missing
  *   domains and workflows as drafts, and publishes the full blueprints under the `publishProblems` rules.
  * - `retireOldCatalog` retires the D15a domains and every workflow of a catalog domain that is not in the mockup.
- * - `reverseCatalogV2` restores the statuses recorded in the audit log.
+ * - `reverseCatalogV2` restores the statuses recorded in the audit log; rows the job created are retired. Running the
+ *   job again after a reverse reinstates the catalog workflows that the reverse retired.
  * Rows used by a project keep their state, nothing is deleted, and every change is audited as SYSTEM:catalog-v2 with
  * the previous status. With `apply: false` nothing is written and the same plan is returned (dry run).
  */
@@ -158,9 +159,8 @@ async function seedInto(tx: Db, clientId: string, plan: CatalogPlan, apply: bool
   for (const d of CATALOG_V2) {
     let domain = await findDomain(tx, clientId, d.name);
     if (!domain) {
-      const id = apply ? (await tx.domain.create({ data: { clientId, name: d.name } })).id : null;
-      await rec.change({ action: 'domain.created', entityType: 'Domain', entityId: id, domain: d.name, workflowName: null, version: null, from: null, to: 'ACTIVE' }, null);
-      domain = apply ? await tx.domain.findUniqueOrThrow({ where: { id: id! } }) : null;
+      domain = apply ? await tx.domain.create({ data: { clientId, name: d.name } }) : null;
+      await rec.change({ action: 'domain.created', entityType: 'Domain', entityId: domain?.id ?? null, domain: d.name, workflowName: null, version: null, from: null, to: 'ACTIVE' }, null);
     } else if (domain.status !== 'ACTIVE') {
       if (apply) await tx.domain.update({ where: { id: domain.id }, data: { status: 'ACTIVE' } });
       await rec.change({ action: 'domain.activated', entityType: 'Domain', entityId: domain.id, domain: domain.name, workflowName: null, version: null, from: domain.status, to: 'ACTIVE' }, { status: domain.status });
@@ -171,7 +171,7 @@ async function seedInto(tx: Db, clientId: string, plan: CatalogPlan, apply: bool
     const lastEvents = await lastCatalogEvents(tx, clientId, existing.map((vs) => vs[0]!.id));
     const domainName = domain?.name ?? d.name;
 
-    for (const w of CATALOG_V2.find((c) => c.name === d.name)!.workflows) {
+    for (const w of d.workflows) {
       const bp = w.blueprint ? loadCatalogBlueprint(w.blueprint) : null;
       if (bp) assertPublishable(w.workflowName, bp);
       const versions = existing.find((vs) => sameName(vs[0]!.workflowName, w.workflowName));

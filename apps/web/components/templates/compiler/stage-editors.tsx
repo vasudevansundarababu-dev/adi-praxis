@@ -395,7 +395,7 @@ function Stage5Editor({ bp, onChange }: StageEditorProps) {
       actions={
         <>
           <SmallButton onClick={() => setWeights(normaliseWeights(ms.map((m) => m.weight)))}>Auto-normalise</SmallButton>
-          <SmallButton onClick={() => set((d) => void d.step_5_default_rubric.milestones.push({ id: `milestone_${ms.length + 1}`, label: '', weight: 0, verifier_template: 'f1_set_match', verifier_body: '' }))}>+ Add milestone</SmallButton>
+          <SmallButton onClick={() => set((d) => void d.step_5_default_rubric.milestones.push({ id: `milestone_${ms.length + 1}`, label: '', weight: 0, verifier_template: 'f1_set_match', verifier_body: '', judge: null }))}>+ Add milestone</SmallButton>
         </>
       }
     >

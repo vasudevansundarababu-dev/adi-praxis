@@ -9,7 +9,7 @@ import { agentVisibleFiles, buildBundle, isHiddenPath, judgeFilePath } from '../
 import { MockRunner, readTarGz, splitOutputs, type HarborRunner } from '../src/harbor/runner';
 import { spentTodayUsd } from '../src/meta-compiler/cost';
 import { defaultAnswers } from '../src/meta-compiler/deps';
-import { defaultJudge, estimateJudgeUsd, judgePrompt, MAX_DELIVERABLE_CHARS, MockJudge, scoreReply, type LlmJudge } from '../src/meta-compiler/judge';
+import { ClaudeVertexJudge, defaultJudge, estimateJudgeUsd, JudgeError, judgePrompt, MAX_DELIVERABLE_CHARS, MockJudge, scoreReply, type LlmJudge } from '../src/meta-compiler/judge';
 import { judgeScore, processTaskJudge, type TaskJudgeEvidence } from '../src/meta-compiler/judge-task';
 import { processAuthoredTaskVerification } from '../src/meta-compiler/task-verification';
 import { layoutChecks } from '../src/meta-compiler/verification';
@@ -104,6 +104,19 @@ describe('J2 LlmJudge', () => {
     expect(() => scoreReply('memo', spec, { criteria: [{ num: 7, awarded: 1, evidence: '' }] }, false)).toThrow(/unknown criterion 7/);
     expect(() => scoreReply('memo', spec, { criteria: [{ num: 1, awarded: 1 }, { num: 1, awarded: 1 }] }, false)).toThrow(/more than once/);
     expect(() => scoreReply('memo', spec, { verdict: 'pass' }, false)).toThrow(/wrong shape/);
+  });
+
+  it('a Claude reply that cannot be used still reports its cost, so it counts toward the budget', async () => {
+    const reply = (text: string, stop = 'end_turn') => ({ content: [{ type: 'text', text }], stop_reason: stop, usage: { input_tokens: 1_000_000, output_tokens: 0 } });
+    const stub = (r: unknown) => ({ messages: { create: async () => r } }) as never;
+    const judge = (r: unknown) => new ClaudeVertexJudge('claude-sonnet-test', { projectId: 'p', region: 'r', client: stub(r) });
+    const failed = (r: unknown) => judge(r).grade(spec, 'memo text').then(() => null, (e: unknown) => e);
+    for (const r of [reply('not json'), reply('{"criteria":[{"num":9,"awarded":1}]}'), reply('{', 'max_tokens')]) {
+      const err = await failed(r);
+      expect(err).toBeInstanceOf(JudgeError);
+      expect((err as JudgeError).costUsd).toBe(3);
+    }
+    expect((await judge(reply('{"criteria":[{"num":3,"awarded":1,"evidence":"risk"}]}')).grade(spec, 'memo text')).costUsd).toBe(3);
   });
 
   it('the prompt holds the system prompt, a numbered checklist and the deliverable, truncated at 60k characters', () => {

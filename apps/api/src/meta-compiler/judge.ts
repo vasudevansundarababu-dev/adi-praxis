@@ -21,7 +21,12 @@ export interface LlmJudge {
   grade(spec: JudgeSpec, deliverable: string): Promise<JudgedMilestone & { costUsd: number }>;
 }
 
-export class JudgeError extends Error {}
+export class JudgeError extends Error {
+  /** What the failed call still cost (a reply that came back but could not be used); counted toward the budget. */
+  constructor(message: string, readonly costUsd = 0) {
+    super(message);
+  }
+}
 
 export const MAX_DELIVERABLE_CHARS = 60_000;
 
@@ -134,9 +139,13 @@ export class ClaudeVertexJudge implements LlmJudge {
       throw new JudgeError(`Claude judge call failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     }
     const cost = costUsd(this.provider, this.model, res.usage.input_tokens, res.usage.output_tokens);
-    if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') throw new JudgeError(`Judge stopped: ${res.stop_reason}`);
+    if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') throw new JudgeError(`Judge stopped: ${res.stop_reason}`, cost);
     const text = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
-    return { ...scoreReply('', spec, extractJson(text), p.truncated), costUsd: cost };
+    try {
+      return { ...scoreReply('', spec, extractJson(text), p.truncated), costUsd: cost };
+    } catch (err) {
+      throw new JudgeError(err instanceof Error ? err.message : 'The judge reply could not be used', cost);
+    }
   }
 }
 

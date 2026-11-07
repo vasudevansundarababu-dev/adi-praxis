@@ -9,7 +9,7 @@ import { JUDGE_DIR, type JudgeFile } from '../harbor/bundle';
 import { readTarGz } from '../harbor/runner';
 import { writeAudit } from '../platform/audit';
 import { budgetProblem, spentTodayUsd, TASK_JUDGE_FAILED, TASK_JUDGED } from './cost';
-import { estimateJudgeUsd, type JudgedMilestone, type LlmJudge } from './judge';
+import { estimateJudgeUsd, JudgeError, type JudgedMilestone, type LlmJudge } from './judge';
 import { redact } from './redact';
 import type { TaskVerificationEvidence } from './task-verification';
 
@@ -128,6 +128,7 @@ export async function processTaskJudge(w: TaskJudgeDeps, authoredTaskId: string)
     }
     await record({ ...base, status: 'MEASURED', score: judgeScore(milestones), costUsd: Math.round(costUsd * 10_000) / 10_000, milestones, error: null });
   } catch (err) {
+    if (err instanceof JudgeError) costUsd += err.costUsd;
     await notMeasured(redact(err instanceof Error ? err.message : 'Judging failed'), Math.round(costUsd * 10_000) / 10_000);
     throw err;
   }

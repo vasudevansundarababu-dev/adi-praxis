@@ -11,6 +11,9 @@ import { processDomainEvent } from '../src/outbox/dispatcher';
 import { HandlerRegistry } from '../src/outbox/handlers';
 import { createCandidate, db, idem } from './helpers';
 
+/** Studio tasks use fixed coverage cells (no open slots): the studio has no coverage-tag control. */
+export const COVERAGE = { dimensions: [{ key: 'channel', label: 'Channel', values: ['search', 'social', 'video'] }], cells: [] };
+
 /** Synthetic, complete (6/6) blueprint shaped like the Harbor PDF §4.1 marketing template. No real data. */
 export function exampleBlueprint(studioId = 'mktg-noise-cancelling-launch'): HarborBlueprint {
   const input: HarborBlueprintInput = {
@@ -21,6 +24,7 @@ export function exampleBlueprint(studioId = 'mktg-noise-cancelling-launch'): Har
       human_gate: 'A Reviewer checks the oracle table before approval.',
       skills: ['Performance marketing'],
       task_modes: ['AUTHORING'],
+      coverage_dimensions: COVERAGE,
     },
     template_meta: { template_id: 'mktg-launch-ncp', label: 'Launch of Noise Cancelling Phone', domain_category: 'Digital Marketing', tpt_minutes: 45, tpt_label: '45m (12 Wks)', modes: ['HERMETIC_MCP'] },
     domain_meta: { title: 'Launch of Noise Cancelling Phone', persona_label: 'Growth Marketing Lead', horizon: { type: 'episodic_loop', max_turns: 12, cadence_unit: 'Wks' } },
@@ -77,6 +81,7 @@ export async function seedTemplate(clientId: string, o: { domainId?: string; dom
       skills: ['Marketing'],
       taskModes: ['AUTHORING'],
       openSlotShare: 0,
+      coverageDimensions: COVERAGE,
       ...(bp ? { blueprint: jsonBody(bp) as object, executionMode: 'HERMETIC_MCP' as const } : {}),
     },
     include: { domain: true },

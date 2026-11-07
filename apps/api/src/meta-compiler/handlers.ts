@@ -30,4 +30,6 @@ export interface MetaCompilerOverrides {
   drafters?: DrafterFactory;
   deps?: Partial<MetaCompilerDeps>;
   runner?: HarborRunner;
+  /** Test-only fault injection for Save & Commit. */
+  studioFaults?: { afterUpload?: () => Promise<void>; beforeRecord?: () => Promise<void> };
 }

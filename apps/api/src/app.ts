@@ -65,6 +65,7 @@ import { taxonomyRoutes } from './routes/taxonomy';
 import { templateRoutes } from './routes/templates';
 import { metaCompilerRoutes } from './routes/meta-compiler';
 import { metaCompilerRunRoutes } from './routes/meta-compiler-runs';
+import { candidateStudioRoutes } from './routes/candidate-studio';
 import { resolveDeps } from './meta-compiler/deps';
 import { defaultDrafterFactory } from './meta-compiler/drafter';
 import { defaultRunner } from './harbor/runner';
@@ -302,6 +303,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(reviewRoutes, { db: deps.db, evaluator: deps.evaluator ?? defaultEvaluator(deps.config), storage });
       await v1.register(journeyRoutes, { db: deps.db, config: deps.config, selectionGate });
       await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
+      await v1.register(candidateStudioRoutes, { db: deps.db, config: deps.config, storage, deps: resolveDeps(deps.metaCompiler?.deps), selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), faults: deps.metaCompiler?.studioFaults });
       await v1.register(taskReviewRoutes, { db: deps.db });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       // M10 SME supply: nothing is registered with the flag off (docs/SME-SUPPLY.md section 13).

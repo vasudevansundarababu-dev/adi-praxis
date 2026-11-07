@@ -5,11 +5,17 @@ import { useRouter } from 'next/navigation';
 
 export type SaveState = { kind: 'idle' | 'saving' | 'saved' | 'error' | 'conflict'; at?: string; message?: string };
 
+/** Where a draft is saved. Defaults to the task route; the SME studio saves to its own draft route. */
+export interface AutosaveTarget<T> {
+  url: string;
+  body: (value: T, expectedRevision: number, activeSecondsDelta: number) => unknown;
+}
+
 /**
  * Autosave for a task draft: saves 1.5 s after the last change and records time actively spent (seconds while the
  * page is visible and the author did something in the last minute). Stale revisions surface as a conflict.
  */
-export function useAutosave<T extends Record<string, unknown>>(taskId: string, initial: T, initialRevision: number, readOnly: boolean) {
+export function useAutosave<T extends Record<string, unknown>>(taskId: string, initial: T, initialRevision: number, readOnly: boolean, target?: AutosaveTarget<T>) {
   const router = useRouter();
   const [value, setValue] = useState<T>(initial);
   const [revision, setRevision] = useState(initialRevision);
@@ -23,6 +29,8 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
   readonlyNow.current = readOnly;
   const inFlight = useRef<Promise<boolean> | null>(null);
   const navigating = useRef(false);
+  const targetRef = useRef(target);
+  targetRef.current = target;
 
   useEffect(() => {
     if (readOnly) return;
@@ -58,10 +66,11 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
       setState({ kind: 'saving' });
       const delta = Math.min(600, active.current);
       const expectedRevision = rev.current;
-      const payload = JSON.stringify({ output: latest.current, activeSecondsDelta: delta, expectedRevision });
+      const t = targetRef.current;
+      const payload = JSON.stringify(t ? t.body(latest.current, expectedRevision, delta) : { output: latest.current, activeSecondsDelta: delta, expectedRevision });
       const request = (async () => {
         try {
-          const res = await fetch(`/api/v1/me/tasks/${taskId}`, {
+          const res = await fetch(t ? t.url : `/api/v1/me/tasks/${taskId}`, {
             method: 'PUT', headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() }, body: payload,
           });
           const body = await res.json().catch(() => null);

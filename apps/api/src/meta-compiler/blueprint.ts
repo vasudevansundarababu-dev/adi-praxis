@@ -66,14 +66,14 @@ export function fieldProblems(field: CustomField, stage: (typeof CUSTOM_FIELD_ST
 }
 
 /**
- * The blueprint as the SME's agent-facing view sees it (D-21): verifier code, verifier assertions, the oracle script
+ * The blueprint as the SME's agent-facing view sees it (D-21): verifier code, judge checklists (answer keys), verifier assertions, the oracle script
  * and the hidden ground-truth path are removed. The SME still sees the oracle grid's columns, tags and preview rows.
  */
 export function agentFacingBlueprint(bp: HarborBlueprint): HarborBlueprint {
   const v = structuredClone(bp);
   v.step_2_data_panels.oracle_annotator.target_path = '';
   v.authored_content.solve_sh = '';
-  v.step_5_default_rubric.milestones = v.step_5_default_rubric.milestones.map((m) => ({ ...m, verifier_body: '' }));
+  v.step_5_default_rubric.milestones = v.step_5_default_rubric.milestones.map((m) => ({ ...m, verifier_body: '', judge: null }));
   for (const s of CUSTOM_FIELD_STAGES) v.custom_fields_by_stage[s] = v.custom_fields_by_stage[s].map((f) => ({ ...f, verifier_assertion: '' }));
   return v;
 }

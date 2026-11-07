@@ -1,5 +1,6 @@
 import { HarborBlueprint, type HarborBlueprintInput } from '@praxis/shared';
 import { generatorFixtureInput } from '../../../packages/shared/test/blueprint-fixture';
+import { exampleBlueprint } from './meta-compiler-fixtures';
 
 /**
  * Invented, synthetic case for the LLM judge tests: the fictitious "Quietline" phone launch with an Admin-fixed
@@ -47,3 +48,16 @@ export function judgedBlueprintInput(): HarborBlueprintInput {
 }
 
 export const judgedBlueprint = () => HarborBlueprint.parse(judgedBlueprintInput());
+
+/** The complete (6/6) API-test blueprint with the same fixed exhibit and judged milestones added. */
+export function judgedExampleBlueprint(studioId: string): HarborBlueprint {
+  const bp = exampleBlueprint(studioId);
+  const judged = judgedBlueprint();
+  bp.step_2_data_panels.public_dropzones.push(judged.step_2_data_panels.public_dropzones.find((z) => z.id === 'exhibit')!);
+  const [intent, budget] = bp.step_5_default_rubric.milestones;
+  intent!.weight = 40;
+  budget!.weight = 30;
+  const [memo, faq] = judged.step_5_default_rubric.milestones.filter((m) => m.judge);
+  bp.step_5_default_rubric.milestones.push({ ...memo!, weight: 20 }, { ...faq!, weight: 10 });
+  return bp;
+}

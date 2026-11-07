@@ -1,0 +1,173 @@
+import { CreateDeploymentRequest, GenerationRunDto, HarborBlueprint, ModelOptionDto, StartGenerationRequest, StudioDeploymentDto, VerificationRunDto } from '@praxis/shared';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import { z } from 'zod';
+import type { ObjectStorage } from '../candidate/storage';
+import type { Config } from '../config';
+import type { Db } from '../db';
+import { AppError, notFound } from '../lib/errors';
+import { isComplete, serverProblems } from '../meta-compiler/blueprint';
+import { budgetProblem, spentTodayUsd } from '../meta-compiler/cost';
+import type { MetaCompilerDeps } from '../meta-compiler/deps';
+import { DrafterError, estimate, type DrafterFactory } from '../meta-compiler/drafter';
+import { generationDto, progress, promptFor, promptHashOf } from '../meta-compiler/generation';
+import type { HarborRunner } from '../harbor/runner';
+import { deploymentDto, deployStudio } from '../meta-compiler/deployments';
+import { pendingChecks, verificationDto, verificationLogTail } from '../meta-compiler/verification';
+import { runCommand } from '../platform/command';
+import type { Prisma } from '@prisma/client';
+
+const IdParams = z.object({ id: z.string().uuid() });
+const ADMIN = ['ADMIN'] as const;
+
+export interface RunRoutesOptions {
+  db: Db;
+  config: Config;
+  storage: ObjectStorage;
+  drafters: DrafterFactory;
+  deps: MetaCompilerDeps;
+  runner: HarborRunner;
+}
+
+/** Screen 3 of the Meta-Compiler: generate, verify, deploy (architecture sections 5 and 6). Admin only (D9). */
+export const metaCompilerRunRoutes: FastifyPluginAsyncZod<RunRoutesOptions> = async (app, { db, config, drafters, storage, runner }) => {
+  const mc = config.metaCompiler;
+
+  // S3-01: the configured Claude and Gemini models; the mock when live AI is off (local, demo, tests).
+  app.get('/meta-compiler/models', { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], response: { 200: z.object({ items: z.array(ModelOptionDto), liveAi: z.boolean(), codegenEnabled: z.boolean() }) } } }, async () => ({
+    items: [
+      ...mc.models.map((m) => ({ provider: m.provider, model: m.model, label: `${m.provider === 'claude' ? 'Claude' : 'Gemini'} ${m.model} (Vertex AI)`, available: mc.liveAi })),
+      ...(mc.liveAi ? [] : [{ provider: 'mock' as const, model: 'mock-drafter-1', label: 'Local mock drafter (no paid calls)', available: true }]),
+    ],
+    liveAi: mc.liveAi,
+    codegenEnabled: mc.codegenEnabled,
+  }));
+
+  app.post(
+    '/templates/:id/generations',
+    { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, body: StartGenerationRequest, response: { 200: GenerationRunDto, 201: GenerationRunDto } } },
+    async (req, reply) => {
+      await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => {
+        const t = await tx.template.findFirst({ where: { id: req.params.id, clientId: actor.clientId } });
+        if (!t) throw notFound('Template not found');
+        // S2-17, S3-03: generation needs a saved blueprint that passes all 6 sections on the server.
+        const parsed = t.blueprint === null ? null : HarborBlueprint.safeParse(t.blueprint);
+        if (!parsed?.success) throw new AppError(422, 'BLUEPRINT_REQUIRED', 'Save a blueprint for this template before generating.');
+        const bp = parsed.data;
+        const problems = await serverProblems(tx, t, bp);
+        if (!isComplete(problems)) throw new AppError(422, 'BLUEPRINT_INCOMPLETE', 'All 6 sections must be valid before generating.', { problems });
+        if (req.body.mode === 'FULL_CODE' && !mc.codegenEnabled) throw new AppError(403, 'CODEGEN_DISABLED', 'Full code generation is switched off in this environment.');
+        let drafter;
+        try {
+          drafter = drafters({ provider: req.body.provider, model: req.body.model });
+        } catch (err) {
+          throw new AppError(422, 'MODEL_NOT_AVAILABLE', err instanceof DrafterError ? err.message : 'This model is not available.');
+        }
+        const promptHash = promptHashOf(bp, req.body.mode, drafter.provider, drafter.model);
+        const key = { templateId_promptHash_mode_model: { templateId: t.id, promptHash, mode: req.body.mode, model: drafter.model } };
+        const existing = await tx.compilerGenerationRun.findUnique({ where: key });
+        // S3-03: the same template, prompt, mode and model is the same run. A failed or capped run is queued again.
+        if (existing && !['FAILED', 'CAPPED'].includes(existing.status)) {
+          await audit({ entityType: 'CompilerGenerationRun', entityId: existing.id, action: 'meta_compiler.generation_reused', after: { status: existing.status } });
+          return { status: 200, body: generationDto(existing) };
+        }
+        const prompt = promptFor(bp, req.body.mode);
+        const est = prompt ? estimate(drafter, prompt) : { costUsd: 0 };
+        const blocked = budgetProblem(mc, est.costUsd, await spentTodayUsd(tx, actor.clientId));
+        const data = {
+          status: blocked ? ('CAPPED' as const) : ('QUEUED' as const),
+          estimatedCostUsd: est.costUsd,
+          error: blocked,
+          progress: progress(0, 0, blocked ?? 'Queued'),
+          finishedAt: blocked ? new Date() : null,
+          requestedById: actor.userId,
+        };
+        const run = existing
+          ? await tx.compilerGenerationRun.update({ where: { id: existing.id }, data: { ...data, actualCostUsd: null, inputTokens: null, outputTokens: null, outputRef: null, outputSha256: null, logRef: null, startedAt: null } })
+          : await tx.compilerGenerationRun.create({ data: { ...data, clientId: actor.clientId, templateId: t.id, templateVersion: t.version, mode: req.body.mode, provider: drafter.provider, model: drafter.model, promptHash } });
+        if (!blocked) await emit({ name: 'compiler.generation_requested', aggregateType: 'CompilerGenerationRun', aggregateId: run.id, payload: { runId: run.id } });
+        await audit({
+          entityType: 'CompilerGenerationRun',
+          entityId: run.id,
+          action: existing ? 'meta_compiler.generation_requeued' : 'meta_compiler.generation_requested',
+          after: { templateId: t.id, templateVersion: t.version, mode: run.mode, provider: run.provider, model: run.model, promptHash, estimatedCostUsd: est.costUsd, status: run.status },
+        });
+        return { status: existing ? 200 : 201, body: generationDto(run) };
+      });
+      return reply;
+    },
+  );
+
+  app.get('/generations/:id', { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 200: GenerationRunDto } } }, async (req) => {
+    const run = await db.compilerGenerationRun.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
+    if (!run) throw notFound('Generation run not found');
+    return generationDto(run);
+  });
+
+  app.post(
+    '/generations/:id/verifications',
+    { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 201: VerificationRunDto } } },
+    async (req, reply) => {
+      await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => {
+        const g = await tx.compilerGenerationRun.findFirst({ where: { id: req.params.id, clientId: actor.clientId } });
+        if (!g) throw notFound('Generation run not found');
+        // S3-04: Step 2 cannot start before Step 1 succeeds.
+        if (g.status !== 'SUCCEEDED') throw new AppError(409, 'GENERATION_NOT_READY', `Step 1 has not succeeded (it is ${g.status}).`);
+        // D-12: deployed environments never "measure" with the mock runner.
+        if (runner.kind === 'mock' && (config.appEnv === 'staging' || config.appEnv === 'production')) {
+          throw new AppError(409, 'RUNNER_UNAVAILABLE', 'Verification needs the sandbox job in this environment (HARBOR_RUNNER=job); the mock runner cannot produce real scores.');
+        }
+        const v = await tx.compilerVerificationRun.create({ data: { clientId: actor.clientId, generationRunId: g.id, requestedById: actor.userId, checks: pendingChecks() as unknown as Prisma.InputJsonValue } });
+        await emit({ name: 'compiler.verification_requested', aggregateType: 'CompilerVerificationRun', aggregateId: v.id, payload: { verificationId: v.id } });
+        await audit({ entityType: 'CompilerVerificationRun', entityId: v.id, action: 'meta_compiler.verification_requested', after: { generationRunId: g.id, templateId: g.templateId, templateVersion: g.templateVersion, runner: runner.kind } });
+        return { status: 201, body: verificationDto(v, '') };
+      });
+      return reply;
+    },
+  );
+
+  app.get('/verifications/:id', { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 200: VerificationRunDto } } }, async (req) => {
+    const v = await db.compilerVerificationRun.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
+    if (!v) throw notFound('Verification run not found');
+    return verificationDto(v, await verificationLogTail(storage, v.logRef));
+  });
+
+  app.post(
+    '/templates/:id/deployments',
+    { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, body: CreateDeploymentRequest, response: { 200: StudioDeploymentDto, 201: StudioDeploymentDto } } },
+    async (req, reply) => {
+      await runCommand(db, req, reply, (ctx) =>
+        deployStudio(ctx, { templateId: req.params.id, verificationRunId: req.body.verificationRunId, projectId: req.body.projectId, candidateId: req.body.smeCandidateId, candidateAppUrl: config.CANDIDATE_APP_URL }),
+      );
+      return reply;
+    },
+  );
+
+  // Screen 3 lists: the workflow's studios, and the projects and assigned SMEs a deployment may target (S3-06).
+  app.get('/templates/:id/deployments', { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 200: z.object({ items: z.array(StudioDeploymentDto) }) } } }, async (req) => {
+    const t = await db.template.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
+    if (!t) throw notFound('Template not found');
+    const rows = await db.studioDeployment.findMany({ where: { clientId: t.clientId, templateLineageId: t.lineageId }, orderBy: { createdAt: 'asc' } });
+    return { items: rows.map((d) => deploymentDto(d, config.CANDIDATE_APP_URL)) };
+  });
+
+  const Targets = z.object({ projects: z.array(z.object({ id: z.string().uuid(), name: z.string(), templateVersion: z.number().int(), smes: z.array(z.object({ candidateId: z.string().uuid(), displayName: z.string().nullable(), email: z.string().nullable() })) })) });
+  app.get('/templates/:id/deployment-targets', { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 200: Targets } } }, async (req) => {
+    const t = await db.template.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
+    if (!t) throw notFound('Template not found');
+    const projects = await db.project.findMany({
+      where: { clientId: t.clientId, template: { lineageId: t.lineageId } },
+      include: { assignments: { where: { releasedAt: null }, include: { smeAssignment: true, candidate: { include: { smeUser: true } } } } },
+      orderBy: { name: 'asc' },
+    });
+    return {
+      projects: projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        templateVersion: p.templateVersion,
+        smes: p.assignments
+          .filter((a) => !a.smeAssignment || ['ACCEPTED', 'HANDED_OFF'].includes(a.smeAssignment.status))
+          .map((a) => ({ candidateId: a.candidateId, displayName: a.candidate.smeUser.displayName, email: a.candidate.smeUser.contactEmail })),
+      })),
+    };
+  });
+};

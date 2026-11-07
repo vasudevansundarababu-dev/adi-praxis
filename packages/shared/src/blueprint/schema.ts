@@ -15,7 +15,7 @@ export const HORIZON_TYPES = ['episodic_loop', 'single_pass', 'milestone_graph']
 export const WIDGET_ARCHETYPES = ['diminishing_returns_curve_slider', 'fuzzy_match_threshold_slider'] as const;
 export const INVARIANT_OPERATORS = ['GREATER_THAN', 'EQUALS', 'CONTAINS_ANY'] as const;
 export const INVARIANT_PENALTIES = ['HARD_FAIL'] as const;
-export const VERIFIER_TEMPLATES = ['f1_set_match', 'regex_schema', 'lp_solver_ceiling', 'exact_graph_path'] as const;
+export const VERIFIER_TEMPLATES = ['f1_set_match', 'regex_schema', 'lp_solver_ceiling', 'exact_graph_path', 'llm_judge_checklist'] as const;
 export const CUSTOM_FIELD_INPUT_TYPES = ['number_input', 'currency_slider', 'single_select', 'multi_select', 'boolean_toggle', 'text_input'] as const;
 export const INJECTION_TARGETS = ['instruction.md', 'task.json', 'mcp_mock.py', 'eval/test_verifiers.py'] as const;
 export const DATAPANEL_FORMATS = ['csv', 'json', 'md', 'txt'] as const;
@@ -26,6 +26,7 @@ export type BlueprintSection = (typeof BLUEPRINT_SECTIONS)[number];
 export const CUSTOM_FIELD_STAGES = ['stage_1', 'stage_2', 'stage_3', 'stage_4', 'stage_5'] as const;
 
 export const PUBLIC_INPUT_ROOT = '/workspace/inputs/';
+export const AGENT_OUTPUT_ROOT = '/workspace/outputs/';
 export const HIDDEN_GROUND_TRUTH_ROOT = '/eval/ground_truth/';
 
 const id = z.string().trim().min(1).max(100);
@@ -126,6 +127,24 @@ export const InvariantCatalog = z.object({
   rules: z.array(InvariantRule).max(50).default([]),
 });
 
+export const JudgeCriterion = z.object({
+  num: z.number().int().min(1).max(500),
+  category: z.string().trim().max(100).default(''),
+  text: z.string().trim().min(1).max(2000),
+  points: z.number().int().min(1).max(100).default(1),
+});
+
+/**
+ * Official per-task grading by an LLM judge (owner decision, 7 Nov 2026). Runs in Praxis after commit, outside the
+ * hermetic task, within the cost caps. It never decides the deploy gate: `verifier_body` stays the deterministic
+ * check that must score 0.00 / 1.00. Contains the answer key, so it is never written to agent-visible paths.
+ */
+export const JudgeSpec = z.object({
+  deliverable_path: z.string().trim().max(300),
+  system_prompt: text.default(''),
+  criteria: z.array(JudgeCriterion).max(200).default([]),
+});
+
 export const RubricMilestone = z.object({
   id,
   label,
@@ -133,7 +152,11 @@ export const RubricMilestone = z.object({
   verifier_template: z.enum(VERIFIER_TEMPLATES),
   /** Verifier body the Admin accepted (Python). Assembled by the generators, never authored by them. */
   verifier_body: text.default(''),
+  judge: JudgeSpec.nullable().default(null),
 });
+
+export type RubricMilestone = z.infer<typeof RubricMilestone>;
+export type JudgeSpec = z.infer<typeof JudgeSpec>;
 
 export const Rubric = z.object({ milestones: z.array(RubricMilestone).max(20).default([]) });
 

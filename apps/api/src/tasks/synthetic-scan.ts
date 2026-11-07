@@ -41,11 +41,15 @@ function walk(v: unknown, path: string, out: [string, string][]) {
   else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walk(x, path ? `${path}.${k}` : k, out);
 }
 
+// A UUID's leading digit groups can pass the card checksum (e.g. 18494366-7685-4028-...). UUIDs are never personal data.
+const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+
 export function scanForRealData(output: unknown): DataFlag[] {
   const strings: [string, string][] = [];
   walk(output, '', strings);
   const flags = new Map<string, DataFlag>();
-  for (const [path, text] of strings) {
+  for (const [path, raw] of strings) {
+    const text = raw.replace(UUID, ' ');
     for (const rule of RULES) {
       for (const m of text.matchAll(rule.re)) {
         if (!rule.real(m[0])) continue;

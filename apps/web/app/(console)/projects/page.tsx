@@ -15,7 +15,7 @@ export default async function ProjectsPage() {
     <div>
       <div className="flex flex-wrap items-center gap-4">
         <h1 className="text-2xl font-semibold">Projects</h1>
-        {user.roles.includes('PM') && (
+        {user.roles.some((r) => r === 'ADMIN' || r === 'PM') && (
           <Link href="/projects/new" className="ml-auto btn btn-primary">
             New project
           </Link>

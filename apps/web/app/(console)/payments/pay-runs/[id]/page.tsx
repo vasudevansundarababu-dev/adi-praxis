@@ -61,9 +61,9 @@ export default async function PayRunPage({ params }: { params: Promise<{ id: str
       <Facts
         rows={[
           ['To pay', totalsText(r.totals)],
-          ['Confirmed by (PM)', who(r.confirmedBy)],
+          ['Legacy PM confirmation', who(r.confirmedBy)],
           [
-            'Finance approvals',
+            'Legacy Finance approvals',
             approvals.length ? (
               <ul className="space-y-1">
                 {approvals.map((a) => (
@@ -75,7 +75,7 @@ export default async function PayRunPage({ params }: { params: Promise<{ id: str
                 ))}
               </ul>
             ) : (
-              'None yet'
+              'None (Admin release needs no PM/Finance sign-off)'
             ),
           ],
           ['Submitted', r.submittedAt ? `${fmtDateTime(r.submittedAt)}${r.providerBatchRef ? ` · batch ${r.providerBatchRef}` : ''}` : '—'],

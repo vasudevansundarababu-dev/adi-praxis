@@ -271,8 +271,7 @@ export const certAdminRoutes: FastifyPluginAsyncZod<{ db: Db; storage: ObjectSto
     return reply;
   });
 
-  // Every family is approved by an Admin, with samples. The Expert tier also needs a Validator (until the domain has two
-  // certified Experts) or a certified Expert (candidate app) before it is approved.
+  // Every tier needs one real Admin decision after valid samples; historical assessor decisions remain recorded.
   app.post('/item-families/:id/decision', { config: { access: REVIEW }, schema: { tags: ['cert'], params: IdParams, body: z.object({ decision: z.enum(['APPROVE', 'REJECT']), note: z.string().trim().max(1000).default('') }) } }, async (req, reply) => {
     await runCommand<{ id: string; status: string; approvals: unknown }>(db, req, reply, async ({ tx, actor, audit }) => {
       const f = await tx.itemFamily.findFirst({ where: { id: req.params.id, clientId: actor.clientId }, include: { blueprint: { include: { version: { include: { package: true } } } } } });
@@ -287,11 +286,8 @@ export const certAdminRoutes: FastifyPluginAsyncZod<{ db: Db; storage: ObjectSto
       if (!(await tx.itemInstance.count({ where: { familyId: f.id, status: 'SAMPLE' } }))) throw new AppError(409, 'NO_SAMPLES', 'Generate at least one valid sample before approving.');
       const role = actor.roles.includes('ADMIN') ? 'ADMIN' : 'REVIEWER';
       const approvals = [...((f.approvals as { userId: string; role: string }[]) ?? []).filter((a) => a.userId !== actor.userId), { userId: actor.userId, role, at: new Date().toISOString() }];
-      let approved = approvals.some((a) => a.role === 'ADMIN');
-      if (f.blueprint.tier === 'EXPERT') {
-        const experts = await tx.certification.count({ where: { domain: f.blueprint.version.package.domain, tier: 'EXPERT', state: 'PASSED' } });
-        approved = approved && (experts >= 2 ? approvals.some((a) => a.role === 'EXPERT') : approvals.some((a) => a.role === 'REVIEWER'));
-      }
+      // One real Admin decision is sufficient; retain historical decisions without inventing sign-offs.
+      const approved = approvals.some((a) => a.role === 'ADMIN');
       await tx.itemFamily.update({ where: { id: f.id }, data: { approvals: approvals as Prisma.InputJsonValue, status: approved ? 'APPROVED' : 'DRAFT' } });
       await audit({ entityType: 'ItemFamily', entityId: f.id, action: approved ? 'cert.family_approved' : 'cert.family_approval_recorded', after: { role, approvals: approvals.length, note: req.body.note } });
       return { status: 200, body: { id: f.id, status: approved ? 'APPROVED' : 'DRAFT', approvals } };
@@ -350,9 +346,9 @@ export const certAdminRoutes: FastifyPluginAsyncZod<{ db: Db; storage: ObjectSto
         tier: a.certification.tier,
         domain: a.certification.domain,
         submittedAt: a.submittedAt?.toISOString() ?? null,
-        items: Object.entries(a.grading as Record<string, { written?: boolean; recommendation?: unknown; confirmations?: unknown[]; required?: number }>)
+        items: Object.entries(a.grading as Record<string, { written?: boolean; recommendation?: unknown; confirmations?: unknown[]; required?: number; confirmedScore?: number | null }>)
           .filter(([, g]) => g.written)
-          .map(([id, g]) => ({ itemId: id, itemType: items.get(id)?.family.itemType, stem: items.get(id)?.stem, rubric: (items.get(id)?.content as { rubric?: unknown })?.rubric ?? [], answer: (a.answers as Record<string, unknown>)[id] ?? '', recommendation: g.recommendation, confirmations: g.confirmations ?? [], required: g.required ?? 1 })),
+          .map(([id, g]) => ({ itemId: id, itemType: items.get(id)?.family.itemType, stem: items.get(id)?.stem, rubric: (items.get(id)?.content as { rubric?: unknown })?.rubric ?? [], answer: (a.answers as Record<string, unknown>)[id] ?? '', recommendation: g.recommendation, confirmations: g.confirmations ?? [], finalized: g.confirmedScore != null, required: req.actor!.roles.includes('ADMIN') ? 1 : g.required ?? 1 })),
       })),
       certifications: certs.map((c) => ({ id: c.id, smeUserId: c.smeUserId, tier: c.tier, domain: c.domain, state: c.state, reviewReason: c.reviewReason, attemptsUsed: c.attemptsUsed, licenceStatus: c.licenceStatus, licence: c.licence })),
     };

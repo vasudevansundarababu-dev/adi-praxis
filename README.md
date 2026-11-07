@@ -9,7 +9,28 @@ Praxis supplies tasks. **ADI Anvil** independently validates imports, qualifies 
 packages, executes evaluations and retains diagnostic results. An export is not an
 Anvil rights approval or permission to spend money.
 
+## YC review
+
+Start with these three documents:
+
+- [YC summary — one-page founder brief](docs/YC-REVIEW.md)
+- [Module guide — definitions and distinctive features](docs/MODULE-GUIDE.md)
+- [30-day roadmap — product delivery and expert taskbanks](docs/30-DAY-ROADMAP.md)
+
+[Hosted application URLs and sign-in steps](docs/REVIEWER-SIGN-IN.md).
+
+The console and partner login pages provide **Request access or password help**.
+Enter your email, choose **Open email request**, and send the prefilled request to
+**admin@adi-labs.ai** from your email app. A configured email app is required;
+otherwise email the administrator directly. Do not include passwords. Administrators
+arrange access manually; this link does not send mail, create accounts or reset
+passwords automatically. Candidate Google sign-in is a separate flow.
+
 ## Review the implementation
+
+Start with [module definitions and distinctive features](docs/MODULE-GUIDE.md) for a
+product-by-product walkthrough of projects, staffing, expert onboarding, task authoring,
+review, approved exports, certification, partners, payments and administration.
 
 | Start here | Purpose |
 | --- | --- |
@@ -116,3 +137,8 @@ email are simulated. It uses Cloud Run, Cloud SQL and Redis in `us-central1`; it
 from the private-network Terraform production target. See [release evidence](docs/YC-REVIEW.md)
 for the verified version and checks. Existing-host deployments set `DEPLOY_ONLY=1` and
 `SKIP_DEMO_SETUP=1` to preserve users and avoid reseeding. Back up the database first.
+
+The planned next API integration sends completed Anvil runs into Praxis as SME review
+assignments and returns submitted reviews to Anvil. The 30-day roadmap targets
+200–500 expert-authored samples per domain in Marketing, Banking and Commerce.
+These are targets; no professor participation or institutional partnership is claimed.

@@ -318,12 +318,14 @@ describe('M2 FLOW 1: project creation', () => {
       expect((await post(admin, `/projects/${p.id}/cancel`)).json().status).toBe('CANCELLED');
     });
 
-    it('Reviewers have no access to projects; only PMs create them', async () => {
+    it('Admin alone can create projects; Reviewers cannot', async () => {
       const p = await draft();
       expect((await get(reviewer, '/projects')).statusCode).toBe(403);
       expect((await get(reviewer, `/projects/${p.id}`)).statusCode).toBe(403);
       expect((await post(reviewer, '/projects', { templateId, name: 'X' })).statusCode).toBe(403);
-      expect((await post(admin, '/projects', { templateId, name: 'X' })).statusCode).toBe(403);
+      const created = await post(admin, '/projects', { templateId, name: 'Admin project' });
+      expect(created.statusCode, created.body).toBe(201);
+      expect(created.json().ownerName).toBeTruthy();
     });
   });
 

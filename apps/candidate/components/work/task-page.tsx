@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ContractEditor, newSyntheticContract } from './contract-editor';
 import { useRouter } from 'next/navigation';
 import { Req, RequiredNote } from '@/components/required';
 import type { TaskView } from '@/lib/work-types';
@@ -10,9 +11,9 @@ import { SubmitPanel } from './submit-panel';
 import { useAutosave, type SaveState } from './use-autosave';
 
 export function SaveIndicator({ state, readOnly }: { state: SaveState; readOnly: boolean }) {
-  if (readOnly) return <span className="rounded-full border border-line px-2 py-0.5 text-xs">Read-only</span>;
+  if (readOnly && state.kind !== 'error' && state.kind !== 'conflict') return <span className="rounded-full border border-line px-2 py-0.5 text-xs">Read-only</span>;
   const text =
-    state.kind === 'saving' ? 'Saving…' : state.kind === 'saved' ? `Saved ${new Date(state.at!).toLocaleTimeString()}` : state.kind === 'conflict' ? 'Changed in another window: reload to continue' : state.kind === 'error' ? state.message : 'All changes save automatically';
+    state.kind === 'saving' ? 'Saving…' : state.kind === 'saved' ? `Saved ${new Date(state.at!).toLocaleTimeString()}` : state.kind === 'conflict' ? state.message ?? 'Changed in another window: reload to continue' : state.kind === 'error' ? state.message : 'All changes save automatically';
   return (
     <span aria-live="polite" className={`text-xs ${state.kind === 'error' || state.kind === 'conflict' ? 'text-error' : 'text-fg-muted'}`}>
       {text}
@@ -26,7 +27,7 @@ export function TaskPage({ task }: { task: TaskView }) {
   const done = () => router.push(`/projects/${task.projectId}?submitted=${task.id}`);
   return (
     <div>
-      <Link href={`/projects/${task.projectId}`} className="text-sm text-link hover:underline">
+      <Link href={`/projects/${task.projectId}`} data-save-before-leaving className="text-sm text-link hover:underline">
         ← {task.projectName}
       </Link>
       <p className="mt-1 text-xs text-fg-muted">
@@ -50,10 +51,11 @@ function GenericAuthoring({ task, onSubmitted }: { task: TaskView; onSubmitted: 
   type Out = { header: { title?: string; coverageTags?: Record<string, string>; edgeCase?: string }; body?: string } & Record<string, unknown>;
   const { value, update, currentRevision, state, flush } = useAutosave<Out>(task.id, (task.output as Out) ?? { header: {} }, task.revision, task.readOnly);
   const input = 'mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5';
+  const startContract = (staged: boolean) => { const c = newSyntheticContract(staged); update({ ...value, header: { ...value.header, title: c.title }, praxisContract: c }); };
   return (
     <div className="max-w-3xl space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold">{value.header.title || 'New task'}</h1>
+        <h1 className="text-xl font-semibold">{value.header?.title || 'New task'}</h1>
         <SaveIndicator state={state} readOnly={task.readOnly} />
       </div>
       <p className="rounded-md border border-line p-3 text-sm">{slot?.brief}</p>
@@ -66,7 +68,7 @@ function GenericAuthoring({ task, onSubmitted }: { task: TaskView; onSubmitted: 
       <fieldset disabled={task.readOnly} className="space-y-3">
         <label className="block text-sm">
           Title
-          <input value={value.header.title ?? ''} onChange={(e) => update({ ...value, header: { ...value.header, title: e.target.value } })} className={input} />
+          <input readOnly={!!value.praxisContract} value={value.header?.title ?? ''} onChange={(e) => update({ ...value, header: { ...value.header, title: e.target.value } })} className={input} />
         </label>
         {slot?.isOpen && (
           <div className="grid gap-2 sm:grid-cols-2">
@@ -88,8 +90,11 @@ function GenericAuthoring({ task, onSubmitted }: { task: TaskView; onSubmitted: 
             </label>
           </div>
         )}
+        {!value.praxisContract && <button type="button" className="text-sm text-link underline" onClick={() => startContract(false)}>Start a synthetic executable marketing example</button>}
+        {!value.praxisContract && <button type="button" className="ml-3 text-sm text-link underline" onClick={() => startContract(true)}>Start a staged synthetic marketing example</button>}
+        {!!value.praxisContract && <ContractEditor value={value.praxisContract as Record<string, unknown>} onChange={(praxisContract) => update({ ...value, header: { ...value.header, title: String(praxisContract.title ?? '') }, praxisContract })} />}
         <label className="block text-sm">
-          The task (scenario, inputs, expected steps, evidence, decision and how to verify it)
+          {value.praxisContract ? 'Author notes (excluded from the executable export)' : 'The task (scenario, inputs, expected steps, evidence, decision and how to verify it)'}
           <textarea value={value.body ?? ''} rows={14} onChange={(e) => update({ ...value, body: e.target.value })} className={input} />
         </label>
       </fieldset>

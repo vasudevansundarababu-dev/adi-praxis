@@ -196,3 +196,25 @@ export function InputUpload({ projectId }: { projectId: string }) {
     </section>
   );
 }
+
+/** Explicit fixture creation; visibility is supplied by the authenticated API's environment and tenant checks. */
+export function SyntheticDraftPanel({ projectId, canCreate, available }: { projectId: string; canCreate: boolean; available: boolean }) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!canCreate && !available) return null;
+  async function create() {
+    setPending(true);
+    setError(null);
+    const result = await mutate('POST', `/projects/${projectId}/synthetic-example`, {});
+    if (result.ok) router.refresh();
+    else setError(result.error ?? 'Could not create the synthetic draft.');
+    setPending(false);
+  }
+  return <section className="mt-4 rounded-md border border-line p-3 text-sm">
+    <p>This software test example has no human task approval or reviewed rights clearance. Staff the project, author and submit the task, then use an Admin acceptance decision to enter the dataset.</p>
+    {canCreate && <button type="button" disabled={pending} className="mt-3 btn btn-secondary disabled:opacity-50" onClick={create}>{pending ? 'Creating draft…' : 'Create synthetic draft'}</button>}
+    {available && <a className="mt-3 inline-block text-link underline" href={`/api/v1/projects/${projectId}/synthetic-example`}>Download synthetic draft for Anvil qualification</a>}
+    {error && <p role="alert" className="mt-2 text-error">{error}</p>}
+  </section>;
+}

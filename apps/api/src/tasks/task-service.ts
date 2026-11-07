@@ -101,6 +101,9 @@ export async function allocateTasks(tx: Tx, args: { projectId: string; candidate
       // A reclaimed task on this slot is reused (cleared); otherwise a new one is created.
       const reuse = await tx.taskInstance.findFirst({ where: { slotId: s.id, status: 'CREATED', assignedToId: null } });
       const data = { status: 'ASSIGNED' as const, assignedToId: args.candidateId, projectAssignmentId: pa.id, assignedAt: now, input, output: Prisma.DbNull, checks: Prisma.DbNull, flags: Prisma.DbNull, coverageTags: { tags: s.tags, edgeCase: s.edgeCase } as Prisma.InputJsonValue };
+      if (reuse?.output && (reuse.input as { syntheticExample?: boolean }).syntheticExample === true) {
+        Object.assign(data, { output: reuse.output, input: { ...input as object, syntheticExample: true } });
+      }
       const t = reuse
         ? await tx.taskInstance.update({ where: { id: reuse.id }, data: { ...data, revision: { increment: 1 } } })
         : await tx.taskInstance.create({ data: { ...data, clientId: p.clientId, projectId: p.id, taskType: 'AUTHORING', slotId: s.id } });

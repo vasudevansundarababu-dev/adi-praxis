@@ -153,8 +153,9 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
                 {a.evidence.map((x) => (
                   <li key={x.id}>
                     {x.scanStatus === 'CLEAN' ? (
-                      <a href={`/api/v1/review/evidence/${x.id}?enrollmentId=${a.id}`} className="text-link hover:underline">
+                      <a href={`/api/v1/review/evidence/${x.id}?enrollmentId=${a.id}`} target="_blank" rel="noopener noreferrer" className="text-link hover:underline">
                         {x.filename}
+                        <span className="sr-only"> (opens in a new tab)</span>
                       </a>
                     ) : (
                       <span>{x.filename}</span>
@@ -175,7 +176,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
               <ol className="mt-2 space-y-2 text-sm">
                 {a.decisions.map((d) => (
                   <li key={d.decidedAt}>
-                    <span className="font-medium">{statusLabel(d.outcome)}</span> · {new Date(d.decidedAt).toLocaleString()}
+                    <span className="font-medium">{statusLabel(d.outcome)}</span> · {new Date(d.decidedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'UTC' })} UTC
                     <span className="block text-fg-muted">{d.reasons.items.map((r) => r.text).join(' ')}</span>
                   </li>
                 ))}

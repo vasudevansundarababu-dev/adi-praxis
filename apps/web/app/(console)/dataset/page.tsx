@@ -1,0 +1,12 @@
+import Link from 'next/link';
+import { apiGet, getCurrentUser } from '@/lib/api';
+export const metadata = { title: 'Approved task exports' };
+type RecordDto = { id: string; seq: string; contentHash: string; projectId: string; workflow: string; output: Record<string, unknown>; createdAt: string };
+export default async function DatasetPage({ searchParams }: { searchParams: Promise<{ after?: string }> }) {
+  const user = await getCurrentUser();
+  if (!user?.roles.includes('ADMIN')) return <p>Administrator access is required.</p>;
+  const { after } = await searchParams;
+  const { status, data } = await apiGet<{ items: RecordDto[]; next: string | null }>(`/dataset/records?limit=100${after && /^\d+$/.test(after) ? `&after=${after}` : ''}`);
+  if (!data) return <p>Unable to load exports ({status}).</p>;
+  return <div className="space-y-4"><h1 className="text-2xl font-semibold">Approved task exports</h1><p className="max-w-3xl text-sm text-fg-muted">Download a versioned executable task after author submission and an Admin acceptance decision. Import the JSON in Anvil, inspect its validation and source revision, then qualify its Harbor package. Rights declarations and source reviews remain subject to Anvil’s own review. Source uploads are excluded.</p><a className="text-link underline" href="/api/v1/dataset/export">Download existing NDJSON dataset</a><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th>Record</th><th>Workflow</th><th>Source hash</th><th>Export</th></tr></thead><tbody>{data.items.map((r) => <tr key={r.id} className="border-t border-line"><td className="py-3">{r.seq}<p className="text-xs">{r.id}</p></td><td>{r.workflow}</td><td className="max-w-xs break-all text-xs">{r.contentHash}<p><a className="text-link underline" href={`/api/v1/dataset/records/${r.id}/lineage`}>Inspect lineage</a></p></td><td>{r.output?.praxisContract ? <a className="text-link underline" href={`/api/v1/dataset/records/${r.id}/praxis-contract?envelope=true`}>Download task with lineage</a> : 'No executable contract'}</td></tr>)}</tbody></table></div>{data.next && <Link className="text-link underline" href={`/dataset?after=${data.next}`}>Next records</Link>}<p className="text-xs text-fg-muted">The task download preserves the exact task payload, its hash, and source record/review metadata in one file for Anvil import. Source review does not grant Anvil rights approval.</p></div>;
+}

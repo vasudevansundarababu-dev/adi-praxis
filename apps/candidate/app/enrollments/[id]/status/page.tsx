@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { pageTitle } from '@praxis/shared/theme';
+import { identityEligible } from '@praxis/shared';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { StatusActions } from '@/components/journey/status-actions';
@@ -12,10 +13,11 @@ export const metadata: Metadata = { title: { absolute: pageTitle('Application st
 /** C06: where the application stands. Explanations appear only after a person has decided. */
 export default async function StatusPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!(await getMe())) redirect(`/sign-in?returnTo=${encodeURIComponent(`/enrollments/${id}/status`)}`);
+  const me = await getMe();
+  if (!me) redirect(`/sign-in?returnTo=${encodeURIComponent(`/enrollments/${id}/status`)}`);
   const { data: s } = await api<EnrollmentStatusView>(`/me/enrollments/${id}/status`);
   if (!s) notFound();
-  const stage = s.status === 'SELECTED' ? (s.onboardingStatus === 'COMPLETE' ? 4 : 3) : s.status === 'DRAFT' ? 1 : 2;
+  const stage = !identityEligible(me.identityStatus) ? 0 : !s.submittedAt ? 1 : s.status === 'SELECTED' ? (s.onboardingStatus === 'COMPLETE' ? 4 : 3) : 2;
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
       <Link href="/home" className="text-sm text-link hover:underline">
@@ -64,7 +66,7 @@ export default async function StatusPage({ params }: { params: Promise<{ id: str
 
       <p className="mt-6 text-sm">
         <Link href={`/enrollments/${s.id}/review`} className="text-link underline">
-          View the profile you submitted
+          {s.submittedAt ? 'View the profile you submitted' : s.status === 'DRAFT' ? 'Continue your draft profile' : 'View your saved draft profile'}
         </Link>
       </p>
       <StatusActions id={s.id} canAmend={s.canAmend} canRequestReview={s.canRequestReview} canWithdraw={s.canWithdraw} />

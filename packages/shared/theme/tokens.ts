@@ -33,7 +33,7 @@ export const semantic = {
     bg: '#212227',
     surface: '#2A2C33',
     text: '#E6EAEE', // 13.1:1 on charcoal
-    textMuted: '#8597A3', // silver, 5.3:1 on charcoal
+    textMuted: '#8A9CA8', // derived silver, also readable on elevated dark cards
     border: '#3A3D46',
     link: '#5AA3E6', // 5.9:1 on charcoal
     focus: '#5AA3E6',

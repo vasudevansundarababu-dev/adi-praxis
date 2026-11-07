@@ -26,6 +26,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Projects', href: '/projects', roles: ['ADMIN', 'PM'] },
       { label: 'Templates', href: '/templates', roles: ['ADMIN', 'PM'] },
+      { label: 'Approved exports', href: '/dataset', roles: ['ADMIN'] },
       { label: 'Requisitions', href: '/requisitions', roles: ['ADMIN', 'PM', 'REVIEWER'], smeSupply: true },
     ],
   },

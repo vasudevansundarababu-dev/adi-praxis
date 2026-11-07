@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { recommendationLabel, statusLabel } from '@/components/review/labels';
 import { apiGet, getCurrentUser } from '@/lib/api';
 import { NoAccess } from '@/components/no-access';
@@ -16,7 +17,8 @@ const FILTERS = [
 ] as const;
 
 export default async function ApplicationsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
-  const user = (await getCurrentUser())!;
+  const user = await getCurrentUser();
+  if (!user) redirect('/login');
   if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Validators and Admins" />;
   const { status } = await searchParams;
   const filter = FILTERS.some(([v]) => v === status) ? status! : '';

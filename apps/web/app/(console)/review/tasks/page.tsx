@@ -16,7 +16,7 @@ export default async function TaskReviewQueue() {
   return (
     <div>
       <h1 className="text-2xl font-semibold">Task reviews</h1>
-      <p className="mt-1 max-w-3xl text-sm text-fg-muted">Submitted tasks for your projects. Likely duplicates and possible real data come first. You never see your own tasks or those of an expert you declared a conflict with.</p>
+      <p className="mt-1 max-w-3xl text-sm text-fg-muted">Submitted tasks for your projects. Likely duplicates and possible real data come first. Admin can decide without a separate reviewer assignment. Declared conflicts still need resolution.</p>
       {items.length === 0 ? (
         <p className="mt-6 text-fg-muted">Nothing is waiting for review.</p>
       ) : (

@@ -247,6 +247,31 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
   });
 
   describe('CF-13 real customer or restricted employer data', () => {
+    it('#59: rejects reversed role dates on add and edit without saving the invalid role', async () => {
+      const c = await candidate();
+      const invalid = await correct(c, { roles: [{ action: 'ADD', role: { title: 'Senior EDD reviewer', start: '2022-06', end: '2019-01' } }] });
+      expect(invalid.statusCode).toBe(400);
+      expect(invalid.json().error).toBe('INVALID_ROLE_DATES');
+      expect((await state(c)).profile.roles).toEqual([]);
+      const valid = await correct(c, { roles: [{ action: 'ADD', role: { title: 'Senior EDD reviewer', start: '2022-06', end: '2022-06' } }] });
+      expect(valid.statusCode).toBe(200);
+      const role = valid.json().profile.roles[0];
+      const changed = await correct(c, { roles: [{ action: 'EDIT', id: role.id, role: { end: '2019-01' } }] });
+      expect(changed.statusCode).toBe(400);
+      expect((await state(c)).profile.roles[0]).toMatchObject({ id: role.id, start: '2022-06', end: '2022-06' });
+    });
+
+    it('redacts manual form corrections before profile persistence and leaves them unconfirmed (#47)', async () => {
+      const c = await candidate();
+      const response = await correct(c, { fields: [{ fieldKey: 'work_example', action: 'EDIT', value: 'Checked account 12345678, IBAN GB82 WEST 1234 5698 7654 32, PAN ABCDE1234F, Aadhaar 2345 6789 0123.' }] });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().profile.fields.work_example.status).toBe('PROPOSED');
+      const stored = await db.profileVersion.findMany({ where: { enrollmentId: c.enrollmentId } });
+      expect(JSON.stringify(stored)).not.toMatch(/12345678|GB82 WEST|ABCDE1234F|2345 6789 0123/);
+      expect(JSON.stringify(stored)).toContain('[removed:');
+      expect(assistant.calls).toHaveLength(0);
+    });
+
     it('stops collection, stores only a redacted copy and never sends it to the model', async () => {
       const c = await candidate();
       const res = await send(c, { content: 'Customer John Smith, account number 12345678, IBAN GB82 WEST 1234 5698 7654 32, called on 020 7946 0958.' });
@@ -456,6 +481,20 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
       return app.inject({ method: 'POST', url: '/api/v1/me/evidence', headers: { cookie, ...idem(), 'content-type': `multipart/form-data; boundary=${b}` }, payload: body });
     };
     const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64)]);
+
+    it('#49: accepts exactly 10 MiB and refuses larger evidence with a product error', async () => {
+      const c = await candidate();
+      const exact = Buffer.alloc(10 * 1024 * 1024);
+      PNG.copy(exact);
+      expect((await upload(c.cookie, exact, 'boundary.png')).statusCode).toBe(201);
+      for (const extra of [1, 2 * 1024 * 1024]) {
+        const response = await upload(c.cookie, Buffer.concat([exact, Buffer.alloc(extra)]), 'oversized.png');
+        expect(response.statusCode).toBe(413);
+        expect(response.json()).toMatchObject({ requestId: expect.any(String) });
+        expect(response.body).not.toContain('FST_');
+      }
+      expect(await db.evidenceArtifact.count()).toBe(1);
+    });
 
     it('stores permitted files privately under a generated key, checked by signature', async () => {
       const c = await candidate();

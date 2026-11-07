@@ -7,6 +7,7 @@ import { fmtDateTime, humanize } from '@/components/supply/ui';
 import { Req, RequiredNote } from '@/components/required';
 
 export interface GradeItemDto {
+  finalized?: boolean;
   itemId: string;
   itemType?: string;
   stem?: string;
@@ -37,10 +38,10 @@ export interface QueueResponse {
 const answerText = (a: unknown) => (typeof a === 'string' ? a : a == null ? '' : JSON.stringify(a, null, 2));
 
 /** One written answer: question, rubric, the answer, the model's recommendation (clearly labelled), and your grade. */
-export function GradeItem({ attemptId, item: i, n, userId }: { attemptId: string; item: GradeItemDto; n: number; userId: string }) {
+export function GradeItem({ attemptId, item: i, n, userId, isAdmin = false }: { isAdmin?: boolean; attemptId: string; item: GradeItemDto; n: number; userId: string }) {
   const a = useAction();
   const [score, setScore] = useState('');
-  const mine = i.confirmations.some((c) => c.by === userId);
+  const mine = isAdmin ? !!i.finalized : i.confirmations.some((c) => c.by === userId);
   const value = Number(score);
   const valid = score.trim() !== '' && Number.isFinite(value) && value >= 0 && value <= 1;
   return (
@@ -85,7 +86,7 @@ export function GradeItem({ attemptId, item: i, n, userId }: { attemptId: string
         </ul>
       )}
       {mine ? (
-        <p className="mt-2 text-xs text-fg-muted">You confirmed this grade. {i.confirmations.length < i.required ? 'Another person must confirm it too.' : ''}</p>
+        <p className="mt-2 text-xs text-fg-muted">You confirmed this grade. {i.confirmations.length < i.required ? 'A legacy confirmation is pending. Admin can finalize directly.' : ''}</p>
       ) : (
         <form
           className="mt-3 flex flex-wrap items-end gap-2"

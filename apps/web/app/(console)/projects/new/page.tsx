@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'New project' };
 
 export default async function NewProjectPage() {
   const user = (await getCurrentUser())!;
-  if (!user.roles.includes('PM')) return <NoAccess need="PMs" />;
+  if (!user.roles.some((r) => r === 'ADMIN' || r === 'PM')) return <NoAccess need="Admins" />;
   const [t, a, j] = await Promise.all([
     apiGet<{ items: TemplateDto[] }>('/templates?view=offerable'),
     apiGet<{ items: DemographicAttributeDto[] }>('/demographic-attributes'),

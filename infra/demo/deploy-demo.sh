@@ -177,11 +177,13 @@ for app in web candidate; do
     --no-invoker-iam-check --port=8080 --min-instances=0 --max-instances=3
 done
 
+if [ "${SKIP_DEMO_SETUP:-0}" != "1" ]; then
 say "Demo data (users and a published KYC project)"
 gcloud run jobs deploy praxis-demo-setup --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 \
   --args=src/jobs/run.ts,demo-setup \
   --set-secrets="$SECRETS,DEMO_ADMIN_PASSWORD=demo-admin-password:latest,DEMO_PM_PASSWORD=demo-pm-password:latest,DEMO_REVIEWER_PASSWORD=demo-reviewer-password:latest${SME_SUPPLY:+,DEMO_FINANCE_PASSWORD=demo-finance-password:latest,DEMO_PARTNER_PASSWORD=demo-partner-password:latest}"
 gcloud run jobs execute praxis-demo-setup --region="$REGION" --wait
+fi
 rm -f "$ENVFILE"
 
 say "Ready"

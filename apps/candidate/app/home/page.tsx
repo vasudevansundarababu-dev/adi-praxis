@@ -31,7 +31,8 @@ export default async function HomePage() {
   // The single most useful next step, and the matching journey stage.
   let stage = 0;
   let next: { title: string; body?: string; href?: string; cta?: string };
-  if (!eligible) next = { title: 'Verify your identity', body: 'A quick check protects the contributor community.', href: '/verify', cta: me.identityStatus === 'NOT_STARTED' ? 'Verify now' : 'Check status' };
+  if (me.applicationBlockReason) next = { title: 'Contributors must be 18 or over', body: me.applicationBlockReason };
+  else if (!eligible) next = { title: 'Verify your identity', body: 'A quick check protects the contributor community.', href: '/verify', cta: me.identityStatus === 'NOT_STARTED' ? 'Verify now' : 'Check status' };
   else if (openTasks > 0 && projects?.items[0]) {
     stage = 5;
     next = { title: `You have ${openTasks} open task${openTasks === 1 ? '' : 's'}`, body: 'Pick up where you left off; your work saves automatically.', href: `/projects/${projects.items[0].projectId}`, cta: 'Continue writing' };

@@ -14,6 +14,7 @@ import { defaultHandlers } from './outbox/handlers';
 import { resolveDeps } from './meta-compiler/deps';
 import { defaultDrafterFactory } from './meta-compiler/drafter';
 import { metaCompilerHandlers } from './meta-compiler/handlers';
+import { BUNDLE_SWEEP_JOB, defaultBundleObjectStore, sweepBundles } from './meta-compiler/bundle-sweep';
 import { defaultRunner } from './harbor/runner';
 import { createMaintenanceWorker, scheduleMaintenance, scheduleRecurring } from './outbox/maintenance';
 import { secretBox } from './lib/secrets';
@@ -63,7 +64,13 @@ const supplyJobs: Record<string, () => Promise<unknown>> = config.SME_SUPPLY_ENA
     }
   : {};
 const supplyQueue = config.SME_SUPPLY_ENABLED ? await scheduleRecurring(connection, [{ name: 'partner-webhooks', everyMs: 30_000 }, { name: 'partner-invites', everyMs: 3_600_000 }, { name: 'cert-forms', everyMs: 300_000 }, { name: 'cert-sweep', everyMs: 600_000 }, { name: 'pay-run-build', everyMs: 3_600_000 }, { name: 'payout-reconcile', everyMs: 86_400_000 }, { name: 'partner-statements', everyMs: 86_400_000 }]) : null;
-const maintenance = createMaintenanceWorker(db, connection, log, undefined, supplyJobs);
+// Meta-Compiler: daily sweep of unreferenced bundle objects older than 24 hours (D-22).
+const sweepQueue = await scheduleRecurring(connection, [{ name: BUNDLE_SWEEP_JOB, everyMs: 86_400_000 }]);
+async function sweepJob() {
+  const r = await sweepBundles(db, defaultBundleObjectStore(config));
+  log('info', 'bundle sweep', { scanned: r.scanned, deleted: r.deleted.length });
+}
+const maintenance = createMaintenanceWorker(db, connection, log, undefined, { ...supplyJobs, [BUNDLE_SWEEP_JOB]: sweepJob });
 maintenance.on('failed', (job, err) => log('error', 'maintenance job failed', { job: job?.name, err: String(err), alert: true }));
 // Queue depth every minute: the backlog alert (M8) is a log-based metric on these entries.
 const depthTimer = setInterval(async () => {
@@ -83,6 +90,7 @@ async function shutdown() {
   await maintenance.close();
   await maintenanceQueue?.close();
   await supplyQueue?.close();
+  await sweepQueue.close();
   clearInterval(depthTimer);
   health?.close();
   await queue.close();

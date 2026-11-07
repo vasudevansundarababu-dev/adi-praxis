@@ -47,7 +47,7 @@ export async function processAuthoredTaskVerification(w: TaskVerificationDeps, a
         where: { id: t.id },
         data: { verificationEvidence: evidence as unknown as Prisma.InputJsonValue, ...(scores ? { zeroBaselineScore: scores.zero, oracleScore: scores.oracle } : {}) },
       });
-      await writeAudit(tx, { clientId: t.clientId, actorType: 'SYSTEM', actorId: null }, {
+      await writeAudit(tx, { clientId: t.clientId, actorType: 'SYSTEM', actorId: 'task-verification' }, {
         entityType: 'SmeAuthoredTask',
         entityId: t.id,
         action: scores ? 'studio.task_verified' : 'studio.task_verification_failed',

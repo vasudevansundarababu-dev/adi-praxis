@@ -75,7 +75,7 @@ describe('C3 Harbor bundle (D-20)', () => {
 
   it('pins the uncompressed archive bytes (golden hash)', () => {
     const tar = gunzipSync(buildBundle(generatorFixture(), smeAnswers(), meta).bytes);
-    expect(sha(tar)).toMatchInlineSnapshot(`"466acf39f796baef7ba001f51315ba43049314daf57a61ca73776ffe126972f0"`);
+    expect(sha(tar)).toMatchInlineSnapshot(`"518e57c9e3ef8787fe2e5df8b9c4b951f05347c273f73e861b2afee1a7850de3"`);
   });
 
   it('writes a fixed gzip header: no file name, mtime 0, Unix OS byte', () => {

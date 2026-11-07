@@ -33,7 +33,7 @@ export type ProposeFieldResult = {
 export type ModelsResponse = { items: ModelOption[]; liveAi: boolean; codegenEnabled: boolean };
 export type DeploymentTarget = { id: string; name: string; templateVersion: number; smes: Array<{ candidateId: string; displayName: string | null; email: string | null }> };
 export type StudioTaskDetail = SmeAuthoredTaskDto & { taskJson: unknown };
-/** GET /studio-tasks/:id/judge (Admin, Reviewer): the post-commit LLM judge result. */
+/** GET /studio-tasks/:id/judge (Admin only): the post-commit LLM judge result. */
 export type JudgeView = {
   status: 'MEASURED' | 'NOT_MEASURED';
   provider: string;

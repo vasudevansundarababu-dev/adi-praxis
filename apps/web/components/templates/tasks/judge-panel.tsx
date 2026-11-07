@@ -7,7 +7,7 @@ const pts = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 
 /**
  * LLM judge result (owner decision, 7 Nov 2026): the official per-task score, with points per milestone and the
- * judge's evidence per criterion. Admin and Reviewer only; the API refuses everyone else and SMEs never see it.
+ * judge's evidence per criterion. Admin only; the API refuses everyone else and SMEs never see it.
  */
 export function JudgeResultView({ judge }: { judge: JudgeView | null }) {
   if (!judge) return <p className="text-sm text-fg-muted">No judge result yet. It appears after per-task verification when the template has judged milestones.</p>;

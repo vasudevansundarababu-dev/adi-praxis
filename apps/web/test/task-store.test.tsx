@@ -82,7 +82,7 @@ describe('U4 task store page', () => {
   });
 });
 
-describe('J4 judge result (Admin and Reviewer only)', () => {
+describe('J4 judge result (Admin only)', () => {
   const judge: JudgeView = {
     status: 'MEASURED',
     provider: 'mock',
@@ -118,10 +118,10 @@ describe('J4 judge result (Admin and Reviewer only)', () => {
     expect(text(html(<JudgeResultView judge={null} />))).toMatch(/No judge result yet/);
   });
 
-  it('RBAC: Admin and Reviewer read it; PM, Finance and roleless callers get 403', async () => {
+  it('RBAC: only Admin reads it; Reviewer, PM, Finance and roleless callers get 403', async () => {
     const list = (await items(['ADMIN'])).body as { items: SmeAuthoredTaskDto[] };
     const path = `/studio-tasks/${list.items[0]!.id}/judge`;
-    for (const roles of [['ADMIN'], ['REVIEWER']]) expect((await handleMock('GET', path, undefined, ctx(roles, fixtureSource([T])))).status).toBe(200);
-    for (const roles of [['PM'], ['FINANCE'], []]) expect((await handleMock('GET', path, undefined, ctx(roles, fixtureSource([T])))).status).toBe(403);
+    expect((await handleMock('GET', path, undefined, ctx(['ADMIN'], fixtureSource([T])))).status).toBe(200);
+    for (const roles of [['REVIEWER'], ['PM'], ['FINANCE'], []]) expect((await handleMock('GET', path, undefined, ctx(roles, fixtureSource([T])))).status).toBe(403);
   });
 });

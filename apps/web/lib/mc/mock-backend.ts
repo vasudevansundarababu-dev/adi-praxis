@@ -622,7 +622,7 @@ const routes: Route[] = [
   {
     method: 'GET',
     pattern: /^\/studio-tasks\/([\w-]+)\/judge$/,
-    roles: ['ADMIN', 'REVIEWER'],
+    roles: ['ADMIN'],
     run: ([, id]) => {
       const t = mockStore().tasks.get(id!);
       if (!t) return error(404, 'NOT_FOUND', 'Task not found');

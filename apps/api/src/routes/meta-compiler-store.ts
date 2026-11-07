@@ -14,8 +14,8 @@ import { authoredTaskDto, authoredTaskInclude, type AuthoredTaskRow } from '../m
 
 const IdParams = z.object({ id: z.string().uuid() });
 const ADMIN = ['ADMIN'] as const;
-/** The judge result is for the people who decide on the task (Admin, Reviewer); never SMEs. */
-const JUDGE_READERS = ['ADMIN', 'REVIEWER'] as const;
+/** The judge result holds the answer key's criteria, so only Admins read it (owner decision, 8 Nov 2026). */
+const JUDGE_READERS = ['ADMIN'] as const;
 
 const ListQuery = z.object({
   templateId: z.string().uuid().optional(),
@@ -96,9 +96,9 @@ export const metaCompilerStoreRoutes: FastifyPluginAsyncZod<{ db: Db; storage: O
     return judgeView(storage, t);
   });
 
-  /** The judge result of a task instance's latest studio submission, for the Reviewer's task review page. */
+  /** The judge result of a task instance's latest studio submission, shown to Admins on the task review page. */
   app.get('/review/tasks/:id/judge', { config: { access: JUDGE_READERS }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 200: JudgeViewResponse } } }, async (req) => {
-    // Same checks as the review page: client scope, and never the task's own author or a conflicted Reviewer.
+    // Same checks as the review page: client scope, and never the task's own author or a conflicted reviewer.
     const task = await reviewableTask(db, req.actor!, req.params.id);
     const t = await db.smeAuthoredTask.findFirst({ where: { taskInstanceId: task.id, clientId: req.actor!.clientId }, orderBy: { submissionVersion: 'desc' } });
     if (!t) throw notFound('Task not found');

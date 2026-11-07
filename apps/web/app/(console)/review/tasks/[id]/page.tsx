@@ -20,7 +20,7 @@ export default async function TaskReviewPage({ params }: { params: Promise<{ id:
     );
   }
   if (!data) notFound();
-  // Studio tasks only: the post-commit LLM judge result (Admin and Reviewer; the API refuses everyone else).
+  // Studio tasks only: the post-commit LLM judge result (Admin only; the API refuses everyone else).
   const judge = await apiGet<{ judge: JudgeView | null }>(`/review/tasks/${id}/judge`);
   return (
     <>

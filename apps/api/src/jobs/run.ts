@@ -11,6 +11,7 @@ import { grantAppRole } from './grant-app-role';
  * - `bundle-sweep`: the nightly deletion of unreferenced Meta-Compiler bundle objects older than 24 hours (D-22).
  * - `seed`: one-time bootstrap of the client, first Admin (SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD) and catalog.
  * - `catalog-v2 [--dry-run] [--reverse] [--client <name>]`: the Meta-Compiler catalog change (PRD D15, D15a).
+ * - `catalog-import --file <abs-path> --client <clientId> [--dry-run]`: one private template as a client DRAFT.
  * Exits non-zero on failure so Cloud Run retries and alerts.
  */
 const job = process.argv[2];
@@ -44,8 +45,11 @@ try {
   } else if (job === 'catalog-v2') {
     const { parseCatalogV2Args, runCatalogV2 } = await import('./catalog-v2');
     await runCatalogV2(db, parseCatalogV2Args(process.argv.slice(3)), log);
+  } else if (job === 'catalog-import') {
+    const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
+    await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

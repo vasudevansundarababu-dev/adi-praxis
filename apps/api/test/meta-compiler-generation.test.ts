@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { GenerationRunDto, type HarborBlueprint } from '@praxis/shared';
 import { buildApp } from '../src/app';
 import { MemoryStorage } from '../src/candidate/storage';
+import { MockRunner } from '../src/harbor/runner';
 import type { Config } from '../src/config';
 import { resolveDeps } from '../src/meta-compiler/deps';
 import { MockContentDrafter, type ContentDrafter, type DraftPrompt, type DrafterFactory } from '../src/meta-compiler/drafter';
@@ -52,7 +53,7 @@ describe('A5 generation runs (S3-01 to S3-03, S3-08, S3-11, NFR-13)', () => {
   }
   async function work() {
     const registry = new HandlerRegistry();
-    for (const h of metaCompilerHandlers({ config, storage, drafters: (c) => drafters(c), deps: resolveDeps() })) registry.register(h);
+    for (const h of metaCompilerHandlers({ config, storage, drafters: (c) => drafters(c), deps: resolveDeps(), runner: new MockRunner(storage) })) registry.register(h);
     for (const ev of await db.outboxEvent.findMany({ where: { name: 'compiler.generation_requested' }, orderBy: { createdAt: 'asc' } })) await processDomainEvent(db, registry, ev.id);
   }
   const generate = (id: string, body: object = { provider: 'mock', model: 'mock-drafter-1' }) => http.post(admin, `/templates/${id}/generations`, body);

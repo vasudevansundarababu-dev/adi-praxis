@@ -1,4 +1,4 @@
-import { GenerationRunDto, HarborBlueprint, ModelOptionDto, StartGenerationRequest } from '@praxis/shared';
+import { GenerationRunDto, HarborBlueprint, ModelOptionDto, StartGenerationRequest, VerificationRunDto } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { ObjectStorage } from '../candidate/storage';
@@ -10,7 +10,10 @@ import { budgetProblem, spentTodayUsd } from '../meta-compiler/cost';
 import type { MetaCompilerDeps } from '../meta-compiler/deps';
 import { DrafterError, estimate, type DrafterFactory } from '../meta-compiler/drafter';
 import { generationDto, progress, promptFor, promptHashOf } from '../meta-compiler/generation';
+import type { HarborRunner } from '../harbor/runner';
+import { pendingChecks, verificationDto, verificationLogTail } from '../meta-compiler/verification';
 import { runCommand } from '../platform/command';
+import type { Prisma } from '@prisma/client';
 
 const IdParams = z.object({ id: z.string().uuid() });
 const ADMIN = ['ADMIN'] as const;
@@ -21,10 +24,11 @@ export interface RunRoutesOptions {
   storage: ObjectStorage;
   drafters: DrafterFactory;
   deps: MetaCompilerDeps;
+  runner: HarborRunner;
 }
 
 /** Screen 3 of the Meta-Compiler: generate, verify, deploy (architecture sections 5 and 6). Admin only (D9). */
-export const metaCompilerRunRoutes: FastifyPluginAsyncZod<RunRoutesOptions> = async (app, { db, config, drafters }) => {
+export const metaCompilerRunRoutes: FastifyPluginAsyncZod<RunRoutesOptions> = async (app, { db, config, drafters, storage, runner }) => {
   const mc = config.metaCompiler;
 
   // S3-01: the configured Claude and Gemini models; the mock when live AI is off (local, demo, tests).
@@ -96,5 +100,33 @@ export const metaCompilerRunRoutes: FastifyPluginAsyncZod<RunRoutesOptions> = as
     const run = await db.compilerGenerationRun.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
     if (!run) throw notFound('Generation run not found');
     return generationDto(run);
+  });
+
+  app.post(
+    '/generations/:id/verifications',
+    { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 201: VerificationRunDto } } },
+    async (req, reply) => {
+      await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => {
+        const g = await tx.compilerGenerationRun.findFirst({ where: { id: req.params.id, clientId: actor.clientId } });
+        if (!g) throw notFound('Generation run not found');
+        // S3-04: Step 2 cannot start before Step 1 succeeds.
+        if (g.status !== 'SUCCEEDED') throw new AppError(409, 'GENERATION_NOT_READY', `Step 1 has not succeeded (it is ${g.status}).`);
+        // D-12: deployed environments never "measure" with the mock runner.
+        if (runner.kind === 'mock' && (config.appEnv === 'staging' || config.appEnv === 'production')) {
+          throw new AppError(409, 'RUNNER_UNAVAILABLE', 'Verification needs the sandbox job in this environment (HARBOR_RUNNER=job); the mock runner cannot produce real scores.');
+        }
+        const v = await tx.compilerVerificationRun.create({ data: { clientId: actor.clientId, generationRunId: g.id, requestedById: actor.userId, checks: pendingChecks() as unknown as Prisma.InputJsonValue } });
+        await emit({ name: 'compiler.verification_requested', aggregateType: 'CompilerVerificationRun', aggregateId: v.id, payload: { verificationId: v.id } });
+        await audit({ entityType: 'CompilerVerificationRun', entityId: v.id, action: 'meta_compiler.verification_requested', after: { generationRunId: g.id, templateId: g.templateId, templateVersion: g.templateVersion, runner: runner.kind } });
+        return { status: 201, body: verificationDto(v, '') };
+      });
+      return reply;
+    },
+  );
+
+  app.get('/verifications/:id', { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 200: VerificationRunDto } } }, async (req) => {
+    const v = await db.compilerVerificationRun.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
+    if (!v) throw notFound('Verification run not found');
+    return verificationDto(v, await verificationLogTail(storage, v.logRef));
   });
 };

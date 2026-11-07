@@ -67,6 +67,7 @@ import { metaCompilerRoutes } from './routes/meta-compiler';
 import { metaCompilerRunRoutes } from './routes/meta-compiler-runs';
 import { resolveDeps } from './meta-compiler/deps';
 import { defaultDrafterFactory } from './meta-compiler/drafter';
+import { defaultRunner } from './harbor/runner';
 import type { MetaCompilerOverrides } from './meta-compiler/handlers';
 import { userRoutes } from './routes/users';
 
@@ -278,7 +279,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(userRoutes, { db: deps.db });
       await v1.register(templateRoutes, { db: deps.db });
       await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });
-      await v1.register(metaCompilerRunRoutes, { db: deps.db, config: deps.config, storage, drafters: deps.metaCompiler?.drafters ?? defaultDrafterFactory(deps.config), deps: resolveDeps(deps.metaCompiler?.deps) });
+      await v1.register(metaCompilerRunRoutes, { db: deps.db, config: deps.config, storage, drafters: deps.metaCompiler?.drafters ?? defaultDrafterFactory(deps.config), deps: resolveDeps(deps.metaCompiler?.deps), runner: deps.metaCompiler?.runner ?? defaultRunner(deps.config, storage) });
       await v1.register(taxonomyRoutes, { db: deps.db });
       await v1.register(jobDescriptionRoutes, { db: deps.db });
       await v1.register(projectRoutes, { db: deps.db });

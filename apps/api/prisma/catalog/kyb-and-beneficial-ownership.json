@@ -1,0 +1,464 @@
+{
+  "schema_version": 1,
+  "studio_id": "bank-kyb-beneficial-ownership",
+  "catalog": {
+    "primary_work": "Trace a synthetic business customer's ownership through layered companies, identify ultimate beneficial owners at the threshold, screen them and recommend an onboarding decision.",
+    "verification_criteria": "UBO set matches the SME's oracle table (F1 >= 0.99); every UBO's ownership chain is exact; the recommendation follows the screening results (enhanced due diligence for a PEP UBO) with a rationale; no auto-approval and no identity numbers in rationales.",
+    "human_gate": "A Reviewer checks the ownership graph, the SME's UBO tags and the recommendation before approval; the agent only recommends.",
+    "skills": [
+      "KYB",
+      "Beneficial ownership",
+      "Corporate structures",
+      "Sanctions and PEP screening"
+    ],
+    "default_jd_id": null,
+    "task_modes": [
+      "AUTHORING"
+    ],
+    "coverage_dimensions": {
+      "dimensions": [
+        {
+          "key": "jurisdiction",
+          "label": "Jurisdiction",
+          "values": [
+            "GB",
+            "IE",
+            "NL",
+            "SG"
+          ]
+        },
+        {
+          "key": "structure",
+          "label": "Ownership structure",
+          "values": [
+            "direct",
+            "layered",
+            "trust",
+            "circular"
+          ]
+        }
+      ],
+      "cells": []
+    },
+    "edge_case_catalog": [
+      {
+        "name": "Complex or circular ownership",
+        "quota": 1,
+        "required": true
+      },
+      {
+        "name": "PEP link",
+        "quota": 1,
+        "required": true
+      },
+      {
+        "name": "Nominee director",
+        "quota": 1,
+        "required": false
+      }
+    ],
+    "default_distinct_target": 50,
+    "default_max_per_expert": 4
+  },
+  "template_meta": {
+    "template_id": "bank-kyb-beneficial-ownership",
+    "registry_source": "domain_templates.json",
+    "label": "KYB and beneficial ownership",
+    "domain_category": "Banking",
+    "version": 1,
+    "tpt_minutes": 35,
+    "tpt_label": "35m (15 Steps)",
+    "modes": [
+      "HERMETIC_GRAPH"
+    ]
+  },
+  "harbor_contract": {
+    "atif_v1_2": true,
+    "network_internal": true,
+    "require_solve_sh": true,
+    "zero_baseline_gate": true
+  },
+  "domain_meta": {
+    "title": "KYB and beneficial ownership",
+    "persona_label": "KYB Compliance Analyst",
+    "objective": "Identify the ultimate beneficial owners of a business applicant and recommend an onboarding decision.",
+    "horizon": {
+      "type": "milestone_graph",
+      "max_turns": 15,
+      "cadence_unit": "Steps"
+    }
+  },
+  "step_2_data_panels": {
+    "public_dropzones": [
+      {
+        "id": "application_form",
+        "label": "Business application form",
+        "target_path": "/workspace/inputs/application_form.md",
+        "format": "md",
+        "description": "The applicant's declared details and purpose of account (synthetic)."
+      },
+      {
+        "id": "declared_owners",
+        "label": "Declared owners",
+        "target_path": "/workspace/inputs/declared_owners.csv",
+        "format": "csv",
+        "description": "Owners as declared by the applicant, which may be incomplete (synthetic)."
+      }
+    ],
+    "oracle_annotator": {
+      "dataset_name": "ubo_register",
+      "target_path": "/eval/ground_truth/ubo_register.csv",
+      "columns": [
+        "party_id",
+        "party_name",
+        "effective_ownership_pct",
+        "ownership_path",
+        "pep_flag",
+        "suggested_role"
+      ],
+      "sme_tag_options": [
+        "UBO",
+        "NON_UBO",
+        "INTERMEDIATE"
+      ],
+      "template_preview_rows": [
+        [
+          "P-0001",
+          "Amara Okonjo",
+          "25",
+          "GB-10045>P-0001",
+          "N",
+          "UBO"
+        ],
+        [
+          "P-0002",
+          "Lucas Brandvold",
+          "15",
+          "GB-10045>P-0002",
+          "N",
+          "NON_UBO"
+        ],
+        [
+          "P-0003",
+          "Mei Takashiro",
+          "30",
+          "GB-10045>GB-20077>P-0003",
+          "N",
+          "UBO"
+        ],
+        [
+          "P-0004",
+          "Diego Ferrantes",
+          "30",
+          "GB-10045>GB-20077>LU-30012>P-0004",
+          "Y",
+          "UBO"
+        ],
+        [
+          "GB-20077",
+          "Northwind Holdings Ltd",
+          "60",
+          "GB-10045>GB-20077",
+          "N",
+          "INTERMEDIATE"
+        ],
+        [
+          "LU-30012",
+          "Cobalt Trust Services SA",
+          "30",
+          "GB-10045>GB-20077>LU-30012",
+          "N",
+          "INTERMEDIATE"
+        ]
+      ]
+    }
+  },
+  "step_3_mcp_simulators": {
+    "tools": [
+      {
+        "tool_id": "lookup_registry",
+        "description": "Returns a company record and its direct shareholdings from the synthetic registry.",
+        "parameters": [
+          {
+            "name": "company_id",
+            "type": "string",
+            "description": "Registry id, for example GB-10045."
+          }
+        ]
+      },
+      {
+        "tool_id": "screen_person",
+        "description": "Screens a person's name against synthetic PEP and sanctions lists.",
+        "parameters": [
+          {
+            "name": "name",
+            "type": "string",
+            "description": "Full name of the person."
+          }
+        ]
+      },
+      {
+        "tool_id": "record_decision",
+        "description": "Records the onboarding recommendation for a human analyst.",
+        "parameters": [
+          {
+            "name": "company_id",
+            "type": "string",
+            "description": "The applicant's registry id."
+          },
+          {
+            "name": "decision",
+            "type": "string",
+            "description": "RECOMMEND_APPROVE, RECOMMEND_EDD or RECOMMEND_REJECT."
+          },
+          {
+            "name": "rationale",
+            "type": "string",
+            "description": "Short reason for the recommendation."
+          }
+        ]
+      }
+    ],
+    "widgets": [
+      {
+        "archetype": "fuzzy_match_threshold_slider",
+        "key": "name_match_threshold",
+        "label": "Screening name-match threshold",
+        "min": 0.7,
+        "max": 1,
+        "default": 0.9,
+        "step": 0.01,
+        "formula": "hit if similarity(name, list_entry) >= threshold"
+      }
+    ]
+  },
+  "step_4_invariant_catalog": {
+    "allowed_subjects": [
+      "decision",
+      "rationale"
+    ],
+    "rules": [
+      {
+        "id": "no_auto_approval",
+        "subject": "decision",
+        "operator": "EQUALS",
+        "threshold": "AUTO_APPROVE",
+        "penalty": "HARD_FAIL",
+        "description": "The agent recommends; it never auto-approves a customer."
+      },
+      {
+        "id": "no_identity_numbers",
+        "subject": "rationale",
+        "operator": "CONTAINS_ANY",
+        "threshold": [
+          "passport number",
+          "national id number",
+          "date of birth"
+        ],
+        "penalty": "HARD_FAIL",
+        "description": "Rationales never quote identity document numbers or dates of birth."
+      }
+    ]
+  },
+  "step_5_default_rubric": {
+    "milestones": [
+      {
+        "id": "ubo_identification",
+        "label": "UBOs identified",
+        "weight": 45,
+        "verifier_template": "f1_set_match",
+        "verifier_body": "rows = env_state['outputs'].get('ubo_register.csv') or []\nassert rows, 'ubo_register.csv is missing or empty'\npredicted = [r.get('party_id') for r in rows if str(r.get('role', '')).strip().upper() == 'UBO']\nexpected = tagged(ground_truth['ubo_register.csv'], 'UBO', key='party_id')\nassert f1_set_match(predicted, expected) >= 0.99"
+      },
+      {
+        "id": "ownership_chains",
+        "label": "Ownership chains traced",
+        "weight": 25,
+        "verifier_template": "exact_graph_path",
+        "verifier_body": "chains = env_state['outputs'].get('ubo_chains.json')\nassert isinstance(chains, dict) and chains, 'ubo_chains.json is missing or empty'\nfor row in tagged(ground_truth['ubo_register.csv'], 'UBO'):\n    expected = row['ownership_path'].split('>')\n    assert exact_graph_path(chains.get(row['party_id']), expected), row['party_id']"
+      },
+      {
+        "id": "recommendation",
+        "label": "Recommendation follows screening",
+        "weight": 30,
+        "verifier_template": "regex_schema",
+        "verifier_body": "calls = [c['args'] for c in env_state['calls'] if c['tool'] == 'record_decision']\nassert len(calls) == 1, 'record exactly one decision'\ndecision = calls[0].get('decision')\nassert regex_schema(decision, r'RECOMMEND_(APPROVE|EDD|REJECT)')\nubos = tagged(ground_truth['ubo_register.csv'], 'UBO')\npep = any(str(r.get('pep_flag', '')).strip().upper() == 'Y' for r in ubos)\nassert decision == ('RECOMMEND_EDD' if pep else 'RECOMMEND_APPROVE')\nscreened = {str(c['args'].get('name', '')).strip().lower() for c in env_state['calls'] if c['tool'] == 'screen_person'}\nassert {str(r['party_name']).strip().lower() for r in ubos} <= screened, 'screen every UBO'"
+      }
+    ]
+  },
+  "custom_fields_by_stage": {
+    "stage_1": [
+      {
+        "field_id": "applicant_jurisdiction",
+        "label": "Applicant jurisdiction",
+        "input_type": "single_select",
+        "options": [
+          "GB",
+          "IE",
+          "NL",
+          "SG"
+        ],
+        "default_value": "GB",
+        "inject_into": [
+          "instruction.md",
+          "task.json"
+        ],
+        "verifier_assertion": ""
+      }
+    ],
+    "stage_2": [
+      {
+        "field_id": "ubo_threshold_pct",
+        "label": "UBO threshold (%)",
+        "input_type": "number_input",
+        "options": [],
+        "default_value": 25,
+        "min": 10,
+        "max": 50,
+        "inject_into": [
+          "instruction.md",
+          "task.json",
+          "eval/test_verifiers.py"
+        ],
+        "verifier_assertion": "all(float(r.get('effective_ownership_pct') or 0) >= value for r in (env_state['outputs'].get('ubo_register.csv') or []) if str(r.get('role', '')).strip().upper() == 'UBO')"
+      }
+    ],
+    "stage_3": [],
+    "stage_4": [
+      {
+        "field_id": "max_ownership_hops",
+        "label": "Maximum ownership depth (hops)",
+        "input_type": "number_input",
+        "options": [],
+        "default_value": 4,
+        "min": 1,
+        "max": 6,
+        "inject_into": [
+          "instruction.md",
+          "mcp_mock.py"
+        ],
+        "verifier_assertion": ""
+      }
+    ],
+    "stage_5": [
+      {
+        "field_id": "require_rationale",
+        "label": "Require a written rationale",
+        "input_type": "boolean_toggle",
+        "options": [],
+        "default_value": true,
+        "inject_into": [
+          "task.json",
+          "eval/test_verifiers.py"
+        ],
+        "verifier_assertion": "(not value) or all(len(str(c['args'].get('rationale', '')).strip()) >= 20 for c in env_state['calls'] if c['tool'] == 'record_decision')"
+      }
+    ]
+  },
+  "authored_content": {
+    "instruction_md": "You are onboarding **Harbourline Logistics Ltd** (company `GB-10045`), a synthetic UK business customer.\nUse only the MCP tools: `lookup_registry(company_id)` returns a company and its direct shareholders;\n`screen_person(name)` returns screening results for a person.\n\n1. **Trace ownership.** Follow every shareholding chain from `GB-10045` down to natural persons, up to the\n   maximum ownership depth. A person's effective ownership is the product of the percentages along the chain,\n   summed over all chains.\n2. **Write the UBO register.** Write `/workspace/outputs/ubo_register.csv` with the header\n   `party_id,party_name,effective_ownership_pct,role`, one row per party you found (persons and intermediate\n   companies). `role` is `UBO` for a person at or above the UBO threshold, `NON_UBO` for a person below it and\n   `INTERMEDIATE` for a company.\n3. **Record the chains.** Write `/workspace/outputs/ubo_chains.json`: an object mapping each UBO's `party_id`\n   to the list of ids from `GB-10045` to that person, for example `[\"GB-10045\", \"GB-20077\", \"P-0003\"]`.\n4. **Screen and recommend.** Screen every UBO with `screen_person`, then call\n   `record_decision(company_id, decision, rationale)` once with `RECOMMEND_APPROVE`, `RECOMMEND_EDD` or\n   `RECOMMEND_REJECT` and a short rationale. Recommend enhanced due diligence when any UBO is a politically\n   exposed person.\n\nYou recommend; a human analyst decides. Never auto-approve, and never quote identity document numbers or dates\nof birth in a rationale.",
+    "solve_sh": "#!/usr/bin/env bash\n# Reference solution (oracle). Runs inside the hermetic sandbox with HARBOR_ROOT set to the task root.\n# It reads the SME's oracle table from solution/ground_truth/ (hidden from the agent) and uses the MCP mock.\nset -euo pipefail\nROOT=\"${HARBOR_ROOT:-/}\"\nHERE=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\nexport ROOT HERE\npython3 - <<'PY'\nimport csv, json, math, os, subprocess, sys\n\nroot, here = os.environ[\"ROOT\"], os.environ[\"HERE\"]\nmock = os.path.join(root, \"environment\", \"mcp_mock.py\")\noutdir = os.path.join(root, \"workspace\", \"outputs\")\nos.makedirs(outdir, exist_ok=True)\ntask = json.load(open(os.path.join(root, \"task.json\"), encoding=\"utf-8\"))\n\n\ndef call(tool, **args):\n    out = subprocess.run([sys.executable, mock, \"call\", tool, json.dumps(args)], check=True, capture_output=True, text=True)\n    return json.loads(out.stdout)\n\n\ndef truth(name):\n    with open(os.path.join(here, \"ground_truth\", name), encoding=\"utf-8\", newline=\"\") as f:\n        return list(csv.DictReader(f))\n\nrows = truth(\"ubo_register.csv\")\nwith open(os.path.join(outdir, \"ubo_register.csv\"), \"w\", encoding=\"utf-8\", newline=\"\") as f:\n    w = csv.writer(f)\n    w.writerow([\"party_id\", \"party_name\", \"effective_ownership_pct\", \"role\"])\n    for row in rows:\n        w.writerow([row[\"party_id\"], row[\"party_name\"], row[\"effective_ownership_pct\"], row[\"sme_tag\"]])\n\nubos = [row for row in rows if row[\"sme_tag\"].strip().upper() == \"UBO\"]\nchains = {row[\"party_id\"]: row[\"ownership_path\"].split(\">\") for row in ubos}\nwith open(os.path.join(outdir, \"ubo_chains.json\"), \"w\", encoding=\"utf-8\") as f:\n    json.dump(chains, f, indent=2, sort_keys=True)\n\ncall(\"lookup_registry\", company_id=\"GB-10045\")\nfor row in ubos:\n    call(\"screen_person\", name=row[\"party_name\"])\npep = any(row[\"pep_flag\"].strip().upper() == \"Y\" for row in ubos)\ncall(\n    \"record_decision\",\n    company_id=\"GB-10045\",\n    decision=\"RECOMMEND_EDD\" if pep else \"RECOMMEND_APPROVE\",\n    rationale=(\n        \"Beneficial owners traced through every shareholding chain; a politically exposed owner needs enhanced due diligence before onboarding.\"\n        if pep\n        else \"Beneficial owners traced through every shareholding chain; screening found no politically exposed or sanctioned owner.\"\n    ),\n)\nPY\n",
+    "mcp_mock_seed_rows": [
+      {
+        "record_type": "company",
+        "company_id": "GB-10045",
+        "name": "Harbourline Logistics Ltd",
+        "jurisdiction": "GB",
+        "status": "active"
+      },
+      {
+        "record_type": "company",
+        "company_id": "GB-20077",
+        "name": "Northwind Holdings Ltd",
+        "jurisdiction": "GB",
+        "status": "active"
+      },
+      {
+        "record_type": "company",
+        "company_id": "LU-30012",
+        "name": "Cobalt Trust Services SA",
+        "jurisdiction": "LU",
+        "status": "active"
+      },
+      {
+        "record_type": "shareholding",
+        "company_id": "GB-10045",
+        "owner_id": "GB-20077",
+        "owner_name": "Northwind Holdings Ltd",
+        "owner_type": "company",
+        "percent": 60
+      },
+      {
+        "record_type": "shareholding",
+        "company_id": "GB-10045",
+        "owner_id": "P-0001",
+        "owner_name": "Amara Okonjo",
+        "owner_type": "person",
+        "percent": 25
+      },
+      {
+        "record_type": "shareholding",
+        "company_id": "GB-10045",
+        "owner_id": "P-0002",
+        "owner_name": "Lucas Brandvold",
+        "owner_type": "person",
+        "percent": 15
+      },
+      {
+        "record_type": "shareholding",
+        "company_id": "GB-20077",
+        "owner_id": "P-0003",
+        "owner_name": "Mei Takashiro",
+        "owner_type": "person",
+        "percent": 50
+      },
+      {
+        "record_type": "shareholding",
+        "company_id": "GB-20077",
+        "owner_id": "LU-30012",
+        "owner_name": "Cobalt Trust Services SA",
+        "owner_type": "company",
+        "percent": 50
+      },
+      {
+        "record_type": "shareholding",
+        "company_id": "LU-30012",
+        "owner_id": "P-0004",
+        "owner_name": "Diego Ferrantes",
+        "owner_type": "person",
+        "percent": 100
+      },
+      {
+        "record_type": "person",
+        "person_id": "P-0001",
+        "name": "Amara Okonjo",
+        "nationality": "GB",
+        "pep": false,
+        "sanctions_match": false
+      },
+      {
+        "record_type": "person",
+        "person_id": "P-0002",
+        "name": "Lucas Brandvold",
+        "nationality": "NO",
+        "pep": false,
+        "sanctions_match": false
+      },
+      {
+        "record_type": "person",
+        "person_id": "P-0003",
+        "name": "Mei Takashiro",
+        "nationality": "JP",
+        "pep": false,
+        "sanctions_match": false
+      },
+      {
+        "record_type": "person",
+        "person_id": "P-0004",
+        "name": "Diego Ferrantes",
+        "nationality": "PT",
+        "pep": true,
+        "sanctions_match": false
+      }
+    ]
+  }
+}

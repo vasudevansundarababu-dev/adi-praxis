@@ -1,0 +1,675 @@
+{
+  "schema_version": 1,
+  "studio_id": "bank-aml-tm-alerts",
+  "catalog": {
+    "primary_work": "Triage a queue of synthetic transaction-monitoring alerts: investigate transactions against customer profiles, screen counterparties, escalate or close each alert with a rationale and summarise typologies.",
+    "verification_criteria": "Escalation set matches the SME's oracle dispositions (F1 >= 0.99); every alert has exactly the SME's disposition and a rationale of the minimum length; the case summary names the typology of each escalated alert; no tipping-off and no customer exit.",
+    "human_gate": "A Reviewer checks the SME's dispositions and the rationale quality before approval; escalations are reviewed by a human investigator.",
+    "skills": [
+      "AML",
+      "Transaction monitoring",
+      "Financial crime typologies",
+      "Investigations"
+    ],
+    "default_jd_id": null,
+    "task_modes": [
+      "AUTHORING"
+    ],
+    "coverage_dimensions": {
+      "dimensions": [
+        {
+          "key": "typology",
+          "label": "Typology",
+          "values": [
+            "structuring",
+            "rapid movement",
+            "watchlist",
+            "false positive"
+          ]
+        },
+        {
+          "key": "segment",
+          "label": "Customer segment",
+          "values": [
+            "retail",
+            "small business"
+          ]
+        }
+      ],
+      "cells": []
+    },
+    "edge_case_catalog": [
+      {
+        "name": "Sanctions near-match",
+        "quota": 1,
+        "required": true
+      },
+      {
+        "name": "Documented one-off event",
+        "quota": 1,
+        "required": true
+      }
+    ],
+    "default_distinct_target": 50,
+    "default_max_per_expert": 4
+  },
+  "template_meta": {
+    "template_id": "bank-aml-tm-alerts",
+    "registry_source": "domain_templates.json",
+    "label": "AML transaction-monitoring alerts",
+    "domain_category": "Banking",
+    "version": 1,
+    "tpt_minutes": 40,
+    "tpt_label": "40m (6 Alerts)",
+    "modes": [
+      "HERMETIC_SQL"
+    ]
+  },
+  "harbor_contract": {
+    "atif_v1_2": true,
+    "network_internal": true,
+    "require_solve_sh": true,
+    "zero_baseline_gate": true
+  },
+  "domain_meta": {
+    "title": "AML transaction-monitoring alerts",
+    "persona_label": "AML Investigator",
+    "objective": "Escalate the alerts that need a referral and close the false positives, with reasons.",
+    "horizon": {
+      "type": "episodic_loop",
+      "max_turns": 6,
+      "cadence_unit": "Alerts"
+    }
+  },
+  "step_2_data_panels": {
+    "public_dropzones": [
+      {
+        "id": "alert_policy",
+        "label": "Alert handling policy",
+        "target_path": "/workspace/inputs/alert_policy.md",
+        "format": "md",
+        "description": "The bank's alert-handling and escalation policy (synthetic)."
+      }
+    ],
+    "oracle_annotator": {
+      "dataset_name": "alert_dispositions",
+      "target_path": "/eval/ground_truth/alert_dispositions.csv",
+      "columns": [
+        "alert_id",
+        "scenario",
+        "customer_id",
+        "total_amount_usd",
+        "suggested_disposition"
+      ],
+      "sme_tag_options": [
+        "ESCALATE",
+        "CLOSE_FALSE_POSITIVE"
+      ],
+      "template_preview_rows": [
+        [
+          "AL-001",
+          "STRUCTURING",
+          "CUST-11",
+          "85500",
+          "ESCALATE"
+        ],
+        [
+          "AL-002",
+          "RAPID_MOVEMENT",
+          "CUST-22",
+          "95500",
+          "ESCALATE"
+        ],
+        [
+          "AL-003",
+          "PAYROLL_SPIKE",
+          "CUST-33",
+          "64200",
+          "CLOSE_FALSE_POSITIVE"
+        ],
+        [
+          "AL-004",
+          "LARGE_ONE_OFF_DEPOSIT",
+          "CUST-44",
+          "180000",
+          "CLOSE_FALSE_POSITIVE"
+        ],
+        [
+          "AL-005",
+          "WATCHLIST_COUNTERPARTY",
+          "CUST-55",
+          "23800",
+          "ESCALATE"
+        ],
+        [
+          "AL-006",
+          "ROUND_AMOUNT_TRANSFERS",
+          "CUST-66",
+          "6000",
+          "CLOSE_FALSE_POSITIVE"
+        ]
+      ]
+    }
+  },
+  "step_3_mcp_simulators": {
+    "tools": [
+      {
+        "tool_id": "list_alerts",
+        "description": "Lists every alert, customer, transaction and watchlist record in the queue.",
+        "parameters": []
+      },
+      {
+        "tool_id": "get_alert",
+        "description": "Returns one alert and its transactions.",
+        "parameters": [
+          {
+            "name": "alert_id",
+            "type": "string",
+            "description": "Alert id, for example AL-001."
+          }
+        ]
+      },
+      {
+        "tool_id": "get_customer_profile",
+        "description": "Returns the customer's segment, occupation and expected monthly turnover.",
+        "parameters": [
+          {
+            "name": "customer_id",
+            "type": "string",
+            "description": "Customer id."
+          }
+        ]
+      },
+      {
+        "tool_id": "screen_counterparty",
+        "description": "Screens a counterparty name against the synthetic watchlist.",
+        "parameters": [
+          {
+            "name": "name",
+            "type": "string",
+            "description": "Counterparty name."
+          }
+        ]
+      },
+      {
+        "tool_id": "score_amount",
+        "description": "Returns the saturating risk contribution of an amount.",
+        "parameters": [
+          {
+            "name": "amount",
+            "type": "number",
+            "description": "Amount in USD."
+          }
+        ]
+      },
+      {
+        "tool_id": "disposition_alert",
+        "description": "Records the disposition of one alert.",
+        "parameters": [
+          {
+            "name": "alert_id",
+            "type": "string",
+            "description": "Alert id."
+          },
+          {
+            "name": "disposition",
+            "type": "string",
+            "description": "ESCALATE or CLOSE_FALSE_POSITIVE."
+          },
+          {
+            "name": "rationale",
+            "type": "string",
+            "description": "Factual reason for the disposition."
+          }
+        ]
+      },
+      {
+        "tool_id": "send_customer_message",
+        "description": "Sends a secure message to a customer, for example to request documents.",
+        "parameters": [
+          {
+            "name": "customer_id",
+            "type": "string",
+            "description": "Customer id."
+          },
+          {
+            "name": "message",
+            "type": "string",
+            "description": "Message text."
+          }
+        ]
+      }
+    ],
+    "widgets": [
+      {
+        "archetype": "diminishing_returns_curve_slider",
+        "key": "risk_saturation_usd",
+        "label": "Risk saturation amount (USD)",
+        "min": 5000,
+        "max": 100000,
+        "default": 25000,
+        "step": 1000,
+        "formula": "risk(a) = a / (a + K_half)"
+      },
+      {
+        "archetype": "fuzzy_match_threshold_slider",
+        "key": "counterparty_match_threshold",
+        "label": "Counterparty match threshold",
+        "min": 0.7,
+        "max": 1,
+        "default": 0.8,
+        "step": 0.01,
+        "formula": "hit if similarity(counterparty, watchlist_entry) >= threshold"
+      }
+    ]
+  },
+  "step_4_invariant_catalog": {
+    "allowed_subjects": [
+      "message",
+      "disposition"
+    ],
+    "rules": [
+      {
+        "id": "no_tipping_off",
+        "subject": "message",
+        "operator": "CONTAINS_ANY",
+        "threshold": [
+          "suspicious",
+          "suspicion",
+          "investigation",
+          "report",
+          "money laundering",
+          "suspicious activity"
+        ],
+        "penalty": "HARD_FAIL",
+        "description": "Customer messages never mention suspicion, investigations or reports (no tipping-off)."
+      },
+      {
+        "id": "no_customer_exit",
+        "subject": "disposition",
+        "operator": "EQUALS",
+        "threshold": "EXIT_CUSTOMER",
+        "penalty": "HARD_FAIL",
+        "description": "Exiting a customer is a human decision; the agent never does it."
+      }
+    ]
+  },
+  "step_5_default_rubric": {
+    "milestones": [
+      {
+        "id": "escalation_set",
+        "label": "Right alerts escalated",
+        "weight": 40,
+        "verifier_template": "f1_set_match",
+        "verifier_body": "final = {}\nfor c in env_state['calls']:\n    if c['tool'] == 'disposition_alert':\n        final[str(c['args'].get('alert_id', '')).strip().upper()] = str(c['args'].get('disposition', '')).strip().upper()\nassert final, 'no alerts dispositioned'\npredicted = [a for a, d in final.items() if d == 'ESCALATE']\nexpected = tagged(ground_truth['alert_dispositions.csv'], 'ESCALATE', key='alert_id')\nassert f1_set_match(predicted, expected) >= 0.99"
+      },
+      {
+        "id": "dispositions",
+        "label": "Every alert dispositioned once",
+        "weight": 30,
+        "verifier_template": "regex_schema",
+        "verifier_body": "calls = [c['args'] for c in env_state['calls'] if c['tool'] == 'disposition_alert']\ntruth = {r['alert_id'].strip().upper(): r['sme_tag'].strip().upper() for r in ground_truth['alert_dispositions.csv']}\nseen = [str(a.get('alert_id', '')).strip().upper() for a in calls]\nassert sorted(seen) == sorted(truth), 'disposition each alert exactly once'\nfor a in calls:\n    d = str(a.get('disposition', '')).strip().upper()\n    assert regex_schema(d, r'ESCALATE|CLOSE_FALSE_POSITIVE'), d\n    assert d == truth[str(a.get('alert_id')).strip().upper()], a.get('alert_id')"
+      },
+      {
+        "id": "case_summary",
+        "label": "Case summary with typologies",
+        "weight": 30,
+        "verifier_template": "regex_schema",
+        "verifier_body": "summary = env_state['outputs'].get('case_summary.json')\nassert isinstance(summary, dict), 'case_summary.json is missing'\nrows = tagged(ground_truth['alert_dispositions.csv'], 'ESCALATE')\nassert f1_set_match(summary.get('escalated') or [], [r['alert_id'] for r in rows]) >= 0.99\ntypologies = summary.get('typologies') or {}\nfor r in rows:\n    t = typologies.get(r['alert_id'])\n    assert regex_schema(t, r'[A-Z][A-Z_]{3,39}') and t == r['scenario'].strip().upper(), r['alert_id']"
+      }
+    ]
+  },
+  "custom_fields_by_stage": {
+    "stage_1": [
+      {
+        "field_id": "review_sla_hours",
+        "label": "Review SLA (hours)",
+        "input_type": "number_input",
+        "options": [],
+        "default_value": 24,
+        "min": 4,
+        "max": 72,
+        "inject_into": [
+          "instruction.md",
+          "task.json"
+        ],
+        "verifier_assertion": ""
+      }
+    ],
+    "stage_2": [
+      {
+        "field_id": "cash_threshold_usd",
+        "label": "Cash reporting threshold (USD)",
+        "input_type": "currency_slider",
+        "options": [],
+        "default_value": 10000,
+        "min": 3000,
+        "max": 15000,
+        "inject_into": [
+          "instruction.md",
+          "task.json"
+        ],
+        "verifier_assertion": ""
+      }
+    ],
+    "stage_3": [],
+    "stage_4": [
+      {
+        "field_id": "require_four_eyes",
+        "label": "Four-eyes check on escalations",
+        "input_type": "boolean_toggle",
+        "options": [],
+        "default_value": true,
+        "inject_into": [
+          "instruction.md",
+          "mcp_mock.py"
+        ],
+        "verifier_assertion": ""
+      }
+    ],
+    "stage_5": [
+      {
+        "field_id": "min_rationale_chars",
+        "label": "Minimum rationale length (characters)",
+        "input_type": "number_input",
+        "options": [],
+        "default_value": 40,
+        "min": 20,
+        "max": 90,
+        "inject_into": [
+          "instruction.md",
+          "eval/test_verifiers.py"
+        ],
+        "verifier_assertion": "all(len(str(c['args'].get('rationale', '')).strip()) >= value for c in env_state['calls'] if c['tool'] == 'disposition_alert')"
+      }
+    ]
+  },
+  "authored_content": {
+    "instruction_md": "You are triaging six synthetic transaction-monitoring alerts for a retail and small-business bank.\nUse only the MCP tools: `list_alerts()`, `get_alert(alert_id)`, `get_customer_profile(customer_id)`,\n`screen_counterparty(name)` and `score_amount(amount)`.\n\n1. **Investigate.** For each alert, review the transactions against the customer's expected activity and screen\n   the counterparties.\n2. **Disposition.** Call `disposition_alert(alert_id, disposition, rationale)` exactly once per alert with\n   `ESCALATE` (refer to the financial-intelligence unit) or `CLOSE_FALSE_POSITIVE`, and a factual rationale.\n3. **Summarise.** Write `/workspace/outputs/case_summary.json`:\n   `{\"escalated\": [\"<alert_id>\", ...], \"typologies\": {\"<alert_id>\": \"<SCENARIO>\", ...}}`, where each escalated\n   alert's typology is its scenario code in capitals, for example `STRUCTURING`.\n\nNever tip off a customer: `send_customer_message` must not mention suspicion, investigations or reports.\nExiting a customer is a human decision; the agent only escalates or closes.",
+    "solve_sh": "#!/usr/bin/env bash\n# Reference solution (oracle). Runs inside the hermetic sandbox with HARBOR_ROOT set to the task root.\n# It reads the SME's oracle table from solution/ground_truth/ (hidden from the agent) and uses the MCP mock.\nset -euo pipefail\nROOT=\"${HARBOR_ROOT:-/}\"\nHERE=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\nexport ROOT HERE\npython3 - <<'PY'\nimport csv, json, math, os, subprocess, sys\n\nroot, here = os.environ[\"ROOT\"], os.environ[\"HERE\"]\nmock = os.path.join(root, \"environment\", \"mcp_mock.py\")\noutdir = os.path.join(root, \"workspace\", \"outputs\")\nos.makedirs(outdir, exist_ok=True)\ntask = json.load(open(os.path.join(root, \"task.json\"), encoding=\"utf-8\"))\n\n\ndef call(tool, **args):\n    out = subprocess.run([sys.executable, mock, \"call\", tool, json.dumps(args)], check=True, capture_output=True, text=True)\n    return json.loads(out.stdout)\n\n\ndef truth(name):\n    with open(os.path.join(here, \"ground_truth\", name), encoding=\"utf-8\", newline=\"\") as f:\n        return list(csv.DictReader(f))\n\nrows = truth(\"alert_dispositions.csv\")\ncall(\"list_alerts\")\nfor row in rows:\n    call(\"get_alert\", alert_id=row[\"alert_id\"])\n    disposition = row[\"sme_tag\"].strip().upper()\n    rationale = (\n        \"Activity departs from the customer's expected profile and matches the alert typology; referral required.\"\n        if disposition == \"ESCALATE\"\n        else \"Activity is consistent with the documented customer profile and expected turnover; no further action.\"\n    )\n    call(\"disposition_alert\", alert_id=row[\"alert_id\"], disposition=disposition, rationale=rationale)\n\nescalated = [row[\"alert_id\"] for row in rows if row[\"sme_tag\"].strip().upper() == \"ESCALATE\"]\nsummary = {\n    \"escalated\": escalated,\n    \"typologies\": {row[\"alert_id\"]: row[\"scenario\"].strip().upper() for row in rows if row[\"alert_id\"] in escalated},\n}\nwith open(os.path.join(outdir, \"case_summary.json\"), \"w\", encoding=\"utf-8\") as f:\n    json.dump(summary, f, indent=2, sort_keys=True)\nPY\n",
+    "mcp_mock_seed_rows": [
+      {
+        "record_type": "alert",
+        "alert_id": "AL-001",
+        "scenario": "STRUCTURING",
+        "customer_id": "CUST-11",
+        "total_amount_usd": 85500,
+        "status": "open"
+      },
+      {
+        "record_type": "alert",
+        "alert_id": "AL-002",
+        "scenario": "RAPID_MOVEMENT",
+        "customer_id": "CUST-22",
+        "total_amount_usd": 95500,
+        "status": "open"
+      },
+      {
+        "record_type": "alert",
+        "alert_id": "AL-003",
+        "scenario": "PAYROLL_SPIKE",
+        "customer_id": "CUST-33",
+        "total_amount_usd": 64200,
+        "status": "open"
+      },
+      {
+        "record_type": "alert",
+        "alert_id": "AL-004",
+        "scenario": "LARGE_ONE_OFF_DEPOSIT",
+        "customer_id": "CUST-44",
+        "total_amount_usd": 180000,
+        "status": "open"
+      },
+      {
+        "record_type": "alert",
+        "alert_id": "AL-005",
+        "scenario": "WATCHLIST_COUNTERPARTY",
+        "customer_id": "CUST-55",
+        "total_amount_usd": 23800,
+        "status": "open"
+      },
+      {
+        "record_type": "alert",
+        "alert_id": "AL-006",
+        "scenario": "ROUND_AMOUNT_TRANSFERS",
+        "customer_id": "CUST-66",
+        "total_amount_usd": 6000,
+        "status": "open"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-001",
+        "txn_id": "T-001-0",
+        "date": "2026-09-01",
+        "amount_usd": 9500,
+        "description": "cash deposit",
+        "counterparty": "branch",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-001",
+        "txn_id": "T-001-1",
+        "date": "2026-09-02",
+        "amount_usd": 9500,
+        "description": "cash deposit",
+        "counterparty": "branch",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-001",
+        "txn_id": "T-001-2",
+        "date": "2026-09-03",
+        "amount_usd": 9500,
+        "description": "cash deposit",
+        "counterparty": "branch",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-001",
+        "txn_id": "T-001-3",
+        "date": "2026-09-04",
+        "amount_usd": 9500,
+        "description": "cash deposit",
+        "counterparty": "branch",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-001",
+        "txn_id": "T-001-4",
+        "date": "2026-09-05",
+        "amount_usd": 9500,
+        "description": "cash deposit",
+        "counterparty": "branch",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-001",
+        "txn_id": "T-001-5",
+        "date": "2026-09-06",
+        "amount_usd": 9500,
+        "description": "cash deposit",
+        "counterparty": "branch",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-001",
+        "txn_id": "T-001-6",
+        "date": "2026-09-07",
+        "amount_usd": 9500,
+        "description": "cash deposit",
+        "counterparty": "branch",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-001",
+        "txn_id": "T-001-7",
+        "date": "2026-09-08",
+        "amount_usd": 9500,
+        "description": "cash deposit",
+        "counterparty": "branch",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-001",
+        "txn_id": "T-001-8",
+        "date": "2026-09-09",
+        "amount_usd": 9500,
+        "description": "cash deposit",
+        "counterparty": "branch",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-002",
+        "txn_id": "T-002-1",
+        "date": "2026-09-14",
+        "amount_usd": 48000,
+        "description": "incoming wire",
+        "counterparty": "Veltra Commerce Ltd",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-002",
+        "txn_id": "T-002-2",
+        "date": "2026-09-14",
+        "amount_usd": 47500,
+        "description": "outgoing wire",
+        "counterparty": "Kestrel Bay Holdings",
+        "country": "XK"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-003",
+        "txn_id": "T-003-1",
+        "date": "2026-09-30",
+        "amount_usd": 64200,
+        "description": "payroll batch",
+        "counterparty": "Staff salaries",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-004",
+        "txn_id": "T-004-1",
+        "date": "2026-09-05",
+        "amount_usd": 180000,
+        "description": "incoming transfer",
+        "counterparty": "Brightwell Conveyancing LLP",
+        "country": "GB"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-005",
+        "txn_id": "T-005-1",
+        "date": "2026-09-21",
+        "amount_usd": 23800,
+        "description": "outgoing wire",
+        "counterparty": "Orion Freight Trading",
+        "country": "AE"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-006",
+        "txn_id": "T-006-1",
+        "date": "2026-09-01",
+        "amount_usd": 1500,
+        "description": "outgoing transfer",
+        "counterparty": "Family support",
+        "country": "PH"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-006",
+        "txn_id": "T-006-2",
+        "date": "2026-10-01",
+        "amount_usd": 1500,
+        "description": "outgoing transfer",
+        "counterparty": "Family support",
+        "country": "PH"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-006",
+        "txn_id": "T-006-3",
+        "date": "2026-11-01",
+        "amount_usd": 1500,
+        "description": "outgoing transfer",
+        "counterparty": "Family support",
+        "country": "PH"
+      },
+      {
+        "record_type": "transaction",
+        "alert_id": "AL-006",
+        "txn_id": "T-006-4",
+        "date": "2026-12-01",
+        "amount_usd": 1500,
+        "description": "outgoing transfer",
+        "counterparty": "Family support",
+        "country": "PH"
+      },
+      {
+        "record_type": "customer",
+        "customer_id": "CUST-11",
+        "segment": "retail",
+        "occupation": "Courier (self-employed)",
+        "expected_monthly_turnover_usd": 4000
+      },
+      {
+        "record_type": "customer",
+        "customer_id": "CUST-22",
+        "segment": "small business",
+        "occupation": "Import trading",
+        "expected_monthly_turnover_usd": 20000
+      },
+      {
+        "record_type": "customer",
+        "customer_id": "CUST-33",
+        "segment": "small business",
+        "occupation": "Bakery chain, 14 staff",
+        "expected_monthly_turnover_usd": 70000
+      },
+      {
+        "record_type": "customer",
+        "customer_id": "CUST-44",
+        "segment": "retail",
+        "occupation": "Teacher; documented house sale",
+        "expected_monthly_turnover_usd": 5500
+      },
+      {
+        "record_type": "customer",
+        "customer_id": "CUST-55",
+        "segment": "small business",
+        "occupation": "Freight forwarding",
+        "expected_monthly_turnover_usd": 30000
+      },
+      {
+        "record_type": "customer",
+        "customer_id": "CUST-66",
+        "segment": "retail",
+        "occupation": "Nurse; monthly family support abroad",
+        "expected_monthly_turnover_usd": 3800
+      },
+      {
+        "record_type": "watchlist",
+        "name": "Orion Freight Trading FZE",
+        "list": "synthetic sanctions list",
+        "country": "AE"
+      },
+      {
+        "record_type": "watchlist",
+        "name": "Kestrel Bay Holdings Limited",
+        "list": "synthetic adverse media list",
+        "country": "XK"
+      }
+    ]
+  }
+}

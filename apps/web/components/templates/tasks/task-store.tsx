@@ -3,6 +3,7 @@
 import type { SmeAuthoredTaskDto } from '@praxis/shared';
 import { useState } from 'react';
 import { Modal } from '@/components/templates/compiler/custom-field-dialog';
+import { JudgePanel } from '@/components/templates/tasks/judge-panel';
 import { mcBrowser } from '@/lib/mc/browser';
 import { MODE_LABELS } from '@/lib/mc/format';
 
@@ -108,6 +109,8 @@ export function TaskStore({ tasks }: { tasks: SmeAuthoredTaskDto[] }) {
                 {inspect.json ?? 'Loading…'}
               </pre>
             )}
+            <h3 className="text-base font-semibold">LLM judge</h3>
+            <JudgePanel taskId={inspect.task.id} />
             <div className="flex justify-end gap-2">
               {inspect.json && (
                 <button type="button" className="btn btn-secondary" onClick={() => void navigator.clipboard?.writeText(inspect.json!)}>

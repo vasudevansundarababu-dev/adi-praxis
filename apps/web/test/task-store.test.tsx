@@ -1,7 +1,9 @@
 import type { SmeAuthoredTaskDto } from '@praxis/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { McHeader } from '@/components/templates/mc-header';
+import { JudgeResultView } from '@/components/templates/tasks/judge-panel';
 import { TaskStore } from '@/components/templates/tasks/task-store';
+import type { JudgeView } from '@/lib/mc/browser';
 import { handleMock, resetMockStore } from '@/lib/mc/mock-backend';
 import { ctx, fixtureSource, html, template, text } from './helpers';
 
@@ -77,5 +79,49 @@ describe('U4 task store page', () => {
   it('S1-14: the "Tasks DB & JSON" shortcut is shown to Admins only', () => {
     expect(html(<McHeader isAdmin />)).toContain('href="/templates/tasks"');
     expect(html(<McHeader isAdmin={false} />)).not.toContain('/templates/tasks');
+  });
+});
+
+describe('J4 judge result (Admin and Reviewer only)', () => {
+  const judge: JudgeView = {
+    status: 'MEASURED',
+    provider: 'mock',
+    model: 'mock-judge-1',
+    score: 0.625,
+    costUsd: 0.0123,
+    judgedAt: '2026-11-07T10:05:00.000Z',
+    error: null,
+    milestones: [
+      {
+        milestoneId: 'launch_memo',
+        weight: 30,
+        pointsEarned: 3,
+        pointsPossible: 6,
+        truncated: true,
+        criteria: [
+          { num: 1, category: 'Budget', text: 'States the synthetic budget', points: 2, awarded: 2, passed: true, evidence: 'Budget line in section 2' },
+          { num: 2, category: '', text: 'Plans the review week', points: 4, awarded: 1, passed: false, evidence: 'Review week missing' },
+        ],
+      },
+    ],
+  };
+
+  it('shows the score, model, cost and a per-milestone table with points and evidence', () => {
+    const t = text(html(<JudgeResultView judge={judge} />));
+    expect(t).toContain('Judge score 0.63');
+    expect(t).toContain('Model mock-judge-1');
+    expect(t).toContain('Cost $0.0123');
+    expect(t).toContain('launch_memo · 3 of 6 points · weight 30');
+    expect(t).toContain('truncated to 60,000 characters');
+    expect(t).toContain('Budget: States the synthetic budget 2 of 2 Budget line in section 2');
+    expect(t).toContain('Plans the review week 1 of 4 Review week missing');
+    expect(text(html(<JudgeResultView judge={null} />))).toMatch(/No judge result yet/);
+  });
+
+  it('RBAC: Admin and Reviewer read it; PM, Finance and roleless callers get 403', async () => {
+    const list = (await items(['ADMIN'])).body as { items: SmeAuthoredTaskDto[] };
+    const path = `/studio-tasks/${list.items[0]!.id}/judge`;
+    for (const roles of [['ADMIN'], ['REVIEWER']]) expect((await handleMock('GET', path, undefined, ctx(roles, fixtureSource([T])))).status).toBe(200);
+    for (const roles of [['PM'], ['FINANCE'], []]) expect((await handleMock('GET', path, undefined, ctx(roles, fixtureSource([T])))).status).toBe(403);
   });
 });

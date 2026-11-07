@@ -268,7 +268,7 @@ async function deploymentTargets(ctx: MockContext, t: TemplateDto) {
     }));
 }
 
-type Route = { method: string; pattern: RegExp; admin?: boolean; run: (m: string[], body: unknown, ctx: MockContext) => Promise<MockResult> | MockResult };
+type Route = { method: string; pattern: RegExp; admin?: boolean; roles?: string[]; run: (m: string[], body: unknown, ctx: MockContext) => Promise<MockResult> | MockResult };
 
 type Schema<T> = { safeParse(v: unknown): { success: true; data: T } | { success: false; error: { issues: Array<{ path: PropertyKey[]; message: string }> } } };
 function parse<T>(schema: Schema<T>, body: unknown): T | MockResult {
@@ -621,6 +621,39 @@ const routes: Route[] = [
   },
   {
     method: 'GET',
+    pattern: /^\/studio-tasks\/([\w-]+)\/judge$/,
+    roles: ['ADMIN', 'REVIEWER'],
+    run: ([, id]) => {
+      const t = mockStore().tasks.get(id!);
+      if (!t) return error(404, 'NOT_FOUND', 'Task not found');
+      return json(200, {
+        judge: {
+          status: 'MEASURED',
+          provider: 'mock',
+          model: 'mock-judge-1',
+          score: 0.75,
+          costUsd: 0,
+          judgedAt: '2026-11-07T10:05:00.000Z',
+          error: null,
+          milestones: [
+            {
+              milestoneId: 'launch_memo',
+              weight: 100,
+              pointsEarned: 3,
+              pointsPossible: 4,
+              truncated: false,
+              criteria: [
+                { num: 1, category: 'Budget', text: 'States the synthetic budget', points: 2, awarded: 2, passed: true, evidence: 'mock: budget stated' },
+                { num: 2, category: 'Risk', text: 'Names one launch risk', points: 2, awarded: 1, passed: false, evidence: 'mock: risk named without a mitigation' },
+              ],
+            },
+          ],
+        },
+      });
+    },
+  },
+  {
+    method: 'GET',
     pattern: /^\/studio-tasks\/([\w-]+)\/bundle$/,
     admin: true,
     run: ([, id]) => {
@@ -638,6 +671,7 @@ export async function handleMock(method: string, path: string, body: unknown, ct
     const m = r.pattern.exec(clean);
     if (!m) continue;
     if (r.admin && !isAdmin(ctx)) return error(403, 'FORBIDDEN', 'Admins only');
+    if (r.roles && !r.roles.some((x) => ctx.roles.includes(x))) return error(403, 'FORBIDDEN', `Only ${r.roles.join(' or ')}`);
     return r.run([...m].map((x) => x ?? ''), body, ctx);
   }
   return error(404, 'NOT_FOUND', `No mock route for ${method} ${clean}`);

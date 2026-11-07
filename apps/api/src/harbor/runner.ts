@@ -17,8 +17,18 @@ import type { Config } from '../config';
  */
 export interface HarborRunner {
   readonly kind: 'mock' | 'docker' | 'job';
-  run(bundleRef: string, mode: RunnerMode): Promise<RunnerResult>;
+  run(bundleRef: string, mode: RunnerMode): Promise<RunnerRun>;
 }
+
+/**
+ * `RunnerResult` plus the text files the run left under `/workspace/outputs/`, keyed by their path relative to it.
+ * The post-commit judge grades the oracle run's deliverables from these. Kept in apps/api: the frozen contract has no
+ * outputs field. Runners that cannot return files leave it undefined.
+ */
+export type RunnerRun = RunnerResult & { outputs?: Record<string, string> };
+
+/** Caps what a runner returns as output files (total characters across files). */
+export const MAX_RUNNER_OUTPUT_CHARS = 150_000;
 
 export class RunnerError extends Error {}
 
@@ -49,8 +59,12 @@ const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
  */
 export class MockRunner implements HarborRunner {
   readonly kind = 'mock' as const;
-  constructor(private readonly storage: ObjectStorage, private readonly forced: Partial<Record<RunnerMode, number>> = {}) {}
-  async run(bundleRef: string, mode: RunnerMode): Promise<RunnerResult> {
+  constructor(
+    private readonly storage: ObjectStorage,
+    private readonly forced: Partial<Record<RunnerMode, number>> = {},
+    private readonly forcedOutputs: Partial<Record<RunnerMode, Record<string, string>>> = {},
+  ) {}
+  async run(bundleRef: string, mode: RunnerMode): Promise<RunnerRun> {
     const bytes = await this.storage.get(bundleRef);
     const files = readTarGz(bytes);
     const verifiers = (files.get('eval/test_verifiers.py')?.toString('utf8') ?? '').includes('def test_');
@@ -58,8 +72,30 @@ export class MockRunner implements HarborRunner {
     const natural = mode === 'null-agent' ? (verifiers ? 0 : 1) : verifiers && solve ? 1 : 0;
     const score = this.forced[mode] ?? natural;
     const log = [`mock runner: ${mode} on ${bundleRef}`, `files: ${[...files.keys()].join(', ')}`, `verifiers: ${verifiers ? 'present' : 'missing'}; solve.sh: ${solve ? 'present' : 'missing'}`, `score: ${score.toFixed(2)}`].join('\n');
-    return { score, log, runnerRef: `mock:${sha(bytes).slice(0, 12)}:${mode}` };
+    return { score, log, runnerRef: `mock:${sha(bytes).slice(0, 12)}:${mode}`, outputs: this.forcedOutputs[mode] ?? (mode === 'oracle' ? mockOracleOutputs(files) : {}) };
   }
+}
+
+/** The mock oracle "writes" each judged deliverable as its checklist text, so the mock judge awards full points. */
+function mockOracleOutputs(files: Map<string, Buffer>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [p, data] of files) {
+    if (!p.startsWith('eval/judge/') || !p.endsWith('.json')) continue;
+    const spec = JSON.parse(data.toString('utf8')) as { deliverable_path: string; criteria: { text: string }[] };
+    const rel = spec.deliverable_path.replace(/^\/workspace\/outputs\//, '');
+    out[rel] = `${out[rel] ?? ''}${spec.criteria.map((c) => c.text).join('\n')}\n`;
+  }
+  return out;
+}
+
+const OUTPUTS_MARKER = '@@PRAXIS_OUTPUTS@@';
+
+/** Splits the grading script's stdout into the pytest part and the JSON map of output files after the marker. */
+export function splitOutputs(stdout: string): { text: string; outputs: Record<string, string> | undefined } {
+  const at = stdout.lastIndexOf(OUTPUTS_MARKER);
+  if (at < 0) return { text: stdout, outputs: undefined };
+  const parsed = z.record(z.string(), z.string()).safeParse((() => { try { return JSON.parse(stdout.slice(at + OUTPUTS_MARKER.length).trim()); } catch { return null; } })());
+  return { text: stdout.slice(0, at), outputs: parsed.success ? parsed.data : undefined };
 }
 
 export type Exec = (cmd: string, args: string[], opts: { timeoutMs: number }) => Promise<{ code: number | null; stdout: string; stderr: string }>;
@@ -80,7 +116,22 @@ const execFile: Exec = (cmd, args, opts) =>
 const GRADE = `set -u
 cp -r /task /tmp/work && cd /tmp/work
 if [ "$1" = "oracle" ]; then sh solution/solve.sh || echo "solve.sh exited with $?"; fi
-python -m pytest -q -p no:cacheprovider eval/test_verifiers.py 2>&1 | tail -n 200`;
+python -m pytest -q -p no:cacheprovider eval/test_verifiers.py 2>&1 | tail -n 200
+echo "${OUTPUTS_MARKER}"
+python - <<'PY'
+import json, os
+root, out, left = "/workspace/outputs", {}, ${MAX_RUNNER_OUTPUT_CHARS}
+for d, dirs, names in os.walk(root):
+    dirs.sort()
+    for n in sorted(names):
+        try:
+            text = open(os.path.join(d, n), encoding="utf-8").read()[:left]
+        except (OSError, UnicodeDecodeError):
+            continue
+        out[os.path.relpath(os.path.join(d, n), root).replace(os.sep, "/")] = text
+        left -= len(text)
+print(json.dumps(out))
+PY`;
 
 /** Score from pytest's summary line: passed / (passed + failed + errors). No tests collected scores 0. */
 export function pytestScore(output: string): number {
@@ -104,7 +155,7 @@ export class DockerRunner implements HarborRunner {
       'sh', '-c', GRADE, 'grade', mode,
     ];
   }
-  async run(bundleRef: string, mode: RunnerMode): Promise<RunnerResult> {
+  async run(bundleRef: string, mode: RunnerMode): Promise<RunnerRun> {
     const files = readTarGz(await this.opts.storage.get(bundleRef));
     const dir = await mkdtemp(path.join(tmpdir(), 'praxis-bundle-'));
     try {
@@ -116,8 +167,9 @@ export class DockerRunner implements HarborRunner {
       }
       const name = `praxis-verify-${randomUUID().slice(0, 12)}`;
       const r = await (this.opts.exec ?? execFile)('docker', this.dockerArgs(dir, mode, name), { timeoutMs: this.opts.timeoutMs ?? 120_000 });
-      const log = `${r.stdout}\n${r.stderr}`.trim();
-      return { score: pytestScore(r.stdout), log, runnerRef: `docker:${name}` };
+      const { text, outputs } = splitOutputs(r.stdout);
+      const log = `${text}\n${r.stderr}`.trim();
+      return { score: pytestScore(text), log, runnerRef: `docker:${name}`, outputs };
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -127,7 +179,7 @@ export class DockerRunner implements HarborRunner {
 type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body?: string }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
 
 const Operation = z.object({ name: z.string(), done: z.boolean().optional(), error: z.object({ message: z.string().optional() }).passthrough().optional(), metadata: z.object({ name: z.string().optional() }).passthrough().optional() });
-const JobResult = z.object({ score: z.number().min(0).max(1), log: z.string().max(1_000_000).default('') });
+const JobResult = z.object({ score: z.number().min(0).max(1), log: z.string().max(1_000_000).default(''), outputs: z.record(z.string(), z.string().max(MAX_RUNNER_OUTPUT_CHARS)).optional() });
 
 /**
  * Staging and production: starts the Cloud Run job `praxis-harbor-verify` (its own service account, no egress, no
@@ -149,7 +201,7 @@ export class SandboxJobRunner implements HarborRunner {
     if (!res.ok) throw new RunnerError(`Cloud Run API ${method} failed (${res.status})`);
     return Operation.parse(await res.json());
   }
-  async run(bundleRef: string, mode: RunnerMode): Promise<RunnerResult> {
+  async run(bundleRef: string, mode: RunnerMode): Promise<RunnerRun> {
     const base = (this.opts.baseUrl ?? 'https://run.googleapis.com').replace(/\/$/, '');
     const resultKey = `results/${sha(Buffer.from(`${bundleRef}:${mode}:${randomUUID()}`)).slice(0, 32)}.json`;
     let op = await this.call('POST', `${base}/v2/${this.jobName}:run`, { overrides: { containerOverrides: [{ args: [bundleRef, mode, resultKey] }], taskCount: 1 } });
@@ -162,7 +214,7 @@ export class SandboxJobRunner implements HarborRunner {
     if (op.error) throw new RunnerError(`The verification job failed: ${op.error.message ?? 'unknown error'}`);
     const result = JobResult.safeParse(JSON.parse((await this.opts.storage.get(resultKey)).toString('utf8')));
     if (!result.success) throw new RunnerError('The verification job wrote an invalid result');
-    return { score: result.data.score, log: result.data.log, runnerRef: op.metadata?.name ?? op.name };
+    return { score: result.data.score, log: result.data.log, runnerRef: op.metadata?.name ?? op.name, outputs: result.data.outputs };
   }
 }
 

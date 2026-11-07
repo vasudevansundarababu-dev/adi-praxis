@@ -4,6 +4,7 @@ import type { ObjectStorage } from '../candidate/storage';
 import type { Config } from '../config';
 import type { Db } from '../db';
 import type { HarborRunner } from '../harbor/runner';
+import { emitEvent } from '../outbox/outbox';
 import { writeAudit } from '../platform/audit';
 import { redact } from './redact';
 
@@ -22,11 +23,16 @@ export interface TaskVerificationEvidence {
   runnerRefs: string[];
   verifyBundleRef: string | null;
   logRef: string;
+  /** The oracle run's files under /workspace/outputs/ (JSON path → text), for the post-commit judge. Never agent-visible. */
+  oracleOutputsRef?: string | null;
   verifiedAt: string;
   error: string | null;
+  /** Written later by the judge job (judge-task.ts). */
+  judge?: unknown;
 }
 
 export const taskVerificationLogKey = (clientId: string, id: string) => `studio-tasks/${clientId}/${id}/verification-log.txt`;
+export const oracleOutputsKey = (clientId: string, id: string) => `studio-tasks/${clientId}/${id}/oracle-outputs.json`;
 
 /**
  * Per-task verification after Save & Commit (architecture section 7, D-12): the worker grades the committed bundle with
@@ -53,6 +59,7 @@ export async function processAuthoredTaskVerification(w: TaskVerificationDeps, a
         action: scores ? 'studio.task_verified' : 'studio.task_verification_failed',
         after: { zeroBaselineScore: scores?.zero ?? null, oracleScore: scores?.oracle ?? null, passed: evidence.passed, runner: evidence.runner, runnerRefs: evidence.runnerRefs, error: evidence.error },
       });
+      if (scores) await emitEvent(tx, t.clientId, { name: 'studio.task_verified', aggregateType: 'SmeAuthoredTask', aggregateId: t.id, payload: { authoredTaskId: t.id } });
     });
   };
   const base = { runner: runner.kind, logRef, verifiedAt: new Date().toISOString() };
@@ -77,8 +84,13 @@ export async function processAuthoredTaskVerification(w: TaskVerificationDeps, a
     const oracle = await runner.run(verifyBundleRef, 'oracle');
     runnerRefs.push(oracle.runnerRef);
     log.push(`--- oracle: ${oracle.score.toFixed(2)} (${oracle.runnerRef})`, oracle.log);
+    let oracleOutputsRef: string | null = null;
+    if (oracle.outputs) {
+      oracleOutputsRef = oracleOutputsKey(t.clientId, t.id);
+      await storage.put(oracleOutputsRef, Buffer.from(JSON.stringify(oracle.outputs)), 'application/json');
+    }
     const passed = zero.score === 0 && oracle.score === 1;
-    await record({ zero: zero.score, oracle: oracle.score }, { ...base, status: 'MEASURED', passed, runnerRefs, verifyBundleRef, error: passed ? null : 'Zero-baseline must be 0.00 and oracle 1.00' });
+    await record({ zero: zero.score, oracle: oracle.score }, { ...base, status: 'MEASURED', passed, runnerRefs, verifyBundleRef, oracleOutputsRef, error: passed ? null : 'Zero-baseline must be 0.00 and oracle 1.00' });
   } catch (err) {
     const message = redact(err instanceof Error ? err.message : 'Verification failed');
     log.push(`error: ${message}`);

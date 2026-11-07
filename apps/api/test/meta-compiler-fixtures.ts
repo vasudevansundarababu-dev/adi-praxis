@@ -7,6 +7,7 @@ import type { HarborRunner } from '../src/harbor/runner';
 import { resolveDeps } from '../src/meta-compiler/deps';
 import { MockContentDrafter } from '../src/meta-compiler/drafter';
 import { metaCompilerHandlers } from '../src/meta-compiler/handlers';
+import { MockJudge, type LlmJudge } from '../src/meta-compiler/judge';
 import { processDomainEvent } from '../src/outbox/dispatcher';
 import { HandlerRegistry } from '../src/outbox/handlers';
 import { createCandidate, db, idem } from './helpers';
@@ -111,12 +112,20 @@ export function api(app: FastifyInstance) {
 }
 
 /** Runs the Meta-Compiler worker jobs for every pending outbox event, as the worker would. */
-export function workerFor(w: { config: Config; storage: ObjectStorage; runner: HarborRunner }) {
+export function workerFor(w: { config: Config; storage: ObjectStorage; runner: HarborRunner; judge?: LlmJudge }) {
   return async () => {
     const registry = new HandlerRegistry();
-    for (const h of metaCompilerHandlers({ ...w, drafters: () => new MockContentDrafter(), deps: resolveDeps() })) registry.register(h);
-    for (const ev of await db.outboxEvent.findMany({ where: { name: { in: ['compiler.generation_requested', 'compiler.verification_requested', 'studio.task_committed'] } }, orderBy: { createdAt: 'asc' } })) {
-      await processDomainEvent(db, registry, ev.id);
+    for (const h of metaCompilerHandlers({ judge: new MockJudge(), ...w, drafters: () => new MockContentDrafter(), deps: resolveDeps() })) registry.register(h);
+    // Jobs can emit follow-up events (verification enqueues the judge): repeat until no new event appears.
+    const seen = new Set<string>();
+    for (;;) {
+      const events = await db.outboxEvent.findMany({ where: { name: { in: ['compiler.generation_requested', 'compiler.verification_requested', 'studio.task_committed', 'studio.task_verified'] } }, orderBy: { createdAt: 'asc' } });
+      const fresh = events.filter((ev) => !seen.has(ev.id));
+      if (fresh.length === 0) return;
+      for (const ev of fresh) {
+        seen.add(ev.id);
+        await processDomainEvent(db, registry, ev.id);
+      }
     }
   };
 }

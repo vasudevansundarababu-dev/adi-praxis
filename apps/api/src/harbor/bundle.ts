@@ -73,8 +73,36 @@ export function bundleEntries(bp: HarborBlueprint, answers: StudioAnswers, meta:
   if (!solve.trim()) {
     if (bp.harbor_contract.require_solve_sh) throw new BundleError('The template has no solution/solve.sh');
   } else entries.push(file('solution/solve.sh', solve, 0o755));
+
+  for (const m of bp.step_5_default_rubric.milestones) {
+    if (!m.judge) continue;
+    if (!/^[A-Za-z0-9_.-]+$/.test(m.id) || m.id.startsWith('.')) throw new BundleError(`Milestone id "${m.id}" cannot be used as a judge file name`);
+    const spec: JudgeFile = {
+      milestone_id: m.id,
+      weight: r.milestoneWeights[m.id] ?? m.weight,
+      deliverable_path: m.judge.deliverable_path,
+      system_prompt: lf(m.judge.system_prompt),
+      criteria: m.judge.criteria.map((c) => ({ num: c.num, category: c.category, text: lf(c.text), points: c.points })),
+    };
+    entries.push(file(judgeFilePath(m.id), `${JSON.stringify(spec, null, 2)}\n`));
+  }
   return entries;
 }
+
+/**
+ * Judge checklist for one milestone (owner decision, 7 Nov 2026). It holds the answer key, so it lives under `eval/`
+ * (hidden) and is read only by the post-commit judge job in Praxis, never by the agent or the in-task verifier.
+ */
+export interface JudgeFile {
+  milestone_id: string;
+  weight: number;
+  deliverable_path: string;
+  system_prompt: string;
+  criteria: { num: number; category: string; text: string; points: number }[];
+}
+
+export const JUDGE_DIR = 'eval/judge/';
+export const judgeFilePath = (milestoneId: string) => `${JUDGE_DIR}${milestoneId}.json`;
 
 /** C3: deterministic `<task>.tar.gz` with its SHA-256 and manifest (same input gives the same bytes). */
 export const buildBundle: BuildBundle = (bp, answers, meta): HarborBundle => {

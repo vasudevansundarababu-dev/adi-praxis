@@ -13,6 +13,7 @@ import { createDomainEventsQueue, createDomainEventsWorker, startOutboxPoller } 
 import { defaultHandlers } from './outbox/handlers';
 import { resolveDeps } from './meta-compiler/deps';
 import { defaultDrafterFactory } from './meta-compiler/drafter';
+import { defaultJudge } from './meta-compiler/judge';
 import { metaCompilerHandlers } from './meta-compiler/handlers';
 import { BUNDLE_SWEEP_JOB, defaultBundleObjectStore, sweepBundles } from './meta-compiler/bundle-sweep';
 import { defaultRunner } from './harbor/runner';
@@ -28,9 +29,9 @@ const connection = redisConnection(config.REDIS_URL);
 const queue = createDomainEventsQueue(connection);
 const cert = { gen: defaultCurriculum(config), box: secretBox(config), embeddings: defaultEmbeddings(config) };
 const registry = defaultHandlers({ evaluator: defaultEvaluator(config), email: defaultEmail(config), config, rlGym: defaultRlGym(config), drafter: defaultDrafter(config), storage: defaultStorage(config), smeSupply: config.SME_SUPPLY_ENABLED, cert });
-// Templates Meta-Compiler: generation, verification and per-task verification jobs.
+// Templates Meta-Compiler: generation, verification, per-task verification and judge jobs.
 const storage = defaultStorage(config);
-for (const h of metaCompilerHandlers({ config, storage, drafters: defaultDrafterFactory(config), deps: resolveDeps(), runner: defaultRunner(config, storage) })) registry.register(h);
+for (const h of metaCompilerHandlers({ config, storage, drafters: defaultDrafterFactory(config), deps: resolveDeps(), runner: defaultRunner(config, storage), judge: defaultJudge(config) })) registry.register(h);
 const worker = createDomainEventsWorker(db, registry, connection);
 const log = (level: string, msg: string, extra: object = {}) =>
   console.log(JSON.stringify({ level, severity: level.toUpperCase(), message: msg, msg, service: 'praxis-worker', time: new Date().toISOString(), ...extra }));

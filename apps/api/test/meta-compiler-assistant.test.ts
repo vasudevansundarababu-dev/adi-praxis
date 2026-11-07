@@ -76,7 +76,7 @@ describe('A3 presets and propose-field (S2-14, D7)', () => {
       expect((await http.get(admin, url)).json().items).toEqual(items);
 
       // Update one (renaming it to the other's label), drop the other, add a new one.
-      const [ubo, cac] = items as [{ id: string }, { id: string }];
+      const [ubo, cac] = [items[0]!, items[1]!];
       const second = await http.put(admin, url, {
         presets: [
           { id: cac.id, label: 'UBO hop depth', field: field('ubo_depth'), sortOrder: 0, active: false },

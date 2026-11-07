@@ -66,6 +66,7 @@ import { templateRoutes } from './routes/templates';
 import { metaCompilerRoutes } from './routes/meta-compiler';
 import { metaCompilerRunRoutes } from './routes/meta-compiler-runs';
 import { metaCompilerAssistantRoutes } from './routes/meta-compiler-assistant';
+import { metaCompilerStoreRoutes } from './routes/meta-compiler-store';
 import { candidateStudioRoutes } from './routes/candidate-studio';
 import { resolveDeps } from './meta-compiler/deps';
 import { defaultDrafterFactory } from './meta-compiler/drafter';
@@ -284,6 +285,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       const drafters = deps.metaCompiler?.drafters ?? defaultDrafterFactory(deps.config);
       await v1.register(metaCompilerRunRoutes, { db: deps.db, config: deps.config, storage, drafters, deps: resolveDeps(deps.metaCompiler?.deps), runner: deps.metaCompiler?.runner ?? defaultRunner(deps.config, storage) });
       await v1.register(metaCompilerAssistantRoutes, { db: deps.db, config: deps.config, drafters });
+      await v1.register(metaCompilerStoreRoutes, { db: deps.db, storage });
       await v1.register(taxonomyRoutes, { db: deps.db });
       await v1.register(jobDescriptionRoutes, { db: deps.db });
       await v1.register(projectRoutes, { db: deps.db });

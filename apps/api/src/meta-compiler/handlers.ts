@@ -5,6 +5,7 @@ import type { EventHandler } from '../outbox/handlers';
 import type { MetaCompilerDeps } from './deps';
 import type { DrafterFactory } from './drafter';
 import { processGeneration } from './generation';
+import { processAuthoredTaskVerification } from './task-verification';
 import { processVerification } from './verification';
 import type { HarborRunner } from '../harbor/runner';
 
@@ -22,6 +23,7 @@ export function metaCompilerHandlers(w: MetaCompilerWorkerDeps): EventHandler[] 
   return [
     { name: 'meta-compiler.generate', event: 'compiler.generation_requested', run: (e, db: Db) => processGeneration({ ...w, db }, payload(e).runId!) },
     { name: 'meta-compiler.verify', event: 'compiler.verification_requested', run: (e, db: Db) => processVerification({ ...w, db }, payload(e).verificationId!) },
+    { name: 'meta-compiler.verify-task', event: 'studio.task_committed', run: (e, db: Db) => processAuthoredTaskVerification({ ...w, db }, payload(e).authoredTaskId!) },
   ];
 }
 

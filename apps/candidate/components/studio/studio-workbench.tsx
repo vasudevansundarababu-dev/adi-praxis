@@ -16,13 +16,14 @@ export interface StudioWorkbenchProps {
   studioUrl: string;
   smeLabel: string;
   tasks: SmeAuthoredTaskDto[];
+  initialStep?: StudioStepId;
 }
 
 const REVIEW_LABEL: Record<string, string> = { SUBMITTED: 'Submitted for review', IN_REVIEW: 'In review', ACCEPTED: 'Accepted', REWORK: 'Returned to you', REJECTED: 'Not accepted' };
 export const reviewLabel = (s: string) => REVIEW_LABEL[s] ?? s.toLowerCase().replace(/_/g, ' ');
 
 /** Screen 4: the SME studio for one deployment (S4-01 to S4-10, S4-13). */
-export function StudioWorkbench({ config, studioUrl, smeLabel, tasks }: StudioWorkbenchProps) {
+export function StudioWorkbench({ config, studioUrl, smeLabel, tasks, initialStep = 'scenario' }: StudioWorkbenchProps) {
   const router = useRouter();
   const bp = config.blueprint;
   const steps = useMemo(() => studioSteps(bp), [bp]);
@@ -30,7 +31,7 @@ export function StudioWorkbench({ config, studioUrl, smeLabel, tasks }: StudioWo
   const readOnly = committed !== null;
   const target = useMemo(() => studioBrowser.draftTarget(config.studioKey), [config.studioKey]);
   const { value, update, currentRevision, state, flush } = useAutosave<StudioAnswers>(config.taskInstanceId, withDefaults(bp, config.answers), config.revision, readOnly, target);
-  const [step, setStep] = useState<StudioStepId>('scenario');
+  const [step, setStep] = useState<StudioStepId>(initialStep);
   const problems = useMemo(() => studioAnswerProblems(bp, value), [bp, value]);
   const current = steps.find((s) => s.id === step)!;
   const navRefs = useRef<Array<HTMLButtonElement | null>>([]);

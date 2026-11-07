@@ -161,7 +161,7 @@ function Stage2Editor({ bp, onChange }: StageEditorProps) {
       <SectionCard
         title="Public dropzones (agent-visible)"
         actions={
-          <SmallButton onClick={() => set((d) => void d.step_2_data_panels.public_dropzones.push({ id: `input_${dz.length + 1}`, label: '', target_path: '/workspace/inputs/', format: 'csv', description: '' }))}>
+          <SmallButton onClick={() => set((d) => void d.step_2_data_panels.public_dropzones.push({ id: `input_${dz.length + 1}`, label: '', target_path: '/workspace/inputs/', format: 'csv', description: '', fixed_content: null }))}>
             + Add dropzone
           </SmallButton>
         }

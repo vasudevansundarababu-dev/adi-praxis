@@ -215,3 +215,34 @@ describe('LLM judge milestones (owner decision 7 Nov 2026)', () => {
     expect((await stage5({ ...judged(spec), verifier_template: 'f1_set_match' })).join()).toMatch(/needs the llm_judge_checklist verifier/);
   });
 });
+
+describe('Admin-fixed dropzone content', () => {
+  const bpWith = async (fixed: string | null) => {
+    const { HarborBlueprint } = await import('../src');
+    return HarborBlueprint.parse({
+      step_2_data_panels: { public_dropzones: [{ id: 'exhibits', label: 'Case exhibits', target_path: '/workspace/inputs/exhibits.md', format: 'md', fixed_content: fixed }] },
+    });
+  };
+  const answers = (inputs: Record<string, string>) => ({ fields: {}, inputs, oracleRows: [], sliders: {}, invariantRuleIds: [], milestoneWeights: {}, instructionNotes: '' });
+
+  it('defaults to null and leaves SME-supplied inputs unchanged', async () => {
+    const { resolveAnswers } = await import('../src');
+    const bp = await bpWith(null);
+    expect(bp.step_2_data_panels.public_dropzones[0]!.fixed_content).toBeNull();
+    expect(resolveAnswers(bp, answers({ exhibits: 'sme text' })).inputs.exhibits).toBe('sme text');
+  });
+
+  it('always resolves to the fixed content, even with no SME answer', async () => {
+    const { resolveAnswers } = await import('../src');
+    const bp = await bpWith('# Exhibit 10');
+    expect(resolveAnswers(bp, null).inputs.exhibits).toBe('# Exhibit 10');
+    expect(resolveAnswers(bp, answers({})).inputs.exhibits).toBe('# Exhibit 10');
+  });
+
+  it('refuses an SME answer that changes fixed content', async () => {
+    const { studioAnswerProblems } = await import('../src');
+    const bp = await bpWith('# Exhibit 10');
+    expect(studioAnswerProblems(bp, answers({ exhibits: 'edited' })).data_oracle.join()).toMatch(/fixed by the template/);
+    expect(studioAnswerProblems(bp, answers({ exhibits: '# Exhibit 10' })).data_oracle.join()).not.toMatch(/fixed by the template/);
+  });
+});

@@ -100,6 +100,9 @@ export const studioAnswerProblems: StudioAnswerProblems = (bp, answers) => {
   const d = out.data_oracle;
   const zones = known(bp.step_2_data_panels.public_dropzones.map((z) => z.id));
   for (const id of Object.keys(answers.inputs)) if (!zones.has(id)) d.push(`Unknown dropzone "${id}"`);
+  for (const z of bp.step_2_data_panels.public_dropzones) {
+    if (z.fixed_content !== null && Object.hasOwn(answers.inputs, z.id) && answers.inputs[z.id] !== z.fixed_content) d.push(`"${z.label}" is fixed by the template and cannot be changed`);
+  }
   const o = bp.step_2_data_panels.oracle_annotator;
   if (answers.oracleRows.length === 0) d.push('Tag at least one oracle row');
   answers.oracleRows.forEach((row, i) => {

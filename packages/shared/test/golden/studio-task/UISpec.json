@@ -176,6 +176,7 @@
     "public_dropzones": [
       {
         "description": "One query per row.",
+        "fixed_content": null,
         "format": "csv",
         "id": "queries",
         "label": "Search queries",
@@ -183,6 +184,7 @@
       },
       {
         "description": "",
+        "fixed_content": null,
         "format": "md",
         "id": "brief",
         "label": "Launch brief",

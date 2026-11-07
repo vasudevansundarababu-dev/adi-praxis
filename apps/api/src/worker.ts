@@ -11,6 +11,9 @@ import { createDb } from './db';
 import { redisConnection } from './lib/redis';
 import { createDomainEventsQueue, createDomainEventsWorker, startOutboxPoller } from './outbox/dispatcher';
 import { defaultHandlers } from './outbox/handlers';
+import { resolveDeps } from './meta-compiler/deps';
+import { defaultDrafterFactory } from './meta-compiler/drafter';
+import { metaCompilerHandlers } from './meta-compiler/handlers';
 import { createMaintenanceWorker, scheduleMaintenance, scheduleRecurring } from './outbox/maintenance';
 import { secretBox } from './lib/secrets';
 import { processPartnerWebhooks } from './supply/webhooks';
@@ -22,7 +25,10 @@ const db = createDb(config.DATABASE_URL);
 const connection = redisConnection(config.REDIS_URL);
 const queue = createDomainEventsQueue(connection);
 const cert = { gen: defaultCurriculum(config), box: secretBox(config), embeddings: defaultEmbeddings(config) };
-const worker = createDomainEventsWorker(db, defaultHandlers({ evaluator: defaultEvaluator(config), email: defaultEmail(config), config, rlGym: defaultRlGym(config), drafter: defaultDrafter(config), storage: defaultStorage(config), smeSupply: config.SME_SUPPLY_ENABLED, cert }), connection);
+const registry = defaultHandlers({ evaluator: defaultEvaluator(config), email: defaultEmail(config), config, rlGym: defaultRlGym(config), drafter: defaultDrafter(config), storage: defaultStorage(config), smeSupply: config.SME_SUPPLY_ENABLED, cert });
+// Templates Meta-Compiler: generation, verification and per-task verification jobs.
+for (const h of metaCompilerHandlers({ config, storage: defaultStorage(config), drafters: defaultDrafterFactory(config), deps: resolveDeps() })) registry.register(h);
+const worker = createDomainEventsWorker(db, registry, connection);
 const log = (level: string, msg: string, extra: object = {}) =>
   console.log(JSON.stringify({ level, severity: level.toUpperCase(), message: msg, msg, service: 'praxis-worker', time: new Date().toISOString(), ...extra }));
 

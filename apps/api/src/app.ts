@@ -64,6 +64,10 @@ import { dbSelectionGate, type SelectionGate } from './staffing/selection-gate';
 import { taxonomyRoutes } from './routes/taxonomy';
 import { templateRoutes } from './routes/templates';
 import { metaCompilerRoutes } from './routes/meta-compiler';
+import { metaCompilerRunRoutes } from './routes/meta-compiler-runs';
+import { resolveDeps } from './meta-compiler/deps';
+import { defaultDrafterFactory } from './meta-compiler/drafter';
+import type { MetaCompilerOverrides } from './meta-compiler/handlers';
 import { userRoutes } from './routes/users';
 
 export interface AppDeps {
@@ -96,6 +100,8 @@ export interface AppDeps {
   payouts?: PayoutProvider;
   /** Support Bot: Claude on Vertex when configured, otherwise the local mock. */
   support?: SupportAssistant;
+  /** Templates Meta-Compiler: drafters, Stream 1 functions and the Harbor runner. Defaults follow config. */
+  metaCompiler?: MetaCompilerOverrides;
 }
 
 export function defaultSupport(config: Config): SupportAssistant {
@@ -272,6 +278,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(userRoutes, { db: deps.db });
       await v1.register(templateRoutes, { db: deps.db });
       await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });
+      await v1.register(metaCompilerRunRoutes, { db: deps.db, config: deps.config, storage, drafters: deps.metaCompiler?.drafters ?? defaultDrafterFactory(deps.config), deps: resolveDeps(deps.metaCompiler?.deps) });
       await v1.register(taxonomyRoutes, { db: deps.db });
       await v1.register(jobDescriptionRoutes, { db: deps.db });
       await v1.register(projectRoutes, { db: deps.db });

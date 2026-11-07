@@ -1,0 +1,50 @@
+# Posts a report comment on an issue as github-actions[bot], so that @mentions of the repository owner trigger
+# GitHub's notification email (GitHub does not email people about comments made by their own account).
+# Run by hand or by an agent: gh workflow run post-report.yml -f issue=12 -f body_file=docs/reports/x.md -f ref=<branch>
+name: Post report
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue number to comment on
+        required: true
+      body:
+        description: Comment text (use body_file for long reports)
+        required: false
+        default: ''
+      body_file:
+        description: Path of a Markdown file in the repository at `ref`
+        required: false
+        default: ''
+      ref:
+        description: Branch or commit that holds body_file
+        required: false
+        default: ''
+permissions:
+  contents: read
+  issues: write
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        if: ${{ inputs.body_file != '' }}
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ inputs.issue }}
+          BODY: ${{ inputs.body }}
+          BODY_FILE: ${{ inputs.body_file }}
+        run: |
+          [[ "$ISSUE" =~ ^[0-9]+$ ]] || { echo "issue must be a number"; exit 1; }
+          if [[ -n "$BODY_FILE" ]]; then
+            [[ "$BODY_FILE" =~ ^[A-Za-z0-9._/-]+\.md$ && "$BODY_FILE" != *..* ]] || { echo "body_file must be a .md path inside the repository"; exit 1; }
+            cp -- "$BODY_FILE" /tmp/body.md
+          else
+            [[ -n "$BODY" ]] || { echo "body or body_file is required"; exit 1; }
+            printf '%s\n' "$BODY" > /tmp/body.md
+          fi
+          gh issue comment "$ISSUE" -R "$REPO" --body-file /tmp/body.md

@@ -2,7 +2,7 @@
 
 | Item | Value |
 | --- | --- |
-| Status | **Draft for owner approval (Gate 3: plan).** Coding starts only after approval. |
+| Status | **Approved by the owner on 8 Nov 2026 (Gate 3: plan).** Coding started 8 Nov. |
 | Implements | [PRD](../prd/PRD-TEMPLATES-META-COMPILER.md) (approved 7 Nov) and [architecture](../architecture/ARCH-TEMPLATES-META-COMPILER.md) (approved 8 Nov) |
 | Target | Phases A and B in production by **16 Nov 2026**; Phase C after, with separate approval |
 | OpenHands budget | **$600** cap for Phases A + B (owner, 7 Nov). Alerts at $300 and $480; stop at $600 unless raised |
@@ -187,4 +187,4 @@ Each stream gets its cap and stops at it, reporting where it got to. The lead re
 
 ## 10. Approval
 
-Reply **Approved** to start coding on 8 Nov after the architecture is approved, or tell me what to change.
+Approved by the owner on 8 Nov 2026, after the architecture approval the same day.

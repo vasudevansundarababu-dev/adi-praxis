@@ -63,6 +63,7 @@ import { OfflineGeocoder, type Geocoder } from './staffing/geocoder';
 import { dbSelectionGate, type SelectionGate } from './staffing/selection-gate';
 import { taxonomyRoutes } from './routes/taxonomy';
 import { templateRoutes } from './routes/templates';
+import { metaCompilerRoutes } from './routes/meta-compiler';
 import { userRoutes } from './routes/users';
 
 export interface AppDeps {
@@ -270,6 +271,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(authRoutes, { db: deps.db, config: deps.config });
       await v1.register(userRoutes, { db: deps.db });
       await v1.register(templateRoutes, { db: deps.db });
+      await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });
       await v1.register(taxonomyRoutes, { db: deps.db });
       await v1.register(jobDescriptionRoutes, { db: deps.db });
       await v1.register(projectRoutes, { db: deps.db });

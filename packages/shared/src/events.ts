@@ -26,5 +26,9 @@ export const DOMAIN_EVENTS = [
   'user.roles_changed',
   'user.status_changed',
   'user.password_reset',
+  // Templates Meta-Compiler (docs/architecture/ARCH-TEMPLATES-META-COMPILER.md section 6 and 7)
+  'compiler.generation_requested',
+  'compiler.verification_requested',
+  'studio.task_committed',
 ] as const;
 export type DomainEventName = (typeof DOMAIN_EVENTS)[number];

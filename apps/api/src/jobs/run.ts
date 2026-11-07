@@ -9,6 +9,7 @@ import { grantAppRole } from './grant-app-role';
  * - `migrate`: applies Prisma migrations as the migration role, then grants the runtime role (APP_DB_ROLE).
  * - `verify-chains`: the nightly hash-chain verification, triggered by Cloud Scheduler.
  * - `seed`: one-time bootstrap of the client, first Admin (SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD) and catalog.
+ * - `catalog-v2 [--dry-run] [--reverse] [--client <name>]`: the Meta-Compiler catalog change (PRD D15, D15a).
  * Exits non-zero on failure so Cloud Run retries and alerts.
  */
 const job = process.argv[2];
@@ -35,8 +36,11 @@ try {
     const { seed } = await import('../../prisma/seed');
     const { client, admin } = await seed(db);
     log('info', 'seeded', { client: client.name, admin: admin.email });
+  } else if (job === 'catalog-v2') {
+    const { parseCatalogV2Args, runCatalogV2 } = await import('./catalog-v2');
+    await runCatalogV2(db, parseCatalogV2Args(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | seed | demo-setup`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | seed | demo-setup | catalog-v2`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

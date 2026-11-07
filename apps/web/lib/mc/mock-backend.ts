@@ -255,6 +255,19 @@ function seedTasks(templates: TemplateDto[]) {
   }
 }
 
+/** Projects of this client that use the template's workflow, with their assigned SMEs (synthetic in the mock, S3-06). */
+async function deploymentTargets(ctx: MockContext, t: TemplateDto) {
+  const lineage = new Set([t.id, ...(await ctx.source.versions(t.id)).map((v) => v.id)]);
+  return (await ctx.source.projects())
+    .filter((p) => lineage.has(p.templateId) || p.workflowName === t.workflowName)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      templateVersion: p.templateVersion,
+      smes: [1, 2].map((n) => ({ candidateId: seededUuid(`sme:${p.id}:${n}`), displayName: `Synthetic SME ${n}`, email: `sme${n}.${p.id.slice(0, 4)}@example.test` })),
+    }));
+}
+
 type Route = { method: string; pattern: RegExp; admin?: boolean; run: (m: string[], body: unknown, ctx: MockContext) => Promise<MockResult> | MockResult };
 
 type Schema<T> = { safeParse(v: unknown): { success: true; data: T } | { success: false; error: { issues: Array<{ path: PropertyKey[]; message: string }> } } };
@@ -427,11 +440,34 @@ const routes: Route[] = [
     run: () =>
       json(200, {
         items: [
-          { provider: 'claude', model: 'claude-sonnet-5', label: 'Claude Sonnet 5 (Vertex AI)', available: true },
-          { provider: 'gemini', model: 'gemini-3-pro', label: 'Gemini 3 Pro (Vertex AI)', available: true },
-          { provider: 'gemini', model: 'gemini-3-flash', label: 'Gemini 3 Flash (Vertex AI)', available: false },
+          { provider: 'claude', model: 'claude-sonnet-5', label: 'Claude claude-sonnet-5 (Vertex AI)', available: false },
+          { provider: 'gemini', model: 'gemini-3-pro', label: 'Gemini gemini-3-pro (Vertex AI)', available: false },
+          { provider: 'mock', model: 'mock-drafter-1', label: 'Local mock drafter (no paid calls)', available: true },
         ],
+        liveAi: false,
+        codegenEnabled: false,
       }),
+  },
+  {
+    method: 'GET',
+    pattern: /^\/templates\/([\w-]+)\/deployment-targets$/,
+    admin: true,
+    run: async ([, id], _b, ctx) => {
+      const t = await findTemplate(ctx, id!);
+      if (!t) return error(404, 'NOT_FOUND', 'Template not found');
+      return json(200, { projects: await deploymentTargets(ctx, t) });
+    },
+  },
+  {
+    method: 'GET',
+    pattern: /^\/templates\/([\w-]+)\/deployments$/,
+    admin: true,
+    run: async ([, id], _b, ctx) => {
+      const t = await findTemplate(ctx, id!);
+      if (!t) return error(404, 'NOT_FOUND', 'Template not found');
+      const items = [...mockStore().deployments.values()].filter((d) => d.lineageId === t.lineageId).map(({ projectName: _p, smeEmail: _e, lineageId: _l, ...dto }) => dto);
+      return json(200, { items });
+    },
   },
   {
     method: 'POST',
@@ -443,7 +479,7 @@ const routes: Route[] = [
       const t = await findTemplate(ctx, id!);
       if (!t) return error(404, 'NOT_FOUND', 'Template not found');
       const e = entry(t);
-      if (validSectionCount(sectionProblems(e.blueprint)) !== BLUEPRINT_SECTIONS.length) return error(409, 'BLUEPRINT_INCOMPLETE', 'All 6 sections must be valid before generating.');
+      if (validSectionCount(sectionProblems(e.blueprint)) !== BLUEPRINT_SECTIONS.length) return error(422, 'BLUEPRINT_INCOMPLETE', 'All 6 sections must be valid before generating.');
       const now = (ctx.now ?? Date.now)();
       const id2 = seededUuid(`gen:${t.id}:${e.revision}:${req.model}:${req.mode}`);
       const s = mockStore();
@@ -488,7 +524,7 @@ const routes: Route[] = [
       const gen = s.generations.get(id!);
       const now = (ctx.now ?? Date.now)();
       if (!gen) return error(404, 'NOT_FOUND', 'Generation run not found');
-      if (generationView(gen, now).status !== 'SUCCEEDED') return error(409, 'GENERATION_NOT_SUCCEEDED', 'Step 2 starts after Step 1 succeeds.');
+      if (generationView(gen, now).status !== 'SUCCEEDED') return error(409, 'GENERATION_NOT_READY', 'Step 2 starts after Step 1 succeeds.');
       const run = {
         id: newId('ver'),
         generationRunId: gen.id,
@@ -528,8 +564,10 @@ const routes: Route[] = [
       const ver = s.verifications.get(req.verificationRunId);
       const v = ver && verificationView(ver, (ctx.now ?? Date.now)());
       if (!v || v.status !== 'SUCCEEDED' || v.zeroBaselineScore !== 0 || v.oracleScore !== 1) return error(409, 'GATES_NOT_PASSED', 'Checks 04 (zero-baseline 0.00) and 05 (oracle 1.00) must pass before deploying.');
-      const project = (await ctx.source.projects()).find((p) => p.id === req.projectId);
+      const project = (await deploymentTargets(ctx, t)).find((p) => p.id === req.projectId);
       if (!project) return error(404, 'NOT_FOUND', 'Project not found');
+      const sme = project.smes.find((x) => x.candidateId === req.smeCandidateId);
+      if (!sme) return error(422, 'SME_NOT_ASSIGNED', 'This SME is not assigned to the project.');
       const key = `${entry(t).blueprint.studio_id || 'studio'}-${hash(`${t.lineageId}:${req.projectId}:${req.smeCandidateId}`).slice(0, 6)}`;
       const existing = [...s.deployments.values()].find((d) => d.studioKey === key);
       for (const d of s.deployments.values()) if (d.studioKey === key) d.status = 'STOPPED';
@@ -545,7 +583,7 @@ const routes: Route[] = [
         runtime: 'SHARED' as const,
         createdAt: new Date((ctx.now ?? Date.now)()).toISOString(),
         projectName: project.name,
-        smeEmail: `sme-${req.smeCandidateId.slice(0, 6)}@example.test`,
+        smeEmail: sme.email ?? '',
         lineageId: t.lineageId,
       };
       s.deployments.set(dep.id, dep);

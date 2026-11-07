@@ -2,7 +2,7 @@
 
 | Item | Value |
 | --- | --- |
-| Status | **Draft for owner approval (Gate 2: architecture).** No code until the plan (Gate 3) is approved. |
+| Status | **Approved by the owner on 8 Nov 2026 (Gate 2: architecture), including AD-01 to AD-09.** No code until the plan (Gate 3) is approved. |
 | Implements | [PRD-TEMPLATES-META-COMPILER](../prd/PRD-TEMPLATES-META-COMPILER.md), approved 7 Nov 2026 (decisions D1–D16) |
 | Code baseline | `main` at `65ada8f` |
 | Prepared by | OpenHands agent (Architect role), 7 Nov 2026 |

@@ -16,7 +16,7 @@ import { createClient, createUser, db, resetDb, testConfig } from './helpers';
 import { exampleBlueprint, seedTemplate } from './meta-compiler-fixtures';
 
 const live = (over: Partial<Config['metaCompiler']> = {}): Config => {
-  const c = testConfig({ VERTEX_PROJECT_ID: 'praxis-test-project' });
+  const c = testConfig();
   return { ...c, metaCompiler: { ...c.metaCompiler, liveAi: true, costCapUsd: 2, dailyBudgetUsd: 10, ...over } };
 };
 const prompt: DraftPrompt = { purpose: 'propose_field', system: 'sys', user: '<request>\nCAC ceiling 42\n</request>', maxOutputTokens: 100 };

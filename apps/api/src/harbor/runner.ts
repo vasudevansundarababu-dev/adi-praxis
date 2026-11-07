@@ -136,13 +136,14 @@ const JobResult = z.object({ score: z.number().min(0).max(1), log: z.string().ma
  */
 export class SandboxJobRunner implements HarborRunner {
   readonly kind = 'job' as const;
-  private readonly auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+  private auth: GoogleAuth | undefined;
   readonly jobName: string;
   constructor(private readonly opts: { storage: ObjectStorage; job: string; projectId: string; region: string; baseUrl?: string; fetch?: Fetch; token?: () => Promise<string>; pollMs?: number; timeoutMs?: number }) {
     if (!opts.job) throw new Error('SandboxJobRunner needs HARBOR_VERIFY_JOB');
     this.jobName = opts.job.startsWith('projects/') ? opts.job : `projects/${opts.projectId}/locations/${opts.region}/jobs/${opts.job}`;
   }
   private async call(method: string, url: string, body?: unknown) {
+    this.auth ??= new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
     const token = this.opts.token ? await this.opts.token() : ((await (await this.auth.getClient()).getAccessToken()).token ?? '');
     const res = await (this.opts.fetch ?? (fetch as unknown as Fetch))(url, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
     if (!res.ok) throw new RunnerError(`Cloud Run API ${method} failed (${res.status})`);

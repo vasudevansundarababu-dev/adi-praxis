@@ -29,7 +29,7 @@ class PricedDrafter implements ContentDrafter {
 }
 
 const liveConfig = (cap: number, budget: number): Config => {
-  const c = testConfig({ VERTEX_PROJECT_ID: 'praxis-test-project' });
+  const c = testConfig();
   return { ...c, metaCompiler: { ...c.metaCompiler, liveAi: true, costCapUsd: cap, dailyBudgetUsd: budget } };
 };
 

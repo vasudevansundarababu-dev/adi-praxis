@@ -87,11 +87,13 @@ export function extractJson(text: string): unknown {
 
 export class ClaudeVertexContentDrafter implements ContentDrafter {
   readonly provider = 'claude' as const;
-  private readonly client: Pick<AnthropicVertex, 'messages'>;
-  constructor(readonly model: string, opts: { projectId: string; region: string; client?: Pick<AnthropicVertex, 'messages'> }) {
-    this.client = opts.client ?? new AnthropicVertex({ projectId: opts.projectId, region: opts.region });
+  private client: Pick<AnthropicVertex, 'messages'> | undefined;
+  constructor(readonly model: string, private readonly opts: { projectId: string; region: string; client?: Pick<AnthropicVertex, 'messages'> }) {
+    this.client = opts.client;
   }
   async complete(p: DraftPrompt): Promise<DraftOutput> {
+    // Created on first use: the SDK starts a credential lookup as soon as it is constructed.
+    this.client ??= new AnthropicVertex({ projectId: this.opts.projectId, region: this.opts.region });
     let res;
     try {
       res = await this.client.messages.create({ model: this.model, max_tokens: p.maxOutputTokens, system: p.system, messages: [{ role: 'user', content: p.user }] });
@@ -108,7 +110,7 @@ type Fetch = (url: string, init: { method: string; headers: Record<string, strin
 
 export class GeminiVertexContentDrafter implements ContentDrafter {
   readonly provider = 'gemini' as const;
-  private readonly auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+  private auth: GoogleAuth | undefined;
   constructor(readonly model: string, private readonly opts: { projectId: string; location: string; fetch?: Fetch; token?: () => Promise<string>; baseUrl?: string }) {}
 
   endpoint() {
@@ -118,6 +120,7 @@ export class GeminiVertexContentDrafter implements ContentDrafter {
   }
 
   async complete(p: DraftPrompt): Promise<DraftOutput> {
+    this.auth ??= new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
     const token = this.opts.token ? await this.opts.token() : ((await (await this.auth.getClient()).getAccessToken()).token ?? '');
     let res;
     try {

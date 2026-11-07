@@ -1,4 +1,4 @@
-import { GenerationRunDto, HarborBlueprint, ModelOptionDto, StartGenerationRequest, VerificationRunDto } from '@praxis/shared';
+import { CreateDeploymentRequest, GenerationRunDto, HarborBlueprint, ModelOptionDto, StartGenerationRequest, StudioDeploymentDto, VerificationRunDto } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { ObjectStorage } from '../candidate/storage';
@@ -11,6 +11,7 @@ import type { MetaCompilerDeps } from '../meta-compiler/deps';
 import { DrafterError, estimate, type DrafterFactory } from '../meta-compiler/drafter';
 import { generationDto, progress, promptFor, promptHashOf } from '../meta-compiler/generation';
 import type { HarborRunner } from '../harbor/runner';
+import { deploymentDto, deployStudio } from '../meta-compiler/deployments';
 import { pendingChecks, verificationDto, verificationLogTail } from '../meta-compiler/verification';
 import { runCommand } from '../platform/command';
 import type { Prisma } from '@prisma/client';
@@ -128,5 +129,45 @@ export const metaCompilerRunRoutes: FastifyPluginAsyncZod<RunRoutesOptions> = as
     const v = await db.compilerVerificationRun.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
     if (!v) throw notFound('Verification run not found');
     return verificationDto(v, await verificationLogTail(storage, v.logRef));
+  });
+
+  app.post(
+    '/templates/:id/deployments',
+    { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, body: CreateDeploymentRequest, response: { 200: StudioDeploymentDto, 201: StudioDeploymentDto } } },
+    async (req, reply) => {
+      await runCommand(db, req, reply, (ctx) =>
+        deployStudio(ctx, { templateId: req.params.id, verificationRunId: req.body.verificationRunId, projectId: req.body.projectId, candidateId: req.body.smeCandidateId, candidateAppUrl: config.CANDIDATE_APP_URL }),
+      );
+      return reply;
+    },
+  );
+
+  // Screen 3 lists: the workflow's studios, and the projects and assigned SMEs a deployment may target (S3-06).
+  app.get('/templates/:id/deployments', { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 200: z.object({ items: z.array(StudioDeploymentDto) }) } } }, async (req) => {
+    const t = await db.template.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
+    if (!t) throw notFound('Template not found');
+    const rows = await db.studioDeployment.findMany({ where: { clientId: t.clientId, templateLineageId: t.lineageId }, orderBy: { createdAt: 'asc' } });
+    return { items: rows.map((d) => deploymentDto(d, config.CANDIDATE_APP_URL)) };
+  });
+
+  const Targets = z.object({ projects: z.array(z.object({ id: z.string().uuid(), name: z.string(), templateVersion: z.number().int(), smes: z.array(z.object({ candidateId: z.string().uuid(), displayName: z.string().nullable(), email: z.string().nullable() })) })) });
+  app.get('/templates/:id/deployment-targets', { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 200: Targets } } }, async (req) => {
+    const t = await db.template.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
+    if (!t) throw notFound('Template not found');
+    const projects = await db.project.findMany({
+      where: { clientId: t.clientId, template: { lineageId: t.lineageId } },
+      include: { assignments: { where: { releasedAt: null }, include: { smeAssignment: true, candidate: { include: { smeUser: true } } } } },
+      orderBy: { name: 'asc' },
+    });
+    return {
+      projects: projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        templateVersion: p.templateVersion,
+        smes: p.assignments
+          .filter((a) => !a.smeAssignment || ['ACCEPTED', 'HANDED_OFF'].includes(a.smeAssignment.status))
+          .map((a) => ({ candidateId: a.candidateId, displayName: a.candidate.smeUser.displayName, email: a.candidate.smeUser.contactEmail })),
+      })),
+    };
   });
 };

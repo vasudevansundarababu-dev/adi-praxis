@@ -1,6 +1,14 @@
 import { HarborBlueprint, type HarborBlueprintInput } from '@praxis/shared';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import type { ObjectStorage } from '../src/candidate/storage';
+import type { Config } from '../src/config';
+import type { HarborRunner } from '../src/harbor/runner';
+import { resolveDeps } from '../src/meta-compiler/deps';
+import { MockContentDrafter } from '../src/meta-compiler/drafter';
+import { metaCompilerHandlers } from '../src/meta-compiler/handlers';
+import { processDomainEvent } from '../src/outbox/dispatcher';
+import { HandlerRegistry } from '../src/outbox/handlers';
 import { createCandidate, db, idem } from './helpers';
 
 /** Synthetic, complete (6/6) blueprint shaped like the Harbor PDF §4.1 marketing template. No real data. */
@@ -95,4 +103,26 @@ export function api(app: FastifyInstance) {
     post: (cookie: string, url: string, payload: object = {}, key = idem()) => app.inject({ method: 'POST', url: `/api/v1${url}`, headers: { cookie, ...key }, payload }),
     put: (cookie: string, url: string, payload: object, key = idem()) => app.inject({ method: 'PUT', url: `/api/v1${url}`, headers: { cookie, ...key }, payload }),
   };
+}
+
+/** Runs the Meta-Compiler worker jobs for every pending outbox event, as the worker would. */
+export function workerFor(w: { config: Config; storage: ObjectStorage; runner: HarborRunner }) {
+  return async () => {
+    const registry = new HandlerRegistry();
+    for (const h of metaCompilerHandlers({ ...w, drafters: () => new MockContentDrafter(), deps: resolveDeps() })) registry.register(h);
+    for (const ev of await db.outboxEvent.findMany({ where: { name: { in: ['compiler.generation_requested', 'compiler.verification_requested', 'studio.task_committed'] } }, orderBy: { createdAt: 'asc' } })) {
+      await processDomainEvent(db, registry, ev.id);
+    }
+  };
+}
+
+/** Generate and verify a template through the API (mock drafter and runner). */
+export async function generateAndVerify(http: ReturnType<typeof api>, admin: string, work: () => Promise<void>, templateId: string) {
+  const g = await http.post(admin, `/templates/${templateId}/generations`, { provider: 'mock', model: 'mock-drafter-1' });
+  if (g.statusCode >= 300) throw new Error(`generation: ${g.statusCode} ${g.body}`);
+  await work();
+  const v = await http.post(admin, `/generations/${g.json().id}/verifications`);
+  if (v.statusCode >= 300) throw new Error(`verification: ${v.statusCode} ${v.body}`);
+  await work();
+  return { generationId: g.json().id as string, verificationId: v.json().id as string };
 }

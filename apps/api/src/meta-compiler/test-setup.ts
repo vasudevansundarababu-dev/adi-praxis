@@ -214,7 +214,8 @@ async function ensureSme(tx: Tx, args: { clientId: string; smeEmail?: string }, 
  */
 async function ensureSelected(tx: Tx, a: { clientId: string; adminId: string; smeUserId: string; projectId: string; domain: string }, created: string[], audit: Audit) {
   const { clientId, adminId, smeUserId, projectId } = a;
-  const opp = (await tx.opportunity.findUnique({ where: { projectId } })) ?? (await tx.opportunity.create({ data: { clientId, projectId, status: 'PUBLISHED' } }));
+  // Closed: the synthetic pool never appears on the public opportunity pages.
+  const opp = (await tx.opportunity.findUnique({ where: { projectId } })) ?? (await tx.opportunity.create({ data: { clientId, projectId, status: 'CLOSED' } }));
   const ov =
     (await tx.opportunityVersion.findFirst({ where: { opportunityId: opp.id }, orderBy: { version: 'desc' } })) ??
     (await tx.opportunityVersion.create({ data: { clientId, opportunityId: opp.id, version: 1, brief: { title: 'Synthetic test opportunity' }, criteria: [], questionPolicy: {}, scope: {}, ownerId: adminId, publishedAt: new Date(), publishedById: adminId } }));

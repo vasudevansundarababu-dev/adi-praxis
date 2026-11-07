@@ -2,8 +2,8 @@
 
 | Item | Value |
 | --- | --- |
-| Status | **Approved by the owner on 8 Nov 2026 (Gate 3: plan).** Coding started 8 Nov. |
-| Implements | [PRD](../prd/PRD-TEMPLATES-META-COMPILER.md) (approved 7 Nov) and [architecture](../architecture/ARCH-TEMPLATES-META-COMPILER.md) (approved 8 Nov) |
+| Status | **Approved by the owner on 7 Nov 2026 (Gate 3: plan).** Coding started 7 Nov. |
+| Implements | [PRD](../prd/PRD-TEMPLATES-META-COMPILER.md) (approved 7 Nov) and [architecture](../architecture/ARCH-TEMPLATES-META-COMPILER.md) (approved 7 Nov) |
 | Target | Phases A and B in production by **16 Nov 2026**; Phase C after, with separate approval |
 | OpenHands budget | **$600** cap for Phases A + B (owner, 7 Nov). Alerts at $300 and $480; stop at $600 unless raised |
 | Prepared by | OpenHands agent (Planner role), 7 Nov 2026 |
@@ -20,7 +20,7 @@ flowchart LR
   Q --> L
 ```
 
-- **Foundation first (lead, 8 Nov).** The lead conversation lands the shared contracts that all streams depend on: Prisma schema and migration, the `HarborBlueprint` Zod schema, validator signatures and API request/response types. Freezing these first stops the streams from conflicting.
+- **Foundation first (lead, 7–8 Nov).** The lead conversation lands the shared contracts that all streams depend on: Prisma schema and migration, the `HarborBlueprint` Zod schema, validator signatures and API request/response types. Freezing these first stops the streams from conflicting.
 - **Three coding streams in parallel (9–12 Nov),** each its own OpenHands conversation, branch and local resources (section 6). Each stream owns separate folders, so merges rarely conflict.
 - **One QA conversation (12–14 Nov)** that did not write the code. It tests against the PRD acceptance criteria and reports defects to the lead.
 - **The lead** reviews and merges every PR into an integration branch, keeps the daily status, and runs the release.
@@ -44,7 +44,7 @@ Every PR is small, has tests and passes CI before merge. No PR goes to `main` un
 
 IDs: **F** = foundation, **C** = catalog and generators, **A** = API and worker, **U** = UI, **Q** = QA, **R** = release. Each task lists the PRD requirements it closes.
 
-### Stream F: foundation (lead, 8 Nov)
+### Stream F: foundation (lead, 7–8 Nov)
 
 | ID | Task | Requirements | Done when |
 | --- | --- | --- | --- |
@@ -121,15 +121,16 @@ Stream 3 builds against the shared types from F4 and mocked API responses until 
 
 | Date | Lead | Stream 1 | Stream 2 | Stream 3 | QA | Owner |
 | --- | --- | --- | --- | --- | --- | --- |
-| Sat 8 Nov | Merge docs PRs; F1–F5; open stream conversations | — | — | — | — | Approve architecture and plan; production target (N3) |
-| Sun 9 Nov | Reviews, merges; R1 | C1, C2 | A1, A2 | U1 | — | Production access (N4); template spec (N8) |
-| Mon 10 Nov | Reviews; R2 | C3, C4 | A3, A4, A5 | U2 | — | Cloud changes (N7) |
-| Tue 11 Nov | Reviews; staging deploy of Phase A | C5, C6 | A6, A7 | U2, U3 | Starts on Phase A | Review blueprints (N9) |
-| Wed 12 Nov | Integration; staging deploy | Fixes | A8–A11 | U4, U5 | Q1–Q3 | SME and Reviewer list (N10); cost cap (N11) |
-| Thu 13 Nov | Defect triage; R3 | Fixes | Fixes | U6, fixes | Q2–Q5 | Owner QA starts (Q6) |
-| Fri 14 Nov | Merge to `main`; production approval request | — | — | — | Retest | QA sign-off; production approval (N13) |
-| Sat 15 Nov | R5, R6, R7 | — | — | — | Production smoke | — |
-| Sun 16 Nov | Support | — | — | — | — | SMEs start |
+| Sat 7 Nov | Merge docs PRs; F1–F5 | — | — | — | — | Architecture and plan approved (done); production target (N3) |
+| Sun 8 Nov | Finish F1–F5; open stream conversations | — | — | — | — | Production target (N3) if not given 7 Nov |
+| Mon 9 Nov | Reviews, merges; R1 | C1, C2 | A1, A2 | U1 | — | Production access (N4); template spec (N8) |
+| Tue 10 Nov | Reviews; R2 | C3, C4 | A3, A4, A5 | U2 | — | Cloud changes (N7) |
+| Wed 11 Nov | Reviews; staging deploy of Phase A | C5, C6 | A6, A7 | U2, U3 | Starts on Phase A | Review blueprints (N9) |
+| Thu 12 Nov | Integration; staging deploy | Fixes | A8–A11 | U4, U5 | Q1–Q3 | SME and Reviewer list (N10); cost cap (N11) |
+| Fri 13 Nov | Defect triage; R3 | Fixes | Fixes | U6, fixes | Q2–Q5 | Owner QA starts (Q6) |
+| Sat 14 Nov | Merge to `main`; production approval request | — | — | — | Retest | QA sign-off; production approval (N13) |
+| Sun 15 Nov | R5, R6, R7 | — | — | — | Production smoke | — |
+| Mon 16 Nov | Support | — | — | — | — | SMEs start |
 
 Stream conversations close when their work is merged, to save budget.
 
@@ -175,7 +176,7 @@ Each stream gets its cap and stops at it, reporting where it got to. The lead re
 | Owner's template spec late (N8) | Ship the 3 mockup blueprints on 16 Nov; add the owner's template within 2 days after |
 | A stream falls behind | Lead moves tasks between streams; Phase B UI polish moves before backend features are cut |
 | Sandbox job not ready (R2) | Do not deploy studios without measured 0.00 / 1.00; report the same day |
-| Merge conflicts between streams | Foundation contracts frozen on 8 Nov; folder ownership per stream; daily integration |
+| Merge conflicts between streams | Foundation contracts frozen on 8 Nov (end of day); folder ownership per stream; daily integration |
 | Budget exceeded | Stop at $600 and report; no work beyond the cap without approval |
 
 ## 9. Rollback
@@ -187,4 +188,4 @@ Each stream gets its cap and stops at it, reporting where it got to. The lead re
 
 ## 10. Approval
 
-Approved by the owner on 8 Nov 2026, after the architecture approval the same day.
+Approved by the owner on 7 Nov 2026, after the architecture approval the same day.

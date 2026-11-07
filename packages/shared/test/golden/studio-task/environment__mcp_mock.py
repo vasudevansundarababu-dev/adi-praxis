@@ -119,13 +119,32 @@ _TYPES = {
 }
 
 
-def _matches(row_value, wanted):
-    for key, archetype in sorted(WIDGETS.items()):
-        if archetype == "fuzzy_match_threshold_slider" and isinstance(wanted, str):
-            return fuzzy_match(row_value, wanted, PARAMETERS[key])
+def _exact(row_value, wanted):
     if isinstance(wanted, str) and isinstance(row_value, str):
         return row_value.strip().lower() == wanted.strip().lower()
     return row_value == wanted
+
+
+def _fuzzy(row_value, wanted):
+    for key, archetype in sorted(WIDGETS.items()):
+        if archetype == "fuzzy_match_threshold_slider":
+            return isinstance(wanted, str) and fuzzy_match(row_value, wanted, PARAMETERS[key])
+    return False
+
+
+def find_rows(args):
+    """Seed rows for a call: all rows for a tool without arguments; otherwise rows whose columns equal the
+    arguments that name a column, falling back to fuzzy matching (threshold slider) when nothing matches exactly."""
+    if not args:
+        return list(SEED_ROWS)
+    keys = [k for k in sorted(args) if any(k in row for row in SEED_ROWS)]
+    if not keys:
+        return []
+    for match in (_exact, _fuzzy):
+        rows = [row for row in SEED_ROWS if all(k in row and match(row[k], args[k]) for k in keys)]
+        if rows:
+            return rows
+    return []
 
 
 def call_tool(tool_id, args):
@@ -144,8 +163,7 @@ def call_tool(tool_id, args):
     state["turn"] += 1
     state["calls"].append({"tool": tool_id, "args": args, "turn": state["turn"]})
     save_state(state)
-    keys = [k for k in sorted(args) if any(k in row for row in SEED_ROWS)]
-    rows = [row for row in SEED_ROWS if keys and all(k in row and _matches(row[k], args[k]) for k in keys)]
+    rows = find_rows(args)
     curves = {}
     for key, archetype in sorted(WIDGETS.items()):
         if archetype != "diminishing_returns_curve_slider":

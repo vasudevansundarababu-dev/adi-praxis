@@ -183,3 +183,35 @@ describe('JSON Schema export (F2)', () => {
     expect(props.harbor_contract!.properties!.network_internal!.const).toBe(true);
   });
 });
+
+describe('LLM judge milestones (owner decision 7 Nov 2026)', () => {
+  const judged = (judge: unknown, body = 'assert True') =>
+    ({ id: 'bl002', label: 'PR strategy', weight: 100, verifier_template: 'llm_judge_checklist', verifier_body: body, judge });
+  const spec = { deliverable_path: '/workspace/outputs/memo.md', system_prompt: 'Grade strictly.', criteria: [{ num: 1, text: 'Recommends a code of conduct' }] };
+  const stage5 = async (m: unknown) => {
+    const { HarborBlueprint, sectionProblems } = await import('../src');
+    return sectionProblems(HarborBlueprint.parse({ step_5_default_rubric: { milestones: [m] } })).stage_5;
+  };
+
+  it('accepts a complete judge milestone and defaults judge to null elsewhere', async () => {
+    expect(await stage5(judged(spec))).toEqual([]);
+    const { RubricMilestone } = await import('../src');
+    expect(RubricMilestone.parse({ id: 'a', label: 'A', weight: 1, verifier_template: 'f1_set_match' }).judge).toBeNull();
+  });
+
+  it('still requires the deterministic gate check', async () => {
+    expect((await stage5(judged(spec, ' '))).join()).toMatch(/deterministic gate check/);
+  });
+
+  it('keeps the deliverable under /workspace/outputs/ and needs criteria and instructions', async () => {
+    const p = await stage5(judged({ ...spec, deliverable_path: '/eval/x.md', system_prompt: '', criteria: [] }));
+    expect(p.join('\n')).toMatch(/deliverable must be a file under \/workspace\/outputs\//);
+    expect(p.join('\n')).toMatch(/judge instructions are required/);
+    expect(p.join('\n')).toMatch(/at least one judge criterion/);
+  });
+
+  it('rejects duplicate criteria and a judge on a non-judge verifier', async () => {
+    expect((await stage5(judged({ ...spec, criteria: [spec.criteria[0], spec.criteria[0]] }))).join()).toMatch(/criterion 1 is listed more than once/);
+    expect((await stage5({ ...judged(spec), verifier_template: 'f1_set_match' })).join()).toMatch(/needs the llm_judge_checklist verifier/);
+  });
+});

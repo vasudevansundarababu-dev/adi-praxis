@@ -173,3 +173,13 @@ describe('helpers', () => {
     expect(slugify('42 hops')).toBe('f_42_hops');
   });
 });
+
+describe('JSON Schema export (F2)', () => {
+  it('describes the blueprint with every top-level key and the network mandate', async () => {
+    const { blueprintJsonSchema } = await import('../src');
+    const s = blueprintJsonSchema() as { definitions: { HarborBlueprint: { properties: Record<string, { properties?: Record<string, { const?: unknown }> }> } } };
+    const props = s.definitions.HarborBlueprint.properties;
+    expect(Object.keys(props)).toEqual(expect.arrayContaining(['studio_id', 'template_meta', 'harbor_contract', 'domain_meta', 'step_2_data_panels', 'step_3_mcp_simulators', 'step_4_invariant_catalog', 'step_5_default_rubric', 'custom_fields_by_stage', 'catalog']));
+    expect(props.harbor_contract!.properties!.network_internal!.const).toBe(true);
+  });
+});

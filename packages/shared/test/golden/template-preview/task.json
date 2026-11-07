@@ -1,0 +1,63 @@
+{
+  "blueprint_schema_version": 1,
+  "custom_fields": {
+    "channels": [
+      "search"
+    ],
+    "locale": "en-GB"
+  },
+  "environment": {
+    "mcp_mock": "environment/mcp_mock.py",
+    "tools": [
+      "lookup_keyword",
+      "set_week_budget"
+    ]
+  },
+  "execution_mode": "HERMETIC_MCP",
+  "harbor": {
+    "atif_version": "1.2",
+    "network": "internal",
+    "require_solve_sh": true,
+    "zero_baseline_gate": true
+  },
+  "horizon": {
+    "cadence_unit": "week",
+    "max_turns": 4,
+    "type": "episodic_loop"
+  },
+  "inputs": [
+    {
+      "format": "csv",
+      "id": "queries",
+      "path": "/workspace/inputs/queries.csv"
+    },
+    {
+      "format": "md",
+      "id": "brief",
+      "path": "/workspace/inputs/brief.md"
+    }
+  ],
+  "modes": [
+    "HERMETIC_MCP"
+  ],
+  "outputs_dir": "/workspace/outputs/",
+  "persona": "Growth Marketing Lead",
+  "reward": {
+    "max": 1,
+    "min": -1,
+    "oracle": 1,
+    "zero_baseline": 0
+  },
+  "schema": "praxis.harbor.task.v1",
+  "studio_id": "mktg-golden-fixture",
+  "task": null,
+  "template": {
+    "domain_category": "Digital Marketing",
+    "label": "Golden fixture",
+    "registry_source": "domain_templates.json",
+    "template_id": "mktg-golden",
+    "version": 1
+  },
+  "title": "Golden fixture launch",
+  "tpt_minutes": 30
+}

@@ -63,6 +63,16 @@ import { OfflineGeocoder, type Geocoder } from './staffing/geocoder';
 import { dbSelectionGate, type SelectionGate } from './staffing/selection-gate';
 import { taxonomyRoutes } from './routes/taxonomy';
 import { templateRoutes } from './routes/templates';
+import { metaCompilerRoutes } from './routes/meta-compiler';
+import { metaCompilerRunRoutes } from './routes/meta-compiler-runs';
+import { metaCompilerAssistantRoutes } from './routes/meta-compiler-assistant';
+import { metaCompilerStoreRoutes } from './routes/meta-compiler-store';
+import { metaCompilerTestSetupRoutes } from './routes/meta-compiler-test-setup';
+import { candidateStudioRoutes } from './routes/candidate-studio';
+import { resolveDeps } from './meta-compiler/deps';
+import { defaultDrafterFactory } from './meta-compiler/drafter';
+import { defaultRunner } from './harbor/runner';
+import type { MetaCompilerOverrides } from './meta-compiler/handlers';
 import { userRoutes } from './routes/users';
 
 export interface AppDeps {
@@ -95,6 +105,8 @@ export interface AppDeps {
   payouts?: PayoutProvider;
   /** Support Bot: Claude on Vertex when configured, otherwise the local mock. */
   support?: SupportAssistant;
+  /** Templates Meta-Compiler: drafters, Stream 1 functions and the Harbor runner. Defaults follow config. */
+  metaCompiler?: MetaCompilerOverrides;
 }
 
 export function defaultSupport(config: Config): SupportAssistant {
@@ -270,6 +282,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(authRoutes, { db: deps.db, config: deps.config });
       await v1.register(userRoutes, { db: deps.db });
       await v1.register(templateRoutes, { db: deps.db });
+      await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });
+      const drafters = deps.metaCompiler?.drafters ?? defaultDrafterFactory(deps.config);
+      const mcDeps = resolveDeps(deps.metaCompiler?.deps);
+      const runner = deps.metaCompiler?.runner ?? defaultRunner(deps.config, storage);
+      await v1.register(metaCompilerRunRoutes, { db: deps.db, config: deps.config, storage, drafters, deps: mcDeps, runner });
+      await v1.register(metaCompilerAssistantRoutes, { db: deps.db, config: deps.config, drafters });
+      await v1.register(metaCompilerStoreRoutes, { db: deps.db, storage });
+      await v1.register(metaCompilerTestSetupRoutes, { db: deps.db, config: deps.config, storage, drafters, deps: mcDeps, runner });
       await v1.register(taxonomyRoutes, { db: deps.db });
       await v1.register(jobDescriptionRoutes, { db: deps.db });
       await v1.register(projectRoutes, { db: deps.db });
@@ -292,6 +312,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(reviewRoutes, { db: deps.db, evaluator: deps.evaluator ?? defaultEvaluator(deps.config), storage });
       await v1.register(journeyRoutes, { db: deps.db, config: deps.config, selectionGate });
       await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
+      await v1.register(candidateStudioRoutes, { db: deps.db, config: deps.config, storage, deps: resolveDeps(deps.metaCompiler?.deps), selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), faults: deps.metaCompiler?.studioFaults });
       await v1.register(taskReviewRoutes, { db: deps.db });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       // M10 SME supply: nothing is registered with the flag off (docs/SME-SUPPLY.md section 13).

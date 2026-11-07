@@ -1,0 +1,411 @@
+{
+  "schema_version": 1,
+  "studio_id": "mktg-noise-cancelling-launch",
+  "catalog": {
+    "primary_work": "Plan and run a 12-week paid launch for a synthetic noise-cancelling phone: label keyword intent, pace a fixed budget against saturating response curves and publish compliant ads for purchase-intent keywords.",
+    "verification_criteria": "Keyword intent matches the SME's oracle table (F1 >= 0.99 for BUY and RESEARCH); all 12 weeks are funded once with 95-100% of the budget; every BUY keyword has one compliant ad; no weekly spend above the cap and no unsubstantiated claims.",
+    "human_gate": "A Reviewer checks the SME's oracle labels and the budget rules before the task is approved.",
+    "skills": [
+      "Performance marketing",
+      "Paid search",
+      "Budget pacing",
+      "Advertising compliance"
+    ],
+    "default_jd_id": null,
+    "task_modes": [
+      "AUTHORING"
+    ],
+    "coverage_dimensions": {
+      "dimensions": [
+        {
+          "key": "launch_market",
+          "label": "Launch market",
+          "values": [
+            "en-GB",
+            "en-US",
+            "de-DE",
+            "fr-FR",
+            "ja-JP"
+          ]
+        },
+        {
+          "key": "budget_band",
+          "label": "Budget band",
+          "values": [
+            "under 100k",
+            "100k-180k",
+            "over 180k"
+          ]
+        }
+      ],
+      "cells": []
+    },
+    "edge_case_catalog": [
+      {
+        "name": "Mostly research-intent keywords",
+        "quota": 1,
+        "required": true
+      },
+      {
+        "name": "Tight CAC ceiling",
+        "quota": 1,
+        "required": false
+      }
+    ],
+    "default_distinct_target": 50,
+    "default_max_per_expert": 4
+  },
+  "template_meta": {
+    "template_id": "dm-launch-noise-cancelling-phone",
+    "registry_source": "domain_templates.json",
+    "label": "Launch of Noise Cancelling Phone",
+    "domain_category": "Digital Marketing",
+    "version": 1,
+    "tpt_minutes": 45,
+    "tpt_label": "45m (12 Wks)",
+    "modes": [
+      "HERMETIC_MCP"
+    ]
+  },
+  "harbor_contract": {
+    "atif_v1_2": true,
+    "network_internal": true,
+    "require_solve_sh": true,
+    "zero_baseline_gate": true
+  },
+  "domain_meta": {
+    "title": "Launch of Noise Cancelling Phone",
+    "persona_label": "Growth Marketing Lead",
+    "objective": "Launch Quietline X profitably: right keywords, paced budget, compliant ads.",
+    "horizon": {
+      "type": "episodic_loop",
+      "max_turns": 12,
+      "cadence_unit": "Wks"
+    }
+  },
+  "step_2_data_panels": {
+    "public_dropzones": [
+      {
+        "id": "launch_brief",
+        "label": "Launch brief",
+        "target_path": "/workspace/inputs/launch_brief.md",
+        "format": "md",
+        "description": "Positioning, audience and brand voice for the launch (synthetic)."
+      },
+      {
+        "id": "scraped_queries",
+        "label": "Scraped search queries",
+        "target_path": "/workspace/inputs/scraped_queries.csv",
+        "format": "csv",
+        "description": "Optional extra queries with a query column (synthetic)."
+      }
+    ],
+    "oracle_annotator": {
+      "dataset_name": "keyword_intent",
+      "target_path": "/eval/ground_truth/keyword_intent.csv",
+      "columns": [
+        "keyword",
+        "monthly_searches",
+        "suggested_intent"
+      ],
+      "sme_tag_options": [
+        "BUY",
+        "RESEARCH",
+        "IGNORE"
+      ],
+      "template_preview_rows": [
+        [
+          "buy noise cancelling phone",
+          "5400",
+          "BUY"
+        ],
+        [
+          "quiet phone deal",
+          "2900",
+          "BUY"
+        ],
+        [
+          "anc phone price",
+          "3600",
+          "BUY"
+        ],
+        [
+          "best noise cancelling phone review",
+          "8100",
+          "RESEARCH"
+        ],
+        [
+          "how does active noise cancelling work",
+          "12100",
+          "RESEARCH"
+        ],
+        [
+          "noise cancelling phone vs earbuds",
+          "1900",
+          "RESEARCH"
+        ],
+        [
+          "free phone case",
+          "22000",
+          "IGNORE"
+        ],
+        [
+          "phone repair near me",
+          "14800",
+          "IGNORE"
+        ]
+      ]
+    }
+  },
+  "step_3_mcp_simulators": {
+    "tools": [
+      {
+        "tool_id": "list_keywords",
+        "description": "Lists the candidate keywords with monthly searches, average CPC and competition.",
+        "parameters": []
+      },
+      {
+        "tool_id": "advance_campaign_week",
+        "description": "Funds one campaign week and returns the saturating response for the spend.",
+        "parameters": [
+          {
+            "name": "week",
+            "type": "number",
+            "description": "Week number, 1 to 12."
+          },
+          {
+            "name": "spend_usd",
+            "type": "number",
+            "description": "Spend for the week in USD."
+          }
+        ]
+      },
+      {
+        "tool_id": "publish_ad",
+        "description": "Publishes one search ad for a keyword.",
+        "parameters": [
+          {
+            "name": "keyword",
+            "type": "string",
+            "description": "Keyword the ad targets."
+          },
+          {
+            "name": "headline",
+            "type": "string",
+            "description": "Ad headline, 10-60 characters."
+          },
+          {
+            "name": "target_cac_usd",
+            "type": "number",
+            "description": "Target customer acquisition cost in USD."
+          }
+        ]
+      }
+    ],
+    "widgets": [
+      {
+        "archetype": "diminishing_returns_curve_slider",
+        "key": "k_half",
+        "label": "Saturation spend (K_half, USD)",
+        "min": 2000,
+        "max": 40000,
+        "default": 12000,
+        "step": 500,
+        "formula": "CTR(s) = CTR_base * (s / (s + K_half))"
+      },
+      {
+        "archetype": "fuzzy_match_threshold_slider",
+        "key": "keyword_match_threshold",
+        "label": "Keyword match threshold",
+        "min": 0.6,
+        "max": 1,
+        "default": 0.85,
+        "step": 0.05,
+        "formula": "match if similarity(keyword, query) >= threshold"
+      }
+    ]
+  },
+  "step_4_invariant_catalog": {
+    "allowed_subjects": [
+      "spend_usd",
+      "headline",
+      "target_cac_usd"
+    ],
+    "rules": [
+      {
+        "id": "weekly_spend_cap",
+        "subject": "spend_usd",
+        "operator": "GREATER_THAN",
+        "threshold": 20000,
+        "penalty": "HARD_FAIL",
+        "description": "Never spend more than $20,000 in a single week."
+      },
+      {
+        "id": "no_unsubstantiated_claims",
+        "subject": "headline",
+        "operator": "CONTAINS_ANY",
+        "threshold": [
+          "medical grade",
+          "guaranteed",
+          "cures",
+          "100% silence"
+        ],
+        "penalty": "HARD_FAIL",
+        "description": "Headlines never claim medical benefits, guarantees or total silence."
+      }
+    ]
+  },
+  "step_5_default_rubric": {
+    "milestones": [
+      {
+        "id": "keyword_intent",
+        "label": "Keyword intent matches the oracle",
+        "weight": 50,
+        "verifier_template": "f1_set_match",
+        "verifier_body": "rows = env_state['outputs'].get('keyword_intent.csv') or []\nlabels = {str(r.get('keyword', '')).strip().lower(): str(r.get('intent', '')).strip().upper() for r in rows}\nassert labels, 'keyword_intent.csv is missing or empty'\ntruth = ground_truth['keyword_intent.csv']\nfor tag in ('BUY', 'RESEARCH'):\n    predicted = [k for k, v in labels.items() if v == tag]\n    expected = tagged(truth, tag, key='keyword')\n    assert f1_set_match(predicted, expected) >= 0.99, tag"
+      },
+      {
+        "id": "budget_pacing",
+        "label": "Budget paced over 12 weeks",
+        "weight": 30,
+        "verifier_template": "lp_solver_ceiling",
+        "verifier_body": "weeks = [c['args'] for c in env_state['calls'] if c['tool'] == 'advance_campaign_week']\nassert sorted(int(w.get('week', 0)) for w in weeks) == list(range(1, 13)), 'fund each week 1-12 once'\ntotal = sum(float(w.get('spend_usd', 0)) for w in weeks)\nbudget = float(fields['total_budget_usd'])\nassert total <= budget + 1e-6, 'over budget'\nassert lp_solver_ceiling(total, budget, tolerance=0.05), 'less than 95% of the budget used'"
+      },
+      {
+        "id": "ad_coverage",
+        "label": "Compliant ad for every BUY keyword",
+        "weight": 20,
+        "verifier_template": "regex_schema",
+        "verifier_body": "ads = [c['args'] for c in env_state['calls'] if c['tool'] == 'publish_ad']\nassert ads, 'no ads published'\ngood = {str(a.get('keyword', '')).strip().lower() for a in ads if regex_schema(a.get('headline'), r'[A-Z][^!]{9,59}')}\nbuy = {str(k).strip().lower() for k in tagged(ground_truth['keyword_intent.csv'], 'BUY', key='keyword')}\nassert buy <= good, 'missing or non-compliant ads: %s' % sorted(buy - good)"
+      }
+    ]
+  },
+  "custom_fields_by_stage": {
+    "stage_1": [
+      {
+        "field_id": "total_budget_usd",
+        "label": "Total launch budget (USD)",
+        "input_type": "currency_slider",
+        "options": [],
+        "default_value": 120000,
+        "min": 50000,
+        "max": 240000,
+        "inject_into": [
+          "instruction.md",
+          "task.json",
+          "eval/test_verifiers.py"
+        ],
+        "verifier_assertion": "sum(float(c['args'].get('spend_usd', 0)) for c in env_state['calls'] if c['tool'] == 'advance_campaign_week') <= value + 1e-6"
+      },
+      {
+        "field_id": "launch_locales",
+        "label": "Launch locales",
+        "input_type": "multi_select",
+        "options": [
+          "en-GB",
+          "en-US",
+          "de-DE",
+          "fr-FR",
+          "ja-JP"
+        ],
+        "default_value": [
+          "en-GB",
+          "en-US"
+        ],
+        "inject_into": [
+          "instruction.md",
+          "task.json"
+        ],
+        "verifier_assertion": ""
+      }
+    ],
+    "stage_2": [],
+    "stage_3": [
+      {
+        "field_id": "creative_fatigue_weeks",
+        "label": "Creative fatigue after (weeks)",
+        "input_type": "number_input",
+        "options": [],
+        "default_value": 4,
+        "min": 2,
+        "max": 8,
+        "inject_into": [
+          "mcp_mock.py"
+        ],
+        "verifier_assertion": ""
+      }
+    ],
+    "stage_4": [
+      {
+        "field_id": "target_cac_ceiling_usd",
+        "label": "Target CAC ceiling (USD)",
+        "input_type": "currency_slider",
+        "options": [],
+        "default_value": 42,
+        "min": 10,
+        "max": 100,
+        "inject_into": [
+          "instruction.md",
+          "task.json",
+          "eval/test_verifiers.py"
+        ],
+        "verifier_assertion": "all(float(v) <= value for v in subject_values(env_state, 'target_cac_usd'))"
+      }
+    ],
+    "stage_5": []
+  },
+  "authored_content": {
+    "instruction_md": "You are launching **Quietline X**, a synthetic noise-cancelling phone, over a 12-week paid campaign.\n\nDo three things, using only the MCP tools and the files in `/workspace/inputs/`:\n\n1. **Label keyword intent.** Call `list_keywords()` and label every keyword as `BUY`, `RESEARCH` or `IGNORE`.\n   Write `/workspace/outputs/keyword_intent.csv` with the header `keyword,intent` and one row per keyword.\n2. **Pace the budget.** Call `advance_campaign_week(week, spend_usd)` exactly once for each week 1 to 12.\n   Spend at least 95% of the total budget and never more than the total. Response curves saturate (see the\n   `curves` value in each response), so even pacing beats bursts.\n3. **Publish ads.** For every keyword you labelled `BUY`, call `publish_ad(keyword, headline, target_cac_usd)` once.\n   Headlines start with a capital letter, are 10 to 60 characters long and contain no exclamation mark.\n   Keep `target_cac_usd` at or below the target CAC ceiling.\n\nClaims must be substantiated: never promise medical benefits, guarantees or total silence.",
+    "solve_sh": "#!/usr/bin/env bash\n# Reference solution (oracle). Runs inside the hermetic sandbox with HARBOR_ROOT set to the task root.\n# It reads the SME's oracle table from solution/ground_truth/ (hidden from the agent) and uses the MCP mock.\nset -euo pipefail\nROOT=\"${HARBOR_ROOT:-/}\"\nHERE=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\nexport ROOT HERE\npython3 - <<'PY'\nimport csv, json, math, os, subprocess, sys\n\nroot, here = os.environ[\"ROOT\"], os.environ[\"HERE\"]\nmock = os.path.join(root, \"environment\", \"mcp_mock.py\")\noutdir = os.path.join(root, \"workspace\", \"outputs\")\nos.makedirs(outdir, exist_ok=True)\ntask = json.load(open(os.path.join(root, \"task.json\"), encoding=\"utf-8\"))\n\n\ndef call(tool, **args):\n    out = subprocess.run([sys.executable, mock, \"call\", tool, json.dumps(args)], check=True, capture_output=True, text=True)\n    return json.loads(out.stdout)\n\n\ndef truth(name):\n    with open(os.path.join(here, \"ground_truth\", name), encoding=\"utf-8\", newline=\"\") as f:\n        return list(csv.DictReader(f))\n\nrows = truth(\"keyword_intent.csv\")\nwith open(os.path.join(outdir, \"keyword_intent.csv\"), \"w\", encoding=\"utf-8\", newline=\"\") as f:\n    w = csv.writer(f)\n    w.writerow([\"keyword\", \"intent\"])\n    for row in rows:\n        w.writerow([row[\"keyword\"], row[\"sme_tag\"]])\n\ncall(\"list_keywords\")\nbudget = float(task[\"custom_fields\"][\"total_budget_usd\"])\nweeks = 12\nweekly = math.floor(budget / weeks * 100) / 100\nfor week in range(1, weeks + 1):\n    call(\"advance_campaign_week\", week=week, spend_usd=weekly)\n\ncac = min(35.0, float(task[\"custom_fields\"][\"target_cac_ceiling_usd\"]))\nfor row in rows:\n    if row[\"sme_tag\"].strip().upper() == \"BUY\":\n        call(\"publish_ad\", keyword=row[\"keyword\"], headline=\"Hear only what matters with Quietline X\", target_cac_usd=cac)\nPY\n",
+    "mcp_mock_seed_rows": [
+      {
+        "keyword": "buy noise cancelling phone",
+        "monthly_searches": 5400,
+        "avg_cpc_usd": 2.1,
+        "competition": "high"
+      },
+      {
+        "keyword": "quiet phone deal",
+        "monthly_searches": 2900,
+        "avg_cpc_usd": 1.65,
+        "competition": "medium"
+      },
+      {
+        "keyword": "anc phone price",
+        "monthly_searches": 3600,
+        "avg_cpc_usd": 1.8,
+        "competition": "high"
+      },
+      {
+        "keyword": "best noise cancelling phone review",
+        "monthly_searches": 8100,
+        "avg_cpc_usd": 0.95,
+        "competition": "medium"
+      },
+      {
+        "keyword": "how does active noise cancelling work",
+        "monthly_searches": 12100,
+        "avg_cpc_usd": 0.4,
+        "competition": "low"
+      },
+      {
+        "keyword": "noise cancelling phone vs earbuds",
+        "monthly_searches": 1900,
+        "avg_cpc_usd": 0.75,
+        "competition": "low"
+      },
+      {
+        "keyword": "free phone case",
+        "monthly_searches": 22000,
+        "avg_cpc_usd": 0.3,
+        "competition": "low"
+      },
+      {
+        "keyword": "phone repair near me",
+        "monthly_searches": 14800,
+        "avg_cpc_usd": 1.1,
+        "competition": "medium"
+      }
+    ]
+  }
+}

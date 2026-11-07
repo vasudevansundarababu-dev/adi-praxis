@@ -183,3 +183,20 @@ describe('A2 blueprint read and save, Save Variant, UISpec export (S2-01, S2-11,
     expect(res.statusCode).toBe(400);
   });
 });
+
+describe('agentFacingBlueprint (D-21)', () => {
+  it('removes judge checklists, which hold the answer key, along with verifier bodies', async () => {
+    const { agentFacingBlueprint } = await import('../src/meta-compiler/blueprint');
+    const bp = exampleBlueprint();
+    const m = bp.step_5_default_rubric.milestones[0]!;
+    bp.step_5_default_rubric.milestones[0] = {
+      ...m,
+      verifier_template: 'llm_judge_checklist',
+      judge: { deliverable_path: '/workspace/outputs/report.md', system_prompt: 'Grade strictly.', criteria: [{ num: 1, category: '', text: 'SECRET-ANSWER 7.6%', points: 1 }] },
+    };
+    const view = agentFacingBlueprint(bp);
+    expect(view.step_5_default_rubric.milestones.every((x) => x.judge === null && x.verifier_body === '')).toBe(true);
+    expect(JSON.stringify(view)).not.toContain('SECRET-ANSWER');
+    expect(bp.step_5_default_rubric.milestones[0]!.judge).not.toBeNull();
+  });
+});

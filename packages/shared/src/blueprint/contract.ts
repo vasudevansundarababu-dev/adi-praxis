@@ -76,3 +76,26 @@ export interface RunnerResult {
   log: string;
   runnerRef: string;
 }
+
+// Post-commit LLM judge (owner decision, 7 Nov 2026). apps/api/src/meta-compiler/judge.ts; mock in tests and CI.
+
+export interface JudgeCriterionResult {
+  num: number;
+  passed: boolean;
+  evidence: string;
+}
+
+export interface JudgeMilestoneResult {
+  milestoneId: string;
+  pointsEarned: number;
+  pointsPossible: number;
+  criteria: JudgeCriterionResult[];
+}
+
+export interface JudgeResult {
+  model: string;
+  /** Weighted 0..1 across milestones, using the rubric weights. */
+  score: number;
+  milestones: JudgeMilestoneResult[];
+  costUsd: number;
+}

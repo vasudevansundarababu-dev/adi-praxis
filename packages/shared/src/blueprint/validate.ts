@@ -1,4 +1,5 @@
 import {
+  AGENT_OUTPUT_ROOT,
   BLUEPRINT_SECTIONS,
   CUSTOM_FIELD_STAGES,
   HIDDEN_GROUND_TRUTH_ROOT,
@@ -6,6 +7,7 @@ import {
   type BlueprintSection,
   type CustomField,
   type HarborBlueprint,
+  type RubricMilestone,
 } from './schema';
 
 export type SectionProblems = Record<BlueprintSection, string[]>;
@@ -143,6 +145,7 @@ export function sectionProblems(bp: HarborBlueprint): SectionProblems {
   for (const d of duplicates(ms.map((m) => m.id))) s5.push(`Milestone id "${d}" is used more than once`);
   const total = ms.reduce((sum, m) => sum + m.weight, 0);
   if (ms.length > 0 && total !== 100) s5.push(`Milestone weights must add up to 100 (now ${total})`);
+  for (const m of ms) s5.push(...judgeProblems(m));
 
   const allFields = CUSTOM_FIELD_STAGES.flatMap((s) => bp.custom_fields_by_stage[s]);
   const dupIds = new Set(duplicates(allFields.map((f) => f.field_id)));
@@ -176,4 +179,19 @@ export function normaliseWeights(weights: number[]): number[] {
     floored[i]! += 1;
   }
   return floored;
+}
+
+function judgeProblems(m: RubricMilestone): string[] {
+  const out: string[] = [];
+  if (m.verifier_template !== 'llm_judge_checklist') {
+    if (m.judge) out.push(`Milestone "${m.id}": a judge checklist needs the llm_judge_checklist verifier`);
+    return out;
+  }
+  if (!m.verifier_body.trim()) out.push(`Milestone "${m.id}": add the deterministic gate check (verifier body) used for the 0.00 / 1.00 test`);
+  if (!m.judge) return [...out, `Milestone "${m.id}": add the judge checklist`];
+  if (!isPathUnder(AGENT_OUTPUT_ROOT, m.judge.deliverable_path)) out.push(`Milestone "${m.id}": deliverable must be a file under ${AGENT_OUTPUT_ROOT}`);
+  if (!m.judge.system_prompt.trim()) out.push(`Milestone "${m.id}": judge instructions are required`);
+  if (m.judge.criteria.length === 0) out.push(`Milestone "${m.id}": add at least one judge criterion`);
+  for (const d of duplicates(m.judge.criteria.map((c) => String(c.num)))) out.push(`Milestone "${m.id}": criterion ${d} is listed more than once`);
+  return out;
 }

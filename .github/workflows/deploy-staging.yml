@@ -6,6 +6,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  pull-requests: read # the reused CI workflow asks for it; a called workflow cannot get more than its caller
 concurrency:
   group: deploy-staging
   cancel-in-progress: false

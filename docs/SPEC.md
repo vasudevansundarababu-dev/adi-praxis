@@ -571,7 +571,7 @@ Nothing in the data tier has a public address; the Cloud Run services reach it o
 | Scheduled jobs (nightly hash-chain check, retention, reports) | Cloud Scheduler → Cloud Run jobs | Retries with alerting |
 | Database | Cloud SQL for PostgreSQL 16 with `pgvector` | Regional HA, private IP, point-in-time recovery, daily backups kept 30 days |
 | Queues and cache | Memorystore for Redis, Standard tier | Private IP, 1 GB to start |
-| Files | Cloud Storage buckets: `task-files`, `evidence`, `exports`, `brand` | Uniform access, no public objects except `brand`; signed URLs; retention policy on `evidence` |
+| Files | Cloud Storage buckets: `task-files`, `evidence`, `exports`, `brand` | Uniform access, no public objects (`brand` included: org policy; public assets go through the load balancer); signed URLs; retention policy on `evidence` |
 | Secrets | Secret Manager | One secret per key; read by service accounts only |
 | AI models | Vertex AI: Claude for the SME profile assistant and suitability evaluation; text embeddings for duplicate detection | Called only from `praxis-worker` and `praxis-api` |
 | Container images | Artifact Registry | Vulnerability scanning on push |
@@ -624,7 +624,7 @@ GitHub authenticates to GCP with Workload Identity Federation: no service-accoun
 - [ ] `terraform apply` builds staging from an empty project with no manual steps.
 - [ ] A merge to `main` reaches staging, migrated and smoke-tested, without manual steps.
 - [ ] A production release requires approval, starts at 10% traffic and can be rolled back in one step.
-- [ ] No database, Redis or bucket (except `brand`) is reachable from the internet.
+- [ ] No database, Redis or bucket is reachable from the internet.
 - [ ] Deleting or updating an `ApprovedTaskRecord` row as the app's database user fails.
 - [ ] Alerts fire on error rate, p95 latency, queue backlog and a broken hash chain.
 

@@ -6,7 +6,7 @@ import { VerificationRunDto, type HarborBlueprint } from '@praxis/shared';
 import { buildApp } from '../src/app';
 import { MemoryStorage } from '../src/candidate/storage';
 import type { Config } from '../src/config';
-import { DockerRunner, MockRunner, pytestScore, readTarGz, SandboxJobRunner, type HarborRunner } from '../src/harbor/runner';
+import { defaultRunner, DockerRunner, MockRunner, pytestScore, readTarGz, SandboxJobRunner, type HarborRunner } from '../src/harbor/runner';
 import { resolveDeps, tarGz } from '../src/meta-compiler/deps';
 import { MockContentDrafter } from '../src/meta-compiler/drafter';
 import { metaCompilerHandlers } from '../src/meta-compiler/handlers';
@@ -173,6 +173,11 @@ describe('A6 runners (unit)', () => {
     let server: Server;
     let base: string;
     const seen: { method: string; url: string; auth: string; body: unknown }[] = [];
+    // The job has no storage access: it receives signed URLs, never reads the bucket itself.
+    const signed = Object.assign(new MemoryStorage(), {
+      signedUrl: async (key: string, action: 'read' | 'write') => `https://signed.example/${action}/${key}`,
+    });
+    let failNext = false;
     beforeAll(async () => {
       server = createServer((req, res) => {
         let raw = '';
@@ -181,14 +186,21 @@ describe('A6 runners (unit)', () => {
           const body = raw ? JSON.parse(raw) : null;
           seen.push({ method: req.method!, url: req.url!, auth: req.headers.authorization ?? '', body });
           res.setHeader('content-type', 'application/json');
+          const ex = 'projects/p/locations/r/jobs/praxis-harbor-verify/executions/ex-1';
           if (req.method === 'POST' && req.url!.startsWith('/v2/') && req.url!.endsWith(':run')) {
-            // The "job" writes its result object, as the sandbox does.
-            const [, mode, resultKey] = body.overrides.containerOverrides[0].args as string[];
-            await storage.put(resultKey!, Buffer.from(JSON.stringify({ score: mode === 'oracle' ? 1 : 0, log: `ran ${mode}` })), 'application/json');
-            return res.end(JSON.stringify({ name: 'projects/p/locations/r/operations/op-1', done: false, metadata: { name: 'projects/p/locations/r/jobs/praxis-harbor-verify/executions/ex-1' } }));
+            const override = body.overrides.containerOverrides[0] as { args: string[]; env: { name: string; value: string }[] };
+            const [, mode, resultKey] = override.args;
+            const env = Object.fromEntries(override.env.map((e) => [e.name, e.value]));
+            // The "job" writes its result through the signed PUT URL, as the sandbox does.
+            if (env.PRAXIS_RESULT_URL === `https://signed.example/write/${resultKey}` && !failNext) {
+              await signed.put(resultKey!, Buffer.from(JSON.stringify({ score: mode === 'oracle' ? 1 : 0, log: `ran ${mode}`, outputs: mode === 'oracle' ? { 'memo.md': 'x' } : {} })), 'application/json');
+            }
+            return res.end(JSON.stringify({ name: 'projects/p/locations/r/operations/op-1', done: false, metadata: { name: ex } }));
           }
-          if (req.method === 'GET' && req.url!.includes('/operations/op-1')) {
-            return res.end(JSON.stringify({ name: 'projects/p/locations/r/operations/op-1', done: true, metadata: { name: 'projects/p/locations/r/jobs/praxis-harbor-verify/executions/ex-1' } }));
+          if (req.method === 'GET' && req.url === `/v2/${ex}`) {
+            const polls = seen.filter((s) => s.method === 'GET').length;
+            if (polls % 2 === 1) return res.end(JSON.stringify({ name: ex }));
+            return res.end(JSON.stringify(failNext ? { name: ex, completionTime: 't', failedCount: 1, conditions: [{ type: 'Completed', state: 'CONDITION_FAILED', message: 'Task failed: exit 1' }] } : { name: ex, completionTime: 't', succeededCount: 1 }));
           }
           res.statusCode = 404;
           res.end('{}');
@@ -197,20 +209,46 @@ describe('A6 runners (unit)', () => {
       base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     });
     afterAll(() => new Promise<void>((r) => server.close(() => r())));
+    beforeEach(() => {
+      seen.length = 0;
+      failNext = false;
+    });
 
-    it('starts the job with the bundle key, polls the operation and reads the result object', async () => {
-      const r = new SandboxJobRunner({ storage, job: 'praxis-harbor-verify', projectId: 'p', region: 'r', baseUrl: base, token: async () => 'tok', pollMs: 1 });
+    it('passes signed URLs to the job, polls the execution, reads and deletes the result object', async () => {
+      await signed.put('bundles/verify/c/abc.tar.gz', Buffer.from('bundle'), 'application/gzip');
+      const r = new SandboxJobRunner({ storage: signed, job: 'praxis-harbor-verify', projectId: 'p', region: 'r', baseUrl: base, token: async () => 'tok', pollMs: 1 });
       const res = await r.run('bundles/verify/c/abc.tar.gz', 'oracle');
-      expect(res).toEqual({ score: 1, log: 'ran oracle', runnerRef: 'projects/p/locations/r/jobs/praxis-harbor-verify/executions/ex-1' });
+      expect(res).toEqual({ score: 1, log: 'ran oracle', runnerRef: 'projects/p/locations/r/jobs/praxis-harbor-verify/executions/ex-1', outputs: { 'memo.md': 'x' } });
       expect(seen[0]).toMatchObject({ method: 'POST', url: '/v2/projects/p/locations/r/jobs/praxis-harbor-verify:run', auth: 'Bearer tok' });
-      expect((seen[0]!.body as { overrides: { containerOverrides: { args: string[] }[] } }).overrides.containerOverrides[0]!.args.slice(0, 2)).toEqual(['bundles/verify/c/abc.tar.gz', 'oracle']);
-      expect(seen[1]).toMatchObject({ method: 'GET', url: '/v2/projects/p/locations/r/operations/op-1' });
+      const override = (seen[0]!.body as { overrides: { containerOverrides: { args: string[]; env: { name: string; value: string }[] }[]; taskCount: number } }).overrides;
+      expect(override.taskCount).toBe(1);
+      expect(override.containerOverrides[0]!.args.slice(0, 2)).toEqual(['bundles/verify/c/abc.tar.gz', 'oracle']);
+      expect(override.containerOverrides[0]!.args[2]).toMatch(/^results\/[0-9a-f]{32}\.json$/);
+      expect(override.containerOverrides[0]!.env).toEqual([
+        { name: 'PRAXIS_BUNDLE_URL', value: 'https://signed.example/read/bundles/verify/c/abc.tar.gz' },
+        { name: 'PRAXIS_RESULT_URL', value: `https://signed.example/write/${override.containerOverrides[0]!.args[2]}` },
+      ]);
+      // Polls the execution (job-scoped viewer), never the project-wide operation.
+      expect(seen.slice(1).every((s) => s.method === 'GET' && s.url.includes('/executions/ex-1'))).toBe(true);
+      expect([...signed.objects.keys()].filter((k) => k.startsWith('results/'))).toEqual([]);
       expect((await r.run('bundles/verify/c/abc.tar.gz', 'null-agent')).score).toBe(0);
     });
 
+    it('reports a failed execution and a missing result clearly', async () => {
+      const r = new SandboxJobRunner({ storage: signed, job: 'praxis-harbor-verify', projectId: 'p', region: 'r', baseUrl: base, token: async () => 'tok', pollMs: 1 });
+      failNext = true;
+      await expect(r.run('bundles/verify/c/abc.tar.gz', 'oracle')).rejects.toThrow('The verification job failed: Task failed: exit 1');
+    });
+
     it('fails clearly when the API refuses', async () => {
-      const r = new SandboxJobRunner({ storage, job: 'projects/p/locations/r/jobs/missing', projectId: 'p', region: 'r', baseUrl: `${base}/nope`, token: async () => 'tok', pollMs: 1 });
+      const r = new SandboxJobRunner({ storage: signed, job: 'projects/p/locations/r/jobs/missing', projectId: 'p', region: 'r', baseUrl: `${base}/nope`, token: async () => 'tok', pollMs: 1 });
       await expect(r.run('b', 'oracle')).rejects.toThrow(/Cloud Run API POST failed \(404\)/);
+    });
+
+    it('defaultRunner refuses the job runner without signed-URL storage', () => {
+      const cfg = testConfig({ HARBOR_RUNNER: 'job', HARBOR_VERIFY_JOB: 'praxis-harbor-verify' });
+      expect(() => defaultRunner(cfg, new MemoryStorage())).toThrow(/needs Cloud Storage/);
+      expect(defaultRunner(cfg, signed).kind).toBe('job');
     });
   });
 });

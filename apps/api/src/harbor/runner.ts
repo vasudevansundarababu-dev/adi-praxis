@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { z } from 'zod';
-import type { ObjectStorage } from '../candidate/storage';
+import type { ObjectStorage, SignedUrlStorage } from '../candidate/storage';
 import type { Config } from '../config';
 
 /**
@@ -179,49 +179,77 @@ export class DockerRunner implements HarborRunner {
 type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body?: string }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
 
 const Operation = z.object({ name: z.string(), done: z.boolean().optional(), error: z.object({ message: z.string().optional() }).passthrough().optional(), metadata: z.object({ name: z.string().optional() }).passthrough().optional() });
+const Execution = z.object({ name: z.string(), completionTime: z.string().optional(), succeededCount: z.number().optional(), failedCount: z.number().optional(), cancelledCount: z.number().optional(), conditions: z.array(z.object({ type: z.string(), state: z.string().optional(), message: z.string().optional() })).optional() });
 const JobResult = z.object({ score: z.number().min(0).max(1), log: z.string().max(1_000_000).default(''), outputs: z.record(z.string(), z.string().max(MAX_RUNNER_OUTPUT_CHARS)).optional() });
 
+/** Signed URLs live a little longer than the job's own timeout (queueing plus the 120 s task limit). */
+const SIGNED_URL_SECONDS = 600;
+
 /**
- * Staging and production: starts the Cloud Run job `praxis-harbor-verify` (its own service account, no egress, no
- * Praxis secrets) through the Cloud Run Admin API v2 with the bundle key as argument, waits for the execution, then
- * reads the result object it wrote under `results/`.
+ * Staging and production: starts the Cloud Run job `praxis-harbor-verify` (its own service account with no storage or
+ * project roles, no route to the internet, no Praxis secrets) through the Cloud Run Admin API v2. The job gets a signed
+ * GET URL for the bundle and a signed PUT URL for a fresh `results/` key, which the grading wrapper hides from task
+ * code. The worker waits for the execution, then reads the result object.
  */
 export class SandboxJobRunner implements HarborRunner {
   readonly kind = 'job' as const;
   private auth: GoogleAuth | undefined;
   readonly jobName: string;
-  constructor(private readonly opts: { storage: ObjectStorage; job: string; projectId: string; region: string; baseUrl?: string; fetch?: Fetch; token?: () => Promise<string>; pollMs?: number; timeoutMs?: number }) {
+  constructor(private readonly opts: { storage: SignedUrlStorage; job: string; projectId: string; region: string; baseUrl?: string; fetch?: Fetch; token?: () => Promise<string>; pollMs?: number; timeoutMs?: number }) {
     if (!opts.job) throw new Error('SandboxJobRunner needs HARBOR_VERIFY_JOB');
     this.jobName = opts.job.startsWith('projects/') ? opts.job : `projects/${opts.projectId}/locations/${opts.region}/jobs/${opts.job}`;
   }
-  private async call(method: string, url: string, body?: unknown) {
+  private async call(method: string, url: string, body?: unknown): Promise<unknown> {
     this.auth ??= new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
     const token = this.opts.token ? await this.opts.token() : ((await (await this.auth.getClient()).getAccessToken()).token ?? '');
     const res = await (this.opts.fetch ?? (fetch as unknown as Fetch))(url, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
     if (!res.ok) throw new RunnerError(`Cloud Run API ${method} failed (${res.status})`);
-    return Operation.parse(await res.json());
+    return res.json();
   }
   async run(bundleRef: string, mode: RunnerMode): Promise<RunnerRun> {
     const base = (this.opts.baseUrl ?? 'https://run.googleapis.com').replace(/\/$/, '');
     const resultKey = `results/${sha(Buffer.from(`${bundleRef}:${mode}:${randomUUID()}`)).slice(0, 32)}.json`;
-    let op = await this.call('POST', `${base}/v2/${this.jobName}:run`, { overrides: { containerOverrides: [{ args: [bundleRef, mode, resultKey] }], taskCount: 1 } });
+    const [bundleUrl, resultUrl] = await Promise.all([
+      this.opts.storage.signedUrl(bundleRef, 'read', { expiresInSeconds: SIGNED_URL_SECONDS }),
+      this.opts.storage.signedUrl(resultKey, 'write', { expiresInSeconds: SIGNED_URL_SECONDS, contentType: 'application/json' }),
+    ]);
+    const env = [{ name: 'PRAXIS_BUNDLE_URL', value: bundleUrl }, { name: 'PRAXIS_RESULT_URL', value: resultUrl }];
+    const op = Operation.parse(await this.call('POST', `${base}/v2/${this.jobName}:run`, { overrides: { containerOverrides: [{ args: [bundleRef, mode, resultKey], env }], taskCount: 1 } }));
+    if (op.error) throw new RunnerError(`The verification job could not start: ${op.error.message ?? 'unknown error'}`);
+    const execution = op.metadata?.name;
+    if (!execution) throw new RunnerError('The Cloud Run API did not return an execution name');
+    // Poll the execution (readable with run.viewer on this job only) rather than the operation (project-wide).
     const deadline = Date.now() + (this.opts.timeoutMs ?? 300_000);
-    while (!op.done) {
+    let ex = Execution.parse(await this.call('GET', `${base}/v2/${execution}`));
+    while (!ex.completionTime) {
       if (Date.now() > deadline) throw new RunnerError('The verification job did not finish in time');
       await new Promise((r) => setTimeout(r, this.opts.pollMs ?? 2000));
-      op = await this.call('GET', `${base}/v2/${op.name}`);
+      ex = Execution.parse(await this.call('GET', `${base}/v2/${execution}`));
     }
-    if (op.error) throw new RunnerError(`The verification job failed: ${op.error.message ?? 'unknown error'}`);
-    const result = JobResult.safeParse(JSON.parse((await this.opts.storage.get(resultKey)).toString('utf8')));
+    if (!ex.succeededCount) {
+      const why = ex.conditions?.find((c) => c.state === 'CONDITION_FAILED')?.message;
+      throw new RunnerError(`The verification job failed${why ? `: ${why}` : ''}`);
+    }
+    let raw: Buffer;
+    try {
+      raw = await this.opts.storage.get(resultKey);
+    } catch {
+      throw new RunnerError('The verification job wrote no result');
+    }
+    const result = JobResult.safeParse((() => { try { return JSON.parse(raw.toString('utf8')); } catch { return null; } })());
+    await this.opts.storage.delete(resultKey).catch(() => undefined);
     if (!result.success) throw new RunnerError('The verification job wrote an invalid result');
-    return { score: result.data.score, log: result.data.log, runnerRef: op.metadata?.name ?? op.name, outputs: result.data.outputs };
+    return { score: result.data.score, log: result.data.log, runnerRef: ex.name, outputs: result.data.outputs };
   }
 }
 
 /** Runner from config (HARBOR_RUNNER): mock by default, docker for manual local runs, the sandbox job when deployed. */
 export function defaultRunner(config: Config, storage: ObjectStorage): HarborRunner {
   const mc = config.metaCompiler;
-  if (mc.runner === 'job') return new SandboxJobRunner({ storage, job: mc.verifyJob, projectId: config.GCS_PROJECT_ID, region: 'us-central1' });
+  if (mc.runner === 'job') {
+    if (!('signedUrl' in storage)) throw new Error('HARBOR_RUNNER=job needs Cloud Storage (signed URLs for the sandbox job)');
+    return new SandboxJobRunner({ storage: storage as SignedUrlStorage, job: mc.verifyJob, projectId: config.GCS_PROJECT_ID, region: config.HARBOR_VERIFY_REGION });
+  }
   if (mc.runner === 'docker') return new DockerRunner({ storage });
   return new MockRunner(storage);
 }

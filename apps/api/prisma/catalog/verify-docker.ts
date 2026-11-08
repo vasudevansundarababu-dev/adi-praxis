@@ -62,7 +62,7 @@ export function runInDocker(bundle: Uint8Array, mode: 'null-agent' | 'oracle' | 
         'run', '--rm', '--network=none', '--read-only', '--tmpfs=/tmp', '--memory=1g', '--cpus=1', ...user,
         `--volume=${root}:/task`, '--workdir=/task',
         '--env=HARBOR_ROOT=/task', '--env=HARBOR_REWARD_PATH=/task/logs/verifier/reward.txt', '--env=PYTHONDONTWRITEBYTECODE=1',
-        VERIFY_IMAGE, 'sh', '-c', script,
+        '--entrypoint=sh', VERIFY_IMAGE, '-c', script,
       ],
       { encoding: 'utf8', timeout: 120_000 },
     );

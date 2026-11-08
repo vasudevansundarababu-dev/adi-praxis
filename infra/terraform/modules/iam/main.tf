@@ -44,6 +44,14 @@ resource "google_storage_bucket_iam_member" "backend_objects" {
   member   = "serviceAccount:${google_service_account.sa[each.value[0]].email}"
 }
 
+# api and worker sign short-lived URLs for the grading sandbox with their own key (IAM signBlob on themselves only).
+resource "google_service_account_iam_member" "self_sign" {
+  for_each           = toset(["api", "worker"])
+  service_account_id = google_service_account.sa[each.key].name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.sa[each.key].email}"
+}
+
 # ── Application secrets: one secret per key, values from (sensitive) Terraform variables ──
 resource "google_secret_manager_secret" "app" {
   for_each  = toset(var.app_secret_names)

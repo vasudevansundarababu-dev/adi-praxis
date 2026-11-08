@@ -2,7 +2,7 @@ import type { RunnerMode, RunnerResult } from '@praxis/shared';
 import { GoogleAuth } from 'google-auth-library';
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
@@ -115,12 +115,13 @@ const execFile: Exec = (cmd, args, opts) =>
 /** Inside the container: copy the read-only task to /tmp, run solve.sh for the oracle, then grade with pytest. */
 const GRADE = `set -u
 cp -r /task /tmp/work && cd /tmp/work
+export HARBOR_ROOT=/tmp/work HARBOR_REWARD_PATH=/tmp/work/logs/verifier/reward.txt
 if [ "$1" = "oracle" ]; then sh solution/solve.sh || echo "solve.sh exited with $?"; fi
 python -m pytest -q -p no:cacheprovider eval/test_verifiers.py 2>&1 | tail -n 200
 echo "${OUTPUTS_MARKER}"
 python - <<'PY'
 import json, os
-root, out, left = "/workspace/outputs", {}, ${MAX_RUNNER_OUTPUT_CHARS}
+root, out, left = "/tmp/work/workspace/outputs", {}, ${MAX_RUNNER_OUTPUT_CHARS}
 for d, dirs, names in os.walk(root):
     dirs.sort()
     for n in sorted(names):
@@ -151,13 +152,16 @@ export class DockerRunner implements HarborRunner {
       '--network=none', '--read-only', '--tmpfs', '/tmp:rw,size=64m',
       '--memory', '1g', '--cpus', '1', '--pids-limit', '256', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
       '-v', `${dir}:/task:ro`,
+      '--entrypoint', 'sh',
       this.opts.image ?? 'praxis-harbor-verify:local',
-      'sh', '-c', GRADE, 'grade', mode,
+      '-c', GRADE, 'grade', mode,
     ];
   }
   async run(bundleRef: string, mode: RunnerMode): Promise<RunnerRun> {
     const files = readTarGz(await this.opts.storage.get(bundleRef));
     const dir = await mkdtemp(path.join(tmpdir(), 'praxis-bundle-'));
+    // The container runs with --cap-drop ALL, so its root cannot read a 0700 directory owned by another user.
+    await chmod(dir, 0o755);
     try {
       for (const [p, data] of files) {
         const target = path.join(dir, p);

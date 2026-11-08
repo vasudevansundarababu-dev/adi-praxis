@@ -6,3 +6,5 @@ output "jobs" { value = module.run.jobs }
 output "deployer_service_account" { value = module.iam.deployer_email }
 output "workload_identity_provider" { value = module.iam.workload_identity_provider }
 output "planner_service_account" { value = module.iam.planner_email }
+output "harbor_verify_job" { value = module.harbor_sandbox.job }
+output "harbor_verify_service_account" { value = module.harbor_sandbox.service_account }

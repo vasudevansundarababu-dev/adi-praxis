@@ -28,6 +28,15 @@ locals {
     EMAIL_FROM          = var.smtp.from
     RL_GYM_WEBHOOK_URL  = var.rl_gym_webhook_url
     DATASET_VERIFY_CRON = "off" # Cloud Scheduler runs the verification job instead
+    # Grading runs only in the praxis-harbor-verify sandbox job (never the mock in deployed environments, D-12).
+    HARBOR_RUNNER        = "job"
+    HARBOR_VERIFY_JOB    = var.harbor_verify_job
+    HARBOR_VERIFY_REGION = var.region
+    # Paid Claude only with both caps set (NFR-08a, NFR-09); config refuses live AI without them.
+    META_COMPILER_LIVE_AI       = tostring(var.meta_compiler.live_ai)
+    META_COMPILER_MODELS        = var.meta_compiler.models
+    GENERATION_COST_CAP_USD     = tostring(var.meta_compiler.cost_cap_usd)
+    GENERATION_DAILY_BUDGET_USD = tostring(var.meta_compiler.daily_budget_usd)
   }
   vpc = { network = var.network_id, subnetwork = var.subnet_id }
 }

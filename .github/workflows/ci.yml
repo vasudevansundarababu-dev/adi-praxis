@@ -65,6 +65,26 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}
 
+  harbor-verify:
+    # The grading sandbox image with real pytest: catalog bundles must score 0.00 (null agent) and 1.00 (oracle), and
+    # a hostile bundle must see no network, no signed URLs, no root files and no judge files.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the grading image
+        run: docker build -t praxis-harbor-verify:ci -f infra/harbor-verify/Dockerfile .
+      - name: Build catalog and hostile bundles
+        run: mkdir -p "$RUNNER_TEMP/hv" && pnpm --filter @praxis/api exec tsx scripts/harbor-verify-bundles.ts "$RUNNER_TEMP/hv"
+      - name: Grade in the image
+        run: python3 infra/harbor-verify/test/run_e2e.py praxis-harbor-verify:ci "$RUNNER_TEMP/hv"
+
   changes:
     runs-on: ubuntu-latest
     outputs:

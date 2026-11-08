@@ -98,13 +98,14 @@ jobs:
         working-directory: infra/terraform/envs/${{ matrix.env }}
         run: terraform init -backend=false -input=false && terraform validate
       - name: Authenticate (read-only planner)
-        if: github.event.pull_request.head.repo.full_name == github.repository
+        # Plans need the environment's Workload Identity variables; until they exist, fmt and validate still run.
+        if: github.event.pull_request.head.repo.full_name == github.repository && (matrix.env == 'staging' && vars.GCP_WIF_PROVIDER_STAGING || matrix.env == 'production' && vars.GCP_WIF_PROVIDER_PRODUCTION)
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ matrix.env == 'staging' && vars.GCP_WIF_PROVIDER_STAGING || vars.GCP_WIF_PROVIDER_PRODUCTION }}
           service_account: ${{ matrix.env == 'staging' && vars.GCP_PLANNER_SA_STAGING || vars.GCP_PLANNER_SA_PRODUCTION }}
       - name: Plan
-        if: github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event.pull_request.head.repo.full_name == github.repository && (matrix.env == 'staging' && vars.GCP_WIF_PROVIDER_STAGING || matrix.env == 'production' && vars.GCP_WIF_PROVIDER_PRODUCTION)
         working-directory: infra/terraform/envs/${{ matrix.env }}
         env:
           TF_VAR_github_repository: ${{ github.repository }}

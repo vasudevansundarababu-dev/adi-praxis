@@ -306,7 +306,7 @@ describe('J3 judge job after task verification', () => {
     expect(calls).toBe(0);
   });
 
-  it('J4: Admin and Reviewer read the judge result with criterion text; PM, Finance, SMEs and other clients cannot', async () => {
+  it('J4: only Admin reads the judge result with criterion text; Reviewers, PM, Finance, SMEs and other clients cannot', async () => {
     const id = await committed();
     await work();
     const row = await db.smeAuthoredTask.findUniqueOrThrow({ where: { id } });
@@ -323,11 +323,8 @@ describe('J3 judge job after task verification', () => {
     expect(res.json().judge).toMatchObject({ status: 'MEASURED', score: 1, provider: 'mock', model: 'mock-judge-1', costUsd: 0 });
     expect(memo).toMatchObject({ weight: 20, pointsEarned: 6, pointsPossible: 6 });
     expect(memo.criteria[0]).toMatchObject({ num: 1, category: 'Budget', text: 'ANSWERKEY-ONE: states the budget of 4200 credits', points: 2, awarded: 2, passed: true });
-    expect((await http.get(reviewer, `/studio-tasks/${id}/judge`)).statusCode).toBe(200);
-    expect((await http.get(reviewer, `/review/tasks/${row.taskInstanceId}/judge`)).json()).toEqual(res.json());
-    expect((await http.get(admin, `/review/tasks/${row.taskInstanceId}/judge`)).statusCode).toBe(200);
-    expect((await http.get(unassigned, `/review/tasks/${row.taskInstanceId}/judge`)).statusCode).toBe(404);
-    for (const who of [pm, finance]) {
+    expect((await http.get(admin, `/review/tasks/${row.taskInstanceId}/judge`)).json()).toEqual(res.json());
+    for (const who of [reviewer, unassigned, pm, finance]) {
       expect((await http.get(who, `/studio-tasks/${id}/judge`)).statusCode).toBe(403);
       expect((await http.get(who, `/review/tasks/${row.taskInstanceId}/judge`)).statusCode).toBe(403);
     }

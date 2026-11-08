@@ -68,11 +68,11 @@ describe('U4 task store page', () => {
     expect(t).toContain('zero-baseline 0.00 · oracle 1.00');
     expect(t).toContain('Submitted for review');
     expect(t).toContain('Inspect JSON for TASK-MKTG-901');
-    expect(m).toContain(`href="/api/mc-mock/studio-tasks/${task.id}/bundle"`);
+    expect(m).toContain(`href="/api/v1/studio-tasks/${task.id}/bundle"`);
   });
 
   it('S4-12: Export all links to the export route', () => {
-    expect(html(<TaskStore tasks={[]} />)).toContain('href="/api/mc-mock/studio-tasks/export"');
+    expect(html(<TaskStore tasks={[]} />)).toContain('href="/api/v1/studio-tasks/export"');
     expect(text(html(<TaskStore tasks={[]} />))).toContain('No studio tasks yet.');
   });
 

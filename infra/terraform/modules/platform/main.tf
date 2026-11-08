@@ -88,7 +88,19 @@ module "run" {
   rl_gym_webhook_url  = var.rl_gym_webhook_url
   scaling             = var.scaling
   deletion_protection = var.deletion_protection
+  harbor_verify_job   = "praxis-harbor-verify"
+  meta_compiler       = var.meta_compiler
   depends_on          = [module.iam]
+}
+
+module "harbor_sandbox" {
+  source                  = "../harbor-sandbox"
+  project_id              = var.project_id
+  region                  = var.region
+  runner_service_accounts = [module.iam.service_accounts.api, module.iam.service_accounts.worker]
+  deployer_email          = module.iam.deployer_email
+  deletion_protection     = var.deletion_protection
+  depends_on              = [google_project_service.api]
 }
 
 module "edge" {

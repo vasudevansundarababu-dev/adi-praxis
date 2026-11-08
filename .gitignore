@@ -24,3 +24,5 @@ playwright-report/
 *.tfvars
 !*.tfvars.example
 .terraform.lock.hcl.bak
+__pycache__/
+*.pyc

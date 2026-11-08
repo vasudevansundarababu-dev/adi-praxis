@@ -86,6 +86,7 @@ const Env = z.object({
   /** Harbor verification runner: mock (tests, local), docker (manual local runs), job (Cloud Run sandbox job). */
   HARBOR_RUNNER: z.enum(['mock', 'docker', 'job']).optional(),
   HARBOR_VERIFY_JOB: z.string().default(''),
+  HARBOR_VERIFY_REGION: z.string().default('us-central1'),
 });
 
 export type Config = z.infer<typeof Env> & {

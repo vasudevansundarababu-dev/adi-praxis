@@ -44,6 +44,14 @@ resource "google_storage_bucket_iam_member" "backend_objects" {
   member   = "serviceAccount:${google_service_account.sa[each.value[0]].email}"
 }
 
+# api and worker sign short-lived URLs for the grading sandbox with their own key (IAM signBlob on themselves only).
+resource "google_service_account_iam_member" "self_sign" {
+  for_each           = toset(["api", "worker"])
+  service_account_id = google_service_account.sa[each.key].name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.sa[each.key].email}"
+}
+
 # ── Application secrets: one secret per key, values from (sensitive) Terraform variables ──
 resource "google_secret_manager_secret" "app" {
   for_each  = toset(var.app_secret_names)
@@ -150,11 +158,27 @@ resource "google_service_account" "planner" {
   display_name = "Terraform planner (CI)"
 }
 
+# serviceUsageConsumer: the provider bills requests to the project (user_project_override).
 resource "google_project_iam_member" "planner" {
-  for_each = toset(["roles/viewer", "roles/iam.securityReviewer", "roles/secretmanager.secretAccessor"])
+  for_each = toset(["roles/viewer", "roles/iam.securityReviewer", "roles/secretmanager.secretAccessor", "roles/serviceusage.serviceUsageConsumer"])
   project  = var.project_id
   role     = each.key
   member   = "serviceAccount:${google_service_account.planner.email}"
+}
+
+# Refreshing the Redis instance reads its AUTH string, which no predefined read-only role grants. The planner can
+# already read the same value from the redis-url secret, so this exposes nothing new.
+resource "google_project_iam_custom_role" "planner_redis" {
+  project     = var.project_id
+  role_id     = "praxisTfPlannerRedis"
+  title       = "Terraform planner: read Redis AUTH string"
+  permissions = ["redis.instances.getAuthString"]
+}
+
+resource "google_project_iam_member" "planner_redis" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.planner_redis.name
+  member  = "serviceAccount:${google_service_account.planner.email}"
 }
 
 resource "google_storage_bucket_iam_member" "planner_state" {

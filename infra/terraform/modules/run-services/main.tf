@@ -39,6 +39,9 @@ resource "google_cloud_run_v2_service" "api" {
   location            = var.region
   ingress             = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
   deletion_protection = var.deletion_protection
+  # The load balancer forwards unauthenticated users. The organization policy forbids allUsers bindings, so the invoker
+  # IAM check is off instead; ingress still accepts traffic only from the load balancer.
+  invoker_iam_disabled = true
   template {
     service_account = var.service_accounts.api
     timeout         = "60s"
@@ -155,12 +158,13 @@ resource "google_cloud_run_v2_service" "worker" {
 
 # ── Next.js front ends ──
 resource "google_cloud_run_v2_service" "front" {
-  for_each            = { web = "praxis-web", candidate = "praxis-candidate" }
-  project             = var.project_id
-  name                = each.value
-  location            = var.region
-  ingress             = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
-  deletion_protection = var.deletion_protection
+  for_each             = { web = "praxis-web", candidate = "praxis-candidate" }
+  project              = var.project_id
+  name                 = each.value
+  location             = var.region
+  ingress              = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  deletion_protection  = var.deletion_protection
+  invoker_iam_disabled = true # see praxis-api
   template {
     service_account = var.service_accounts[each.key]
     scaling {
@@ -207,16 +211,6 @@ resource "google_cloud_run_v2_service" "front" {
   lifecycle {
     ignore_changes = [template[0].containers[0].image, client, client_version, traffic]
   }
-}
-
-# The load balancer forwards unauthenticated users; ingress still limits traffic to the load balancer and the VPC.
-resource "google_cloud_run_v2_service_iam_member" "public" {
-  for_each = { api = google_cloud_run_v2_service.api.name, web = google_cloud_run_v2_service.front["web"].name, candidate = google_cloud_run_v2_service.front["candidate"].name }
-  project  = var.project_id
-  location = var.region
-  name     = each.value
-  role     = "roles/run.invoker"
-  member   = "allUsers"
 }
 
 # ── Jobs: migrations (as the migration role) and the nightly hash-chain verification ──

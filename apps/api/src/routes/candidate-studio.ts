@@ -158,6 +158,7 @@ export const candidateStudioRoutes: FastifyPluginAsyncZod<StudioRouteOptions> = 
             projectId: d.projectId,
             candidateId,
             externalTaskId: extId,
+            policySnapshotId: (await tx.taskSubmission.findUnique({ where: { taskInstanceId_version: { taskInstanceId: t.id, version } }, select: { policySnapshotId: true } }))?.policySnapshotId ?? null,
             title,
             tptEstimate: bp.template_meta.tpt_label || null,
             executionMode,

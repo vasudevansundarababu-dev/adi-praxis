@@ -87,6 +87,23 @@ const Env = z.object({
   HARBOR_RUNNER: z.enum(['mock', 'docker', 'job']).optional(),
   HARBOR_VERIFY_JOB: z.string().default(''),
   HARBOR_VERIFY_REGION: z.string().default('us-central1'),
+  /** Policy Rules extraction (docs/architecture/ARCH-POLICY-RULES.md section 10). Off = providers report Not available. */
+  POLICY_EXTRACTION_LIVE: flag,
+  LLAMAEXTRACT_API_KEY: z.string().default(''),
+  LLAMAEXTRACT_PROJECT_ID: z.string().default(''),
+  LLAMAEXTRACT_BASE_URL: z.string().default('https://api.cloud.llamaindex.ai'),
+  /** projects/<p>/locations/us/processors/<id> of the Document AI Layout Parser. */
+  DOCUMENTAI_PROCESSOR: z.string().default(''),
+  DOCUMENTAI_LOCATION: z.string().default('us'),
+  POLICY_GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  POLICY_GEMINI_LOCATION: z.string().default('us-central1'),
+  /** Cumulative spend ceilings per provider in USD (owner D-B1). Blank = live calls refused. */
+  POLICY_BUDGET_LLAMA_USD: z.string().default(''),
+  POLICY_BUDGET_GOOGLE_USD: z.string().default(''),
+  /** Worst-case estimates used to reserve budget before a job (actual usage recorded after). */
+  POLICY_PRICE_LLAMA_USD_PER_PAGE: z.string().default('0.10'),
+  POLICY_PRICE_GOOGLE_USD_PER_PAGE: z.string().default('0.03'),
+  POLICY_MAX_PAGES: z.coerce.number().int().min(1).max(500).default(20),
 });
 
 export type Config = z.infer<typeof Env> & {
@@ -114,7 +131,18 @@ export type Config = z.infer<typeof Env> & {
     runner: 'mock' | 'docker' | 'job';
     verifyJob: string;
   };
+  /** Derived Policy Rules extraction settings (ARCH-POLICY-RULES section 10). */
+  policy: PolicyConfig;
 };
+
+export interface PolicyConfig {
+  live: boolean;
+  maxPages: number;
+  budgets: { llamaextract: number | null; google: number | null };
+  prices: { llamaextract: number; google: number };
+  llamaextract: { apiKey: string; projectId: string; baseUrl: string };
+  google: { processor: string; location: string; geminiModel: string; geminiLocation: string; projectId: string };
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = Env.safeParse(env);
@@ -143,7 +171,26 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   const appEnv = c.APP_ENV ?? (c.NODE_ENV === 'production' ? 'production' : 'local');
   const metaCompiler = metaCompilerConfig(c, appEnv);
-  return { ...c, candidateAuthMode, identityMode, assistantMode, emailMode, payoutMode, appEnv, requireLiveIdentity: appEnv === 'production', metaCompiler };
+  const policy = policyConfig(c, appEnv);
+  return { ...c, candidateAuthMode, identityMode, assistantMode, emailMode, payoutMode, appEnv, requireLiveIdentity: appEnv === 'production', metaCompiler, policy };
+}
+
+/** Live policy extraction only in staging, with both ceilings set (owner D-B1, D-D1; never in tests or production). */
+function policyConfig(c: z.infer<typeof Env>, appEnv: Config['appEnv']): Config['policy'] {
+  const budgets = { llamaextract: usdOrNull('POLICY_BUDGET_LLAMA_USD', c.POLICY_BUDGET_LLAMA_USD), google: usdOrNull('POLICY_BUDGET_GOOGLE_USD', c.POLICY_BUDGET_GOOGLE_USD) };
+  const prices = { llamaextract: usdOrNull('POLICY_PRICE_LLAMA_USD_PER_PAGE', c.POLICY_PRICE_LLAMA_USD_PER_PAGE) ?? 0, google: usdOrNull('POLICY_PRICE_GOOGLE_USD_PER_PAGE', c.POLICY_PRICE_GOOGLE_USD_PER_PAGE) ?? 0 };
+  if (c.POLICY_EXTRACTION_LIVE) {
+    if (appEnv !== 'staging' || c.NODE_ENV === 'test') throw new Error('Invalid configuration: POLICY_EXTRACTION_LIVE is only allowed in staging');
+    if (budgets.llamaextract === null || budgets.google === null) throw new Error('Invalid configuration: POLICY_EXTRACTION_LIVE needs POLICY_BUDGET_LLAMA_USD and POLICY_BUDGET_GOOGLE_USD');
+  }
+  return {
+    live: c.POLICY_EXTRACTION_LIVE,
+    maxPages: c.POLICY_MAX_PAGES,
+    budgets,
+    prices,
+    llamaextract: { apiKey: c.LLAMAEXTRACT_API_KEY, projectId: c.LLAMAEXTRACT_PROJECT_ID, baseUrl: c.LLAMAEXTRACT_BASE_URL },
+    google: { processor: c.DOCUMENTAI_PROCESSOR, location: c.DOCUMENTAI_LOCATION, geminiModel: c.POLICY_GEMINI_MODEL, geminiLocation: c.POLICY_GEMINI_LOCATION, projectId: c.VERTEX_PROJECT_ID },
+  };
 }
 
 function usdOrNull(name: string, v: string): number | null {

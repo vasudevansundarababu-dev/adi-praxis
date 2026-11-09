@@ -2,7 +2,8 @@
 
 | Item | Value |
 | --- | --- |
-| Status | **Draft for owner approval (Gate 3: plan).** |
+| Status | **Approved by the owner on 9 Nov 2026 (Gate 3: plan).** Coding started 9 Nov. |
+| OpenHands budget | **$150** this conversation (build), **$50** independent QA conversation (owner, 9 Nov). Alert at 80%; stop at the cap unless raised. |
 | Implements | [PRD](../prd/PRD-POLICY-RULES.md) (approved 9 Nov) and [architecture](../architecture/ARCH-POLICY-RULES.md) (approved 9 Nov) |
 | Target | **Code complete on `feat/policy-rules` by end of 11 Nov 2026**; independent QA and staging deploy follow with separate approvals |
 | Prepared by | OpenHands agent (Planner role), 9 Nov 2026 |

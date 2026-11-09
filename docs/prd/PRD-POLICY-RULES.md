@@ -2,7 +2,7 @@
 
 | Item | Value |
 | --- | --- |
-| Status | **Draft for owner review (Gate 1: PRD).** No code until the owner approves. |
+| Status | **Approved by the owner on 9 Nov 2026 (Gate 1: PRD).** Next: architecture (Gate 2). |
 | Owner | Product owner (vasudevansundarababu-dev) |
 | Prepared by | OpenHands agent (PRD role), Praxis enhancement workflow |
 | Date | 9 November 2026 |
@@ -46,7 +46,7 @@ Uses existing Praxis roles only. [S1 §10]
 | --- | --- | --- |
 | View project policies, rules, snapshots | PM, ADMIN (project access) | [Code] `projects.ts` ACCESS = PM, ADMIN |
 | Upload documents, paste text, start extraction, edit rules, exclude, add task changes | PM, ADMIN | [Owner Q3] |
-| **Mark a rule version Reviewed** | **PM** (and ADMIN), never the user who last edited that version | [Owner Q7]; independent review rule [Code] CLAUDE.md "AI output never makes a final … decision" |
+| **Mark a rule version Reviewed** | **PM** (and ADMIN); the editor may review in Release 1 | [Owner Q7, D-R1]; a human, never AI, makes the decision [Code] CLAUDE.md |
 | Publish Project rule set; publish task snapshot | PM, ADMIN | [S1 R14, T10] |
 | Choose deployment/tenant default provider, per-request override, project profile | **ADMIN only** | [Owner Q4], [S2 §2] |
 | SMEs (candidate app) | See agent-visible rules of their task, read-only | [Owner Q2] |
@@ -103,7 +103,7 @@ Uses existing Praxis roles only. [S1 §10]
 | PR-R01 | Rule selector with exact version and state. | S1 R01 | — |
 | PR-R02 | Source evidence beside the rule: document title, version/hash, page/section/line locator, quoted span. Unresolvable evidence keeps the rule Needs definition. Per-claim evidence for requirement, conditions, exceptions, dates, precedence. | S1 R02; S2 §6 | A05, A06. |
 | PR-R03 | Editable fields: requirement; applicability (actors, actions, entities, channels, locales, jurisdictions, condition) incl. explicit universal; gate/precedence with referenced rule versions; exceptions (explicit "none" vs unknown); effective dates/scope; required evidence; suggested verification capability (hint only). | S1 R03–R09; S2 §5 | Cycles/conflicts detected; block publication. |
-| PR-R04 | **Mark Reviewed** (PM/ADMIN, not last editor): requires complete source, definition, scope; records reviewer, time, content hash. Reviewed content is immutable; editing creates a new draft version. Stale decisions rejected. | S1 R10; Owner Q7 | AC06, AC17, AC18. |
+| PR-R04 | **Mark Reviewed** (PM/ADMIN; a human action, never automatic): requires complete source, definition, scope; records reviewer, time, content hash. Reviewed content is immutable; editing creates a new draft version. Stale decisions rejected. | S1 R10; Owner Q7 | AC06, AC17, AC18. |
 | PR-R05 | Needs definition / Excluded (with reason); required policies cannot be silently omitted; counts shown. | S1 R11 | — |
 | PR-R06 | **Apply to all Project tasks** (on by default; Release 1 mode). | S1 R12 | No per-task checkboxes (AC07). |
 | PR-R07 | Publication preview: included Reviewed versions, excluded candidates, unresolved required rules/conflicts (block). | S1 R13 | — |
@@ -156,7 +156,7 @@ Template policy profile · Project policy document version · Extraction attempt
 | D-Q6 | Conflict = same rule ID different content, or same section different visibility; Anvil resolves meaning contradictions at execution. |
 | D-Q7 | Shared schema added to `contracts/praxis/` as proposed. |
 | D-Q8 | Admin default role (done, PR #34). |
-| D-R1 | **PM marks rules Reviewed** (not the last editor — proposed safeguard, confirm). |
+| D-R1 | **PM marks rules Reviewed.** Keep it simple: the editor may also review; no separate-reviewer guardrail in Release 1 (enhancement E-1, section 11). |
 | D-A1 | Provider default/override/project profile: **Admin only**. |
 | D-G1 | **Google (Document AI Layout Parser + Gemini on Vertex AI) replaces Azure** as the second adapter. |
 | D-L1 | Hosted LlamaExtract, Pay as you go; Enterprise/BYOC after funding. |
@@ -167,7 +167,9 @@ Template policy profile · Project policy document version · Extraction attempt
 | D-S1 | Seed: 5 projects (no Healthcare), 2 draft tasks each; staging allowed; drafts OK; private Bodhium pack. |
 | D-S2 | KYC-001 and FineQuestions data to be supplied later by the owner. |
 
-Open for Gate 1: confirm D-R1 safeguard; confirm Gemini model choice (proposal: latest GA Gemini Flash on Vertex AI, pinned).
+| D-M1 | Google adapter uses the latest generally available Gemini Flash on Vertex AI, pinned to a fixed model version. |
+
+Gate 1: the owner approved the PRD on 9 Nov 2026 ("PRD approved"), then answered the two open points: no separate-reviewer guardrail for now (D-R1, logged as E-1); Gemini Flash pinned (D-M1, yes).
 
 ## 9. Change list
 
@@ -180,3 +182,9 @@ S1 AC01–AC20 and S2 A01–A12 (with A01/A04 reading "LlamaExtract and Google";
 ## 11. Out of scope / later
 
 Database extraction; Azure; trial tooling; BYOC; Anvil discovery/fixture test calls (status stays Not tested until Anvil exposes the API); real Anvil import and model runs (Anvil side).
+
+Enhancement backlog
+
+| ID | Enhancement | Origin |
+| --- | --- | --- |
+| E-1 | Review guardrail: the person who last edited a rule version cannot mark it Reviewed (second-person review). Data already records editor and reviewer, so this is a validation rule only. | Owner D-R1, 9 Nov 2026 |

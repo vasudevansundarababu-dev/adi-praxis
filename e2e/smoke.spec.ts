@@ -181,7 +181,7 @@ test.describe('user administration', () => {
     const email = `new.validator.${Date.now()}@e2e.local`;
     await page.locator('#new-user-name').fill('Nina Validator');
     await page.locator('#new-user-email').fill(email);
-    await expect(page.getByLabel('Validator', { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel('PM', { exact: true }).last()).not.toBeChecked();
     await expect(page.getByLabel('Admin', { exact: true }).last()).toBeChecked();
     await page.getByRole('button', { name: 'Add user' }).click();
     const box = page.getByRole('status').filter({ hasText: `Temporary password for ${email}` });

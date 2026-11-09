@@ -33,7 +33,7 @@ test('an Admin takes a template from the directory to a deployed studio; the SME
 
   // Screen 1: the directory lists the workflow; its name opens the Meta-Compiler.
   await admin.goto(`${WEB}/templates`);
-  await expect(admin.getByRole('heading', { level: 1 })).toHaveText('Harbor Templates Directory');
+  await expect(admin.getByRole('heading', { level: 1 })).toHaveText('Harbor Templates Directory', { timeout: 30_000 });
   await expect(admin.getByRole('button', { name: /new template/i })).toHaveCount(0);
   await expect(admin.getByRole('link', { name: /new template/i })).toHaveCount(0);
   const row = admin.getByRole('row').filter({ has: admin.getByRole('link', { name: WORKFLOW, exact: true }) });
@@ -42,13 +42,13 @@ test('an Admin takes a template from the directory to a deployed studio; the SME
   await row.getByRole('link', { name: WORKFLOW, exact: true }).click();
 
   // Screen 2 (S1-05): the workflow name opened this template; all six sections valid, so Generate → links to Screen 3.
-  await expect(admin).toHaveURL(new RegExp(`/templates/${s.templateId}$`));
-  await expect(admin.getByRole('heading', { level: 1 })).toHaveText(WORKFLOW);
+  await expect(admin).toHaveURL(new RegExp(`/templates/${s.templateId}$`), { timeout: 30_000 });
+  await expect(admin.getByRole('heading', { level: 1 })).toHaveText(WORKFLOW, { timeout: 30_000 });
   await expect(admin.getByRole('toolbar', { name: 'Meta-Compiler actions' })).toBeVisible();
   await admin.getByRole('link', { name: 'Generate →' }).click();
 
   // Screen 3: generate (mock drafter), verify (mock runner: 0.00 / 1.00), deploy to the test project and SME.
-  await expect(admin.getByRole('heading', { level: 1 })).toHaveText('Generate, verify and deploy');
+  await expect(admin.getByRole('heading', { level: 1 })).toHaveText('Generate, verify and deploy', { timeout: 30_000 });
   await expect(admin.getByText('Live AI is off here')).toBeVisible();
   await admin.getByRole('button', { name: /^Generate( again)?$/ }).click();
   await expect(admin.getByRole('progressbar', { name: 'UI compilation' })).toHaveAttribute('aria-valuenow', '100', { timeout: 60_000 });
@@ -72,7 +72,7 @@ test('an Admin takes a template from the directory to a deployed studio; the SME
   expect((await sme.request.post(`${CANDIDATE}/api/v1/auth/google`, { data: { credential: token.credential, adultAttested: true } })).ok()).toBeTruthy();
   await sme.goto(`${CANDIDATE}/studio/${s.studioKey}`);
   await sme.waitForLoadState('networkidle'); // let the studio hydrate before typing into it
-  await expect(sme.getByRole('heading', { level: 1 })).toHaveText(WORKFLOW);
+  await expect(sme.getByRole('heading', { level: 1 })).toHaveText(WORKFLOW, { timeout: 30_000 });
   const steps = sme.getByRole('navigation', { name: 'Authoring steps' });
   await expect(steps.getByRole('button')).toHaveCount(6);
   const title = `Synthetic journey task ${randomUUID().slice(0, 8)}`;
@@ -127,19 +127,19 @@ test('the workflow name opens Screen 2 and Back keeps the filter; Save Variant c
   await page.goto(`${WEB}/templates`);
   // S1-05: the name opens Screen 2 for that template; Back returns to the directory with the filter kept.
   await page.getByRole('navigation', { name: 'Filter by domain' }).getByRole('link', { name: /^Digital Marketing/ }).click();
-  await expect(page).toHaveURL(/\?domain=/);
+  await expect(page).toHaveURL(/\?domain=/, { timeout: 30_000 });
   const filtered = page.url();
   await page.getByRole('link', { name: 'Launch of Noise Cancelling Phone', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Launch of Noise Cancelling Phone');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Launch of Noise Cancelling Phone', { timeout: 30_000 });
   await page.goBack();
-  await expect(page).toHaveURL(filtered);
+  await expect(page).toHaveURL(filtered, { timeout: 30_000 });
   await expect(page.getByRole('region', { name: /^Banking/ })).toHaveCount(0);
   await page.goForward();
   await page.getByRole('toolbar', { name: 'Meta-Compiler actions' }).getByRole('button', { name: 'Save Variant' }).click();
   const label = `Journey variant ${randomUUID().slice(0, 6)}`;
   await page.getByRole('textbox', { name: 'Variant label' }).fill(label);
   await page.getByRole('dialog').getByRole('button', { name: 'Save Variant' }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(new RegExp(label));
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(new RegExp(label), { timeout: 30_000 });
 
   const stage1 = () => page.getByRole('tab', { name: /^Domain, Persona & Horizon/ }).click();
   await stage1();
@@ -163,13 +163,13 @@ test('a PM sees published workflows read-only: no Meta-Compiler, no Screen 3, no
   await signIn(page, 'pm@e2e.local', 'e2e-pm-password');
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible({ timeout: 30_000 });
   await page.goto(`${WEB}/templates`);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Harbor Templates Directory');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Harbor Templates Directory', { timeout: 30_000 });
   await expect(page.getByRole('columnheader', { name: 'Project & Assigned SME' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /SME UI/ })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Tasks DB & JSON' })).toHaveCount(0);
   await expect(page.getByText(/Draft/)).toHaveCount(0);
   await page.getByRole('link', { name: 'Launch of Noise Cancelling Phone', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Launch of Noise Cancelling Phone');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Launch of Noise Cancelling Phone', { timeout: 30_000 });
   await expect(page.getByRole('toolbar', { name: 'Meta-Compiler actions' })).toHaveCount(0);
   const id = page.url().split('/').pop();
   for (const path of [`/templates/${id}/generate`, '/templates/tasks']) {

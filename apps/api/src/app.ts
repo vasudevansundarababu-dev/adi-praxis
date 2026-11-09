@@ -28,6 +28,8 @@ import { MockIdentityProvider, StripeIdentityProvider, type IdentityProvider } f
 import { ClaudeVertexProfileAssistant, MockProfileAssistant, type ProfileAssistant } from './candidate/profile-assistant';
 import { ClaudeVertexSuitabilityEvaluator, MockSuitabilityEvaluator, type SuitabilityEvaluator } from './candidate/suitability';
 import { GcsStorage, stubScanner, type MalwareScanner, type ObjectStorage } from './candidate/storage';
+import { defaultAdapters, type Adapters } from './policy/extraction/service';
+import { policyRoutes } from './routes/policy';
 import { campaignRoutes } from './routes/campaigns';
 import { journeyRoutes } from './routes/journey';
 import { taskRoutes } from './routes/tasks';
@@ -107,6 +109,8 @@ export interface AppDeps {
   support?: SupportAssistant;
   /** Templates Meta-Compiler: drafters, Stream 1 functions and the Harbor runner. Defaults follow config. */
   metaCompiler?: MetaCompilerOverrides;
+  /** Policy extraction providers. Defaults follow config (live calls only when POLICY_EXTRACTION_LIVE is on). */
+  policyAdapters?: Adapters;
 }
 
 export function defaultSupport(config: Config): SupportAssistant {
@@ -315,6 +319,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(candidateStudioRoutes, { db: deps.db, config: deps.config, storage, deps: resolveDeps(deps.metaCompiler?.deps), selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), faults: deps.metaCompiler?.studioFaults });
       await v1.register(taskReviewRoutes, { db: deps.db });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
+      await v1.register(policyRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, adapters: deps.policyAdapters ?? defaultAdapters(deps.config.policy) });
       // M10 SME supply: nothing is registered with the flag off (docs/SME-SUPPLY.md section 13).
       if (deps.config.SME_SUPPLY_ENABLED) {
         const email = deps.email ?? defaultEmail(deps.config);

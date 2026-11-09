@@ -2880,7 +2880,8 @@ model PolicyDocumentVersion {
 
 /// Allowlisted extraction profile (S2 §2). Only Admins change it; each change bumps the revision.
 model ExtractionProfile {
-  id          String   @id
+  /// Allowlisted profile ID (e.g. llama-agentic-v1); the same built-in IDs exist once per client.
+  id          String
   clientId    String   @map("client_id") @db.Uuid
   provider    String
   label       String
@@ -2892,7 +2893,7 @@ model ExtractionProfile {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@index([clientId])
+  @@id([clientId, id])
 }
 
 /// Project-level extraction profile chosen by an Admin (S2 §2 precedence).

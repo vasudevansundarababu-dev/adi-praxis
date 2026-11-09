@@ -11,6 +11,7 @@ import { createDb } from './db';
 import { redisConnection } from './lib/redis';
 import { createDomainEventsQueue, createDomainEventsWorker, startOutboxPoller } from './outbox/dispatcher';
 import { defaultHandlers } from './outbox/handlers';
+import { defaultAdapters, policyExtractionHandler } from './policy/extraction/service';
 import { resolveDeps } from './meta-compiler/deps';
 import { defaultDrafterFactory } from './meta-compiler/drafter';
 import { defaultJudge } from './meta-compiler/judge';
@@ -31,6 +32,7 @@ const cert = { gen: defaultCurriculum(config), box: secretBox(config), embedding
 const registry = defaultHandlers({ evaluator: defaultEvaluator(config), email: defaultEmail(config), config, rlGym: defaultRlGym(config), drafter: defaultDrafter(config), storage: defaultStorage(config), smeSupply: config.SME_SUPPLY_ENABLED, cert });
 // Templates Meta-Compiler: generation, verification, per-task verification and judge jobs.
 const storage = defaultStorage(config);
+registry.register(policyExtractionHandler({ storage, adapters: defaultAdapters(config.policy) }));
 for (const h of metaCompilerHandlers({ config, storage, drafters: defaultDrafterFactory(config), deps: resolveDeps(), runner: defaultRunner(config, storage), judge: defaultJudge(config) })) registry.register(h);
 const worker = createDomainEventsWorker(db, registry, connection);
 const log = (level: string, msg: string, extra: object = {}) =>

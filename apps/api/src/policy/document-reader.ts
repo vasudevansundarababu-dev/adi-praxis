@@ -16,7 +16,7 @@ export interface ReadPolicyDocument {
   pages: string[];
   pageCount: number;
   pageCountMethod: 'pdf_pages' | 'docx_app_xml' | 'text_estimate';
-  locatorGranularity: 'page' | 'line';
+  locatorGranularity: 'page' | 'line' | 'section' | 'none';
 }
 
 const MEDIA = {

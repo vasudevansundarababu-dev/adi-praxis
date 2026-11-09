@@ -107,7 +107,7 @@ CREATE TABLE "ExtractionProfile" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "ExtractionProfile_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "ExtractionProfile_pkey" PRIMARY KEY ("client_id", "id")
 );
 
 -- CreateTable
@@ -302,9 +302,6 @@ CREATE INDEX "PolicyDocumentVersion_client_id_project_id_idx" ON "PolicyDocument
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PolicyDocumentVersion_document_id_version_key" ON "PolicyDocumentVersion"("document_id", "version");
-
--- CreateIndex
-CREATE INDEX "ExtractionProfile_client_id_idx" ON "ExtractionProfile"("client_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ExtractionBatch_idempotency_key_key" ON "ExtractionBatch"("idempotency_key");

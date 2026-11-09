@@ -7,6 +7,7 @@ import { sha256, stableStringify } from '../../lib/crypto';
 import { AppError, notFound } from '../../lib/errors';
 import type { AuditInput } from '../../platform/audit';
 import type { OutboxInput } from '../../outbox/outbox';
+import type { EventHandler } from '../../outbox/handlers';
 import { loadVersionText } from '../documents';
 import { resolveProfile } from '../profiles';
 import { createRuleFromCandidate } from '../rules';
@@ -228,4 +229,9 @@ export async function refreshBatch(db: Db | Tx, batchId: string) {
   const usable = s.filter((x) => x === 'SUCCEEDED' || x === 'PARTIAL').length;
   const status = ok === s.length ? 'SUCCEEDED' : usable > 0 ? 'PARTIAL' : s.includes('UNCERTAIN') ? 'UNCERTAIN' : s.every((x) => x === 'CANCELLED') ? 'CANCELLED' : 'FAILED';
   await db.extractionBatch.update({ where: { id: batchId }, data: { status, finishedAt: new Date() } });
+}
+
+/** Worker handler: one run per extraction job, outside a transaction (slow provider calls). */
+export function policyExtractionHandler(w: Omit<WorkerDeps, 'db'>): EventHandler {
+  return { name: 'policy.extract', event: 'policy.extraction_requested', run: (e, db) => processExtractionJob({ ...w, db }, (e.payload as { jobId: string }).jobId) };
 }

@@ -2,7 +2,7 @@
 
 | Item | Value |
 | --- | --- |
-| Status | **Draft for owner review (Gate 2: architecture).** No code until approved. |
+| Status | **Approved by the owner on 9 Nov 2026 (Gate 2: architecture).** A1–A8 accepted as proposed; region US. Next: build plan (Gate 3). |
 | PRD | `docs/prd/PRD-POLICY-RULES.md` (approved 9 Nov 2026) |
 | Baseline | `main` at `1daacdd` |
 | Prepared by | OpenHands agent (Architect role) |

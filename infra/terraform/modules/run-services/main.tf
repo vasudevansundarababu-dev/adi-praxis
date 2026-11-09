@@ -1,5 +1,6 @@
 # Cloud Run services and jobs (SPEC GCP deployment). Images are deployed by CI (`gcloud run deploy`), so Terraform
-# creates each service once with a placeholder image and then ignores image changes.
+# creates each service once with a placeholder image and then ignores image changes. Scaling is set per revision
+# (template.scaling); the service-level block is filled in by the API and would otherwise show as drift.
 locals {
   placeholder = "us-docker.pkg.dev/cloudrun/container/hello"
   secret_env = {
@@ -105,7 +106,7 @@ resource "google_cloud_run_v2_service" "api" {
     }
   }
   lifecycle {
-    ignore_changes = [template[0].containers[0].image, client, client_version, traffic]
+    ignore_changes = [template[0].containers[0].image, client, client_version, traffic, scaling]
   }
 }
 
@@ -161,7 +162,7 @@ resource "google_cloud_run_v2_service" "worker" {
     }
   }
   lifecycle {
-    ignore_changes = [template[0].containers[0].image, client, client_version, traffic]
+    ignore_changes = [template[0].containers[0].image, client, client_version, traffic, scaling]
   }
 }
 
@@ -218,7 +219,7 @@ resource "google_cloud_run_v2_service" "front" {
     }
   }
   lifecycle {
-    ignore_changes = [template[0].containers[0].image, client, client_version, traffic]
+    ignore_changes = [template[0].containers[0].image, client, client_version, traffic, scaling]
   }
 }
 

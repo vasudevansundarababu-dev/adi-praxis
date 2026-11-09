@@ -22,5 +22,5 @@ variable "app_secret_values" {
   type        = map(string)
   default     = {}
   sensitive   = true
-  description = "Initial secret values (for example from CI secrets). Missing values leave an empty secret to fill later."
+  description = "First version of each secret, needed when it is created. Later changes are ignored (rotate with gcloud)."
 }

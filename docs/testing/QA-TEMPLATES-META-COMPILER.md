@@ -15,7 +15,7 @@ environment) is not part of this record.
 
 | Item | Result |
 | --- | --- |
-| Q1 Acceptance criteria | 80 of 87 PRD rows pass with test evidence; 1 fails (S1-08, DEF-1); 1 not built (S3-10, Phase C); 1 open (D-23); 4 NFRs checked by review (NFR-02 partly, NFR-04, NFR-05, NFR-11) |
+| Q1 Acceptance criteria | 81 of 87 PRD rows pass with test evidence (S1-08 after the DEF-1 fix); 1 not built (S3-10, Phase C); 1 open (D-23); 4 NFRs checked by review (NFR-02 partly, NFR-04, NFR-05, NFR-11) |
 | Q2 Browser journey | Pass. `e2e/meta-compiler-journey.spec.ts`: 3 tests |
 | Q3 Security | Pass. No new findings |
 | Q4 Performance (NFR-12) | Pass on a production build |
@@ -50,6 +50,10 @@ full text in `template_meta.tpt_label`, and `tptText()` in `apps/web/lib/mc/form
 The unit tests disagree on the contract (`meta-compiler-directory.test.ts` expects `45m (12 Wks)` from the API;
 `directory.test.tsx` passes `15 Steps` to `tptText`), so both pass. Not fixed in this pass; owner to decide
 whether the label carries only the horizon or the full text.
+
+**Fixed 9 Nov 2026 (PR #31).** Owner decision: the API sends only the horizon (`12 Wks`) and the console adds the
+minutes. Authored labels that include the minutes are reduced to the horizon, so the seeded blueprints need no data
+change. Covered by a new S1-08 API test and the existing web test; to be confirmed in the browser on staging (Q6).
 
 ## Q2 — Browser journey
 
@@ -137,7 +141,7 @@ repository, without a dedicated test.
 | S1-05 | M | Workflow name opens Screen 2 pre-loaded with that template. | Pass — meta-compiler-journey.spec.ts |
 | S1-06 | M | Version shows the latest version label (`v1`, `v2`). | Pass — meta-compiler-journey.spec.ts |
 | S1-07 | M | Status badge: **Active** (emerald) when a verified studio is deployed; **Draft** (slate) before. | Pass — directory.test.tsx, meta-compiler-directory.test.ts |
-| S1-08 | M | TPT shows expected duration and horizon, e.g. `45m (12 Wks)`, `35m (15 Steps)`. | **FAIL** — DEF-1: renders `45m (45m (12 Wks))` |
+| S1-08 | M | TPT shows expected duration and horizon, e.g. `45m (12 Wks)`, `35m (15 Steps)`. Pass — DEF-1 fixed in PR #31 (API sends `12 Wks`; console renders `45m (12 Wks)`) |
 | S1-09 | M | Modes shows the sandbox protocol: Hermetic MCP, Hermetic Graph, Hermetic SQL. | Pass — directory.test.tsx |
 | S1-10 | M | Project & Assigned SME shows bound project ID and SME email once deployed. | Pass — directory.test.tsx, meta-compiler-directory.test.ts |
 | S1-11 | M | Preserved studio URL with SME UI (open) action and Edit Template → action. | Pass — directory.test.tsx, meta-compiler-directory.test.ts |

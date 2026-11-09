@@ -6,6 +6,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  pull-requests: read # the reused CI workflow asks for it; a called workflow cannot get more than its caller
 concurrency:
   group: deploy-staging
   cancel-in-progress: false
@@ -39,11 +40,13 @@ jobs:
           for app in api web candidate; do
             docker buildx build --push -f "apps/$app/Dockerfile" -t "$REG/$app:$GITHUB_SHA" .
           done
+          docker buildx build --push -f infra/harbor-verify/Dockerfile -t "$REG/harbor-verify:$GITHUB_SHA" .
       - name: Run database migrations (Cloud Run job, migration role)
         run: |
           REG="$REGION-docker.pkg.dev/$PROJECT/praxis"
           gcloud run jobs update praxis-migrate --region "$REGION" --image "$REG/api:$GITHUB_SHA"
           gcloud run jobs update praxis-verify-chains --region "$REGION" --image "$REG/api:$GITHUB_SHA"
+          gcloud run jobs update praxis-harbor-verify --region "$REGION" --image "$REG/harbor-verify:$GITHUB_SHA"
           gcloud run jobs execute praxis-migrate --region "$REGION" --wait
       - name: Deploy services
         run: |

@@ -37,3 +37,7 @@ variable "deletion_protection" {
   type    = bool
   default = true
 }
+variable "harbor_verify_job" { type = string }
+variable "meta_compiler" {
+  type = object({ live_ai = bool, models = string, cost_cap_usd = number, daily_budget_usd = number })
+}

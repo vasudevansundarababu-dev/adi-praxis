@@ -152,16 +152,20 @@ resource "google_monitoring_alert_policy" "chain_broken" {
   combiner              = "OR"
   notification_channels = local.channels
   severity              = "CRITICAL"
-  conditions {
-    display_name = "Hash chain verification found a break"
-    condition_threshold {
-      filter          = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.chain_broken.name}\""
-      comparison      = "COMPARISON_GT"
-      threshold_value = 0
-      duration        = "0s"
-      aggregations {
-        alignment_period   = "300s"
-        per_series_aligner = "ALIGN_SUM"
+  dynamic "conditions" {
+    # Alert filters must name a resource type; these lines come from Cloud Run jobs and the worker service.
+    for_each = ["cloud_run_job", "cloud_run_revision"]
+    content {
+      display_name = "Hash chain verification found a break (${conditions.value})"
+      condition_threshold {
+        filter          = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.chain_broken.name}\" AND resource.type=\"${conditions.value}\""
+        comparison      = "COMPARISON_GT"
+        threshold_value = 0
+        duration        = "0s"
+        aggregations {
+          alignment_period   = "300s"
+          per_series_aligner = "ALIGN_SUM"
+        }
       }
     }
   }
@@ -185,16 +189,20 @@ resource "google_monitoring_alert_policy" "failed_jobs" {
       }
     }
   }
-  conditions {
-    display_name = "Worker or job logged an alert"
-    condition_threshold {
-      filter          = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.alerts.name}\""
-      comparison      = "COMPARISON_GT"
-      threshold_value = 0
-      duration        = "0s"
-      aggregations {
-        alignment_period   = "300s"
-        per_series_aligner = "ALIGN_SUM"
+  dynamic "conditions" {
+    # Alert filters must name a resource type; these lines come from Cloud Run jobs and the worker service.
+    for_each = ["cloud_run_job", "cloud_run_revision"]
+    content {
+      display_name = "Worker or job logged an alert (${conditions.value})"
+      condition_threshold {
+        filter          = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.alerts.name}\" AND resource.type=\"${conditions.value}\""
+        comparison      = "COMPARISON_GT"
+        threshold_value = 0
+        duration        = "0s"
+        aggregations {
+          alignment_period   = "300s"
+          per_series_aligner = "ALIGN_SUM"
+        }
       }
     }
   }

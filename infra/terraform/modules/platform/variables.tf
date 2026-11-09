@@ -36,3 +36,8 @@ variable "app_secret_values" {
   default   = {}
   sensitive = true
 }
+variable "meta_compiler" {
+  description = "Live Claude for the Meta-Compiler and judge (owner-approved caps). live_ai = false keeps the mock."
+  type        = object({ live_ai = bool, models = string, cost_cap_usd = number, daily_budget_usd = number })
+  default     = { live_ai = false, models = "claude:claude-sonnet-5", cost_cap_usd = 2, daily_budget_usd = 10 }
+}

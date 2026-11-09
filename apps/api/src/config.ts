@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const flag = z.enum(['true', 'false', '1', '0', '']).default('false').transform((v) => v === 'true' || v === '1');
+
 const Env = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   /**
@@ -70,6 +72,21 @@ const Env = z.object({
   /** Pay-run total (in USD-equivalent units of the run's currency) above which a second Finance approver is needed.
    *  Blank = one approver (flagged in the audit log as single-approver). */
   PAYRUN_SECOND_APPROVAL_ABOVE: z.string().default(''),
+  /** Templates Meta-Compiler (architecture section 10). Comma-separated `provider:model` pairs offered on Screen 3. */
+  META_COMPILER_MODELS: z.string().default('claude:claude-sonnet-5,gemini:gemini-3-pro'),
+  /** Per-run and per-client daily caps in USD. Blank = live generation refused (D5a, NFR-09). */
+  GENERATION_COST_CAP_USD: z.string().default(''),
+  GENERATION_DAILY_BUDGET_USD: z.string().default(''),
+  /** Live drafters (Claude/Gemini on Vertex) for the Meta-Compiler. Off = the deterministic mock. */
+  META_COMPILER_LIVE_AI: flag,
+  /** D5 FULL_CODE generation (Phase C). */
+  META_COMPILER_CODEGEN_ENABLED: flag,
+  /** D5a: allow tasks that use real public data. Off = every task is SYNTHETIC. */
+  REAL_DATA_ENABLED: flag,
+  /** Harbor verification runner: mock (tests, local), docker (manual local runs), job (Cloud Run sandbox job). */
+  HARBOR_RUNNER: z.enum(['mock', 'docker', 'job']).optional(),
+  HARBOR_VERIFY_JOB: z.string().default(''),
+  HARBOR_VERIFY_REGION: z.string().default('us-central1'),
 });
 
 export type Config = z.infer<typeof Env> & {
@@ -86,6 +103,17 @@ export type Config = z.infer<typeof Env> & {
   assistantMode: 'vertex' | 'mock';
   /** Derived: SMTP when a host is set, otherwise an in-memory outbox. */
   emailMode: 'smtp' | 'memory';
+  /** Derived Meta-Compiler settings (architecture section 10). */
+  metaCompiler: {
+    models: { provider: 'claude' | 'gemini'; model: string }[];
+    liveAi: boolean;
+    costCapUsd: number | null;
+    dailyBudgetUsd: number | null;
+    codegenEnabled: boolean;
+    realDataEnabled: boolean;
+    runner: 'mock' | 'docker' | 'job';
+    verifyJob: string;
+  };
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -114,5 +142,39 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error('Invalid configuration: production needs GOOGLE_OAUTH_CLIENT_ID, STRIPE_SECRET_KEY, STRIPE_IDENTITY_WEBHOOK_SECRET, VERTEX_PROJECT_ID and SMTP_HOST (mocks are local-only)');
   }
   const appEnv = c.APP_ENV ?? (c.NODE_ENV === 'production' ? 'production' : 'local');
-  return { ...c, candidateAuthMode, identityMode, assistantMode, emailMode, payoutMode, appEnv, requireLiveIdentity: appEnv === 'production' };
+  const metaCompiler = metaCompilerConfig(c, appEnv);
+  return { ...c, candidateAuthMode, identityMode, assistantMode, emailMode, payoutMode, appEnv, requireLiveIdentity: appEnv === 'production', metaCompiler };
+}
+
+function usdOrNull(name: string, v: string): number | null {
+  if (!v.trim()) return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`Invalid configuration: ${name} must be a positive number of USD`);
+  return n;
+}
+
+/** Live paid generation only runs in staging or production, on Vertex, with both caps set (NFR-08a, NFR-09, AD-06). */
+function metaCompilerConfig(c: z.infer<typeof Env>, appEnv: Config['appEnv']): Config['metaCompiler'] {
+  const models = c.META_COMPILER_MODELS.split(',').map((s) => s.trim()).filter(Boolean).map((pair) => {
+    const [provider, ...rest] = pair.split(':');
+    const model = rest.join(':').trim();
+    if ((provider !== 'claude' && provider !== 'gemini') || !model) throw new Error(`Invalid configuration: META_COMPILER_MODELS entry "${pair}" must be claude:<model> or gemini:<model>`);
+    return { provider, model } as const;
+  });
+  const costCapUsd = usdOrNull('GENERATION_COST_CAP_USD', c.GENERATION_COST_CAP_USD);
+  const dailyBudgetUsd = usdOrNull('GENERATION_DAILY_BUDGET_USD', c.GENERATION_DAILY_BUDGET_USD);
+  const deployed = appEnv === 'staging' || appEnv === 'production';
+  if (c.META_COMPILER_LIVE_AI) {
+    if (!deployed || c.NODE_ENV === 'test') throw new Error('Invalid configuration: META_COMPILER_LIVE_AI is only allowed in staging or production (live paid calls are never made locally, in demo or in tests)');
+    if (!c.VERTEX_PROJECT_ID) throw new Error('Invalid configuration: META_COMPILER_LIVE_AI needs VERTEX_PROJECT_ID');
+    if (costCapUsd === null || dailyBudgetUsd === null) throw new Error('Invalid configuration: META_COMPILER_LIVE_AI needs GENERATION_COST_CAP_USD and GENERATION_DAILY_BUDGET_USD');
+    if (models.length === 0) throw new Error('Invalid configuration: META_COMPILER_LIVE_AI needs at least one META_COMPILER_MODELS entry');
+  }
+  if (c.META_COMPILER_CODEGEN_ENABLED && !c.META_COMPILER_LIVE_AI) throw new Error('Invalid configuration: META_COMPILER_CODEGEN_ENABLED needs META_COMPILER_LIVE_AI');
+  // Without a sandbox job, staging and production still start, but verification refuses to measure with the mock
+  // there (harbor runner), so no studio can be deployed without real 0.00 / 1.00 scores (D-12).
+  const runner = c.HARBOR_RUNNER ?? (c.HARBOR_VERIFY_JOB ? 'job' : 'mock');
+  if (runner === 'job' && !c.HARBOR_VERIFY_JOB) throw new Error('Invalid configuration: HARBOR_RUNNER=job needs HARBOR_VERIFY_JOB');
+  if (runner === 'docker' && deployed) throw new Error('Invalid configuration: HARBOR_RUNNER=docker is for local development only');
+  return { models, liveAi: c.META_COMPILER_LIVE_AI, costCapUsd, dailyBudgetUsd, codegenEnabled: c.META_COMPILER_CODEGEN_ENABLED, realDataEnabled: c.REAL_DATA_ENABLED, runner, verifyJob: c.HARBOR_VERIFY_JOB };
 }

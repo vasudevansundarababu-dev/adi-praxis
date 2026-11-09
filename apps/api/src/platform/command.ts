@@ -81,6 +81,42 @@ export async function runStaffOrServiceCommand<T>(
   return execute<Actor | ApiClientActor, T>(db, req, reply, { actor: c, actorId: `service:${c.apiClientId}`, actorType: 'SERVICE', clientId: c.clientId }, handler);
 }
 
+/**
+ * The same guarantees for an operator job run from the command line (no HTTP request), audited as SYSTEM: a repeat
+ * with the same key and request replays the stored result, a different request under the same key is refused, the
+ * handler must write an AuditEvent, and outbox rows share the transaction.
+ */
+export async function runJobCommand<T>(
+  db: Db,
+  job: { clientId: string; actorId: string; name: string; key: string; request: unknown },
+  handler: (ctx: CommandContext<{ type: 'SYSTEM'; id: string }>) => Promise<CommandResult<T>>,
+): Promise<{ replayed: boolean; status: number; body: unknown }> {
+  const requestHash = sha256(stableStringify({ method: 'JOB', url: job.name, body: job.request }));
+  const replay = await findReplay(db, job.actorId, job.key, requestHash);
+  if (replay) return { replayed: true, status: replay.responseStatus, body: replay.responseBody };
+  const out = await db.$transaction(async (tx) => {
+    let audits = 0;
+    const ctx: CommandContext<{ type: 'SYSTEM'; id: string }> = {
+      tx,
+      actor: { type: 'SYSTEM', id: job.actorId },
+      audit: async (input) => {
+        audits += 1;
+        await writeAudit(tx, { clientId: job.clientId, actorType: 'SYSTEM', actorId: job.actorId }, input);
+      },
+      emit: async (event) => {
+        await emitEvent(tx, job.clientId, event);
+      },
+    };
+    const result = await handler(ctx);
+    if (audits === 0) throw new Error(`Job ${job.name} changed state without writing an AuditEvent`);
+    await tx.idempotencyKey.create({
+      data: { clientId: job.clientId, actorId: job.actorId, key: job.key, method: 'JOB', path: job.name, requestHash, responseStatus: result.status, responseBody: (result.body ?? null) as Prisma.InputJsonValue, expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS) },
+    });
+    return result;
+  }, { timeout: 15_000, maxWait: 5_000 });
+  return { replayed: false, status: out.status, body: out.body };
+}
+
 async function execute<A, T>(
   db: Db,
   req: FastifyRequest,

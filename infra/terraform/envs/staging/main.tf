@@ -41,6 +41,8 @@ module "platform" {
   billing_account     = var.billing_account
   monthly_budget_usd  = var.monthly_budget_usd
   app_secret_values   = var.app_secret_values
+  # Owner approval (8 Nov 2026): live Claude in staging, $2 per run, $10 per day.
+  meta_compiler = { live_ai = true, models = "claude:claude-sonnet-5", cost_cap_usd = 2, daily_budget_usd = 10 }
 }
 
 output "platform" { value = module.platform }

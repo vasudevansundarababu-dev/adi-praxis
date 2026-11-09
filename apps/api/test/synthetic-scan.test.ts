@@ -41,4 +41,9 @@ describe('synthetic-data scan (TASK-KYC section 2)', () => {
   it('reports the JSON path of each flag', () => {
     expect(scanForRealData({ parties: [{ contact: 'x@realbank.com' }] })).toEqual([expect.objectContaining({ kind: 'EMAIL', path: 'parties[0].contact' })]);
   });
+
+  it('ignores UUIDs whose digits pass the card checksum, but still flags a real card next to one', () => {
+    expect(kinds('templateId 18494366-7685-4028-9c1e-2b3f4a5d6e7f')).toEqual([]);
+    expect(kinds('id 18494366-7685-4028-9c1e-2b3f4a5d6e7f card 4111 1111 1111 1111')).toEqual(['CARD_NUMBER']);
+  });
 });

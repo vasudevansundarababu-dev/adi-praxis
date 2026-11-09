@@ -1,5 +1,6 @@
 # Cloud Run services and jobs (SPEC GCP deployment). Images are deployed by CI (`gcloud run deploy`), so Terraform
-# creates each service once with a placeholder image and then ignores image changes.
+# creates each service once with a placeholder image and then ignores image changes. Scaling is set per revision
+# (template.scaling); the service-level block is filled in by the API and would otherwise show as drift.
 locals {
   placeholder = "us-docker.pkg.dev/cloudrun/container/hello"
   secret_env = {
@@ -28,6 +29,15 @@ locals {
     EMAIL_FROM          = var.smtp.from
     RL_GYM_WEBHOOK_URL  = var.rl_gym_webhook_url
     DATASET_VERIFY_CRON = "off" # Cloud Scheduler runs the verification job instead
+    # Grading runs only in the praxis-harbor-verify sandbox job (never the mock in deployed environments, D-12).
+    HARBOR_RUNNER        = "job"
+    HARBOR_VERIFY_JOB    = var.harbor_verify_job
+    HARBOR_VERIFY_REGION = var.region
+    # Paid Claude only with both caps set (NFR-08a, NFR-09); config refuses live AI without them.
+    META_COMPILER_LIVE_AI       = tostring(var.meta_compiler.live_ai)
+    META_COMPILER_MODELS        = var.meta_compiler.models
+    GENERATION_COST_CAP_USD     = tostring(var.meta_compiler.cost_cap_usd)
+    GENERATION_DAILY_BUDGET_USD = tostring(var.meta_compiler.daily_budget_usd)
   }
   vpc = { network = var.network_id, subnetwork = var.subnet_id }
 }
@@ -39,6 +49,9 @@ resource "google_cloud_run_v2_service" "api" {
   location            = var.region
   ingress             = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
   deletion_protection = var.deletion_protection
+  # The load balancer forwards unauthenticated users. The organization policy forbids allUsers bindings, so the invoker
+  # IAM check is off instead; ingress still accepts traffic only from the load balancer.
+  invoker_iam_disabled = true
   template {
     service_account = var.service_accounts.api
     timeout         = "60s"
@@ -93,7 +106,7 @@ resource "google_cloud_run_v2_service" "api" {
     }
   }
   lifecycle {
-    ignore_changes = [template[0].containers[0].image, client, client_version, traffic]
+    ignore_changes = [template[0].containers[0].image, client, client_version, traffic, scaling]
   }
 }
 
@@ -149,18 +162,19 @@ resource "google_cloud_run_v2_service" "worker" {
     }
   }
   lifecycle {
-    ignore_changes = [template[0].containers[0].image, client, client_version, traffic]
+    ignore_changes = [template[0].containers[0].image, client, client_version, traffic, scaling]
   }
 }
 
 # ── Next.js front ends ──
 resource "google_cloud_run_v2_service" "front" {
-  for_each            = { web = "praxis-web", candidate = "praxis-candidate" }
-  project             = var.project_id
-  name                = each.value
-  location            = var.region
-  ingress             = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
-  deletion_protection = var.deletion_protection
+  for_each             = { web = "praxis-web", candidate = "praxis-candidate" }
+  project              = var.project_id
+  name                 = each.value
+  location             = var.region
+  ingress              = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  deletion_protection  = var.deletion_protection
+  invoker_iam_disabled = true # see praxis-api
   template {
     service_account = var.service_accounts[each.key]
     scaling {
@@ -205,18 +219,8 @@ resource "google_cloud_run_v2_service" "front" {
     }
   }
   lifecycle {
-    ignore_changes = [template[0].containers[0].image, client, client_version, traffic]
+    ignore_changes = [template[0].containers[0].image, client, client_version, traffic, scaling]
   }
-}
-
-# The load balancer forwards unauthenticated users; ingress still limits traffic to the load balancer and the VPC.
-resource "google_cloud_run_v2_service_iam_member" "public" {
-  for_each = { api = google_cloud_run_v2_service.api.name, web = google_cloud_run_v2_service.front["web"].name, candidate = google_cloud_run_v2_service.front["candidate"].name }
-  project  = var.project_id
-  location = var.region
-  name     = each.value
-  role     = "roles/run.invoker"
-  member   = "allUsers"
 }
 
 # ── Jobs: migrations (as the migration role) and the nightly hash-chain verification ──

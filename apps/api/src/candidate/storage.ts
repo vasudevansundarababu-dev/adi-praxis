@@ -7,7 +7,12 @@ export interface ObjectStorage {
   delete(key: string): Promise<void>;
 }
 
-export class GcsStorage implements ObjectStorage {
+/** Storage that can hand out short-lived V4 signed URLs (the sandbox job has no storage access of its own). */
+export interface SignedUrlStorage extends ObjectStorage {
+  signedUrl(key: string, action: 'read' | 'write', opts: { expiresInSeconds: number; contentType?: string }): Promise<string>;
+}
+
+export class GcsStorage implements SignedUrlStorage {
   private readonly bucket;
   constructor(bucketName: string, opts: { apiEndpoint?: string; projectId?: string } = {}) {
     this.bucket = new Storage(opts).bucket(bucketName);
@@ -27,6 +32,11 @@ export class GcsStorage implements ObjectStorage {
   }
   async delete(key: string) {
     await this.bucket.file(key).delete({ ignoreNotFound: true });
+  }
+  /** Signed with the runtime service account through the IAM signBlob API (needs Token Creator on itself). */
+  async signedUrl(key: string, action: 'read' | 'write', opts: { expiresInSeconds: number; contentType?: string }) {
+    const [url] = await this.bucket.file(key).getSignedUrl({ version: 'v4', action, expires: Date.now() + opts.expiresInSeconds * 1000, contentType: opts.contentType });
+    return url;
   }
 }
 

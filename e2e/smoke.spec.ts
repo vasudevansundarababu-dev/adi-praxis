@@ -25,7 +25,9 @@ test.describe('console smoke', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/project/i);
     await nav.getByRole('link', { name: 'Projects' }).click();
     await page.getByRole('navigation', { name: 'Projects pages' }).getByRole('link', { name: 'Templates' }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toContainText(/templates/i);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Harbor Templates Directory');
+    // S1-12, S1-13: templates and domains come only from the seed and Save Variant.
+    await expect(page.getByRole('main').getByText(/new template|add domain/i)).toHaveCount(0);
     await expect(nav.getByRole('link', { name: 'Projects' })).toHaveAttribute('aria-current', 'true');
     await page.getByRole('navigation', { name: 'Projects pages' }).getByRole('link', { name: 'Approved exports' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Approved task exports');

@@ -21,11 +21,18 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.9.8
+          # The wrapper turns exit code 2 (changes) into success, which would hide drift.
+          terraform_wrapper: false
+      - name: Skip an environment that is not set up yet
+        if: matrix.env == 'staging' && vars.GCP_WIF_PROVIDER_STAGING == '' || matrix.env == 'production' && vars.GCP_WIF_PROVIDER_PRODUCTION == ''
+        run: echo "::notice::${{ matrix.env }} has no GCP_WIF_PROVIDER_* variable yet; nothing to check."
       - uses: google-github-actions/auth@v2
+        if: matrix.env == 'staging' && vars.GCP_WIF_PROVIDER_STAGING || matrix.env == 'production' && vars.GCP_WIF_PROVIDER_PRODUCTION
         with:
           workload_identity_provider: ${{ matrix.env == 'staging' && vars.GCP_WIF_PROVIDER_STAGING || vars.GCP_WIF_PROVIDER_PRODUCTION }}
           service_account: ${{ matrix.env == 'staging' && vars.GCP_PLANNER_SA_STAGING || vars.GCP_PLANNER_SA_PRODUCTION }}
       - name: Plan (exit code 2 means drift)
+        if: matrix.env == 'staging' && vars.GCP_WIF_PROVIDER_STAGING || matrix.env == 'production' && vars.GCP_WIF_PROVIDER_PRODUCTION
         working-directory: infra/terraform/envs/${{ matrix.env }}
         env:
           TF_VAR_github_repository: ${{ github.repository }}

@@ -9,6 +9,8 @@ const external = !!process.env.E2E_WEB_URL;
 const E2E_DB = process.env.E2E_DATABASE_URL ?? 'postgresql://praxis:praxis@localhost:5442/praxis_e2e';
 const REDIS = process.env.E2E_REDIS_URL ?? 'redis://localhost:6389/7';
 const env = { NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1' };
+// The API and the worker must share one object store, or worker jobs fall back to real GCS and hang.
+const storage = { EVIDENCE_BUCKET: 'praxis-evidence', GCS_EMULATOR_HOST: 'http://localhost:4443', GCS_PROJECT_ID: 'praxis-local' };
 
 export default defineConfig({
   testDir: '.',
@@ -27,7 +29,7 @@ export default defineConfig({
     {
       command: 'pnpm --filter @praxis/api exec tsx src/server.ts',
       url: 'http://localhost:4300/healthz',
-      env: { ...env, DATABASE_URL: E2E_DB, REDIS_URL: REDIS, API_PORT: '4300', CANDIDATE_APP_URL: 'http://localhost:3301', CORS_ORIGINS: 'http://localhost:3300,http://localhost:3301', LOGIN_RATE_LIMIT_PER_MINUTE: '1000', SME_SUPPLY_ENABLED: 'true', GCS_EMULATOR_HOST: 'http://localhost:4443', GCS_PROJECT_ID: 'praxis-local', EVIDENCE_BUCKET: 'praxis-evidence' },
+      env: { ...env, ...storage, DATABASE_URL: E2E_DB, REDIS_URL: REDIS, API_PORT: '4300', CANDIDATE_APP_URL: 'http://localhost:3301', CORS_ORIGINS: 'http://localhost:3300,http://localhost:3301', LOGIN_RATE_LIMIT_PER_MINUTE: '1000', SME_SUPPLY_ENABLED: 'true' },
       reuseExistingServer: false,
       timeout: 240_000,
     },
@@ -35,7 +37,7 @@ export default defineConfig({
       // M10 generation runs and webhooks are worker jobs.
       command: 'pnpm --filter @praxis/api exec tsx src/worker.ts',
       url: 'http://localhost:4301/healthz',
-      env: { ...env, DATABASE_URL: E2E_DB, REDIS_URL: REDIS, WORKER_HEALTH_PORT: '4301', CANDIDATE_APP_URL: 'http://localhost:3301', SME_SUPPLY_ENABLED: 'true', DATASET_VERIFY_CRON: 'off' },
+      env: { ...env, ...storage, DATABASE_URL: E2E_DB, REDIS_URL: REDIS, WORKER_HEALTH_PORT: '4301', CANDIDATE_APP_URL: 'http://localhost:3301', SME_SUPPLY_ENABLED: 'true', DATASET_VERIFY_CRON: 'off' },
       reuseExistingServer: false,
       timeout: 240_000,
     },

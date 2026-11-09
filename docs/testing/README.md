@@ -17,6 +17,7 @@ session; keep it open while you test.
 | [API-QUICK-REFERENCE.md](API-QUICK-REFERENCE.md) | Every API endpoint and who may call it |
 | [PENTEST.md](PENTEST.md) | Rules for security and penetration testing (read before any security test) |
 | [TRIAGE.md](TRIAGE.md) | How reports are triaged, fixed by the nightly agent and verified |
+| [QA-TEMPLATES-META-COMPILER.md](QA-TEMPLATES-META-COMPILER.md) | Engineering QA record (Q1–Q5) for the Templates Directory, Meta-Compiler and SME Studio |
 | `samples/` | Files to upload in the tests |
 
 ## What's new in this build (Release 1.1 test build)

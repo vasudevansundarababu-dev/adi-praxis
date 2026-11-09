@@ -30,4 +30,8 @@ jobs:
         env:
           TF_VAR_github_repository: ${{ github.repository }}
           TF_VAR_domains: ${{ matrix.env == 'staging' && vars.DOMAINS_STAGING || vars.DOMAINS_PRODUCTION }}
-        run: terraform init -input=false && terraform plan -input=false -lock=false -detailed-exitcode -no-color
+          # The operator's terraform.tfvars without app_secret_values (infra/README.md); a secret, so it stays out of the public repository.
+          TFVARS: ${{ matrix.env == 'staging' && secrets.TFVARS_STAGING || secrets.TFVARS_PRODUCTION }}
+        run: |
+          if [ -n "$TFVARS" ]; then printf '%s\n' "$TFVARS" > ci.auto.tfvars; fi
+          terraform init -input=false && terraform plan -input=false -lock=false -detailed-exitcode -no-color

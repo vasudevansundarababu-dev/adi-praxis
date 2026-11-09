@@ -62,10 +62,15 @@ resource "google_secret_manager_secret" "app" {
   }
 }
 
+# Values seed the first version only. Plans without them (CI, drift) must not delete versions, so the set is keyed on
+# names and the value is ignored afterwards; rotate with `gcloud secrets versions add`.
 resource "google_secret_manager_secret_version" "app" {
-  for_each    = nonsensitive(toset([for k in var.app_secret_names : k if lookup(var.app_secret_values, k, "") != ""]))
+  for_each    = toset(var.app_secret_names)
   secret      = google_secret_manager_secret.app[each.key].id
-  secret_data = var.app_secret_values[each.key]
+  secret_data = lookup(var.app_secret_values, each.key, "")
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 resource "google_secret_manager_secret_iam_member" "backend" {

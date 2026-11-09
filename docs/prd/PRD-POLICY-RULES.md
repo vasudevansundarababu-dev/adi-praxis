@@ -179,6 +179,65 @@ API: new policy module (documents, extraction service + 2 adapters + normaliser,
 
 S1 AC01–AC20 and S2 A01–A12 (with A01/A04 reading "LlamaExtract and Google"; A11 trial out of scope) map to unit, API and Playwright tests. Live-provider checks are a staging smoke step within budget, not CI.
 
+The full acceptance criteria are listed below so this PRD can be used on its own (for example by independent QA). Each line shows its source and the PRD requirements it covers.
+
+### 10.1 Product acceptance criteria [S1 §12]
+
+| ID | Area | Pass condition | PRD refs |
+| --- | --- | --- | --- |
+| AC01 | Existing Praxis UI | Project, template and task components, navigation, typography, spacing, uploads, tables and permission patterns are reused. No replacement app shell. | 5.1–5.4 |
+| AC02 | Single workspace | Sources and Policies opens one Policy Rules workspace with Extract and Review Rules stages; no separate Rule Workbench route. | PR-P03, PR-E13 |
+| AC03 | Document scope | PDF, DOCX, TXT and Markdown inputs are validated; unsupported content and documents over 20 pages return a useful error; no database policy extraction. | PR-E01 |
+| AC04 | Provider truth | An unconfigured provider cannot report live success. Manual text creates real, source-linked drafts with declared locator granularity. | PR-E04, PR-E10 |
+| AC05 | Source provenance | Every published rule resolves to an exact document version and hash and its source evidence; replacing a document does not rewrite old versions. | PR-E02, PR-R02 |
+| AC06 | Review gate | Draft and Needs definition candidates cannot be included in a published set. Unresolved required conflicts, applicability or effective scope block publication. | PR-R04, PR-R07, PR-R10 |
+| AC07 | Inheritance | Publishing Project defaults exposes the same rule versions to all task drafts and new tasks, without per-task selection checkboxes. | PR-R06, PR-T01, PR-T02 |
+| AC08 | Template isolation | Template edits do not change existing Projects, reviewed rules or published task snapshots. | PR-P01, PR-P02 |
+| AC09 | Conditional checks | A copy-only task without scheduling shows approval ordering as Not applicable; an unexpected scheduling attempt is still covered by the inherited rule. | PR-T02 |
+| AC10 | Exceptions | A missing reason or source is rejected. An unsupported exemption is rejected. Valid source-authorised exceptions or stricter constraints remain explicit and versioned. | PR-T03 |
+| AC11 | Frozen handoff | Task publication resolves exact rule and source versions, scope, precedence, evidence and rubric version. Import never depends on the latest mutable Project rules. | PR-T05, PR-T07 |
+| AC12 | Historical integrity | Document, rule and Project edits leave prior tasks, exports and Runs unchanged; adopting policy changes requires an explicit new task publication. | PR-E02, PR-T05 |
+| AC13 | Rubric stability | Existing criteria, points, weights and formula are unchanged. No new aggregate or duplicate policy weighting. | PR-T04 |
+| AC14 | Verdict semantics | Policy Pass / Fail / Unknown / Not applicable stay distinct from evaluator Not run / Error. Missing evidence never becomes Pass. | PR-T06, PR-T07 |
+| AC15 | Evaluator ownership | Praxis sends requirements and optional fixtures; Anvil owns engines, credentials, environment compatibility and execution. | PR-T06, PR-T07 |
+| AC16 | Legacy compatibility | Projects and tasks without policy extensions continue through the current authoring, export and import flow; migration creates no fabricated compliance claim. | PR-T01, PR-T07 |
+| AC17 | Concurrency and retries | Stale review or publication is rejected or versioned; repeated identical extraction or publication requests do not create duplicate active records. | PR-E05, PR-R04, PR-R08 |
+| AC18 | Authorisation and audit | Existing Project access controls apply to documents, rules, exceptions and receipts; review and publish decisions record user, time and content. | Section 3, PR-R04 |
+| AC19 | Seed slice | One marketing task is authored with source-linked rules, Project inheritance, a task snapshot and an importable handoff. Fictional fixtures are visibly separate from real source mappings. | PR-S01–PR-S05 |
+| AC20 | No benchmark rewrite | Existing Anvil model comparison, rubric scoring and result tabs remain. New technical bindings do not move domain interpretation to the RL engineer. | Section 2 non-goals |
+
+### 10.2 Extraction acceptance criteria [S2 §12, adapted by owner decisions]
+
+| ID | Pass condition | PRD refs |
+| --- | --- | --- |
+| A01 | Both adapters (LlamaExtract and Google) are implemented. CI tests them with recorded provider responses; live behaviour is checked by a staging smoke test within budget. An unconfigured provider returns "Not available"; no fabricated receipts. | PR-E08, PR-E09, PR-E10 |
+| A02 | Default selection, Project profile and authorised (Admin-only) per-request override work. Unauthorised or unknown profiles fail. Resolved settings stay pinned per job. | PR-E07 |
+| A03 | The same canonical output drives the Extract and Review Rules screens for both providers; no provider-specific review screen. | PR-E09, PR-E12 |
+| A04 | PDF, DOCX, TXT and Markdown handling is verified on both providers; unsupported formats are reported, with no silent conversion and no invented page numbers. | PR-E01, PR-E09 |
+| A05 | Citations for nested rules, conditions and exceptions keep their field association. Missing, malformed, Unicode and converted-page locators are tested. | PR-R02 |
+| A06 | Quote and source checks reject wrong document versions and unsupported evidence. An evidence repair by a reviewer is audited; extraction cannot mark rules Reviewed. | PR-R02, PR-R04 |
+| A07 | Polling retry, submit timeout ambiguity, cancellation, partial batch, duplicate request, budget exhaustion and worker crash recovery do not duplicate active rules. | PR-E05, PR-E06, PR-E11 |
+| A08 | Switching provider creates a new attempt; it does not overwrite reviewed rules or published Project or task snapshots. | PR-E07 |
+| A09 | Rubric values and scoring are identical before and after rule publication. Anvil imports frozen source and rule versions without querying the latest Project rules. | PR-T04, PR-T07 |
+| A10 | Tenant and Project isolation, secret handling, endpoint allowlists and provider file cleanup are verified. Ordinary logs contain no policy text or credentials. | Section 7 |
+| A11 | *Out of scope in this build* (extraction comparison trial, D-T1). | — |
+| A12 | Disabling either provider stops new submissions to it, keeps existing records, and still allows manual authoring or an explicit attempt with the other provider. | PR-E07, PR-E10 |
+
+### 10.3 Owner-decision checks [Owner, 9 Nov 2026]
+
+| ID | Pass condition | Decision |
+| --- | --- | --- |
+| OD1 | A PM can mark a rule Reviewed, including a rule the same PM edited (no separate-reviewer guardrail in Release 1). A non-PM/non-Admin user cannot. | D-R1 |
+| OD2 | Only an Admin can change the default provider, a Project's provider or use a per-request override; a PM gets 403. | D-A1 |
+| OD3 | A document over 20 pages (or text over the 20-page equivalent) is rejected at upload. | D-L2 |
+| OD4 | Live provider spend stops before exceeding $20 (LlamaExtract) or $30 (Google); the next job is refused with a clear message. | D-B1 |
+| OD5 | Live provider calls happen only on staging with live extraction switched on; never from tests or production. | D-B1, D-D1 |
+| OD6 | No Azure adapter and no Healthcare seed content exist. | D-G1, D-S1 |
+| OD7 | The seed creates 5 projects with 2 draft tasks each, a published rule set per project and one deliberate unpublished conflict; running it twice creates nothing new; it refuses to run in production. | D-S1 |
+| OD8 | The Google adapter uses a pinned Gemini Flash model version recorded on every job. | D-M1 |
+| OD9 | SMEs see the agent-visible rules of their own task read-only and cannot edit them. | D-Q2 |
+
+
 ## 11. Out of scope / later
 
 Database extraction; Azure; trial tooling; BYOC; Anvil discovery/fixture test calls (status stays Not tested until Anvil exposes the API); real Anvil import and model runs (Anvil side).

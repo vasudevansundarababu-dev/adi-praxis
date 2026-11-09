@@ -78,11 +78,14 @@ export function agentFacingBlueprint(bp: HarborBlueprint): HarborBlueprint {
   return v;
 }
 
-/** `45m (12 Wks)`-style TPT label (S1-08). */
+/**
+ * TPT minutes and horizon label such as `12 Wks` (S1-08); the console adds the minutes. Authored labels may already
+ * include them (`45m (12 Wks)`), so that wrapper is removed.
+ */
 export function tptLabel(bp: HarborBlueprint | null, fallbackMinutes: number | null): { minutes: number | null; label: string } {
   const minutes = bp?.template_meta.tpt_minutes ?? fallbackMinutes;
-  if (bp?.template_meta.tpt_label) return { minutes, label: bp.template_meta.tpt_label };
-  if (minutes === null) return { minutes, label: '—' };
+  const authored = bp?.template_meta.tpt_label.trim() ?? '';
+  if (authored) return { minutes, label: authored.replace(/^\d+\s*m\s*\((.*)\)$/, '$1').trim() };
   const h = bp?.domain_meta.horizon;
-  return { minutes, label: h?.cadence_unit ? `${minutes}m (${h.max_turns} ${h.cadence_unit})` : `${minutes}m` };
+  return { minutes, label: h?.cadence_unit ? `${h.max_turns} ${h.cadence_unit}` : '' };
 }

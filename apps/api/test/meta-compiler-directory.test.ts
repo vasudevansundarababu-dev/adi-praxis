@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { TemplateDirectoryResponse } from '@praxis/shared';
 import { buildTestApp, createCandidate, createClient, createUser, db, login, resetDb } from './helpers';
-import { api, seedProject, seedTemplate } from './meta-compiler-fixtures';
+import { tptLabel } from '../src/meta-compiler/blueprint';
+import { api, exampleBlueprint, seedProject, seedTemplate } from './meta-compiler-fixtures';
 
 describe('A1 Templates directory (S1-01 to S1-11, S1-15)', () => {
   let app: FastifyInstance;
@@ -59,11 +60,11 @@ describe('A1 Templates directory (S1-01 to S1-11, S1-15)', () => {
     expect(body.view).toBe('ADMIN');
     expect(body.domains.map((d) => [d.domainName, d.rows.length])).toEqual([['Banking', 1], ['Digital Marketing', 1], ['Empty', 0]]);
     const row = body.domains[1]!.rows[0]!;
-    expect(row).toMatchObject({ templateId: v2.id, version: 2, templateStatus: 'DRAFT', status: 'DRAFT', tptMinutes: 45, tptLabel: '45m (12 Wks)', modes: ['HERMETIC_MCP'], validSections: 6, hasBlueprint: true, projectCount: 1 });
+    expect(row).toMatchObject({ templateId: v2.id, version: 2, templateStatus: 'DRAFT', status: 'DRAFT', tptMinutes: 45, tptLabel: '12 Wks', modes: ['HERMETIC_MCP'], validSections: 6, hasBlueprint: true, projectCount: 1 });
     // The studio runs v1; the row shows v2 (a draft), so the badge is Draft, but the live studio is still listed (S1-10, S3-09).
     expect(row.deployments).toEqual([{ id: expect.any(String), projectId: project.id, projectName: 'PRJ-MKTG-101', status: 'ACTIVE', smeEmail: 'sme.one@example.test', studioUrl: 'https://experts.example.test/studio/mktg-launch-abc123' }]);
     const k = body.domains[0]!.rows[0]!;
-    expect(k).toMatchObject({ templateId: kyb.id, hasBlueprint: false, validSections: 0, tptLabel: '45m', modes: [], deployments: [] });
+    expect(k).toMatchObject({ templateId: kyb.id, hasBlueprint: false, validSections: 0, tptLabel: '', modes: [], deployments: [] });
     expect(body.summary).toEqual({ totalTemplates: 2, activeStudios: 1, attachedProjects: 1, attachedSmes: 1, authoredTasks: 0 });
 
     const withRetired = TemplateDirectoryResponse.parse((await http.get(admin, '/templates/directory?includeRetired=true')).json());
@@ -118,5 +119,13 @@ describe('A1 Templates directory (S1-01 to S1-11, S1-15)', () => {
     expect(res.statusCode).toBe(200);
     expect(Date.now() - start).toBeLessThan(2000);
     expect(res.json().summary.totalTemplates).toBe(500);
+  });
+
+  it('S1-08: the API sends only the horizon, such as "12 Wks"; the console adds the minutes (DEF-1)', () => {
+    const bp = exampleBlueprint();
+    expect(tptLabel(bp, null)).toEqual({ minutes: 45, label: '12 Wks' });
+    expect(tptLabel({ ...bp, template_meta: { ...bp.template_meta, tpt_label: '15 Steps' } }, null).label).toBe('15 Steps');
+    expect(tptLabel({ ...bp, template_meta: { ...bp.template_meta, tpt_label: '' } }, null).label).toBe('12 Wks');
+    expect(tptLabel(null, 30)).toEqual({ minutes: 30, label: '' });
   });
 });

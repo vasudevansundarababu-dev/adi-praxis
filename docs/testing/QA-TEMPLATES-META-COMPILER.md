@@ -19,7 +19,7 @@ environment) is not part of this record.
 | Q2 Browser journey | Pass. `e2e/meta-compiler-journey.spec.ts`: 3 tests |
 | Q3 Security | Pass. No new findings |
 | Q4 Performance (NFR-12) | Pass on a production build |
-| Q5 Hardened sandbox | Pass for the 3 seeded blueprints and the hostile bundle. The private C5 template result was not recorded and needs a rerun |
+| Q5 Hardened sandbox | Pass for the 3 seeded blueprints, the owner's private C5 template (rerun 9 Nov) and the hostile bundle |
 
 ## Test suites
 
@@ -107,8 +107,16 @@ Image `infra/harbor-verify/Dockerfile`, bundles from `scripts/harbor-verify-bund
 The hostile bundle also confirmed: runs as `nobody`, no internet, cannot write `/etc/shadow` or change the
 verifiers, judge files absent, symlinked output not followed.
 
-The owner's private C5 template was run through the same sandbox from a temporary directory, but its output was
-not kept and the directory has been deleted. **Open:** rerun C5 and record the result here.
+**C5 (owner's private template), rerun 9 Nov 2026.** Pass. The file was the owner's chosen version (SHA-256 starts
+`307d5b91`), read from its private folder outside the repository. The template content stays out of git; the run
+outputs are kept with the private files.
+
+| Check | Result |
+|---|---|
+| Blueprint sections | 6 of 6 valid; no studio answer problems |
+| Bundle | 13 files, 8 hidden from the agent; no judge criteria in the SME view |
+| Grading sandbox | Null agent 0.00, oracle 1.00; hostile bundle checks all passed in the same run |
+| Import dry run (local QA database) | Would create version 1 as a DRAFT; nothing written |
 
 ## UX observation
 

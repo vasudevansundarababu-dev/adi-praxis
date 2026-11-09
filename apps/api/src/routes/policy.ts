@@ -153,7 +153,7 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
         parentBatchId: b.parentBatchId,
         createdAt: b.createdAt,
         finishedAt: b.finishedAt,
-        jobs: b.jobs.map((j) => ({ id: j.id, status: j.status, provider: j.provider, document: j.documentVersion.document.title, documentVersion: j.documentVersion.version, candidateCount: j.candidateCount, error: j.error, finishedAt: j.finishedAt, ...(isAdmin(actor) ? { estimatedUsd: Number(j.estimatedUsd), actualUsd: j.actualUsd === null ? null : Number(j.actualUsd) } : {}) })),
+        jobs: b.jobs.map((j) => ({ id: j.id, status: j.status, provider: j.provider, documentVersionId: j.documentVersionId, document: j.documentVersion.document.title, documentVersion: j.documentVersion.version, candidateCount: j.candidateCount, error: j.error, finishedAt: j.finishedAt, ...(isAdmin(actor) ? { estimatedUsd: Number(j.estimatedUsd), actualUsd: j.actualUsd === null ? null : Number(j.actualUsd) } : {}) })),
       })),
     };
   });
@@ -298,8 +298,10 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
     const latest = await db.taskPolicySnapshot.findFirst({ where: { taskInstanceId: t.id }, orderBy: { version: 'desc' } });
     const changes = await db.taskPolicyChange.findMany({ where: { taskInstanceId: t.id, deletedAt: null }, orderBy: { createdAt: 'asc' } });
     if (!eff) return { configured: false, snapshot: null, changes: [], rules: [], anvil: 'Not tested' };
+    const cits = await db.policyCitation.findMany({ where: { ruleVersionId: { in: eff.body.rules.map((r) => r.rule_version_id) } }, select: { id: true, ruleVersionId: true, role: true, quote: true } });
     return {
       configured: true,
+      citations: cits.map((c) => ({ id: c.id, ruleVersionId: c.ruleVersionId, role: c.role, quote: c.quote.slice(0, 300) })),
       ruleSet: eff.body.project_rule_set,
       rules: eff.body.rules,
       changes,

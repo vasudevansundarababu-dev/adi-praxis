@@ -371,6 +371,8 @@ BEGIN
   FOREACH t IN ARRAY ARRAY['PolicyDocumentVersion', 'ProjectRuleSet', 'TaskPolicySnapshot', 'ExtractionSpend'] LOOP
     EXECUTE format('CREATE TRIGGER %I BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION praxis_append_only()', t || '_append_only', t);
     EXECUTE format('CREATE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION praxis_no_truncate()', t || '_no_truncate', t);
+    EXECUTE format('REVOKE UPDATE, DELETE ON %I FROM PUBLIC', t);
+    EXECUTE format('REVOKE UPDATE, DELETE ON %I FROM CURRENT_USER', t);
   END LOOP;
 END;
 $$;

@@ -81,6 +81,11 @@ export function ProjectSummary({
           </Link>
         </>
       )}
+      {!['CANCELLED', 'COMPLETED'].includes(p.status) && (
+        <Link href={`/projects/${p.id}/policy`} className="ml-3 mt-6 inline-block btn btn-secondary">
+          Policy rules
+        </Link>
+      )}
       {(p.status === 'IN_PROGRESS' || p.status === 'PAUSED') && <PauseResumeButton projectId={p.id} paused={p.status === 'PAUSED'} />}
       {CANCELLABLE_STATUSES.includes(p.status) && <CancelProjectButton projectId={p.id} />}
       {reviewers && !['CANCELLED', 'COMPLETED'].includes(p.status) && <ReviewersPanel projectId={p.id} initial={reviewers} />}

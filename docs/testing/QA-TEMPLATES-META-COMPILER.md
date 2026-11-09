@@ -35,6 +35,11 @@ Earlier full Playwright runs without retries failed one or two different tests p
 `smoke.spec.ts:74`, `tester-profile-form.spec.ts:5`). Each passed when run alone and on retry. This looks like
 load-related timing with 4 workers on 4 cores; CI already retries once.
 
+CI first failed the journey test because the e2e worker had no storage settings: it fell back to real GCS and
+verification stayed "Running". Earlier local runs passed, probably because that shell carried the emulator settings.
+`e2e/playwright.config.ts` now gives the API and the worker the same emulator settings. The test fails on the old
+config and passes with the fix, both run the way CI runs it.
+
 ## Defects
 
 ### DEF-1 — TPT shown twice on Screen 1 (S1-08, Must)

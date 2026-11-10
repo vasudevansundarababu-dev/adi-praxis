@@ -79,6 +79,8 @@ module "policy_extraction" {
   environment            = var.environment
   api_service_account    = module.iam.service_accounts.api
   worker_service_account = module.iam.service_accounts.worker
+  jobs_service_account   = module.iam.service_accounts.jobs
+  evidence_bucket        = module.storage.buckets.evidence
   settings               = var.policy_extraction
 }
 

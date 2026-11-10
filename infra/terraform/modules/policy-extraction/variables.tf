@@ -2,6 +2,8 @@ variable "project_id" { type = string }
 variable "environment" { type = string }
 variable "api_service_account" { type = string }
 variable "worker_service_account" { type = string }
+variable "jobs_service_account" { type = string }
+variable "evidence_bucket" { type = string }
 variable "settings" {
   description = "Owner decisions D-B1/D-D1: per-provider spend ceilings in USD; live = false keeps both providers Not available."
   type = object({

@@ -18,10 +18,14 @@ export const STATUS_PILLS: Record<DirectoryStatus, { label: string; tone: string
 
 export const versionLabel = (v: number) => `v${v}`;
 
-/** S1-08: "45m (12 Wks)"; minutes alone when there is no horizon label; "—" when unknown. */
+/**
+ * S1-08: "45m (12 Wks)"; minutes alone when there is no horizon label; "—" when unknown. Seeded blueprints store the
+ * full "45m (12 Wks)" in tpt_label, so that wrapper is removed first, as the API's tptLabel() does (DEF-1).
+ */
 export function tptText(minutes: number | null, label: string): string {
   if (minutes === null) return '—';
-  return label.trim() ? `${minutes}m (${label.trim()})` : `${minutes}m`;
+  const horizon = label.trim().replace(/^\d+\s*m\s*\((.*)\)$/, '$1').trim();
+  return horizon ? `${minutes}m (${horizon})` : `${minutes}m`;
 }
 
 export const modesText = (modes: ExecutionMode[]) => (modes.length ? modes.map((m) => MODE_LABELS[m]).join(', ') : '—');

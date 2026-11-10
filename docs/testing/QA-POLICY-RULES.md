@@ -9,8 +9,8 @@ QA pass of the Policy Rules feature against [PRD-POLICY-RULES.md](../prd/PRD-POL
   API on 4040, console on 3140. Object storage in memory (no GCS emulator in this sandbox).
 - **Providers:** recorded provider responses and test doubles only. Live extraction off, no provider keys set.
   No paid calls.
-- **Independence:** the plan asks for QA in a separate conversation that did not write the code. **This pass was run by
-  the conversation that wrote the code**, so it is not independent. An independent re-run is still owed.
+- **Independence:** this pass was run by the conversation that wrote the code. An independent pass followed on 10 Nov
+  (see "Independent QA" below).
 
 ## Summary
 
@@ -110,9 +110,19 @@ now covers the four tables.
 | A11 Comparison trial | Out of scope | D-T1 |
 | A12 Disabling a provider | Pass | Disabled profile reports Not available; manual authoring still works |
 
+## Independent QA (10 Nov, separate conversation, head 67e8d86)
+
+Run in a separate conversation that did not write the code, with local services only and no provider keys.
+
+- **Verdict on the code:** sign-off. No Blocker defects and no AC marked Fail. A05 stays Partly (no malformed or converted-page locator test); the A01 live half stays for the staging smoke.
+- **Suites:** typecheck clean; API 689 passed, 1 failed (`infra.test.ts`, needs the Docker socket), 5 skipped; web 55, candidate 23, shared 188 passed. Policy suites 44 passed.
+- **Spend safety:** a throwaway concurrency test with a budget that fits exactly one job gave `[202, 409 BUDGET_EXHAUSTED]`, and a null ceiling gave `409 BUDGET_NOT_SET`. The advisory lock serialises reservations.
+- **Migration:** additive only. Applies on an empty database and on a database at `main`'s schema; existing rows intact; 13 append-only triggers.
+- **Security:** route access matrix (200/403/404/401) as designed; PM view hides profiles, budget and cost; API log has no policy text, keys or cookies.
+- **Seed:** refuses production; 5 created on the first run, all skipped on the second; CLI matches the live-setup guide §3.
+- **Defects raised:** D1 PR description still said "PRD, docs only" (fixed: PR retitled and redescribed). D2 stale base SHA in the QA brief (no code impact). D3 flaky, pre-existing `tasks.test.ts` outbox receipt race (`outbox/dispatcher.ts:69`, unique `event_id, handler`), to be tracked separately. D4 this record (updated here). D5 labels differ from PRD wording ("Sources and Policies", "Review Rules"); owner to choose.
+
 ## Still owed before staging
 
-1. Independent QA in a separate conversation (plan requirement).
-2. Owner names the staging environment and approves the rollback plan (previous image; migration is additive).
-3. Owner applies the infra PR and sets the LlamaExtract key in Secret Manager.
-4. Staging deploy, `policy-seed`, live provider smoke within budget, then merge.
+1. Owner approves merging to staging and the rollback plan: the Roll back workflow (staging) moves traffic to the previous revisions; the migration is additive, so the previous image runs on the new schema; live extraction stays off.
+2. `policy-seed` on staging (infra PR #37 applied), then live provider smoke within budget, then live off again.

@@ -10,6 +10,8 @@ import { MemoryStorage } from '../src/candidate/storage';
 import { appendRecord } from '../src/dataset/approved-records';
 import { policySeed, SEED_ACTOR, SEED_PREFIX, SEED_PROJECTS } from '../src/jobs/policy-seed';
 import { previewRuleSet } from '../src/policy/rule-sets';
+import { applicabilityLabel } from '../src/policy/task-policy';
+import { PolicyRuleBody } from '@praxis/shared';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { createClient, createUser, db, login, resetDb, testConfig } from './helpers';
 
@@ -247,5 +249,28 @@ describe('export sidecar (AC11, AC16, A09)', () => {
     const items = r.json().items as Array<{ task: { id: string }; policy?: { snapshot_id: string; digest: string } }>;
     expect(items.find((i) => i.task.id === withPolicy.id)!.policy).toMatchObject({ snapshot_id: snap.id, digest: snap.digest });
     expect(Object.hasOwn(items.find((i) => i.task.id === without.id)!, 'policy')).toBe(false);
+  });
+});
+
+describe('conditional checks and rubric stability (AC09, AC13, A09)', () => {
+  const body = (applicability: object) => PolicyRuleBody.parse({ title: 't', requirement: 'r', applicability });
+
+  it('a rule tied to scheduling reads Not applicable outside it, and a universal rule always applies', () => {
+    expect(applicabilityLabel(body({ actions: ['schedules a campaign'] }))).toBe('Applies when the agent schedules a campaign. Otherwise: Not applicable.');
+    expect(applicabilityLabel(body({ universal: true, actions: ['schedules a campaign'] }))).toBe('Always applies');
+    expect(applicabilityLabel(body({}))).toBe('Applies as written');
+  });
+
+  it('publishing rules and snapshotting tasks leaves the template blueprint and scoring untouched', async () => {
+    const before = await db.template.findMany({ where: { clientId }, orderBy: { id: 'asc' }, select: { id: true, version: true, blueprint: true, blueprintRevision: true, verificationCriteria: true, updatedAt: true } });
+    await runSeed();
+    const after = await db.template.findMany({ where: { clientId }, orderBy: { id: 'asc' }, select: { id: true, version: true, blueprint: true, blueprintRevision: true, verificationCriteria: true, updatedAt: true } });
+    expect(after).toEqual(before);
+    const snaps = await db.taskPolicySnapshot.findMany();
+    expect(snaps).toHaveLength(10);
+    for (const s of snaps) {
+      const t = await db.taskInstance.findUniqueOrThrow({ where: { id: s.taskInstanceId }, include: { project: true } });
+      expect((s.content as { rubric_version: string }).rubric_version).toBe(`template:${t.project.templateId}@${t.project.templateVersion}`);
+    }
   });
 });

@@ -1,0 +1,198 @@
+{
+  "schema_version": "praxis.anvil.policy.v1-proposed",
+  "snapshot_id": "fc6c4cd3-2ad3-4ff1-9571-e3868f1d8948",
+  "task_id": "10cf2554-0e6e-4de2-9db6-0cd4668c9d4b",
+  "snapshot_version": 1,
+  "published_at": "2026-11-10T04:53:53.712Z",
+  "project_rule_set": {
+    "id": "f65f1800-7f40-45ad-9f0c-0fcf35be42fc",
+    "digest": "07d45fa203eda1a13515509ee3ee5a381e8284ca0089ed30c613704772509957",
+    "version": 1
+  },
+  "rules": [
+    {
+      "title": "Approved glossary",
+      "rule_id": "5c648396-71e0-479c-8df1-bdd80ccd3ec7",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "Every localised creative must use the approved glossary for its locale.",
+          "sha256": "cebbdb136dbc74ca7a4158f1f3164b5e9eeafc0743a73b6dcd980711645f8716",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 220,
+            "chunkId": null,
+            "lineEnd": 4,
+            "section": null,
+            "charStart": 149,
+            "lineStart": 4,
+            "renditionPage": null
+          },
+          "document_version_id": "04f0bac7-c6d7-4258-819d-d3c3f28b7d20"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-approved_glossary",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "agent_visible",
+      "requirement": "Use the approved glossary for the locale.",
+      "content_hash": "e7bdc9067f4450f4fd19a956bc9a8831f7cff951497ad7aec5704cd935816580",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "46fb08a1-9726-48f9-898a-cf34a13313c3",
+      "requirement_type": "obligation",
+      "verification_hint": null,
+      "applicability_label": "Always applies"
+    },
+    {
+      "title": "German imprint link",
+      "rule_id": "bd382637-ba8f-4624-9d16-dca65fc48513",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "Creatives for the German market must include the legal imprint link.",
+          "sha256": "cebbdb136dbc74ca7a4158f1f3164b5e9eeafc0743a73b6dcd980711645f8716",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 353,
+            "chunkId": null,
+            "lineEnd": 6,
+            "section": null,
+            "charStart": 285,
+            "lineStart": 6,
+            "renditionPage": null
+          },
+          "document_version_id": "04f0bac7-c6d7-4258-819d-d3c3f28b7d20"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-de_imprint",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "agent_visible",
+      "requirement": "Include the legal imprint link on German creatives.",
+      "content_hash": "ac240423e1c71684386919cc272b59f8ff71e2b41f53318f93e5604948560c58",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [
+          "de-DE"
+        ],
+        "channels": [],
+        "entities": [],
+        "universal": false,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "a78ff02a-f23f-4017-a7c7-177b9d9a4b32",
+      "requirement_type": "obligation",
+      "verification_hint": null,
+      "applicability_label": "Applies for de-DE. Otherwise: Not applicable."
+    },
+    {
+      "title": "Local currency",
+      "rule_id": "2d29b455-3ab9-484c-95d3-14caa5b83f69",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "Prices must be shown in the local currency of the market.",
+          "sha256": "cebbdb136dbc74ca7a4158f1f3164b5e9eeafc0743a73b6dcd980711645f8716",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 281,
+            "chunkId": null,
+            "lineEnd": 5,
+            "section": null,
+            "charStart": 224,
+            "lineStart": 5,
+            "renditionPage": null
+          },
+          "document_version_id": "04f0bac7-c6d7-4258-819d-d3c3f28b7d20"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-local_currency",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "agent_visible",
+      "requirement": "Show prices in the local currency of the market.",
+      "content_hash": "b9ece8dd30fbc686768b62fff79dde3d125f235c0251722a2e527e2e46e36849",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "6bddecda-0a9e-429c-92c2-d48e30988e42",
+      "requirement_type": "obligation",
+      "verification_hint": null,
+      "applicability_label": "Always applies"
+    }
+  ],
+  "task_changes": [
+    {
+      "id": "f9f3aa1a-d055-4d77-8b47-b935c746ac9c",
+      "type": "CLARIFICATION",
+      "scope": {},
+      "reason": "Stricter house style for this campaign.",
+      "requirement": "Show the currency symbol before the amount for this task.",
+      "exception_index": null,
+      "rule_version_id": "6bddecda-0a9e-429c-92c2-d48e30988e42",
+      "source_citation_id": null
+    }
+  ],
+  "rubric_version": "template:a8c9ae85-4c47-4bdf-af4f-3ad3a0577ee5@1",
+  "digest": "31bdc4ebdcdba345053ec191440980513a69917e968efdef61a3f18bd7d44432"
+}

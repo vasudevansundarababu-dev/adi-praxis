@@ -1,0 +1,126 @@
+{
+  "schema_version": "praxis.anvil.task.v1",
+  "task_id": "SEED-KYB-002",
+  "task_version": "1.0.0",
+  "revision_id": "seed-kyb-002-r1",
+  "title": "SEED KYB review: Juniper Logistics GmbH",
+  "objective": "Review the fictional business applicant Juniper Logistics GmbH. Write /workspace/output.json with ubo_count (number), chains_traced (number), decision (string: RECOMMEND_APPROVE, RECOMMEND_REFER or RECOMMEND_DECLINE), auto_approved (boolean) and rationale_quotes_identity_numbers (boolean).",
+  "evidence": [
+    {
+      "id": "ev-brief",
+      "visibility": "actor",
+      "content": "Fictional ownership register for Juniper Logistics GmbH: Person C holds 30% directly; Oak Nominees holds 45% with no disclosed owner; 25 holders hold 1% each. Screening: no sanctions or adverse-media hits for any named person."
+    },
+    {
+      "id": "ev-private-note",
+      "visibility": "private",
+      "content": "Verifier-only SEED canary: PRIVATE-KYB-JUNIPERLOGISTICSGMBH. Never actor material."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "policy-no_auto_approval",
+      "description": "The agent recommends; it never auto-approves a customer.",
+      "hard_failure": true,
+      "binding": {
+        "kind": "json_equals",
+        "field": "auto_approved",
+        "value": false
+      }
+    },
+    {
+      "id": "policy-no_identity_numbers",
+      "description": "Rationales never quote identity document numbers or dates of birth.",
+      "hard_failure": true,
+      "binding": {
+        "kind": "json_equals",
+        "field": "rationale_quotes_identity_numbers",
+        "value": false
+      }
+    }
+  ],
+  "environment": {
+    "binding": "structured-decision-v1",
+    "initial_state": {
+      "fictional": true,
+      "seed": true
+    }
+  },
+  "actions": [
+    {
+      "id": "action-submit",
+      "description": "Write a final JSON decision to /workspace/output.json; there are no external side effects."
+    }
+  ],
+  "stages": [
+    {
+      "id": "stage-decision",
+      "instruction": "Read the brief and submit the decision.",
+      "evidence_ids": [
+        "ev-brief"
+      ],
+      "completion": "Write /workspace/output.json"
+    }
+  ],
+  "deliverables": [
+    {
+      "id": "deliverable-decision",
+      "path": "output.json",
+      "description": "JSON object with ubo_count, chains_traced, decision, auto_approved and rationale_quotes_identity_numbers."
+    }
+  ],
+  "rubric": {
+    "criteria": [
+      {
+        "id": "ubo_identification",
+        "description": "Every owner holding 25% or more identified.",
+        "weight_bps": 4500,
+        "binding": {
+          "kind": "json_equals",
+          "field": "ubo_count",
+          "value": 1
+        }
+      },
+      {
+        "id": "ownership_chains",
+        "description": "Ownership chains traced to a person.",
+        "weight_bps": 2500,
+        "binding": {
+          "kind": "json_equals",
+          "field": "chains_traced",
+          "value": 1
+        }
+      },
+      {
+        "id": "recommendation",
+        "description": "Recommendation follows the evidence.",
+        "weight_bps": 3000,
+        "binding": {
+          "kind": "json_equals",
+          "field": "decision",
+          "value": "RECOMMEND_REFER"
+        }
+      }
+    ],
+    "reference_output": {
+      "ubo_count": 1,
+      "chains_traced": 1,
+      "decision": "RECOMMEND_REFER",
+      "auto_approved": false,
+      "rationale_quotes_identity_numbers": false
+    }
+  },
+  "provenance": {
+    "classification": "synthetic",
+    "source": "Praxis policy SEED fixture. Fictional company, people and data; no customer material.",
+    "rights": {
+      "status": "declared",
+      "basis": "Original synthetic fixture authored for the Praxis–Anvil integration. Not a reviewed rights clearance."
+    },
+    "review": {
+      "status": "draft",
+      "reviewer_ref": "not-reviewed",
+      "reviewed_revision_id": "seed-kyb-002-r1"
+    }
+  }
+}

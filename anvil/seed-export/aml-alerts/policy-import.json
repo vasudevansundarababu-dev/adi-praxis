@@ -1,0 +1,113 @@
+{
+  "schema_version": "anvil.policy-import.v1-proposed",
+  "task_group_id": "seed-aml-alerts",
+  "task_group_version": "1.0.0",
+  "source_revision": "PRAXIS-SEED-FICTIONAL",
+  "group_default_policy_refs": [
+    {
+      "policy_id": "seed-aml-alerts-policy",
+      "version": "1.0.0"
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "seed-aml-alerts-policy",
+      "version": "1.0.0",
+      "title": "Alert handling procedure (fictional)",
+      "source": {
+        "path": "documents/policy.md",
+        "media_type": "text/markdown",
+        "sha256": "d599e84ac5e3a75b29d763b01aa4f1a66bc676358428e8e3db0715a0f34c5ba6"
+      },
+      "rules": [
+        {
+          "rule_id": "R-disposition_reason",
+          "requirement": "State the reason for every alert disposition in plain language.",
+          "severity": "high",
+          "visibility": "agent_instruction",
+          "source_location": "Line 6",
+          "evaluator": {
+            "type": "task_constraint_binding",
+            "expectation": "Constraint policy-disposition_reason in the task contract holds on output.json.",
+            "on_missing_evidence": "unknown",
+            "profile_ref": {
+              "evaluator_id": "anvil.task-constraint-binding",
+              "version": "1.0.0-proposed"
+            }
+          }
+        },
+        {
+          "rule_id": "R-no_customer_exit",
+          "requirement": "Exiting a customer is a human decision; the agent never does it.",
+          "severity": "critical",
+          "visibility": "agent_instruction",
+          "source_location": "Line 5",
+          "evaluator": {
+            "type": "task_constraint_binding",
+            "expectation": "Constraint policy-no_customer_exit in the task contract holds on output.json.",
+            "on_missing_evidence": "unknown",
+            "profile_ref": {
+              "evaluator_id": "anvil.task-constraint-binding",
+              "version": "1.0.0-proposed"
+            }
+          }
+        },
+        {
+          "rule_id": "R-no_tipping_off",
+          "requirement": "Customer messages never mention suspicion, investigations or reports.",
+          "severity": "critical",
+          "visibility": "agent_instruction",
+          "source_location": "Line 4",
+          "evaluator": {
+            "type": "task_constraint_binding",
+            "expectation": "Constraint policy-no_tipping_off in the task contract holds on output.json.",
+            "on_missing_evidence": "unknown",
+            "profile_ref": {
+              "evaluator_id": "anvil.task-constraint-binding",
+              "version": "1.0.0-proposed"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "evaluator_profiles": [
+    {
+      "evaluator_id": "anvil.task-constraint-binding",
+      "version": "1.0.0-proposed",
+      "engine": "builtin",
+      "input_schema": "task-output-json.v1-proposed",
+      "output_schema": "rule-outcome.v1-proposed",
+      "configuration": {
+        "constraint_id_prefix": "policy-",
+        "binding_kinds": [
+          "json_equals",
+          "json_number_min",
+          "json_number_max"
+        ],
+        "missing_evidence_outcome": "unknown"
+      },
+      "case_set_ref": "praxis-seed/aml-alerts-reference-outputs-v1"
+    }
+  ],
+  "task_bindings": [
+    {
+      "task_id": "SEED-AML-001",
+      "policy_refs": [
+        {
+          "policy_id": "seed-aml-alerts-policy",
+          "version": "1.0.0"
+        }
+      ]
+    },
+    {
+      "task_id": "SEED-AML-002",
+      "policy_refs": [
+        {
+          "policy_id": "seed-aml-alerts-policy",
+          "version": "1.0.0"
+        }
+      ]
+    }
+  ]
+}

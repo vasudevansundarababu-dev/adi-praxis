@@ -1,0 +1,353 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Proposed Praxis Anvil optional policy exchange v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_group_id",
+    "task_group_version",
+    "source_revision",
+    "policies",
+    "evaluator_profiles",
+    "task_bindings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "anvil.policy-import.v1-proposed"
+    },
+    "task_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_group_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "group_default_policy_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "policy_id",
+          "version"
+        ],
+        "properties": {
+          "policy_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "policies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/policy"
+      }
+    },
+    "evaluator_profiles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/profile"
+      }
+    },
+    "task_bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/binding"
+      }
+    }
+  },
+  "$defs": {
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "version",
+        "title",
+        "source",
+        "rules"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "media_type",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "media_type": {
+              "enum": [
+                "application/pdf",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "text/plain",
+                "text/markdown"
+              ]
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rule"
+          }
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "requirement",
+        "severity",
+        "visibility",
+        "source_location"
+      ],
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requirement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "visibility": {
+          "enum": [
+            "agent_instruction",
+            "evaluator_only"
+          ]
+        },
+        "source_location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rubric_criterion_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "failure_mode_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "evaluator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "expectation",
+            "on_missing_evidence"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectation": {
+              "type": "string",
+              "minLength": 1
+            },
+            "resource_set_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "on_missing_evidence": {
+              "const": "unknown"
+            },
+            "profile_ref": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "evaluator_id",
+                "version"
+              ],
+              "properties": {
+                "evaluator_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluator_id",
+        "version",
+        "engine",
+        "input_schema",
+        "output_schema",
+        "configuration",
+        "case_set_ref"
+      ],
+      "properties": {
+        "evaluator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "engine": {
+          "enum": [
+            "builtin",
+            "rubric_judge",
+            "custom_package"
+          ]
+        },
+        "input_schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration": {
+          "type": "object"
+        },
+        "case_set_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sha256",
+            "entrypoint",
+            "registry_ref"
+          ],
+          "properties": {
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "entrypoint": {
+              "type": "string",
+              "minLength": 1
+            },
+            "registry_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "engine": {
+                "const": "custom_package"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "artifact"
+            ]
+          }
+        }
+      ]
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "policy_refs"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "policy_id",
+              "version"
+            ],
+            "properties": {
+              "policy_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "safety_case_set_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

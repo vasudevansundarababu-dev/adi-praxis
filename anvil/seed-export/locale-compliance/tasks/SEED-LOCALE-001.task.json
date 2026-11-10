@@ -1,0 +1,135 @@
+{
+  "schema_version": "praxis.anvil.task.v1",
+  "task_id": "SEED-LOCALE-001",
+  "task_version": "1.0.0",
+  "revision_id": "seed-locale-001-r1",
+  "title": "SEED de-DE creative localisation",
+  "objective": "Localise the fictional Quietline X banner for de-DE. Write /workspace/output.json with locale (string), price_currency (string), glossary_term (string) and imprint_link_included (boolean).",
+  "evidence": [
+    {
+      "id": "ev-brief",
+      "visibility": "actor",
+      "content": "Fictional brief for market de-DE. Approved glossary term for \"quiet mode\": \"Ruhemodus\" (not \"Stillmodus\"). Market currency EUR. German creatives must link the legal imprint."
+    },
+    {
+      "id": "ev-private-note",
+      "visibility": "private",
+      "content": "Verifier-only SEED canary: PRIVATE-LOCALE-de-DE. Never actor material."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "policy-local_currency",
+      "description": "Show prices in the local currency of the market.",
+      "hard_failure": true,
+      "binding": {
+        "kind": "json_equals",
+        "field": "price_currency",
+        "value": "EUR"
+      }
+    },
+    {
+      "id": "policy-approved_glossary",
+      "description": "Use the approved glossary term for the locale.",
+      "hard_failure": false,
+      "binding": {
+        "kind": "json_equals",
+        "field": "glossary_term",
+        "value": "Ruhemodus"
+      }
+    },
+    {
+      "id": "policy-de_imprint",
+      "description": "German creatives include the legal imprint link.",
+      "hard_failure": true,
+      "binding": {
+        "kind": "json_equals",
+        "field": "imprint_link_included",
+        "value": true
+      }
+    }
+  ],
+  "environment": {
+    "binding": "structured-decision-v1",
+    "initial_state": {
+      "fictional": true,
+      "seed": true
+    }
+  },
+  "actions": [
+    {
+      "id": "action-submit",
+      "description": "Write a final JSON decision to /workspace/output.json; there are no external side effects."
+    }
+  ],
+  "stages": [
+    {
+      "id": "stage-decision",
+      "instruction": "Read the brief and submit the decision.",
+      "evidence_ids": [
+        "ev-brief"
+      ],
+      "completion": "Write /workspace/output.json"
+    }
+  ],
+  "deliverables": [
+    {
+      "id": "deliverable-decision",
+      "path": "output.json",
+      "description": "JSON object with locale, price_currency, glossary_term and imprint_link_included."
+    }
+  ],
+  "rubric": {
+    "criteria": [
+      {
+        "id": "locale_match",
+        "description": "Creative targets the requested locale.",
+        "weight_bps": 3000,
+        "binding": {
+          "kind": "json_equals",
+          "field": "locale",
+          "value": "de-DE"
+        }
+      },
+      {
+        "id": "currency_correct",
+        "description": "Price shown in the market currency.",
+        "weight_bps": 4000,
+        "binding": {
+          "kind": "json_equals",
+          "field": "price_currency",
+          "value": "EUR"
+        }
+      },
+      {
+        "id": "glossary_used",
+        "description": "Approved glossary term used.",
+        "weight_bps": 3000,
+        "binding": {
+          "kind": "json_equals",
+          "field": "glossary_term",
+          "value": "Ruhemodus"
+        }
+      }
+    ],
+    "reference_output": {
+      "locale": "de-DE",
+      "price_currency": "EUR",
+      "glossary_term": "Ruhemodus",
+      "imprint_link_included": true
+    }
+  },
+  "provenance": {
+    "classification": "synthetic",
+    "source": "Praxis policy SEED fixture. Fictional company, people and data; no customer material.",
+    "rights": {
+      "status": "declared",
+      "basis": "Original synthetic fixture authored for the Praxis–Anvil integration. Not a reviewed rights clearance."
+    },
+    "review": {
+      "status": "draft",
+      "reviewer_ref": "not-reviewed",
+      "reviewed_revision_id": "seed-locale-001-r1"
+    }
+  }
+}

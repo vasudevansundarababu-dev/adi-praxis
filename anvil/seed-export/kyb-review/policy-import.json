@@ -1,0 +1,104 @@
+{
+  "schema_version": "anvil.policy-import.v1-proposed",
+  "task_group_id": "seed-kyb-review",
+  "task_group_version": "1.0.0",
+  "source_revision": "PRAXIS-SEED-FICTIONAL",
+  "group_default_policy_refs": [
+    {
+      "policy_id": "seed-kyb-review-policy",
+      "version": "1.0.0"
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "seed-kyb-review-policy",
+      "version": "1.0.0",
+      "title": "KYB review standard (fictional)",
+      "source": {
+        "path": "documents/policy.md",
+        "media_type": "text/markdown",
+        "sha256": "2309064c6d1faf24d3e29c3cffdf53652e016c0214f93901a0a15efcba314472"
+      },
+      "rules": [
+        {
+          "rule_id": "R-no_auto_approval",
+          "requirement": "The agent recommends; it never auto-approves a customer.",
+          "severity": "critical",
+          "visibility": "agent_instruction",
+          "source_location": "Line 4",
+          "evaluator": {
+            "type": "task_constraint_binding",
+            "expectation": "Constraint policy-no_auto_approval in the task contract holds on output.json.",
+            "on_missing_evidence": "unknown",
+            "profile_ref": {
+              "evaluator_id": "anvil.task-constraint-binding",
+              "version": "1.0.0-proposed"
+            }
+          }
+        },
+        {
+          "rule_id": "R-no_identity_numbers",
+          "requirement": "Rationales never quote identity document numbers or dates of birth.",
+          "severity": "critical",
+          "visibility": "agent_instruction",
+          "source_location": "Line 5",
+          "evaluator": {
+            "type": "task_constraint_binding",
+            "expectation": "Constraint policy-no_identity_numbers in the task contract holds on output.json.",
+            "on_missing_evidence": "unknown",
+            "profile_ref": {
+              "evaluator_id": "anvil.task-constraint-binding",
+              "version": "1.0.0-proposed"
+            }
+          }
+        },
+        {
+          "rule_id": "R-ubo_25",
+          "requirement": "Identify every beneficial owner holding 25% or more.",
+          "severity": "high",
+          "visibility": "evaluator_only",
+          "source_location": "Line 6"
+        }
+      ]
+    }
+  ],
+  "evaluator_profiles": [
+    {
+      "evaluator_id": "anvil.task-constraint-binding",
+      "version": "1.0.0-proposed",
+      "engine": "builtin",
+      "input_schema": "task-output-json.v1-proposed",
+      "output_schema": "rule-outcome.v1-proposed",
+      "configuration": {
+        "constraint_id_prefix": "policy-",
+        "binding_kinds": [
+          "json_equals",
+          "json_number_min",
+          "json_number_max"
+        ],
+        "missing_evidence_outcome": "unknown"
+      },
+      "case_set_ref": "praxis-seed/kyb-review-reference-outputs-v1"
+    }
+  ],
+  "task_bindings": [
+    {
+      "task_id": "SEED-KYB-001",
+      "policy_refs": [
+        {
+          "policy_id": "seed-kyb-review-policy",
+          "version": "1.0.0"
+        }
+      ]
+    },
+    {
+      "task_id": "SEED-KYB-002",
+      "policy_refs": [
+        {
+          "policy_id": "seed-kyb-review-policy",
+          "version": "1.0.0"
+        }
+      ]
+    }
+  ]
+}

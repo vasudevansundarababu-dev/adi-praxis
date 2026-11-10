@@ -1,0 +1,198 @@
+{
+  "schema_version": "praxis.anvil.policy.v1-proposed",
+  "snapshot_id": "72a60412-4a8f-4f9f-9077-bbc5169b5989",
+  "task_id": "55c242c4-674b-4a28-ae26-05eb61c66550",
+  "snapshot_version": 1,
+  "published_at": "2026-11-10T04:53:53.871Z",
+  "project_rule_set": {
+    "id": "2d258685-379e-430d-b3b1-4e22c306cd48",
+    "digest": "0f10461422f811c2bd016b633ef2795db358100877cdc6fd4409d770e5646bd9",
+    "version": 1
+  },
+  "rules": [
+    {
+      "title": "Recent proof of address",
+      "rule_id": "a421a09b-3542-4944-a412-50df5bf25b28",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "Proof of address must be dated within the last three months.",
+          "sha256": "c8a3b42148a5426a43f6d95ce0564d207d54cdcbf656aeadc7771a4c451fb69c",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 203,
+            "chunkId": null,
+            "lineEnd": 4,
+            "section": null,
+            "charStart": 143,
+            "lineStart": 4,
+            "renditionPage": null
+          },
+          "document_version_id": "070514f7-7736-424b-819e-dbff77532355"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-address_recency",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "agent_visible",
+      "requirement": "Proof of address is dated within the last three months.",
+      "content_hash": "bb5f59f483abd26fb2777ccb63828bc74cdba5cbf370578581b832da247a9fb1",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "4e21afc8-3ffe-40d7-bd08-900702363363",
+      "requirement_type": "obligation",
+      "verification_hint": null,
+      "applicability_label": "Always applies"
+    },
+    {
+      "title": "Annual high-risk refresh",
+      "rule_id": "c76afd0a-1112-4d41-9c99-384b60f6d2a2",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "A refresh review is required every 12 months for high-risk customers.",
+          "sha256": "c8a3b42148a5426a43f6d95ce0564d207d54cdcbf656aeadc7771a4c451fb69c",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 347,
+            "chunkId": null,
+            "lineEnd": 6,
+            "section": null,
+            "charStart": 278,
+            "lineStart": 6,
+            "renditionPage": null
+          },
+          "document_version_id": "070514f7-7736-424b-819e-dbff77532355"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-high_risk_refresh",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "agent_visible",
+      "requirement": "Review high-risk customers every 12 months.",
+      "content_hash": "bd8f6ae3ecf4984289430ee3db8a53b868290543119d1740247f5aa40d7662ab",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [
+          "high-risk customer"
+        ],
+        "universal": false,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "74c7d3db-a9cc-4636-9c23-fb6e9589049e",
+      "requirement_type": "obligation",
+      "verification_hint": null,
+      "applicability_label": "Applies as written"
+    },
+    {
+      "title": "Screen before opening",
+      "rule_id": "708a6e1e-52f2-4d43-91a2-609b88da5b1e",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "Sanctions screening must be completed before the account is opened.",
+          "sha256": "c8a3b42148a5426a43f6d95ce0564d207d54cdcbf656aeadc7771a4c451fb69c",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 274,
+            "chunkId": null,
+            "lineEnd": 5,
+            "section": null,
+            "charStart": 207,
+            "lineStart": 5,
+            "renditionPage": null
+          },
+          "document_version_id": "070514f7-7736-424b-819e-dbff77532355"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-screen_before_open",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "agent_visible",
+      "requirement": "Complete sanctions screening before opening the account.",
+      "content_hash": "ee90a435f68b29586bbf785d24f4110f27b611d80b03a43cb672f517a5e63226",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "f8524817-e37f-44d2-8d5a-8a7be248ac7a",
+      "requirement_type": "obligation",
+      "verification_hint": null,
+      "applicability_label": "Always applies"
+    }
+  ],
+  "task_changes": [
+    {
+      "id": "6e673f74-984e-434b-be06-7e6d6c822886",
+      "type": "CLARIFICATION",
+      "scope": {},
+      "reason": "Stricter evidence for this task.",
+      "requirement": "Utility bills only; no bank statements.",
+      "exception_index": null,
+      "rule_version_id": "4e21afc8-3ffe-40d7-bd08-900702363363",
+      "source_citation_id": null
+    }
+  ],
+  "rubric_version": "template:78ed7b53-5c73-47c2-821b-14a66797b000@1",
+  "digest": "3db0d0497c1b26b77fa5329708d7a90549eb83f54051be7ab306f1827b1a7ea0"
+}

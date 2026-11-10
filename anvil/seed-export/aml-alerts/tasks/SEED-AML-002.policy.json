@@ -1,0 +1,185 @@
+{
+  "schema_version": "praxis.anvil.policy.v1-proposed",
+  "snapshot_id": "92adf7bf-787f-4aaf-bc2d-3b8c9fac7787",
+  "task_id": "0272fa28-3ce6-45b6-9ed0-f4c9ff1df408",
+  "snapshot_version": 1,
+  "published_at": "2026-11-10T04:53:53.823Z",
+  "project_rule_set": {
+    "id": "98ac760b-507f-4b55-ad5a-7f97017cf424",
+    "digest": "1b3037bde316622438f578958943ee8c43da9b28fc8609c3fcac4e56a5ba9365",
+    "version": 1
+  },
+  "rules": [
+    {
+      "title": "Disposition reason",
+      "rule_id": "920c0fe7-a992-4229-ba89-e5f3a2bbe17a",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "Every alert disposition must state the reason in plain language.",
+          "sha256": "d599e84ac5e3a75b29d763b01aa4f1a66bc676358428e8e3db0715a0f34c5ba6",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 356,
+            "chunkId": null,
+            "lineEnd": 6,
+            "section": null,
+            "charStart": 292,
+            "lineStart": 6,
+            "renditionPage": null
+          },
+          "document_version_id": "cefd83ac-ebb2-4416-97cf-eff1b840b682"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-disposition_reason",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "agent_visible",
+      "requirement": "State the reason for every alert disposition in plain language.",
+      "content_hash": "beec77f36b3d9fc680208f92b918a4255b1448bf865b0a1866bb140b70d10a0f",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "15cb3874-ea7b-4b11-901e-1b3ee1b9fa3b",
+      "requirement_type": "obligation",
+      "verification_hint": null,
+      "applicability_label": "Always applies"
+    },
+    {
+      "title": "No customer exit by the agent",
+      "rule_id": "87cf48f7-240e-484d-8eb3-7e960750d696",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "Exiting a customer is a human decision; the agent must never do it.",
+          "sha256": "d599e84ac5e3a75b29d763b01aa4f1a66bc676358428e8e3db0715a0f34c5ba6",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 288,
+            "chunkId": null,
+            "lineEnd": 5,
+            "section": null,
+            "charStart": 221,
+            "lineStart": 5,
+            "renditionPage": null
+          },
+          "document_version_id": "cefd83ac-ebb2-4416-97cf-eff1b840b682"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-no_customer_exit",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "agent_visible",
+      "requirement": "Exiting a customer is a human decision; the agent never does it.",
+      "content_hash": "54f80451393603d4688fef3a9829477f452fd52e0652981d49e8a9dcb2b7cb0a",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "783f69d7-d49f-43bd-9aa4-0b53482f7a44",
+      "requirement_type": "prohibition",
+      "verification_hint": null,
+      "applicability_label": "Always applies"
+    },
+    {
+      "title": "No tipping-off",
+      "rule_id": "c9aa3275-6dd2-4fa3-951f-e1f57284f3f7",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "Customer messages must never mention suspicion, investigations or reports.",
+          "sha256": "d599e84ac5e3a75b29d763b01aa4f1a66bc676358428e8e3db0715a0f34c5ba6",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 217,
+            "chunkId": null,
+            "lineEnd": 4,
+            "section": null,
+            "charStart": 143,
+            "lineStart": 4,
+            "renditionPage": null
+          },
+          "document_version_id": "cefd83ac-ebb2-4416-97cf-eff1b840b682"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-no_tipping_off",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "agent_visible",
+      "requirement": "Customer messages never mention suspicion, investigations or reports.",
+      "content_hash": "7fa9cbcf14826d439e1c00c391129b57a778e5a7d6c5c52929d333351cfa79b6",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "b5379121-e5f1-4339-b30b-602374bc30ce",
+      "requirement_type": "prohibition",
+      "verification_hint": null,
+      "applicability_label": "Always applies"
+    }
+  ],
+  "task_changes": [],
+  "rubric_version": "template:ef2ff1f4-8dc3-4cd9-8a8a-e02668d0260b@1",
+  "digest": "80ce429d396991853325cc8f2f24103077045767de486d7f5e0c75a26084191c"
+}

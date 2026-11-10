@@ -1,0 +1,196 @@
+{
+  "schema_version": "praxis.anvil.policy.v1-proposed",
+  "snapshot_id": "a7345686-7da3-407b-8fe4-2ad8c1d8d790",
+  "task_id": "70f130af-0c8f-481f-814a-cbe2b5f5634c",
+  "snapshot_version": 1,
+  "published_at": "2026-11-10T04:53:53.765Z",
+  "project_rule_set": {
+    "id": "6d43f0df-3ed4-4c5f-a540-f09eca5e9ff8",
+    "digest": "5ca3009a5685c3c4f7a990aaf54ae2aed62c6c978f96d5e38f672a42237957b4",
+    "version": 1
+  },
+  "rules": [
+    {
+      "title": "No auto-approval",
+      "rule_id": "5ee6d80d-1487-4166-9a8a-81ed0bd514eb",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "The agent recommends a decision; it must never auto-approve a customer.",
+          "sha256": "2309064c6d1faf24d3e29c3cffdf53652e016c0214f93901a0a15efcba314472",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 209,
+            "chunkId": null,
+            "lineEnd": 4,
+            "section": null,
+            "charStart": 138,
+            "lineStart": 4,
+            "renditionPage": null
+          },
+          "document_version_id": "2ef3b413-2391-4ddc-bddb-694d4601e71f"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-no_auto_approval",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "agent_visible",
+      "requirement": "The agent recommends; it never auto-approves a customer.",
+      "content_hash": "68ce131a41288d6016ba9539e0fec0c6f283b47546b9b85a089d10e29cc778ea",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "9882d52b-0fed-46fc-8e94-585835336cbe",
+      "requirement_type": "prohibition",
+      "verification_hint": null,
+      "applicability_label": "Always applies"
+    },
+    {
+      "title": "No identity numbers",
+      "rule_id": "6f5cca69-c1e3-4e2d-95d3-9cfc7539b219",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "Rationales must never quote identity document numbers or dates of birth.",
+          "sha256": "2309064c6d1faf24d3e29c3cffdf53652e016c0214f93901a0a15efcba314472",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 285,
+            "chunkId": null,
+            "lineEnd": 5,
+            "section": null,
+            "charStart": 213,
+            "lineStart": 5,
+            "renditionPage": null
+          },
+          "document_version_id": "2ef3b413-2391-4ddc-bddb-694d4601e71f"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-no_identity_numbers",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "agent_visible",
+      "requirement": "Rationales never quote identity document numbers or dates of birth.",
+      "content_hash": "3c3bc738b79802a7175fce130fe24470d8e585765a0183fa3c2cbb738cdd2afe",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "f16e8770-1405-4ec2-a33c-be58cfb9211f",
+      "requirement_type": "prohibition",
+      "verification_hint": null,
+      "applicability_label": "Always applies"
+    },
+    {
+      "title": "Identify 25% owners",
+      "rule_id": "c94fe183-36cb-4fa5-a6d0-2d131b5b58ad",
+      "sources": [
+        {
+          "role": "supports",
+          "field": "requirement",
+          "quote": "Every beneficial owner holding 25% or more must be identified.",
+          "sha256": "2309064c6d1faf24d3e29c3cffdf53652e016c0214f93901a0a15efcba314472",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 351,
+            "chunkId": null,
+            "lineEnd": 6,
+            "section": null,
+            "charStart": 289,
+            "lineStart": 6,
+            "renditionPage": null
+          },
+          "document_version_id": "2ef3b413-2391-4ddc-bddb-694d4601e71f"
+        }
+      ],
+      "version": 1,
+      "rule_key": "R-ubo_25",
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "precedence": [],
+      "visibility": "evaluator_only",
+      "requirement": "Identify every beneficial owner holding 25% or more.",
+      "content_hash": "54f2214834ca15df9cc9b0ce4704900b8be588876b56a5ae99d0ad4614062b64",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "prerequisites": [],
+      "evidence_needs": [],
+      "rule_version_id": "e243b450-8e56-40bd-bbb1-7f6200ddc4d6",
+      "requirement_type": "obligation",
+      "verification_hint": null,
+      "applicability_label": "Always applies"
+    }
+  ],
+  "task_changes": [
+    {
+      "id": "91daf6fe-b5c7-40f6-a363-6419e365e6e9",
+      "type": "CLARIFICATION",
+      "scope": {},
+      "reason": "Clarifies the expected evidence.",
+      "requirement": "Name the ownership chain for each owner found.",
+      "exception_index": null,
+      "rule_version_id": "e243b450-8e56-40bd-bbb1-7f6200ddc4d6",
+      "source_citation_id": null
+    }
+  ],
+  "rubric_version": "template:813e0397-c698-4ec6-b748-a683fefa859b@1",
+  "digest": "f8ba57fd19de058c1680ce65ffd52044722fcf41f43dcebb3fbac4d2a86f582d"
+}

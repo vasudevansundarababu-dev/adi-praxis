@@ -1,0 +1,258 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://praxis/contracts/praxis/policy-snapshot.schema.json",
+  "title": "Praxis task policy snapshot sidecar (PROPOSED)",
+  "description": "Status: proposed (docs/architecture/ARCH-POLICY-RULES.md section 8). Optional `policy` member on /studio-tasks/export items and /dataset/export rows when the task was frozen with a policy snapshot. Absent for tasks without policy. Task envelopes praxis.anvil.task.v1/v2 are unchanged. Not yet agreed with Anvil.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "task_id",
+    "snapshot_version",
+    "published_at",
+    "project_rule_set",
+    "rules",
+    "task_changes",
+    "rubric_version",
+    "digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "praxis.anvil.policy.v1-proposed"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "task_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "snapshot_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "project_rule_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "digest": {
+          "type": "string"
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Rule"
+      }
+    },
+    "task_changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TaskChange"
+      }
+    },
+    "rubric_version": {
+      "type": "string"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "Rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "rule_key",
+        "rule_version_id",
+        "version",
+        "content_hash",
+        "title",
+        "requirement",
+        "requirement_type",
+        "visibility",
+        "applicability",
+        "applicability_label",
+        "prerequisites",
+        "precedence",
+        "exceptions",
+        "effective",
+        "evidence_needs",
+        "verification_hint",
+        "sources"
+      ],
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "rule_key": {
+          "type": "string"
+        },
+        "rule_version_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "content_hash": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "requirement_type": {
+          "type": "string"
+        },
+        "visibility": {
+          "enum": [
+            "agent_visible",
+            "evaluator_only"
+          ]
+        },
+        "applicability": {
+          "type": "object"
+        },
+        "applicability_label": {
+          "type": "string"
+        },
+        "prerequisites": {
+          "type": "array"
+        },
+        "precedence": {
+          "type": "array"
+        },
+        "exceptions": {
+          "type": "object"
+        },
+        "effective": {
+          "type": "object"
+        },
+        "evidence_needs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "verification_hint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "document_version_id",
+              "sha256",
+              "field",
+              "role",
+              "quote",
+              "locator"
+            ],
+            "properties": {
+              "document_version_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "field": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "quote": {
+                "type": "string"
+              },
+              "locator": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "TaskChange": {
+      "type": "object",
+      "required": [
+        "id",
+        "rule_version_id",
+        "type",
+        "requirement",
+        "scope",
+        "reason"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "rule_version_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "type": {
+          "type": "string"
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "object"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "source_citation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exception_index": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

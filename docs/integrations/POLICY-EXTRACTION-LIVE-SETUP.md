@@ -50,7 +50,7 @@ terraform -chdir=infra/terraform/envs/staging init
 terraform -chdir=infra/terraform/envs/staging plan -out=policy.tfplan
 ```
 
-The plan must show only: **create** 1 API service, 1 processor, 1 project IAM member, 1 secret, 2 secret IAM members; **update in place** `praxis-api` and `praxis-worker` (new env vars). Anything else: stop and send me the plan summary line. Then:
+The plan must read **`Plan: 6 to add, 4 to change, 0 to destroy.`** Create: 1 API service, 1 processor, 1 project IAM member, 1 secret, 2 secret IAM members. Update in place (new non-secret env vars only): services `praxis-api`, `praxis-worker` and jobs `praxis-migrate`, `praxis-verify-chains`. Anything else, or any destroy/replace: stop and send me the plan summary line. Then:
 
 ```zsh
 terraform -chdir=infra/terraform/envs/staging apply policy.tfplan
@@ -69,7 +69,7 @@ The last command shows `1 enabled` and never the key.
 
 ### 2.3 Switch live extraction on (only for the smoke test)
 
-In `infra/terraform/envs/staging/main.tf`, change `live = false` to `live = true` in `policy_extraction`, then plan and apply again. That plan should only update `praxis-api` and `praxis-worker` (live flag plus the key reference). Production is never changed.
+In `infra/terraform/envs/staging/main.tf`, change `live = false` to `live = true` in `policy_extraction`, then plan and apply again. That plan should only update the same four Cloud Run resources (live flag; the key reference is added to `praxis-api` and `praxis-worker` only). Production is never changed.
 
 ## 3. Turn it on in Praxis (after the staging deploy)
 

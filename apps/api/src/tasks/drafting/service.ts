@@ -48,9 +48,11 @@ export async function assertDraftable(tx: Db | Tx, t: Pick<TaskInstance, 'taskTy
 /** W06: every drafted section must be confirmed by the author before submit (TASK-DRAFTING section 4). */
 export function draftingChecks(t: Pick<TaskInstance, 'drafting'>): TaskCheck[] {
   const sections = Object.entries(draftingOf(t).sections) as [DraftSection, SectionState][];
-  if (!sections.length) return [];
+  const chat = (t.drafting as { conversation?: { pending?: unknown; needsReview?: boolean; unresolved?: string[] } } | null)?.conversation;
+  const chatChecks: TaskCheck[] = chat ? [{ id: 'conversation.review', section: 'W06', ok: !chat.pending && !chat.needsReview && !(chat.unresolved?.length), message: 'Resolve conversation questions and review coordinated edits before submission' }] : [];
+  if (!sections.length) return chatChecks;
   const open = sections.filter(([, s]) => !s.confirmedAt).map(([k]) => k).sort();
-  return [{ id: 'drafting.confirmed', section: 'W06', ok: open.length === 0, message: open.length ? `Check and confirm the AI-drafted section(s): ${open.join(', ')}` : 'Every AI-drafted section was checked and confirmed by you' }];
+  return [...chatChecks, { id: 'drafting.confirmed', section: 'W06', ok: open.length === 0, message: open.length ? `Check and confirm the AI-drafted section(s): ${open.join(', ')}` : 'Every AI-drafted section was checked and confirmed by you' }];
 }
 
 // ───────────────────────── Sources ─────────────────────────
@@ -186,7 +188,7 @@ async function fail(db: Db, run: TaskDraftRun, error: string, problems: string[]
  */
 export async function executeDraft(db: Db, deps: { drafter: TaskDrafter; storage: ObjectStorage }, runId: string) {
   const run = await db.taskDraftRun.findUnique({ where: { id: runId } });
-  if (!run || run.status === 'SUCCEEDED' || run.status === 'FAILED') return;
+  if (!run || run.section === 'CHAT' || run.status === 'SUCCEEDED' || run.status === 'FAILED') return;
   const claimed = await db.taskDraftRun.updateMany({ where: { id: run.id, status: { in: ['QUEUED', 'RUNNING'] } }, data: { status: 'RUNNING', startedAt: new Date() } });
   if (!claimed.count) return;
   const task = await db.taskInstance.findUniqueOrThrow({ where: { id: run.taskInstanceId }, include: { project: true } });

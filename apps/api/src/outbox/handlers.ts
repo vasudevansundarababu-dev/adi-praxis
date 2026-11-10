@@ -1,3 +1,5 @@
+import { executeConversation } from '../tasks/conversation/service';
+import { MockConversationAssistant, VertexConversationAssistant, type ConversationAssistant } from '../tasks/conversation/assistant';
 import type { OutboxEvent } from '@prisma/client';
 import type { DomainEventName } from '@praxis/shared';
 import type { Db, Tx } from '../db';
@@ -47,12 +49,16 @@ export class HandlerRegistry {
 }
 
 /** Production handler registry. Optional dependencies enable the handlers that need them (tests opt in). */
-export function defaultHandlers(deps: { evaluator?: SuitabilityEvaluator; email?: EmailSender; config?: Config; rlGym?: RlGymClient | null; drafter?: TaskDrafter; storage?: ObjectStorage; smeSupply?: boolean; cert?: Omit<ItemDeps, 'db'> } = {}): HandlerRegistry {
+export function defaultHandlers(deps: { evaluator?: SuitabilityEvaluator; email?: EmailSender; config?: Config; conversationAssistant?: ConversationAssistant; rlGym?: RlGymClient | null; drafter?: TaskDrafter; storage?: ObjectStorage; smeSupply?: boolean; cert?: Omit<ItemDeps, 'db'> } = {}): HandlerRegistry {
   const r = new HandlerRegistry().register(rematchOnApproval(new OfflineGeocoder())).register(closeCampaignsOnStaffed()).register(startProjectOnStaffed());
   if (deps.evaluator) r.register(assessOnSubmit(deps.evaluator));
   if (deps.email && deps.config) r.register(issueTasksOnAssigned({ email: deps.email, config: deps.config }));
   if (deps.rlGym !== undefined) r.register(deliverRlResult(deps.rlGym));
   if (deps.drafter && deps.storage) r.register(draftOnRequest({ drafter: deps.drafter, storage: deps.storage }));
+  if (deps.config || deps.conversationAssistant) {
+    const assistant = deps.conversationAssistant ?? (deps.config!.assistantMode === 'vertex' ? new VertexConversationAssistant({ projectId: deps.config!.VERTEX_PROJECT_ID, region: deps.config!.VERTEX_LOCATION }) : new MockConversationAssistant());
+    r.register({ name: 'authoring.conversation', event: 'task.draft.requested', async run(event, db) { await executeConversation(db, assistant, (event.payload as { runId: string }).runId); } });
+  }
   // M10 SME supply: only with the feature flag on (docs/SME-SUPPLY.md section 13).
   if (deps.smeSupply ?? deps.config?.SME_SUPPLY_ENABLED) {
     for (const h of supplyHandlers()) r.register(h);

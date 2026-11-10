@@ -10,7 +10,8 @@ import { draftingChecks } from './drafting/service';
 import { findSimilar, storeEmbedding, type SimilarMatch } from './similarity';
 import { scanForRealData, type DataFlag } from './synthetic-scan';
 import { templateRef } from './task-service';
-import { snapshotTask } from '../policy/task-policy';
+import { chatOf } from './conversation/service';
+import { effectivePolicy, snapshotTask } from '../policy/task-policy';
 
 type Audit = (i: Parameters<typeof writeAudit>[2]) => Promise<void>;
 
@@ -24,13 +25,19 @@ export interface StoredChecks {
 export const blocking = (c: TaskCheck) => !c.ok && c.severity !== 'warning';
 
 /** Every automated check for the task's current output (TASK-KYC section 5), without changing anything. */
-export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 'projectId' | 'taskType' | 'output' | 'input' | 'drafting'>) {
+export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 'projectId' | 'taskType' | 'output' | 'input' | 'drafting' | 'revision'>) {
   const project = await tx.project.findUniqueOrThrow({ where: { id: task.projectId }, include: { template: true } });
   const template = await templateRef(tx, project.templateId);
   const def = definitionFor(template);
   const output = (task.output ?? {}) as Record<string, unknown>;
   const slot = task.taskType === 'AUTHORING' ? ((task.input as { slot?: SlotRef }).slot ?? null) : null;
   const checks: TaskCheck[] = [...coverageChecks(template, slot, output), ...(def.key === 'kyc-onboarding-v1' ? praxisContractChecks(output) : []), ...def.validateSubmission(template, output, slot), ...draftingChecks(task)];
+  const chat = chatOf(task);
+  if (chat.reviewedRevision !== undefined) checks.push({ id: 'conversation.reviewed_revision', section: 'W06', ok: chat.reviewedRevision === task.revision, message: 'Review the latest task revision after manual edits' });
+  if (chat.policyDigest) {
+    const policy = await effectivePolicy(tx, project.clientId, task);
+    checks.push({ id: 'conversation.policy_version', section: 'W06', ok: chat.policyDigest === (policy?.digest ?? 'none'), message: 'Reconcile conversation against current published project rules' });
+  }
   const coverage: CoverageTags | null = task.taskType === 'AUTHORING' ? finalCoverage(slot, output) : null;
   return {
     project,

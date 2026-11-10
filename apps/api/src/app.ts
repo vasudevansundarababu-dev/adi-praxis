@@ -1,3 +1,4 @@
+import { conversationRoutes } from './routes/conversation';
 import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import cors from '@fastify/cors';
@@ -318,6 +319,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
       await v1.register(candidateStudioRoutes, { db: deps.db, config: deps.config, storage, deps: resolveDeps(deps.metaCompiler?.deps), selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), faults: deps.metaCompiler?.studioFaults });
       await v1.register(taskReviewRoutes, { db: deps.db });
+      await v1.register(conversationRoutes, { db: deps.db, selectionGate });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       await v1.register(policyRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, adapters: deps.policyAdapters ?? defaultAdapters(deps.config.policy) });
       // M10 SME supply: nothing is registered with the flag off (docs/SME-SUPPLY.md section 13).

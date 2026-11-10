@@ -1,5 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { ConversationWorkbench } from './conversation-workbench';
+
 import Link from 'next/link';
 import { ContractEditor, newSyntheticContract } from './contract-editor';
 import { useRouter } from 'next/navigation';
@@ -23,6 +26,8 @@ export function SaveIndicator({ state, readOnly }: { state: SaveState; readOnly:
 
 /** Opens the right editor for the task: the KYC workbench, the generic authoring editor, or the annotation form. */
 export function TaskPage({ task }: { task: TaskView }) {
+  const [detailed, setDetailed] = useState(false);
+  useEffect(() => { setDetailed(new URLSearchParams(window.location.search).get("editor") === "form"); }, []);
   const router = useRouter();
   const done = () => router.push(`/projects/${task.projectId}?submitted=${task.id}`);
   return (
@@ -39,7 +44,7 @@ export function TaskPage({ task }: { task: TaskView }) {
         </p>
       )}
       <div className="mt-4">
-        {task.definition === 'kyc-onboarding-v1' ? <KycWorkbench task={task} onSubmitted={done} /> : task.taskType === 'ANNOTATION' ? <AnnotationTask task={task} onSubmitted={done} /> : <GenericAuthoring task={task} onSubmitted={done} />}
+        {task.taskType === 'AUTHORING' && !detailed ? <ConversationWorkbench task={task} /> : task.definition === 'kyc-onboarding-v1' ? <KycWorkbench task={task} onSubmitted={done} /> : task.taskType === 'ANNOTATION' ? <AnnotationTask task={task} onSubmitted={done} /> : <GenericAuthoring task={task} onSubmitted={done} />}
       </div>
     </div>
   );

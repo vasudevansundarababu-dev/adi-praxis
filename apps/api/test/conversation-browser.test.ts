@@ -5,7 +5,7 @@ import type { ConversationAssistant, ConversationInput } from '../src/tasks/conv
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { KYC_EXAMPLE_TASK, replayCall, type KycTask } from '@praxis/shared';
+import { KYC_EXAMPLE_TASK, TEMPLATE_INSTRUCTIONS, replayCall, type KycTask } from '@praxis/shared';
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MockGoogleVerifier } from '../src/candidate/google';
@@ -90,6 +90,8 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
 
   async function template(workflowName = 'KYC onboarding and refresh') {
     const domainId = (await db.domain.findFirst({ where: { clientId } }))?.id ?? (await post(admin, '/domains', { name: 'Banking' })).json().id;
+    const existing = await db.template.findFirst({where:{clientId,workflowName,status:'PUBLISHED'}});
+    if (existing) return existing.id;
     const t = (
       await post(admin, '/templates', {
         domainId,
@@ -104,7 +106,9 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
         edgeCaseCatalog: [{ name: EDGE, quota: 1, required: true }],
       })
     ).json();
-    expect((await post(admin, `/templates/${t.id}/publish`)).statusCode).toBe(200);
+    expect(t.id, JSON.stringify(t)).toBeTruthy();
+    const published=await post(admin, `/templates/${t.id}/publish`);
+    expect(published.statusCode,published.body).toBe(200);
     return t.id as string;
   }
 
@@ -236,6 +240,65 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       await page.getByRole('textbox', { name: /^Title/ }).waitFor();
       for (let i=0;i<20 && await page.getByRole('textbox', { name: /^Title/ }).isDisabled();i++) await new Promise(r=>setTimeout(r,50));
       expect(await page.getByRole('textbox', { name: /^Title/ }).isEnabled()).toBe(true);
+      // Every KYC content section remains editable; immediate tab changes flush the last keystroke.
+      const sections = [
+        ['W01', /^Title/, 'Section title retained'],
+        ['W02', /^Business context/, 'Scenario answer retained'],
+        ['W03', /^Response the environment returns/, 'Recorded response retained'],
+        ['W04', /^Rationale/, 'Evidence grounded rationale retained'],
+        ['W05', /^Pass condition/, 'Observable criterion retained'],
+      ] as const;
+      for (let i=0;i<sections.length;i++) {
+        const [section,label,text]=sections[i]!;
+        await page.getByRole('button',{name:new RegExp('^'+section)}).click();
+        const field=page.getByRole('textbox',{name:label}).first();
+        await field.fill(text);
+        await page.getByRole('button',{name:new RegExp('^'+sections[(i+1)%sections.length]![0])}).click();
+      }
+      await page.reload({waitUntil:'networkidle'});
+      for(const [section,label,text] of sections){
+        await page.getByRole('button',{name:new RegExp('^'+section)}).click();
+        expect(await page.getByRole('textbox',{name:label}).first().inputValue()).toBe(text);
+      }
+      // A failed save keeps the current section and its answer available.
+      await page.route('**/api/v1/me/tasks/'+id,route=>route.request().method()==='PUT'?route.fulfill({status:503,json:{message:'Test save unavailable'}}):route.continue());
+      await page.getByRole('button',{name:/^W02/}).click();
+      await page.getByRole('textbox',{name:/^Business context/}).fill('Retain this answer through a save failure');
+      await page.getByRole('button',{name:/^W03/}).click();
+      await page.getByRole('alert').filter({hasText:'Your changes could not be saved. Stay in this section'}).waitFor();
+      expect(await page.getByRole('textbox',{name:/^Business context/}).inputValue()).toContain('save failure');
+      await page.unroute('**/api/v1/me/tasks/'+id);
+      await page.getByRole('button',{name:/^W03/}).click();
+      // Agent preview must save without discarding the mounted Classic editor.
+      await page.getByRole('textbox',{name:/^Response the environment returns/}).first().fill('Latest recorded response before preview');
+      await page.getByRole('button',{name:'View as agent',exact:true}).click();
+      await page.getByRole('button',{name:'Return to authoring',exact:true}).click();
+      expect(await page.getByRole('textbox',{name:/^Response the environment returns/}).first().inputValue()).toBe('Latest recorded response before preview');
+      expect((await task(a,id)).output.environment.responses[0].response).toBe('Latest recorded response before preview');
+      // All other catalogue templates use the shared generic Classic editor, never an empty tab placeholder.
+      for(const templateHelp of TEMPLATE_INSTRUCTIONS.filter(t=>t.name.toLowerCase()!=='kyc onboarding and refresh')){
+        console.log('Catalogue persistence:',templateHelp.name);
+        const fixture=await kycTask(templateHelp.name);
+        const context=await browser.newContext({viewport:{width:1200,height:900}});
+        await context.addCookies([{name:'praxis_candidate',value:fixture.a.cookie.split('=')[1]!,domain:'127.0.0.1',path:'/'}]);
+        const generic=await context.newPage();
+        await generic.goto(`http://127.0.0.1:${port}/tasks/${fixture.id}`,{waitUntil:'networkidle'});
+        await generic.getByLabel('I agree to these terms.').check();
+        await generic.getByRole('button',{name:'Accept authorship terms'}).click();
+        await generic.getByLabel('Your answer').fill('Unsent draft for '+templateHelp.id);
+        await generic.getByRole('button',{name:'Classic',exact:true}).click();
+        const body=generic.getByRole('textbox',{name:'The task (scenario, inputs, expected steps, evidence, decision and how to verify it)',exact:true});
+        const answer='SME-authored case for '+templateHelp.id+' with evidence, expected work and grading.';
+        await body.fill(answer);
+        await generic.getByRole('button',{name:'Chatbot',exact:true}).click();
+        expect(await generic.getByLabel('Your answer').inputValue()).toBe('Unsent draft for '+templateHelp.id);
+        expect((await task(fixture.a,fixture.id)).output.body).toBe(answer);
+        await generic.reload({waitUntil:'networkidle'});
+        expect(await generic.getByLabel('Your answer').inputValue()).toBe('Unsent draft for '+templateHelp.id);
+        await generic.getByRole('button',{name:'Classic',exact:true}).click();
+        expect(await body.inputValue()).toBe(answer);
+        await context.close();
+      }
       // Actual PM UI: the required choice is persisted and restored for every mode.
       webChild=spawn('pnpm',['--filter','@praxis/web','exec','next','dev','-H','127.0.0.1','-p','0'],{cwd:new URL('../../../',import.meta.url),env:{...process.env,NODE_ENV:'development',API_BASE_URL:address,NEXT_TELEMETRY_DISABLED:'1',NEXT_DIST_DIR:'.next-verify'},stdio:['ignore','pipe','pipe'],detached:true});
       let webLogs='';
@@ -260,5 +323,5 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       await manager.screenshot({path:'/private/tmp/praxis-mode-project-creation.png',fullPage:true});
 
     } finally { await browser.close(); if(webChild?.pid){try{process.kill(-webChild.pid,'SIGTERM');}catch{}} if (child.pid) { try { process.kill(-child.pid, 'SIGTERM'); } catch {} } }
-  }, 150000);
+  }, 300000);
 });

@@ -61,3 +61,7 @@ Remaining independent gaps: two-stage Expert→PM role routing, candidate policy
 
 ## Delivery boundary
 Local source and isolated SQL/browser validation only. No paid model calls, cloud deployment, push, merge or live payment. Full implementation/validation evidence is in IMPLEMENTATION-EXPERIENCE-HANDOFF.md.
+
+### Classic persistence follow-up — 10 November 2026
+
+See [CLASSIC-PERSISTENCE-FIX.md](CLASSIC-PERSISTENCE-FIX.md). KYC section navigation now awaits saves and retains the answer on failure. Classic agent preview saves first and preserves the mounted editor. The uniform eight-section Figma design remains a target; current non-KYC templates still use the shared generic Classic form.

@@ -34,6 +34,9 @@ export interface SlotInput {
 }
 
 export interface TaskView extends TaskSummary {
+  authoringExperience?: 'CLASSIC'|'CHATBOT'|'BOTH'|null;
+  effectiveAuthoringExperience?: 'CLASSIC'|'CHATBOT'|'BOTH';
+  authoringWorkspace?: {view:'CLASSIC'|'CHATBOT';answer:string}|null;
   projectId: string;
   projectName: string;
   tptMinutes: number | null;

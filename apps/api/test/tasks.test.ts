@@ -105,7 +105,9 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
     templateId ??= await template(taskMode);
     const jd = (await post(pm, '/job-descriptions', { title: 'KYC Analyst', responsibilities: 'Author KYC cases.', skills: ['KYC'], wagePerTask: 40, wageCurrency: 'GBP', locationType: 'REMOTE' })).json();
     const volume = taskMode === 'AUTHORING' ? { distinctTarget: 12, maxPerExpert: 4 } : { taskCount: 3 };
-    const p = (await post(pm, '/projects', { templateId, name: `P ${randomUUID().slice(0, 6)}`, taskMode, ...volume, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-10-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: true }], ...extra })).json();
+    const p = (await post(pm, '/projects', { authoringExperience: 'BOTH', templateId, name: `P ${randomUUID().slice(0, 6)}`, taskMode, ...volume, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-10-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: true }], ...extra })).json();
+    // Existing-task regression: migrated projects retain historical editing behaviour.
+    await db.project.update({where:{id:p.id},data:{authoringExperience:null}});
     const submitted = await post(pm, `/projects/${p.id}/submit`);
     expect(submitted.statusCode, submitted.body).toBe(200);
     expect((await post(pm, `/projects/${p.id}/match`)).statusCode).toBe(200);

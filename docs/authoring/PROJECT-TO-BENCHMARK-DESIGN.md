@@ -40,3 +40,6 @@ Use deterministic schema/reference/dependency/scoring/tool-call checks, sensitiv
 4. Formal project quotas/deadlines/rework/payment/export invariants with existing platform integrations.
 5. Multi-agent authoring, typed graph validation, role previews and separate runtime qualification.
 6. Build a permissioned training dataset from accepted tasks, corrections and adjudications; hold out whole projects/policy families, maintain hidden evaluator material, and assess a candidate open-weight model on quality, safety, cost and abstention before substituting it. RAG still supplies current customer policy; do not encode confidential policies or blindly imitate unreviewed chats in training. Train the authoring assistant separately from the model being benchmarked.
+
+## Current scope clarification
+For the current demo, reuse existing Praxis modules and add human-only conversational authoring. See APPROVAL-INDEX.md for the current scope, evidence and gaps. Multi-agent orchestration, two-stage approvals and missing executable contract adapters are future work; this target design is not proof of implementation.

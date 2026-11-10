@@ -78,6 +78,7 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
             active.current -= delta;
             rev.current = body.revision;
             setRevision(body.revision);
+            window.dispatchEvent(new CustomEvent('praxis:task-saved',{detail:{taskId,output:JSON.parse(payload).output,revision:body.revision}}));
             if (!dirty.current) setState({ kind: 'saved', at: body.savedAt });
             return true;
           }
@@ -140,6 +141,8 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
     document.addEventListener('click', leave, true);
     return () => { active = false; document.removeEventListener('click', leave, true); };
   }, [put, router]);
+
+  useEffect(()=>{const listener=(e:Event)=>{(e as CustomEvent<{saves:Promise<boolean>[]}>).detail.saves.push(put());};window.addEventListener('praxis:flush',listener);return()=>window.removeEventListener('praxis:flush',listener);},[put]);
 
   const update = useCallback((next: T | ((prev: T) => T)) => {
     if (readonlyNow.current) return;

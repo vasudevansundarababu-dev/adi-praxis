@@ -20,3 +20,5 @@ export * from './blueprint';
 export * from './policy';
 
 export * from "./authoring-conversation";
+
+export * from "./template-instructions";

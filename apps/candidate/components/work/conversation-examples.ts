@@ -64,14 +64,14 @@ export const CONVERSATION_EXAMPLES = [
   },
   {
     "name": "KYB and Beneficial Ownership",
-    "scenario": "A synthetic company is owned through another entity. One intermediate ownership record is stale. Apply the explicit fictional ownership policy supplied with this case.",
+    "scenario": "A synthetic company is owned through another entity. One intermediate ownership record is stale. Apply the explicit ownership policy supplied with this case.",
     "evidence": "E-01 parent owns 60%; E-02 parent ownership filing is stale",
     "finding": "The chain cannot be treated as fully verified from stale evidence.",
     "outcome": "Map the known chain, request current evidence and recommend escalation."
   },
   {
     "name": "KYC Onboarding and Refresh",
-    "scenario": "An invented applicant requests a current account. The identity document and address evidence show inconsistent family names. The fictional policy requires resolution before a completion recommendation.",
+    "scenario": "An invented applicant requests a current account. The identity document and address evidence show inconsistent family names. The policy requires resolution before a completion recommendation.",
     "evidence": "E-01 identity: Mira Demo; E-02 address: Mira Sample; no name-change evidence",
     "finding": "The family-name discrepancy is unresolved.",
     "outcome": "Request supporting name-change evidence and escalate any approval decision."

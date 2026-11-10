@@ -27,6 +27,7 @@ export interface WizardState {
   description: string;
   startDate: string;
   endDate: string;
+  authoringExperience: 'CLASSIC' | 'CHATBOT' | 'BOTH' | '';
   taskMode: TaskMode;
   taskCount: string;
   distinctTarget: string;
@@ -48,6 +49,7 @@ function initialState(project: ProjectDto | null, templates: TemplateDto[]): Wiz
       description: project.description ?? '',
       startDate: project.startDate ?? '',
       endDate: project.endDate ?? '',
+      authoringExperience: project.authoringExperience ?? '',
       taskMode: project.taskMode,
       taskCount: project.taskCount?.toString() ?? '',
       distinctTarget: project.distinctTarget?.toString() ?? '',
@@ -62,6 +64,7 @@ function initialState(project: ProjectDto | null, templates: TemplateDto[]): Wiz
   const t = templates[0];
   return {
     templateId: t?.id ?? '',
+    authoringExperience: '',
     name: '',
     description: '',
     startDate: '',
@@ -126,6 +129,7 @@ export function ProjectWizard(props: {
       description: state.description.trim() || null,
       startDate: state.startDate || null,
       endDate: state.endDate || null,
+      authoringExperience: state.authoringExperience || undefined,
       taskMode: state.taskMode,
       taskCount: state.taskMode === 'ANNOTATION' ? num(state.taskCount) : null,
       distinctTarget: state.taskMode === 'AUTHORING' ? num(state.distinctTarget) : null,
@@ -145,6 +149,7 @@ export function ProjectWizard(props: {
       setStep(state.templateId ? 1 : 0);
       return null;
     }
+    if (state.taskMode === 'AUTHORING' && !state.authoringExperience && (!projectId || !!project?.authoringExperience)) { setMessage({kind:'error',text:'Choose Classic, Chatbot or Both before saving.'}); setStep(1); return null; }
     setPending(true);
     const res = projectId
       ? await mutate<ProjectDto>('PATCH', `/projects/${projectId}`, payload())
@@ -261,6 +266,7 @@ export function ProjectWizard(props: {
             </div>
           )}
 
+          {step === 1 && state.taskMode === 'AUTHORING' && <fieldset className="mb-5 space-y-2"><legend className="font-medium">Authoring experience <Req /></legend><p className="text-sm text-fg-muted">Choose how SMEs author tasks. Agent type remains defined by the template.</p>{project && !project.authoringExperience && <p className="text-sm text-fg-muted">Legacy project: both existing views remain available. Leave this choice unchanged to preserve its current controls.</p>}<div className="grid gap-3 sm:grid-cols-3">{(['CLASSIC','CHATBOT','BOTH'] as const).map(mode=><label key={mode} className="rounded border border-line p-3"><input type="radio" name="authoringExperience" checked={state.authoringExperience===mode} onChange={()=>set({authoringExperience:mode})} /> <b>{mode==='CLASSIC'?'Classic':mode==='CHATBOT'?'Chatbot':'Both'}</b><p className="mt-2 text-sm">{mode==='CLASSIC'?'Guided fields and investigation map.':mode==='CHATBOT'?'Conversation-led authoring and investigation map.':'Switch views while editing the same task.'}</p></label>)}</div></fieldset>}
           {step === 1 && (
             <div className="mt-4 space-y-4">
               <RequiredNote />
@@ -473,6 +479,7 @@ function ReviewStep({ state, template, jd, attributes }: { state: WizardState; t
   const rows: [string, React.ReactNode][] = [
     ['Template', template ? `${template.domainName} — ${template.workflowName} (v${template.version})` : '—'],
     ['Name', state.name || '—'],
+    ['Authoring experience', state.taskMode === 'AUTHORING' ? state.authoringExperience || 'Choose before saving' : 'Not applicable'],
     ['Dates', state.startDate && state.endDate ? `${state.startDate} to ${state.endDate}` : '—'],
     ['Mode', state.taskMode === 'AUTHORING' ? `Authoring: ${state.distinctTarget || '?'} distinct tasks, max ${state.maxPerExpert || '?'} per expert` : `Annotation: ${state.taskCount || '?'} tasks`],
     ['TPT', state.tptMinutes ? `${state.tptMinutes} minutes` : '—'],

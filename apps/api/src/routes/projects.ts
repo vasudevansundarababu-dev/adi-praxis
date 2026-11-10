@@ -51,6 +51,7 @@ export function toProjectDto(p: ProjectFull): ProjectDto {
     templateVersion: p.templateVersion,
     workflowName: p.template.workflowName,
     domainName: p.template.domain.name,
+    authoringExperience: p.authoringExperience,
     taskMode: p.taskMode,
     taskCount: p.taskCount,
     distinctTarget: p.distinctTarget,
@@ -125,6 +126,7 @@ async function replaceFilters(tx: Tx, project: { id: string; clientId: string },
 
 function scalarData(body: z.infer<typeof UpdateProjectRequest>): Prisma.ProjectUncheckedUpdateInput {
   const d: Prisma.ProjectUncheckedUpdateInput = {};
+  if (body.authoringExperience !== undefined) d.authoringExperience = body.authoringExperience;
   if (body.name !== undefined) d.name = body.name;
   if (body.description !== undefined) d.description = body.description;
   if (body.startDate !== undefined) d.startDate = toDate(body.startDate);
@@ -180,6 +182,7 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         await assertUniqueName(tx, actor.clientId, req.body.name);
         await assertJd(tx, req.body.jobDescriptionId, actor.clientId);
         const taskMode = req.body.taskMode ?? (t.taskModes.includes('AUTHORING') ? 'AUTHORING' : t.taskModes[0]!);
+        if (taskMode === 'AUTHORING' && !req.body.authoringExperience) throw new AppError(400, 'AUTHORING_EXPERIENCE_REQUIRED', 'Choose Classic, Chatbot or Both before creating an authoring project.');
         if (!t.taskModes.includes(taskMode)) throw badRequest(`This template does not allow ${taskMode.toLowerCase()} projects`);
 
         // Defaults come from the template; the PM's values override them.
@@ -202,7 +205,7 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         if (req.body.demographicFilters) await replaceFilters(tx, created, req.body.demographicFilters);
         const p = await loadProject(tx, created.id, actor);
         const body = toProjectDto(p);
-        await audit({ entityType: 'Project', entityId: p.id, action: 'project.created', after: { status: 'DRAFT', name: p.name, templateId: t.id, templateVersion: t.version } });
+        await audit({ entityType: 'Project', entityId: p.id, action: 'project.created', after: { status: 'DRAFT', name: p.name, templateId: t.id, templateVersion: t.version, authoringExperience: p.authoringExperience } });
         return { status: 201, body };
       });
       return reply;
@@ -218,6 +221,7 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         if (before.status !== 'DRAFT') {
           throw new AppError(409, 'PROJECT_NOT_EDITABLE', 'Only draft projects can be edited; submitted projects keep their snapshot.');
         }
+        if (req.body.authoringExperience && req.body.authoringExperience !== before.authoringExperience && await tx.taskInstance.count({where:{projectId:before.id}})) throw new AppError(409,'AUTHORING_CONFIGURATION_FROZEN','Authoring experience cannot change after tasks are assigned.');
         const data = scalarData(req.body);
         if (req.body.templateId !== undefined && req.body.templateId !== before.templateId) {
           const t = await offerableTemplate(tx, req.body.templateId, actor.clientId);

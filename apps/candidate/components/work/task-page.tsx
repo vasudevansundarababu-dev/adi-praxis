@@ -1,6 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useSyncExternalStore } from 'react';
+import { AUTHORSHIP_VERSION } from '@praxis/shared';
+import { call } from '@/lib/client';
+import { AuthoringConsent } from './authoring-controls';
+import { InvestigationMap } from './investigation-map';
+import { TemplateInstructions } from './template-instructions';
+import { TypedAnswerBoundary } from './typed-answer-boundary';
 import { ConversationWorkbench } from './conversation-workbench';
 
 import Link from 'next/link';
@@ -26,8 +32,27 @@ export function SaveIndicator({ state, readOnly }: { state: SaveState; readOnly:
 
 /** Opens the right editor for the task: the KYC workbench, the generic authoring editor, or the annotation form. */
 export function TaskPage({ task }: { task: TaskView }) {
-  const [detailed, setDetailed] = useState(false);
-  useEffect(() => { setDetailed(new URLSearchParams(window.location.search).get("editor") === "form"); }, []);
+  const phone=useSyncExternalStore(notify=>{const m=window.matchMedia('(max-width:767px)');m.addEventListener('change',notify);return()=>m.removeEventListener('change',notify);},()=>window.matchMedia('(max-width:767px)').matches,()=>false);
+  const [current,setCurrent]=useState(task),[editor,setEditor]=useState<'CLASSIC'|'CHATBOT'>(task.authoringWorkspace?.view ?? (task.effectiveAuthoringExperience==='CLASSIC'?'CLASSIC':'CHATBOT'));
+  const [draftAnswer,setDraftAnswer]=useState(task.authoringWorkspace?.answer??''),[switching,setSwitching]=useState(false),[switchError,setSwitchError]=useState(''),[consented,setConsented]=useState(!task.authoringExperience);
+  const currentRef=useRef(current);currentRef.current=current;
+  const draftRef=useRef(draftAnswer);draftRef.current=draftAnswer;
+  const prefQueue=useRef<Promise<boolean>>(Promise.resolve(true));
+  const mode=task.effectiveAuthoringExperience??'BOTH';
+  const allowedEditor=mode==='BOTH'?editor:mode;
+  const refresh=async()=>{const r=await call<TaskView>('GET',`/me/tasks/${task.id}`);if(r.ok&&r.data){setCurrent(r.data);currentRef.current=r.data;}return r.ok;};
+  const persist=async(view:'CLASSIC'|'CHATBOT',answer:string)=>{prefQueue.current=prefQueue.current.then(async()=>{const r=await call('POST',`/me/tasks/${task.id}/authoring-workspace`,{view,answer});if(!r.ok)setSwitchError(r.error??'Could not save workspace');return r.ok;});return prefQueue.current;};
+  useEffect(()=>{if(task.taskType!=='AUTHORING')return;void call<{state:{consent?:{version:string}}}>('GET',`/me/tasks/${task.id}/conversation`).then(r=>{if(r.ok&&r.data)setConsented(r.data.state.consent?.version===AUTHORSHIP_VERSION);});
+    if(mode==='BOTH'&&!task.authoringWorkspace){setEditor(new URLSearchParams(window.location.search).get('editor')==='form'?'CLASSIC':'CHATBOT');}
+  },[task.id]);
+  useEffect(()=>{const load=()=>{void refresh();};const saved=(e:Event)=>{const d=(e as CustomEvent).detail;if(d.taskId===task.id&&d.output)setCurrent(t=>({...t,output:d.output,revision:d.revision}));};window.addEventListener('praxis:reload-task',load);window.addEventListener('praxis:task-saved',saved);return()=>{window.removeEventListener('praxis:reload-task',load);window.removeEventListener('praxis:task-saved',saved);};},[task.id]);
+  useEffect(()=>{if(task.taskType!=='AUTHORING'||current.readOnly||!consented)return;const timer=setTimeout(()=>void persist(allowedEditor,draftAnswer),700);return()=>clearTimeout(timer);},[draftAnswer,allowedEditor,consented]);
+  const flushAll=async()=>{const saves:Promise<boolean>[]=[];window.dispatchEvent(new CustomEvent('praxis:flush',{detail:{saves}}));if(!(await Promise.all(saves)).every(Boolean))return false;return refresh();};
+  const switchView=async(next:'CLASSIC'|'CHATBOT')=>{if(mode!=='BOTH'||switching||next===allowedEditor)return;setSwitching(true);setSwitchError('');try{if(!await flushAll()){setSwitchError('Your changes could not be saved. Remain here and retry.');return;}if(!current.readOnly&&!await persist(next,draftRef.current))return;setEditor(next);}finally{setSwitching(false);}};
+  const detailed=allowedEditor==='CLASSIC';
+  const visibleTask={...current,readOnly:current.readOnly||phone};
+  const steps=(current.output as {solution?:{steps?:import('@praxis/shared').KycStep[]}}|null)?.solution?.steps??[];
+  const [agentPreview,setAgentPreview]=useState<unknown>(null),[selectedStep,setSelectedStep]=useState<string|null>(null);
   const router = useRouter();
   const done = () => router.push(`/projects/${task.projectId}?submitted=${task.id}`);
   return (
@@ -43,9 +68,15 @@ export function TaskPage({ task }: { task: TaskView }) {
           This task was not accepted ({task.review.rejectReason?.toLowerCase().replace(/_/g, ' ')}). {task.review.notes}
         </p>
       )}
-      <div className="mt-4">
-        {task.taskType === 'AUTHORING' && !detailed ? <ConversationWorkbench task={task} /> : task.definition === 'kyc-onboarding-v1' ? <KycWorkbench task={task} onSubmitted={done} /> : task.taskType === 'ANNOTATION' ? <AnnotationTask task={task} onSubmitted={done} /> : <GenericAuthoring task={task} onSubmitted={done} />}
-      </div>
+      {task.taskType==='AUTHORING'&&mode==='BOTH'&&<div className="mt-4 flex flex-wrap gap-2" aria-label="Authoring view"><button disabled={switching} aria-pressed={detailed} onClick={()=>void switchView('CLASSIC')} className="rounded border border-line p-2">Classic</button><button disabled={switching} aria-pressed={!detailed} onClick={()=>void switchView('CHATBOT')} className="rounded border border-line p-2">Chatbot</button><span className="self-center text-xs text-fg-muted">Same task, rubric and validation</span></div>}
+      {switchError&&<p role="alert" className="text-error">{switchError}</p>}
+      {task.taskType==='AUTHORING'&&task.authoringExperience&&!consented&&!current.readOnly?<AuthoringConsent taskId={task.id} readOnly={phone} onReady={()=>{setConsented(true);void refresh();}}/>:<TypedAnswerBoundary enabled={task.taskType === 'AUTHORING'}><div className="mt-4" key={allowedEditor}>
+        {agentPreview!=null ? <section className="space-y-3"><button className="rounded border border-line p-2" onClick={()=>setAgentPreview(null)}>Return to authoring</button><pre className="whitespace-pre-wrap break-words text-sm">{JSON.stringify(agentPreview,null,2)}</pre></section> : <>
+        {task.taskType === 'AUTHORING' && !detailed ? <><ConversationWorkbench task={visibleTask} draftAnswer={draftAnswer} onDraftChange={setDraftAnswer}/>{!visibleTask.readOnly&&<SubmitPanel taskId={task.id} flush={flushAll} revision={()=>currentRef.current.revision} onSubmitted={done}/>}</> : current.definition === 'kyc-onboarding-v1' ? <KycWorkbench task={visibleTask} onSubmitted={done} /> : current.taskType === 'ANNOTATION' ? <AnnotationTask task={visibleTask} onSubmitted={done} /> : <GenericAuthoring task={visibleTask} onSubmitted={done} />}
+        {task.taskType==='AUTHORING'&&detailed&&<section className="mt-6 space-y-3"><TemplateInstructions workflow={task.template.workflow} audience="author"/><h2>Investigation map · {steps.length} steps</h2><InvestigationMap steps={steps} selected={selectedStep} onSelect={setSelectedStep}/>{steps.filter(s=>s.id===selectedStep).map(s=><div key={s.id} className="rounded border border-line p-3"><h3>{s.id}</h3><p>{s.why}</p><p>{s.expectedResult}</p></div>)}<button className="rounded border border-line p-2" onClick={async()=>{const r=await call<{task:unknown}>('GET',`/me/tasks/${task.id}/agent-preview`);if(r.ok&&r.data)setAgentPreview(r.data.task);}}>View as agent</button>{agentPreview!=null&&<pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(agentPreview,null,2)}</pre>}</section>}
+        </>}
+      </div></TypedAnswerBoundary>}
+
     </div>
   );
 }
@@ -95,8 +126,8 @@ function GenericAuthoring({ task, onSubmitted }: { task: TaskView; onSubmitted: 
             </label>
           </div>
         )}
-        {!value.praxisContract && <button type="button" className="text-sm text-link underline" onClick={() => startContract(false)}>Start a synthetic executable marketing example</button>}
-        {!value.praxisContract && <button type="button" className="ml-3 text-sm text-link underline" onClick={() => startContract(true)}>Start a staged synthetic marketing example</button>}
+        {!task.authoringExperience && !value.praxisContract && <button type="button" className="text-sm text-link underline" onClick={() => startContract(false)}>Start a synthetic executable marketing example</button>}
+        {!task.authoringExperience && !value.praxisContract && <button type="button" className="ml-3 text-sm text-link underline" onClick={() => startContract(true)}>Start a staged synthetic marketing example</button>}
         {!!value.praxisContract && <ContractEditor value={value.praxisContract as Record<string, unknown>} onChange={(praxisContract) => update({ ...value, header: { ...value.header, title: String(praxisContract.title ?? '') }, praxisContract })} />}
         <label className="block text-sm">
           {value.praxisContract ? 'Author notes (excluded from the executable export)' : 'The task (scenario, inputs, expected steps, evidence, decision and how to verify it)'}

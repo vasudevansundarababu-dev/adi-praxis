@@ -1,3 +1,4 @@
+import { AUTHORSHIP_VERSION, authoredChangeProblems, facilitatorQuestion } from './authorship';
 import type { Prisma, TaskInstance } from '@prisma/client';
 import { applyConversationChanges, ConversationProposal, type KycTask } from '@praxis/shared';
 import type { Db, Tx } from '../../db';
@@ -7,11 +8,15 @@ import { effectivePolicy } from '../../policy/task-policy';
 import type { ConversationAssistant } from './assistant';
 import { proposalProblems } from './guards';
 
-export const CONVERSATION_VERSION = 'authoring-chat/1';
-export const editable = (t: TaskInstance) => {
+export const CONVERSATION_VERSION = 'authoring-facilitator/2';
+export const editable = (t: TaskInstance & {project?:{status:string}}) => {
+  if(t.project?.status==='PAUSED')throw new AppError(409,'PROJECT_PAUSED','This project is paused.');
   if (t.taskType !== 'AUTHORING' || !['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(t.status) || t.quarantinedAt) throw new AppError(409, 'READ_ONLY', 'Only an editable authoring task can use this conversation.');
 };
 export interface ChatState {
+  humanOnly?: boolean;
+  consent?: { version: string; at: string; smeUserId: string };
+  declaration?: { revision: number; at: string; smeUserId: string };
   pending?: { runId: string; revision: number; policyDigest: string; proposal: ConversationProposal; problems: string[] };
   unresolved?: string[];
   policyLinks?: ConversationProposal['ruleLinks'];
@@ -48,8 +53,14 @@ export async function executeConversation(db: Db, assistant: ConversationAssista
     if ((policy?.digest ?? 'none') !== start.policyDigest) throw new Error('Project policy changed before generation.');
     const turns = await db.taskInterviewTurn.findMany({ where: { taskInstanceId: task.id }, orderBy: { seq: 'asc' }, take: 301 });
     if (turns.length > 300) throw new Error('Conversation limit reached. No prior messages were silently discarded.');
-    const proposal = ConversationProposal.parse(await assistant.propose({ workflow: task.project.template.workflowName, template: { primaryWork: task.project.template.primaryWork, verificationCriteria: task.project.template.verificationCriteria, humanGate: task.project.template.humanGate, taskDefinitionSchema: task.project.template.taskDefinitionSchema, collectionSchema: task.project.template.collectionSchema }, current: (task.output ?? {}) as Record<string, unknown>, slot: task.input, history: turns.map(x => ({ speaker: x.speaker, content: x.content })), policy: policy?.body ?? null, previousUnresolved: chatOf(task).unresolved ?? [] }));
-    const problems = proposalProblems((task.output ?? {}) as Record<string, unknown>, proposal, policy?.body.rules ?? [], task.project.template.workflowName.toLowerCase() === 'kyc onboarding and refresh');
+    const reviewFeedback = await db.taskReview.findMany({ where: { taskInstanceId: task.id }, orderBy: { createdAt: 'asc' }, select: { decision: true, comments: true, notes: true, submissionVersion: true } });
+    let proposal = ConversationProposal.parse(await assistant.propose({ workflow: task.project.template.workflowName, reviewFeedback, template: { primaryWork: task.project.template.primaryWork, verificationCriteria: task.project.template.verificationCriteria, humanGate: task.project.template.humanGate, taskDefinitionSchema: task.project.template.taskDefinitionSchema, collectionSchema: task.project.template.collectionSchema }, current: (task.output ?? {}) as Record<string, unknown>, slot: task.input, history: turns.map(x => ({ speaker: x.speaker, content: x.content })), policy: policy?.body ?? null, previousUnresolved: chatOf(task).unresolved ?? [] }));
+    const authors = turns.filter(t=>t.speaker==='AUTHOR' && t.questionId==='conversation' && t.clientMessageId?.startsWith('answer:')).map(t=>t.content);
+    const unsupported = authoredChangeProblems((task.output ?? {}) as Record<string, unknown>, proposal, authors);
+    const latestAnswer = authors.at(-1) ?? '';
+    const safeQuestion = facilitatorQuestion(latestAnswer, (task.output ?? {}) as Record<string, unknown>, task.project.template.workflowName);
+    proposal = { ...proposal, reply: unsupported.length ? 'I cannot generate task answers. Type the assessment yourself; I can help organise your words.' : 'I can organise your typed answer. Review its placement before confirming.', question: safeQuestion, changes: unsupported.length ? [] : proposal.changes.map(c=>({...c,reason:'Extracted from SME-authored content; confirm the placement.'})), ruleLinks: proposal.ruleLinks.map(l=>({...l,reason:'Suggested project-rule link; SME applicability confirmation required.'})), unresolved: unsupported.length ? ['SME must type the missing substantive content.'] : proposal.unresolved.map(()=> 'Confirm the outstanding evidence or policy applicability in your own words.') };
+    const problems = [...unsupported, ...proposalProblems((task.output ?? {}) as Record<string, unknown>, proposal, policy?.body.rules ?? [], task.project.template.workflowName.toLowerCase() === 'kyc onboarding and refresh')];
     await db.$transaction(async tx => {
       await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${task.id}::uuid FOR UPDATE`;
       const fresh = await tx.taskInstance.findUniqueOrThrow({ where: { id: task.id } });
@@ -81,7 +92,7 @@ export async function decideProposal(tx: Tx, task: TaskInstance, runId: string, 
     if (task.revision !== pending.revision || (policy?.digest ?? 'none') !== pending.policyDigest) throw new AppError(409, 'STALE_REVISION', 'Task or project policy changed. Request a fresh proposal.');
     if (pending.problems.length) throw new AppError(422, 'PROPOSAL_BLOCKED', 'Resolve the proposal checks before applying changes.', { problems: pending.problems });
     const output = applyConversationChanges((task.output ?? {}) as Record<string, unknown>, pending.proposal);
-    chat.unresolved = pending.proposal.unresolved; chat.policyLinks = pending.proposal.ruleLinks; chat.needsReview = true; delete chat.reviewedRevision; chat.policyDigest = pending.policyDigest;
+    chat.unresolved = pending.proposal.unresolved; chat.policyLinks = pending.proposal.ruleLinks; chat.needsReview = true; delete chat.declaration; delete chat.reviewedRevision; chat.policyDigest = pending.policyDigest;
     delete chat.pending;
     const drafting = draftingWith(task, chat) as { sections: Record<string, { confirmedAt: string | null }>; conversation: ChatState };
     // Any coordinated edit invalidates section confirmations; never claim regenerated output was human-reviewed.

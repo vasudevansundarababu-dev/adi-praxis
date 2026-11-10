@@ -1,3 +1,5 @@
+import { allowEditor } from '../tasks/authoring-experience';
+import { AUTHORSHIP_VERSION, AUTHORSHIP_TERMS, generationRequest } from '../tasks/conversation/authorship';
 import type { Prisma } from '@prisma/client';
 import { authoringAgentView } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -18,6 +20,16 @@ export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: 
     if (t.taskType !== 'AUTHORING') throw new AppError(409, 'NOT_AUTHORING', 'Conversation is for authoring tasks.');
     return t;
   };
+  app.post('/me/tasks/:id/conversation/consent', { config: { access: 'candidate' }, schema: { params: Params, body: z.object({ version: z.literal(AUTHORSHIP_VERSION), accepted: z.literal(true) }).strict() } }, async (req, reply) => {
+    await runCandidateCommand(db, req, reply, async ({tx,actor,audit})=>{
+      await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${req.params.id}::uuid FOR UPDATE`;
+      const t=await load(tx,req.params.id,actor.smeUserId); editable(t); const chat=chatOf(t);
+      chat.humanOnly=true; chat.consent={version:AUTHORSHIP_VERSION,at:new Date().toISOString(),smeUserId:actor.smeUserId};
+      await tx.taskInstance.update({where:{id:t.id},data:{drafting:JSON.parse(JSON.stringify(draftingWith(t,chat))) as Prisma.InputJsonValue}});
+      await audit({entityType:'TaskInstance',entityId:t.id,action:'task.authorship.consent',after:{version:AUTHORSHIP_VERSION}});
+      return {status:200,body:{accepted:true,terms:AUTHORSHIP_TERMS}};
+    }); return reply;
+  });
   app.get('/me/tasks/:id/conversation', { config: { access: 'candidate' }, schema: { params: Params } }, async req => conversationView(db, await load(db, req.params.id, req.candidate!.smeUserId)));
   app.get('/me/tasks/:id/agent-preview', { config: { access: 'candidate' }, schema: { params: Params } }, async req => {
     const t = await load(db, req.params.id, req.candidate!.smeUserId), policy = await effectivePolicy(db, t.clientId, t);
@@ -27,14 +39,17 @@ export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: 
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit, emit }) => {
       await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${req.params.id}::uuid FOR UPDATE`;
       const t = await load(tx, req.params.id, actor.smeUserId); editable(t);
+      allowEditor(t.project,'CHATBOT');
       if (t.revision !== req.body.expectedRevision) throw new AppError(409, 'STALE_REVISION', 'Reload before continuing.');
+      if (chatOf(t).consent?.version !== AUTHORSHIP_VERSION) throw new AppError(409,'AUTHORSHIP_CONSENT_REQUIRED','Accept the human-authorship terms before answering.');
+      if (generationRequest(req.body.content)) throw new AppError(422,'AUTHOR_INPUT_REQUIRED','I can help only with your assigned task. Write the assessment yourself; I cannot generate answers or answer unrelated requests.');
       const inputProblems = conversationInputProblems(req.body.content);
       if (inputProblems.length) throw new AppError(422, 'UNSAFE_INPUT', 'Answer was not saved or sent to the model.', { problems: inputProblems });
       if (await tx.taskDraftRun.findFirst({ where: { taskInstanceId: t.id, status: { in: ['QUEUED', 'RUNNING'] } } })) throw new AppError(409, 'DRAFT_IN_PROGRESS', 'A model request is already active.');
       if (chatOf(t).pending) throw new AppError(409, 'PENDING_PROPOSAL', 'Confirm or discard the existing proposal first.');
       if (await tx.taskInterviewTurn.count({ where: { taskInstanceId: t.id, questionId: 'conversation' } }) >= 298) throw new AppError(409, 'CONVERSATION_LIMIT', 'Conversation limit reached; no history was discarded.');
       const policy = await effectivePolicy(tx, t.clientId, t);
-      await appendTurn(tx, t, 'AUTHOR', req.body.content);
+      await appendTurn(tx, t, 'AUTHOR', req.body.content, 'answer:' + req.id);
       const run = await tx.taskDraftRun.create({ data: { clientId: t.clientId, taskInstanceId: t.id, section: 'CHAT', instruction: JSON.stringify({ revision: t.revision, policyDigest: policy?.digest ?? 'none' }), sourceIds: [], requestedById: actor.smeUserId, promptVersion: CONVERSATION_VERSION } });
       await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.conversation.message', after: { runId: run.id, revision: t.revision } });
       await emit({ name: 'task.draft.requested', aggregateType: 'TaskInstance', aggregateId: t.id, payload: { taskId: t.id, runId: run.id } });
@@ -45,16 +60,26 @@ export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: 
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => {
       await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${req.params.id}::uuid FOR UPDATE`;
       const t = await load(tx, req.params.id, actor.smeUserId); editable(t);
+      if (req.body.accept) allowEditor(t.project,'CHATBOT');
       await decideProposal(tx, t, req.body.runId, req.body.accept);
       await audit({ entityType: 'TaskInstance', entityId: t.id, action: req.body.accept ? 'task.conversation.confirmed' : 'task.conversation.discarded', after: { runId: req.body.runId } });
       return { status: 200, body: { accepted: req.body.accept } };
     }); return reply;
   });
-  app.post('/me/tasks/:id/conversation/review', { config: { access: 'candidate' }, schema: { params: Params, body: z.object({ expectedRevision: z.number().int().nonnegative() }).strict() } }, async (req, reply) => {
+  app.post('/me/tasks/:id/conversation/review', { config: { access: 'candidate' }, schema: { params: Params, body: z.object({ expectedRevision: z.number().int().nonnegative(), ownWork: z.literal(true), noExternalLlm: z.literal(true), authorisedSources: z.literal(true), resolutions: z.array(z.object({question:z.string().max(4000),answer:z.string().trim().min(10).max(4000)}).strict()).max(50).optional() }).strict() } }, async (req, reply) => {
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => {
       await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${req.params.id}::uuid FOR UPDATE`;
       const t = await load(tx, req.params.id, actor.smeUserId); editable(t); const chat = chatOf(t);
+      if (chat.consent?.version !== AUTHORSHIP_VERSION) throw new AppError(409,'AUTHORSHIP_CONSENT_REQUIRED','Accept the human-authorship terms first.');
+      const resolutions=req.body.resolutions??[];
+      if(t.revision===req.body.expectedRevision&&!chat.pending&&chat.unresolved?.length&&chat.unresolved.every(q=>resolutions.some(r=>r.question===q))){
+        for(const resolution of resolutions){if(conversationInputProblems(resolution.answer).length)throw new AppError(422,'UNSAFE_INPUT','Remove sensitive data from the clarification.');await appendTurn(tx,t,'AUTHOR',resolution.question+'\n'+resolution.answer,'clarification:'+req.id+':'+resolutions.indexOf(resolution));}
+        chat.unresolved=[];
+      }
       if (t.revision !== req.body.expectedRevision || chat.pending || chat.unresolved?.length) throw new AppError(409, 'REVIEW_INCOMPLETE', 'Resolve pending changes and follow-up questions before reviewing this revision.');
+      if (await tx.taskDraftRun.count({where:{taskInstanceId:t.id,status:'SUCCEEDED',promptVersion:{not: 'authoring-facilitator/2'}}})) throw new AppError(409,'PRIOR_AI_DRAFT','Prior generative drafting requires a human-authorship review; no automatic declaration is allowed.');
+      chat.declaration={revision:t.revision,at:new Date().toISOString(),smeUserId:actor.smeUserId};
+      chat.policyDigest = (await effectivePolicy(tx,t.clientId,t))?.digest ?? 'none';
       chat.needsReview = false; chat.reviewedRevision = t.revision;
       await tx.taskInstance.update({ where: { id: t.id }, data: { drafting: JSON.parse(JSON.stringify(draftingWith(t, chat))) as Prisma.InputJsonValue } });
       await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.conversation.author_reviewed', after: { revision: t.revision } });

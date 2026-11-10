@@ -58,7 +58,12 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
   let admin: string;
   let pm: string;
 
-  const post = (cookie: string, url: string, payload: object = {}) => app.inject({ method: 'POST', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
+  let requestIp=1;
+  const post = async (cookie: string, url: string, payload: object = {}) => {
+    if (url.endsWith('/conversation/messages')) await app.inject({method:'POST',url:'/api/v1'+url.replace('/messages','/consent'),headers:{cookie,...idem()},payload:{version:'human-only/1',accepted:true}});
+    const body = url.endsWith('/conversation/review') ? {...payload,ownWork:true,noExternalLlm:true,authorisedSources:true} : payload;
+    return app.inject({method:'POST',url:`/api/v1${url}`,headers:{cookie,...idem()},payload:body,remoteAddress:'127.0.1.'+(requestIp++%250+1)});
+  };
   const put = (cookie: string, url: string, payload: object) => app.inject({ method: 'PUT', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
   const get = (cookie: string, url: string) => app.inject({ method: 'GET', url: `/api/v1${url}`, headers: { cookie } });
   const handlers = () => defaultHandlers({ email, config, drafter, storage });
@@ -116,7 +121,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
   async function kycTask(workflowName?: string) {
     const templateId = await template(workflowName);
     const jd = (await post(pm, '/job-descriptions', { title: 'KYC Analyst', responsibilities: 'Author KYC cases.', skills: ['KYC'], wagePerTask: 40, wageCurrency: 'GBP', locationType: 'REMOTE' })).json();
-    const p = (await post(pm, '/projects', { templateId, name: `P ${randomUUID().slice(0, 6)}`, taskMode: 'AUTHORING', distinctTarget: 4, maxPerExpert: 4, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-10-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] })).json();
+    const p = (await post(pm, '/projects', { authoringExperience: 'BOTH', templateId, name: `P ${randomUUID().slice(0, 6)}`, taskMode: 'AUTHORING', distinctTarget: 4, maxPerExpert: 4, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-10-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] })).json();
     const sub = await post(pm, `/projects/${p.id}/submit`);
     expect(sub.statusCode, sub.body).toBe(200);
     expect((await post(pm, `/projects/${p.id}/match`)).statusCode).toBe(200);
@@ -178,16 +183,27 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
     const { a, id } = await kycTask();
     await db.taskInstance.update({ where: { id }, data: { output: KYC_EXAMPLE_TASK as never } });
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
-    const child = spawn('pnpm', ['--filter', '@praxis/candidate', 'exec', 'next', 'dev', '-H', '127.0.0.1', '-p', '0'], { cwd: new URL('../../../', import.meta.url), env: { ...process.env, NODE_ENV: 'development', API_BASE_URL: address, NEXT_TELEMETRY_DISABLED: '1', NEXT_DIST_DIR: '.next-verify' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('pnpm', ['--filter', '@praxis/candidate', 'exec', 'next', 'dev', '-H', '127.0.0.1', '-p', '0'], { cwd: new URL('../../../', import.meta.url), env: { ...process.env, NODE_ENV: 'development', API_BASE_URL: address, NEXT_TELEMETRY_DISABLED: '1', NEXT_DIST_DIR: '.next-verify' }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     let logs = '';
-    const port = await new Promise<number>((resolve, reject) => { const timer = setTimeout(() => reject(new Error('Next startup timeout: '+logs.slice(-1000))), 60000); const data = (chunk: Buffer) => { logs += chunk.toString(); const match = logs.match(/http:\/\/127\.0\.0\.1:(\d+)/); if(match) { clearTimeout(timer); resolve(Number(match[1])); } }; child.stdout.on('data', data); child.stderr.on('data', data); child.on('error', reject); });
+    const port = await new Promise<number>((resolve, reject) => { const timer = setTimeout(() => reject(new Error('Next startup timeout: '+logs.slice(-1000))), 60000); const data = (chunk: Buffer) => { logs += chunk.toString(); const match = logs.match(/http:\/\/127\.0\.0\.1:(\d+)/); if(match) { clearTimeout(timer); resolve(Number(match[1])); } }; child.stdout.on('data', data); child.stderr.on('data', data); child.on('error', reject); }).catch(error => { if (child.pid) process.kill(-child.pid, 'SIGTERM'); throw error; });
     const browser = await chromium.launch({ channel: 'chrome', headless: true });
+    let webChild: ReturnType<typeof spawn> | null = null;
     try {
       const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
       await page.context().addCookies([{ name: 'praxis_candidate', value: a.cookie.split('=')[1]!, domain: '127.0.0.1', path: '/' }]);
       await page.goto(`http://127.0.0.1:${port}/tasks/${id}`, { waitUntil: 'networkidle' });
+      await page.getByLabel('I agree to these terms.').check();
+      await page.getByRole('button',{name:'Accept authorship terms'}).click();
       await page.getByRole('heading', { name: 'Build a case through conversation' }).waitFor();
-      await page.getByLabel('Your answer').fill('The SSN and Tax ID are absent. Which project rule applies?');
+      await page.getByLabel('Your answer').fill('My unsent answer survives the view switch.');
+      await page.getByRole('button',{name:'Classic',exact:true}).click();
+      await page.getByRole('textbox',{name:/^Title/}).fill('An SME typed this title in Classic');
+      await page.getByRole('button',{name:'Chatbot',exact:true}).click();
+      expect(await page.getByLabel('Your answer').inputValue()).toBe('My unsent answer survives the view switch.');
+      expect((await task(a,id)).output.header.title).toBe('An SME typed this title in Classic');
+      const pasteBlocked=await page.getByLabel('Your answer').evaluate(el=>{const event=new Event('paste',{bubbles:true,cancelable:true});el.dispatchEvent(event);return event.defaultPrevented;});
+      expect(pasteBlocked).toBe(true);
+      await page.getByLabel('Your answer').fill('SSN and Tax ID absent; policy applicability unresolved. Identifier gaps recorded; ask for applicable approved policy. Check identifiers without inventing a requirement.');
       await page.getByRole('button', { name: 'Send answer' }).click();
       let run;
       for (let i=0;i<30;i++) { run = await db.taskDraftRun.findFirst({ where: { taskInstanceId: id, section: 'CHAT' } }); if (run) break; await new Promise(r=>setTimeout(r,100)); }
@@ -201,15 +217,48 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       await page.getByRole('button', { name: 'Confirm changes', exact: true }).click();
       await page.getByRole('button', { name: /Identifier gaps recorded/ }).waitFor();
       await page.reload({ waitUntil: 'networkidle' });
-      await page.getByText('I correlated the identifier gap with the case, map and grading.').first().waitFor();
+      await page.getByText('I can organise your typed answer.',{exact:false}).first().waitFor();
       await page.getByText('Reference outcome and rubric', { exact: true }).click();
-      await page.getByText(/Check identifiers without inventing/).waitFor();
+      await page.locator('pre').filter({hasText:'Check identifiers without inventing'}).waitFor();
       await page.screenshot({ path: '/private/tmp/praxis-conversation-real-browser.png', fullPage: true });
       await page.getByRole('button', { name: 'View as agent' }).click();
       await page.getByRole('button', { name: 'Return to authoring' }).waitFor();
       const preview = await page.locator('pre').textContent();
       expect(preview).not.toContain('Check identifiers without inventing'); expect(preview).not.toContain('solution');
       expect(preview).toContain('SSN and Tax ID absent');
-    } finally { await browser.close(); child.kill('SIGTERM'); }
-  }, 120000);
+      await page.getByRole('button', { name: 'Return to authoring' }).click();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.getByText('Phone view is read-only.', { exact: false }).waitFor();
+      expect(await page.getByLabel('Your answer').isDisabled()).toBe(true);
+      await page.getByRole('button',{name:'Classic',exact:true}).click();
+      expect(await page.getByRole('textbox', { name: /^Title/ }).isDisabled()).toBe(true);
+      await page.setViewportSize({ width: 1200, height: 900 });
+      await page.getByRole('textbox', { name: /^Title/ }).waitFor();
+      for (let i=0;i<20 && await page.getByRole('textbox', { name: /^Title/ }).isDisabled();i++) await new Promise(r=>setTimeout(r,50));
+      expect(await page.getByRole('textbox', { name: /^Title/ }).isEnabled()).toBe(true);
+      // Actual PM UI: the required choice is persisted and restored for every mode.
+      webChild=spawn('pnpm',['--filter','@praxis/web','exec','next','dev','-H','127.0.0.1','-p','0'],{cwd:new URL('../../../',import.meta.url),env:{...process.env,NODE_ENV:'development',API_BASE_URL:address,NEXT_TELEMETRY_DISABLED:'1',NEXT_DIST_DIR:'.next-verify'},stdio:['ignore','pipe','pipe'],detached:true});
+      let webLogs='';
+      const webPort=await new Promise<number>((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Console startup timeout '+webLogs.slice(-500))),60000);const collect=(chunk:Buffer)=>{webLogs+=chunk.toString();const m=webLogs.match(/http:\/\/127\.0\.0\.1:(\d+)/);if(m){clearTimeout(timer);resolve(Number(m[1]));}};webChild!.stdout!.on('data',collect);webChild!.stderr!.on('data',collect);});
+      const manager=await browser.newPage({viewport:{width:1200,height:900}});
+      await manager.context().addCookies([{name:'praxis_session',value:pm.split('=')[1]!,domain:'127.0.0.1',path:'/'}]);
+      for(const mode of ['CLASSIC','CHATBOT','BOTH'] as const){
+        const name='UI '+mode+' '+randomUUID().slice(0,6);
+        const label=new RegExp('^'+(mode==='CLASSIC'?'Classic':mode==='CHATBOT'?'Chatbot':'Both'));
+        await manager.goto(`http://127.0.0.1:${webPort}/projects/new`,{waitUntil:'networkidle'});
+        await manager.getByRole('button',{name:'2. Basics',exact:true}).click();
+        await manager.getByLabel('Project name',{exact:false}).fill(name);
+        await manager.getByRole('button',{name:'Save as draft',exact:true}).click();
+        await manager.getByRole('alert').filter({hasText:'Choose Classic, Chatbot or Both'}).waitFor();
+        await manager.getByRole('radio',{name:label}).check();
+        await manager.getByRole('button',{name:'Save as draft',exact:true}).click();
+        await manager.getByRole('status').filter({hasText:'Draft saved.'}).waitFor();
+        expect((await db.project.findFirstOrThrow({where:{name}})).authoringExperience).toBe(mode);
+        await manager.reload({waitUntil:'networkidle'});
+        expect(await manager.getByRole('radio',{name:label}).isChecked()).toBe(true);
+      }
+      await manager.screenshot({path:'/private/tmp/praxis-mode-project-creation.png',fullPage:true});
+
+    } finally { await browser.close(); if(webChild?.pid){try{process.kill(-webChild.pid,'SIGTERM');}catch{}} if (child.pid) { try { process.kill(-child.pid, 'SIGTERM'); } catch {} } }
+  }, 150000);
 });

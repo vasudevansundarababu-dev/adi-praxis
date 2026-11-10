@@ -33,6 +33,8 @@ export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 
   const slot = task.taskType === 'AUTHORING' ? ((task.input as { slot?: SlotRef }).slot ?? null) : null;
   const checks: TaskCheck[] = [...coverageChecks(template, slot, output), ...(def.key === 'kyc-onboarding-v1' ? praxisContractChecks(output) : []), ...def.validateSubmission(template, output, slot), ...draftingChecks(task)];
   const chat = chatOf(task);
+  if (task.taskType === 'AUTHORING' && project.authoringExperience) checks.push({id:'authoring.consent',section:'W06',ok:!!chat.consent && !!chat.humanOnly,message:'Accept human-authorship terms and review this revision before submission'});
+  if (chat.humanOnly) checks.push({id:'conversation.authorship',section:'W06',ok:chat.declaration?.revision===task.revision,message:'Confirm human authorship, no external LLM generation and authorised sources for this revision'});
   if (chat.reviewedRevision !== undefined) checks.push({ id: 'conversation.reviewed_revision', section: 'W06', ok: chat.reviewedRevision === task.revision, message: 'Review the latest task revision after manual edits' });
   if (chat.policyDigest) {
     const policy = await effectivePolicy(tx, project.clientId, task);

@@ -527,6 +527,12 @@ model JobDescriptionSnapshot {
   projects       Project[]
 }
 
+enum AuthoringExperience {
+  CLASSIC
+  CHATBOT
+  BOTH
+}
+
 model Project {
   id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId                String        @map("client_id") @db.Uuid
@@ -538,6 +544,8 @@ model Project {
   name                    String
   description             String?
   status                  ProjectStatus @default(DRAFT)
+  /// Null preserves both existing editors for legacy projects; new projects choose explicitly.
+  authoringExperience     AuthoringExperience? @map("authoring_experience")
   taskMode                TaskMode      @default(AUTHORING) @map("task_mode")
   /// Annotation projects: number of task instances.
   taskCount               Int?          @map("task_count")

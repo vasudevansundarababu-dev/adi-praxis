@@ -61,7 +61,11 @@ export const CoverageQuotas = z.object({
 });
 export type CoverageQuotas = z.infer<typeof CoverageQuotas>;
 
+export const AUTHORING_EXPERIENCES = ['CLASSIC', 'CHATBOT', 'BOTH'] as const;
+export type AuthoringExperience = (typeof AUTHORING_EXPERIENCES)[number];
+
 export const ProjectFields = z.object({
+  authoringExperience: z.enum(AUTHORING_EXPERIENCES).optional(),
   templateId: z.string().uuid(),
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(5000).nullable().optional(),
@@ -254,6 +258,7 @@ export function submitProblems(p: ProjectForSubmit, ctx: SubmitContext): { probl
 }
 
 export const ProjectDto = z.object({
+  authoringExperience: z.enum(AUTHORING_EXPERIENCES).nullable().optional(),
   id: z.string().uuid(),
   status: z.enum(PROJECT_STATUSES),
   name: z.string(),

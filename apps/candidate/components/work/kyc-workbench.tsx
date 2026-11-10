@@ -272,7 +272,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
           )}
 
           {section !== 'W00' && section !== 'W06' && <RequiredNote />}
-          {section !== 'W00' && section !== 'W06' && <SectionDraftBanner taskId={task.id} section={section} state={drafted[section]} running={drafting.running} readOnly={ro} onChanged={() => void drafting.load()} beforeDraft={flush} />}
+          {section !== 'W00' && section !== 'W06' && <SectionDraftBanner taskId={task.id} section={section} state={drafted[section]} running={drafting.running} readOnly={ro || !!drafting.view?.humanOnly} onChanged={() => void drafting.load()} beforeDraft={flush} />}
 
           {section === 'W01' && (
             <section className="space-y-4">

@@ -41,3 +41,6 @@ SME adds missing Tax ID/SSN. Assistant receives previous answers and current cas
 ## Validation receipt (local)
 
 2026-11-10: 45 focused API/database/SDK-contract/browser and existing drafting/policy tests pass. Shared-package suite:192 tests pass including four new conversation contract tests. All workspace type checks and candidate production build pass. The Chrome journey used the actual candidate app/API and controlled model response: answer -> pending proposal -> confirmation -> changed map/rubric -> reload/resume -> private-free agent preview. All12 template names exercise the persistent conversation route; this is not a claim of independent domain review or full Anvil acceptance for each. No live provider call, production change or remote branch update occurred.
+
+## Current approval revision
+The human-only facilitator requirements in CHATBOT-REQUIREMENTS.md supersede earlier generative-drafting language. Chat extracts SME wording and asks clarification; examples are read-only. See ARCHITECTURE.md, EXISTING-CAPABILITY-AUDIT.md and VALIDATION-REPORT.md for current controls and limitations.

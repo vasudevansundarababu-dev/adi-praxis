@@ -32,3 +32,6 @@ export function authoringAgentView(task: Record<string, unknown>) {
     documents: t.evidence?.documents?.map(({ id, type, issuer, partyId, issueDate, expiryDate, fields }) => ({ id, type, issuer, partyId, issueDate, expiryDate, fields })),
     tools: t.environment?.tools ?? [] };
 }
+
+export const AUTHORSHIP_VERSION = 'human-only/1';
+export const AUTHORSHIP_TERMS = 'I will author the task, findings, reference solution, rationale and rubric myself. I will not use the built-in assistant or an external LLM to generate answers. Case data must be synthetic and sources authorised. The assistant may ask task-scoped questions, identify gaps and organise my words. Similarity and browser activity signals may be reviewed by a human; they are not proof of misconduct. I may explain or dispute a flag.';

@@ -1,0 +1,8 @@
+import { TEMPLATE_INSTRUCTIONS } from '@praxis/shared';
+export function TemplateInstructions({ workflow, audience }: { workflow: string; audience: 'author' | 'reviewer' }) {
+  const normal = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const guide = TEMPLATE_INSTRUCTIONS.find(x => normal(x.name) === normal(workflow));
+  if (!guide) return <p className="text-sm text-fg-muted">Template instructions are not yet configured. Ask the project manager before submitting.</p>;
+  const entries = audience === 'author' ? guide.fields : guide.reviews;
+  return <details className="min-w-0 rounded border border-line p-4"><summary className="font-semibold">{audience === 'author' ? 'Authoring' : 'Reviewing'} instructions · 8 {audience === 'author' ? 'sections' : 'checks'}</summary><div className="mt-3 space-y-3"><p className="text-sm">What to expect, what each field means and what you need to do.</p><a href={`/template-instructions/${guide.slug}-instructions.pdf`} target="_blank" rel="noreferrer" className="text-sm underline">Open template instructions PDF · 3 pages</a><p className="text-xs text-fg-muted">Page 1: SME authoring. Page 2: field meanings. Page 3: expert review and PM approval. Instructions v1.2.</p><details><summary>Field meanings and how to fill them</summary>{guide.glossary.map(f => <section key={f.title} className="mt-3"><h3 className="font-medium">{f.title}</h3><p className="text-sm">{f.text}</p></section>)}</details>{entries.map(f => <section key={f.title}><h3 className="font-medium">{f.title}</h3><p className="whitespace-pre-wrap break-words text-sm">{f.text}</p></section>)}</div></details>;
+}

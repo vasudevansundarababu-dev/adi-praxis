@@ -86,7 +86,7 @@ describe('M2 FLOW 1: project creation', () => {
     demographicFilters: FILTERS,
   };
   async function draft(extra: object = {}, cookie = pm) {
-    const res = await post(cookie, '/projects', { templateId, name: `KYC Q4 ${randomUUID().slice(0, 6)}`, ...extra });
+    const res = await post(cookie, '/projects', { authoringExperience: 'BOTH', templateId, name: `KYC Q4 ${randomUUID().slice(0, 6)}`, ...extra });
     expect(res.statusCode, res.body).toBe(201);
     return res.json();
   }
@@ -142,15 +142,15 @@ describe('M2 FLOW 1: project creation', () => {
 
     it('only the latest published version of a workflow can be used', async () => {
       const draftT = (await post(admin, `/templates/${templateId}/versions`)).json();
-      expect((await post(pm, '/projects', { templateId: draftT.id, name: 'From draft' })).statusCode).toBe(400);
+      expect((await post(pm, '/projects', { authoringExperience: 'BOTH', templateId: draftT.id, name: 'From draft' })).statusCode).toBe(400);
       await post(admin, `/templates/${draftT.id}/publish`);
-      expect((await post(pm, '/projects', { templateId, name: 'From old v1' })).statusCode).toBe(400);
-      expect((await post(pm, '/projects', { templateId: draftT.id, name: 'From v2' })).statusCode).toBe(201);
+      expect((await post(pm, '/projects', { authoringExperience: 'BOTH', templateId, name: 'From old v1' })).statusCode).toBe(400);
+      expect((await post(pm, '/projects', { authoringExperience: 'BOTH', templateId: draftT.id, name: 'From v2' })).statusCode).toBe(201);
     });
 
     it('project names are unique per client', async () => {
       await draft({}, pm).then((p) => patch(pm, `/projects/${p.id}`, { name: 'Unique name' }));
-      expect((await post(otherPm, '/projects', { templateId, name: 'unique NAME' })).statusCode).toBe(409);
+      expect((await post(otherPm, '/projects', { authoringExperience: 'BOTH', templateId, name: 'unique NAME' })).statusCode).toBe(409);
     });
 
     it('a submitted project can no longer be edited', async () => {
@@ -322,8 +322,8 @@ describe('M2 FLOW 1: project creation', () => {
       const p = await draft();
       expect((await get(reviewer, '/projects')).statusCode).toBe(403);
       expect((await get(reviewer, `/projects/${p.id}`)).statusCode).toBe(403);
-      expect((await post(reviewer, '/projects', { templateId, name: 'X' })).statusCode).toBe(403);
-      const created = await post(admin, '/projects', { templateId, name: 'Admin project' });
+      expect((await post(reviewer, '/projects', { authoringExperience: 'BOTH', templateId, name: 'X' })).statusCode).toBe(403);
+      const created = await post(admin, '/projects', { authoringExperience: 'BOTH', templateId, name: 'Admin project' });
       expect(created.statusCode, created.body).toBe(201);
       expect(created.json().ownerName).toBeTruthy();
     });

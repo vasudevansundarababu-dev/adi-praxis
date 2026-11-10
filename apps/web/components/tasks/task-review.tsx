@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { TemplateInstructions } from './template-instructions';
 import { Req, RequiredNote } from '@/components/required';
 
 export interface TaskReviewData {
@@ -36,6 +37,7 @@ export interface TaskReviewData {
 }
 
 interface Drafting {
+  authorship?: {mode:string;consent?:{version:string;at:string};declaration?:{revision:number;at:string};limitations:string} | null;
   sources: { id: string; kind: 'DOCUMENT' | 'TRANSCRIPT'; fileName: string; sizeBytes: number; sha256: string; textChars: number; flags: { kind: string; line: number; preview: string }[]; uploadedAt: string }[];
   interview: { turns: { id: string; speaker: string; questionId: string; content: string; redacted: boolean }[]; answered: number; total: number };
   runs: { id: string; section: string | null; status: string; sections: string[]; model: string | null; problems: string[]; notes: string | null; error: string | null; createdAt: string }[];
@@ -45,7 +47,7 @@ interface Drafting {
 /** TASK-DRAFTING section 6: sources (opening one is audited), the interview, drafts and what the author changed. */
 function HowMade({ taskId, d }: { taskId: string; d: Drafting }) {
   const drafted = Object.entries(d.sections).sort(([a], [b]) => a.localeCompare(b));
-  if (!d.sources.length && !d.interview.answered && !d.runs.length) {
+  if (!d.authorship && !d.sources.length && !d.interview.answered && !d.runs.length) {
     return (
       <section aria-labelledby="made-h" className="card p-4 text-sm">
         <h2 id="made-h" className="font-semibold">How this task was made</h2>
@@ -56,6 +58,7 @@ function HowMade({ taskId, d }: { taskId: string; d: Drafting }) {
   return (
     <section aria-labelledby="made-h" className="card space-y-3 p-4 text-sm">
       <h2 id="made-h" className="font-semibold">How this task was made</h2>
+      {d.authorship && <section className="rounded border border-line p-3"><h3 className="font-semibold">Human-authorship review</h3><p>Consent: {d.authorship.consent ? `${d.authorship.consent.version} · ${d.authorship.consent.at}` : 'Missing'}</p><p>Own-work / no external LLM declaration: {d.authorship.declaration ? `Revision ${d.authorship.declaration.revision} · ${d.authorship.declaration.at}` : 'Missing'}</p><p className="text-xs text-fg-muted">{d.authorship.limitations} Compare flagged similarities and hear the author's explanation before deciding. No detector alone should determine rejection or payment.</p></section>}
       {drafted.length > 0 && (
         <div>
           <p className="font-medium">AI-drafted sections</p>
@@ -248,6 +251,7 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
 
   return (
     <div className="max-w-6xl">
+      <TemplateInstructions workflow={d.project.workflow} audience="reviewer" />
       <Link href="/review/tasks" className="text-sm text-link hover:underline">
         ← Task reviews
       </Link>

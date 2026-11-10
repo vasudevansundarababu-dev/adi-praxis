@@ -51,7 +51,7 @@ export async function demoSetup(db: Db, env: NodeJS.ProcessEnv, log: (level: str
   const end = new Date(Date.now() + 45 * 86_400_000);
   const d = (x: Date) => x.toISOString().slice(0, 10);
   // 12 distinct tasks, up to 12 per expert: one selected expert can staff the demo project on their own.
-  const p = await call('p', 'POST', '/projects', { templateId: t.id, name: 'KYC authoring demo', distinctTarget: 12, maxPerExpert: 12, tptMinutes: 90, startDate: d(start), endDate: d(end), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] });
+  const p = await call('p', 'POST', '/projects', { authoringExperience: 'BOTH', templateId: t.id, name: 'KYC authoring demo', distinctTarget: 12, maxPerExpert: 12, tptMinutes: 90, startDate: d(start), endDate: d(end), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] });
   await call('p', 'POST', `/projects/${p.id}/submit`);
   await call('p', 'POST', `/projects/${p.id}/match`);
   await call('p', 'POST', `/projects/${p.id}/opportunity/publish`);
@@ -140,7 +140,7 @@ export async function executableDemoSetup(call: Call, log: (level: string, messa
   if (t.status === 'DRAFT') await call('a', 'POST', `/templates/${t.id}/publish`);
   const jd = await call('p', 'POST', '/job-descriptions', { title: 'Synthetic marketing task author', responsibilities: 'Use the built-in synthetic decision example, inspect and edit the constraints, reference answer and rubric, and submit for independent human review.', skills: ['Marketing'], wagePerTask: 1, wageCurrency: 'USD', locationType: 'REMOTE' });
   const d = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
-  const project = await call('p', 'POST', '/projects', { templateId: t.id, name, distinctTarget: 1, maxPerExpert: 1, tptMinutes: 30, startDate: d(1), endDate: d(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] });
+  const project = await call('p', 'POST', '/projects', { authoringExperience: 'BOTH', templateId: t.id, name, distinctTarget: 1, maxPerExpert: 1, tptMinutes: 30, startDate: d(1), endDate: d(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] });
   await call('p', 'POST', `/projects/${project.id}/submit`);
   const example = await call('p', 'POST', `/projects/${project.id}/synthetic-example`);
   log('info', 'synthetic executable draft created; awaits staffing and real author/reviewer actions', { projectId: project.id, templateId: t.id, taskId: example.taskId });

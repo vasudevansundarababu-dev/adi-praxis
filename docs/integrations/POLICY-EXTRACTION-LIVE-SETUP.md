@@ -30,44 +30,46 @@ Nothing to buy. Praxis signs in with its existing Cloud Run service account, so 
 
 Send me: nothing; just confirm you can run Terraform for staging.
 
-## 2. What you run (after I open the infra PR)
+## 2. What you run (infra PR #36, branch `infra/policy-docai`)
 
-I will open a small PR on branch `infra/policy-docai`. Please review it. It only:
-- enables `documentai.googleapis.com`;
-- creates one Document AI **Layout Parser** processor in `us`;
-- grants the backend service account `roles/documentai.apiUser` (Vertex access already exists);
-- gives the Document AI service agent access to one private folder (`policy-docai/`) in the staging evidence bucket (needed for 16–20 page files);
-- adds the secret name `llamaextract-api-key` (empty) and the non-secret settings below.
+PR #36 only:
+- enables `documentai.googleapis.com` and creates one Document AI **Layout Parser** processor in `us`;
+- grants `roles/documentai.apiUser` to the worker service account (it runs extraction jobs; Vertex access already exists);
+- creates the secret `llamaextract-api-key` **with no value**, readable by the api and worker only;
+- adds the non-secret settings to `praxis-api` and `praxis-worker` with `live = false`. The LlamaCloud project ID is already in `envs/staging/main.tf`.
+
+The app calls Document AI online with the file inline, so no bucket access is needed. The key is wired into Cloud Run only when `live = true`, because Cloud Run cannot start on a secret with no value.
 
 ### 2.1 Apply Terraform (staging)
 
 ```zsh
 cd ~/praxis-staging-setup
+git status --short   # must be empty; stash or commit local work first
 git fetch origin && git switch infra/policy-docai
 terraform -chdir=infra/terraform/envs/staging init
-terraform -chdir=infra/terraform/envs/staging plan  -var llamaextract_project_id=PASTE_PROJECT_ID
-terraform -chdir=infra/terraform/envs/staging apply -var llamaextract_project_id=PASTE_PROJECT_ID
+terraform -chdir=infra/terraform/envs/staging plan -out=policy.tfplan
 ```
 
-Check the plan shows only: one API, one processor, IAM bindings, one secret, Cloud Run env changes. Anything else: stop and tell me.
+The plan must show only: **create** 1 API service, 1 processor, 1 project IAM member, 1 secret, 2 secret IAM members; **update in place** `praxis-api` and `praxis-worker` (new env vars). Anything else: stop and send me the plan summary line. Then:
+
+```zsh
+terraform -chdir=infra/terraform/envs/staging apply policy.tfplan
+```
 
 ### 2.2 Store the LlamaExtract key (zsh, key never shown or saved in history)
 
 ```zsh
-read -s "LLAMA_KEY?LlamaExtract API key: "; echo
-printf %s "$LLAMA_KEY" | gcloud secrets versions add llamaextract-api-key --project YOUR_STAGING_PROJECT_ID --data-file=-
+read -rs "LLAMA_KEY?LlamaExtract API key: "; echo
+printf %s "$LLAMA_KEY" | gcloud secrets versions add llamaextract-api-key --project adi-praxis-staging --data-file=-
 unset LLAMA_KEY
+gcloud secrets versions list llamaextract-api-key --project adi-praxis-staging --format='value(name,state)'
 ```
 
-### 2.3 Switch live extraction on
+The last command shows `1 enabled` and never the key.
 
-In `infra/terraform/envs/staging/main.tf` the infra PR adds (off by default):
+### 2.3 Switch live extraction on (only for the smoke test)
 
-```hcl
-policy_extraction = { live = false, budget_llama_usd = 20, budget_google_usd = 30, max_pages = 20 }
-```
-
-When you are ready for the smoke test, change `live = false` to `live = true` in that PR (or tell me to), then apply again. Production is never changed.
+In `infra/terraform/envs/staging/main.tf`, change `live = false` to `live = true` in `policy_extraction`, then plan and apply again. That plan should only update `praxis-api` and `praxis-worker` (live flag plus the key reference). Production is never changed.
 
 ## 3. Turn it on in Praxis (after the staging deploy)
 

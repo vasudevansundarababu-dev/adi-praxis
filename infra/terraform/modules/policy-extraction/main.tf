@@ -44,3 +44,16 @@ resource "google_secret_manager_secret_iam_member" "llamaextract" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${each.key}"
 }
+
+# The policy-seed job (praxis-migrate image, jobs service account) stores fictional SEED documents. Staging only, and
+# only create + read under policy/: the seed never lists, overwrites or deletes (object keys are fresh ids).
+resource "google_storage_bucket_iam_member" "seed_objects" {
+  for_each = var.environment == "staging" ? toset(["roles/storage.objectCreator", "roles/storage.objectViewer"]) : toset([])
+  bucket   = var.evidence_bucket
+  role     = each.key
+  member   = "serviceAccount:${var.jobs_service_account}"
+  condition {
+    title      = "policy-seed-objects"
+    expression = "resource.name.startsWith(\"projects/_/buckets/${var.evidence_bucket}/objects/policy/\")"
+  }
+}

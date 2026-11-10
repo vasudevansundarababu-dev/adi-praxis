@@ -10,6 +10,8 @@ variables {
   environment            = "staging"
   api_service_account    = "praxis-api@test-project.iam.gserviceaccount.com"
   worker_service_account = "praxis-worker@test-project.iam.gserviceaccount.com"
+  jobs_service_account   = "praxis-jobs@test-project.iam.gserviceaccount.com"
+  evidence_bucket        = "test-project-evidence"
   settings               = { live = false, llamaextract_project_id = "p-1", budget_llama_usd = 20, budget_google_usd = 30, max_pages = 20 }
 }
 
@@ -34,6 +36,14 @@ run "off_by_default_creates_the_slot_but_wires_no_key" {
   assert {
     condition     = length(google_secret_manager_secret_iam_member.llamaextract) == 2
     error_message = "api and worker read the key; nobody else"
+  }
+  assert {
+    condition     = toset(keys(google_storage_bucket_iam_member.seed_objects)) == toset(["roles/storage.objectCreator", "roles/storage.objectViewer"])
+    error_message = "the seed job may create and read objects, nothing more"
+  }
+  assert {
+    condition     = alltrue([for m in google_storage_bucket_iam_member.seed_objects : m.member == "serviceAccount:praxis-jobs@test-project.iam.gserviceaccount.com" && m.condition[0].expression == "resource.name.startsWith(\"projects/_/buckets/test-project-evidence/objects/policy/\")"])
+    error_message = "seed access is for the jobs account and limited to policy/ objects"
   }
 }
 
@@ -63,4 +73,15 @@ run "budgets_are_required" {
     settings = { live = false, llamaextract_project_id = "p-1", budget_llama_usd = 0, budget_google_usd = 30, max_pages = 20 }
   }
   expect_failures = [var.settings]
+}
+
+run "no_seed_access_outside_staging" {
+  command = plan
+  variables {
+    environment = "production"
+  }
+  assert {
+    condition     = length(google_storage_bucket_iam_member.seed_objects) == 0
+    error_message = "the seed never runs in production, so the jobs account gets no bucket access there"
+  }
 }

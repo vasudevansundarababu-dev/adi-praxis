@@ -41,3 +41,8 @@ variable "harbor_verify_job" { type = string }
 variable "meta_compiler" {
   type = object({ live_ai = bool, models = string, cost_cap_usd = number, daily_budget_usd = number })
 }
+variable "policy_extraction" {
+  description = "Policy Rules extraction settings and secret names from modules/policy-extraction (empty where it is not deployed)."
+  type        = object({ env = map(string), secret_env = map(string) })
+  default     = { env = {}, secret_env = {} }
+}

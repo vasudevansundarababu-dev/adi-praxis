@@ -118,8 +118,8 @@ jobs:
       - run: terraform fmt -check -recursive infra/terraform
       - name: Module tests (mock provider, no credentials)
         if: matrix.env == 'staging'
-        working-directory: infra/terraform/modules/iam
-        run: terraform init -backend=false -input=false && terraform test
+        working-directory: infra/terraform/modules
+        run: for m in iam policy-extraction; do (cd "$m" && terraform init -backend=false -input=false && terraform test) || exit 1; done
       - name: Validate
         working-directory: infra/terraform/envs/${{ matrix.env }}
         run: terraform init -backend=false -input=false && terraform validate

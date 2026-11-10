@@ -41,3 +41,14 @@ variable "meta_compiler" {
   type        = object({ live_ai = bool, models = string, cost_cap_usd = number, daily_budget_usd = number })
   default     = { live_ai = false, models = "claude:claude-sonnet-5", cost_cap_usd = 2, daily_budget_usd = 10 }
 }
+variable "policy_extraction" {
+  description = "Live policy extraction (staging only; see modules/policy-extraction). null = not deployed."
+  type = object({
+    live                    = bool
+    llamaextract_project_id = string
+    budget_llama_usd        = number
+    budget_google_usd       = number
+    max_pages               = number
+  })
+  default = null
+}

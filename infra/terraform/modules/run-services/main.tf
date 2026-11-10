@@ -12,7 +12,7 @@ locals {
     SMTP_PASSWORD                  = "smtp-password"
     RL_GYM_WEBHOOK_SECRET          = "rl-gym-webhook-secret"
   }
-  backend_env = {
+  backend_env = merge({
     NODE_ENV            = "production"
     APP_ENV             = var.environment
     API_PORT            = "8080"
@@ -38,8 +38,10 @@ locals {
     META_COMPILER_MODELS        = var.meta_compiler.models
     GENERATION_COST_CAP_USD     = tostring(var.meta_compiler.cost_cap_usd)
     GENERATION_DAILY_BUDGET_USD = tostring(var.meta_compiler.daily_budget_usd)
-  }
-  vpc = { network = var.network_id, subnetwork = var.subnet_id }
+  }, var.policy_extraction.env)
+  # Policy secrets go to api and worker only; the jobs service account cannot read them.
+  service_secret_env = merge(local.secret_env, var.policy_extraction.secret_env)
+  vpc                = { network = var.network_id, subnetwork = var.subnet_id }
 }
 
 # ── API ──
@@ -82,7 +84,7 @@ resource "google_cloud_run_v2_service" "api" {
         }
       }
       dynamic "env" {
-        for_each = local.secret_env
+        for_each = local.service_secret_env
         content {
           name = env.key
           value_source {
@@ -148,7 +150,7 @@ resource "google_cloud_run_v2_service" "worker" {
         }
       }
       dynamic "env" {
-        for_each = local.secret_env
+        for_each = local.service_secret_env
         content {
           name = env.key
           value_source {

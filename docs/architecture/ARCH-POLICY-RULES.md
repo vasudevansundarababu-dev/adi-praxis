@@ -135,7 +135,7 @@ All writes use `runCommand`. Export: `/studio-tasks/export` and `/dataset/export
 - `projects/[id]/policies/page.tsx`: tabs **Extract** and **Review Rules** using existing table, form, upload, badge and tab components. Source viewer: PDF via existing viewer pattern (page + highlight when a box exists), text via line view.
 - Project page: Sources and Policies entry + summary card. Tasks list: policy readiness column.
 - Task page: policy panel (banner, inherited list, conditional applicability, changes, snapshot preview, Anvil status "Not tested").
-- Admin → Extraction profiles (ADMIN only).
+- Admin: extraction profiles (ADMIN only), a section of each project's Policy rules page: enable per client, choose per project, setup problems inline.
 - Accessible state labels (text, not colour only).
 
 ## 10. Configuration (names only; values never committed)

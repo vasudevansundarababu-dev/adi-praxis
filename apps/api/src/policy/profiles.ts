@@ -45,6 +45,6 @@ export async function resolveProfile(tx: Db | Tx, clientId: string, projectId: s
   }
   const p = profiles.find((x) => x.id === id);
   if (!p) throw new AppError(400, 'UNKNOWN_PROFILE', `Extraction profile "${id ?? '(none)'}" does not exist.`);
-  if (!p.enabled) throw new AppError(409, 'PROFILE_DISABLED', `Extraction profile "${p.label}" is disabled. An Admin can enable it under Admin → Extraction profiles, or authors can use Paste text.`);
+  if (!p.enabled) throw new AppError(409, 'PROFILE_DISABLED', `Extraction profile "${p.label}" is disabled. An Admin can enable it on a project's Policy rules page under Admin: extraction profiles, or authors can use Paste text.`);
   return { snapshot: { id: p.id, provider: p.provider as ProviderId, revision: p.revision, config: p.config as Record<string, unknown> }, source };
 }

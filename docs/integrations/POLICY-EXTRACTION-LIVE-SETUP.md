@@ -71,32 +71,44 @@ The last command shows `1 enabled` and never the key.
 
 In `infra/terraform/envs/staging/main.tf`, change `live = false` to `live = true` in `policy_extraction`, then plan and apply again. That plan should only update the same four Cloud Run resources (live flag; the key reference is added to `praxis-api` and `praxis-worker` only). Production is never changed.
 
-## 3. Turn it on in Praxis (after the staging deploy)
+## 3. Seed the fictional projects (staging, after #35 is deployed)
 
-1. Sign in to the staging console as an **Admin**.
-2. Go to **Admin → Extraction profiles**.
-3. You will see `llama-agentic-v1` (default), `llama-cost-effective-v1` and `google-layout-gemini-v1`, each **Disabled / Not available**.
-4. Click **Check** on each. It confirms settings and access **without** sending a document. Fix anything it reports.
-5. **Enable** `llama-agentic-v1` and `google-layout-gemini-v1`. Leave the cost-effective profile disabled unless you want it.
+Needs infra PR #37 applied (it lets the seed job store its documents). The seed refuses production.
 
-## 4. Smoke test (I can run it with you)
+1. Find two IDs. Sign in to the staging console **as the PM who should own the SEED projects** and open `https://<console host>/api/v1/auth/me`. Note `clientId` and `id` (the PM's user ID). Neither is secret. Replace the two placeholders below, keeping the quotes.
+2. Run the seed (zsh):
 
-1. Open the seeded project **SEED — Phone launch** → **Sources and Policies** → **Extract**.
-2. Select the small fictional document `SEED Claims and brand policy (v1)`, click **Extract candidates**. The receipt shows the provider, profile revision, status and cost.
-3. As Admin, run the same document again with the override **google-layout-gemini-v1**. It creates a second, separate attempt.
-4. Open **Review Rules**: both attempts' candidates show quotes linked to the document. Nothing is marked Reviewed automatically.
-5. Check **Admin → Extraction profiles → Spend**: two jobs, both well under $1.
+```zsh
+CLIENT_ID='paste-clientId-here'; PM_ID='paste-id-here'
+gcloud run jobs execute praxis-migrate --region us-central1 --project adi-praxis-staging --wait \
+  --args="src/jobs/run.ts,policy-seed,--client,$CLIENT_ID,--owner,$PM_ID"
+```
 
-Expected cost: a few cents (Google) and a few hundred LlamaExtract credits (covered by the free monthly credits).
+3. Expected: 5 projects named `SEED — …` are created, each with a fictional policy document. Running it again creates nothing (it skips projects that already exist). If a project's workflow template is missing, that project is skipped and the job exits with code 3. Check the job log for `template missing`.
+
+Your own test document is optional. Upload it on any SEED project's **Policy rules** page under **Policy documents**. Use fictional content only (no real client names or policy text), 20 pages at most, as PDF, DOCX, TXT or MD.
+
+## 4. Enable a provider and run the smoke test
+
+Live calls start only after guide 2.3 (`live = true`) is applied. Everything below is on one project's page: **Projects → SEED — Phone launch → Policy rules** (`/projects/<id>/policy`).
+
+1. Sign in as an **Admin** and open the page. Under **Extract candidate rules**, expand **Admin: extraction profiles**. You will see `llama-agentic-v1` (deployment default), `llama-cost-effective-v1` and `google-layout-gemini-v1`, all unticked. Setup problems, if any, appear in orange beside each profile. There is no separate check button: an empty problem list means the settings and access are in place. Profiles are per client, so enabling one here enables it for every project.
+2. Tick **Enabled** for `llama-agentic-v1` and `google-layout-gemini-v1`. Leave the cost-effective profile off.
+3. **LlamaExtract run.** The line "Provider: … (set by …)" shows which profile this project uses (the deployment default is `llama-agentic-v1`). Under **Documents to extract**, tick `Phone launch marketing policy (fictional)` and click **Extract candidates**. Refresh after a minute. The **Receipts** table shows the document, status, number of candidates, profile with revision, and (for Admins) cost.
+4. **Google run.** Click **Use for this project** next to `google-layout-gemini-v1`, then extract the same document again. Because the profile differs, this is a new attempt with its own receipt. Clicking **Extract candidates** again with the same profile and revision shows the existing receipt rather than calling the provider again.
+5. **Rules:** candidates from both runs appear with quotes linked to the document. Nothing is marked Reviewed automatically; open one and check the source evidence beside it.
+6. **Budget:** the Admin-only "Budget (provider): $x of $y used" line under the provider shows spend so far against the $20 / $30 limits. Each run reserves a worst-case estimate first (20 pages × $0.10 for LlamaExtract, × $0.03 for Google) and records the actual cost when it finishes.
+
+Expected cost for a 1–2 page document is cents on Google, and a small part of your $75 LlamaCloud credit. That credit is paid, with no auto-reload and "Pause jobs" set.
 
 ## 5. Turning it off (rollback)
 
 Any one of these stops new live calls immediately; existing records stay:
-- **Admin → Extraction profiles → Disable** the profile (fastest), or
-- set `live = false` and apply Terraform, or
-- in LlamaCloud, revoke the `praxis-staging-extract` key.
+- untick **Enabled** for the profile under **Admin: extraction profiles** (fastest; affects every project), or
+- set `live = false` in `envs/staging/main.tf` and apply Terraform (guide 2.3 in reverse), or
+- revoke the key in LlamaCloud.
 
-Spend limits also stop new jobs automatically at $20 (LlamaExtract) and $30 (Google).
+The app also refuses new jobs once their estimate would pass $20 (LlamaExtract) or $30 (Google).
 
 ## 6. Checklist to send back
 

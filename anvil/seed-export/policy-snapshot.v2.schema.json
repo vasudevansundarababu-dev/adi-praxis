@@ -1,0 +1,347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://praxis/contracts/praxis/policy-snapshot.v2.schema.json",
+  "title": "Praxis task policy snapshot sidecar v2 (PROPOSED)",
+  "description": "Status: proposed, not yet validated by Anvil. Replaces nothing: praxis.anvil.policy.v1-proposed (policy-snapshot.schema.json) stays as published. Content identity (content_hash fields) is separate from database identity (provenance objects). Hash definition: docs/integrations/POLICY-SNAPSHOT-V2.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "hash_algorithm",
+    "task_ref",
+    "content_hash",
+    "rules",
+    "task_changes",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "praxis.anvil.policy.v2-proposed"
+    },
+    "hash_algorithm": {
+      "const": "praxis.content-hash.v1",
+      "description": "SHA-256, lowercase hex, of the RFC 8785 canonical JSON (UTF-8) of the documented hash input."
+    },
+    "task_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Stable task identifier in the export package (e.g. SEED-PHONE-001); null when exported without one."
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Hash of { rules: sorted rule content_hash values, task_changes: sorted change content_hash values }."
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Rule"
+      }
+    },
+    "task_changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TaskChange"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/SnapshotProvenance"
+    }
+  },
+  "$defs": {
+    "Rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_key",
+        "content_hash",
+        "title",
+        "requirement",
+        "requirement_type",
+        "visibility",
+        "applicability",
+        "applicability_label",
+        "prerequisites",
+        "precedence",
+        "exceptions",
+        "effective",
+        "evidence_needs",
+        "verification_hint",
+        "sources",
+        "provenance"
+      ],
+      "properties": {
+        "rule_key": {
+          "type": "string"
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Hash of the rule hash input: every field below except applicability_label, locator and provenance, with sources reduced to { document_sha256, field, role, quote } and sorted."
+        },
+        "title": {
+          "type": "string"
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "requirement_type": {
+          "type": "string"
+        },
+        "visibility": {
+          "enum": [
+            "agent_visible",
+            "evaluator_only"
+          ]
+        },
+        "applicability": {
+          "type": "object"
+        },
+        "applicability_label": {
+          "type": "string",
+          "description": "Display text derived from applicability; not hashed."
+        },
+        "prerequisites": {
+          "type": "array"
+        },
+        "precedence": {
+          "type": "array"
+        },
+        "exceptions": {
+          "type": "object"
+        },
+        "effective": {
+          "type": "object"
+        },
+        "evidence_needs": {
+          "type": "array"
+        },
+        "verification_hint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Source"
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rule_id",
+            "rule_version_id",
+            "rule_version",
+            "praxis_content_hash"
+          ],
+          "properties": {
+            "rule_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "rule_version_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "rule_version": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "praxis_content_hash": {
+              "type": "string",
+              "description": "Praxis-internal v1 hash; includes database IDs, so it changes on reseed. Not for identity."
+            }
+          }
+        }
+      }
+    },
+    "Source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "document_sha256",
+        "field",
+        "role",
+        "quote",
+        "locator",
+        "provenance"
+      ],
+      "properties": {
+        "document_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 of the cited document's original bytes; the rule's source binding."
+        },
+        "field": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "quote": {
+          "type": "string"
+        },
+        "locator": {
+          "type": "object",
+          "description": "Where the quote is in the document; not hashed (a re-extraction can move it without changing content)."
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "document_version_id"
+          ],
+          "properties": {
+            "document_version_id": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      }
+    },
+    "TaskChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_key",
+        "rule_content_hash",
+        "type",
+        "requirement",
+        "scope",
+        "reason",
+        "exception_index",
+        "content_hash",
+        "provenance"
+      ],
+      "properties": {
+        "rule_key": {
+          "type": "string"
+        },
+        "rule_content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "type": {
+          "type": "string"
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "object"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "exception_index": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Hash of this object without content_hash and provenance."
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "change_id",
+            "rule_version_id",
+            "source_citation_id"
+          ],
+          "properties": {
+            "change_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "rule_version_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "source_citation_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "SnapshotProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "task_instance_id",
+        "snapshot_version",
+        "published_at",
+        "project_rule_set",
+        "rubric_version",
+        "praxis_digest"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "task_instance_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "snapshot_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "published_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "project_rule_set": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version",
+            "digest"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "digest": {
+              "type": "string"
+            }
+          }
+        },
+        "rubric_version": {
+          "type": "string"
+        },
+        "praxis_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Praxis-internal v1 snapshot digest; changes on reseed. Not for identity."
+        }
+      }
+    }
+  }
+}

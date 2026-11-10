@@ -1,0 +1,221 @@
+{
+  "schema_version": "praxis.anvil.policy.v2-proposed",
+  "hash_algorithm": "praxis.content-hash.v1",
+  "task_ref": "SEED-KYB-001",
+  "content_hash": "a07d0643d19c91961a4dc8d8bfca9580de74ad71c9a0f0f45ba7a7e49e0dc41a",
+  "rules": [
+    {
+      "rule_key": "R-no_auto_approval",
+      "content_hash": "c40e2cb116aaccae8828009ea9c4190698216dc2b66bd9cb93e3e90efeb46a91",
+      "title": "No auto-approval",
+      "requirement": "The agent recommends; it never auto-approves a customer.",
+      "requirement_type": "prohibition",
+      "visibility": "agent_visible",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "applicability_label": "Always applies",
+      "prerequisites": [],
+      "precedence": [],
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "evidence_needs": [],
+      "verification_hint": null,
+      "sources": [
+        {
+          "document_sha256": "2309064c6d1faf24d3e29c3cffdf53652e016c0214f93901a0a15efcba314472",
+          "field": "requirement",
+          "role": "supports",
+          "quote": "The agent recommends a decision; it must never auto-approve a customer.",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 209,
+            "chunkId": null,
+            "lineEnd": 4,
+            "section": null,
+            "charStart": 138,
+            "lineStart": 4,
+            "renditionPage": null
+          },
+          "provenance": {
+            "document_version_id": "751389d1-492f-4e21-8b59-1e5c320c91c8"
+          }
+        }
+      ],
+      "provenance": {
+        "rule_id": "033232dc-2eb4-44b1-b21d-3f10f7b9a315",
+        "rule_version_id": "8129b26f-4b19-4203-8405-5fe14fcf6801",
+        "rule_version": 1,
+        "praxis_content_hash": "b4bdbadf29240f44fa6a4f51675f2ceb4381ba416e18ffb766c1f8b127ec3413"
+      }
+    },
+    {
+      "rule_key": "R-no_identity_numbers",
+      "content_hash": "30b3d1ce2cda3c1410134f79461a6959c0ff1725c43485d3b7563f61f1ec8211",
+      "title": "No identity numbers",
+      "requirement": "Rationales never quote identity document numbers or dates of birth.",
+      "requirement_type": "prohibition",
+      "visibility": "agent_visible",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "applicability_label": "Always applies",
+      "prerequisites": [],
+      "precedence": [],
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "evidence_needs": [],
+      "verification_hint": null,
+      "sources": [
+        {
+          "document_sha256": "2309064c6d1faf24d3e29c3cffdf53652e016c0214f93901a0a15efcba314472",
+          "field": "requirement",
+          "role": "supports",
+          "quote": "Rationales must never quote identity document numbers or dates of birth.",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 285,
+            "chunkId": null,
+            "lineEnd": 5,
+            "section": null,
+            "charStart": 213,
+            "lineStart": 5,
+            "renditionPage": null
+          },
+          "provenance": {
+            "document_version_id": "751389d1-492f-4e21-8b59-1e5c320c91c8"
+          }
+        }
+      ],
+      "provenance": {
+        "rule_id": "8a1685c9-3dbb-40b8-9074-5975e00776e9",
+        "rule_version_id": "d8895116-41fe-4402-bdb5-b2e1c760ac94",
+        "rule_version": 1,
+        "praxis_content_hash": "244477d8a41cdeab902d80dbd4289810df71f12054b42a92cf00ba5f5c6771ef"
+      }
+    },
+    {
+      "rule_key": "R-ubo_25",
+      "content_hash": "b7732297926901bc43a7d5cc329486011d73414c43c2fb50ad77cc0a2c146cf3",
+      "title": "Identify 25% owners",
+      "requirement": "Identify every beneficial owner holding 25% or more.",
+      "requirement_type": "obligation",
+      "visibility": "evaluator_only",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "applicability_label": "Always applies",
+      "prerequisites": [],
+      "precedence": [],
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "evidence_needs": [],
+      "verification_hint": null,
+      "sources": [
+        {
+          "document_sha256": "2309064c6d1faf24d3e29c3cffdf53652e016c0214f93901a0a15efcba314472",
+          "field": "requirement",
+          "role": "supports",
+          "quote": "Every beneficial owner holding 25% or more must be identified.",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 351,
+            "chunkId": null,
+            "lineEnd": 6,
+            "section": null,
+            "charStart": 289,
+            "lineStart": 6,
+            "renditionPage": null
+          },
+          "provenance": {
+            "document_version_id": "751389d1-492f-4e21-8b59-1e5c320c91c8"
+          }
+        }
+      ],
+      "provenance": {
+        "rule_id": "c7be7ee3-4cc0-490e-bf4d-2dcd1e67955e",
+        "rule_version_id": "29cd3e95-f722-4813-8493-0ca841a7a607",
+        "rule_version": 1,
+        "praxis_content_hash": "b94e14af14638731c191a020f43cb2469e14555664626d4c36e148bbb3d35b5a"
+      }
+    }
+  ],
+  "task_changes": [
+    {
+      "rule_key": "R-ubo_25",
+      "rule_content_hash": "b7732297926901bc43a7d5cc329486011d73414c43c2fb50ad77cc0a2c146cf3",
+      "type": "CLARIFICATION",
+      "requirement": "Name the ownership chain for each owner found.",
+      "scope": {},
+      "reason": "Clarifies the expected evidence.",
+      "exception_index": null,
+      "content_hash": "959515f704fa4a2d5c538745be02163346ff2af04db68806d3bf17164673b2bc",
+      "provenance": {
+        "change_id": "f36d22c2-ab03-40c1-b13c-e6f74a995ecb",
+        "rule_version_id": "29cd3e95-f722-4813-8493-0ca841a7a607",
+        "source_citation_id": null
+      }
+    }
+  ],
+  "provenance": {
+    "snapshot_id": "cb7f74f9-7b66-4597-8bd2-bcc021083eb5",
+    "task_instance_id": "a2237a8b-03d4-4f8e-9e21-6a256c72ffba",
+    "snapshot_version": 1,
+    "published_at": "2026-11-10T14:53:47.236Z",
+    "project_rule_set": {
+      "id": "140b4ddd-74b0-4d5f-a985-508dd63fca28",
+      "digest": "42fda6ce5955b74e4b3c7e282a7af09b4f94aa011bd7c823876aec5371b85fce",
+      "version": 1
+    },
+    "rubric_version": "template:2f0b91d1-1dbb-4569-967e-2b8d6f3d0c4a@1",
+    "praxis_digest": "157996339031acf0353904d0e51c2695a90abf53686bb6e8e17acb4745394e20"
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "schema_version": "anvil.policy-import.v1-proposed",
+  "task_group_id": "seed-locale-compliance",
+  "task_group_version": "1.0.0",
+  "source_revision": "PRAXIS-SEED-FICTIONAL",
+  "group_default_policy_refs": [
+    {
+      "policy_id": "seed-locale-compliance-policy",
+      "version": "1.0.0"
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "seed-locale-compliance-policy",
+      "version": "1.0.0",
+      "title": "Creative and locale guidelines (fictional)",
+      "source": {
+        "path": "documents/policy.md",
+        "media_type": "text/markdown",
+        "sha256": "cebbdb136dbc74ca7a4158f1f3164b5e9eeafc0743a73b6dcd980711645f8716"
+      },
+      "rules": [
+        {
+          "rule_id": "R-approved_glossary",
+          "requirement": "Use the approved glossary for the locale.",
+          "severity": "high",
+          "visibility": "agent_instruction",
+          "source_location": "Line 4",
+          "evaluator": {
+            "type": "task_constraint_binding",
+            "expectation": "Constraint policy-approved_glossary in the task contract holds on output.json.",
+            "on_missing_evidence": "unknown",
+            "profile_ref": {
+              "evaluator_id": "anvil.task-constraint-binding",
+              "version": "1.0.0-proposed"
+            }
+          }
+        },
+        {
+          "rule_id": "R-de_imprint",
+          "requirement": "Include the legal imprint link on German creatives.",
+          "severity": "high",
+          "visibility": "agent_instruction",
+          "source_location": "Line 6",
+          "evaluator": {
+            "type": "task_constraint_binding",
+            "expectation": "Constraint policy-de_imprint in the task contract holds on output.json.",
+            "on_missing_evidence": "unknown",
+            "profile_ref": {
+              "evaluator_id": "anvil.task-constraint-binding",
+              "version": "1.0.0-proposed"
+            }
+          }
+        },
+        {
+          "rule_id": "R-local_currency",
+          "requirement": "Show prices in the local currency of the market.",
+          "severity": "high",
+          "visibility": "agent_instruction",
+          "source_location": "Line 5",
+          "evaluator": {
+            "type": "task_constraint_binding",
+            "expectation": "Constraint policy-local_currency in the task contract holds on output.json.",
+            "on_missing_evidence": "unknown",
+            "profile_ref": {
+              "evaluator_id": "anvil.task-constraint-binding",
+              "version": "1.0.0-proposed"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "evaluator_profiles": [
+    {
+      "evaluator_id": "anvil.task-constraint-binding",
+      "version": "1.0.0-proposed",
+      "engine": "builtin",
+      "input_schema": "task-output-json.v1-proposed",
+      "output_schema": "rule-outcome.v1-proposed",
+      "configuration": {
+        "constraint_id_prefix": "policy-",
+        "binding_kinds": [
+          "json_equals",
+          "json_number_min",
+          "json_number_max"
+        ],
+        "missing_evidence_outcome": "unknown"
+      },
+      "case_set_ref": "praxis-seed/locale-compliance-reference-outputs-v1"
+    }
+  ],
+  "task_bindings": [
+    {
+      "task_id": "SEED-LOCALE-001",
+      "policy_refs": [
+        {
+          "policy_id": "seed-locale-compliance-policy",
+          "version": "1.0.0"
+        }
+      ]
+    },
+    {
+      "task_id": "SEED-LOCALE-002",
+      "policy_refs": [
+        {
+          "policy_id": "seed-locale-compliance-policy",
+          "version": "1.0.0"
+        }
+      ]
+    }
+  ]
+}

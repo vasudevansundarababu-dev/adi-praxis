@@ -1,0 +1,104 @@
+{
+  "schema_version": "anvil.policy-import.v1-proposed",
+  "task_group_id": "seed-kyc-onboarding",
+  "task_group_version": "1.0.0",
+  "source_revision": "PRAXIS-SEED-FICTIONAL",
+  "group_default_policy_refs": [
+    {
+      "policy_id": "seed-kyc-onboarding-policy",
+      "version": "1.0.0"
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "seed-kyc-onboarding-policy",
+      "version": "1.0.0",
+      "title": "KYC onboarding checklist (fictional)",
+      "source": {
+        "path": "documents/policy.md",
+        "media_type": "text/markdown",
+        "sha256": "c8a3b42148a5426a43f6d95ce0564d207d54cdcbf656aeadc7771a4c451fb69c"
+      },
+      "rules": [
+        {
+          "rule_id": "R-address_recency",
+          "requirement": "Proof of address is dated within the last three months.",
+          "severity": "high",
+          "visibility": "agent_instruction",
+          "source_location": "Line 4"
+        },
+        {
+          "rule_id": "R-high_risk_refresh",
+          "requirement": "Review high-risk customers every 12 months.",
+          "severity": "high",
+          "visibility": "agent_instruction",
+          "source_location": "Line 6",
+          "evaluator": {
+            "type": "task_constraint_binding",
+            "expectation": "Constraint policy-high_risk_refresh in the task contract holds on output.json.",
+            "on_missing_evidence": "unknown",
+            "profile_ref": {
+              "evaluator_id": "anvil.task-constraint-binding",
+              "version": "1.0.0-proposed"
+            }
+          }
+        },
+        {
+          "rule_id": "R-screen_before_open",
+          "requirement": "Complete sanctions screening before opening the account.",
+          "severity": "high",
+          "visibility": "agent_instruction",
+          "source_location": "Line 5",
+          "evaluator": {
+            "type": "task_constraint_binding",
+            "expectation": "Constraint policy-screen_before_open in the task contract holds on output.json.",
+            "on_missing_evidence": "unknown",
+            "profile_ref": {
+              "evaluator_id": "anvil.task-constraint-binding",
+              "version": "1.0.0-proposed"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "evaluator_profiles": [
+    {
+      "evaluator_id": "anvil.task-constraint-binding",
+      "version": "1.0.0-proposed",
+      "engine": "builtin",
+      "input_schema": "task-output-json.v1-proposed",
+      "output_schema": "rule-outcome.v1-proposed",
+      "configuration": {
+        "constraint_id_prefix": "policy-",
+        "binding_kinds": [
+          "json_equals",
+          "json_number_min",
+          "json_number_max"
+        ],
+        "missing_evidence_outcome": "unknown"
+      },
+      "case_set_ref": "praxis-seed/kyc-onboarding-reference-outputs-v1"
+    }
+  ],
+  "task_bindings": [
+    {
+      "task_id": "SEED-KYC-001",
+      "policy_refs": [
+        {
+          "policy_id": "seed-kyc-onboarding-policy",
+          "version": "1.0.0"
+        }
+      ]
+    },
+    {
+      "task_id": "SEED-KYC-002",
+      "policy_refs": [
+        {
+          "policy_id": "seed-kyc-onboarding-policy",
+          "version": "1.0.0"
+        }
+      ]
+    }
+  ]
+}

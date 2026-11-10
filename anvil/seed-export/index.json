@@ -1,0 +1,236 @@
+{
+  "schema": "praxis.seed-anvil-handoff.v2-proposed",
+  "policy_schema_version": "praxis.anvil.policy.v2-proposed",
+  "hash_stability_example": "examples/hash-stability.json",
+  "generated_at": "2026-11-10T14:53:47.717Z",
+  "fictional": true,
+  "projects": [
+    {
+      "workflow": "Launch of Noise Cancelling Phone",
+      "project": "SEED — Phone launch",
+      "folder": "phone-launch",
+      "rubric_source": "Catalog blueprint milestones (keyword_intent 50, budget_pacing 30, ad_coverage 20).",
+      "policy_import": "phone-launch/policy-import.json",
+      "documents": [
+        {
+          "path": "phone-launch/documents/policy.md",
+          "sha256": "5e9a97e3dfe929f1579bf23f70c98155ac94bb6f4319eeb330e7dbf70641cef9",
+          "document_version_id": "f6772fc5-1215-46a0-8a9d-ab4f5c245073",
+          "title": "seed-policy.md",
+          "published": true
+        },
+        {
+          "path": "phone-launch/documents/unpublished-conflict-1.md",
+          "sha256": "ab975774745f62774ac666e9604fc16765bcfd45a98af38afa74f465ba091d84",
+          "document_version_id": "c02d4640-6a4c-4cd4-baa7-38382ffea865",
+          "title": "seed-regional.md",
+          "published": false
+        }
+      ],
+      "tasks": [
+        {
+          "task_id": "SEED-PHONE-001",
+          "title": "SEED Quietline X launch plan (noise cancelling phone)",
+          "task": "phone-launch/tasks/SEED-PHONE-001.task.json",
+          "task_payload_sha256": "a96acb4340d7952af39e581232e39fc9430b9538dc2b79b71fb0807e7d79b48e",
+          "policy": "phone-launch/tasks/SEED-PHONE-001.policy.json",
+          "praxis_task_instance_id": "12976b43-c2cf-4ff4-9ab9-b132fd387191",
+          "policy_snapshot_id": "aaccfbe3-72be-4e32-ad95-363fa42f182b",
+          "policy_content_hash": "50653cb19d27909d6af6ae526c42b8e9a4076afeffee252dad4a44f4896e2802",
+          "rules": 3,
+          "task_changes": 1,
+          "review_status": "draft"
+        },
+        {
+          "task_id": "SEED-PHONE-002",
+          "title": "SEED Quietline X launch plan (quiet phone for travel)",
+          "task": "phone-launch/tasks/SEED-PHONE-002.task.json",
+          "task_payload_sha256": "0e10b07b4194dacf803275cf210c6831dd476cae1906222114e520f24f412584",
+          "policy": "phone-launch/tasks/SEED-PHONE-002.policy.json",
+          "praxis_task_instance_id": "a543b52c-2e82-45b6-b776-e0292bd4a64b",
+          "policy_snapshot_id": "7371c517-e956-40f5-a230-1f8c3932c813",
+          "policy_content_hash": "8c31e7ea8546f45b86c8f2d286596ddcc0ccaad6365f5f6b796a04ebacbda5d9",
+          "rules": 3,
+          "task_changes": 0,
+          "review_status": "draft"
+        }
+      ]
+    },
+    {
+      "workflow": "Omnichannel Creative & Locale Compliance",
+      "project": "SEED — Omnichannel creative and locale compliance",
+      "folder": "locale-compliance",
+      "rubric_source": "Fictional SEED rubric: this template has no catalog blueprint yet.",
+      "policy_import": "locale-compliance/policy-import.json",
+      "documents": [
+        {
+          "path": "locale-compliance/documents/policy.md",
+          "sha256": "cebbdb136dbc74ca7a4158f1f3164b5e9eeafc0743a73b6dcd980711645f8716",
+          "document_version_id": "36e73ed2-bb22-4102-9684-2cb73d96272b",
+          "title": "seed-policy.md",
+          "published": true
+        }
+      ],
+      "tasks": [
+        {
+          "task_id": "SEED-LOCALE-001",
+          "title": "SEED de-DE creative localisation",
+          "task": "locale-compliance/tasks/SEED-LOCALE-001.task.json",
+          "task_payload_sha256": "1bffd8f9bac1777497bc11badcd6249f8efb1e2355cc918069075d04a2990e4f",
+          "policy": "locale-compliance/tasks/SEED-LOCALE-001.policy.json",
+          "praxis_task_instance_id": "c1b2e6b1-6807-4694-8bb9-2b9852bc23a6",
+          "policy_snapshot_id": "07833cce-8c34-40d7-b17f-b2412e3e31eb",
+          "policy_content_hash": "748dac80fe398900e1ab1efcf451f8d7a65776816c3e2fb0fa5efcb046d92703",
+          "rules": 3,
+          "task_changes": 1,
+          "review_status": "draft"
+        },
+        {
+          "task_id": "SEED-LOCALE-002",
+          "title": "SEED fr-FR creative localisation",
+          "task": "locale-compliance/tasks/SEED-LOCALE-002.task.json",
+          "task_payload_sha256": "74169d0d55abdf779d052043e27f035c852b86da1bc99027ec94d4b305881b1a",
+          "policy": "locale-compliance/tasks/SEED-LOCALE-002.policy.json",
+          "praxis_task_instance_id": "7379eb1a-8146-4af5-a79a-e9f08e5f7c86",
+          "policy_snapshot_id": "01a1761d-f8e7-4459-ba52-a1737718d895",
+          "policy_content_hash": "27ecef04a442bd942780414c3c911e3bcab8dbb599597caae4e04d31daff950e",
+          "rules": 3,
+          "task_changes": 0,
+          "review_status": "draft"
+        }
+      ]
+    },
+    {
+      "workflow": "KYB and beneficial ownership",
+      "project": "SEED — KYB and beneficial ownership",
+      "folder": "kyb-review",
+      "rubric_source": "Catalog blueprint milestones (ubo_identification 45, ownership_chains 25, recommendation 30).",
+      "policy_import": "kyb-review/policy-import.json",
+      "documents": [
+        {
+          "path": "kyb-review/documents/policy.md",
+          "sha256": "2309064c6d1faf24d3e29c3cffdf53652e016c0214f93901a0a15efcba314472",
+          "document_version_id": "751389d1-492f-4e21-8b59-1e5c320c91c8",
+          "title": "seed-policy.md",
+          "published": true
+        }
+      ],
+      "tasks": [
+        {
+          "task_id": "SEED-KYB-001",
+          "title": "SEED KYB review: Alder & Birch Trading Ltd",
+          "task": "kyb-review/tasks/SEED-KYB-001.task.json",
+          "task_payload_sha256": "10c17cd7cc61b42c89901e197165d4f3fc3eb99a4c5cad6bbe8ccddeb391d45d",
+          "policy": "kyb-review/tasks/SEED-KYB-001.policy.json",
+          "praxis_task_instance_id": "a2237a8b-03d4-4f8e-9e21-6a256c72ffba",
+          "policy_snapshot_id": "cb7f74f9-7b66-4597-8bd2-bcc021083eb5",
+          "policy_content_hash": "a07d0643d19c91961a4dc8d8bfca9580de74ad71c9a0f0f45ba7a7e49e0dc41a",
+          "rules": 3,
+          "task_changes": 1,
+          "review_status": "draft"
+        },
+        {
+          "task_id": "SEED-KYB-002",
+          "title": "SEED KYB review: Juniper Logistics GmbH",
+          "task": "kyb-review/tasks/SEED-KYB-002.task.json",
+          "task_payload_sha256": "46b946f49dcd84af9bf0a3920c7e85081bb9ac2b3382674d568611e67722c280",
+          "policy": "kyb-review/tasks/SEED-KYB-002.policy.json",
+          "praxis_task_instance_id": "38465d89-0177-42fa-b3c1-5d92bed1d5a2",
+          "policy_snapshot_id": "d5513c3a-96c7-48af-9adb-1e9fbce666df",
+          "policy_content_hash": "298b1adf677ed80021a750a6325343a21d68bdc15957367e7b56bda244808e5a",
+          "rules": 3,
+          "task_changes": 0,
+          "review_status": "draft"
+        }
+      ]
+    },
+    {
+      "workflow": "AML transaction-monitoring alerts",
+      "project": "SEED — AML transaction-monitoring alerts",
+      "folder": "aml-alerts",
+      "rubric_source": "Catalog blueprint milestones (escalation_set 40, dispositions 30, case_summary 30).",
+      "policy_import": "aml-alerts/policy-import.json",
+      "documents": [
+        {
+          "path": "aml-alerts/documents/policy.md",
+          "sha256": "d599e84ac5e3a75b29d763b01aa4f1a66bc676358428e8e3db0715a0f34c5ba6",
+          "document_version_id": "a34ce0c5-324d-4808-bbab-798fe687c439",
+          "title": "seed-policy.md",
+          "published": true
+        }
+      ],
+      "tasks": [
+        {
+          "task_id": "SEED-AML-001",
+          "title": "SEED AML alert batch (structuring)",
+          "task": "aml-alerts/tasks/SEED-AML-001.task.json",
+          "task_payload_sha256": "740784d1113293a776f46921a2e0c773ef7ab73e5c7623af159db2433d2f79f8",
+          "policy": "aml-alerts/tasks/SEED-AML-001.policy.json",
+          "praxis_task_instance_id": "40073c38-608b-44ac-9d2e-203d098cfda7",
+          "policy_snapshot_id": "cdf11d94-dbf2-4789-a367-360bc78e7bd6",
+          "policy_content_hash": "1c60617c30dbde11a36b40f872baf9c5220afae26213f7f7ab4ed24f57eabc73",
+          "rules": 3,
+          "task_changes": 1,
+          "review_status": "draft"
+        },
+        {
+          "task_id": "SEED-AML-002",
+          "title": "SEED AML alert batch (rapid_movement)",
+          "task": "aml-alerts/tasks/SEED-AML-002.task.json",
+          "task_payload_sha256": "6eed25b7c6af2af40e1ce72be03e5a6e3d7ca05aec338093c2acbf0ff71b82bb",
+          "policy": "aml-alerts/tasks/SEED-AML-002.policy.json",
+          "praxis_task_instance_id": "d69ece2e-c1ff-468b-a13f-372a03e0cd73",
+          "policy_snapshot_id": "fdc89b03-3238-4ce3-8d03-02837eea474d",
+          "policy_content_hash": "127f87a3fc167d66d77562a72bd405fa8fb1cc534bbdca0cb94773f29a050b29",
+          "rules": 3,
+          "task_changes": 0,
+          "review_status": "draft"
+        }
+      ]
+    },
+    {
+      "workflow": "KYC onboarding and refresh",
+      "project": "SEED — KYC onboarding and refresh",
+      "folder": "kyc-onboarding",
+      "rubric_source": "Fictional SEED rubric: this workflow uses the KYC task definition, not a catalog blueprint.",
+      "policy_import": "kyc-onboarding/policy-import.json",
+      "documents": [
+        {
+          "path": "kyc-onboarding/documents/policy.md",
+          "sha256": "c8a3b42148a5426a43f6d95ce0564d207d54cdcbf656aeadc7771a4c451fb69c",
+          "document_version_id": "d402d467-e75b-4e93-9914-b2fd06425f2f",
+          "title": "seed-policy.md",
+          "published": true
+        }
+      ],
+      "tasks": [
+        {
+          "task_id": "SEED-KYC-001",
+          "title": "SEED KYC onboarding: Applicant R. Varma",
+          "task": "kyc-onboarding/tasks/SEED-KYC-001.task.json",
+          "task_payload_sha256": "1d21d5b1a812f148f7510e9cd3ebae238c45004322abb59182d80f1d8fa550c8",
+          "policy": "kyc-onboarding/tasks/SEED-KYC-001.policy.json",
+          "praxis_task_instance_id": "039502a6-c56d-4d89-83a7-0f2e018e171e",
+          "policy_snapshot_id": "cf770dbe-226c-40e4-926a-3a14ce82140a",
+          "policy_content_hash": "e42df4c5040f62f44be69018a14004ec0bbc7efd93529ca154e800de01144ad7",
+          "rules": 3,
+          "task_changes": 1,
+          "review_status": "draft"
+        },
+        {
+          "task_id": "SEED-KYC-002",
+          "title": "SEED KYC onboarding: Applicant L. Moreau",
+          "task": "kyc-onboarding/tasks/SEED-KYC-002.task.json",
+          "task_payload_sha256": "4aaff8e883b1b65cde913a2e3e0e8c88c546f6e69e5a6821c344796d066aa99d",
+          "policy": "kyc-onboarding/tasks/SEED-KYC-002.policy.json",
+          "praxis_task_instance_id": "6afdf45e-6ff8-4089-b9aa-51ffa0adba7c",
+          "policy_snapshot_id": "5de411f3-88e6-441e-b846-76658329c286",
+          "policy_content_hash": "452138858f5809f36c1c9454348955ec657c8dcd1b72399e58f052657df2f0fa",
+          "rules": 3,
+          "task_changes": 0,
+          "review_status": "draft"
+        }
+      ]
+    }
+  ]
+}

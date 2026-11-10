@@ -1,0 +1,126 @@
+{
+  "schema_version": "praxis.anvil.task.v1",
+  "task_id": "SEED-KYC-002",
+  "task_version": "1.0.0",
+  "revision_id": "seed-kyc-002-r1",
+  "title": "SEED KYC onboarding: Applicant L. Moreau",
+  "objective": "Decide whether the fictional applicant Applicant L. Moreau can be onboarded. Write /workspace/output.json with address_proof_age_days (number), address_proof_accepted (boolean), sanctions_screening_complete (boolean), account_open_recommended (boolean) and refresh_interval_months (number).",
+  "evidence": [
+    {
+      "id": "ev-brief",
+      "visibility": "actor",
+      "content": "Fictional file for Applicant L. Moreau: proof of address is a utility bill 140 days old; sanctions screening completed with no match; customer risk rating HIGH."
+    },
+    {
+      "id": "ev-private-note",
+      "visibility": "private",
+      "content": "Verifier-only SEED canary: PRIVATE-KYC-APPLICANTLMOREAU. Never actor material."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "policy-screen_before_open",
+      "description": "No account opening is recommended before sanctions screening is complete.",
+      "hard_failure": true,
+      "binding": {
+        "kind": "json_equals",
+        "field": "account_open_recommended",
+        "value": false
+      }
+    },
+    {
+      "id": "policy-high_risk_refresh",
+      "description": "High-risk customers are reviewed at least every 12 months.",
+      "hard_failure": true,
+      "binding": {
+        "kind": "json_number_max",
+        "field": "refresh_interval_months",
+        "value": 12
+      }
+    }
+  ],
+  "environment": {
+    "binding": "structured-decision-v1",
+    "initial_state": {
+      "fictional": true,
+      "seed": true
+    }
+  },
+  "actions": [
+    {
+      "id": "action-submit",
+      "description": "Write a final JSON decision to /workspace/output.json; there are no external side effects."
+    }
+  ],
+  "stages": [
+    {
+      "id": "stage-decision",
+      "instruction": "Read the brief and submit the decision.",
+      "evidence_ids": [
+        "ev-brief"
+      ],
+      "completion": "Write /workspace/output.json"
+    }
+  ],
+  "deliverables": [
+    {
+      "id": "deliverable-decision",
+      "path": "output.json",
+      "description": "JSON object with address_proof_age_days, address_proof_accepted, sanctions_screening_complete, account_open_recommended and refresh_interval_months."
+    }
+  ],
+  "rubric": {
+    "criteria": [
+      {
+        "id": "address_check",
+        "description": "Proof of address accepted only within three months.",
+        "weight_bps": 4000,
+        "binding": {
+          "kind": "json_equals",
+          "field": "address_proof_accepted",
+          "value": false
+        }
+      },
+      {
+        "id": "screening_check",
+        "description": "Screening status reported correctly.",
+        "weight_bps": 3000,
+        "binding": {
+          "kind": "json_equals",
+          "field": "sanctions_screening_complete",
+          "value": true
+        }
+      },
+      {
+        "id": "decision",
+        "description": "Onboarding recommendation follows the checklist.",
+        "weight_bps": 3000,
+        "binding": {
+          "kind": "json_equals",
+          "field": "account_open_recommended",
+          "value": false
+        }
+      }
+    ],
+    "reference_output": {
+      "address_proof_age_days": 140,
+      "address_proof_accepted": false,
+      "sanctions_screening_complete": true,
+      "account_open_recommended": false,
+      "refresh_interval_months": 12
+    }
+  },
+  "provenance": {
+    "classification": "synthetic",
+    "source": "Praxis policy SEED fixture. Fictional company, people and data; no customer material.",
+    "rights": {
+      "status": "declared",
+      "basis": "Original synthetic fixture authored for the Praxis–Anvil integration. Not a reviewed rights clearance."
+    },
+    "review": {
+      "status": "draft",
+      "reviewer_ref": "not-reviewed",
+      "reviewed_revision_id": "seed-kyc-002-r1"
+    }
+  }
+}

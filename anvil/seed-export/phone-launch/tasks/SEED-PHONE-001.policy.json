@@ -1,0 +1,255 @@
+{
+  "schema_version": "praxis.anvil.policy.v2-proposed",
+  "hash_algorithm": "praxis.content-hash.v1",
+  "task_ref": "SEED-PHONE-001",
+  "content_hash": "50653cb19d27909d6af6ae526c42b8e9a4076afeffee252dad4a44f4896e2802",
+  "rules": [
+    {
+      "rule_key": "R-event_approval",
+      "content_hash": "fc6c0edfc37e10c1feae3588e9774c913034f786757f791f59d1479d9789620f",
+      "title": "Manager approval before scheduling",
+      "requirement": "Obtain written manager approval before scheduling a launch event.",
+      "requirement_type": "obligation",
+      "visibility": "agent_visible",
+      "applicability": {
+        "actors": [
+          "agent"
+        ],
+        "actions": [
+          "schedule launch event"
+        ],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": false,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "applicability_label": "Applies when the agent schedule launch event. Otherwise: Not applicable.",
+      "prerequisites": [],
+      "precedence": [],
+      "exceptions": {
+        "kind": "listed",
+        "items": [
+          {
+            "statement": "Approval is not needed for internal rehearsals that are not shown to customers.",
+            "conditions": null
+          }
+        ]
+      },
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "evidence_needs": [
+        "approval record"
+      ],
+      "verification_hint": null,
+      "sources": [
+        {
+          "document_sha256": "5e9a97e3dfe929f1579bf23f70c98155ac94bb6f4319eeb330e7dbf70641cef9",
+          "field": "requirement",
+          "role": "supports",
+          "quote": "Agents must obtain written manager approval before scheduling a launch event.",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 373,
+            "chunkId": null,
+            "lineEnd": 6,
+            "section": null,
+            "charStart": 296,
+            "lineStart": 6,
+            "renditionPage": null
+          },
+          "provenance": {
+            "document_version_id": "f6772fc5-1215-46a0-8a9d-ab4f5c245073"
+          }
+        },
+        {
+          "document_sha256": "5e9a97e3dfe929f1579bf23f70c98155ac94bb6f4319eeb330e7dbf70641cef9",
+          "field": "exceptions",
+          "role": "exception",
+          "quote": "Approval is not needed for internal rehearsals that are not shown to customers.",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 456,
+            "chunkId": null,
+            "lineEnd": 7,
+            "section": null,
+            "charStart": 377,
+            "lineStart": 7,
+            "renditionPage": null
+          },
+          "provenance": {
+            "document_version_id": "f6772fc5-1215-46a0-8a9d-ab4f5c245073"
+          }
+        }
+      ],
+      "provenance": {
+        "rule_id": "c0f3fa74-38b0-46d2-b49b-e3a3fd6ea44b",
+        "rule_version_id": "a9719882-072a-448e-99fd-721805a882b4",
+        "rule_version": 1,
+        "praxis_content_hash": "7b7884ea7b6b927ba481089583f1bbd52a4566b6454bed4f5ae475fe84a18f7a"
+      }
+    },
+    {
+      "rule_key": "R-no_unsubstantiated_claims",
+      "content_hash": "a03ec91eab94e616aea644e68b2ae2b578bde4de3f08045ac2e796118adec64f",
+      "title": "No unsubstantiated claims",
+      "requirement": "Headlines never claim medical benefits, guarantees or total silence.",
+      "requirement_type": "prohibition",
+      "visibility": "agent_visible",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "applicability_label": "Always applies",
+      "prerequisites": [],
+      "precedence": [],
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "evidence_needs": [],
+      "verification_hint": null,
+      "sources": [
+        {
+          "document_sha256": "5e9a97e3dfe929f1579bf23f70c98155ac94bb6f4319eeb330e7dbf70641cef9",
+          "field": "requirement",
+          "role": "supports",
+          "quote": "Headlines must never claim medical benefits, guarantees or total silence.",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 292,
+            "chunkId": null,
+            "lineEnd": 5,
+            "section": null,
+            "charStart": 219,
+            "lineStart": 5,
+            "renditionPage": null
+          },
+          "provenance": {
+            "document_version_id": "f6772fc5-1215-46a0-8a9d-ab4f5c245073"
+          }
+        }
+      ],
+      "provenance": {
+        "rule_id": "7efb6613-cadf-4508-9605-c3d9d3d742c9",
+        "rule_version_id": "f5e14933-acc6-4b91-ae73-f07aaec88d12",
+        "rule_version": 1,
+        "praxis_content_hash": "5580b366823831733f6ba39926afb37971968fd11d1ead1521708a12835c97ac"
+      }
+    },
+    {
+      "rule_key": "R-weekly_spend_cap",
+      "content_hash": "e85f41988c53a76b8f82ce5f9d007202d6b8f5342cbb8faa996c36e84ecdb758",
+      "title": "Weekly spend cap",
+      "requirement": "Never spend more than $20,000 in a single week.",
+      "requirement_type": "prohibition",
+      "visibility": "agent_visible",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "applicability_label": "Always applies",
+      "prerequisites": [],
+      "precedence": [],
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "evidence_needs": [
+        "weekly spend report"
+      ],
+      "verification_hint": null,
+      "sources": [
+        {
+          "document_sha256": "5e9a97e3dfe929f1579bf23f70c98155ac94bb6f4319eeb330e7dbf70641cef9",
+          "field": "requirement",
+          "role": "supports",
+          "quote": "Weekly paid media spend must never exceed $20,000 in a single week.",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 215,
+            "chunkId": null,
+            "lineEnd": 4,
+            "section": null,
+            "charStart": 148,
+            "lineStart": 4,
+            "renditionPage": null
+          },
+          "provenance": {
+            "document_version_id": "f6772fc5-1215-46a0-8a9d-ab4f5c245073"
+          }
+        }
+      ],
+      "provenance": {
+        "rule_id": "8e10bb10-de77-4b97-83a5-e0da377a53b9",
+        "rule_version_id": "a362763f-219c-4c23-9e55-5bce24f9b353",
+        "rule_version": 1,
+        "praxis_content_hash": "cb64a80f19ff54e3dbc639cd350d5739f48a64cff95609e7455f70b90952ea4b"
+      }
+    }
+  ],
+  "task_changes": [
+    {
+      "rule_key": "R-no_unsubstantiated_claims",
+      "rule_content_hash": "a03ec91eab94e616aea644e68b2ae2b578bde4de3f08045ac2e796118adec64f",
+      "type": "CLARIFICATION",
+      "requirement": "Also avoid the words \"silent\" and \"noise-free\" in this task.",
+      "scope": {},
+      "reason": "Clarifies the claim limit for this creative brief.",
+      "exception_index": null,
+      "content_hash": "a49a00c179e12f7525011ceaa02e3cc58edf8fa7e70a4879fbe0be4d7b263d84",
+      "provenance": {
+        "change_id": "d11077d1-a775-4d6c-b16f-c76082856488",
+        "rule_version_id": "f5e14933-acc6-4b91-ae73-f07aaec88d12",
+        "source_citation_id": null
+      }
+    }
+  ],
+  "provenance": {
+    "snapshot_id": "aaccfbe3-72be-4e32-ad95-363fa42f182b",
+    "task_instance_id": "12976b43-c2cf-4ff4-9ab9-b132fd387191",
+    "snapshot_version": 1,
+    "published_at": "2026-11-10T14:53:47.102Z",
+    "project_rule_set": {
+      "id": "cc3862d6-1f7d-41bd-9794-734f0152904f",
+      "digest": "e6c466598153b278bc4beab64560f896084eb15c319cb07d816758844b0acd7b",
+      "version": 1
+    },
+    "rubric_version": "template:f3af81f6-6263-4bc7-a876-7f8ab1b951c7@1",
+    "praxis_digest": "387ebd3a30d7d3d3b43bb4024f544254a0a24d709e0c53d53af0d295ba4f67e7"
+  }
+}

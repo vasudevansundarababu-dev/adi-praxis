@@ -1,0 +1,223 @@
+{
+  "schema_version": "praxis.anvil.policy.v2-proposed",
+  "hash_algorithm": "praxis.content-hash.v1",
+  "task_ref": "SEED-LOCALE-001",
+  "content_hash": "748dac80fe398900e1ab1efcf451f8d7a65776816c3e2fb0fa5efcb046d92703",
+  "rules": [
+    {
+      "rule_key": "R-approved_glossary",
+      "content_hash": "a95c74cbb472a1c8023614041a13476bea5fc04410838fddaa367df2c99d96b7",
+      "title": "Approved glossary",
+      "requirement": "Use the approved glossary for the locale.",
+      "requirement_type": "obligation",
+      "visibility": "agent_visible",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "applicability_label": "Always applies",
+      "prerequisites": [],
+      "precedence": [],
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "evidence_needs": [],
+      "verification_hint": null,
+      "sources": [
+        {
+          "document_sha256": "cebbdb136dbc74ca7a4158f1f3164b5e9eeafc0743a73b6dcd980711645f8716",
+          "field": "requirement",
+          "role": "supports",
+          "quote": "Every localised creative must use the approved glossary for its locale.",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 220,
+            "chunkId": null,
+            "lineEnd": 4,
+            "section": null,
+            "charStart": 149,
+            "lineStart": 4,
+            "renditionPage": null
+          },
+          "provenance": {
+            "document_version_id": "36e73ed2-bb22-4102-9684-2cb73d96272b"
+          }
+        }
+      ],
+      "provenance": {
+        "rule_id": "b027d782-41a5-408f-a125-0b4c3db6b0c2",
+        "rule_version_id": "afd84294-6f12-473d-849e-96b89c78c049",
+        "rule_version": 1,
+        "praxis_content_hash": "edd3034138b2b0720e26d5452d1623a061766a72fb06aad60391402a3184a2cd"
+      }
+    },
+    {
+      "rule_key": "R-de_imprint",
+      "content_hash": "9a82b107eb0465ed65f41ba57d5bd7ca81f54b53adab550b9508b199533ec7bd",
+      "title": "German imprint link",
+      "requirement": "Include the legal imprint link on German creatives.",
+      "requirement_type": "obligation",
+      "visibility": "agent_visible",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [
+          "de-DE"
+        ],
+        "channels": [],
+        "entities": [],
+        "universal": false,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "applicability_label": "Applies for de-DE. Otherwise: Not applicable.",
+      "prerequisites": [],
+      "precedence": [],
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "evidence_needs": [],
+      "verification_hint": null,
+      "sources": [
+        {
+          "document_sha256": "cebbdb136dbc74ca7a4158f1f3164b5e9eeafc0743a73b6dcd980711645f8716",
+          "field": "requirement",
+          "role": "supports",
+          "quote": "Creatives for the German market must include the legal imprint link.",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 353,
+            "chunkId": null,
+            "lineEnd": 6,
+            "section": null,
+            "charStart": 285,
+            "lineStart": 6,
+            "renditionPage": null
+          },
+          "provenance": {
+            "document_version_id": "36e73ed2-bb22-4102-9684-2cb73d96272b"
+          }
+        }
+      ],
+      "provenance": {
+        "rule_id": "35cf3754-2e85-469a-8962-c9da75602e80",
+        "rule_version_id": "2c86a455-9ad5-4ad6-8974-2d171f14130d",
+        "rule_version": 1,
+        "praxis_content_hash": "f7bf83930106bdbf2a2042a28d505403641f4efa9cfe0b108833d95cc4b794a4"
+      }
+    },
+    {
+      "rule_key": "R-local_currency",
+      "content_hash": "61c11558ff53999562928b81a0c51e1e77acbd188e7c01c229b7687c9291e4ce",
+      "title": "Local currency",
+      "requirement": "Show prices in the local currency of the market.",
+      "requirement_type": "obligation",
+      "visibility": "agent_visible",
+      "applicability": {
+        "actors": [],
+        "actions": [],
+        "locales": [],
+        "channels": [],
+        "entities": [],
+        "universal": true,
+        "conditionText": null,
+        "jurisdictions": []
+      },
+      "applicability_label": "Always applies",
+      "prerequisites": [],
+      "precedence": [],
+      "exceptions": {
+        "kind": "none",
+        "items": []
+      },
+      "effective": {
+        "to": null,
+        "from": null,
+        "conditionText": "always"
+      },
+      "evidence_needs": [],
+      "verification_hint": null,
+      "sources": [
+        {
+          "document_sha256": "cebbdb136dbc74ca7a4158f1f3164b5e9eeafc0743a73b6dcd980711645f8716",
+          "field": "requirement",
+          "role": "supports",
+          "quote": "Prices must be shown in the local currency of the market.",
+          "locator": {
+            "kind": "text_span",
+            "page": null,
+            "boxes": null,
+            "charEnd": 281,
+            "chunkId": null,
+            "lineEnd": 5,
+            "section": null,
+            "charStart": 224,
+            "lineStart": 5,
+            "renditionPage": null
+          },
+          "provenance": {
+            "document_version_id": "36e73ed2-bb22-4102-9684-2cb73d96272b"
+          }
+        }
+      ],
+      "provenance": {
+        "rule_id": "9a408ffd-0148-4e07-9ce9-ff0970707b5f",
+        "rule_version_id": "84ba1c5d-f66f-4160-b248-116d7025617e",
+        "rule_version": 1,
+        "praxis_content_hash": "339eadfc6a3dc79f9367ad3dcededfddacccf1364521e62e7c8b6495fe33102c"
+      }
+    }
+  ],
+  "task_changes": [
+    {
+      "rule_key": "R-local_currency",
+      "rule_content_hash": "61c11558ff53999562928b81a0c51e1e77acbd188e7c01c229b7687c9291e4ce",
+      "type": "CLARIFICATION",
+      "requirement": "Show the currency symbol before the amount for this task.",
+      "scope": {},
+      "reason": "Stricter house style for this campaign.",
+      "exception_index": null,
+      "content_hash": "0cf0e70b57f6a1f3183e5e000f5fc68ba80b0e6abbcd55dbd502308aff88c7ab",
+      "provenance": {
+        "change_id": "a7de5933-55cf-4ae3-b526-6b99c38020a8",
+        "rule_version_id": "84ba1c5d-f66f-4160-b248-116d7025617e",
+        "source_citation_id": null
+      }
+    }
+  ],
+  "provenance": {
+    "snapshot_id": "07833cce-8c34-40d7-b17f-b2412e3e31eb",
+    "task_instance_id": "c1b2e6b1-6807-4694-8bb9-2b9852bc23a6",
+    "snapshot_version": 1,
+    "published_at": "2026-11-10T14:53:47.170Z",
+    "project_rule_set": {
+      "id": "48e4f246-eb73-4d3c-8987-d263cc153f5e",
+      "digest": "88b4ccc433220591d6c3ea77da40806b10a3f24014646494e46ed40b6b848bce",
+      "version": 1
+    },
+    "rubric_version": "template:b9a6ca46-b4d5-432c-9d98-f2def4e2a0ac@1",
+    "praxis_digest": "8405b6cafbbccd31436d7b0e9515af0852588dfe8821e89706d6d090001f05af"
+  }
+}

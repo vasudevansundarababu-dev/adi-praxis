@@ -55,9 +55,10 @@ export function resolveCitation(c: CandidateCitation, doc: { text: string; pages
   const q = squash(c.quote);
   if (q.length < 8) return { quote: c.quote, locator: { ...base, kind: 'manual_reference' }, resolution: 'UNRESOLVED' };
   if (doc.format === 'pdf' && doc.pages.length) {
-    const order = c.page ? [c.page - 1, ...doc.pages.map((_, i) => i).filter((i) => i !== c.page! - 1)] : doc.pages.map((_, i) => i);
+    const hint = Number.isInteger(c.page) && c.page! >= 1 && c.page! <= doc.pages.length ? c.page! - 1 : null;
+    const order = hint === null ? doc.pages.map((_, i) => i) : [hint, ...doc.pages.map((_, i) => i).filter((i) => i !== hint)];
     for (const i of order) {
-      if (i >= 0 && i < doc.pages.length && squash(doc.pages[i]!).includes(q)) return { quote: c.quote, locator: { ...base, kind: 'page_region', page: i + 1 }, resolution: 'RESOLVED' };
+      if (squash(doc.pages[i]!).includes(q)) return { quote: c.quote, locator: { ...base, kind: 'page_region', page: i + 1 }, resolution: 'RESOLVED' };
     }
     return { quote: c.quote, locator: { ...base, kind: 'page_region', page: null }, resolution: 'QUOTE_MISMATCH' };
   }
@@ -76,6 +77,28 @@ export function findSpan(text: string, quote: string): [number, number] | null {
   if (exact >= 0) return [exact, exact + quote.length];
   const words = quote.normalize('NFKC').trim().split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/['\u2018\u2019]/g, "['\u2018\u2019]").replace(/["\u201C\u201D]/g, '["\u201C\u201D]').replace(/[-\u2013\u2014]/g, '[-\u2013\u2014]'));
   if (!words.length || words.length > 400) return null;
-  const m = new RegExp(words.join('\\s+'), 'i').exec(text.normalize('NFKC'));
-  return m ? [m.index, m.index + m[0].length] : null;
+  const { normalised, start, end } = nfkcWithOrigin(text);
+  const m = new RegExp(words.join('\\s+'), 'i').exec(normalised);
+  return m && m[0].length ? [start[m.index]!, end[m.index + m[0].length - 1]!] : null;
+}
+
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+/**
+ * NFKC per grapheme, recording for each normalised UTF-16 unit the [start, end) of the original grapheme it came from,
+ * so offsets found in the normalised text point at the original text even where "ﬁ" became "fi".
+ */
+function nfkcWithOrigin(text: string): { normalised: string; start: number[]; end: number[] } {
+  let normalised = '';
+  const start: number[] = [];
+  const end: number[] = [];
+  for (const { segment, index } of graphemes.segment(text)) {
+    const n = segment.normalize('NFKC');
+    normalised += n;
+    for (let k = 0; k < n.length; k++) {
+      start.push(index);
+      end.push(index + segment.length);
+    }
+  }
+  return { normalised, start, end };
 }

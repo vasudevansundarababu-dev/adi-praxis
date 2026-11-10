@@ -140,11 +140,12 @@ export function normaliseLlama(raw: LlamaJob): ProviderResult {
   const candidates: CandidateRule[] = [];
   let dropped = 0;
   rules.forEach((r, i) => {
-    const m = meta[i] ?? {};
+    const m = (Array.isArray(meta) && meta[i] && typeof meta[i] === 'object' ? meta[i] : {}) as Record<string, { citation?: LlamaCitation[]; confidence?: number }>;
     const citations: CandidateCitation[] = [];
     const add = (field: string, path: string) => {
-      for (const c of m[field]?.citation ?? []) {
-        if (typeof c.matching_text !== 'string' || !c.matching_text.trim()) continue;
+      const list = m[field]?.citation;
+      for (const c of Array.isArray(list) ? list : []) {
+        if (!c || typeof c.matching_text !== 'string' || !c.matching_text.trim()) continue;
         citations.push({ fieldPath: path, role: field === 'exceptions' ? 'exception' : field === 'conditionText' ? 'qualifies' : 'supports', quote: c.matching_text.slice(0, 4000), page: Number.isInteger(c.page) && c.page! > 0 ? c.page! : null, chunkId: null, lineStart: null, lineEnd: null, confidence: typeof m[field]?.confidence === 'number' ? m[field]!.confidence! : null });
       }
     };

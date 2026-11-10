@@ -1,3 +1,5 @@
+> Current consolidated handover: [Praxis authoring v2.0](handover-v2/00-READ-FIRST.md). It supersedes historical layout and capability-gap notes where stated. One chatbot and one reusable Classic framework serve all templates; the connected desktop graph is horizontal below both views.
+
 # Praxis authoring approval pack
 
 Decision requested: approve or revise the shared authoring experience, facilitator boundaries, proposed architecture and scoped integration. This does not approve cloud deployment, model spending or native multi-agent benchmark execution.

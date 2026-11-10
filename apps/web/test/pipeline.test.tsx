@@ -116,6 +116,12 @@ describe('U3 mock routes (Stream 2 stand-in)', () => {
     expect(list.items.filter((d) => d.status === 'ACTIVE')).toHaveLength(1);
     const dir = (await handleMock('GET', '/templates/directory', undefined, cx)).body as TemplateDirectoryResponse;
     expect(dir.domains.flatMap((d) => d.rows).find((r) => r.templateId === T.id)?.status).toBe('ACTIVE');
+
+    // S3-10: Stop keeps the row (and URL) and is idempotent; only an Admin may stop.
+    const stopped = await handleMock('POST', `/deployments/${d1.id}/stop`, {}, cx);
+    expect(stopped.body).toMatchObject({ id: d1.id, status: 'STOPPED', studioUrl: d1.studioUrl });
+    expect((await handleMock('POST', `/deployments/${d1.id}/stop`, {}, cx)).status).toBe(200);
+    expect((await handleMock('POST', '/deployments/no-such/stop', {}, cx)).status).toBe(404);
   });
 });
 
@@ -173,5 +179,14 @@ describe('U3 Screen 3 rendering', () => {
     const t = text(html(<Pipeline {...props({ deployments: [d] })} />));
     expect(t).toContain('Studios for this workflow');
     expect(t).toContain('http://localhost:3131/studio/launch-abc123');
+  });
+
+  it('S3-10: each active studio has a Stop button; a stopped studio shows Stopped and no button', () => {
+    const base = { templateId: T.id, templateVersion: 1, projectId: P.id, smeCandidateId: TARGETS[0]!.smes[0]!.candidateId, runtime: 'SHARED' as const, createdAt: '2026-11-10T00:00:00.000Z' };
+    const live: StudioDeploymentDto = { ...base, id: '00000000-0000-4000-8000-00000000f001', studioKey: 'launch-live01', studioUrl: 'http://localhost:3131/studio/launch-live01', status: 'ACTIVE' };
+    const stopped: StudioDeploymentDto = { ...base, id: '00000000-0000-4000-8000-00000000f002', studioKey: 'launch-stop01', studioUrl: 'http://localhost:3131/studio/launch-stop01', status: 'STOPPED' };
+    const m = html(<Pipeline {...props({ deployments: [live, stopped] })} />);
+    expect(m.match(/>Stop studio</g)).toHaveLength(1);
+    expect(text(m)).toContain('Stopped');
   });
 });

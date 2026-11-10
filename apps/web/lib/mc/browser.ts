@@ -80,6 +80,7 @@ export const mcBrowser = {
   verification: (id: string) => call<VerificationRunDto>('GET', `/verifications/${id}`),
   deploy: (id: string, body: { verificationRunId: string; projectId: string; smeCandidateId: string }, key: string) => call<StudioDeploymentDto>('POST', `/templates/${id}/deployments`, body, key),
   deployments: (id: string) => call<{ items: StudioDeploymentDto[] }>('GET', `/templates/${id}/deployments`),
+  stopStudio: (deploymentId: string, key: string) => call<StudioDeploymentDto>('POST', `/deployments/${deploymentId}/stop`, {}, key),
   studioTask: (id: string) => call<StudioTaskDetail>('GET', `/studio-tasks/${id}`),
   studioTaskJudge: (id: string) => call<{ judge: JudgeView | null }>('GET', `/studio-tasks/${id}/judge`),
   bundleUrl: (id: string) => `${MC_BROWSER_BASE}/studio-tasks/${id}/bundle`,

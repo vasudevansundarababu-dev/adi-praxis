@@ -471,6 +471,18 @@ const routes: Route[] = [
   },
   {
     method: 'POST',
+    pattern: /^\/deployments\/([\w-]+)\/stop$/,
+    admin: true,
+    run: async ([, id]) => {
+      const d = mockStore().deployments.get(id!);
+      if (!d) return error(404, 'NOT_FOUND', 'Studio not found');
+      d.status = 'STOPPED';
+      const { projectName: _p, smeEmail: _e, lineageId: _l, ...dto } = d;
+      return json(200, dto);
+    },
+  },
+  {
+    method: 'POST',
     pattern: /^\/templates\/([\w-]+)\/generations$/,
     admin: true,
     run: async ([, id], body, ctx) => {

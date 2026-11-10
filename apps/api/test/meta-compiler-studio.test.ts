@@ -105,7 +105,7 @@ describe('A8 candidate studio: config, autosave, atomic Save & Commit, own tasks
     expect(await db.auditEvent.count({ where: { entityId: body.taskInstanceId, action: { in: ['task.issued', 'studio.task_opened'] } } })).toBe(2);
   });
 
-  it('only the assigned SME gets in: other SMEs, other clients and stopped studios get 404; signed-out callers get 401 (S4-02)', async () => {
+  it('only the assigned SME gets in: other SMEs and other clients get 404; signed-out callers get 401 (S4-02)', async () => {
     const { other, studioKey } = await deployed();
     expect((await studio(other.cookie, studioKey)).statusCode).toBe(404);
     expect((await studio(other.cookie, studioKey, '/tasks')).statusCode).toBe(404);
@@ -115,6 +115,41 @@ describe('A8 candidate studio: config, autosave, atomic Save & Commit, own tasks
     // An internal Admin session is a different audience and never opens the candidate studio.
     expect((await studio(admin, studioKey)).statusCode).toBe(401);
     expect((await studio(other.cookie, 'no-such-studio')).statusCode).toBe(404);
+  });
+
+  it('S3-10 an Admin stops a studio: its SME sees "closed" (410), others still get 404, work is kept, stop is audited and idempotent, redeploy reopens the URL', async () => {
+    const { t, project, author, other, studioKey, bp } = await deployed();
+    const open = StudioConfigResponse.parse((await studio(author.cookie, studioKey)).json());
+    const rev = (await saveDraft(author.cookie, studioKey, answersFor(bp), open.revision)).json().revision;
+    expect((await commit(author.cookie, studioKey, rev)).statusCode).toBe(200);
+    const d = await db.studioDeployment.findFirstOrThrow({ where: { studioKey } });
+
+    const pm = await login(app, (await createUser(clientId, ['PM'])).email);
+    expect((await http.post(pm, `/deployments/${d.id}/stop`, {})).statusCode).toBe(403);
+    const otherClient = (await createClient()).id;
+    const outsider = await login(app, (await createUser(otherClient, ['ADMIN'])).email);
+    expect((await http.post(outsider, `/deployments/${d.id}/stop`, {})).statusCode).toBe(404);
+
+    const stop = await http.post(admin, `/deployments/${d.id}/stop`, {});
+    expect(stop.statusCode, stop.body).toBe(200);
+    expect(stop.json()).toMatchObject({ id: d.id, status: 'STOPPED', studioKey });
+    const again = await http.post(admin, `/deployments/${d.id}/stop`, {});
+    expect(again.json()).toMatchObject({ status: 'STOPPED' });
+    expect(await db.auditEvent.count({ where: { entityId: d.id, action: 'studio.stopped' } })).toBe(1);
+    expect(await db.studioDeployment.findUniqueOrThrow({ where: { id: d.id } })).toMatchObject({ status: 'STOPPED', stoppedById: adminId, stoppedAt: expect.any(Date) });
+
+    for (const res of [await studio(author.cookie, studioKey), await studio(author.cookie, studioKey, '/tasks'), await saveDraft(author.cookie, studioKey, answersFor(bp), 0), await commit(author.cookie, studioKey, 0)]) {
+      expect(res.statusCode, res.body).toBe(410);
+      expect(res.json().error).toBe('STUDIO_CLOSED');
+    }
+    expect((await studio(other.cookie, studioKey)).statusCode).toBe(404);
+    expect(await db.smeAuthoredTask.count({ where: { deploymentId: d.id } })).toBe(1);
+    expect((await http.get(admin, `/templates/${t.id}/deployments`)).json().items).toEqual([expect.objectContaining({ id: d.id, status: 'STOPPED' })]);
+
+    const { verificationId } = await generateAndVerify(http, admin, work, t.id);
+    const redeploy = await http.post(admin, `/templates/${t.id}/deployments`, { verificationRunId: verificationId, projectId: project.id, smeCandidateId: author.candidateId });
+    expect(redeploy.json()).toMatchObject({ id: d.id, studioKey, status: 'ACTIVE' });
+    expect((await studio(author.cookie, studioKey)).statusCode).toBe(200);
   });
 
   it('reuses the work checks: an SME who has not finished onboarding is told the outstanding step', async () => {

@@ -58,10 +58,41 @@ describe('C4 catalog blueprints (S1-17)', () => {
   it('the catalog lists exactly the mockup workflows (D15)', () => {
     expect(CATALOG_V2.map((d) => [d.name, d.workflows.length])).toEqual([
       ['Digital Marketing', 3],
-      ['Banking', 12],
+      ['Banking', 10],
     ]);
     expect(normaliseName('Fraud–risk/compliance handoffs')).toBe(normaliseName('Fraud-risk/compliance handoffs'));
     expect(normaliseName('  KYB and  Beneficial ownership ')).toBe('kyb and beneficial ownership');
+  });
+
+  it('the owner removed Control testing and Country-specific interpretation (10 Nov 2026)', () => {
+    const names = CATALOG_V2.flatMap((d) => d.workflows.map((w) => w.workflowName));
+    expect(names).not.toContain('Control testing');
+    expect(names).not.toContain('Country-specific interpretation');
+  });
+
+  it('every workflow without a blueprint carries publish fields that pass the publish rules (D15, 10 Nov 2026)', () => {
+    const fromFields = CATALOG_V2.flatMap((d) => d.workflows.filter((w) => !w.blueprint).map((w) => ({ domain: d.name, workflowName: w.workflowName, fields: w.fields! })));
+    expect(fromFields.map((f) => f.workflowName).sort()).toEqual(
+      [
+        'Q4 Global Paid Search Query Clustering',
+        'Omnichannel Creative & Locale Compliance',
+        'Adverse media review',
+        'Audit and evidence preparation',
+        'Communications surveillance',
+        'Compliance monitoring',
+        'Customer risk rating',
+        'Enhanced due diligence',
+        'Fraud-risk/compliance handoffs',
+        'Issue and remediation tracking',
+      ].sort(),
+    );
+    for (const { workflowName, fields } of fromFields) {
+      expect(fields, workflowName).toBeDefined();
+      expect(fields.defaultTptMinutes, workflowName).toBeGreaterThan(0);
+      expect(fields.skills.length, workflowName).toBeGreaterThan(0);
+      expect(fields.taskModes.length, workflowName).toBeGreaterThan(0);
+      expect(publishProblems({ workflowName, ...fields }), workflowName).toEqual([]);
+    }
   });
 });
 

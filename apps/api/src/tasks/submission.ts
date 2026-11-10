@@ -10,6 +10,7 @@ import { draftingChecks } from './drafting/service';
 import { findSimilar, storeEmbedding, type SimilarMatch } from './similarity';
 import { scanForRealData, type DataFlag } from './synthetic-scan';
 import { templateRef } from './task-service';
+import { snapshotTask } from '../policy/task-policy';
 
 type Audit = (i: Parameters<typeof writeAudit>[2]) => Promise<void>;
 
@@ -95,7 +96,8 @@ export async function submitTask(
   if (!count) throw new AppError(409, 'STALE_REVISION', 'This task changed in another window. Reload to continue.');
   if (t.slotId) await tx.coverageSlot.update({ where: { id: t.slotId }, data: { status: 'IN_PROGRESS' } });
   const version = (await tx.taskSubmission.count({ where: { taskInstanceId: t.id } })) + 1;
-  await tx.taskSubmission.create({ data: { clientId: t.clientId, taskInstanceId: t.id, version, output: t.output as Prisma.InputJsonValue, coverageTags: (ev.coverage ?? undefined) as Prisma.InputJsonValue | undefined, checks: stored as unknown as Prisma.InputJsonValue } });
+  const policy = await snapshotTask(tx, { clientId: t.clientId, task: { id: t.id, projectId: t.projectId }, actorId: 'task-submission' });
+  await tx.taskSubmission.create({ data: { clientId: t.clientId, taskInstanceId: t.id, version, policySnapshotId: policy?.snapshot.id ?? null, output: t.output as Prisma.InputJsonValue, coverageTags: (ev.coverage ?? undefined) as Prisma.InputJsonValue | undefined, checks: stored as unknown as Prisma.InputJsonValue } });
   const flagged = similar.filter((m) => m.flagged);
   await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.submitted', before: { status: t.status }, after: { status: 'SUBMITTED', version, flaggedDuplicates: flagged.map((m) => m.taskId), dataFlags: flags.length } });
   await emit({ name: 'task.submitted', aggregateType: 'TaskInstance', aggregateId: t.id, payload: { taskId: t.id, projectId: t.projectId, version, flaggedDuplicate: flagged.length > 0 } });

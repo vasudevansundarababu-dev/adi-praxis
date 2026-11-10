@@ -12,6 +12,7 @@ import { grantAppRole } from './grant-app-role';
  * - `seed`: one-time bootstrap of the client, first Admin (SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD) and catalog.
  * - `catalog-v2 [--dry-run] [--reverse] [--client <name>]`: the Meta-Compiler catalog change (PRD D15, D15a).
  * - `catalog-import --file <abs-path> --client <clientId> [--dry-run]`: one private template as a client DRAFT.
+ * - `policy-seed --client <clientId> --owner <pmUserId>`: fictional SEED policy projects (PRD PR-S01); never production.
  * Exits non-zero on failure so Cloud Run retries and alerts.
  */
 const job = process.argv[2];
@@ -45,11 +46,23 @@ try {
   } else if (job === 'catalog-v2') {
     const { parseCatalogV2Args, runCatalogV2 } = await import('./catalog-v2');
     await runCatalogV2(db, parseCatalogV2Args(process.argv.slice(3)), log);
+  } else if (job === 'policy-seed') {
+    // --client <clientId> --owner <PM userId>: both explicit, so the seed never guesses whose projects these are.
+    const arg = (name: string) => {
+      const i = process.argv.indexOf(`--${name}`);
+      const v = i > 0 ? process.argv[i + 1] : undefined;
+      if (!v) throw new Error(`policy-seed needs --${name}`);
+      return v;
+    };
+    const { policySeed } = await import('./policy-seed');
+    const { defaultStorage } = await import('../app');
+    const r = await policySeed(db, { storage: defaultStorage(config), appEnv: config.appEnv, clientId: arg('client'), ownerId: arg('owner') }, log);
+    if (r.missingTemplates.length) process.exitCode = 3;
   } else if (job === 'catalog-import') {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

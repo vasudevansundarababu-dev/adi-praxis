@@ -12,6 +12,7 @@ import { redeemInvite } from '../tasks/invites';
 import { findSimilar } from '../tasks/similarity';
 import { evaluateTask, submitTask, type StoredChecks } from '../tasks/submission';
 import { activeAssignment, allocateTasks, templateRef } from '../tasks/task-service';
+import { effectivePolicy, sidecar } from '../policy/task-policy';
 
 const IdParams = z.object({ id: z.string().uuid() });
 
@@ -138,6 +139,18 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       readOnly: !['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(t.status),
       review: review ? { decision: review.decision, comments: review.comments, notes: review.notes, rejectReason: review.rejectReason, at: review.createdAt.toISOString() } : null,
     };
+  });
+
+  // OD9: the SME sees the agent-visible rules of their own task, read-only. Evaluator-only rules never leave the server.
+  app.get('/me/tasks/:id/policy', { config: { access: 'candidate' }, schema: { tags: ['work'], params: IdParams } }, async (req) => {
+    const t = await ownTask(db, req.params.id, req.candidate!.smeUserId);
+    const snap = await db.taskPolicySnapshot.findFirst({ where: { taskInstanceId: t.id }, orderBy: { version: 'desc' } });
+    if (snap) return { configured: true, readOnly: true, ...sidecar(snap, { agentVisibleOnly: true }) };
+    const eff = await effectivePolicy(db, t.clientId, t);
+    if (!eff) return { configured: false, readOnly: true, rules: [], task_changes: [] };
+    const rules = eff.body.rules.filter((r) => r.visibility === 'agent_visible');
+    const visible = new Set(rules.map((r) => r.rule_version_id));
+    return { configured: true, readOnly: true, snapshot_id: null, project_rule_set: eff.body.project_rule_set, rules, task_changes: eff.body.task_changes.filter((x) => visible.has(x.rule_version_id)) };
   });
 
   // W01: a sample accepted task of the same workflow from a different coverage cell (accepted content is synthetic).

@@ -13,6 +13,7 @@ import { definitionFor } from '../tasks/definitions';
 import { createInvite, sendInvite } from '../tasks/invites';
 import { EXPERT_TASK_TYPES, ensureSlots, reclaimTask, templateRef } from '../tasks/task-service';
 import { loadProject } from './projects';
+import { policyReadiness } from '../policy/task-policy';
 
 const IdParams = z.object({ id: z.string().uuid() });
 const ACCESS = ['PM', 'ADMIN'] as const;
@@ -63,6 +64,7 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
         orderBy: [{ status: 'asc' }, { assignedAt: 'asc' }],
         take: 2000,
       });
+      const policy = await policyReadiness(db, p.clientId, p.id, tasks.map((t) => t.id));
       const eligible = ['local', 'demo'].includes(config.appEnv) && p.status === 'READY_FOR_STAFFING' && p.taskMode === 'AUTHORING' && p.name.startsWith('SYNTHETIC TEST — ') && p.template.workflowName === EXECUTABLE_WORKFLOW;
       const available = eligible && tasks.some((t) => t.status === 'CREATED' && !t.assignedToId && (t.input as { syntheticExample?: boolean }).syntheticExample === true && praxisContractIssues((t.output as Record<string, unknown> | null)?.praxisContract).length === 0);
       return {
@@ -81,6 +83,7 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
           activeSeconds: t.activeSeconds,
           reworkCount: t.reworkCount,
           revision: t.revision,
+          policy: policy ? (policy.get(t.id) ?? 'NOT_FROZEN') : null,
         })),
       };
     },

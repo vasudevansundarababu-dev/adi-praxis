@@ -8,6 +8,7 @@ import { verifyApprovedChain } from '../dataset/verify';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
+import { sidecarsById, snapshotIdsForRecords, withPolicy } from '../policy/task-policy';
 
 const IdParams = z.object({ id: z.string().uuid() });
 /** Read-only access: Admins, and RL Gym with its API key. */
@@ -117,10 +118,12 @@ export const datasetRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
       orderBy: { seq: 'asc' },
       take: q.limit,
     });
+    const snaps = await snapshotIdsForRecords(db, rows);
+    const sidecars = await sidecarsById(db, [...snaps.values()]);
     return reply
       .header('content-type', 'application/x-ndjson')
       .header('x-next-after', rows.length === q.limit ? String(rows.at(-1)!.seq) : '')
-      .send(rows.map((r) => JSON.stringify(toRecordDto(r))).join('\n') + (rows.length ? '\n' : ''));
+      .send(rows.map((r) => JSON.stringify(withPolicy(toRecordDto(r), sidecars.get(snaps.get(r.id) ?? '')))).join('\n') + (rows.length ? '\n' : ''));
   });
 
   // A correction never edits a record: it appends a new one that supersedes it, with the same lineage.

@@ -765,14 +765,16 @@ model ProjectAssignment {
 
 /// Every submitted version of a task (rework keeps history; the Reviewer sees what changed). Append-only.
 model TaskSubmission {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId       String   @map("client_id") @db.Uuid
-  taskInstanceId String   @map("task_instance_id") @db.Uuid
-  version        Int
-  output         Json
-  coverageTags   Json?    @map("coverage_tags")
-  checks         Json?
-  submittedAt    DateTime @default(now()) @map("submitted_at")
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId         String   @map("client_id") @db.Uuid
+  taskInstanceId   String   @map("task_instance_id") @db.Uuid
+  version          Int
+  output           Json
+  coverageTags     Json?    @map("coverage_tags")
+  checks           Json?
+  submittedAt      DateTime @default(now()) @map("submitted_at")
+  /// Frozen policy snapshot taken with this version (PRD-POLICY-RULES PR-T05); null when the project has no rule set.
+  policySnapshotId String?  @map("policy_snapshot_id") @db.Uuid
 
   taskInstance TaskInstance @relation(fields: [taskInstanceId], references: [id])
 
@@ -2740,6 +2742,8 @@ model SmeAuthoredTask {
   projectId            String             @map("project_id") @db.Uuid
   candidateId          String             @map("candidate_id") @db.Uuid
   externalTaskId       String             @unique @map("external_task_id")
+  /// Frozen policy snapshot taken with this version (PRD-POLICY-RULES PR-T05); null when the project has no rule set.
+  policySnapshotId     String?            @map("policy_snapshot_id") @db.Uuid
   title                String
   tptEstimate          String?            @map("tpt_estimate")
   executionMode        ExecutionMode      @map("execution_mode")
@@ -2762,4 +2766,324 @@ model SmeAuthoredTask {
   @@unique([taskInstanceId, submissionVersion])
   @@index([clientId, createdAt])
   @@index([clientId, deploymentId])
+}
+
+// ── Policy Rules (docs/prd/PRD-POLICY-RULES.md, docs/architecture/ARCH-POLICY-RULES.md) ──
+
+enum PolicyDocumentOrigin {
+  UPLOAD
+  MANUAL_TEXT
+  SEED
+}
+
+enum ExtractionStatus {
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+  CANCELLED
+  UNCERTAIN
+}
+
+enum PolicyRuleState {
+  DRAFT
+  NEEDS_DEFINITION
+  REVIEWED
+  EXCLUDED
+}
+
+enum TaskPolicyChangeType {
+  CLARIFICATION
+  STRICTER
+  EXEMPTION
+}
+
+/// Optional policy requirements of a template version (S1 P03). Copied into a project at creation.
+model TemplatePolicyProfile {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String   @map("client_id") @db.Uuid
+  templateId        String   @unique @map("template_id") @db.Uuid
+  categories        Json     @default("[]")
+  suggestedPatterns Json     @default("[]") @map("suggested_patterns")
+  expectedEvidence  Json     @default("[]") @map("expected_evidence")
+  updatedById       String   @map("updated_by_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+}
+
+/// Template policy requirements as copied into a project (S1 J01, P02). Never changed by later template edits.
+model ProjectPolicyRequirement {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String   @map("client_id") @db.Uuid
+  projectId         String   @unique @map("project_id") @db.Uuid
+  templateId        String   @map("template_id") @db.Uuid
+  templateVersion   Int      @map("template_version")
+  categories        Json     @default("[]")
+  suggestedPatterns Json     @default("[]") @map("suggested_patterns")
+  expectedEvidence  Json     @default("[]") @map("expected_evidence")
+  createdAt         DateTime @default(now()) @map("created_at")
+}
+
+model PolicyDocument {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String    @map("client_id") @db.Uuid
+  projectId     String    @map("project_id") @db.Uuid
+  title         String
+  category      String?
+  language      String?
+  jurisdiction  String?
+  effectiveFrom DateTime? @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  latestVersion Int       @default(0) @map("latest_version")
+  createdById   String    @map("created_by_id")
+  archivedAt    DateTime? @map("archived_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  versions PolicyDocumentVersion[]
+
+  @@index([clientId, projectId])
+}
+
+/// Immutable document version (S1 E04). Append-only in the database.
+model PolicyDocumentVersion {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String               @map("client_id") @db.Uuid
+  projectId          String               @map("project_id") @db.Uuid
+  documentId         String               @map("document_id") @db.Uuid
+  version            Int
+  sha256             String
+  fileName           String               @map("file_name")
+  mediaType          String               @map("media_type")
+  format             String
+  sizeBytes          Int                  @map("size_bytes")
+  pageCount          Int                  @map("page_count")
+  /// How the page count was obtained: pdf_pages | docx_app_xml | text_estimate.
+  pageCountMethod    String               @map("page_count_method")
+  storageKey         String               @unique @map("storage_key")
+  textStorageKey     String               @map("text_storage_key")
+  textChars          Int                  @map("text_chars")
+  /// Locator granularity for citations: page | line | section | none (S1 E07).
+  locatorGranularity String               @map("locator_granularity")
+  origin             PolicyDocumentOrigin
+  uploadedById       String               @map("uploaded_by_id")
+  createdAt          DateTime             @default(now()) @map("created_at")
+
+  document  PolicyDocument   @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  jobs      ExtractionJob[]
+  citations PolicyCitation[]
+
+  @@unique([documentId, version])
+  @@index([clientId, projectId])
+}
+
+/// Allowlisted extraction profile (S2 §2). Only Admins change it; each change bumps the revision.
+model ExtractionProfile {
+  /// Allowlisted profile ID (e.g. llama-agentic-v1); the same built-in IDs exist once per client.
+  id          String
+  clientId    String   @map("client_id") @db.Uuid
+  provider    String
+  label       String
+  enabled     Boolean  @default(false)
+  revision    Int      @default(1)
+  config      Json
+  isDefault   Boolean  @default(false) @map("is_default")
+  updatedById String?  @map("updated_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@id([clientId, id])
+}
+
+/// Project-level extraction profile chosen by an Admin (S2 §2 precedence).
+model ProjectExtractionSetting {
+  projectId   String   @id @map("project_id") @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
+  profileId   String   @map("profile_id")
+  updatedById String   @map("updated_by_id")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+}
+
+model ExtractionBatch {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String           @map("client_id") @db.Uuid
+  projectId       String           @map("project_id") @db.Uuid
+  /// tenant + project + sorted document hashes + profile revision + schema/prompt hashes + attempt token (S2 §7).
+  idempotencyKey  String           @unique @map("idempotency_key")
+  profileId       String           @map("profile_id")
+  profileRevision Int              @map("profile_revision")
+  profileSnapshot Json             @map("profile_snapshot")
+  selectionSource String           @map("selection_source")
+  schemaHash      String           @map("schema_hash")
+  promptHash      String           @map("prompt_hash")
+  parentBatchId   String?          @map("parent_batch_id") @db.Uuid
+  status          ExtractionStatus @default(QUEUED)
+  requestedById   String           @map("requested_by_id")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  finishedAt      DateTime?        @map("finished_at")
+
+  jobs ExtractionJob[]
+
+  @@index([clientId, projectId, createdAt])
+}
+
+model ExtractionJob {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId            String           @map("client_id") @db.Uuid
+  batchId             String           @map("batch_id") @db.Uuid
+  documentVersionId   String           @map("document_version_id") @db.Uuid
+  provider            String
+  providerOperationId String?          @map("provider_operation_id")
+  status              ExtractionStatus @default(QUEUED)
+  attempt             Int              @default(1)
+  error               String?
+  rawReceiptKey       String?          @map("raw_receipt_key")
+  usage               Json?
+  candidateCount      Int              @default(0) @map("candidate_count")
+  estimatedUsd        Decimal          @default(0) @map("estimated_usd") @db.Decimal(10, 4)
+  actualUsd           Decimal?         @map("actual_usd") @db.Decimal(10, 4)
+  cleanup             String?
+  startedAt           DateTime?        @map("started_at")
+  finishedAt          DateTime?        @map("finished_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
+
+  batch           ExtractionBatch       @relation(fields: [batchId], references: [id])
+  documentVersion PolicyDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([batchId, documentVersionId])
+}
+
+/// Spend ledger (S2 §11, D-B1). Append-only; the ceiling is cumulative per provider.
+model ExtractionSpend {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  provider  String
+  jobId     String   @map("job_id") @db.Uuid
+  kind      String
+  amountUsd Decimal  @map("amount_usd") @db.Decimal(10, 4)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([provider])
+}
+
+model PolicyRule {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  /// Human-readable stable key, e.g. R-APPROVAL. Unique per project.
+  ruleKey       String   @map("rule_key")
+  /// Rule ID proposed by the source (before de-duplication); the same sourceKey with different content is a conflict (PR-R10).
+  sourceKey     String?  @map("source_key")
+  latestVersion Int      @default(1) @map("latest_version")
+  required      Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  versions PolicyRuleVersion[]
+
+  @@unique([projectId, ruleKey])
+  @@index([clientId, projectId])
+  @@index([projectId, sourceKey])
+}
+
+/// A rule version. Editable only while DRAFT or NEEDS_DEFINITION; REVIEWED and EXCLUDED are immutable (trigger).
+model PolicyRuleVersion {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String          @map("client_id") @db.Uuid
+  ruleId          String          @map("rule_id") @db.Uuid
+  version         Int
+  state           PolicyRuleState @default(DRAFT)
+  /// Canonical rule body (packages/shared/src/policy/schema.ts PolicyRuleBody).
+  body            Json
+  contentHash     String          @map("content_hash")
+  extractionJobId String?         @map("extraction_job_id") @db.Uuid
+  origin          String
+  editedById      String          @map("edited_by_id")
+  reviewedById    String?         @map("reviewed_by_id")
+  reviewedAt      DateTime?       @map("reviewed_at")
+  excludeReason   String?         @map("exclude_reason")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  rule      PolicyRule       @relation(fields: [ruleId], references: [id])
+  citations PolicyCitation[]
+
+  @@unique([ruleId, version])
+}
+
+model PolicyCitation {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String   @map("client_id") @db.Uuid
+  ruleVersionId     String   @map("rule_version_id") @db.Uuid
+  documentVersionId String   @map("document_version_id") @db.Uuid
+  fieldPath         String   @map("field_path")
+  /// supports | qualifies | exception | conflict
+  role              String
+  quote             String
+  /// { kind: page_region | text_span | manual_reference, page?, lineStart?, lineEnd?, charStart?, charEnd?, section?, chunkId? }
+  locator           Json
+  /// RESOLVED | QUOTE_MISMATCH | UNRESOLVED
+  resolution        String
+  providerRaw       Json?    @map("provider_raw")
+  confirmedById     String?  @map("confirmed_by_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  ruleVersion     PolicyRuleVersion     @relation(fields: [ruleVersionId], references: [id], onDelete: Cascade)
+  documentVersion PolicyDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+
+  @@index([ruleVersionId])
+}
+
+/// Immutable published Project rule set (S1 R14). Append-only.
+model ProjectRuleSet {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String   @map("client_id") @db.Uuid
+  projectId       String   @map("project_id") @db.Uuid
+  version         Int
+  inheritanceMode String   @default("ALL_TASKS") @map("inheritance_mode")
+  ruleVersionIds  String[] @map("rule_version_ids")
+  excluded        Json     @default("[]")
+  content         Json
+  digest          String
+  publishedById   String   @map("published_by_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([projectId, version])
+  @@index([projectId, digest])
+}
+
+model TaskPolicyChange {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId         String               @map("client_id") @db.Uuid
+  taskInstanceId   String               @map("task_instance_id") @db.Uuid
+  ruleVersionId    String               @map("rule_version_id") @db.Uuid
+  type             TaskPolicyChangeType
+  scope            Json
+  requirement      String
+  reason           String
+  sourceCitationId String?              @map("source_citation_id") @db.Uuid
+  exceptionIndex   Int?                 @map("exception_index")
+  createdById      String               @map("created_by_id")
+  deletedAt        DateTime?            @map("deleted_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  @@index([taskInstanceId])
+}
+
+/// Frozen effective policy of a task version (S1 T09/T10). Append-only.
+model TaskPolicySnapshot {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String   @map("client_id") @db.Uuid
+  taskInstanceId String   @map("task_instance_id") @db.Uuid
+  version        Int
+  ruleSetId      String   @map("rule_set_id") @db.Uuid
+  content        Json
+  rubricVersion  String   @map("rubric_version")
+  digest         String
+  publishedById  String   @map("published_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([taskInstanceId, version])
+  @@index([taskInstanceId, digest])
 }

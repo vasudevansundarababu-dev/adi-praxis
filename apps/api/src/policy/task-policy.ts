@@ -110,7 +110,9 @@ export async function snapshotTask(tx: Tx, input: { clientId: string; task: { id
 
 /** Policy sidecar for exports (contracts/praxis/policy-snapshot.schema.json, status proposed). */
 export function sidecar(s: { id: string; taskInstanceId: string; version: number; content: unknown; digest: string; createdAt: Date }, opts: { agentVisibleOnly?: boolean } = {}) {
-  const c = s.content as { project_rule_set: unknown; rules: Array<{ visibility: string }>; task_changes: unknown[]; rubric_version: string };
+  const c = s.content as { project_rule_set: unknown; rules: Array<{ visibility: string; rule_version_id: string }>; task_changes: Array<{ rule_version_id: string }>; rubric_version: string };
+  const rules = opts.agentVisibleOnly ? c.rules.filter((r) => r.visibility === 'agent_visible') : c.rules;
+  const visible = new Set(rules.map((r) => r.rule_version_id));
   return {
     schema_version: POLICY_SIDECAR_VERSION,
     snapshot_id: s.id,
@@ -118,9 +120,49 @@ export function sidecar(s: { id: string; taskInstanceId: string; version: number
     snapshot_version: s.version,
     published_at: s.createdAt.toISOString(),
     project_rule_set: c.project_rule_set,
-    rules: opts.agentVisibleOnly ? c.rules.filter((r) => r.visibility === 'agent_visible') : c.rules,
-    task_changes: c.task_changes,
+    rules,
+    task_changes: opts.agentVisibleOnly ? c.task_changes.filter((x) => visible.has(x.rule_version_id)) : c.task_changes,
     rubric_version: c.rubric_version,
     digest: s.digest,
   };
+}
+
+/** Sidecars by snapshot ID, for export pages (one query per page). */
+export async function sidecarsById(tx: Db | Tx, ids: Array<string | null | undefined>) {
+  const want = [...new Set(ids.filter((x): x is string => !!x))];
+  if (!want.length) return new Map<string, ReturnType<typeof sidecar>>();
+  const rows = await tx.taskPolicySnapshot.findMany({ where: { id: { in: want } } });
+  return new Map(rows.map((r) => [r.id, sidecar(r)]));
+}
+
+/** Snapshot of the submission a dataset record approved: the task's latest submission before the review decision. */
+export async function snapshotIdsForRecords(tx: Db | Tx, records: Array<{ id: string; taskInstanceId: string; reviewDecisionAt: Date }>) {
+  if (!records.length) return new Map<string, string>();
+  const subs = await tx.taskSubmission.findMany({
+    where: { taskInstanceId: { in: [...new Set(records.map((r) => r.taskInstanceId))] }, policySnapshotId: { not: null } },
+    select: { taskInstanceId: true, submittedAt: true, policySnapshotId: true },
+    orderBy: { submittedAt: 'desc' },
+  });
+  const out = new Map<string, string>();
+  for (const r of records) {
+    const s = subs.find((x) => x.taskInstanceId === r.taskInstanceId && x.submittedAt <= r.reviewDecisionAt);
+    if (s?.policySnapshotId) out.set(r.id, s.policySnapshotId);
+  }
+  return out;
+}
+
+/** Adds `policy` only when a snapshot exists, so rows without policy stay exactly as before (AC16). */
+export function withPolicy<T extends object>(row: T, policy: ReturnType<typeof sidecar> | undefined): T | (T & { policy: ReturnType<typeof sidecar> }) {
+  return policy ? { ...row, policy } : row;
+}
+
+/**
+ * Per-task policy state for the PM task list: CURRENT when the latest snapshot used the latest published rule set,
+ * OUTDATED when the project published since. Tasks without a snapshot are absent (NOT_FROZEN). Null without a rule set.
+ */
+export async function policyReadiness(tx: Db | Tx, clientId: string, projectId: string, taskIds: string[]) {
+  const set = await latestRuleSet(tx, clientId, projectId);
+  if (!set) return null;
+  const snaps = await tx.taskPolicySnapshot.findMany({ where: { clientId, taskInstanceId: { in: taskIds } }, orderBy: { version: 'desc' }, distinct: ['taskInstanceId'], select: { taskInstanceId: true, ruleSetId: true } });
+  return new Map(snaps.map((s) => [s.taskInstanceId, s.ruleSetId === set.id ? ('CURRENT' as const) : ('OUTDATED' as const)]));
 }

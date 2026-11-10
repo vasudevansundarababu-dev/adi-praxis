@@ -4,12 +4,14 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
 import { Req, RequiredNote } from '@/components/required';
+import Link from 'next/link';
 
-export type TaskRow = { id: string; status: string; taskType: string; brief: string | null; author: string | null; assignedAt: string | null; lastSavedAt: string | null; submittedAt: string | null; activeSeconds: number; reworkCount: number };
+export type TaskRow = { id: string; status: string; taskType: string; brief: string | null; author: string | null; assignedAt: string | null; lastSavedAt: string | null; submittedAt: string | null; activeSeconds: number; reworkCount: number; policy?: 'CURRENT' | 'OUTDATED' | 'NOT_FROZEN' | null };
 export type InviteRow = { id: string; candidateName: string | null; channel: string; sentAt: string | null; expiresAt: string; usedAt: string | null; state: string };
 
 const STATUS: Record<string, string> = { CREATED: 'Queued', ASSIGNED: 'Assigned', IN_PROGRESS: 'In progress', SUBMITTED: 'In review', REWORK: 'Rework', ACCEPTED: 'Accepted', REJECTED: 'Rejected' };
 const RECLAIMABLE = ['ASSIGNED', 'IN_PROGRESS', 'REWORK'];
+const POLICY_STATE: Record<string, string> = { CURRENT: 'Frozen, current', OUTDATED: 'Newer rules published', NOT_FROZEN: 'Not frozen yet' };
 
 export function TaskTable({ projectId, tptMinutes, initial }: { projectId: string; tptMinutes: number | null; initial: TaskRow[] }) {
   const router = useRouter();
@@ -53,6 +55,7 @@ export function TaskTable({ projectId, tptMinutes, initial }: { projectId: strin
               <th className="px-2 py-2 font-medium">Status</th>
               <th className="px-2 py-2 font-medium">Active vs TPT</th>
               <th className="px-2 py-2 font-medium">Last activity</th>
+              {initial.some((t) => t.policy) && <th className="px-2 py-2 font-medium">Policy</th>}
               <th className="px-2 py-2 font-medium" />
             </tr>
           </thead>
@@ -71,6 +74,13 @@ export function TaskTable({ projectId, tptMinutes, initial }: { projectId: strin
                     {mins} / {tptMinutes ?? '—'} min
                   </td>
                   <td className="px-2 py-2">{t.lastSavedAt ? new Date(t.lastSavedAt).toLocaleString() : t.assignedAt ? `assigned ${new Date(t.assignedAt).toLocaleDateString()}` : '—'}</td>
+                  {initial.some((x) => x.policy) && (
+                    <td className="px-2 py-2">
+                      <Link href={`/projects/${projectId}/tasks/${t.id}/policy`} className={`hover:underline ${t.policy === 'CURRENT' ? 'text-success' : t.policy === 'OUTDATED' ? 'text-warning' : 'text-link'}`}>
+                        {POLICY_STATE[t.policy ?? 'NOT_FROZEN']}
+                      </Link>
+                    </td>
+                  )}
                   <td className="whitespace-nowrap px-2 py-2">
                     {RECLAIMABLE.includes(t.status) &&
                       (reclaiming === t.id ? (

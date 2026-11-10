@@ -11,6 +11,7 @@ import { auditRead } from '../meta-compiler/audit';
 import { judgeView, JudgeViewResponse } from '../meta-compiler/judge-task';
 import { reviewableTask } from '../tasks/review-service';
 import { authoredTaskDto, authoredTaskInclude, type AuthoredTaskRow } from '../meta-compiler/task-store';
+import { sidecarsById, withPolicy } from '../policy/task-policy';
 
 const IdParams = z.object({ id: z.string().uuid() });
 const ADMIN = ['ADMIN'] as const;
@@ -68,8 +69,9 @@ export const metaCompilerStoreRoutes: FastifyPluginAsyncZod<{ db: Db; storage: O
           orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           take: EXPORT_BATCH,
         });
+        const sidecars = await sidecarsById(db, rows.map((t) => t.policySnapshotId));
         for (const t of rows) {
-          yield `${first ? '' : ','}${JSON.stringify(detail(t))}`;
+          yield `${first ? '' : ','}${JSON.stringify(withPolicy(detail(t), sidecars.get(t.policySnapshotId ?? '')))}`;
           first = false;
         }
         if (rows.length < EXPORT_BATCH) break;

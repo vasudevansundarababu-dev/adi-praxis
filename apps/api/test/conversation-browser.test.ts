@@ -201,6 +201,9 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       await page.getByLabel('I agree to these terms.').check();
       await page.getByRole('button',{name:'Accept authorship terms'}).click();
       await page.getByRole('heading', { name: 'Build a case through conversation' }).waitFor();
+      // The answer box is enabled only once the conversation state (consent) has loaded; wait for that explicitly
+      // rather than relying on fill's implicit wait (flaky on a cold CI dev server).
+      await page.getByLabel('Your answer').and(page.locator(':enabled')).waitFor({ timeout: 60_000 });
       await page.getByLabel('Your answer').fill('My unsent answer survives the view switch.');
       await page.getByRole('button',{name:'Classic',exact:true}).click();
       await page.getByRole('textbox',{name:/^Title/}).fill('An SME typed this title in Classic');

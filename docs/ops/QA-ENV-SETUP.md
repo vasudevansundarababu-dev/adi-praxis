@@ -81,7 +81,7 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
   answered (HTTP 200, 86 tokens incl. 78 thinking) and `text-embedding-005` works; `gemini-2.5-flash` returns 404
   "not found or your project does not have access" although Google still lists it. So the chatbot uses
   `gemini-3.8-flash`. Also affected: policy extraction's `POLICY_GEMINI_MODEL` (default `gemini-2.5-flash`) and the
-  meta-compiler's `gemini:gemini-3-pro` (not listed at all) — both would fail in QA. Passed to the code session.
+  meta-compiler's `gemini:gemini-3-pro` (not listed at all) — both would fail in QA. Code session (10 Nov): the chatbot handles 3.8 Flash (skips thought parts, maxOutputTokens 24000, MAX_TOKENS fails closed, tests added). `POLICY_GEMINI_MODEL` and `META_COMPILER_MODELS` are settings, so the QA deployer can override them (e.g. `POLICY_GEMINI_MODEL=gemini-3.8-flash`) once the owner agrees — decided with step 4.
 
 ## 5. Step 7: clean up (owner, after the QA setup is finished)
 

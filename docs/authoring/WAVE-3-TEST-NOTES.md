@@ -39,6 +39,9 @@ linked. If the project published newer rules after the snapshot, the page says s
 
 ## 4. Open model (Vertex MaaS)
 
+**Status (12 Nov):** deferred. The Model Garden quota request is pending with Google, so QA stays on Gemini for this
+session. Do the steps below once the quota is approved; skip this section until then.
+
 The authoring chatbot can now run on a Vertex Model Garden managed open model (MaaS), alongside Claude and Gemini on
 Vertex (handover chapter 11). It uses Vertex's OpenAI-compatible chat completions endpoint with the QA service
 account's own Google credentials (no API key). Same system prompt, same proposal schema and validators, same daily

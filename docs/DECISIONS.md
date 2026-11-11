@@ -618,3 +618,7 @@ Expert and PM with two audit events; Expert edits need a reason, and a material 
   mode Single; field contracts "requires confirmation" (gaps in `docs/authoring/TEMPLATE-PROFILES.md`).
 - **Open for the owner:** domain confirmation of the Wave 2 and Wave 3 field contracts; the live QA session for Waves 2
   and 3 together (`WAVE-2-TEST-NOTES.md`, `WAVE-3-TEST-NOTES.md`), including the open-model comparison.
+- **(owner, 12 Nov)** QA stays on Gemini through Vertex for the Wave 1–3 sessions. The open-model (Vertex MaaS)
+  comparison is deferred until Google approves the Model Garden quota for `adi-praxis-test-0928` (request pending with
+  Google Cloud support). Wave 3 sign-off does not wait on it; switching later is a configuration change
+  (`AUTHORING_MODEL=maas:<publisher>/<model>`, `AUTHORING_MAAS_LOCATION`) plus the smoke check, no new build.

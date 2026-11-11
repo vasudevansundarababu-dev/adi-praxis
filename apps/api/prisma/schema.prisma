@@ -558,44 +558,44 @@ enum ReviewRoute {
 }
 
 model Project {
-  id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId                String        @map("client_id") @db.Uuid
-  ownerId                 String        @map("owner_id") @db.Uuid
-  templateId              String        @map("template_id") @db.Uuid
-  templateVersion         Int           @map("template_version")
-  jobDescriptionId        String?       @map("job_description_id") @db.Uuid
-  jdSnapshotId            String?       @map("jd_snapshot_id") @db.Uuid
+  id                      String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId                String               @map("client_id") @db.Uuid
+  ownerId                 String               @map("owner_id") @db.Uuid
+  templateId              String               @map("template_id") @db.Uuid
+  templateVersion         Int                  @map("template_version")
+  jobDescriptionId        String?              @map("job_description_id") @db.Uuid
+  jdSnapshotId            String?              @map("jd_snapshot_id") @db.Uuid
   name                    String
   description             String?
-  status                  ProjectStatus @default(DRAFT)
+  status                  ProjectStatus        @default(DRAFT)
   /// Null preserves both existing editors for legacy projects; new projects choose explicitly.
   authoringExperience     AuthoringExperience? @map("authoring_experience")
   /// SME -> PM (default) or SME -> Expert -> PM. Frozen once tasks exist.
-  reviewRoute             ReviewRoute   @default(SME_PM) @map("review_route")
-  taskMode                TaskMode      @default(AUTHORING) @map("task_mode")
+  reviewRoute             ReviewRoute          @default(SME_PM) @map("review_route")
+  taskMode                TaskMode             @default(AUTHORING) @map("task_mode")
   /// Annotation projects: number of task instances.
-  taskCount               Int?          @map("task_count")
+  taskCount               Int?                 @map("task_count")
   /// Authoring projects: distinct-task target and per-expert cap.
-  distinctTarget          Int?          @map("distinct_target")
-  maxPerExpert            Int?          @map("max_per_expert")
-  openSlotShare           Decimal?      @map("open_slot_share") @db.Decimal(4, 3)
+  distinctTarget          Int?                 @map("distinct_target")
+  maxPerExpert            Int?                 @map("max_per_expert")
+  openSlotShare           Decimal?             @map("open_slot_share") @db.Decimal(4, 3)
   /// PM-raised coverage quotas (never below the template minimum).
-  coverageQuotas          Json?         @map("coverage_quotas")
-  tptMinutes              Int?          @map("tpt_minutes")
-  hoursPerWorkerDay       Decimal       @default(4) @map("hours_per_worker_day") @db.Decimal(4, 2)
-  startDate               DateTime?     @map("start_date") @db.Date
-  endDate                 DateTime?     @map("end_date") @db.Date
-  requiredWorkers         Int?          @map("required_workers")
+  coverageQuotas          Json?                @map("coverage_quotas")
+  tptMinutes              Int?                 @map("tpt_minutes")
+  hoursPerWorkerDay       Decimal              @default(4) @map("hours_per_worker_day") @db.Decimal(4, 2)
+  startDate               DateTime?            @map("start_date") @db.Date
+  endDate                 DateTime?            @map("end_date") @db.Date
+  requiredWorkers         Int?                 @map("required_workers")
   /// Computed fields frozen at submit: tasks, requiredAuthors, totalEffortHours, workingDays, labourBudget.
   figures                 Json?
-  demographicsSnapshot    Json?         @map("demographics_snapshot")
-  autoLaunchCampaign      Boolean       @default(false) @map("auto_launch_campaign")
+  demographicsSnapshot    Json?                @map("demographics_snapshot")
+  autoLaunchCampaign      Boolean              @default(false) @map("auto_launch_campaign")
   /// M10 per-project switch (with the global SME_SUPPLY_ENABLED flag): requisitions and partner supply.
-  smeSupplyEnabled        Boolean       @default(false) @map("sme_supply_enabled")
-  openTaskCapPerCandidate Int           @default(3) @map("open_task_cap_per_candidate")
-  submittedAt             DateTime?     @map("submitted_at")
-  createdAt               DateTime      @default(now()) @map("created_at")
-  updatedAt               DateTime      @updatedAt @map("updated_at")
+  smeSupplyEnabled        Boolean              @default(false) @map("sme_supply_enabled")
+  openTaskCapPerCandidate Int                  @default(3) @map("open_task_cap_per_candidate")
+  submittedAt             DateTime?            @map("submitted_at")
+  createdAt               DateTime             @default(now()) @map("created_at")
+  updatedAt               DateTime             @updatedAt @map("updated_at")
 
   client             Client                     @relation(fields: [clientId], references: [id])
   owner              User                       @relation("ProjectOwner", fields: [ownerId], references: [id])
@@ -2817,6 +2817,32 @@ enum PolicyDocumentOrigin {
   UPLOAD
   MANUAL_TEXT
   SEED
+  /// Accepted from an SME's policy proposal (authoring v2.1 Wave 3).
+  SME_PROPOSAL
+}
+
+enum PolicyProposalStatus {
+  PENDING
+  ACCEPTED
+  RETURNED
+  REJECTED
+}
+
+/// docs/authoring/handover-v2/07: source categories, not a hierarchy.
+enum PolicyProposalCategory {
+  BANK_POLICY
+  CUSTOMER_POLICY
+  REGULATION
+  SUPPORTING_REFERENCE
+}
+
+/// The reviewer's qualification of a proposed document (chapter 07). A document-workflow outcome, not a task state.
+enum PolicyQualification {
+  POLICY_CANDIDATE
+  SUPPORTING_REFERENCE
+  UNRELATED
+  UNREADABLE
+  SENSITIVE
 }
 
 enum ExtractionStatus {
@@ -2887,6 +2913,54 @@ model PolicyDocument {
   versions PolicyDocumentVersion[]
 
   @@index([clientId, projectId])
+}
+
+/// An SME's proposed policy document (authoring v2.1 Wave 3, handover chapter 07). Pending until an assigned Expert
+/// (Validator) or the project's PM/Admin decides. Nothing in a proposal is authoritative: accepting it only adds a
+/// project document version, whose rules still go through extraction, rule review and PM/Admin publication. The file
+/// columns and a decision, once made, are immutable (trigger).
+model PolicyProposal {
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String                 @map("client_id") @db.Uuid
+  projectId         String                 @map("project_id") @db.Uuid
+  taskInstanceId    String?                @map("task_instance_id") @db.Uuid
+  smeUserId         String                 @map("sme_user_id") @db.Uuid
+  title             String
+  category          PolicyProposalCategory
+  issuer            String?
+  versionLabel      String?                @map("version_label")
+  language          String?
+  jurisdiction      String?
+  effectiveFrom     DateTime?              @map("effective_from") @db.Date
+  effectiveTo       DateTime?              @map("effective_to") @db.Date
+  /// Why the SME needs this document for their task.
+  reason            String
+  rightsDeclared    Boolean                @map("rights_declared")
+  sha256            String
+  fileName          String                 @map("file_name")
+  mediaType         String                 @map("media_type")
+  format            String?
+  sizeBytes         Int                    @map("size_bytes")
+  pageCount         Int                    @default(0) @map("page_count")
+  storageKey        String                 @unique @map("storage_key")
+  /// Praxis's text reading; null when the file could not be read (flag UNREADABLE).
+  textStorageKey    String?                @map("text_storage_key")
+  textChars         Int                    @default(0) @map("text_chars")
+  /// Deterministic intake flags: [{ code, message }]. Advice to the reviewer only, never a decision.
+  intakeFlags       Json                   @default("[]") @map("intake_flags")
+  status            PolicyProposalStatus   @default(PENDING)
+  qualification     PolicyQualification?
+  decisionReason    String?                @map("decision_reason")
+  decidedById       String?                @map("decided_by_id") @db.Uuid
+  decidedRole       String?                @map("decided_role")
+  decidedAt         DateTime?              @map("decided_at")
+  documentId        String?                @map("document_id") @db.Uuid
+  documentVersionId String?                @map("document_version_id") @db.Uuid
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+
+  @@index([clientId, projectId, status])
+  @@index([smeUserId, projectId])
 }
 
 /// Immutable document version (S1 E04). Append-only in the database.

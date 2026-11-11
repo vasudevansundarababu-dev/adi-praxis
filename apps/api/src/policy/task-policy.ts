@@ -60,6 +60,24 @@ export function applicabilityLabel(body: PolicyRuleBody) {
 }
 
 /** The task's effective policy: the latest published project set plus its active changes (S1 T09). */
+type RetrievableRule = { rule_version_id: string; visibility: string; effective?: { from: string | null; to: string | null } | null };
+
+/**
+ * Policy retrieval for authoring (Wave 3, handover chapter 07): only rules of the latest published rule set (approved),
+ * only agent-visible ones (permission-filtered: the SME and the authoring model never see evaluator-only rules), and
+ * only those in force on `asOf` (current). Pending proposals and unpublished documents are never in a rule set.
+ */
+export function retrievableRules<R extends RetrievableRule>(rules: R[], asOf: Date = new Date()): R[] {
+  const today = asOf.toISOString().slice(0, 10);
+  return rules.filter((r) => r.visibility === 'agent_visible' && (!r.effective?.from || r.effective.from <= today) && (!r.effective?.to || today <= r.effective.to));
+}
+
+export function authoringPolicyView<B extends { rules: RetrievableRule[]; task_changes: Array<{ rule_version_id: string }> }>(body: B, asOf: Date = new Date()): B {
+  const rules = retrievableRules(body.rules, asOf);
+  const ids = new Set(rules.map((r) => r.rule_version_id));
+  return { ...body, rules, task_changes: body.task_changes.filter((c) => ids.has(c.rule_version_id)) };
+}
+
 export async function effectivePolicy(tx: Db | Tx, clientId: string, task: { id: string; projectId: string }) {
   const set = await latestRuleSet(tx, clientId, task.projectId);
   if (!set) return null;

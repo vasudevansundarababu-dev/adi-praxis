@@ -28,3 +28,4 @@ export * from "./workflow-graph";
 export * from "./task-phase";
 export * from "./template-profile";
 export * from "./review-stages";
+export * from './policy-proposal';

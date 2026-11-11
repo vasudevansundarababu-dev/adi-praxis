@@ -32,6 +32,7 @@ import { ClaudeVertexSuitabilityEvaluator, MockSuitabilityEvaluator, type Suitab
 import { GcsStorage, stubScanner, type MalwareScanner, type ObjectStorage } from './candidate/storage';
 import { defaultAdapters, type Adapters } from './policy/extraction/service';
 import { policyRoutes } from './routes/policy';
+import { policyProposalRoutes } from './routes/policy-proposals';
 import { campaignRoutes } from './routes/campaigns';
 import { journeyRoutes } from './routes/journey';
 import { taskRoutes } from './routes/tasks';
@@ -325,6 +326,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(conversationRoutes, { db: deps.db, selectionGate, dailyModelCallCap: deps.config.AUTHORING_DAILY_CALL_CAP });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       await v1.register(policyRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, adapters: deps.policyAdapters ?? defaultAdapters(deps.config.policy) });
+      await v1.register(policyProposalRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       // M10 SME supply: nothing is registered with the flag off (docs/SME-SUPPLY.md section 13).
       if (deps.config.SME_SUPPLY_ENABLED) {
         const email = deps.email ?? defaultEmail(deps.config);

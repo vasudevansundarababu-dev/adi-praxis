@@ -24,7 +24,7 @@ const safeName = (n: string) => n.replace(/[^\w.\- ]+/g, '_').slice(0, 200) || '
 export async function addDocumentVersion(
   tx: Tx,
   deps: { storage: ObjectStorage; scanner: MalwareScanner; maxPages: number },
-  input: { clientId: string; projectId: string; actorId: string; documentId?: string | null; meta: DocumentMeta; fileName: string; buf: Buffer; origin: 'UPLOAD' | 'MANUAL_TEXT' | 'SEED'; read?: ReadPolicyDocument },
+  input: { clientId: string; projectId: string; actorId: string; documentId?: string | null; meta: DocumentMeta; fileName: string; buf: Buffer; origin: 'UPLOAD' | 'MANUAL_TEXT' | 'SEED' | 'SME_PROPOSAL'; read?: ReadPolicyDocument },
   audit: (a: AuditInput) => Promise<void>,
 ) {
   const read = input.read ?? (await readPolicyDocument(input.buf, input.fileName, deps.maxPages));

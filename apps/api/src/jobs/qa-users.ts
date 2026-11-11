@@ -135,7 +135,7 @@ const LIVE_PROJECT = { notIn: ['CANCELLED', 'COMPLETED'] as ('CANCELLED' | 'COMP
 /** The template's pool: its oldest live project with a published opportunity (or our own synthetic pool by name). */
 async function poolProject(db: Db, clientId: string, templateId: string, workflowName: string) {
   const published = await db.project.findFirst({
-    where: { clientId, templateId, status: LIVE_PROJECT, opportunity: { status: 'PUBLISHED' } },
+    where: { clientId, templateId, status: LIVE_PROJECT, opportunities: { some: { role: 'AUTHOR', status: 'PUBLISHED' } } },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
   return published ?? db.project.findFirst({ where: { clientId, name: { equals: poolName(workflowName), mode: 'insensitive' } } });
@@ -263,9 +263,9 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
       pool.created = true;
     } else {
       // Only our own synthetic pool can be half-made (a run stopped mid-way); finish it the same way.
-      const project = await db.project.findUniqueOrThrow({ where: { id: pool.id }, include: { opportunity: true } });
+      const project = await db.project.findUniqueOrThrow({ where: { id: pool.id }, include: { opportunities: { where: { role: 'AUTHOR' } } } });
       if (project.status === 'DRAFT') await call(actorFor(project.ownerId), 'POST', `/projects/${project.id}/submit`);
-      if (project.opportunity?.status !== 'PUBLISHED') await publishOpportunity(pool.id);
+      if (project.opportunities[0]?.status !== 'PUBLISHED') await publishOpportunity(pool.id);
     }
     result.templates.push({ id: t.id, workflowName: t.workflowName, projectId: pool.id, projectName: pool.name, created: pool.created });
   }
@@ -287,7 +287,7 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
       await signInCandidate(s.candidateEmail);
       signedIn.add(s.candidateEmail);
     }
-    const opp = await db.opportunity.findUniqueOrThrow({ where: { projectId: s.projectId } });
+    const opp = await db.opportunity.findUniqueOrThrow({ where: { projectId_role: { projectId: s.projectId, role: 'AUTHOR' } } });
     const e = (await call(who, 'POST', '/me/enrollments', { opportunityId: opp.id })).body as { id: string; status: string };
     s.enrollmentId = e.id;
     if (e.status === 'DRAFT') await completeAndSubmit(who, e.id);
@@ -482,7 +482,7 @@ export async function slotState(db: Db, email: string, projectId: string | null)
   if (!pid) return 'not signed up';
   if (!['VERIFIED', 'ALTERNATIVE_VERIFIED'].includes(pid.smeUser.identityStatus)) return `identity ${pid.smeUser.identityStatus}`;
   if (!projectId) return 'no pool yet';
-  const e = await db.enrollment.findFirst({ where: { smeUserId: pid.smeUserId, opportunity: { projectId } }, include: { onboarding: true } });
+  const e = await db.enrollment.findFirst({ where: { smeUserId: pid.smeUserId, opportunity: { projectId, role: 'AUTHOR' } }, include: { onboarding: true } });
   if (!e) return 'not enrolled';
   if (e.status !== 'SELECTED') return `enrollment ${e.status}`;
   return e.onboarding?.status === 'COMPLETE' ? READY : `onboarding ${e.onboarding?.status ?? 'NOT_STARTED'}`;

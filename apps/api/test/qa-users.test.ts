@@ -161,10 +161,10 @@ describe('qa-users: QA seed of 30 staffing-ready SMEs and 10 Reviewers', () => {
     await login(app, 'reviewer07@praxis.test', REVIEWER_PW);
     expect(logs.join('\n')).not.toContain(REVIEWER_PW);
     // Every live project of each published template has all 10 as Validators (review queues are staffed).
-    const pools = await db.project.findMany({ where: { templateId: { in: [templateA, templateB] } }, include: { reviewers: true, opportunity: true } });
+    const pools = await db.project.findMany({ where: { templateId: { in: [templateA, templateB] } }, include: { reviewers: true, opportunities: { where: { role: 'AUTHOR' } } } });
     expect(pools.map((p) => p.name).sort()).toEqual(['KYC authoring demo', poolName('Sanctions screening')]);
     for (const p of pools) {
-      expect(p.opportunity!.status).toBe('PUBLISHED');
+      expect(p.opportunities[0]!.status).toBe('PUBLISHED');
       for (const u of reviewers) expect(p.reviewers.some((x) => x.userId === u.id)).toBe(true);
     }
 
@@ -182,7 +182,7 @@ describe('qa-users: QA seed of 30 staffing-ready SMEs and 10 Reviewers', () => {
 
     for (const templateId of [templateA, templateB]) {
       const pool = pools.find((p) => p.templateId === templateId)!;
-      const ready = await db.enrollment.findMany({ where: { opportunity: { projectId: pool.id }, status: 'SELECTED', onboarding: { status: 'COMPLETE' } } });
+      const ready = await db.enrollment.findMany({ where: { opportunity: { projectId: pool.id, role: 'AUTHOR' }, status: 'SELECTED', onboarding: { status: 'COMPLETE' } } });
       expect(ready.length).toBeGreaterThanOrEqual(3);
       // The real staffing gate agrees each one can be proposed for work.
       const { assignmentEligibility } = await import('../src/candidate/onboarding-service');

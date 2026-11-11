@@ -217,6 +217,14 @@ gcloud run jobs deploy praxis-vertex-smoke --image="$REPO/api:$TAG" "${COMMON[@]
   --args=scripts/vertex-smoke.ts --set-secrets="$SECRETS"
 fi
 
+if [ -f "$ROOT/apps/api/src/jobs/catalog-v2.ts" ]; then
+say "Catalog job (deployed only, as a dry run; the owner reads its plan before applying)"
+# Plan:  gcloud run jobs execute praxis-catalog-v2 --region <region> --wait            (writes nothing; read the logs)
+# Apply: gcloud run jobs execute praxis-catalog-v2 --region <region> --wait --args=src/jobs/run.ts,catalog-v2
+gcloud run jobs deploy praxis-catalog-v2 --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=900s \
+  --args=src/jobs/run.ts,catalog-v2,--dry-run --set-secrets="$SECRETS"
+fi
+
 if [ "${SKIP_DEMO_SETUP:-0}" != "1" ]; then
 say "Demo data (users and a published KYC project)"
 gcloud run jobs deploy praxis-demo-setup --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 \

@@ -162,11 +162,35 @@ if [ -n "$VERTEX" ]; then
   # The API refuses chatbot calls above the daily cap per client (429 MODEL_DAILY_CAP). Older builds ignore both.
   printf 'AUTHORING_MODEL: "%s"\nAUTHORING_DAILY_CALL_CAP: "%s"\n' "${AUTHORING_MODEL:-gemini:gemini-3.8-flash}" "${AUTHORING_DAILY_CALL_CAP:-300}" >> "$ENVFILE"
 fi
+# Live policy extraction (owner decision 10 Nov: live in QA; one-time setup: infra/demo/setup-policy-extraction.sh).
+# Settings are added only when the Layout Parser processor exists in the project. The live switch is added only when
+# this build's API accepts it outside staging: older builds refuse to start with POLICY_EXTRACTION_LIVE in a demo env.
+# Off with PRAXIS_POLICY_LIVE=0. The LlamaExtract key is wired only once the owner has added a version to its secret.
+LLAMA_SECRET=
+if [ -n "$VERTEX" ] && [ "${PRAXIS_POLICY_LIVE:-1}" != "0" ]; then
+  POLICY_PROCESSOR=$(curl -fsS -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    "https://us-documentai.googleapis.com/v1/projects/$PROJECT_ID/locations/us/processors" 2>/dev/null |
+    python3 -c 'import json,sys; [print(p["name"]) for p in json.load(sys.stdin).get("processors",[]) if p.get("displayName")=="praxis-policy-layout"]' 2>/dev/null | head -1 || true)
+  if [ -n "$POLICY_PROCESSOR" ]; then
+    printf 'DOCUMENTAI_PROCESSOR: "%s"\nDOCUMENTAI_LOCATION: "us"\nPOLICY_GEMINI_MODEL: "%s"\nPOLICY_GEMINI_LOCATION: "%s"\nPOLICY_BUDGET_LLAMA_USD: "%s"\nPOLICY_BUDGET_GOOGLE_USD: "%s"\n' \
+      "$POLICY_PROCESSOR" "${POLICY_GEMINI_MODEL:-gemini-3.8-flash}" "${POLICY_GEMINI_LOCATION:-global}" \
+      "${POLICY_BUDGET_LLAMA_USD:-5}" "${POLICY_BUDGET_GOOGLE_USD:-5}" >> "$ENVFILE"
+    if [ -n "${LLAMAEXTRACT_PROJECT_ID:-}" ]; then printf 'LLAMAEXTRACT_PROJECT_ID: "%s"\n' "$LLAMAEXTRACT_PROJECT_ID" >> "$ENVFILE"; fi
+    if grep -q "POLICY_EXTRACTION_LIVE is only allowed in staging'" "$ROOT/apps/api/src/config.ts"; then
+      echo "Policy extraction stays off: this build allows it live in staging only."
+    else
+      echo 'POLICY_EXTRACTION_LIVE: "true"' >> "$ENVFILE"
+      if [ -n "$(gcloud secrets versions list llamaextract-api-key --filter=state=ENABLED --limit=1 --format='value(name)' 2>/dev/null)" ]; then
+        LLAMA_SECRET=,LLAMAEXTRACT_API_KEY=llamaextract-api-key:latest
+      fi
+    fi
+  fi
+fi
 # gcloud accepts one env-vars file and no extra variables, so the runtime role name lives in the shared file.
 echo 'APP_DB_ROLE: praxis_app' >> "$ENVFILE"
 COMMON=(--region="$REGION" --service-account="$SA" --set-cloudsql-instances="$CONN" --env-vars-file="$ENVFILE"
   --network=default --subnet=default --vpc-egress=private-ranges-only)
-SECRETS=DATABASE_URL=database-url-app:latest,REDIS_URL=redis-url:latest,MOCK_SECRET=mock-secret:latest
+SECRETS=DATABASE_URL=database-url-app:latest,REDIS_URL=redis-url:latest,MOCK_SECRET=mock-secret:latest$LLAMA_SECRET
 
 say "Database migrations (Cloud Run job, migration role)"
 gcloud run jobs deploy praxis-migrate --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=1800s \

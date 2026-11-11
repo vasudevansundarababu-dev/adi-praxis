@@ -53,6 +53,7 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 | 4 | Policy extraction in QA: Document AI layout parser, LlamaExtract key slot | Open (blocked by O2) |
 | 5 | Migrations (incl. `20261111000000_authoring_v21_modes`) and seed, catalogue templates | Open |
 | 6 | First wave deploy on the owner's go; smoke job (exit 0); admin check shows `vertex` | Open |
+| 7 | Clean up old projects and budgets (owner, after steps 1–6) | Open. See section 5. |
 
 ## 4. Open items
 
@@ -72,3 +73,22 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
   cut QA cost at some cost in chatbot quality.
 - **O6 — Claude quota.** Waiting for Google to grant the three increases above. Check: Cloud Quotas preference
   `praxis-qa-anthropic-claude-sonnet` shows granted value 30.
+
+## 5. Step 7: clean up (owner, after the QA setup is finished)
+
+The owner removes projects no longer needed. Nothing is deleted by an agent. Projects found on 10 Nov 2026:
+
+| Project | Billing account | Keep? |
+| --- | --- | --- |
+| `adi-praxis-test-0928` (QA) | My Billing Account | **Keep** — QA for the waves |
+| `adi-praxis-staging` | Praxis-Billing | **Keep** — weekly staging |
+| `adi-praxis-prod` | Praxis-Billing | **Keep** — production |
+| `adi-praxis-demo-0927` (old click-through demo, ~110–130 USD/month) | My Billing Account | Candidate to delete — owner decides |
+| `adi-anvil-mvp-2026`, `gen-lang-client-0032350917` (Anvil) | — | Anvil's, not Praxis's — owner decides separately |
+
+Also tidy budgets: the "Budget Alert For Vertex API" (500 USD) watches only the demo project, so delete or repoint it if
+the demo project goes. QA should keep an all-services budget on My Billing Account.
+
+Deleting a project (`gcloud projects delete <id>`, or IAM & Admin → Manage resources) stops its billing and can be
+undone for 30 days. Before deleting the demo project, check nothing still points at its URLs (handbook artifact, tester
+emails).

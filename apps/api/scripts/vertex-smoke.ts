@@ -1,5 +1,6 @@
 /**
- * Authoring v2.1 QA smoke check: one live call to the authoring chatbot model and one embedding call on Vertex.
+ * Authoring v2.1 QA smoke check: one live call to the authoring chatbot model (Claude, or Gemini when
+ * AUTHORING_MODEL=gemini:<model>) and one embedding call on Vertex.
  * Run in the QA environment (it makes two small billed calls), never in tests or locally without intent:
  *   pnpm --filter @praxis/api exec tsx --env-file-if-exists=../../.env scripts/vertex-smoke.ts
  * Exit 0 = both live calls worked and returned valid output; 2 = Vertex is not configured (mock mode); 1 = a call failed.
@@ -7,7 +8,7 @@
  */
 import { ConversationProposal } from '@praxis/shared';
 import { loadConfig } from '../src/config';
-import { VertexConversationAssistant } from '../src/tasks/conversation/assistant';
+import { authoringAssistant, parseAuthoringModel } from '../src/tasks/conversation/assistant';
 import { VertexEmbeddingProvider } from '../src/tasks/embeddings';
 
 async function main() {
@@ -19,7 +20,8 @@ async function main() {
   const results: Record<string, unknown>[] = [];
   let failed = false;
 
-  const chat = new VertexConversationAssistant({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION, model: config.AUTHORING_MODEL });
+  const chat = authoringAssistant(config);
+  const vendor = parseAuthoringModel(config.AUTHORING_MODEL).vendor;
   let started = Date.now();
   try {
     const proposal = await chat.propose({
@@ -31,10 +33,10 @@ async function main() {
       previousUnresolved: [],
     });
     ConversationProposal.parse(proposal);
-    results.push({ check: 'authoring-chatbot', ok: true, model: chat.model, latencyMs: Date.now() - started });
+    results.push({ check: 'authoring-chatbot', ok: true, vendor, model: chat.model, latencyMs: Date.now() - started });
   } catch (e) {
     failed = true;
-    results.push({ check: 'authoring-chatbot', ok: false, model: chat.model, latencyMs: Date.now() - started, error: e instanceof Error ? `${e.name}: ${e.message.slice(0, 200)}` : 'error' });
+    results.push({ check: 'authoring-chatbot', ok: false, vendor, model: chat.model, latencyMs: Date.now() - started, error: e instanceof Error ? `${e.name}: ${e.message.slice(0, 200)}` : 'error' });
   }
 
   const emb = new VertexEmbeddingProvider({ projectId: config.VERTEX_PROJECT_ID, location: config.EMBEDDING_LOCATION ?? 'us-central1', model: config.EMBEDDING_MODEL });

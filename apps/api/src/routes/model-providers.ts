@@ -1,6 +1,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Config } from '../config';
 import type { Db } from '../db';
+import { parseAuthoringModel } from '../tasks/conversation/assistant';
 
 /**
  * Authoring v2.1 QA: which model providers this deployment actually uses (live Vertex or local mock), the models
@@ -19,6 +20,7 @@ export const modelProviderRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
       vertex: live ? { projectConfigured: true, location: config.VERTEX_LOCATION } : { projectConfigured: false, location: null },
       models: {
         authoringChatbot: live ? config.AUTHORING_MODEL : 'mock-conversation-no-model',
+        authoringChatbotVendor: live ? parseAuthoringModel(config.AUTHORING_MODEL).vendor : 'mock',
         support: live ? config.SUPPORT_MODEL : 'mock',
         certification: live ? config.CERT_MODEL : 'mock',
         embeddings: live ? config.EMBEDDING_MODEL : 'local-hashing-mock',

@@ -56,7 +56,7 @@ export function defaultHandlers(deps: { evaluator?: SuitabilityEvaluator; email?
   if (deps.rlGym !== undefined) r.register(deliverRlResult(deps.rlGym));
   if (deps.drafter && deps.storage) r.register(draftOnRequest({ drafter: deps.drafter, storage: deps.storage }));
   if (deps.config || deps.conversationAssistant) {
-    const assistant = deps.conversationAssistant ?? (deps.config!.assistantMode === 'vertex' ? new VertexConversationAssistant({ projectId: deps.config!.VERTEX_PROJECT_ID, region: deps.config!.VERTEX_LOCATION }) : new MockConversationAssistant());
+    const assistant = deps.conversationAssistant ?? (deps.config!.assistantMode === 'vertex' ? new VertexConversationAssistant({ projectId: deps.config!.VERTEX_PROJECT_ID, region: deps.config!.VERTEX_LOCATION, model: deps.config!.AUTHORING_MODEL }) : new MockConversationAssistant());
     r.register({ name: 'authoring.conversation', event: 'task.draft.requested', async run(event, db) { await executeConversation(db, assistant, (event.payload as { runId: string }).runId); } });
   }
   // M10 SME supply: only with the feature flag on (docs/SME-SUPPLY.md section 13).

@@ -312,6 +312,25 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       const expertRoute = await app.inject({ method: 'POST', url: '/api/v1/projects', headers: { cookie: pm, ...idem() }, payload: { templateId, name: 'Expert route', authoringExperience: 'BOTH', reviewRoute: 'SME_EXPERT_PM' } });
       expect(expertRoute.statusCode).toBe(409); expect(expertRoute.json().error).toBe('REVIEW_ROUTE_NOT_AVAILABLE');
     });
+    it('authoring v2.1: Admins see which model providers are live; the chatbot stops at the daily call cap', async () => {
+      const status = await get(admin, '/admin/model-providers'); expect(status.statusCode, status.body).toBe(200);
+      expect(status.json()).toMatchObject({ mode: 'mock', models: { authoringChatbot: 'mock-conversation-no-model' }, authoringChatbot: { dailyCallCap: 300 } });
+      expect(JSON.stringify(status.json())).not.toMatch(/key|secret|token/i);
+      expect((await get(pm, '/admin/model-providers')).statusCode).toBe(403);
+      const { a, id } = await kycTask(); const v = await task(a, id);
+      await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-only/1', accepted: true });
+      const used = (await get(admin, '/admin/model-providers')).json().authoringChatbot.callsToday as number;
+      const filler = Array.from({ length: 300 - used }, () => ({ clientId, taskInstanceId: id, section: 'CHAT', status: 'SUCCEEDED' as const, requestedById: a.smeUserId, promptVersion: 'cap-test' }));
+      await db.taskDraftRun.createMany({ data: filler });
+      try {
+        const capped = await post(a.cookie, `/me/tasks/${id}/conversation/messages`, { content: 'The applicant supplied no address record.', expectedRevision: (await task(a, id)).revision });
+        expect(capped.statusCode).toBe(429); expect(capped.json().error).toBe('MODEL_DAILY_CAP');
+        expect(await db.taskInterviewTurn.count({ where: { taskInstanceId: id, content: 'The applicant supplied no address record.' } })).toBe(0);
+      } finally {
+        await db.taskDraftRun.deleteMany({ where: { promptVersion: 'cap-test' } });
+      }
+      void v;
+    });
     it('integrates chat with existing submit, Admin rework, resubmit, acceptance, hash chain and dataset export', async () => {
       const { a, id, projectId } = await kycTask();
       const view = await task(a, id);

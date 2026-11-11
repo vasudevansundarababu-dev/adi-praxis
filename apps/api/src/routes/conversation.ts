@@ -14,7 +14,7 @@ import { conversationInputProblems } from '../tasks/conversation/guards';
 import { appendTurn, chatOf, CONVERSATION_VERSION, conversationView, decideProposal, draftingWith, editable } from '../tasks/conversation/service';
 import { ownTask, outstanding, workContext } from './work';
 const Params = z.object({ id: z.string().uuid() });
-export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: SelectionGate }> = async (app, { db, selectionGate }) => {
+export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: SelectionGate; dailyModelCallCap?: number }> = async (app, { db, selectionGate, dailyModelCallCap }) => {
   const load = async (tx: Parameters<typeof ownTask>[0], id: string, sme: string) => {
     const t = await ownTask(tx, id, sme);
     const ctx = await workContext(tx, selectionGate, sme, t.projectId); if (!ctx.ok) outstanding(ctx);
@@ -50,6 +50,13 @@ export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: 
       if (await tx.taskDraftRun.findFirst({ where: { taskInstanceId: t.id, status: { in: ['QUEUED', 'RUNNING'] } } })) throw new AppError(409, 'DRAFT_IN_PROGRESS', 'A model request is already active.');
       if (chatOf(t).pending) throw new AppError(409, 'PENDING_PROPOSAL', 'Confirm or discard the existing proposal first.');
       if (await tx.taskInterviewTurn.count({ where: { taskInstanceId: t.id, questionId: 'conversation' } }) >= 298) throw new AppError(409, 'CONVERSATION_LIMIT', 'Conversation limit reached; no history was discarded.');
+      if (dailyModelCallCap !== undefined) {
+        // Spend guard for the live model: a per-client cap on chatbot calls per UTC day. Nothing is queued past it.
+        const since = new Date(); since.setUTCHours(0, 0, 0, 0);
+        if ((await tx.taskDraftRun.count({ where: { clientId: t.clientId, section: 'CHAT', createdAt: { gte: since } } })) >= dailyModelCallCap) {
+          throw new AppError(429, 'MODEL_DAILY_CAP', 'The assistant has reached today\'s usage limit. Your answer was not sent; keep authoring in Classic or try again tomorrow.');
+        }
+      }
       const policy = await effectivePolicy(tx, t.clientId, t);
       await appendTurn(tx, t, 'AUTHOR', req.body.content, 'answer:' + req.id);
       const run = await tx.taskDraftRun.create({ data: { clientId: t.clientId, taskInstanceId: t.id, section: 'CHAT', instruction: JSON.stringify({ revision: t.revision, policyDigest: policy?.digest ?? 'none' }), sourceIds: [], requestedById: actor.smeUserId, promptVersion: CONVERSATION_VERSION } });

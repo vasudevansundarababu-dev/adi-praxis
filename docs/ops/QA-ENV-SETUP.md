@@ -56,8 +56,9 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 
 ## 4. Open items
 
-- **O1 — demo-data job fails on re-run.** `demo-setup` tries to create "SYNTHETIC TEST — Harbor marketing decisions"
-  again and gets 409. Application code; passed to the authoring v2.1 code session.
+- **O1 — demo-data job fails on re-run.** `demo-setup` looked projects up as the demo PM, who sees only their own
+  projects, so it missed "SYNTHETIC TEST — Harbor marketing decisions" and got 409. **Fixed on `feat/authoring-v21`**
+  (looks up as Admin, with a regression test). Not yet on `main`; reaches QA with the Wave 1 PR.
 - **O2 — live policy extraction is refused in QA.** The app allows `POLICY_EXTRACTION_LIVE` only when
   `APP_ENV=staging`, and QA runs `APP_ENV=demo`. The Terraform `policy-extraction` module (PRs #36, #37) has the same
   staging-only rule and is not applied to QA. Needs an owner decision and a code change.

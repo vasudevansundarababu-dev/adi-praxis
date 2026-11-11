@@ -27,6 +27,9 @@ export default async function ProjectPolicyPage({ params }: { params: Promise<{ 
       <p className="mt-1 max-w-3xl text-sm text-fg-muted">
         Add the project’s policy documents, extract candidate rules, review each rule against its source, then publish one rule set. Every task in this project inherits the published set. Extraction suggests; only a person marks a rule Reviewed.
       </p>
+      <p className="mt-2 text-sm">
+        <Link href="/review/policy-proposals" className="text-link hover:underline">Documents proposed by SMEs</Link> appear here once an Expert or you accept them.
+      </p>
       <PolicyWorkspace
         projectId={id}
         isAdmin={user?.roles.includes('ADMIN') ?? false}

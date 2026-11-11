@@ -193,6 +193,11 @@ describe('Wave 3: SME policy proposals and policy retrieval', () => {
       expect(list.role).toBe(role);
       expect(list.items[0]).toMatchObject({ id, proposer: 'Ada Author', reason: META.reason, readable: true, status: 'PENDING' });
     }
+    // The cross-project queue follows the same rule.
+    expect((await get(p.expert, '/review/policy-proposals')).json().items.map((x: { id: string; projectId: string }) => [x.id, x.projectId])).toEqual([[id, p.projectId]]);
+    expect((await get(admin, '/review/policy-proposals')).json().items).toHaveLength(1);
+    expect((await get(p.outsider, '/review/policy-proposals')).json().items).toEqual([]);
+    expect((await get(otherPm, '/review/policy-proposals')).json().items).toEqual([]);
     // An accept needs a qualification that can carry rules.
     const bad = await post(p.expert, `/projects/${p.projectId}/policy/proposals/${id}/decision`, { decision: 'ACCEPT', qualification: 'UNRELATED', reason: 'Accepting anyway.' });
     expect(bad.statusCode).toBe(400);

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { pageTitle } from '@praxis/shared/theme';
 import { notFound, redirect } from 'next/navigation';
 import { TaskPage } from '@/components/work/task-page';
+import { PolicyProposals } from '@/components/work/policy-proposals';
 import { TaskRules, type TaskRulesView } from '@/components/work/task-rules';
 import { api, getMe } from '@/lib/api';
 import type { TaskView } from '@/lib/work-types';
@@ -16,6 +17,7 @@ export default async function TaskRoute({ params }: { params: Promise<{ id: stri
   return (
     <main className="mx-auto max-w-6xl px-4 py-6">
       {policy && <TaskRules policy={policy} />}
+      {data.taskType === 'AUTHORING' && <PolicyProposals taskId={data.id} readOnly={data.readOnly} />}
       <TaskPage task={data} />
     </main>
   );

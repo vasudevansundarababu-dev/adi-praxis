@@ -17,6 +17,9 @@ export default async function TaskReviewQueue() {
     <div>
       <h1 className="text-2xl font-semibold">Task reviews</h1>
       <p className="mt-1 max-w-3xl text-sm text-fg-muted">Submitted tasks for your projects. Likely duplicates and possible real data come first. Admin can decide without a separate reviewer assignment. Declared conflicts still need resolution. On projects with Expert review, assigned Validators see tasks at Expert review and the project&apos;s PM sees tasks at PM approval.</p>
+      <p className="mt-2 text-sm">
+        <Link href="/review/policy-proposals" className="text-link hover:underline">Policy documents proposed by SMEs</Link>
+      </p>
       {items.length === 0 ? (
         <p className="mt-6 text-fg-muted">Nothing is waiting for review.</p>
       ) : (

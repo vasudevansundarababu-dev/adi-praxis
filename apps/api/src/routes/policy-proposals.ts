@@ -61,6 +61,23 @@ export const policyProposalRoutes: FastifyPluginAsyncZod<{ db: Db; config: Confi
     return { role: a.role, items: items.map((p) => reviewerProposalView(p, name.get(p.smeUserId) ?? null)) };
   });
 
+  /** The reviewer's queue across projects: assigned projects for Validators, owned projects for PMs, all for Admins. */
+  app.get('/review/policy-proposals', { config: { access: REVIEWERS }, schema: { tags: ['policy'], querystring: z.object({ status: z.enum(POLICY_PROPOSAL_STATUSES).default('PENDING') }) } }, async (req) => {
+    const actor = req.actor!;
+    const admin = actor.roles.includes('ADMIN');
+    const owned = actor.roles.includes('PM') ? await db.project.findMany({ where: { clientId: actor.clientId, ownerId: actor.userId }, select: { id: true } }) : [];
+    const assigned = actor.roles.includes('REVIEWER') ? await db.projectReviewer.findMany({ where: { clientId: actor.clientId, userId: actor.userId }, select: { projectId: true } }) : [];
+    const projectIds = [...new Set([...owned.map((p) => p.id), ...assigned.map((a) => a.projectId)])];
+    const items = await db.policyProposal.findMany({ where: { clientId: actor.clientId, status: req.query.status, ...(admin ? {} : { projectId: { in: projectIds } }) }, orderBy: { createdAt: 'asc' }, take: 200 });
+    const [smes, projects] = await Promise.all([
+      db.smeUser.findMany({ where: { id: { in: [...new Set(items.map((i) => i.smeUserId))] } }, select: { id: true, displayName: true } }),
+      db.project.findMany({ where: { id: { in: [...new Set(items.map((i) => i.projectId))] } }, select: { id: true, name: true } }),
+    ]);
+    const sme = new Map(smes.map((s) => [s.id, s.displayName]));
+    const project = new Map(projects.map((p) => [p.id, p.name]));
+    return { items: items.map((p) => ({ ...reviewerProposalView(p, sme.get(p.smeUserId) ?? null), projectId: p.projectId, projectName: project.get(p.projectId) ?? '' })) };
+  });
+
   /** Praxis's reading of the file (redacted if real data was suspected), with page breaks, for comparison with the original. */
   app.get('/projects/:projectId/policy/proposals/:proposalId/text', { config: { access: REVIEWERS }, schema: { tags: ['policy'], params: ProposalParams } }, async (req) => {
     await proposalAccess(db, req.actor!, req.params.projectId);

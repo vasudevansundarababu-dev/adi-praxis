@@ -4,6 +4,7 @@ export * from './schemas';
 export * from './templates';
 export * from './taxonomy';
 export * from './projects';
+export * from './jd-generator';
 export * from './matching';
 export * from './candidate';
 export * from './profile';

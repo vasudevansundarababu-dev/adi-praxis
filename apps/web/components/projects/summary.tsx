@@ -1,4 +1,4 @@
-import { CANCELLABLE_STATUSES, type DemographicAttributeDto, type JobDescriptionDto, type ProjectDto, type TemplateDto } from '@praxis/shared';
+import { CANCELLABLE_STATUSES, educationLabel, type DemographicAttributeDto, type JobDescriptionDto, type ProjectDto, type TemplateDto } from '@praxis/shared';
 import Link from 'next/link';
 import { CancelProjectButton } from './cancel-button';
 import { PauseResumeButton } from './pause-resume';
@@ -23,6 +23,7 @@ export function ProjectSummary({
   const label = (key: string) => snapshot.attributes.find((a) => a.key === key)?.label ?? attributes.find((a) => a.key === key)?.label ?? key;
   // Show the JD as frozen at submit, not its current (possibly edited) version.
   const jd = (p.jdSnapshot as JobDescriptionDto | null) ?? jobDescriptions.find((j) => j.id === p.jobDescriptionId);
+  const reviewerJd = (p.reviewerJdSnapshot as JobDescriptionDto | null | undefined) ?? null;
   const rows: [string, React.ReactNode][] = [
     ['Workflow', `${p.domainName} — ${p.workflowName} (template v${p.templateVersion})`],
     ['Owner', p.ownerName],
@@ -32,7 +33,8 @@ export function ProjectSummary({
     ['TPT', p.tptMinutes ? `${p.tptMinutes} minutes (${p.hoursPerWorkerDay} h per worker per day)` : '—'],
     ['Required workers', p.requiredWorkers ?? '—'],
     ['Demographics', p.demographicFilters.map((f) => `${label(f.attributeKey)} (${f.required ? 'required' : 'preferred'})`).join(', ') || '—'],
-    ['Job description', jd ? `${jd.title}: ${jd.wagePerTask} ${jd.wageCurrency} per task, ${jd.locationType.toLowerCase()}${jd.location ? `, ${jd.location}` : ''}` : '—'],
+    ['Job description', jd ? jdLine(jd) : '—'],
+    ...(reviewerJd ? ([['Reviewer job description', jdLine(reviewerJd)]] as [string, React.ReactNode][]) : []),
     ['Submitted', p.submittedAt ? new Date(p.submittedAt).toLocaleString() : '—'],
   ];
   return (
@@ -92,4 +94,16 @@ export function ProjectSummary({
       {reviewers && !['CANCELLED', 'COMPLETED'].includes(p.status) && <ReviewersPanel projectId={p.id} initial={reviewers} />}
     </div>
   );
+}
+
+/** Title, pay and location, plus the generated requirements (mandatory skills, experience, education). */
+function jdLine(jd: JobDescriptionDto): string {
+  const req = [
+    jd.mandatorySkills?.length ? `mandatory skills ${jd.mandatorySkills.join(', ')}` : '',
+    jd.minExperienceYears ? `${jd.minExperienceYears}+ years` : '',
+    jd.educationLevel ? `${educationLabel(jd.educationLevel)} or higher` : '',
+  ]
+    .filter(Boolean)
+    .join('; ');
+  return `${jd.title}: ${jd.wagePerTask} ${jd.wageCurrency} per task, ${jd.locationType.toLowerCase()}${jd.location ? `, ${jd.location}` : ''}${req ? ` (${req})` : ''}`;
 }

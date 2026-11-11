@@ -2,6 +2,7 @@
 
 import {
   computeProjectFigures,
+  educationLabel,
   effectiveCoverage,
   type CoverageQuotas,
   type DemographicAttributeDto,
@@ -21,6 +22,7 @@ import { Req, RequiredNote } from '@/components/required';
 import { DemographicsStep } from './demographics-step';
 import { FiguresPanel } from './figures-panel';
 import { JobDescriptionStep } from './jd-step';
+import { GeneratedJdPanel, type ProjectJds } from './generated-jd';
 
 const STEPS = ['Template', 'Basics', 'Volume, diversity and TPT', 'Demographics', 'Job description', 'Review and submit'] as const;
 
@@ -41,6 +43,8 @@ export interface WizardState {
   hoursPerWorkerDay: string;
   demographicFilters: DemographicFilterInput[];
   jobDescriptionId: string | null;
+  /** Generated from the template (default for new projects) or picked by hand. */
+  jdGenerated: boolean;
 }
 
 const num = (s: string) => (s.trim() === '' ? null : Number(s));
@@ -64,6 +68,7 @@ function initialState(project: ProjectDto | null, templates: TemplateDto[]): Wiz
       hoursPerWorkerDay: String(project.hoursPerWorkerDay),
       demographicFilters: project.demographicFilters,
       jobDescriptionId: project.jobDescriptionId,
+      jdGenerated: project.jdGenerated,
     };
   }
   const t = templates[0];
@@ -85,6 +90,7 @@ function initialState(project: ProjectDto | null, templates: TemplateDto[]): Wiz
     demographicFilters: [],
     // The API applies the template's default JD (if any) when the draft is created.
     jobDescriptionId: null,
+    jdGenerated: true,
   };
 }
 
@@ -111,7 +117,8 @@ export function ProjectWizard(props: {
     setMessage(null);
   };
   const template = templates.find((t) => t.id === state.templateId);
-  const jd = jobDescriptions.find((j) => j.id === state.jobDescriptionId) ?? null;
+  const [projectJds, setProjectJds] = useState<ProjectJds | null>(null);
+  const jd = state.jdGenerated ? (projectJds?.author ?? null) : (jobDescriptions.find((j) => j.id === state.jobDescriptionId) ?? null);
   const figures = useMemo(
     () =>
       computeProjectFigures({
@@ -145,7 +152,8 @@ export function ProjectWizard(props: {
       tptMinutes: num(state.tptMinutes),
       hoursPerWorkerDay: num(state.hoursPerWorkerDay) ?? 4,
       demographicFilters: state.demographicFilters,
-      jobDescriptionId: state.jobDescriptionId,
+      jdGenerated: state.jdGenerated,
+      ...(state.jdGenerated ? {} : { jobDescriptionId: state.jobDescriptionId }),
     };
   }
 
@@ -378,6 +386,32 @@ export function ProjectWizard(props: {
           {step === 3 && <DemographicsStep attributes={attributes} filters={state.demographicFilters} onChange={(demographicFilters) => set({ demographicFilters })} />}
 
           {step === 4 && (
+            <fieldset className="mt-4 flex flex-wrap gap-4 text-sm">
+              <legend className="sr-only">How to set the job description</legend>
+              <label className="flex items-center gap-2">
+                <input type="radio" name="jdSource" checked={state.jdGenerated} onChange={() => set({ jdGenerated: true })} />
+                Generate from the template (recommended)
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="radio" name="jdSource" checked={!state.jdGenerated} onChange={() => set({ jdGenerated: false })} />
+                Use or write my own
+              </label>
+            </fieldset>
+          )}
+          {step === 4 && state.jdGenerated && (
+            <GeneratedJdPanel
+              template={template}
+              taskMode={state.taskMode}
+              reviewRoute={state.reviewRoute}
+              tptMinutes={num(state.tptMinutes)}
+              filters={state.demographicFilters}
+              attributes={attributes}
+              projectId={projectId}
+              jds={projectJds}
+              onJdsChange={setProjectJds}
+            />
+          )}
+          {step === 4 && !state.jdGenerated && (
             <JobDescriptionStep
               jobDescriptions={jobDescriptions}
               selectedId={state.jobDescriptionId}
@@ -390,7 +424,7 @@ export function ProjectWizard(props: {
           )}
 
           {step === 5 && (
-            <ReviewStep state={state} template={template} jd={jd} attributes={attributes} />
+            <ReviewStep state={state} template={template} jd={jd} reviewerJd={projectJds?.reviewer ?? null} attributes={attributes} />
           )}
 
           {message && (
@@ -482,7 +516,14 @@ function CoverageQuotaEditor({
   );
 }
 
-function ReviewStep({ state, template, jd, attributes }: { state: WizardState; template?: TemplateDto; jd: JobDescriptionDto | null; attributes: DemographicAttributeDto[] }) {
+function jdSummary(jd: JobDescriptionDto): string {
+  const req = [jd.mandatorySkills.length ? `mandatory skills ${jd.mandatorySkills.join(', ')}` : '', jd.minExperienceYears ? `${jd.minExperienceYears}+ years` : '', jd.educationLevel ? educationLabel(jd.educationLevel) : '']
+    .filter(Boolean)
+    .join('; ');
+  return `${jd.title}: ${jd.wagePerTask ? `${jd.wagePerTask} ${jd.wageCurrency} per task` : 'pay not set'}, ${jd.locationType.toLowerCase()}${jd.location ? `, ${jd.location}` : ''}${req ? ` (${req})` : ''}`;
+}
+
+function ReviewStep({ state, template, jd, reviewerJd, attributes }: { state: WizardState; template?: TemplateDto; jd: JobDescriptionDto | null; reviewerJd: JobDescriptionDto | null; attributes: DemographicAttributeDto[] }) {
   const label = (key: string) => attributes.find((a) => a.key === key)?.label ?? key;
   const rows: [string, React.ReactNode][] = [
     ['Template', template ? `${template.domainName} — ${template.workflowName} (v${template.version})` : '—'],
@@ -493,7 +534,8 @@ function ReviewStep({ state, template, jd, attributes }: { state: WizardState; t
     ['Mode', state.taskMode === 'AUTHORING' ? `Authoring: ${state.distinctTarget || '?'} distinct tasks, max ${state.maxPerExpert || '?'} per expert` : `Annotation: ${state.taskCount || '?'} tasks`],
     ['TPT', state.tptMinutes ? `${state.tptMinutes} minutes` : '—'],
     ['Demographics', state.demographicFilters.length ? state.demographicFilters.map((f) => `${label(f.attributeKey)} (${f.required ? 'required' : 'preferred'})`).join(', ') : '—'],
-    ['Job description', jd ? `${jd.title}: ${jd.wagePerTask} ${jd.wageCurrency} per task, ${jd.locationType.toLowerCase()}${jd.location ? `, ${jd.location}` : ''}` : '—'],
+    ['Job description', jd ? jdSummary(jd) : '—'],
+    ...(state.taskMode === 'AUTHORING' && state.reviewRoute === 'SME_EXPERT_PM' ? ([['Reviewer job description', reviewerJd ? jdSummary(reviewerJd) : 'Created when you save the draft']] as [string, React.ReactNode][]) : []),
   ];
   return (
     <dl className="mt-4 card divide-y divide-line text-sm">

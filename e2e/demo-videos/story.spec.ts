@@ -183,7 +183,8 @@ test('04 PM: create a project, validators and opportunity page', async ({ browse
   if (await opt.isVisible().catch(() => false)) await c.click(opt);
   await c.pause(1000);
   await c.click(p.getByRole('button', { name: 'Next', exact: true }));
-  await c.say('Step 5: the job description', 'Reuse one, or create a new one');
+  await c.say('Step 5: the job description', 'Generated from the template: its skills are mandatory; a reviewer JD is added for the Expert route');
+  await c.click(p.getByLabel('Use or write my own'));
   const existing = p.getByLabel('Use an existing job description');
   if (await existing.isVisible().catch(() => false)) {
     await c.click(existing);

@@ -1,6 +1,6 @@
 'use client';
 
-import { LAUNCH_DOMAINS, SME_TIERS, TIER_LABELS, type SmeTier } from '@praxis/shared';
+import { LAUNCH_DOMAINS, SME_TIERS, TIER_LABELS, requisitionFromJd, type JobDescriptionDto, type SmeTier } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Req, RequiredNote } from '@/components/required';
@@ -66,6 +66,20 @@ export function RequisitionForm({ projects, partners, existing, initialProjectId
     maxPerPartner: intOrNull(f.maxPerPartner),
     payRoute: f.payRoute,
   });
+
+  const [jdNote, setJdNote] = useState<string | null>(null);
+  /** Generated JDs (12 Nov 2026): the reviewer JD feeds Expert and Reviewer-SME requisitions, the author JD the rest. */
+  async function fillFromJd() {
+    setJdNote(null);
+    const res = await fetch(`/api/v1/projects/${f.projectId}/job-descriptions`, { cache: 'no-store' }).catch(() => null);
+    const data = res?.ok ? ((await res.json()) as { author: JobDescriptionDto | null; reviewer: JobDescriptionDto | null }) : null;
+    const wantReviewer = f.tier === 'EXPERT' || f.tier === 'REVIEWER_SME';
+    const jd = (wantReviewer ? data?.reviewer : null) ?? data?.author ?? null;
+    if (!jd) return setJdNote('This project has no job description yet.');
+    const r = requisitionFromJd(jd);
+    setF((x) => ({ ...x, title: r.title, summary: r.summary, minYears: String(r.minYears), qualifications: r.qualifications.join('\n'), notes: r.notes, location: r.location || x.location }));
+    setJdNote(`Filled from the ${jd.role === 'REVIEWER' ? 'reviewer' : 'author'} job description${wantReviewer && jd.role !== 'REVIEWER' ? ' (the project has no reviewer JD)' : ''}.`);
+  }
 
   const eligible = partners.filter((p) => p.status === 'ACTIVE' || f.allowedPartnerIds.includes(p.id));
 
@@ -136,6 +150,12 @@ export function RequisitionForm({ projects, partners, existing, initialProjectId
               ))}
             </select>
           </label>
+          <div className="sm:col-span-2">
+            <button type="button" className="btn btn-secondary" onClick={fillFromJd} disabled={!f.projectId}>
+              Fill from project JD
+            </button>
+            {jdNote && <p role="status" className="mt-1 text-fg-muted">{jdNote}</p>}
+          </div>
           <label className="block">
             Headcount<Req />
             <input required type="number" min={1} max={10000} value={f.headcount} onChange={(ev) => set('headcount', ev.target.value)} className={input} />

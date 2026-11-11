@@ -224,7 +224,8 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       after.rubric!.criteria![0]!.name = 'Check identifiers without inventing a requirement';
       after.solution!.steps![0]!.expectedResult = 'Identifier gaps recorded; ask for applicable approved policy.';
       await executeConversation(db, { model: 'browser-test-no-model', async propose(input) { expect(input.history.at(-1)?.content).toContain('SSN'); return { reply: 'I correlated the identifier gap with the case, map and grading.', question: 'Which approved project rule requires an identifier?', changes: [{ section: 'scenario', value: after.scenario, reason: 'SME observation' }, { section: 'solution', value: after.solution, reason: 'Related investigation' }, { section: 'rubric', value: after.rubric, reason: 'Related grading criterion' }], ruleLinks: [], unresolved: ['Identifier applicability'] }; } }, run!.id);
-      await page.getByRole('button', { name: 'Confirm changes', exact: true }).waitFor({ timeout: 20000 });
+      // The page polls the conversation every 2 s; a cold CI dev server can take well over 20 s to show the proposal.
+      await page.getByRole('button', { name: 'Confirm changes', exact: true }).waitFor({ timeout: 60_000 });
       await page.getByRole('button', { name: 'Confirm changes', exact: true }).click();
       await page.getByRole('button', { name: /Identifier gaps recorded/ }).waitFor();
       await page.reload({ waitUntil: 'networkidle' });

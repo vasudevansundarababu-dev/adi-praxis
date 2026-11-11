@@ -1,6 +1,7 @@
-# Template profiles and the Anvil contract compiler (Wave 1)
+# Template profiles and the Anvil contract compiler (Wave 1 and Wave 2)
 
-Status: built on `wave1-template-profiles` for AUTHORING-V2.1-PLAN Wave 1. Field contracts outside KYC are marked
+Status: built on `wave1-template-profiles` for AUTHORING-V2.1-PLAN Wave 1; Wave 2 (adverse media review, enhanced due
+diligence, customer risk rating) on `wave2-template-profiles`. Field contracts outside KYC are marked
 `requires_confirmation` (plan §6) until the domain owner confirms them.
 
 Code: `packages/shared/src/template-profile/` (schema, registry, helpers, `contract.ts` compiler, one file per
@@ -62,3 +63,45 @@ Profiles match the catalogue (`apps/api/prisma/catalog/index.ts`), not the hando
 "Launch of Noise Cancelling Phone" (handover: Noise Cancelling Headphones Launch),
 "Omnichannel Creative & Locale Compliance" (handover: "and"), "KYB and beneficial ownership",
 "AML transaction-monitoring alerts", "KYC onboarding and refresh". Nothing is renamed.
+
+## Wave 2 profiles
+
+All three are `storage: 'sections'`, `agentMode: 'SINGLE'`, `contractStatus: 'requires_confirmation'`, built by
+`sectionsProfile` (`common.ts`) like KYB and AML, so S1–S4, S7 and S8 and the common S5/S6 fields are the shared
+ones (title, trigger, business context, deliverable, scope, language, as-of date; evidence records; environment,
+tools and recorded responses; policy citations; steps, findings, rationale, unresolved issues, business hand-off;
+further output fields; criteria with typed bindings, weights total 100, at least one critical; common errors and
+acceptable variations; sources used). Only the template-specific parts below come from each
+`handover-v2/templates/<slug>/task.md` draft. Pick-list values are the drafts' "current proposed labels", verbatim.
+
+| | Adverse media review (BK03) | Enhanced due diligence (BK10) | Customer risk rating (BK09) |
+|---|---|---|---|
+| Profile file | `profiles/adverse-media-review.ts` | `profiles/enhanced-due-diligence.ts` | `profiles/customer-risk-rating.ts` |
+| S1 subject | Customer type | Customer type | Customer type |
+| S2 evidence types | customer_identifiers, media_extract, source_metadata, other | high_risk_case, source_of_funds, source_of_wealth, ownership_record, adverse_finding, other | customer_profile, risk_factor, supporting_evidence, rating_methodology, other |
+| S5 deliverables (private) | identityMatch, sourceReliability, allegationsVsFacts, relevance (all required) | enhancedChecks, evidenceGaps, riskAssessment (required); business hand-off **required** | factorAssessments (repeated: id `RF1…`, factor, assessment, evidenceRefs; required), calculation (optional, "where supported"), overrideRationale (required when S6.override is proposed_increase or proposed_decrease) |
+| S5 finding fields | common | + evidenceStatus: verified, unverified, conflicting, missing (required) | common |
+| S6 output fields (private reference) | `match`: confirmed, possible, false_positive, unresolved; `recommendation`: close, escalate, request_information | `recommendation`: proceed_for_approval, request_information, escalate, recommend_decline | `risk`: low, medium, high, undetermined; `override`: none, proposed_increase, proposed_decrease |
+
+Contract mapping is the common sections mapping above, unchanged: each S6 pick list becomes a string output.json field
+whose allowed values are the pick list, and its selection is the `rubric.reference_output` value; S7 criteria bind to
+those fields (or to S6 "further output fields"). EDD's per-finding evidence status is private reference material (part
+of the S5 findings), not an output.json field; an author who wants it graded adds a further output field. CRR's
+methodology, factors and bands are S2 evidence the author supplies; the profile defines no factor, weight or
+threshold, and the calculation is free text because the draft gives no calculation contract.
+
+Starting workflows (`workflow-graph/template-graphs.ts`) use the common review pattern: case inputs → review →
+"sufficient?" decision (yes / missing / else and unknown to escalation) → request information, returning to review
+(bounded loop, 2 iterations, exhausted → escalate) → conclude → output. Enhanced due diligence adds an "Approver
+decides" human step (authorised approver, Approve/Decline, timeout → escalate) between conclude and output, because its
+draft lists a human hand-off and a `proceed_for_approval` outcome. Adverse media review and customer risk rating have no
+business human step: their drafts do not describe one. Roles list no tools: the drafts leave the tool catalogue open.
+
+Not mapped from the drafts (left for the domain owner, nothing invented):
+- exact field names and enums outside these proposed labels, and the published agent mode;
+- the qualified tool catalogue and environment (S3 tools stay free entries, `allowCustom`);
+- adverse media: a per-extract reliability or allegation/fact enum (free text only);
+- EDD: an enum for the risk assessment (free text; the draft gives only the recommendation and evidence labels);
+- CRR: factor-level ratings, weights and a calculation schema; who approves a proposed override;
+- critical-failure scoring semantics beyond "at least one critical criterion".
+

@@ -1,7 +1,6 @@
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
 import type { Message } from '@anthropic-ai/sdk/resources/messages';
 import { ConversationProposal } from '@praxis/shared';
-import { ClaudeVertexTaskDrafter } from '../drafting/drafter';
 export interface ConversationInput {
   workflow: string; template?: unknown; reviewFeedback?: unknown; current: Record<string, unknown>; slot: unknown;
   history: Array<{ speaker: string; content: string }>;
@@ -18,7 +17,9 @@ export class VertexConversationAssistant implements ConversationAssistant {
   readonly model: string;
   private client: Pick<AnthropicVertex, 'messages'>;
   constructor(opts: { projectId: string; region: string; model?: string; client?: Pick<AnthropicVertex, 'messages'> }) {
-    this.model = opts.model ?? ClaudeVertexTaskDrafter.MODEL;
+    // Owner decision (10 Nov 2026): Sonnet 5.5 for cost; Haiku 5.5 as the cheap backup. The request below sends no
+    // thinking, tool_choice or sampling parameters, which Sonnet 5.5 rejects; omitting thinking runs adaptive.
+    this.model = opts.model ?? 'claude-sonnet-5-5';
     this.client = opts.client ?? new AnthropicVertex({ projectId: opts.projectId, region: opts.region, timeout: 90000, maxRetries: 0 });
   }
   async propose(input: ConversationInput) {

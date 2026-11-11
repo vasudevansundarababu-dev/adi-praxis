@@ -89,6 +89,16 @@ The owner removes projects no longer needed. Nothing is deleted by an agent. Pro
 Also tidy budgets: the "Budget Alert For Vertex API" (500 USD) watches only the demo project, so delete or repoint it if
 the demo project goes. QA should keep an all-services budget on My Billing Account.
 
+**Is the demo project still used? (checked 10 Nov 2026, read-only)**
+
+- Real visits to the console or API: last on **31 Oct** (about 60 requests) and **7 Nov** (about 450 requests).
+  Nothing since then except the background worker running on its own.
+- No GitHub workflow, variable, secret or environment uses it.
+- Only documents mention it: `docs/user-guide/01-getting-started.md`, `docs/user-guide/ROLES-AND-ADMIN.md`,
+  `docs/user-guide/VIDEOS.md`, `e2e/demo-videos/run.sh` (in `adi-praxis`, copied into `adi-praxis-testing`). Update
+  these when the project is deleted. `adi-anvil` and `adi-autonomous-qa` do not mention it.
+- The `@praxis.demo` logins are the shared demo accounts and also exist in QA, so they are not a reason to keep it.
+
 Deleting a project (`gcloud projects delete <id>`, or IAM & Admin → Manage resources) stops its billing and can be
 undone for 30 days. Before deleting the demo project, check nothing still points at its URLs (handbook artifact, tester
 emails).

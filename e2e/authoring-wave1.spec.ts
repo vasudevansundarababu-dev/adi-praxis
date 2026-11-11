@@ -1,6 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { expect, test } from '@playwright/test';
+import { base, fixture, gatedBackend } from './authoring-fixtures';
 
 /**
  * Authoring v2.1 Wave 1, per template: the workflow graph below both editors on one task.
@@ -14,37 +13,6 @@ import { randomUUID } from 'node:crypto';
 test.skip(!!process.env.E2E_WEB_URL, 'isolated UI fixture; never production');
 
 const TEMPLATES = ['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone'];
-const base = process.env.E2E_CANDIDATE_BASE ?? 'http://localhost:3301';
-
-async function fixture(page: Page, workflow: string) {
-  const token = await (await page.request.post(base + '/api/v1/auth/dev/google-token', { data: { email: `wave1.${randomUUID()}@example.test`, name: 'Wave 1 fixture' } })).json();
-  const signed = await (await page.request.post(base + '/api/v1/auth/google', { data: { credential: token.credential, adultAttested: true } })).json();
-  return JSON.parse(execFileSync('pnpm', ['--silent', '--filter', '@praxis/api', 'exec', 'tsx', 'scripts/e2e-m10.ts', 'wave1', signed.id, workflow], { encoding: 'utf8' }).trim().split('\n').pop()!) as { taskId: string };
-}
-
-/** In-test backend for the gated calls; the stored output and revision feed the real task read on reload. */
-async function gatedBackend(page: Page, taskId: string) {
-  const state: { output: Record<string, unknown> | null; revision: number | null } = { output: null, revision: null };
-  await page.route(`**/api/v1/me/tasks/${taskId}`, async (route) => {
-    const req = route.request();
-    if (req.method() === 'PUT') {
-      const body = req.postDataJSON();
-      state.output = body.output;
-      state.revision = body.expectedRevision + 1;
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: state.revision, savedAt: new Date().toISOString() }) });
-    }
-    const res = await route.fetch();
-    const json = await res.json();
-    if (state.output) Object.assign(json, { output: state.output, revision: state.revision });
-    return route.fulfill({ response: res, json });
-  });
-  await page.route(`**/api/v1/me/tasks/${taskId}/authoring-workspace`, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: route.request().postData() ?? '{}' }));
-  await page.route(`**/api/v1/me/tasks/${taskId}/conversation`, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: state.revision ?? 0, output: state.output ?? {}, state: { humanOnly: true, consent: { version: 'human-only/1' } }, messages: [], run: null, policy: null }) }),
-  );
-  return state;
-}
-
 for (const workflow of TEMPLATES) {
   test(`Wave 1 · ${workflow}: one workflow graph below Classic and Chatbot`, async ({ page }) => {
     const { taskId } = await fixture(page, workflow);

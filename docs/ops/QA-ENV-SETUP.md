@@ -18,7 +18,7 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 | Runtime service account `praxis-demo-run` | `aiplatform.user`, `cloudsql.client`, `secretmanager.secretAccessor`, `logging.logWriter`, `monitoring.metricWriter` |
 | Vertex wiring | `VERTEX_PROJECT_ID=adi-praxis-test-0928`, `VERTEX_LOCATION=global` on the API and worker |
 | Spend caps in the app | None set (`deploy-demo.sh` passes no caps) |
-| Billing budget | "Bugdet Alert For Praxis", 1000 USD, scoped to this project |
+| Billing budget | "Bugdet Alert For Praxis", 1000 USD, this project but one service only; from 10 Nov also "PraxisQA All Services", 500 USD, all services |
 | Secrets | Database, Redis, mock secret, demo passwords. **No `llamaextract-api-key`.** |
 | GitHub wiring | `TEST_GCP_PROJECT`, `TEST_WIF_PROVIDER`, `TEST_DEPLOYER_SA`, `NIGHTLY_ENABLED=true` set |
 | Last Nightly build | Run 42757420232: CI green, deploy red at the demo-data step (O1) |
@@ -49,7 +49,7 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 | --- | --- | --- |
 | 1 | How a wave build reaches QA | **Decided 10 Nov: option A.** Develop and test on `feat/authoring-v21`, PR to `main` (CI green, owner approves), then the Nightly build (or Run workflow / `/qa deploy`) deploys `main` to QA. Pipeline unchanged. |
 | 2 | Vertex: Model Garden access for `AUTHORING_MODEL` (Claude) and Gemini, quota | **In progress.** Owner chose Claude Sonnet 5.5 (`claude-sonnet-5-5`) for the chatbot, Haiku 5.5 as the cheap backup, instead of Opus 5. Sonnet enabled in Model Garden (10 Nov). Claude quota was 0 for every model (`global_online_prediction_requests_per_base_model`, all `anthropic-*` base models), so live calls returned 429. Increase to 30/min filed 10 Nov for `anthropic-claude-sonnet`, `anthropic-claude-haiku` and `anthropic-count-tokens` (Cloud Quotas preferences `praxis-qa-*`); waiting for Google. |
-| 3 | Caps: deployer passes `AUTHORING_MODEL` and `AUTHORING_DAILY_CALL_CAP`; `llm.call` metric and alert; Vertex budget | **Deployer done (local commit, 10 Nov):** `infra/demo/deploy-demo.sh` with `PRAXIS_VERTEX=1` sets `AUTHORING_MODEL=claude-sonnet-5-5` and `AUTHORING_DAILY_CALL_CAP=300` (both overridable) and deploys, never runs, job `praxis-vertex-smoke` when the build contains `apps/api/scripts/vertex-smoke.ts`. Open: `llm.call` log metric and alert; whether to keep the 1000 USD project budget alert or add a smaller Vertex one. |
+| 3 | Caps: deployer passes `AUTHORING_MODEL` and `AUTHORING_DAILY_CALL_CAP`; `llm.call` metric and alert; Vertex budget | **Deployer done (local commit, 10 Nov):** `infra/demo/deploy-demo.sh` with `PRAXIS_VERTEX=1` sets `AUTHORING_MODEL=claude-sonnet-5-5` and `AUTHORING_DAILY_CALL_CAP=300` (both overridable) and deploys, never runs, job `praxis-vertex-smoke` when the build contains `apps/api/scripts/vertex-smoke.ts`. **Budget done (10 Nov):** owner created "PraxisQA All Services", 500 USD/month on My Billing Account, QA project only, all services, alerts at 50/90/100%. (The older 1000 USD QA budget counts one service only.) Optional later: an `llm.call` log metric and alert. |
 | 4 | Policy extraction in QA: Document AI layout parser, LlamaExtract key slot | Open (blocked by O2) |
 | 5 | Migrations (incl. `20261111000000_authoring_v21_modes`) and seed, catalogue templates | Open |
 | 6 | First wave deploy on the owner's go; smoke job (exit 0); admin check shows `vertex` | Open |

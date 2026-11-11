@@ -21,6 +21,10 @@ export default async function HomePage() {
       { label: 'RL reviews', count: rl, hint: 'Give verdicts on RL Gym results.', href: '/review/rl' },
     );
   }
+  // SME -> Expert -> PM projects: a PM (who is not also a Validator) sees what waits for PM approval.
+  if (has('PM') && !has('REVIEWER') && !has('ADMIN')) {
+    tiles.push({ label: 'Tasks awaiting PM approval', count: await count('/review/tasks'), hint: 'Approve the exact version the Expert passed, or return it.', href: '/review/tasks' });
+  }
   if (has('PM') || has('ADMIN')) {
     const projects = (await apiGet<{ items: { status: string }[] }>('/projects')).data?.items ?? [];
     tiles.push(

@@ -35,7 +35,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Reviews',
     items: [
       { label: 'Applications', href: '/review/applications', roles: ['REVIEWER', 'ADMIN'] },
-      { label: 'Task reviews', href: '/review/tasks', roles: ['REVIEWER', 'ADMIN'] },
+      { label: 'Task reviews', href: '/review/tasks', roles: ['REVIEWER', 'ADMIN', 'PM'] },
       { label: 'RL reviews', href: '/review/rl', roles: ['REVIEWER', 'ADMIN'] },
       { label: 'Identity reviews', href: '/review/identity', roles: ['REVIEWER', 'ADMIN'] },
       { label: 'Conflicts', href: '/review/conflicts', roles: ['REVIEWER', 'ADMIN'] },

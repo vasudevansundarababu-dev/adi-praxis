@@ -23,6 +23,8 @@ export const EDD_PROFILE = sectionsProfile({
     field.lt('riskAssessment', 'Risk assessment', 'How the agent should assess the risk of the relationship from the checks.', { required: true }),
   ],
   outcomes: [
+    // Owner, 12 Nov: the overall risk is a fixed rating, graded alongside the recommendation.
+    { key: 'riskRating', type: 'pick_list', label: 'Risk rating', help: 'The overall risk of the relationship after the enhanced checks.', required: true, options: options('low', 'medium', 'high', 'very_high'), outputField: 'risk_rating' },
     {
       key: 'recommendation',
       type: 'pick_list',

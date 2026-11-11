@@ -578,3 +578,15 @@ Expert and PM with two audit events; Expert edits need a reason, and a material 
 - **Open for the owner (12 Nov):** domain confirmation of the three Wave 2 field contracts (Adverse media review,
   Enhanced due diligence, Customer risk rating; gaps listed in `docs/authoring/TEMPLATE-PROFILES.md`), and the owner's
   live Wave 2 session in QA (`docs/authoring/WAVE-2-TEST-NOTES.md`).
+
+### Authoring v2.1 Wave 2: owner field-contract answers (12 Nov 2026)
+
+- **(owner)** The drafts' pick lists for Adverse media review, Enhanced due diligence and Customer risk rating are final.
+- **(owner)** Adverse media: per-source reliability from a fixed list (high / medium / low / unknown) with a reason; an
+  `escalate` recommendation goes to a "Compliance reviewer decides" person step.
+- **(owner)** EDD: a graded overall risk rating (low / medium / high / very_high) beside the recommendation.
+- **(owner)** CRR: a rating per risk factor (low / medium / high), no weights or formula; a proposed override goes to a
+  "Senior compliance approver decides" person step.
+- **(owner)** Failing a critical rubric criterion fails the whole task. Exported to Anvil as a hard-failure constraint
+  with the criterion's binding (Anvil's `praxis.anvil.task.v1` already has `constraints[].hard_failure`), so no new
+  Anvil field is invented.

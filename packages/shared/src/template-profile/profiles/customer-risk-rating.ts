@@ -25,10 +25,12 @@ export const CUSTOMER_RISK_RATING_PROFILE = sectionsProfile({
       required: true,
       itemLabel: 'factor assessment',
       idPrefix: 'RF',
-      example: 'RF1 · the factor as the methodology names it · assessment for this customer · evidence E2',
+      example: 'RF1 · the factor as the methodology names it · high · assessment for this customer · evidence E2',
       itemFields: [
         field.t('id', 'Factor ID', 'Stable factor ID.', { required: true }),
         field.t('factor', 'Risk factor', 'The factor, as the methodology names it.', { required: true }),
+        // Owner, 12 Nov: each factor is rated; no weights or formula (the methodology document decides the overall rating).
+        { key: 'rating', type: 'pick_list', label: 'Factor rating', help: 'The risk this factor indicates for this customer.', required: true, options: options('low', 'medium', 'high') },
         field.lt('assessment', 'Assessment', 'How the factor applies to this customer.', { required: true }),
         field.refs('evidenceRefs', 'Evidence', 'Evidence IDs that support the assessment.'),
       ],

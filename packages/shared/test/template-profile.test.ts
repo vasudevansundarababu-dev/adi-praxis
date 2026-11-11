@@ -79,7 +79,7 @@ describe('template profile registry', () => {
     }
     const [adverse, edd, crr] = WAVE2_PROFILES;
     expect(s6(adverse)).toEqual({ match: ['confirmed', 'possible', 'false_positive', 'unresolved'], recommendation: ['close', 'escalate', 'request_information'] });
-    expect(s6(edd)).toEqual({ recommendation: ['proceed_for_approval', 'request_information', 'escalate', 'recommend_decline'] });
+    expect(s6(edd)).toEqual({ risk_rating: ['low', 'medium', 'high', 'very_high'], recommendation: ['proceed_for_approval', 'request_information', 'escalate', 'recommend_decline'] });
     expect(s6(crr)).toEqual({ risk: ['low', 'medium', 'high', 'undetermined'], override: ['none', 'proposed_increase', 'proposed_decrease'] });
     // Template deliverables (S5) from each draft.
     const s5 = (p: TemplateProfile) => p.sections[4]!.fields.map((f) => f.key);
@@ -237,6 +237,14 @@ describe('Anvil contract compiler (praxis.anvil.task.v1)', () => {
     expect(c.rubric.criteria.reduce((n, x) => n + x.weight_bps, 0)).toBe(10000);
     expect(c.constraints[0]).toMatchObject({ id: 'policy-PR1', hard_failure: true, binding: { kind: 'json_number_max', field: 'gap_count', value: 5 } });
     expect(c.rubric.reference_output.gap_count).toBe(2);
+    // Owner, 12 Nov: every critical criterion is also a hard failure with the same binding; its weight still scores.
+    for (const crit of c.rubric.criteria) {
+      const hard = c.constraints.find((x) => x.id === `${crit.id}.critical`);
+      const isCritical = ((sampleProfileOutput(p).sections as Record<string, Record<string, unknown>>).S7!.criteria as Array<{ id: string; critical?: boolean }>).find((x) => x.id === crit.id)?.critical === true;
+      if (isCritical) expect(hard).toMatchObject({ hard_failure: true, binding: crit.binding });
+      else expect(hard).toBeUndefined();
+    }
+    expect(c.constraints.some((x) => x.id.endsWith('.critical'))).toBe(true);
     // Private material is never actor evidence.
     expect(JSON.stringify(c.evidence.filter((e) => e.visibility === 'actor'))).not.toContain('PRIVATE-');
     expect(c.evidence.some((e) => e.visibility === 'private')).toBe(true);

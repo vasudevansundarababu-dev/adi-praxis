@@ -4,11 +4,12 @@ Source: `praxis-authoring-handover-v2.zip` (v2.0, 10 Nov 2026), chapters 00–16
 `sha256-manifest.json` (53/53 files). Grounded in the current source: `main` at `e0bb46f` and the
 authoring baseline `feat/conversational-case-authoring` at `3c191e9`.
 
-Status: **plan for owner confirmation**. Nothing here is implemented or deployed by this document.
+Status: **plan confirmed by the owner 10 Nov 2026.** Phases 0–3 deliver the test build for tomorrow; Phases 4 and 5
+start immediately once that build is deployed (**08:00 CST**) and run **in parallel**, template by template.
 
 ## 1. What the owner asked for
 
-An **aggressive** path to a **test build by tomorrow**, covering:
+An **aggressive** path to a **test build by tomorrow (08:00 CST)**, covering:
 
 1. the **task-authoring UI** (the Classic editor and the Chatbot editor, one shared task),
 2. **SME review** (submit → review → rework, with the graph visible), and
@@ -17,7 +18,8 @@ An **aggressive** path to a **test build by tomorrow**, covering:
 And, per the standing decisions: authoring experiences are **CLASSIC / CHATBOT / BOTH**; all seeded
 templates **publish by default**; the catalogue is **11 single-agent workflows** (Control testing,
 Country-specific interpretation and AML were removed); the owner wants to **test chatbot effectiveness in
-authoring** in QA.
+authoring** in QA. **Real Vertex Model Garden is enabled in QA** so the owner can author tasks, policies and rules
+and export tasks to Anvil. Rollout is **template by template**.
 
 ## 2. What already exists (do not rebuild)
 
@@ -53,12 +55,25 @@ From chapter 00 and the traceability CSV:
 | PR-18 | Per-template executable Anvil contract qualification | 15 | partial adapters; gaps explicit |
 | MODEL-01 | Vertex MaaS provider adapter | 11 | recommendation; **no paid call** |
 
-## 4. Aggressive plan — phased, with a defensible "tomorrow" slice
+## 4. Plan — Phases 0–3 for tomorrow, then Phases 4 and 5 start immediately and run **in parallel**
 
-The full v2 is multi-week. The aggressive plan front-loads a **thin vertical slice** that is genuinely
-demoable tomorrow, then widens. Each phase ends in a working build; nothing is claimed done from a mockup.
+Not sequential. Phase 3 is the deployable test build for tomorrow. The moment the test deployment is up
+(**08:00 CST tomorrow**), Phases 4 and 5 begin **immediately**, alongside the ongoing per-template rollout —
+not after it.
 
-### Phase 0 — baseline first (½ day)
+```
+NOW ─────────────► 08:00 CST tomorrow ──────────────────────────────► finish
+Phase 0  baseline green            ┐
+Phase 1  two editors, one task     ├─ test build (deployable)
+Phase 2  horizontal graph          │
+Phase 3  SME review loop           ┘
+                                   │
+                                   └─► Phase 4 (policy bridge + Expert→PM)  ┐
+                                       Phase 5 (Vertex MaaS + Anvil export) ├─ START IMMEDIATELY,
+                                       per-template rollout (A → B → C …)   ┘ RUN IN PARALLEL
+```
+
+### Phase 0 — baseline first (now, the gate)
 
 Goal: get the local implementation onto a branch that can build and be reviewed.
 
@@ -114,21 +129,32 @@ Goal: the demo review loop, reusing the existing one-stage authorised review.
 Exit: a reviewer returns a task with an actionable comment; rework keeps the task and comments; the accepted
 revision is frozen and appears (still) as **"Approved; export adapter missing"** where no executable contract exists.
 
-### Phase 4 — policy bridge and two-stage route (later, not tomorrow)
+### Phase 4 — policy bridge and two-stage route (starts 08:00 CST tomorrow, in parallel)
 
 Explicit **SME→Expert→PM** stage engine with exact-revision authority and invalidation; SME policy proposal
-queue with qualification and authorised publication. Demo continues on the existing authorised final-review
-path until this passes.
+queue with qualification and authorised publication. Runs alongside the per-template rollout, not after it.
 
-### Phase 5 — provider adapter and Anvil qualification (later, no paid calls)
+### Phase 5 — provider adapter and Anvil export (starts 08:00 CST tomorrow, in parallel)
 
-Vertex MaaS adapter with **contract tests only** (no paid calls); per-template Anvil executable mappings;
-unsupported graph/contract blocks export with a precise blocker.
+Real **Vertex Model Garden** authoring (live model, not mock) so the owner can author tasks, policies and rules
+and **export tasks to Anvil**. Per-template Anvil executable mappings, template by template. Unsupported
+graph/contract blocks export with a precise blocker. No paid calls in automated tests; live calls only in the
+owner's QA authoring session, within the approved cap.
+
+### Per-template rollout (in parallel, A → B → C …)
+
+The authoring UI, chatbot and graph are built **once** and driven by the template registry (PR-03). Rollout
+proceeds **template by template**: register a template's versioned profile, confirm its field/outcome contract
+and graph, then qualify its Anvil export. Start with KYC onboarding (existing typed fields), then the other
+banking workflows, then the two Digital Marketing templates. A template with an unsupported field type is
+disabled with a diagnostic — never shown as an apparently complete blank form.
 
 ## 5. QA target for tomorrow
 
 Scope of the QA build: **Phases 0–3** on the **existing QA environment** (`adi-praxis-test-0928`; QA = test).
-No new environment. No paid provider calls.
+No new environment. **Real Vertex Model Garden is enabled in QA** so the owner can author tasks, policies and
+rules with a live model and exercise Anvil export; live calls stay within the approved cap and no paid calls run
+in automated tests.
 
 | # | QA check | Pass criteria |
 | --- | --- | --- |
@@ -144,23 +170,38 @@ No new environment. No paid provider calls.
 | 10 | Agent projection | Private rubric/solution absent from the View-as-Agent payload |
 | 11 | Review loop | Submit → rework with comment → resubmit keeps the same task; one eligible earning only |
 | 12 | **Chatbot effectiveness (owner priority)** | On a banking template, the bot asks template-aware questions, extracts the SME's own words into sections, does **not** author substantive content, and safely redirects off-topic/"generate my answer" requests |
+| 13 | Author → policy → rule (live) | Owner can author a task, propose a policy and a rule against the live QA model |
+| 14 | Anvil export | A finished task exports toward Anvil; a missing executable contract returns an explicit blocker, not a false success |
 
-**Out of scope for tomorrow's QA:** two-stage Expert→PM engine, SME policy publication queue, live MaaS calls,
-per-template executable Anvil execution. These stay explicitly "not yet" in the QA notes.
+**Out of scope for tomorrow's QA build (starts 08:00 CST, in parallel):** the two-stage Expert→PM engine and the
+SME policy publication queue (Phase 4); the full Vertex MaaS adapter and per-template executable Anvil execution
+(Phase 5). These are explicitly "not yet" in the QA notes for the 08:00 build and land next, in parallel.
 
 ## 6. Risks and honest limits
 
 - **Base-branch risk:** the local implementation lives off `main`; if the baseline does not build cleanly on a
   fresh checkout, Phase 0 absorbs the time. Mitigation: Phase 0 is the gate and runs first.
 - **Graph runtime:** the graph UI is deliverable tomorrow; the **executable** runtime/export is not. Say so.
-- **Model calls:** the chatbot works on the existing Vertex path with the owner's staging approval; QA enablement
-  of live Vertex is a separate switch. No paid calls in this plan's tests.
+- **Model calls:** real Vertex Model Garden is enabled in QA per the owner's decision; live calls stay within the
+  approved cap and no automated test makes a paid call.
 - **Not claimed:** a graph mockup, a dataset export or an SDK mock response is **not** production acceptance.
 
-## 7. What I need from the owner
+## 7. Owner decisions — answered 10 Nov 2026
 
-1. Confirm **base branch = `feat/conversational-case-authoring`** (`3c191e9`) for the new work.
-2. Confirm the **tomorrow slice = Phases 0–3** and the 12 QA checks above.
-3. Confirm QA uses the **existing** `adi-praxis-test-0928` and that enabling live Vertex in QA is in scope for the
-   effectiveness test (or say "mock only" for tomorrow).
-4. Name the **one or two templates** to focus tomorrow's authoring/chatbot QA on (e.g. KYC onboarding + one other).
+1. **Tomorrow's slice = Phases 0–3** (task authoring UI, horizontal graph, SME review). ✅
+2. **Phase 4 and Phase 5 start immediately** once the test deployment is up (target **08:00 CST tomorrow**), and
+   run **in parallel** with the per-template rollout — **not** sequentially. ✅
+3. **QA uses the existing test environment** and **real Vertex Model Garden** is enabled there, so the owner can
+   author tasks, policies and rules and export tasks to Anvil. ✅
+4. **Per-template rollout:** go **template by template**, starting with KYC onboarding, then the other banking
+   workflows, then the two Digital Marketing templates. ✅
+5. **Base branch = `feat/conversational-case-authoring` (`3c191e9`).** ✅ (assumed; correct if the baseline is the
+   intended starting point)
+
+## 8. Definition of done for tomorrow (08:00 CST)
+
+- The test build is deployed to QA and reachable.
+- Phases 0–3 pass their QA checks (table above, checks 1–12).
+- Real Vertex Model Garden is live in QA; the owner can author a task, a policy and a rule, and start an Anvil
+  export (checks 13–14).
+- Phase 4 and Phase 5 work has **already started** on parallel branches, not queued behind the deployment.

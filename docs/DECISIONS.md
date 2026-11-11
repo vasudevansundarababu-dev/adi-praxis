@@ -528,3 +528,34 @@ no field for several Anvil concepts, so the emitter maps conservatively. Details
 - **(chosen by Claude)** Anvil contract mapping and blockers: see `docs/authoring/TEMPLATE-PROFILES.md`. Export
   blockers never block submission. KYC criteria gain three optional binding keys (`outputField`, `comparison`,
   `expectedValue`); until the workbench edits them, KYC exports are reported as blocked.
+
+## QA seed users: `qa-users` job (11 Nov 2026)
+
+- **(chosen by Claude)** **Real journey, not database inserts.** Every write goes through the public API at `API_URL`
+  (as `demo-setup` does): mock Google sign-in (subject `mock-<lowercased email>`, the same one the candidate app's
+  mock screen produces), the mock identity simulation, enrollment, the accessible profile form (CF-30), explicit
+  submit, the worker's suitability assessment, the Reviewer's decision and the C07 checklist. States, idempotency and
+  audit events are therefore the real ones. The database is only read, to plan and to resume.
+- **(chosen by Claude)** **Human decisions.** Each SELECTED decision is made by one of the seeded Reviewers, signed in
+  with their own account, rotating across the ten; it is recorded as theirs (`enrollment.decided`, actor USER). The AI
+  only recommends. If an assessment has not finished, the job stops short for that SME (no decision is synthesised)
+  and a re-run continues.
+- **(chosen by Claude)** **"Published template"** means what a PM can use: the newest PUBLISHED version of a workflow
+  in an active domain. Drafts and retired templates are not covered.
+- **(chosen by Claude)** **Pool per template.** Readiness is per project (FLOW2 section 9), so each template needs one
+  pool: the oldest live project with a published opportunity (e.g. *KYC authoring demo*), else a new project
+  `SYNTHETIC QA pool — <workflow>` created by `pm@praxis.demo` with template defaults, a USD 1 synthetic JD and a
+  non-required country filter (GB, IN, US), then submitted and its opportunity published. A project the owner creates
+  later needs its own applications (an SME can apply from the candidate app).
+- **(chosen by Claude)** **Spread.** max(30, 3 × templates) slots, shared evenly over templates and filled with SMEs in
+  turn, so each template has at least 3 different SMEs and each of the 30 SMEs at least one pool.
+- **(chosen by Claude)** **Reviewers** are created by the demo Admin with `POST /users` (audited, no forced password
+  change), and attached as Validators to every live project of the covered templates, so candidate and task review
+  queues are staffed. An existing account with that email keeps its password; the REVIEWER role is added if missing.
+- **(chosen by Claude)** **Synthetic data.** Names start `SYNTHETIC QA`; profile answers say they are synthetic; no
+  evidence files; identity is the mock provider's test-mode session reference and status only. Onboarding
+  preferences alternate GB (Europe/London) and IN (Asia/Kolkata), English C2, 20 h/week, email notifications off.
+- **(chosen by Claude)** **Selection scope** comes from the published brief (domain, specialty, jurisdictions,
+  contribution roles); blanks default to the template's domain, GB and IN, and Task author; language English; no expiry.
+- **(chosen by Claude)** **Login rate limit.** QA allows 10 sign-ins a minute per route; the job waits out a 429 rather
+  than failing, so a first run takes a few minutes.

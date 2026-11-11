@@ -3,7 +3,9 @@
  * plain language. Source: docs/SPEC.md, docs/FLOW2-SME.md, docs/TASK-KYC.md, docs/SME-SUPPLY.md and docs/DECISIONS.md.
  * Keep it in step with those documents when behaviour changes. Paragraphs are separated by blank lines.
  */
-export const HELP_VERSION = 'help/1 (28 Sep 2026)';
+import { AUTHORING_GUIDE } from './authoring-help';
+
+export const HELP_VERSION = 'help/2 (12 Nov 2026: authoring v2.1, review routes, policy proposals, template guides)';
 
 const COMMON = `ADI Praxis is where subject-matter experts (SMEs) write and review realistic, fully synthetic work tasks from domain workflow templates (for example Banking / KYC onboarding). Approved tasks go into an append-only Approved Task Dataset that the separate RL Gym platform uses. People make every decision — selection, task acceptance, certification, payment approval. AI only drafts, checks and recommends.
 
@@ -25,7 +27,7 @@ APPLICATIONS — FLOW 2 (Validator). Candidates sign in with Google, verify iden
 
 IDENTITY REVIEWS AND CONFLICTS (Validator). Identity reviews handle people who cannot use the automated check (approved alternative process — never labelled "Stripe verified"). Conflicts are declared employer or customer conflicts to resolve before assignment.
 
-TASKS — FLOW 3. Assigned SMEs author tasks in the workbench (states and actions, dependencies, failure and recovery cases, rubrics and evidence), can draft from an uploaded document or an interview, autosave, and submit. Automatic checks flag likely real identifiers and near-duplicates. A Validator reviews each submitted task: Accept, Request rework (with specific notes), or Reject with a reason code. Accepted tasks are written to the append-only Approved Task Dataset and cannot be changed.
+TASKS — FLOW 3. Assigned SMEs author tasks from the project's template in Classic, Chatbot or both (the project decides), with the workflow graph below; they can also draft from an uploaded document or an interview, autosave, and submit. Automatic checks flag likely real identifiers and near-duplicates. Review follows the project's route (see REVIEW ROUTES below): on SME → PM a Validator or Admin accepts, requests rework with specific notes, or rejects with a reason code; on SME → Expert → PM the Expert passes first and the PM approves. Accepted tasks are written to the append-only Approved Task Dataset and cannot be changed.
 
 RL REVIEWS — FLOW 4 (Validator). RL Gym sends agent runs for review. The Validator claims one, gives a PASS or FAIL verdict per metric with comments (every FAIL and every disagreement needs a comment and a reason code), and submits. The verdict becomes an append-only RL review record delivered to RL Gym.
 
@@ -39,7 +41,9 @@ CERTIFICATION REVIEWS (Validator, Admin). Written answers show the model's score
 
 PAYMENTS (Finance, PM, Admin). Rate cards are versioned (USD or INR, a price per task type); a new version never changes past earnings. Each accepted task on a direct-pay requisition earns exactly one ledger entry at the linked rate card price. Earnings can never be edited or deleted; Finance corrects with a reversal. Pay runs are weekly (Monday to Sunday, built on Mondays): one payment per SME and currency. Held (not paid, reported): payee not ready, account suspended, a dispute or fraud hold, suspended standing. Balances under USD 10 or INR 500 carry forward. Admin steps: build → release → submit explicitly to the payout provider. Release replaces PM/Finance sign-offs, is audited, sends no money, and cannot be done by a recipient in that run. Legacy Finance routes remain compatible. Provider updates mark payments Paid, Failed or Returned; failed and returned money is owed again next run. Daily reconciliation lists every mismatch with the provider's report as a payout exception for Finance to resolve with a note. Partner fees: one entry per certified candidate at the partner's fee terms; monthly statements are shown to the partner; payment happens outside Praxis.
 
-ADMIN. Users: invite staff, set roles, disable access. Taxonomy: domains and skills. Terms: publish contributor, confidentiality/IP and data-use terms (placeholder terms block onboarding in production). Failure codes: reason codes for RL reviews. API clients: machine access keys (for example RL Gym).`;
+ADMIN. Users: invite staff, set roles, disable access. Taxonomy: domains and skills. Terms: publish contributor, confidentiality/IP and data-use terms (placeholder terms block onboarding in production). Failure codes: reason codes for RL reviews. API clients: machine access keys (for example RL Gym).
+
+${AUTHORING_GUIDE}`;
 
 export const PARTNER_HELP = `${COMMON}
 
@@ -58,3 +62,15 @@ CERTIFICATION. After selection, candidates complete a course and a timed certifi
 STATEMENTS. You owe a fee for each certified candidate you supplied, at your agreed fee terms. Statements are issued monthly with one line per certified candidate (your candidate id and your reference). Payment happens outside the portal; contact ADI Praxis about any line.
 
 API AND WEBHOOKS. Create API clients per environment: Sandbox (simulated candidates, nothing emailed) or Live. The client secret is shown once — store it safely; rotate it if exposed. Webhooks send signed events (header Praxis-Signature with a timestamp and HMAC) for every state change; the signing secret is shown once. Deliveries retry for about 8 attempts and can be replayed. Call the Partner API on the API host (path /partner/v1), not the portal address.`;
+
+
+/** SMEs (authors) in the candidate app: how to author, what happens in review, and policy. */
+export const SME_HELP = `ADI Praxis is where subject-matter experts like you write realistic, fully synthetic work tasks from a project's workflow template. Approved tasks go into an append-only dataset used to train and test AI agents. People make every decision about your task — the Expert, the PM or an Admin. AI only organises your words, checks and recommends; it never writes your answers.
+
+All task content must be synthetic: invented people, companies, accounts and identifiers only. Never enter real customer, employer or identity data. Praxis flags possible real data (for example a valid IBAN or card number) and blocks it.
+
+YOUR TASKS. Your home page lists your projects and tasks. Open a task to author it. It autosaves; reopening keeps everything. When the checks pass, submit it. You can see its state at the top: Authoring, Review pending or Approval pending, Approved, or Rejected. If it comes back for rework you see the reviewer's comments, pinned to the section, field or workflow step they concern; fix them and resubmit. If an Expert made a material change (anything in the rubric or the reference answer), the task comes back for you to reconfirm.
+
+PAYMENT. You earn once per accepted task, at the project's rate; rework and resubmission do not create a second earning.
+
+${AUTHORING_GUIDE}`;

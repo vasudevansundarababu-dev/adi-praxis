@@ -4,7 +4,8 @@ import { roleLabel } from '@praxis/shared';
 import { z } from 'zod';
 import { AppError } from '../lib/errors';
 import { SupportUnavailableError, type SupportAssistant, type SupportContext } from '../support/assistant';
-import { HELP_VERSION, PARTNER_HELP, STAFF_HELP } from '../support/help-pack';
+import { templateGuide, templatesFor } from '../support/authoring-help';
+import { HELP_VERSION, PARTNER_HELP, SME_HELP, STAFF_HELP } from '../support/help-pack';
 
 /**
  * Support Bot API (docs/SUPPORT-BOT.md). The browser sends the question, the recent conversation and a description of
@@ -52,9 +53,14 @@ const STAFF_RECORDS: [RegExp, (m: RegExpMatchArray) => string, string][] = [
   [/^\/guidelines\/?$/, () => '/guidelines/packages', 'guidelines packages'],
   [/^\/certifications\/?$/, () => '/certifications/review-queue', 'certification review queue'],
   [new RegExp(`^/review/applications/(${UUID})`), (m) => `/review/enrollments/${m[1]}`, 'application'],
+  [new RegExp(`^/review/tasks/(${UUID})`), (m) => `/review/tasks/${m[1]}`, 'task under review'],
+  [/^\/review\/policy-proposals\/?$/, () => '/review/policy-proposals', 'policy proposals'],
+  [new RegExp(`^/review/rl/(${UUID})`), (m) => `/review/rl/${m[1]}`, 'RL review'],
   [new RegExp(`^/projects/(${UUID})`), (m) => `/projects/${m[1]}`, 'project'],
   [new RegExp(`^/templates/(${UUID})`), (m) => `/templates/${m[1]}`, 'template'],
 ];
+/** Candidate app paths (SMEs): their own task, with their own permissions. */
+const SME_RECORDS: [RegExp, (m: RegExpMatchArray) => string, string][] = [[new RegExp(`^/tasks/(${UUID})`), (m) => `/me/tasks/${m[1]}`, 'your task']];
 const PARTNER_RECORDS: [RegExp, (m: RegExpMatchArray) => string, string][] = [
   [new RegExp(`^/partner/requisitions/(${UUID})`), (m) => `/partner-portal/requisitions/${m[1]}`, 'requisition'],
   [/^\/partner\/requisitions\/?$/, () => '/partner-portal/requisitions', 'requisition list'],
@@ -95,11 +101,13 @@ export const supportRoutes: FastifyPluginAsyncZod<{ assistant: SupportAssistant;
   const root = app as unknown as FastifyInstance;
   const ask = async (req: FastifyRequest, ctx: Omit<SupportContext, 'record' | 'screen'>, body: z.infer<typeof SupportAsk>, table: typeof STAFF_RECORDS) => {
     const record = await recordFor(root, req, table, body.screen.path);
+    // The template(s) the record on screen or the question is about: their generated guide goes with the question.
+    const templates = ctx.audience === 'PARTNER' ? [] : templatesFor(body.question, record?.data);
     const started = Date.now();
     try {
-      const r = await assistant.answer({ ...ctx, screen: body.screen, record }, body.history, body.question);
-      req.log.info({ support: { audience: ctx.audience, path: body.screen.path, record: record?.source ?? null, model: assistant.model, ms: Date.now() - started, ...r.usage } }, 'support answer');
-      return { answer: r.answer, model: assistant.model, helpVersion: HELP_VERSION, usedRecord: record?.source ?? null };
+      const r = await assistant.answer({ ...ctx, screen: body.screen, record, templates: templates.map(templateGuide) }, body.history, body.question);
+      req.log.info({ support: { audience: ctx.audience, path: body.screen.path, record: record?.source ?? null, templates: templates.map((t) => t.profileId), model: assistant.model, ms: Date.now() - started, ...r.usage } }, 'support answer');
+      return { answer: r.answer, model: assistant.model, helpVersion: HELP_VERSION, usedRecord: record?.source ?? null, usedTemplates: templates.map((t) => t.catalogWorkflowName) };
     } catch (err) {
       if (err instanceof SupportUnavailableError) throw new AppError(503, 'SUPPORT_UNAVAILABLE', 'The Support Bot is not available right now. Try again in a minute, or ask an Admin.');
       throw err;
@@ -108,6 +116,11 @@ export const supportRoutes: FastifyPluginAsyncZod<{ assistant: SupportAssistant;
 
   app.post('/support/ask', { config: { access: ['ADMIN', 'PM', 'REVIEWER', 'FINANCE'], rateLimit: perSession('praxis_session') }, schema: { tags: ['support'], body: SupportAsk } }, async (req) =>
     ask(req, { audience: 'STAFF', roles: req.actor!.roles.map(roleLabel), help: STAFF_HELP }, req.body, STAFF_RECORDS),
+  );
+
+  // Authors (SMEs) in the candidate app: the same bot with the SME help pack and their own task as the record.
+  app.post('/me/support/ask', { config: { access: 'candidate', rateLimit: perSession('praxis_candidate') }, schema: { tags: ['support'], body: SupportAsk } }, async (req) =>
+    ask(req, { audience: 'SME', roles: ['SME'], help: SME_HELP }, req.body, SME_RECORDS),
   );
 
   if (partnerPortal) {

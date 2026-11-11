@@ -53,6 +53,31 @@ two-level menu; add a Support Bot that explains what each screen needs and the b
   with each question; nothing is stored. Asking changes nothing and writes no audit entry; a structured log line
   records the page, model and token use (not the question).
 
+## 4. Help for authors, reviewers and approvers (authoring v2.1, 12 Nov 2026)
+
+Owner, 12 Nov 2026: the help chatbot must explain the authoring decisions to Authors, Reviewers (Experts) and
+Approvers (PMs), and it was too basic. Now:
+
+- **Authors (SMEs) have it too.** A Help button on the SME's home and task pages calls `POST /me/support/ask`
+  (candidate session). The record on screen is the SME's own task (`/me/tasks/:id` with their own cookie); another
+  SME's task is never given to the bot. The SME prompt adds: never write task content (facts, findings, reference
+  answers, rationales, rubric criteria or values); explain what a field needs instead.
+- **What it knows** (`apps/api/src/support/authoring-help.ts`, help version `help/2`): an authoring guide (sections
+  S1–S8, Classic and Chatbot, the workflow graph, checks and submit, task states, the two review routes, Expert edits
+  and why rubric or reference changes are always material, PM approval and rejection, same-person Expert and PM,
+  critical criteria failing the task, which policy rules authors see, proposing and deciding policy documents, policy
+  sources on the review page, Anvil export, Q4 clustering F1, what AI does and does not do). Staff and SMEs both get it.
+- **Template guides generated from the product.** For the template the question names (also short forms: EDD, CRR,
+  KYB, AML, Q4…) or the record on screen belongs to, the bot gets a guide built from the template profile and its
+  starting workflow: every section and field with its help, required flag, privacy and allowed values, the graded
+  outputs, the workflow and its person steps, plus the owner's decisions for that template. It cannot drift from the
+  product. At most two templates per question.
+- **More screens recognised for staff:** a task under review, the policy proposals queue and an RL review.
+- **Runs on Gemini in QA.** `SUPPORT_MODEL` takes the same forms as `AUTHORING_MODEL`; empty, it follows a Gemini
+  `AUTHORING_MODEL` (QA, while the Claude quota is pending), otherwise Claude Sonnet 5. The Gemini path logs one
+  `llm.call` line (`feature: support-bot`) and fails closed on a bad answer.
+- **Offline bot** (local, demo, tests) ranks help paragraphs by tf-idf and returns the best three.
+
 ## Gaps found while marking required fields (not changed; for the owner to prioritise)
 
 - Several minimum lengths and formats are checked only by the API or by disabling a button, not on the field itself:

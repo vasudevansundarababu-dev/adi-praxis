@@ -49,7 +49,7 @@ import { certAdminRoutes } from './routes/cert-admin';
 import { certCandidateRoutes } from './routes/cert-candidate';
 import { paymentCandidateRoutes, paymentRoutes } from './routes/payments';
 import { supportRoutes } from './routes/support';
-import { ClaudeVertexSupportAssistant, MockSupportAssistant, type SupportAssistant } from './support/assistant';
+import { ClaudeVertexSupportAssistant, GeminiSupportAssistant, MockSupportAssistant, supportModel, type SupportAssistant } from './support/assistant';
 import { MockPayoutProvider, TrolleyPayoutProvider, type PayoutProvider } from './pay/provider';
 import { ClaudeVertexCurriculumGenerator, MockCurriculumGenerator, type CurriculumGenerator } from './cert/generator';
 import { MockSelfieCheck, StripeSelfieCheck, type SelfieCheck } from './cert/selfie';
@@ -118,7 +118,11 @@ export interface AppDeps {
 }
 
 export function defaultSupport(config: Config): SupportAssistant {
-  return config.assistantMode === 'vertex' ? new ClaudeVertexSupportAssistant({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION, model: config.SUPPORT_MODEL }) : new MockSupportAssistant();
+  if (config.assistantMode !== 'vertex') return new MockSupportAssistant();
+  // SUPPORT_MODEL takes the same forms as AUTHORING_MODEL; unset, it follows a Gemini AUTHORING_MODEL (QA), else Claude.
+  const { vendor, model } = supportModel(config);
+  if (vendor === 'gemini') return new GeminiSupportAssistant(model, { projectId: config.VERTEX_PROJECT_ID, location: config.VERTEX_LOCATION });
+  return new ClaudeVertexSupportAssistant({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION, model });
 }
 
 export function defaultPayouts(config: Config): PayoutProvider {

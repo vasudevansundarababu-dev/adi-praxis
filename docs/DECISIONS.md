@@ -647,3 +647,12 @@ Expert and PM with two audit events; Expert edits need a reason, and a material 
 - **(owner)** Fraud handoffs: a "Receiving team accepts handoff" person step; fixed lists for fraud indicators and
   compliance concerns (as approved); the common business hand-off is hidden.
 - **(owner)** Compliance monitoring: a severity per exception as well as the overall graded severity.
+
+### Help chatbot for authoring v2.1 (owner, 12 Nov 2026)
+
+- **(owner)** The help chatbot must explain these decisions to Authors, Reviewers and Approvers, and be stronger than
+  before. Built: an SME Help button and `POST /me/support/ask`; an authoring guide covering every authoring v2.1
+  decision; per-template guides generated from the template profiles and workflows; more staff screens recognised;
+  Gemini support in QA (`SUPPORT_MODEL`, defaulting to a Gemini `AUTHORING_MODEL`). See `docs/SUPPORT-BOT.md` §4.
+- The SME bot never writes task content: it explains fields and decisions only (authoring integrity, as for the
+  authoring chatbot).

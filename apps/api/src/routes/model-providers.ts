@@ -1,3 +1,4 @@
+import { supportModel } from '../support/assistant';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Config } from '../config';
 import type { Db } from '../db';
@@ -32,7 +33,7 @@ export const modelProviderRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
         authoringChatbot: live ? config.AUTHORING_MODEL : 'mock-conversation-no-model',
         authoringChatbotVendor: live ? parseAuthoringModel(config.AUTHORING_MODEL).vendor : 'mock',
         ...authoringChatbotProvider(config),
-        support: live ? config.SUPPORT_MODEL : 'mock',
+        support: live ? supportModel(config).value : 'mock',
         certification: live ? config.CERT_MODEL : 'mock',
         embeddings: live ? config.EMBEDDING_MODEL : 'local-hashing-mock',
       },

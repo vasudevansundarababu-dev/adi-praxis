@@ -61,8 +61,11 @@ const Env = z.object({
    *  per-candidate question wording and the independent solver check. Blank bulk model = CERT_MODEL. */
   CERT_MODEL: z.string().default('claude-opus-5'),
   CERT_BULK_MODEL: z.string().default(''),
-  /** Support Bot model on Vertex (docs/SUPPORT-BOT.md). Used only when VERTEX_PROJECT_ID is set; otherwise a local mock. */
-  SUPPORT_MODEL: z.string().default('claude-sonnet-5'),
+  /**
+   * Support Bot model on Vertex (docs/SUPPORT-BOT.md), same forms as AUTHORING_MODEL (`gemini:<model>` or a Claude id).
+   * Empty: follows a Gemini AUTHORING_MODEL (QA), otherwise claude-sonnet-5. Used only with VERTEX_PROJECT_ID set.
+   */
+  SUPPORT_MODEL: z.string().default(''),
   /** Authoring v2.1: the chatbot facilitator's model on Vertex (live in QA), and its per-client daily call cap. */
   AUTHORING_MODEL: z.string().default('claude-sonnet-5-5'),
   AUTHORING_DAILY_CALL_CAP: z.coerce.number().int().min(1).max(100_000).default(300),

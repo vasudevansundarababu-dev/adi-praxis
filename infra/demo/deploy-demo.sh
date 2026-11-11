@@ -11,6 +11,10 @@
 # Options (environment variables):
 #   PRAXIS_VERTEX=1        Real Claude and embeddings on Vertex AI (the testers' environment); sign-in, identity
 #                          check and email stay simulated. Claude must be enabled for the project in Model Garden.
+#                          Also sets the authoring chatbot model and daily cap (AUTHORING_MODEL, default
+#                          gemini:gemini-3.8-flash until Claude quota is granted, then claude-sonnet-5-5;
+#                          AUTHORING_DAILY_CALL_CAP, default 300) and deploys, but never runs, the
+#                          praxis-vertex-smoke job.
 #   PRAXIS_SME_SUPPLY=1    Switch on M10 SME supply (partners, certification, payments; docs/SME-SUPPLY.md) in the API,
 #                          worker, console and candidate app, and add its test data (Finance user, a partner with a
 #                          portal login, a rate card and an open requisition).
@@ -153,12 +157,41 @@ YAML
 if [ -n "$SME_SUPPLY" ]; then echo 'SME_SUPPLY_ENABLED: "true"' >> "$ENVFILE"; fi
 if [ -n "$VERTEX" ]; then
   printf 'VERTEX_PROJECT_ID: %s\nVERTEX_LOCATION: "%s"\nEMBEDDING_LOCATION: "%s"\n' "$PROJECT_ID" "${VERTEX_LOCATION:-global}" "$REGION" >> "$ENVFILE"
+  # Authoring v2.1 chatbot on Vertex (docs/ops/QA-ENV-SETUP.md). Owner's model is Claude Sonnet 5.5, but Claude quota
+  # on Vertex was denied (10 Nov), so QA runs Gemini until it is granted; then set AUTHORING_MODEL=claude-sonnet-5-5.
+  # The API refuses chatbot calls above the daily cap per client (429 MODEL_DAILY_CAP). Older builds ignore both.
+  printf 'AUTHORING_MODEL: "%s"\nAUTHORING_DAILY_CALL_CAP: "%s"\n' "${AUTHORING_MODEL:-gemini:gemini-3.8-flash}" "${AUTHORING_DAILY_CALL_CAP:-300}" >> "$ENVFILE"
+fi
+# Live policy extraction (owner decision 10 Nov: live in QA; one-time setup: infra/demo/setup-policy-extraction.sh).
+# Settings are added only when the Layout Parser processor exists in the project. The live switch is added only when
+# this build's API accepts it outside staging: older builds refuse to start with POLICY_EXTRACTION_LIVE in a demo env.
+# Off with PRAXIS_POLICY_LIVE=0. The LlamaExtract key is wired only once the owner has added a version to its secret.
+LLAMA_SECRET=
+if [ -n "$VERTEX" ] && [ "${PRAXIS_POLICY_LIVE:-1}" != "0" ]; then
+  POLICY_PROCESSOR=$(curl -fsS -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    "https://us-documentai.googleapis.com/v1/projects/$PROJECT_ID/locations/us/processors" 2>/dev/null |
+    python3 -c 'import json,sys; [print(p["name"]) for p in json.load(sys.stdin).get("processors",[]) if p.get("displayName")=="praxis-policy-layout"]' 2>/dev/null | head -1 || true)
+  if [ -n "$POLICY_PROCESSOR" ]; then
+    printf 'DOCUMENTAI_PROCESSOR: "%s"\nDOCUMENTAI_LOCATION: "us"\nPOLICY_GEMINI_MODEL: "%s"\nPOLICY_GEMINI_LOCATION: "%s"\nPOLICY_BUDGET_LLAMA_USD: "%s"\nPOLICY_BUDGET_GOOGLE_USD: "%s"\n' \
+      "$POLICY_PROCESSOR" "${POLICY_GEMINI_MODEL:-gemini-3.8-flash}" "${POLICY_GEMINI_LOCATION:-global}" \
+      "${POLICY_BUDGET_LLAMA_USD:-5}" "${POLICY_BUDGET_GOOGLE_USD:-5}" >> "$ENVFILE"
+    if grep -q "POLICY_EXTRACTION_LIVE is only allowed in staging'" "$ROOT/apps/api/src/config.ts"; then
+      echo "Policy extraction stays off: this build allows it live in staging only."
+    else
+      echo 'POLICY_EXTRACTION_LIVE: "true"' >> "$ENVFILE"
+      # LlamaExtract needs both the key and the LlamaCloud project id (kept in Secret Manager: the repository is public).
+      has_version() { [ -n "$(gcloud secrets versions list "$1" --filter=state=ENABLED --limit=1 --format='value(name)' 2>/dev/null)" ]; }
+      if has_version llamaextract-api-key && has_version llamaextract-project-id; then
+        LLAMA_SECRET=,LLAMAEXTRACT_API_KEY=llamaextract-api-key:latest,LLAMAEXTRACT_PROJECT_ID=llamaextract-project-id:latest
+      fi
+    fi
+  fi
 fi
 # gcloud accepts one env-vars file and no extra variables, so the runtime role name lives in the shared file.
 echo 'APP_DB_ROLE: praxis_app' >> "$ENVFILE"
 COMMON=(--region="$REGION" --service-account="$SA" --set-cloudsql-instances="$CONN" --env-vars-file="$ENVFILE"
   --network=default --subnet=default --vpc-egress=private-ranges-only)
-SECRETS=DATABASE_URL=database-url-app:latest,REDIS_URL=redis-url:latest,MOCK_SECRET=mock-secret:latest
+SECRETS=DATABASE_URL=database-url-app:latest,REDIS_URL=redis-url:latest,MOCK_SECRET=mock-secret:latest$LLAMA_SECRET
 
 say "Database migrations (Cloud Run job, migration role)"
 gcloud run jobs deploy praxis-migrate --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=1800s \
@@ -176,6 +209,21 @@ for app in web candidate; do
     --set-env-vars="^|^API_BASE_URL=$API_URL|CANDIDATE_APP_URL=$CAND_URL|PRAXIS_DEMO=1|PRAXIS_BUILD=$BUILD|PRAXIS_ENV_LABEL=$ENV_LABEL|SME_SUPPLY_ENABLED=${SME_SUPPLY:+true}" \
     --no-invoker-iam-check --port=8080 --min-instances=0 --max-instances=3
 done
+
+if [ -n "$VERTEX" ] && [ -f "$ROOT/apps/api/scripts/vertex-smoke.ts" ]; then
+say "Vertex smoke job (deployed only; it makes two small billed calls, so it runs only when the owner says so)"
+# Run it: gcloud run jobs execute praxis-vertex-smoke --region <region> --wait   (exit 0 live, 2 mock, 1 a call failed)
+gcloud run jobs deploy praxis-vertex-smoke --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=300s \
+  --args=scripts/vertex-smoke.ts --set-secrets="$SECRETS"
+fi
+
+if [ -f "$ROOT/apps/api/src/jobs/catalog-v2.ts" ]; then
+say "Catalog job (deployed only, as a dry run; the owner reads its plan before applying)"
+# Plan:  gcloud run jobs execute praxis-catalog-v2 --region <region> --wait            (writes nothing; read the logs)
+# Apply: gcloud run jobs execute praxis-catalog-v2 --region <region> --wait --args=src/jobs/run.ts,catalog-v2
+gcloud run jobs deploy praxis-catalog-v2 --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=900s \
+  --args=src/jobs/run.ts,catalog-v2,--dry-run --set-secrets="$SECRETS"
+fi
 
 if [ "${SKIP_DEMO_SETUP:-0}" != "1" ]; then
 say "Demo data (users and a published KYC project)"

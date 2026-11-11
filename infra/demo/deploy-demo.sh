@@ -161,6 +161,9 @@ if [ -n "$VERTEX" ]; then
   # on Vertex was denied (10 Nov), so QA runs Gemini until it is granted; then set AUTHORING_MODEL=claude-sonnet-5-5.
   # The API refuses chatbot calls above the daily cap per client (429 MODEL_DAILY_CAP). Older builds ignore both.
   printf 'AUTHORING_MODEL: "%s"\nAUTHORING_DAILY_CALL_CAP: "%s"\n' "${AUTHORING_MODEL:-gemini:gemini-3.8-flash}" "${AUTHORING_DAILY_CALL_CAP:-300}" >> "$ENVFILE"
+  # FLOW2 SME suitability assessment (worker, qa-users job): Claude Opus by default, which fails without Claude quota,
+  # so QA uses Gemini until the quota is granted (then SUITABILITY_MODEL=claude-opus-5). Older builds ignore it.
+  printf 'SUITABILITY_MODEL: "%s"\n' "${SUITABILITY_MODEL:-gemini:gemini-3.8-flash}" >> "$ENVFILE"
 fi
 # Live policy extraction (owner decision 10 Nov: live in QA; one-time setup: infra/demo/setup-policy-extraction.sh).
 # Settings are added only when the Layout Parser processor exists in the project. The live switch is added only when

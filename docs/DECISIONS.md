@@ -578,3 +578,43 @@ Expert and PM with two audit events; Expert edits need a reason, and a material 
 - **Open for the owner (12 Nov):** domain confirmation of the three Wave 2 field contracts (Adverse media review,
   Enhanced due diligence, Customer risk rating; gaps listed in `docs/authoring/TEMPLATE-PROFILES.md`), and the owner's
   live Wave 2 session in QA (`docs/authoring/WAVE-2-TEST-NOTES.md`).
+
+## Authoring v2.1 Wave 3: policy proposals, policy sources, open model, 3 templates (12 Nov 2026)
+
+- **(owner)** Wave 3 is built on its own branch `feat/authoring-wave3`, cut from the tip of `feat/authoring-wave2`, while
+  Wave 2 waits for its QA deploy; the two are tested together in QA. Nothing pushed; main untouched.
+- **SME policy proposals** (handover chapter 07) are a separate bridge, not task-source upload and not the PM/Admin
+  policy routes. An SME proposes from their own task; the proposal is `PENDING` until a decision.
+  - **Who decides:** a Validator assigned to the project (Expert), the owning PM or an Admin. The plan says "Expert
+    reviews"; the PM and Admins may also decide because they can already upload policy directly. The decision records
+    the role. An internal user whose email matches the proposing SME cannot decide.
+  - **Outcomes:** Accept / Return / Reject, each with a qualification (policy candidate, supporting reference, unrelated,
+    unreadable, sensitive) and a reason the SME sees. Only a policy candidate or supporting reference can be accepted.
+  - **Accept** copies the original bytes into a new project document version (origin `SME_PROPOSAL`) through the
+    existing document service. Nothing becomes a rule until the PM extracts, reviews and publishes it: no new
+    publication path.
+  - **Intake flags are advice only** (deterministic: unreadable, few requirement words, invoice/statement/marketing
+    wording, suspected real data, text addressed to an AI). No automatic rejection; the reviewer decides.
+  - **Unreadable files** (scans with no text) and files with suspected real data are kept as pending so the reviewer can
+    see them, but cannot be accepted: they are returned for a readable or synthetic copy. Suspected real data is stored
+    in Praxis's text reading only redacted; the original file is downloadable by reviewers only.
+  - Refused outright as for PM uploads: malware, unsupported format, encrypted, over 10 MB, too many pages, empty.
+  - Limits: 10 pending proposals per SME per project; 10 uploads a minute per SME. Re-proposing the same file while it is
+    pending returns the existing proposal.
+  - The database refuses deleting a proposal, changing its file or owner columns, or changing it after a decision.
+- **Retrieval for authoring** returns only rules of the latest published rule set that are agent-visible and in force
+  today (effective from/to). This applies to the SME's rules panel, the chatbot view, the model's context and the agent
+  preview. It fixed a leak: the chatbot view and the model received evaluator-only rules. PM views, snapshots and
+  exports are unchanged. No vector index added: the published rule set is small (chapter 07 "start with the existing
+  published project rule set").
+- **Policy sources on the review page** show the frozen snapshot when there is one, else the current published set,
+  with every rule (evaluator-only labelled), its quoted source, document, version, page/line and hash, the task's rule
+  changes and the steps the SME linked; a warning when newer rules were published after the snapshot. Same access as
+  the review page.
+- **Open model:** `AUTHORING_MODEL=maas:<publisher>/<model>` with `AUTHORING_MAAS_LOCATION`; pilot `gpt-oss-120b`,
+  compared with Gemma 4 26B A4B IT in the owner's QA session. Must be enabled in Model Garden in `adi-praxis-test-0928`
+  first (`docs/authoring/WAVE-3-TEST-NOTES.md` §4).
+- **Templates:** Q4 global paid search query clustering, Fraud-risk/compliance handoffs, Compliance monitoring; agent
+  mode Single; field contracts "requires confirmation" (gaps in `docs/authoring/TEMPLATE-PROFILES.md`).
+- **Open for the owner:** domain confirmation of the Wave 2 and Wave 3 field contracts; the live QA session for Waves 2
+  and 3 together (`WAVE-2-TEST-NOTES.md`, `WAVE-3-TEST-NOTES.md`), including the open-model comparison.

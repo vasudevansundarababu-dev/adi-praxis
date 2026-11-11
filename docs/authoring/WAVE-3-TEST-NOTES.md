@@ -1,9 +1,43 @@
 # Wave 3 test notes
 
 For the owner's QA session once Wave 3 is deployed. Everything in `WAVE-1-TEST-NOTES.md` and `WAVE-2-TEST-NOTES.md`
-still applies; this adds what is new.
+still applies; this adds what is new. Wave 3 is built on the Wave 2 branch, so one QA deploy covers both.
 
-## Open model (Vertex MaaS)
+New templates: Q4 global paid search query clustering (Digital Marketing) · Fraud-risk/compliance handoffs ·
+Compliance monitoring (agent mode Single; field contracts marked "requires confirmation", gaps listed in
+`TEMPLATE-PROFILES.md`, "Wave 3 profiles").
+
+## 1. SME policy proposals
+1. As an SME on a task, open **Propose a policy document** (above the task). Upload a synthetic policy (PDF, Word,
+   text or Markdown), choose its kind (bank policy, customer policy, regulation, supporting reference), say why the
+   task needs it, and tick the declaration. It shows **Waiting for review**. Upload the same file again: you are told
+   it is already waiting (no duplicate).
+2. Also try: an invoice or a marketing leaflet (flagged "may not be a policy"), a scanned PDF with no text (flagged
+   unreadable), and a text containing a valid-looking IBAN (flagged as possible real data). None is rejected
+   automatically.
+3. As the project's Expert (assigned Validator), PM or an Admin open **Reviews → Task reviews → Policy documents
+   proposed by SMEs** (`/review/policy-proposals`). Each proposal shows who proposed it and why, the file and its
+   sha256, and Praxis's flags as advice. Download the original; show Praxis's reading (redacted when real data was
+   suspected).
+4. Decide: **Accept** (as a policy candidate or supporting reference), **Return to the SME**, or **Reject**, always
+   with a reason the SME sees. An unreadable or possibly-real-data file cannot be accepted: return it. A second
+   decision on the same proposal is refused.
+5. After an accept, the document appears in the project's **Policy rules** page (origin "SME proposal"). The SME's task
+   still shows no new rules: the PM must extract, review and publish them as for any document.
+
+## 2. What SMEs and the chatbot see of policy
+- The SME's rules panel, the chatbot's "Approved project rules" and the agent preview show only rules that are
+  **published**, **agent-visible** and **in force today**. Evaluator-only rules and rules whose end date has passed are
+  not shown to the SME or sent to the model. (Before Wave 3 the chatbot view also listed evaluator-only rules: fixed.)
+- Pending, returned or rejected proposals never appear anywhere an SME, the model or the agent sees.
+
+## 3. Policy sources on the review page
+Open a submitted task in **Task reviews**: under the graph, **Policy sources** lists every rule the task is judged
+against (frozen snapshot, or the current published set), each with its quoted source, document, version, page/line
+and hash, evaluator-only rules labelled, rules not in force marked, the task's own rule changes and the steps the SME
+linked. If the project published newer rules after the snapshot, the page says so.
+
+## 4. Open model (Vertex MaaS)
 
 The authoring chatbot can now run on a Vertex Model Garden managed open model (MaaS), alongside Claude and Gemini on
 Vertex (handover chapter 11). It uses Vertex's OpenAI-compatible chat completions endpoint with the QA service

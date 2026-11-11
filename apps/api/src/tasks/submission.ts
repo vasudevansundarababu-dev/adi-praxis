@@ -13,6 +13,7 @@ import { templateRef } from './task-service';
 import { chatOf } from './conversation/service';
 import { effectivePolicy, snapshotTask } from '../policy/task-policy';
 import { graphChecks } from './workflow-graph';
+import { compileForSubmission, profileChecks, type ExportStatus } from './profile-output';
 
 type Audit = (i: Parameters<typeof writeAudit>[2]) => Promise<void>;
 
@@ -21,6 +22,8 @@ export interface StoredChecks {
   keyInputs: string[];
   similar: SimilarMatch[];
   embeddingModel: string | null;
+  /** Anvil export readiness of a profile-driven task (compiled at submission); absent for other tasks. */
+  export?: ExportStatus;
 }
 
 export const blocking = (c: TaskCheck) => !c.ok && c.severity !== 'warning';
@@ -32,7 +35,7 @@ export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 
   const def = definitionFor(template);
   const output = (task.output ?? {}) as Record<string, unknown>;
   const slot = task.taskType === 'AUTHORING' ? ((task.input as { slot?: SlotRef }).slot ?? null) : null;
-  const checks: TaskCheck[] = [...coverageChecks(template, slot, output), ...(def.key === 'kyc-onboarding-v1' ? praxisContractChecks(output) : []), ...def.validateSubmission(template, output, slot), ...draftingChecks(task), ...(task.taskType === 'AUTHORING' ? graphChecks(output, project.template) : [])];
+  const checks: TaskCheck[] = [...coverageChecks(template, slot, output), ...(def.key === 'kyc-onboarding-v1' ? praxisContractChecks(output) : []), ...def.validateSubmission(template, output, slot), ...(task.taskType === 'AUTHORING' ? profileChecks(template.workflowName, output) : []), ...draftingChecks(task), ...(task.taskType === 'AUTHORING' ? graphChecks(output, project.template) : [])];
   const chat = chatOf(task);
   if (task.taskType === 'AUTHORING' && project.authoringExperience) checks.push({id:'authoring.consent',section:'W06',ok:!!chat.consent && !!chat.humanOnly,message:'Accept human-authorship terms and review this revision before submission'});
   if (chat.humanOnly) checks.push({id:'conversation.authorship',section:'W06',ok:chat.declaration?.revision===task.revision,message:'Confirm human authorship, no external LLM generation and authorised sources for this revision'});
@@ -89,7 +92,10 @@ export async function submitTask(
     });
   }
 
-  const stored: StoredChecks = { results: ev.checks, keyInputs: ev.keyInputs, similar, embeddingModel: args.embeddingModel };
+  // Export readiness is separate from authoring: a blocked compile never blocks the submission.
+  const compiled = t.taskType === 'AUTHORING' ? compileForSubmission(ev.template.workflowName, t.output as Record<string, unknown>, { taskId: t.id, revisionId: `${t.id}-r${t.revision}` }) : null;
+  const output = (compiled?.output ?? t.output) as Prisma.InputJsonValue;
+  const stored: StoredChecks = { results: ev.checks, keyInputs: ev.keyInputs, similar, embeddingModel: args.embeddingModel, ...(compiled ? { export: compiled.status } : {}) };
   const flags = ev.flags.map((f) => ({ ...f, explanation: args.body.flagExplanations[f.id] }));
   const now = new Date();
   const { count } = await tx.taskInstance.updateMany({
@@ -97,6 +103,7 @@ export async function submitTask(
     data: {
       status: 'SUBMITTED',
       submittedAt: now,
+      ...(compiled ? { output } : {}),
       coverageTags: (ev.coverage ?? undefined) as Prisma.InputJsonValue | undefined,
       checks: stored as unknown as Prisma.InputJsonValue,
       flags: flags as unknown as Prisma.InputJsonValue,
@@ -107,9 +114,9 @@ export async function submitTask(
   if (t.slotId) await tx.coverageSlot.update({ where: { id: t.slotId }, data: { status: 'IN_PROGRESS' } });
   const version = (await tx.taskSubmission.count({ where: { taskInstanceId: t.id } })) + 1;
   const policy = await snapshotTask(tx, { clientId: t.clientId, task: { id: t.id, projectId: t.projectId }, actorId: 'task-submission' });
-  await tx.taskSubmission.create({ data: { clientId: t.clientId, taskInstanceId: t.id, version, policySnapshotId: policy?.snapshot.id ?? null, output: t.output as Prisma.InputJsonValue, coverageTags: (ev.coverage ?? undefined) as Prisma.InputJsonValue | undefined, checks: stored as unknown as Prisma.InputJsonValue } });
+  await tx.taskSubmission.create({ data: { clientId: t.clientId, taskInstanceId: t.id, version, policySnapshotId: policy?.snapshot.id ?? null, output, coverageTags: (ev.coverage ?? undefined) as Prisma.InputJsonValue | undefined, checks: stored as unknown as Prisma.InputJsonValue } });
   const flagged = similar.filter((m) => m.flagged);
-  await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.submitted', before: { status: t.status }, after: { status: 'SUBMITTED', version, flaggedDuplicates: flagged.map((m) => m.taskId), dataFlags: flags.length } });
+  await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.submitted', before: { status: t.status }, after: { status: 'SUBMITTED', version, ...(compiled ? { export: compiled.status.status } : {}), flaggedDuplicates: flagged.map((m) => m.taskId), dataFlags: flags.length } });
   await emit({ name: 'task.submitted', aggregateType: 'TaskInstance', aggregateId: t.id, payload: { taskId: t.id, projectId: t.projectId, version, flaggedDuplicate: flagged.length > 0 } });
   return { version, similar };
 }

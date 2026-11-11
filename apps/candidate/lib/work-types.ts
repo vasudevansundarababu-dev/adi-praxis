@@ -1,4 +1,4 @@
-import type { TaskCheck } from '@praxis/shared';
+import type { ExportStatusView, TaskCheck } from '@praxis/shared';
 
 export interface TaskSummary {
   id: string;
@@ -60,6 +60,8 @@ export interface TaskView extends TaskSummary {
   output: Record<string, unknown> | null;
   coverageTags: { tags: Record<string, string>; edgeCase: string | null } | null;
   checks: TaskCheck[] | null;
+  /** Anvil export readiness of a template-profile task, compiled at submission. */
+  exportStatus?: ExportStatusView | null;
   readOnly: boolean;
   review: { decision: string; comments: { section: string; text: string }[]; notes: string | null; rejectReason: string | null; at: string } | null;
 }

@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { KYC_EXAMPLE_TASK, TEMPLATE_INSTRUCTIONS, replayCall, type KycTask } from '@praxis/shared';
+import { KYC_EXAMPLE_TASK, TEMPLATE_INSTRUCTIONS, profileForWorkflow, replayCall, type KycTask } from '@praxis/shared';
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MockGoogleVerifier } from '../src/candidate/google';
@@ -277,8 +277,10 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       await page.getByRole('button',{name:'Return to authoring',exact:true}).click();
       expect(await page.getByRole('textbox',{name:/^Response the environment returns/}).first().inputValue()).toBe('Latest recorded response before preview');
       expect((await task(a,id)).output.environment.responses[0].response).toBe('Latest recorded response before preview');
-      // All other catalogue templates use the shared generic Classic editor, never an empty tab placeholder.
+      // All other catalogue templates use the shared Classic editor, never an empty tab placeholder: the template
+      // profile editor when the workflow has a registered profile (Wave 1), otherwise the generic editor.
       for(const templateHelp of TEMPLATE_INSTRUCTIONS.filter(t=>t.name.toLowerCase()!=='kyc onboarding and refresh')){
+        const profiled=profileForWorkflow(templateHelp.name).status==='ok';
         console.log('Catalogue persistence:',templateHelp.name);
         const fixture=await kycTask(templateHelp.name);
         const context=await browser.newContext({viewport:{width:1200,height:900}});
@@ -289,12 +291,13 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
         await generic.getByRole('button',{name:'Accept authorship terms'}).click();
         await generic.getByLabel('Your answer').fill('Unsent draft for '+templateHelp.id);
         await generic.getByRole('button',{name:'Classic',exact:true}).click();
-        const body=generic.getByRole('textbox',{name:'The task (scenario, inputs, expected steps, evidence, decision and how to verify it)',exact:true});
+        const body=profiled?generic.getByRole('textbox',{name:/^Business context/}):generic.getByRole('textbox',{name:'The task (scenario, inputs, expected steps, evidence, decision and how to verify it)',exact:true});
         const answer='SME-authored case for '+templateHelp.id+' with evidence, expected work and grading.';
         await body.fill(answer);
         await generic.getByRole('button',{name:'Chatbot',exact:true}).click();
         expect(await generic.getByLabel('Your answer').inputValue()).toBe('Unsent draft for '+templateHelp.id);
-        expect((await task(fixture.a,fixture.id)).output.body).toBe(answer);
+        const saved=(await task(fixture.a,fixture.id)).output;
+        expect(profiled?saved.sections.S1.businessContext:saved.body).toBe(answer);
         await generic.reload({waitUntil:'networkidle'});
         expect(await generic.getByLabel('Your answer').inputValue()).toBe('Unsent draft for '+templateHelp.id);
         await generic.getByRole('button',{name:'Classic',exact:true}).click();

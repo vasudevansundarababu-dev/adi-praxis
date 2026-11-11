@@ -500,3 +500,17 @@ no field for several Anvil concepts, so the emitter maps conservatively. Details
   tenant's `RL_GYM` API client; anyone else gets 403 (wrong role or client kind) or 404 (other project or tenant).
   Every export, source download and blocked attempt writes an audit event (`anvil.project_policy_exported`,
   `anvil.project_policy_source_downloaded`, `anvil.project_policy_blocked`). Nothing else is written.
+
+## Authoring v2.1 Wave 1: template profiles (10 Nov 2026)
+
+- **(chosen by Claude)** All five Wave 1 profiles are agent mode `SINGLE` (owner default, plan §6). Non-KYC field
+  contracts are built from `templates/*/task.md` and marked `requires_confirmation`.
+- **(chosen by Claude)** Profiles match the catalogue workflow name; the handover's "Noise Cancelling Headphones Launch"
+  and "Omnichannel Creative and Locale Compliance" are recorded as `handoverName` only.
+- **(chosen by Claude)** A task that already holds legacy generic content keeps the generic editor; only blank or
+  profile outputs open the profile editor. No silent migration.
+- **(chosen by Claude)** The KYC agent preview keeps its existing view; the KYC profile drives progress, checks and
+  projection in shared code, and `kycChecks` stays authoritative at submission.
+- **(chosen by Claude)** Anvil contract mapping and blockers: see `docs/authoring/TEMPLATE-PROFILES.md`. Export
+  blockers never block submission. KYC criteria gain three optional binding keys (`outputField`, `comparison`,
+  `expectedValue`); until the workbench edits them, KYC exports are reported as blocked.

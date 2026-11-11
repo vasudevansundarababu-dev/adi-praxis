@@ -75,6 +75,7 @@ export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, {
       submittedAt: t.submittedAt?.toISOString() ?? null,
       reworkCount: t.reworkCount,
       checks: checks?.results ?? [],
+      exportStatus: checks?.export ?? null,
       flags: t.flags ?? [],
       embeddingModel: checks?.embeddingModel ?? null,
       similar: similar.map((m) => {

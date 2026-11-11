@@ -26,3 +26,4 @@ export * from "./template-instructions";
 
 export * from "./workflow-graph";
 export * from "./task-phase";
+export * from "./template-profile";

@@ -4,6 +4,8 @@ import { executeConversation } from '../src/tasks/conversation/service';
 import type { ConversationAssistant, ConversationInput } from '../src/tasks/conversation/assistant';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { KYC_EXAMPLE_TASK, TEMPLATE_INSTRUCTIONS, replayCall, type KycTask } from '@praxis/shared';
 import { seed } from '../prisma/seed';
@@ -224,7 +226,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       await page.getByText('I can organise your typed answer.',{exact:false}).first().waitFor();
       await page.getByText('Reference outcome and rubric', { exact: true }).click();
       await page.locator('pre').filter({hasText:'Check identifiers without inventing'}).waitFor();
-      await page.screenshot({ path: '/private/tmp/praxis-conversation-real-browser.png', fullPage: true });
+      await page.screenshot({ path: join(tmpdir(), 'praxis-conversation-real-browser.png'), fullPage: true });
       await page.getByRole('button', { name: 'View as agent' }).click();
       await page.getByRole('button', { name: 'Return to authoring' }).waitFor();
       const preview = await page.locator('pre').textContent();
@@ -320,7 +322,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
         await manager.reload({waitUntil:'networkidle'});
         expect(await manager.getByRole('radio',{name:label}).isChecked()).toBe(true);
       }
-      await manager.screenshot({path:'/private/tmp/praxis-mode-project-creation.png',fullPage:true});
+      await manager.screenshot({path:join(tmpdir(), 'praxis-mode-project-creation.png'),fullPage:true});
 
     } finally { await browser.close(); if(webChild?.pid){try{process.kill(-webChild.pid,'SIGTERM');}catch{}} if (child.pid) { try { process.kill(-child.pid, 'SIGTERM'); } catch {} } }
   }, 300000);

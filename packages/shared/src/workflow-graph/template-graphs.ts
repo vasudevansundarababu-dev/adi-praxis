@@ -1,7 +1,7 @@
 import { WORKFLOW_GRAPH_SCHEMA, type WorkflowGraphInput } from './schema';
 
 /**
- * Starting workflows for the Wave 1 templates. An SME starts from the template's workflow with an explicit
+ * Starting workflows for the Wave 1 and Wave 2 templates. An SME starts from the template's workflow with an explicit
  * "Start from the template workflow" action, then edits it for the assigned case. These describe the template's
  * process shape only: they hold no case facts, answers or rubric judgements.
  */
@@ -139,9 +139,46 @@ const PATTERNS: Record<string, Pattern> = {
     outputLabel: 'Launch plan',
     escalation: 'The plan cannot meet policy with the given brief.',
   },
+  // Wave 2. The tool catalogue of these templates is not qualified yet (task.md open questions), so roles list none.
+  'Adverse media review': {
+    templateId: 'adverse-media-review',
+    role: { name: 'Adverse media analyst', responsibility: 'Decide whether media is about the customer and whether it matters', tools: [] },
+    evidence: 'Customer identifiers, media extracts and source metadata',
+    review: { label: 'Assess media', instruction: 'Match each extract to the customer identifiers; judge source reliability and separate allegations from established facts, citing evidence IDs.', output: 'Match and source assessment' },
+    missing: { question: 'Identity resolved?', label: 'Request identifiers', instruction: 'Ask for the specific identifier or source detail needed to resolve the match.' },
+    conclude: { label: 'Recommend outcome', instruction: 'State the match status and relevance, then recommend an outcome with rationale.', output: 'Match status and recommendation' },
+    human: null,
+    outputLabel: 'Adverse media recommendation',
+    escalation: 'The match or its relevance cannot be resolved with the available evidence.',
+  },
+  'Enhanced due diligence': {
+    templateId: 'enhanced-due-diligence',
+    role: { name: 'EDD analyst', responsibility: 'Carry out enhanced checks on a higher-risk relationship', tools: [] },
+    evidence: 'High-risk case, funds, wealth, ownership and adverse findings',
+    review: { label: 'Perform enhanced checks', instruction: 'Check source of funds, source of wealth, ownership and adverse findings; record each evidence status with evidence IDs.', output: 'Enhanced check findings' },
+    missing: { question: 'Evidence sufficient?', label: 'Request evidence', instruction: 'Ask for exactly the missing or conflicting evidence and say why it is needed.' },
+    conclude: { label: 'Assess risk and recommend', instruction: 'Assess the relationship risk and recommend a next action with rationale and a hand-off.', output: 'Risk assessment, recommendation and hand-off' },
+    human: { label: 'Approver decides', actorRole: 'Authorised approver', prompt: 'Approve or decline the relationship on the EDD recommendation.', choices: ['Approve', 'Decline'] },
+    outputLabel: 'EDD recommendation',
+    escalation: 'The relationship cannot be assessed with the available evidence.',
+  },
+  'Customer risk rating': {
+    templateId: 'customer-risk-rating',
+    role: { name: 'Risk rating analyst', responsibility: 'Assess risk factors and propose a rating under the versioned methodology', tools: [] },
+    evidence: 'Customer profile, risk factors and rating methodology',
+    review: { label: 'Assess risk factors', instruction: 'Assess each factor the methodology names against the evidence, citing evidence IDs.', output: 'Factor assessments' },
+    missing: { question: 'Factors supported?', label: 'Request factor evidence', instruction: 'Ask for the specific evidence a risk factor needs.' },
+    conclude: { label: 'Propose rating', instruction: 'Calculate the rating where the methodology supports it; propose the risk and any override with rationale.', output: 'Proposed risk, override and rationale' },
+    human: null,
+    outputLabel: 'Proposed risk rating',
+    escalation: 'The rating cannot be determined with the available evidence.',
+  },
 };
 
-export const WAVE1_GRAPH_TEMPLATES = Object.keys(PATTERNS);
+/** Every template with a starting workflow (Wave 1 and Wave 2). */
+export const STARTING_GRAPH_TEMPLATES = Object.keys(PATTERNS);
+export const WAVE1_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(0, 5);
+export const WAVE2_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(5);
 
 /** The template's starting workflow, or null when the template has none yet. */
 export function templateStartingGraph(workflowName: string, templateVersion = 1): WorkflowGraphInput | null {

@@ -126,8 +126,8 @@ describe('fixture files for Anvil', () => {
   });
 });
 
-describe('template starting workflows (Wave 1)', () => {
-  it.each(['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone'])('%s passes the checker with no errors or warnings', async (name) => {
+describe('template starting workflows (Wave 1 and Wave 2)', () => {
+  it.each(['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone', 'Adverse media review', 'Enhanced due diligence', 'Customer risk rating'])('%s passes the checker with no errors or warnings', async (name) => {
     const { templateStartingGraph } = await import('../src/workflow-graph');
     const g = templateStartingGraph(name)!;
     expect(g).not.toBeNull();
@@ -135,8 +135,18 @@ describe('template starting workflows (Wave 1)', () => {
     expect(r.errors).toEqual([]);
     expect(r.warnings).toEqual([]);
   });
-  it('has no starting workflow for templates outside Wave 1', async () => {
+  it('Wave 2: only Enhanced due diligence has a business human step (its draft names an approver hand-off)', async () => {
+    const { templateStartingGraph, WAVE2_GRAPH_TEMPLATES } = await import('../src/workflow-graph');
+    expect(WAVE2_GRAPH_TEMPLATES).toEqual(['Adverse media review', 'Enhanced due diligence', 'Customer risk rating']);
+    const humans = (name: string) => templateStartingGraph(name)!.nodes.filter((n) => n.type === 'human_step');
+    expect(humans('Enhanced due diligence')).toHaveLength(1);
+    expect(humans('Enhanced due diligence')[0]).toMatchObject({ actorRole: 'Authorised approver' });
+    expect(humans('Adverse media review')).toHaveLength(0);
+    expect(humans('Customer risk rating')).toHaveLength(0);
+    for (const name of WAVE2_GRAPH_TEMPLATES) expect(templateStartingGraph(name)!).toMatchObject({ agentMode: 'SINGLE', loops: [expect.objectContaining({ maxIterations: 2, exhaustedTarget: 'escalate' })] });
+  });
+  it('has no starting workflow for templates outside Waves 1 and 2', async () => {
     const { templateStartingGraph } = await import('../src/workflow-graph');
-    expect(templateStartingGraph('Customer risk rating')).toBeNull();
+    expect(templateStartingGraph('Compliance monitoring')).toBeNull();
   });
 });

@@ -44,7 +44,8 @@ export function TaskPage({ task }: { task: TaskView }) {
   const allowedEditor=mode==='BOTH'?editor:mode;
   const refresh=async()=>{const r=await call<TaskView>('GET',`/me/tasks/${task.id}`);if(r.ok&&r.data){setCurrent(r.data);currentRef.current=r.data;}return r.ok;};
   const persist=async(view:'CLASSIC'|'CHATBOT',answer:string)=>{prefQueue.current=prefQueue.current.then(async()=>{const r=await call('POST',`/me/tasks/${task.id}/authoring-workspace`,{view,answer});if(!r.ok)setSwitchError(r.error??'Could not save workspace');return r.ok;});return prefQueue.current;};
-  useEffect(()=>{if(task.taskType!=='AUTHORING')return;void call<{state:{consent?:{version:string}}}>('GET',`/me/tasks/${task.id}/conversation`).then(r=>{if(r.ok&&r.data)setConsented(r.data.state.consent?.version===AUTHORSHIP_VERSION);});
+  useEffect(()=>{if(task.taskType!=='AUTHORING')return;// A slow load-time read must never undo an acceptance made meanwhile: it can only confirm consent, not withdraw it.
+    void call<{state:{consent?:{version:string}}}>('GET',`/me/tasks/${task.id}/conversation`).then(r=>{if(r.ok&&r.data){const given=r.data.state.consent?.version===AUTHORSHIP_VERSION;setConsented(c=>c||given);}});
     if(mode==='BOTH'&&!task.authoringWorkspace){setEditor(new URLSearchParams(window.location.search).get('editor')==='form'?'CLASSIC':'CHATBOT');}
   },[task.id]);
   useEffect(()=>{const load=()=>{void refresh();};const saved=(e:Event)=>{const d=(e as CustomEvent).detail;if(d.taskId===task.id&&d.output)setCurrent(t=>({...t,output:d.output,revision:d.revision}));};window.addEventListener('praxis:reload-task',load);window.addEventListener('praxis:task-saved',saved);return()=>{window.removeEventListener('praxis:reload-task',load);window.removeEventListener('praxis:task-saved',saved);};},[task.id]);

@@ -111,3 +111,33 @@ the demo project goes. QA should keep an all-services budget on My Billing Accou
 Deleting a project (`gcloud projects delete <id>`, or IAM & Admin → Manage resources) stops its billing and can be
 undone for 30 days. Before deleting the demo project, check nothing still points at its URLs (handbook artifact, tester
 emails).
+
+## 6. QA seed users: `qa-users` job (11 Nov 2026)
+
+Synthetic test users for testing staffing, authoring and review at scale. QA (and local) only: the job refuses
+`APP_ENV=production`. Decisions: `docs/DECISIONS.md`, "QA seed users".
+
+- **Who:** 10 Reviewer console users `reviewer01..10@praxis.test` (role REVIEWER, demo client, one shared password from
+  the secret `QA_SEED_REVIEWER_PASSWORD`) and 30 SMEs `sme01..30@praxis.test`. Sign in as an SME on the candidate app's
+  mock Google screen with that email (any name). Names start with `SYNTHETIC QA`.
+- **Ready for staffing:** each published template (newest version, active domain) gets at least 3 SMEs selected and
+  onboarded in its pool project: the oldest live project with a published opportunity, or a new project
+  `SYNTHETIC QA pool — <workflow>` owned by `pm@praxis.demo`. All 30 SMEs get at least one pool. All 10 Reviewers are
+  Validators on every live project of those templates.
+- **How:** the real FLOW 2 journey over the public API (mock sign-in, mock identity, profile form, submit, the worker's
+  suitability assessment on live Vertex, a SELECTED decision by a named seeded Reviewer, onboarding). Needs the worker
+  running. Expect about 30–40 assessment calls on the first run and none on re-runs.
+- **Re-runs** resume from each SME's current state and create nothing twice. Exit code 3 means some SMEs are not ready
+  yet (usually still awaiting the assessment): run it again later.
+
+Deployer wiring (DevOps session, `infra/demo/deploy-demo.sh`), deployed as a dry run like `catalog-v2`:
+
+```bash
+gcloud run jobs deploy praxis-qa-users --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=3600s \
+  --args=src/jobs/run.ts,qa-users,--dry-run \
+  --set-secrets="$SECRETS,DEMO_ADMIN_PASSWORD=demo-admin-password:latest,DEMO_PM_PASSWORD=demo-pm-password:latest,QA_SEED_REVIEWER_PASSWORD=qa-seed-reviewer-password:latest"
+```
+
+Owner: create the secret `qa-seed-reviewer-password` (at least 12 characters) in Secret Manager, then
+plan with `gcloud run jobs execute praxis-qa-users --region <region> --wait` (writes nothing; read the logs) and apply
+with `gcloud run jobs execute praxis-qa-users --region <region> --wait --args=src/jobs/run.ts,qa-users`.

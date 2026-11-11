@@ -13,7 +13,7 @@ import { randomUUID } from 'node:crypto';
  */
 test.skip(!!process.env.E2E_WEB_URL, 'isolated UI fixture; never production');
 
-const TEMPLATES = ['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone'];
+const TEMPLATES = ['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone', 'Adverse media review', 'Enhanced due diligence', 'Customer risk rating'];
 const base = process.env.E2E_CANDIDATE_BASE ?? 'http://localhost:3301';
 
 async function fixture(page: Page, workflow: string) {

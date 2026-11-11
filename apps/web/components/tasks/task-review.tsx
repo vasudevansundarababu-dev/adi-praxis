@@ -1,6 +1,6 @@
 'use client';
 
-import { KYC_SECTIONS, responseArguments, type KycTask, type TaskCheck } from '@praxis/shared';
+import { exportStatusLine, KYC_SECTIONS, responseArguments, type ExportStatusView, type KycTask, type TaskCheck } from '@praxis/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -24,6 +24,8 @@ export interface TaskReviewData {
   activeSeconds: number;
   reworkCount: number;
   checks: TaskCheck[];
+  /** Anvil export readiness of a template-profile task, compiled at submission. */
+  exportStatus?: ExportStatusView | null;
   flags: { id: string; kind: string; path: string; excerpt: string; explanation?: string }[];
   embeddingModel: string | null;
   similar: { taskId: string; embeddingScore: number; structuredScore: number; flagged: boolean; status: string | null; project: string | null; brief: string | null; text: string | null }[];
@@ -259,6 +261,11 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
       <p className="text-sm text-fg-muted">
         {d.project.name} · {d.project.workflow} · by {d.author ?? 'expert'} · version {d.versions.at(-1)?.version ?? 1} · active {Math.round(d.activeSeconds / 60)} min (TPT {d.project.tptMinutes ?? '—'})
       </p>
+      {d.exportStatus && (
+        <p role="status" className={`mt-2 text-sm ${d.exportStatus.status === 'blocked' ? 'text-warning' : 'text-fg-muted'}`}>
+          {exportStatusLine(d.status === 'ACCEPTED' ? 'Approved' : d.status.charAt(0) + d.status.slice(1).toLowerCase(), d.exportStatus)}
+        </p>
+      )}
       {d.slot && (
         <p className="mt-2 text-sm">
           <span className="font-medium">Slot:</span> {d.slot.brief}

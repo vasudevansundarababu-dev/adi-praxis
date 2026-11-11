@@ -11,6 +11,9 @@
 # Options (environment variables):
 #   PRAXIS_VERTEX=1        Real Claude and embeddings on Vertex AI (the testers' environment); sign-in, identity
 #                          check and email stay simulated. Claude must be enabled for the project in Model Garden.
+#                          Also sets the authoring chatbot model and daily cap (AUTHORING_MODEL, default
+#                          claude-sonnet-5-5; AUTHORING_DAILY_CALL_CAP, default 300) and deploys, but never runs, the
+#                          praxis-vertex-smoke job.
 #   PRAXIS_SME_SUPPLY=1    Switch on M10 SME supply (partners, certification, payments; docs/SME-SUPPLY.md) in the API,
 #                          worker, console and candidate app, and add its test data (Finance user, a partner with a
 #                          portal login, a rate card and an open requisition).
@@ -153,6 +156,9 @@ YAML
 if [ -n "$SME_SUPPLY" ]; then echo 'SME_SUPPLY_ENABLED: "true"' >> "$ENVFILE"; fi
 if [ -n "$VERTEX" ]; then
   printf 'VERTEX_PROJECT_ID: %s\nVERTEX_LOCATION: "%s"\nEMBEDDING_LOCATION: "%s"\n' "$PROJECT_ID" "${VERTEX_LOCATION:-global}" "$REGION" >> "$ENVFILE"
+  # Authoring v2.1 chatbot on Vertex (docs/ops/QA-ENV-SETUP.md): owner chose Sonnet 5.5 over Opus to keep QA cost down;
+  # the API refuses chatbot calls above the daily cap per client (429 MODEL_DAILY_CAP). Older builds ignore both.
+  printf 'AUTHORING_MODEL: "%s"\nAUTHORING_DAILY_CALL_CAP: "%s"\n' "${AUTHORING_MODEL:-claude-sonnet-5-5}" "${AUTHORING_DAILY_CALL_CAP:-300}" >> "$ENVFILE"
 fi
 # gcloud accepts one env-vars file and no extra variables, so the runtime role name lives in the shared file.
 echo 'APP_DB_ROLE: praxis_app' >> "$ENVFILE"
@@ -176,6 +182,13 @@ for app in web candidate; do
     --set-env-vars="^|^API_BASE_URL=$API_URL|CANDIDATE_APP_URL=$CAND_URL|PRAXIS_DEMO=1|PRAXIS_BUILD=$BUILD|PRAXIS_ENV_LABEL=$ENV_LABEL|SME_SUPPLY_ENABLED=${SME_SUPPLY:+true}" \
     --no-invoker-iam-check --port=8080 --min-instances=0 --max-instances=3
 done
+
+if [ -n "$VERTEX" ] && [ -f "$ROOT/apps/api/scripts/vertex-smoke.ts" ]; then
+say "Vertex smoke job (deployed only; it makes two small billed calls, so it runs only when the owner says so)"
+# Run it: gcloud run jobs execute praxis-vertex-smoke --region <region> --wait   (exit 0 live, 2 mock, 1 a call failed)
+gcloud run jobs deploy praxis-vertex-smoke --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=300s \
+  --args=scripts/vertex-smoke.ts --set-secrets="$SECRETS"
+fi
 
 if [ "${SKIP_DEMO_SETUP:-0}" != "1" ]; then
 say "Demo data (users and a published KYC project)"

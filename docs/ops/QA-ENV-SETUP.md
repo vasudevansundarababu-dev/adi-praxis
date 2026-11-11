@@ -49,7 +49,7 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 | --- | --- | --- |
 | 1 | How a wave build reaches QA | **Decided 10 Nov: option A.** Develop and test on `feat/authoring-v21`, PR to `main` (CI green, owner approves), then the Nightly build (or Run workflow / `/qa deploy`) deploys `main` to QA. Pipeline unchanged. |
 | 2 | Vertex: Model Garden access for `AUTHORING_MODEL` (Claude) and Gemini, quota | **In progress.** Owner chose Claude Sonnet 5.5 (`claude-sonnet-5-5`) for the chatbot, Haiku 5.5 as the cheap backup, instead of Opus 5. Sonnet enabled in Model Garden (10 Nov). Claude quota was 0 for every model (`global_online_prediction_requests_per_base_model`, all `anthropic-*` base models), so live calls returned 429. Increase to 30/min filed 10 Nov for `anthropic-claude-sonnet`, `anthropic-claude-haiku` and `anthropic-count-tokens` (Cloud Quotas preferences `praxis-qa-*`); waiting for Google. |
-| 3 | Caps: deployer passes `AUTHORING_MODEL` and `AUTHORING_DAILY_CALL_CAP`; `llm.call` metric and alert; Vertex budget | Open |
+| 3 | Caps: deployer passes `AUTHORING_MODEL` and `AUTHORING_DAILY_CALL_CAP`; `llm.call` metric and alert; Vertex budget | **Deployer done (local commit, 10 Nov):** `infra/demo/deploy-demo.sh` with `PRAXIS_VERTEX=1` sets `AUTHORING_MODEL=claude-sonnet-5-5` and `AUTHORING_DAILY_CALL_CAP=300` (both overridable) and deploys, never runs, job `praxis-vertex-smoke` when the build contains `apps/api/scripts/vertex-smoke.ts`. Open: `llm.call` log metric and alert; whether to keep the 1000 USD project budget alert or add a smaller Vertex one. |
 | 4 | Policy extraction in QA: Document AI layout parser, LlamaExtract key slot | Open (blocked by O2) |
 | 5 | Migrations (incl. `20261111000000_authoring_v21_modes`) and seed, catalogue templates | Open |
 | 6 | First wave deploy on the owner's go; smoke job (exit 0); admin check shows `vertex` | Open |
@@ -62,8 +62,10 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 - **O2 — live policy extraction is refused in QA.** The app allows `POLICY_EXTRACTION_LIVE` only when
   `APP_ENV=staging`, and QA runs `APP_ENV=demo`. The Terraform `policy-extraction` module (PRs #36, #37) has the same
   staging-only rule and is not applied to QA. Needs an owner decision and a code change.
-- **O3 — no app spend caps in QA.** `infra/demo/deploy-demo.sh` must pass `AUTHORING_MODEL` and
-  `AUTHORING_DAILY_CALL_CAP` (names now fixed by the code session). Infra change, made on the owner's go.
+- **O3 — app caps in QA.** Done in the deployer (step 3); live from the first wave deploy. The change must reach `main`
+  (its own PR, or with Wave 1) before the Nightly build uses it.
+- **O4 — smoke job.** `praxis-vertex-smoke` is deployed by the deployer; run it only on the owner's yes:
+  `gcloud run jobs execute praxis-vertex-smoke --region us-central1 --wait` (exit 0 live, 2 mock, 1 a call failed).
 - **O5 — chatbot model.** `AUTHORING_MODEL` defaults to `claude-opus-5`; QA will set `claude-sonnet-5-5`. The code
   session must confirm the chatbot's request shape works on Sonnet 5.5 (it rejects `thinking: disabled`).
 - **O6 — Claude quota.** Waiting for Google to grant the three increases above. Check: Cloud Quotas preference

@@ -7,8 +7,9 @@ import type { SectionKey, TemplateProfile } from './schema';
  * Private values carry a `PRIVATE-` canary so projection tests can prove they never reach the agent.
  */
 export function sampleProfileOutput(profile: TemplateProfile): Record<string, unknown> {
-  const outcome = profile.sections.find((s) => s.key === 'S6')!.fields.find((f) => f.outputField)!;
-  const outcomeValue = outcome.options?.[0]?.value ?? '1';
+  // Profiles without an S6 outcome (Q4: per-query fields) bind the sample criterion to the sample further output field.
+  const outcome = profile.sections.find((s) => s.key === 'S6')!.fields.find((f) => f.outputField) ?? { outputField: 'gap_count', options: [] as { value: string }[] };
+  const outcomeValue = outcome.options?.[0]?.value ?? (outcome.outputField === 'gap_count' ? '2' : '1');
   const canary = (vis: string | undefined) => (vis === 'private_reference' ? 'PRIVATE-REF ' : vis === 'private_rubric' ? 'PRIVATE-RUBRIC ' : '');
 
   const value = (f: ItemField, vis: string | undefined, n: number, context: string): unknown => {

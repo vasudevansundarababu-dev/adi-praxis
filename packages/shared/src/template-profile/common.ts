@@ -1,5 +1,5 @@
 import { TEMPLATE_INSTRUCTIONS } from '../template-instructions';
-import { PROFILE_SCHEMA_VERSION, PROFILE_SECTIONS, type PickOption, type TemplateProfileField, type TemplateProfile } from './schema';
+import { PROFILE_SCHEMA_VERSION, PROFILE_SECTIONS, type ContractMapping, type PickOption, type TemplateProfileField, type TemplateProfile } from './schema';
 
 /**
  * Shared building blocks for the non-KYC (sections-stored) profiles: the common eight-section fields of handover
@@ -37,6 +37,12 @@ export interface SectionsProfileSpec {
   findingFields?: TemplateProfileField[];
   /** S6: the template's outcome pick lists, each mapped to an output.json field. */
   outcomes: TemplateProfileField[];
+  /** S5: the draft lists the business hand-off as part of the expected deliverable, so it is required. */
+  handoffRequired?: boolean;
+  /** S5: the template has its own hand-off deliverable, so the common business hand-off is not shown (owner, 12 Nov). */
+  handoffHidden?: boolean;
+  /** Contract: one output.json field per item of a repeated S5 field (owner, 12 Nov: Q4 grades every query). */
+  perItemOutputs?: ContractMapping['perItemOutputs'];
 }
 
 const t = (key: string, label: string, help: string, extra: Partial<TemplateProfileField> = {}): TemplateProfileField => ({ key, type: 'text', label, help, ...extra });
@@ -147,7 +153,7 @@ export function sectionsProfile(spec: SectionsProfileSpec): TemplateProfile {
       ...spec.deliverables.map((f) => ({ visibility: 'private_reference' as const, ...f })),
       lt('rationale', 'Rationale', 'Why the outcome follows from the evidence and the applicable rules.', { required: true, visibility: 'private_reference' }),
       lt('unresolvedIssues', 'Unresolved issues', 'What remains open and why.', { visibility: 'private_reference' }),
-      lt('humanHandoff', 'Business hand-off', 'What an authorised person must decide or do next. This is a case interaction, not the Praxis review.', { visibility: 'private_reference' }),
+      ...(spec.handoffHidden ? [] : [lt('humanHandoff', 'Business hand-off', 'What an authorised person must decide or do next. This is a case interaction, not the Praxis review.', { visibility: 'private_reference', ...(spec.handoffRequired ? { required: true } : {}) })]),
     ],
     // S6 Allowed outcomes and values
     [
@@ -219,6 +225,7 @@ export function sectionsProfile(spec: SectionsProfileSpec): TemplateProfile {
       policies: 'S4.policies',
       decisionFields: 'S6.decisionFields',
       criteria: 'S7.criteria',
+      ...(spec.perItemOutputs ? { perItemOutputs: spec.perItemOutputs } : {}),
     },
     sections: PROFILE_SECTIONS.map((s, i) => ({ key: s.key, title: s.title, help: help[i], fields: sectionFields[i]! })),
   };

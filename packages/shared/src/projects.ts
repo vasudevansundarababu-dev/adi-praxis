@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DemographicFilterInput, filterProblems, type DemographicType } from './taxonomy';
 import { CoverageDimensions, EdgeCaseCatalog, TASK_MODES, type TaskMode } from './templates';
+import { JD_ROLES, JdProfileLine } from './jd-generator';
 
 export const PROJECT_STATUSES = [
   'DRAFT',
@@ -46,7 +47,18 @@ export const UpdateJobDescriptionRequest = JdFields.partial();
 export const JobDescriptionDto = JdFields.extend({
   id: z.string().uuid(),
   location: z.string().nullable(),
+  /** A generated JD starts with no pay (0) until the PM sets it; submit is blocked until then. */
+  wagePerTask: z.number().min(0),
+  skills: z.array(z.string()),
   updatedAt: z.string(),
+  /** Generated JDs (12 Nov 2026): who it recruits, the template's mandatory skills, experience, education, demographics. */
+  role: z.enum(JD_ROLES).default('AUTHOR'),
+  generated: z.boolean().default(false),
+  projectId: z.string().uuid().nullable().default(null),
+  mandatorySkills: z.array(z.string()).default([]),
+  minExperienceYears: z.number().int().nullable().default(null),
+  educationLevel: z.string().nullable().default(null),
+  demographicProfile: z.array(JdProfileLine).default([]),
 });
 export type JobDescriptionDto = z.infer<typeof JobDescriptionDto>;
 
@@ -67,7 +79,7 @@ export type AuthoringExperience = (typeof AUTHORING_EXPERIENCES)[number];
 /** Platform review route (handover v2.1 ch. 08, 17 §2). SME_EXPERT_PM is enabled once its stage engine ships. */
 export const REVIEW_ROUTES = ['SME_PM', 'SME_EXPERT_PM'] as const;
 export type ReviewRoute = (typeof REVIEW_ROUTES)[number];
-export const ENABLED_REVIEW_ROUTES: readonly ReviewRoute[] = ['SME_PM'];
+export const ENABLED_REVIEW_ROUTES: readonly ReviewRoute[] = ['SME_PM', 'SME_EXPERT_PM'];
 export const REVIEW_ROUTE_LABELS: Record<ReviewRoute, string> = { SME_PM: 'SME → PM approval', SME_EXPERT_PM: 'SME → Expert review → PM approval' };
 
 export const ProjectFields = z.object({
@@ -87,6 +99,8 @@ export const ProjectFields = z.object({
   hoursPerWorkerDay: z.number().positive().max(24).optional(),
   demographicFilters: z.array(DemographicFilterInput).max(50).optional(),
   jobDescriptionId: z.string().uuid().nullable().optional(),
+  /** True: Praxis generates the JDs from the template and keeps them in step with the project. False: use jobDescriptionId. */
+  jdGenerated: z.boolean().optional(),
   autoLaunchCampaign: z.boolean().optional(),
 });
 
@@ -200,6 +214,8 @@ export interface SubmitContext {
   attributes: { key: string; label: string; type: DemographicType; allowedValues: unknown }[];
   jobDescription: { wagePerTask: number } | null;
   maxTaskCount: number;
+  /** Problems from the generated JDs (jdProblems): mandatory skills, the reviewer JD. */
+  jdProblems?: string[];
 }
 
 export interface ProjectForSubmit {
@@ -259,6 +275,8 @@ export function submitProblems(p: ProjectForSubmit, ctx: SubmitContext): { probl
   }
 
   if (!ctx.jobDescription) problems.push('Choose or create a job description');
+  else if (!(ctx.jobDescription.wagePerTask > 0)) problems.push('Set the wage per task on the job description');
+  problems.push(...(ctx.jdProblems ?? []));
 
   const figures = computeProjectFigures({ ...p, wagePerTask: ctx.jobDescription?.wagePerTask ?? null });
   return { problems, warnings: figures.warnings };
@@ -290,6 +308,11 @@ export const ProjectDto = z.object({
   requiredWorkers: z.number().int().nullable(),
   demographicFilters: z.array(DemographicFilterInput),
   jobDescriptionId: z.string().uuid().nullable(),
+  /** SME -> Expert -> PM projects: the generated reviewer JD (null otherwise). */
+  reviewerJobDescriptionId: z.string().uuid().nullable().default(null),
+  /** New projects generate their JDs from the template; false keeps a hand-picked JD. */
+  jdGenerated: z.boolean().default(false),
+  reviewerJdSnapshot: z.unknown().optional(),
   jdSnapshotId: z.string().uuid().nullable(),
   /** The JD as frozen at submit (null for drafts). */
   jdSnapshot: z.unknown(),

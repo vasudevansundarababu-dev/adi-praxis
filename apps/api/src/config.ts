@@ -61,13 +61,18 @@ const Env = z.object({
    *  per-candidate question wording and the independent solver check. Blank bulk model = CERT_MODEL. */
   CERT_MODEL: z.string().default('claude-opus-5'),
   CERT_BULK_MODEL: z.string().default(''),
-  /** Support Bot model on Vertex (docs/SUPPORT-BOT.md). Used only when VERTEX_PROJECT_ID is set; otherwise a local mock. */
-  SUPPORT_MODEL: z.string().default('claude-sonnet-5'),
+  /**
+   * Support Bot model on Vertex (docs/SUPPORT-BOT.md), same forms as AUTHORING_MODEL (`gemini:<model>` or a Claude id).
+   * Empty: follows a Gemini AUTHORING_MODEL (QA), otherwise claude-sonnet-5. Used only with VERTEX_PROJECT_ID set.
+   */
+  SUPPORT_MODEL: z.string().default(''),
   /** Authoring v2.1: the chatbot facilitator's model on Vertex (live in QA), and its per-client daily call cap. */
   AUTHORING_MODEL: z.string().default('claude-sonnet-5-5'),
   /** FLOW2 suitability assessment model on Vertex: a Claude model id (default), or `gemini:<model>` (QA without Claude quota). */
   SUITABILITY_MODEL: z.string().default('claude-opus-5'),
   AUTHORING_DAILY_CALL_CAP: z.coerce.number().int().min(1).max(100_000).default(300),
+  /** Wave 3: Vertex location for AUTHORING_MODEL=maas:<publisher>/<model> (the region on the model card, or `global`). Blank = VERTEX_LOCATION. */
+  AUTHORING_MAAS_LOCATION: z.string().regex(/^$|^[a-z0-9-]+$/).default(''),
   /** M10c payouts through Trolley. Blank keys = the local mock (refused in production with SME supply on). */
   TROLLEY_ACCESS_KEY: z.string().default(''),
   TROLLEY_SECRET_KEY: z.string().default(''),
@@ -173,6 +178,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   if (c.NODE_ENV === 'production' && c.APP_ENV !== 'demo' && (candidateAuthMode === 'mock' || identityMode === 'mock' || assistantMode === 'mock' || emailMode === 'memory')) {
     throw new Error('Invalid configuration: production needs GOOGLE_OAUTH_CLIENT_ID, STRIPE_SECRET_KEY, STRIPE_IDENTITY_WEBHOOK_SECRET, VERTEX_PROJECT_ID and SMTP_HOST (mocks are local-only)');
+  }
+  if (c.AUTHORING_MODEL.startsWith('maas:') && !/^maas:[a-z0-9][a-z0-9-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(c.AUTHORING_MODEL)) {
+    throw new Error('Invalid configuration: AUTHORING_MODEL=maas:<publisher>/<model> needs the exact Model Garden id, e.g. maas:openai/gpt-oss-120b-maas');
   }
   const appEnv = c.APP_ENV ?? (c.NODE_ENV === 'production' ? 'production' : 'local');
   const metaCompiler = metaCompilerConfig(c, appEnv);

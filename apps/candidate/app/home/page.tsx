@@ -4,6 +4,7 @@ import { pageTitle } from '@praxis/shared/theme';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Assignments } from '@/components/journey/assignments';
+import { SupportBot } from '@/components/support/support-bot';
 import { Journey, NextStep, StatusPill } from '@/components/ui';
 import { api, getMe } from '@/lib/api';
 import type { AssignmentCard } from '@/lib/journey-types';
@@ -114,6 +115,7 @@ export default async function HomePage() {
           <Assignments initial={assignments?.items ?? []} onboarded={!!selected} />
         </div>
       )}
+      <SupportBot />
     </main>
   );
 }

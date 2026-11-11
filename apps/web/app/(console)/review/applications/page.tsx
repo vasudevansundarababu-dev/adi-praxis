@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { TableSearch } from '@/components/search/table-search';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { recommendationLabel, statusLabel } from '@/components/review/labels';
@@ -40,7 +41,9 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
       {items.length === 0 ? (
         <p className="mt-6 text-fg-muted">No applications here.</p>
       ) : (
-        <div className="mt-6 overflow-x-auto">
+        <>
+        <TableSearch type="candidates" label="Search candidates" placeholder="Search candidates by name, project or expertise" />
+        <div data-search-scope="candidates" className="mt-6 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-line text-fg-muted">
               <tr>
@@ -53,7 +56,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
             </thead>
             <tbody className="divide-y divide-line">
               {items.map((i) => (
-                <tr key={i.id}>
+                <tr data-search-id={i.id} key={i.id}>
                   <td className="px-3 py-2">
                     <Link href={`/review/applications/${i.id}`} className="font-medium text-link hover:underline">
                       {i.candidateName ?? 'Unnamed candidate'}
@@ -71,6 +74,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

@@ -23,12 +23,15 @@ import {
   sectionProgress,
   setFieldValue,
   startProfileOutput,
+  TEMPLATE_PROFILES,
   WAVE1_PROFILES,
+  WAVE2_PROFILES,
+  WAVE3_PROFILES,
   type KycTask,
   type TemplateProfile,
 } from '../src';
 
-const NON_KYC = WAVE1_PROFILES.filter((p) => p.storage === 'sections');
+const NON_KYC = TEMPLATE_PROFILES.filter((p) => p.storage === 'sections');
 const ids = { taskId: '3f0c1d2e-0000-4000-8000-000000000001', revisionId: '3f0c1d2e-0000-4000-8000-000000000001-r4' };
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
@@ -57,10 +60,92 @@ describe('template profile registry', () => {
     }
     expect(profileForWorkflow('launch of noise cancelling phone').status).toBe('ok');
     expect(profileForWorkflow('Omnichannel Creative & Locale Compliance').status).toBe('ok');
-    expect(profileForWorkflow('Adverse media review').status).toBe('none');
+    expect(profileForWorkflow('Communications surveillance').status).toBe('none');
     expect(KYC_PROFILE.domainPlugin).toBe('kyc-workbench');
     expect(KYC_PROFILE.contractStatus).toBe('confirmed');
     for (const p of NON_KYC) expect(p.contractStatus).toBe('requires_confirmation');
+  });
+
+  it('registers the three Wave 2 profiles with their draft pick lists as typed S6 output fields', () => {
+    const s6 = (p: TemplateProfile) => Object.fromEntries(p.sections[5]!.fields.filter((f) => f.outputField).map((f) => [f.outputField, f.options!.map((o) => o.value)]));
+    expect(WAVE2_PROFILES.map((p) => [p.catalogWorkflowName, p.templateId])).toEqual([['Adverse media review', 'BK03'], ['Enhanced due diligence', 'BK10'], ['Customer risk rating', 'BK09']]);
+    for (const p of WAVE2_PROFILES) {
+      expect(checkProfile(p), p.profileId).toEqual([]);
+      expect(profileForWorkflow(p.catalogWorkflowName)).toMatchObject({ status: 'ok', profile: { profileId: p.profileId } });
+      expect(p).toMatchObject({ agentMode: 'SINGLE', storage: 'sections', contractStatus: 'requires_confirmation', domainPlugin: null });
+      // Reference values and the rubric are private.
+      for (const f of p.sections[5]!.fields.filter((x) => x.outputField)) expect(f.visibility, `${p.profileId} S6.${f.key}`).toBe('private_reference');
+      expect(itemFieldsOf(p.sections[5]!.fields.find((f) => f.key === 'decisionFields')!).find((f) => f.key === 'referenceValue')!.visibility).toBe('private_reference');
+      for (const f of p.sections[6]!.fields) expect(f.visibility, `${p.profileId} S7.${f.key}`).toBe('private_rubric');
+    }
+    const [adverse, edd, crr] = WAVE2_PROFILES;
+    expect(s6(adverse)).toEqual({ match: ['confirmed', 'possible', 'false_positive', 'unresolved'], recommendation: ['close', 'escalate', 'request_information'] });
+    expect(s6(edd)).toEqual({ risk_rating: ['low', 'medium', 'high', 'very_high'], recommendation: ['proceed_for_approval', 'request_information', 'escalate', 'recommend_decline'] });
+    expect(s6(crr)).toEqual({ risk: ['low', 'medium', 'high', 'undetermined'], override: ['none', 'proposed_increase', 'proposed_decrease'] });
+    // Template deliverables (S5) from each draft.
+    const s5 = (p: TemplateProfile) => p.sections[4]!.fields.map((f) => f.key);
+    expect(s5(adverse)).toEqual(expect.arrayContaining(['identityMatch', 'sourceReliability', 'allegationsVsFacts', 'relevance']));
+    expect(s5(edd)).toEqual(expect.arrayContaining(['enhancedChecks', 'evidenceGaps', 'riskAssessment', 'humanHandoff']));
+    expect(s5(crr)).toEqual(expect.arrayContaining(['factorAssessments', 'calculation', 'overrideRationale']));
+  });
+
+  it('Wave 2 conditional and template rules: EDD hand-off and finding evidence status, CRR override rationale', () => {
+    const [, edd, crr] = WAVE2_PROFILES;
+    const eddProblems = profileProblems(edd, setFieldValue(edd, sampleProfileOutput(edd), 'S5', 'humanHandoff', ''));
+    expect(eddProblems).toContainEqual(expect.objectContaining({ path: 'S5.humanHandoff', kind: 'required' }));
+    const findings = getFieldValue(edd, sampleProfileOutput(edd), 'S5', { key: 'findings' }) as Record<string, unknown>[];
+    expect(findings[0]!.evidenceStatus).toBe('verified');
+    const badStatus = profileProblems(edd, setFieldValue(edd, sampleProfileOutput(edd), 'S5', 'findings', [{ ...findings[0], evidenceStatus: 'probable' }]));
+    expect(badStatus).toContainEqual(expect.objectContaining({ path: 'S5.findings[0].evidenceStatus', kind: 'invalid' }));
+    let out = setFieldValue(crr, sampleProfileOutput(crr), 'S5', 'overrideRationale', '');
+    expect(profileProblems(crr, out).some((x) => x.path === 'S5.overrideRationale')).toBe(false);
+    out = setFieldValue(crr, out, 'S6', 'override', 'proposed_increase');
+    expect(profileProblems(crr, out)).toContainEqual(expect.objectContaining({ path: 'S5.overrideRationale', kind: 'conditional' }));
+  });
+
+  it('registers the three Wave 3 profiles with their draft pick lists as typed S6 output fields', () => {
+    const s6 = (p: TemplateProfile) => Object.fromEntries(p.sections[5]!.fields.filter((f) => f.outputField).map((f) => [f.outputField, f.options!.map((o) => o.value)]));
+    expect(WAVE3_PROFILES.map((p) => [p.catalogWorkflowName, p.templateId])).toEqual([['Q4 Global Paid Search Query Clustering', 'DM01'], ['Fraud-risk/compliance handoffs', 'BK11'], ['Compliance monitoring', 'BK06']]);
+    for (const p of WAVE3_PROFILES) {
+      expect(checkProfile(p), p.profileId).toEqual([]);
+      expect(profileForWorkflow(p.catalogWorkflowName)).toMatchObject({ status: 'ok', profile: { profileId: p.profileId } });
+      expect(p).toMatchObject({ agentMode: 'SINGLE', storage: 'sections', contractStatus: 'requires_confirmation', domainPlugin: null });
+      expect(p.sections.map((s) => s.key)).toEqual(['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8']);
+      // Reference values and the rubric are private.
+      for (const f of p.sections[5]!.fields.filter((x) => x.outputField)) expect(f.visibility, `${p.profileId} S6.${f.key}`).toBe('private_reference');
+      for (const f of p.sections[4]!.fields) expect(f.visibility, `${p.profileId} S5.${f.key}`).toBe('private_reference');
+      expect(itemFieldsOf(p.sections[5]!.fields.find((f) => f.key === 'decisionFields')!).find((f) => f.key === 'referenceValue')!.visibility).toBe('private_reference');
+      for (const f of p.sections[6]!.fields) expect(f.visibility, `${p.profileId} S7.${f.key}`).toBe('private_rubric');
+    }
+    // The catalogue writes an en dash in some imports; the match ignores dash style.
+    expect(profileForWorkflow('Fraud–risk/compliance handoffs')).toMatchObject({ status: 'ok', profile: { profileId: 'fraud-risk-and-compliance-handoffs' } });
+    const [paidSearch, fraud, monitoring] = WAVE3_PROFILES;
+    // Owner, 12 Nov: Q4 grades every query through per-query output fields, not a single focus query.
+    expect(s6(paidSearch)).toEqual({});
+    expect(paidSearch.contract!.perItemOutputs).toMatchObject({ from: 'S5.queryAssignments', maxItems: 20, prefix: 'q', weightShare: 50 });
+    expect(s6(fraud)).toEqual({ handoff: ['fraud', 'compliance', 'joint_review'], recommendation: ['request_information', 'escalate', 'close_with_rationale'] });
+    expect(s6(monitoring)).toEqual({ result: ['compliant', 'noncompliant', 'insufficient_evidence', 'not_applicable'], severity: ['low', 'medium', 'high', 'critical', 'undetermined'] });
+    // Template deliverables (S5) from each draft.
+    const s5 = (p: TemplateProfile) => p.sections[4]!.fields.map((f) => f.key);
+    expect(s5(paidSearch)).toEqual(expect.arrayContaining(['clusters', 'queryAssignments', 'exclusions', 'ambiguousQueries', 'rationale']));
+    expect(s5(fraud)).toEqual(expect.arrayContaining(['facts', 'fraudIndicators', 'complianceConcerns', 'handoffPackage', 'rationale']));
+    expect(s5(monitoring)).toEqual(expect.arrayContaining(['obligationAssessments', 'exceptions', 'proposedFollowUp', 'rationale']));
+    // The Q4 template is Digital Marketing: no banking field names.
+    expect(JSON.stringify(paidSearch.sections[4]!.fields.map((f) => f.key))).not.toMatch(/customer|kyc|risk/i);
+  });
+
+  it('Wave 3 per-item pick lists: Q4 query intent and assignment, compliance monitoring obligation result', () => {
+    const [paidSearch, , monitoring] = WAVE3_PROFILES;
+    const rows = getFieldValue(paidSearch, sampleProfileOutput(paidSearch), 'S5', { key: 'queryAssignments' }) as Record<string, unknown>[];
+    expect(rows[0]).toMatchObject({ intent: 'informational', assignment: 'assigned' });
+    const badIntent = profileProblems(paidSearch, setFieldValue(paidSearch, sampleProfileOutput(paidSearch), 'S5', 'queryAssignments', [{ ...rows[0], intent: 'brand' }]));
+    expect(badIntent).toContainEqual(expect.objectContaining({ path: 'S5.queryAssignments[0].intent', kind: 'invalid' }));
+    const missing = profileProblems(paidSearch, setFieldValue(paidSearch, sampleProfileOutput(paidSearch), 'S5', 'exclusions', ''));
+    expect(missing).toContainEqual(expect.objectContaining({ path: 'S5.exclusions', kind: 'required' }));
+    const obligations = getFieldValue(monitoring, sampleProfileOutput(monitoring), 'S5', { key: 'obligationAssessments' }) as Record<string, unknown>[];
+    expect(obligations[0]!.result).toBe('compliant');
+    const badResult = profileProblems(monitoring, setFieldValue(monitoring, sampleProfileOutput(monitoring), 'S5', 'obligationAssessments', [{ ...obligations[0], result: 'partly_compliant' }]));
+    expect(badResult).toContainEqual(expect.objectContaining({ path: 'S5.obligationAssessments[0].result', kind: 'invalid' }));
   });
 
   const base = (): TemplateProfile => clone(NON_KYC[0]!);
@@ -198,6 +283,14 @@ describe('Anvil contract compiler (praxis.anvil.task.v1)', () => {
     expect(c.rubric.criteria.reduce((n, x) => n + x.weight_bps, 0)).toBe(10000);
     expect(c.constraints[0]).toMatchObject({ id: 'policy-PR1', hard_failure: true, binding: { kind: 'json_number_max', field: 'gap_count', value: 5 } });
     expect(c.rubric.reference_output.gap_count).toBe(2);
+    // Owner, 12 Nov: every critical criterion is also a hard failure with the same binding; its weight still scores.
+    for (const crit of c.rubric.criteria) {
+      const hard = c.constraints.find((x) => x.id === `${crit.id}.critical`);
+      const isCritical = ((sampleProfileOutput(p).sections as Record<string, Record<string, unknown>>).S7!.criteria as Array<{ id: string; critical?: boolean }>).find((x) => x.id === crit.id)?.critical === true;
+      if (isCritical) expect(hard).toMatchObject({ hard_failure: true, binding: crit.binding });
+      else expect(hard).toBeUndefined();
+    }
+    expect(c.constraints.some((x) => x.id.endsWith('.critical'))).toBe(true);
     // Private material is never actor evidence.
     expect(JSON.stringify(c.evidence.filter((e) => e.visibility === 'actor'))).not.toContain('PRIVATE-');
     expect(c.evidence.some((e) => e.visibility === 'private')).toBe(true);
@@ -206,11 +299,13 @@ describe('Anvil contract compiler (praxis.anvil.task.v1)', () => {
   });
 
   it.each(NON_KYC.map((p) => [p.profileId, p] as const))('%s: a missing reference value yields a precise blocker', (_id, p) => {
-    const outcome = p.sections[5]!.fields.find((f) => f.outputField)!;
-    const out = setFieldValue(p, sampleProfileOutput(p), 'S6', outcome.key, '');
-    const r = compilePraxisContract(p, out, ids);
-    expect(r).not.toHaveProperty('contract');
-    expect('blockers' in r && r.blockers).toContainEqual(expect.objectContaining({ code: 'MISSING_REFERENCE', path: `S6.${outcome.key}` }));
+    const outcome = p.sections[5]!.fields.find((f) => f.outputField);
+    if (outcome) {
+      const out = setFieldValue(p, sampleProfileOutput(p), 'S6', outcome.key, '');
+      const r = compilePraxisContract(p, out, ids);
+      expect(r).not.toHaveProperty('contract');
+      expect('blockers' in r && r.blockers).toContainEqual(expect.objectContaining({ code: 'MISSING_REFERENCE', path: `S6.${outcome.key}` }));
+    }
     const df = getFieldValue(p, sampleProfileOutput(p), 'S6', { key: 'decisionFields' }) as Record<string, unknown>[];
     const r2 = compilePraxisContract(p, setFieldValue(p, sampleProfileOutput(p), 'S6', 'decisionFields', [{ ...df[0], referenceValue: '' }]), ids);
     expect('blockers' in r2 && r2.blockers).toContainEqual(expect.objectContaining({ code: 'MISSING_REFERENCE', path: 'S6.decisionFields[0].referenceValue' }));
@@ -248,5 +343,58 @@ describe('Anvil contract compiler (praxis.anvil.task.v1)', () => {
     expect('blockers' in unbound && unbound.blockers[0]).toMatchObject({ code: 'MISSING_BINDING', path: 'rubric.criteria[0].outputField' });
     const noRef = compileKycContract({ ...KYC_BOUND, solution: { ...KYC_BOUND.solution, riskRating: undefined } }, ids);
     expect('blockers' in noRef && noRef.blockers).toContainEqual(expect.objectContaining({ code: 'MISSING_REFERENCE', path: 'solution.riskRating' }));
+  });
+});
+
+describe('Wave 3 owner answers (12 Nov 2026)', () => {
+  it('fraud handoffs: fixed indicator and concern lists, no common business hand-off', async () => {
+    const { FRAUD_INDICATORS, COMPLIANCE_CONCERNS, FRAUD_HANDOFF_PROFILE } = await import('../src/template-profile/profiles/fraud-risk-and-compliance-handoffs');
+    expect(FRAUD_INDICATORS.map((o) => o.value)).toEqual(['account_takeover', 'money_mule', 'synthetic_identity', 'first_party_fraud', 'authorised_push_payment_scam', 'card_fraud', 'insider_fraud', 'other']);
+    expect(COMPLIANCE_CONCERNS.map((o) => o.value)).toEqual(['suspicious_activity_report', 'sanctions', 'customer_due_diligence', 'data_protection', 'conduct_risk', 'other']);
+    const s5 = FRAUD_HANDOFF_PROFILE.sections.find((x) => x.key === 'S5')!.fields;
+    expect(s5.map((f) => f.key)).not.toContain('humanHandoff');
+    expect(s5.find((f) => f.key === 'fraudIndicators')).toMatchObject({ type: 'repeated_array', required: true });
+    expect(s5.find((f) => f.key === 'complianceConcerns')).toMatchObject({ type: 'repeated_array', required: true });
+    expect(checkProfile(FRAUD_HANDOFF_PROFILE)).toEqual([]);
+  });
+  it('compliance monitoring: each exception has its own severity; the overall severity stays graded', async () => {
+    const { COMPLIANCE_MONITORING_PROFILE: p } = await import('../src/template-profile/profiles/compliance-monitoring');
+    const ex = p.sections.find((x) => x.key === 'S5')!.fields.find((f) => f.key === 'exceptions')!;
+    expect(ex.type).toBe('repeated_array');
+    expect(ex.itemFields!.find((f) => f.key === 'severity')).toMatchObject({ type: 'pick_list', required: true });
+    expect(p.sections.find((x) => x.key === 'S6')!.fields.find((f) => f.key === 'severity')).toMatchObject({ outputField: 'severity' });
+    expect(checkProfile(p)).toEqual([]);
+  });
+});
+
+describe('Q4 paid search: every query graded (owner, 12 Nov 2026)', () => {
+  const p = TEMPLATE_PROFILES.find((x) => x.profileId === 'q4-global-paid-search-query-clustering')!;
+  const withQueries = (n: number, extra: Record<string, unknown>[] = []) =>
+    setFieldValue(p, sampleProfileOutput(p), 'S5', 'queryAssignments', [
+      ...Array.from({ length: n }, (_, i) => ({ query: `synthetic query ${i + 1}`, clusterId: i % 2 ? 'CL2' : 'CL1', intent: i % 2 ? 'commercial' : 'informational', assignment: 'assigned', evidenceRefs: ['E1'] })),
+      ...extra,
+    ]);
+
+  it('emits q01_intent, q01_assignment and q01_cluster per query; Anvil grades intent and assignment, half the score', () => {
+    const r = compilePraxisContract(p, withQueries(3, [{ query: 'synthetic excluded query', intent: 'unclear', assignment: 'excluded', evidenceRefs: ['E1'] }]), ids);
+    if (!('contract' in r)) throw new Error(JSON.stringify(r.blockers));
+    const c = r.contract;
+    expect(praxisContractIssues(c)).toEqual([]);
+    expect(c.rubric.reference_output).toMatchObject({ q01_intent: 'informational', q01_assignment: 'assigned', q01_cluster: 'CL1', q02_intent: 'commercial', q02_cluster: 'CL2', q04_assignment: 'excluded', q04_cluster: 'none' });
+    expect(c.objective).toContain('q01_intent (string: informational, commercial, transactional, navigational, unclear)');
+    const generated = c.rubric.criteria.filter((x) => /^q\d\d-/.test(x.id));
+    expect(generated.map((x) => x.id)).toEqual(['q01-intent', 'q01-assignment', 'q02-intent', 'q02-assignment', 'q03-intent', 'q03-assignment', 'q04-intent', 'q04-assignment']);
+    expect(generated.every((x) => x.binding.kind === 'json_equals')).toBe(true);
+    // Cluster labels are the agent's own: not graded by Anvil (Praxis scores them by F1).
+    expect(c.rubric.criteria.some((x) => x.binding.field.endsWith('_cluster'))).toBe(false);
+    expect(generated.reduce((n, x) => n + x.weight_bps, 0)).toBe(5000);
+    expect(c.rubric.criteria.reduce((n, x) => n + x.weight_bps, 0)).toBe(10000);
+  });
+
+  it('refuses more than 20 queries, at save and at export', () => {
+    const out = withQueries(21);
+    expect(profileProblems(p, out).some((x) => x.message.includes('at most 20 allowed'))).toBe(true);
+    const r = compilePraxisContract(p, out, ids);
+    expect('blockers' in r && r.blockers.map((b) => b.code)).toContain('TOO_MANY_ITEMS');
   });
 });

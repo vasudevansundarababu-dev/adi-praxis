@@ -529,6 +529,191 @@ no field for several Anvil concepts, so the emitter maps conservatively. Details
   blockers never block submission. KYC criteria gain three optional binding keys (`outputField`, `comparison`,
   `expectedValue`); until the workbench edits them, KYC exports are reported as blocked.
 
+## Authoring v2.1 Wave 2: Expert → PM review route (12 Nov 2026)
+
+Route and rules: `docs/authoring/REVIEW-ROUTES.md`. Owner decisions already taken (plan §6): the same person may be
+Expert and PM with two audit events; Expert edits need a reason, and a material edit needs the author to reconfirm.
+
+- **(chosen by Claude)** **Data.** The pending stage lives on the task (`TaskInstance.reviewStage`); stage decisions
+  are `TaskReview` rows (already append-only) with `stage`, `contentHash`, `editReason`, `material` and two new
+  decisions `PASS` and `EDIT`. PM approval is stored as `ACCEPT` with `stage = PM_APPROVAL`. Chosen over a new table so
+  existing readers (author feedback, chatbot feedback) need only a filter; SME → PM rows are untouched (`stage` null).
+- **(chosen by Claude)** **Binding.** A decision binds to the submission version and the sha256 of its output (stable
+  JSON). It is in force only while that version is the latest with the same hash; any content change is a new
+  version, so voiding needs no update to an append-only row. Stale requests get 409 `STALE_STAGE_DECISION`.
+- **(chosen by Claude)** **Expert.** A Validator assigned to the project. Admins act as Expert only when assigned (the
+  Expert stage is a domain responsibility, not an admin power). On this route the author check applies to Admins too.
+- **(chosen by Claude)** **PM approval.** The project's owning PM or an Admin. The PM approves or returns; only the
+  Expert rejects (spec: "PM may approve the exact eligible revision or return it").
+- **(chosen by Claude)** **Expert edits** are allowed at Expert review and at PM approval (before the PM acts). An edit
+  at PM approval voids the pass and goes back to Expert review. The Expert declares materiality explicitly (required
+  boolean); the server does not guess it. Material: the task returns to the author (`REWORK`) to reconfirm by
+  resubmitting; it does not increment `reworkCount`. Minor: stays submitted at Expert review.
+- **(chosen by Claude)** **Checks on an edit.** All task checks re-run on the edited output except the author's own
+  attestations (`authoring.*`, `conversation.*` consent and declarations); new possible-real-data flags need an
+  explanation (earlier explanations carry over). The duplicate search re-runs; the export contract is recompiled. The
+  new version keeps the policy snapshot of the version it replaced.
+- **(chosen by Claude)** The one-step decision endpoint refuses two-stage tasks (409 `STAGE_DECISION_REQUIRED`), so a
+  Validator cannot accept without PM approval.
+- **(chosen by Claude)** Open-slot coverage tags are confirmed by the Expert at pass (the console confirms the author's
+  tags; correcting them in the stage panel is left for later). Duplicate decisions are taken by the Expert.
+- **(chosen by Claude)** Rework comments on this route can be pinned to a section (any section id, e.g. `S1`, `W04`), a
+  graph node or a field path. The one-step route keeps its W01–W06 rule.
+- **(chosen by Claude)** PMs see the review queue and task page only for their own two-stage projects; a PM without the
+  Validator role still gets 403 on SME → PM tasks, as before. Source-file downloads and the LLM judge panel keep their
+  existing access (Validators and Admins).
+- **Open (owner):** a field-level Expert editor (the console uses a JSON editor today); whether a PM may also reject;
+  whether material edits should be detected automatically (e.g. any rubric or reference change).
+
+### Authoring v2.1 Wave 2: owner answers (11 Nov 2026)
+
+- **(owner)** The PM may reject a task at PM approval, as the Expert may at Expert review (same reasons, audited with
+  responsibility PM). The same person may act as Expert and PM; both decisions stay separate.
+- **(owner)** Any change to the rubric or the reference answer is a material edit, whatever the Expert declares: KYC
+  `rubric` and `solution`; profiled templates S5 (expected work), S6 (outcomes and reference values) and S7 (rubric).
+  The task returns to the author to reconfirm; the audit records the declared and the effective materiality and the
+  paths that forced it.
+- **(owner)** No field-level edit form for Experts: the JSON editor stays.
+- **(owner)** Policy sources on the review page move to Wave 3, with SME policy proposals.
+- **Open for the owner (12 Nov):** domain confirmation of the three Wave 2 field contracts (Adverse media review,
+  Enhanced due diligence, Customer risk rating; gaps listed in `docs/authoring/TEMPLATE-PROFILES.md`), and the owner's
+  live Wave 2 session in QA (`docs/authoring/WAVE-2-TEST-NOTES.md`).
+
+## Authoring v2.1 Wave 3: policy proposals, policy sources, open model, 3 templates (12 Nov 2026)
+
+- **(owner)** Wave 3 is built on its own branch `feat/authoring-wave3`, cut from the tip of `feat/authoring-wave2`, while
+  Wave 2 waits for its QA deploy; the two are tested together in QA. Nothing pushed; main untouched.
+- **SME policy proposals** (handover chapter 07) are a separate bridge, not task-source upload and not the PM/Admin
+  policy routes. An SME proposes from their own task; the proposal is `PENDING` until a decision.
+  - **Who decides:** a Validator assigned to the project (Expert), the owning PM or an Admin. The plan says "Expert
+    reviews"; the PM and Admins may also decide because they can already upload policy directly. The decision records
+    the role. An internal user whose email matches the proposing SME cannot decide.
+  - **Outcomes:** Accept / Return / Reject, each with a qualification (policy candidate, supporting reference, unrelated,
+    unreadable, sensitive) and a reason the SME sees. Only a policy candidate or supporting reference can be accepted.
+  - **Accept** copies the original bytes into a new project document version (origin `SME_PROPOSAL`) through the
+    existing document service. Nothing becomes a rule until the PM extracts, reviews and publishes it: no new
+    publication path.
+  - **Intake flags are advice only** (deterministic: unreadable, few requirement words, invoice/statement/marketing
+    wording, suspected real data, text addressed to an AI). No automatic rejection; the reviewer decides.
+  - **Unreadable files** (scans with no text) and files with suspected real data are kept as pending so the reviewer can
+    see them, but cannot be accepted: they are returned for a readable or synthetic copy. Suspected real data is stored
+    in Praxis's text reading only redacted; the original file is downloadable by reviewers only.
+  - Refused outright as for PM uploads: malware, unsupported format, encrypted, over 10 MB, too many pages, empty.
+  - Limits: 10 pending proposals per SME per project; 10 uploads a minute per SME. Re-proposing the same file while it is
+    pending returns the existing proposal.
+  - The database refuses deleting a proposal, changing its file or owner columns, or changing it after a decision.
+- **Retrieval for authoring** returns only rules of the latest published rule set that are agent-visible and in force
+  today (effective from/to). This applies to the SME's rules panel, the chatbot view, the model's context and the agent
+  preview. It fixed a leak: the chatbot view and the model received evaluator-only rules. PM views, snapshots and
+  exports are unchanged. No vector index added: the published rule set is small (chapter 07 "start with the existing
+  published project rule set").
+- **Policy sources on the review page** show the frozen snapshot when there is one, else the current published set,
+  with every rule (evaluator-only labelled), its quoted source, document, version, page/line and hash, the task's rule
+  changes and the steps the SME linked; a warning when newer rules were published after the snapshot. Same access as
+  the review page.
+- **Open model:** `AUTHORING_MODEL=maas:<publisher>/<model>` with `AUTHORING_MAAS_LOCATION`; pilot `gpt-oss-120b`,
+  compared with Gemma 4 26B A4B IT in the owner's QA session. Must be enabled in Model Garden in `adi-praxis-test-0928`
+  first (`docs/authoring/WAVE-3-TEST-NOTES.md` §4).
+- **Templates:** Q4 global paid search query clustering, Fraud-risk/compliance handoffs, Compliance monitoring; agent
+  mode Single; field contracts "requires confirmation" (gaps in `docs/authoring/TEMPLATE-PROFILES.md`).
+- **Open for the owner:** domain confirmation of the Wave 2 and Wave 3 field contracts; the live QA session for Waves 2
+  and 3 together (`WAVE-2-TEST-NOTES.md`, `WAVE-3-TEST-NOTES.md`), including the open-model comparison.
+- **(owner, 12 Nov)** QA stays on Gemini through Vertex for the Wave 1–3 sessions. The open-model (Vertex MaaS)
+  comparison is deferred until Google approves the Model Garden quota for `adi-praxis-test-0928` (request pending with
+  Google Cloud support). Wave 3 sign-off does not wait on it; switching later is a configuration change
+  (`AUTHORING_MODEL=maas:<publisher>/<model>`, `AUTHORING_MAAS_LOCATION`) plus the smoke check, no new build.
+### Authoring v2.1 Wave 2: owner field-contract answers (12 Nov 2026)
+
+- **(owner)** The drafts' pick lists for Adverse media review, Enhanced due diligence and Customer risk rating are final.
+- **(owner)** Adverse media: per-source reliability from a fixed list (high / medium / low / unknown) with a reason; an
+  `escalate` recommendation goes to a "Compliance reviewer decides" person step.
+- **(owner)** EDD: a graded overall risk rating (low / medium / high / very_high) beside the recommendation.
+- **(owner)** CRR: a rating per risk factor (low / medium / high), no weights or formula; a proposed override goes to a
+  "Senior compliance approver decides" person step.
+- **(owner)** Failing a critical rubric criterion fails the whole task. Exported to Anvil as a hard-failure constraint
+  with the criterion's binding (Anvil's `praxis.anvil.task.v1` already has `constraints[].hard_failure`), so no new
+  Anvil field is invented.
+
+### Authoring v2.1 Wave 3: owner field-contract answers (12 Nov 2026)
+
+- **(owner)** The drafts' pick lists for Q4 paid search, Fraud-risk/compliance handoffs and Compliance monitoring are final.
+- **(owner)** Q4: every query is graded. Built as per-query output.json fields (`q01_intent`, `q01_assignment`,
+  `q01_cluster`), at most 20 queries per task (Anvil task v1: no list type, 50 criteria). Generated per-query criteria
+  carry 50% of the score (default taken; the owner can change the share).
+- **(owner)** Q4: the catalogue's F1 ≥ 0.99 is checked automatically in Praxis on Anvil's results: pairwise clustering
+  F1 against the reference, shown to the RL Reviewer as advice. **Needs Anvil:** RL Gym / Anvil must send the run's
+  output.json as the new optional `final_output` field on `POST /integrations/rl-gym/review-requests`; without it the
+  screen says the score is not available.
+- **(owner)** Fraud handoffs: a "Receiving team accepts handoff" person step; fixed lists for fraud indicators and
+  compliance concerns (as approved); the common business hand-off is hidden.
+- **(owner)** Compliance monitoring: a severity per exception as well as the overall graded severity.
+
+### Help chatbot for authoring v2.1 (owner, 12 Nov 2026)
+
+- **(owner)** The help chatbot must explain these decisions to Authors, Reviewers and Approvers, and be stronger than
+  before. Built: an SME Help button and `POST /me/support/ask`; an authoring guide covering every authoring v2.1
+  decision; per-template guides generated from the template profiles and workflows; more staff screens recognised;
+  Gemini support in QA (`SUPPORT_MODEL`, defaulting to a Gemini `AUTHORING_MODEL`). See `docs/SUPPORT-BOT.md` §4.
+- The SME bot never writes task content: it explains fields and decisions only (authoring integrity, as for the
+  authoring chatbot).
+
+### Generated job descriptions (owner bug report, 12 Nov 2026)
+
+- **(owner)** Each template has skills. When a PM creates a project, the JD is generated with the template's skills as
+  **mandatory** skills, plus the demographic and education profile, so the JD is complete. If the project needs a
+  reviewer (route SME → Expert → PM), a **reviewer JD** is generated with the same skills and more years of
+  experience. Both go to recruitment.
+- **Built (Wave 2 branch, merged into Wave 3):** shared `packages/shared/src/jd-generator.ts` (deterministic, no
+  model); API `apps/api/src/projects/generated-jd.ts` runs on project create and every draft edit; new
+  `GET /projects/:id/job-descriptions`; wizard step 5 defaults to "Generate from the template".
+- **Default (decided, change on request):** experience = the project's Domain experience filter minimum, else
+  **5 years**; education = the lowest level the project's Education filter accepts, else **Bachelor's or equivalent
+  (ISCED 6)**; reviewer = author + **5 years**. The demographic profile lists every other filter in plain words with
+  required / preferred.
+- **Default:** the PM may edit the title, responsibilities, pay and location and add skills; the template's skills
+  cannot be removed (API 400 `MANDATORY_SKILLS_REQUIRED` and a database CHECK). Requirements re-follow the template and
+  the filters on every draft save; title and responsibilities are rewritten only if the template changes.
+- **Default:** a generated JD starts with no pay (pay comes from the template's default JD when it has one); submit is
+  blocked until each JD has a wage per task. A hand-picked JD is still allowed but must include the template's skills.
+- **Default:** generated JDs belong to their project and are hidden from the reusable JD list.
+- **Recruitment:** the job post's criteria are generated from the JD (mandatory skills, experience, education and
+  required demographics → REQUIRED; added skills and preferred demographics → PREFERRED). For the reviewer JD,
+  requisitions (M10) get a "Fill from project JD" button that uses the reviewer JD for Expert and Reviewer-SME tiers.
+- **(owner, 12 Nov 2026) Reviewers get their own public job post.** Built: one opportunity per project and role
+  (`Opportunity.role`, unique per project and role). SME → Expert → PM projects have a second post, built from the
+  reviewer JD (contribution role Reviewer; its criteria include the higher experience). The console's opportunity page
+  has "Task authors" and "Expert reviewers" tabs (`?role=REVIEWER` on every owner route); the candidate app shows the
+  post with a note that it is an Expert reviewer role.
+- **Default:** reviewer applicants go through the same candidate flow (profile, identity, human selection decision).
+  A SELECTED applicant with a verified identity becomes the project's Expert with "Make Expert"
+  (`POST /projects/:id/reviewer-applicants/:enrollmentId/make-expert`): a Validator (REVIEWER) staff account assigned
+  to the project. Creating that account, or adding the role to an existing account, stays an **Admin** action (as for
+  `/users`; the temporary password is shown once and must be changed). A PM can assign an applicant who already has an
+  active Validator account.
+- **Default:** author flows (staffing, matching, campaigns, assignment journeys) use the author post only. Requisitions
+  for the Expert and Reviewer-SME tiers send candidates to the reviewer post when the project has one.
+
+### Console search bar (owner, 12 Nov 2026)
+
+- **(owner)** Projects, Templates, Candidates and the other lists get a search bar on top of the table; a few letters
+  must find a project or candidate, and search should be semantic. For Wave 3.
+- **Built:** `GET /search/:type?q=` for projects, templates, candidates (the Applications list; the console has no
+  separate candidate directory), requisitions, users and partners; `TableSearch` above each table. Typing filters the
+  table to the matches and lists the best matches as links (keyboard: arrows, Enter, Escape).
+- **Default: hybrid search.** By letters: title prefix, prefix of every query word, substring, then trigram similarity
+  (pg_trgm), so 2–3 letters and typos work. By meaning: from **4 characters**, the query and each record's
+  professional text are embedded with the same provider as near-duplicate detection (Vertex `text-embedding-005` in
+  QA and production, the hashing stand-in locally and in tests) and ranked by cosine similarity (match ≥ 0.6). If the
+  model fails, letters still work and the bar says so.
+- **Default: access.** Each list's own rule applies (PMs: their projects; Validators: applicants in their assigned
+  projects, never a declared conflict; Users: Admin only), so search never shows a record the list would not.
+- **Default: privacy.** Names, emails and other personal details are matched by letters in the database only; only
+  professional text (workflow, skills, specialties, jurisdictions, post titles, descriptions) goes to the embedding
+  model. Search queries of 4+ characters are embedded too.
+- **Default:** the index (`SearchDocument`) is derived data, refreshed from the source rows on each search (changed
+  text is re-indexed; changed meaning is re-embedded, at most 20 records per search). It holds no business state, so
+  index writes are not audited. Search ranks only; it never makes a decision.
+
 ## QA seed users: `qa-users` job (11 Nov 2026)
 
 - **(chosen by Claude)** **Real journey, not database inserts.** Every write goes through the public API at `API_URL`

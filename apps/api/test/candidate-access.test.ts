@@ -79,7 +79,7 @@ describe('M4a: sourcing, candidate sign-in, identity, opportunity', () => {
     expect((await post(pm, `/projects/${p.id}/match`)).statusCode).toBe(200);
     const pub = await post(pm, `/projects/${p.id}/opportunity/publish`);
     expect(pub.statusCode, pub.body).toBe(200);
-    const opportunityId = (await db.opportunity.findUniqueOrThrow({ where: { projectId: p.id } })).id;
+    const opportunityId = (await db.opportunity.findUniqueOrThrow({ where: { projectId_role: { projectId: p.id, role: 'AUTHOR' } } })).id;
     return { projectId: p.id as string, opportunityId };
   }
 

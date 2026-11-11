@@ -10,6 +10,8 @@ import {
   DEFAULT_MAX_TASK_COUNT,
   ProjectDto,
   submitProblems,
+  jdProblems,
+  JobDescriptionDto,
   UpdateProjectRequest,
   type DemographicFilterInput,
   type ProjectStatus,
@@ -22,6 +24,7 @@ import { ensureSlots } from '../tasks/task-service';
 import { AppError, badRequest, conflict, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { toJdDto } from './job-descriptions';
+import { syncGeneratedJds } from '../projects/generated-jd';
 
 type ProjectFull = Project & {
   template: Template & { domain: Domain };
@@ -69,6 +72,9 @@ export function toProjectDto(p: ProjectFull): ProjectDto {
     requiredWorkers: p.requiredWorkers,
     demographicFilters: p.demographicFilters.map(toFilter),
     jobDescriptionId: p.jobDescriptionId,
+    reviewerJobDescriptionId: p.reviewerJobDescriptionId,
+    jdGenerated: p.jdGenerated,
+    reviewerJdSnapshot: p.reviewerJdSnapshot ?? null,
     jdSnapshotId: p.jdSnapshotId,
     jdSnapshot: p.jdSnapshot?.data ?? null,
     demographicsSnapshot: p.demographicsSnapshot,
@@ -152,6 +158,9 @@ function scalarData(body: z.infer<typeof UpdateProjectRequest>): Prisma.ProjectU
   if (body.tptMinutes !== undefined) d.tptMinutes = body.tptMinutes;
   if (body.hoursPerWorkerDay !== undefined) d.hoursPerWorkerDay = body.hoursPerWorkerDay;
   if (body.jobDescriptionId !== undefined) d.jobDescriptionId = body.jobDescriptionId;
+  // Picking a JD by hand switches generation off unless the request says otherwise.
+  if (body.jdGenerated !== undefined) d.jdGenerated = body.jdGenerated;
+  else if (body.jobDescriptionId) d.jdGenerated = false;
   if (body.autoLaunchCampaign !== undefined) d.autoLaunchCampaign = body.autoLaunchCampaign;
   return d;
 }
@@ -207,6 +216,8 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
             openSlotShare: t.openSlotShare,
             tptMinutes: t.defaultTptMinutes,
             jobDescriptionId: t.defaultJdId,
+            // New projects generate their JDs from the template unless the PM picks one.
+            jdGenerated: req.body.jdGenerated ?? !req.body.jobDescriptionId,
             ...(scalarData(req.body) as Omit<Prisma.ProjectUncheckedCreateInput, 'clientId' | 'ownerId' | 'templateId' | 'templateVersion' | 'name'>),
             taskMode,
             clientId: actor.clientId,
@@ -217,6 +228,7 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
           },
         });
         if (req.body.demographicFilters) await replaceFilters(tx, created, req.body.demographicFilters);
+        await syncGeneratedJds(tx, created.id, audit);
         const p = await loadProject(tx, created.id, actor);
         const body = toProjectDto(p);
         await audit({ entityType: 'Project', entityId: p.id, action: 'project.created', after: { status: 'DRAFT', name: p.name, templateId: t.id, templateVersion: t.version, authoringExperience: p.authoringExperience, reviewRoute: p.reviewRoute } });
@@ -252,6 +264,7 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         const { count } = await tx.project.updateMany({ where: { id: before.id, status: 'DRAFT' }, data: { ...data, updatedAt: new Date() } });
         if (count === 0) throw new AppError(409, 'PROJECT_NOT_EDITABLE', 'This project was submitted or cancelled meanwhile.');
         if (req.body.demographicFilters) await replaceFilters(tx, before, req.body.demographicFilters);
+        await syncGeneratedJds(tx, before.id, audit, { templateChanged: data.templateId !== undefined || (req.body.jdGenerated === true && !before.jdGenerated) });
 
         const after = await loadProject(tx, before.id, actor);
         const changed = Object.keys(req.body) as (keyof ProjectDto)[];
@@ -263,6 +276,22 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
     },
   );
 
+  app.get(
+    '/projects/:id/job-descriptions',
+    {
+      config: { access: ACCESS },
+      schema: { tags: ['projects'], params: IdParams, response: { 200: z.object({ author: JobDescriptionDto.nullable(), reviewer: JobDescriptionDto.nullable() }) } },
+    },
+    async (req) => {
+      const p = await loadProject(db, req.params.id, req.actor!);
+      const [author, reviewer] = await Promise.all([
+        p.jobDescriptionId ? db.jobDescription.findUnique({ where: { id: p.jobDescriptionId } }) : null,
+        p.reviewerJobDescriptionId ? db.jobDescription.findUnique({ where: { id: p.reviewerJobDescriptionId } }) : null,
+      ]);
+      return { author: author ? toJdDto(author) : null, reviewer: reviewer ? toJdDto(reviewer) : null };
+    },
+  );
+
   app.post(
     '/projects/:id/submit',
     { config: { access: ACCESS }, schema: { tags: ['projects'], params: IdParams, response: { 200: ProjectDto } } },
@@ -271,9 +300,10 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         const p = await loadProject(tx, req.params.id, actor);
         if (p.status !== 'DRAFT') throw new AppError(409, 'NOT_A_DRAFT', `Only drafts can be submitted (this project is ${p.status}).`);
 
-        const [attributes, jd, client] = await Promise.all([
+        const [attributes, jd, reviewerJd, client] = await Promise.all([
           tx.demographicAttribute.findMany({ where: { clientId: actor.clientId } }),
           p.jobDescriptionId ? tx.jobDescription.findFirst({ where: { id: p.jobDescriptionId, clientId: actor.clientId } }) : null,
+          p.reviewerJobDescriptionId ? tx.jobDescription.findFirst({ where: { id: p.reviewerJobDescriptionId, clientId: actor.clientId } }) : null,
           tx.client.findUniqueOrThrow({ where: { id: actor.clientId } }),
         ]);
         const maxTaskCount = Number((client.settings as { maxTaskCount?: number }).maxTaskCount ?? DEFAULT_MAX_TASK_COUNT);
@@ -284,6 +314,10 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
           attributes,
           jobDescription: jd ? { wagePerTask: Number(jd.wagePerTask) } : null,
           maxTaskCount,
+          jdProblems: [
+            ...jdProblems(p.template.skills, p, jd, reviewerJd),
+            ...(reviewerJd && !(Number(reviewerJd.wagePerTask) > 0) ? ['Set the wage per task on the reviewer job description'] : []),
+          ],
         });
         if (problems.length > 0) {
           throw new AppError(422, 'PROJECT_INCOMPLETE', `Cannot submit yet: ${problems.join('; ')}.`, { problems, warnings });
@@ -307,6 +341,7 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
             status: 'READY_FOR_STAFFING',
             submittedAt: now,
             jdSnapshotId: jdSnapshot.id,
+            reviewerJdSnapshot: reviewerJd ? (toJdDto(reviewerJd) as unknown as Prisma.InputJsonValue) : undefined,
             demographicsSnapshot: demographicsSnapshot as unknown as Prisma.InputJsonValue,
             requiredWorkers: figures.requiredWorkers,
             figures: figures as unknown as Prisma.InputJsonValue,

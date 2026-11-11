@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { applyGraphOps, GraphOp } from './workflow-graph/edit';
+import { WorkflowGraph } from './workflow-graph/schema';
 /** Model output is a proposal, never an approval or an executable tool call. */
 const Json: z.ZodType<unknown> = z.lazy(() => z.union([z.string().max(12000), z.number().finite(), z.boolean(), z.null(), z.array(Json).max(100), z.record(Json)]));
 export const AUTHORING_KEYS = ['header', 'scenario', 'customerFile', 'evidence', 'environment', 'policy', 'solution', 'rubric', 'body'] as const;
@@ -8,6 +10,8 @@ export const ConversationProposal = z.object({
   changes: z.array(z.object({ section: z.enum(AUTHORING_KEYS), value: Json, reason: z.string().min(1).max(2000) }).strict()).max(9),
   ruleLinks: z.array(z.object({ stepId: z.string().max(100), ruleVersionId: z.string().max(100), reason: z.string().min(1).max(2000) }).strict()).max(50),
   unresolved: z.array(z.string().min(1).max(1000)).max(30),
+  /** Authoring v2.1 Wave 2: workflow changes, in the SME's own words; applied only when the SME confirms. */
+  graphOps: z.array(GraphOp).max(10).optional(),
 }).strict();
 export type ConversationProposal = z.infer<typeof ConversationProposal>;
 export function applyConversationChanges(current: Record<string, unknown>, p: ConversationProposal) {
@@ -21,6 +25,11 @@ export function applyConversationChanges(current: Record<string, unknown>, p: Co
     if (c.value === null || (c.section !== 'body' && (typeof c.value !== 'object' || Array.isArray(c.value)))) throw new Error('Sections must be objects');
     if (c.section === 'body' && typeof c.value !== 'string') throw new Error('Body must be text');
     next[c.section] = structuredClone(c.value);
+  }
+  if (p.graphOps?.length) {
+    const graph = WorkflowGraph.safeParse(current.workflowGraph);
+    if (!graph.success) throw new Error('Start the workflow in Classic before changing it in the chat');
+    next.workflowGraph = applyGraphOps(graph.data, p.graphOps);
   }
   return next;
 }

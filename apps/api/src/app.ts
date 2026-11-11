@@ -32,6 +32,7 @@ import { MockSuitabilityEvaluator, vertexSuitabilityEvaluator, type SuitabilityE
 import { GcsStorage, stubScanner, type MalwareScanner, type ObjectStorage } from './candidate/storage';
 import { defaultAdapters, type Adapters } from './policy/extraction/service';
 import { policyRoutes } from './routes/policy';
+import { policyProposalRoutes } from './routes/policy-proposals';
 import { campaignRoutes } from './routes/campaigns';
 import { journeyRoutes } from './routes/journey';
 import { taskRoutes } from './routes/tasks';
@@ -48,7 +49,7 @@ import { certAdminRoutes } from './routes/cert-admin';
 import { certCandidateRoutes } from './routes/cert-candidate';
 import { paymentCandidateRoutes, paymentRoutes } from './routes/payments';
 import { supportRoutes } from './routes/support';
-import { ClaudeVertexSupportAssistant, MockSupportAssistant, type SupportAssistant } from './support/assistant';
+import { ClaudeVertexSupportAssistant, GeminiSupportAssistant, MockSupportAssistant, supportModel, type SupportAssistant } from './support/assistant';
 import { MockPayoutProvider, TrolleyPayoutProvider, type PayoutProvider } from './pay/provider';
 import { ClaudeVertexCurriculumGenerator, MockCurriculumGenerator, type CurriculumGenerator } from './cert/generator';
 import { MockSelfieCheck, StripeSelfieCheck, type SelfieCheck } from './cert/selfie';
@@ -62,6 +63,9 @@ import { reviewRoutes } from './routes/review';
 import { candidateAuthRoutes } from './routes/candidate-auth';
 import { candidateRoutes } from './routes/candidates';
 import { opportunityRoutes } from './routes/opportunities';
+import { reviewerRecruitmentRoutes } from './routes/reviewer-recruitment';
+import { searchRoutes } from './routes/search';
+import { SearchService } from './search/service';
 import { projectRoutes } from './routes/projects';
 import { staffingRoutes } from './routes/staffing';
 import { OfflineGeocoder, type Geocoder } from './staffing/geocoder';
@@ -117,7 +121,11 @@ export interface AppDeps {
 }
 
 export function defaultSupport(config: Config): SupportAssistant {
-  return config.assistantMode === 'vertex' ? new ClaudeVertexSupportAssistant({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION, model: config.SUPPORT_MODEL }) : new MockSupportAssistant();
+  if (config.assistantMode !== 'vertex') return new MockSupportAssistant();
+  // SUPPORT_MODEL takes the same forms as AUTHORING_MODEL; unset, it follows a Gemini AUTHORING_MODEL (QA), else Claude.
+  const { vendor, model } = supportModel(config);
+  if (vendor === 'gemini') return new GeminiSupportAssistant(model, { projectId: config.VERTEX_PROJECT_ID, location: config.VERTEX_LOCATION });
+  return new ClaudeVertexSupportAssistant({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION, model });
 }
 
 export function defaultPayouts(config: Config): PayoutProvider {
@@ -308,6 +316,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       });
       await v1.register(candidateRoutes, { db: deps.db });
       await v1.register(opportunityRoutes, { db: deps.db, config: deps.config });
+      await v1.register(reviewerRecruitmentRoutes, { db: deps.db });
+      await v1.register(searchRoutes, { service: new SearchService(deps.db, deps.embeddings ?? defaultEmbeddings(deps.config)) });
       await v1.register(campaignRoutes, { db: deps.db, config: deps.config });
       await v1.register(profileRoutes, {
         db: deps.db,
@@ -320,11 +330,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(journeyRoutes, { db: deps.db, config: deps.config, selectionGate });
       await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
       await v1.register(candidateStudioRoutes, { db: deps.db, config: deps.config, storage, deps: resolveDeps(deps.metaCompiler?.deps), selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), faults: deps.metaCompiler?.studioFaults });
-      await v1.register(taskReviewRoutes, { db: deps.db });
+      await v1.register(taskReviewRoutes, { db: deps.db, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
       await v1.register(modelProviderRoutes, { db: deps.db, config: deps.config });
       await v1.register(conversationRoutes, { db: deps.db, selectionGate, dailyModelCallCap: deps.config.AUTHORING_DAILY_CALL_CAP });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       await v1.register(policyRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, adapters: deps.policyAdapters ?? defaultAdapters(deps.config.policy) });
+      await v1.register(policyProposalRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       // M10 SME supply: nothing is registered with the flag off (docs/SME-SUPPLY.md section 13).
       if (deps.config.SME_SUPPLY_ENABLED) {
         const email = deps.email ?? defaultEmail(deps.config);

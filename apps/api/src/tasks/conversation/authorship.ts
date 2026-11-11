@@ -1,4 +1,4 @@
-import type { ConversationProposal } from '@praxis/shared';
+import { applyGraphOps, graphOpText, planNextQuestion, profileForWorkflow, WorkflowGraph, type ConversationProposal } from '@praxis/shared';
 export { AUTHORSHIP_VERSION, AUTHORSHIP_TERMS } from '@praxis/shared';
 const normal = (v: string) => v.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 /** Reject new substantive text not extractable from AUTHOR messages. This proves source linkage, not external authorship. */
@@ -26,11 +26,18 @@ export function authoredChangeProblems(current: Record<string, unknown>, p: Conv
     if (typeof value === 'boolean' && !authorMessages.some(s=>normal(s).includes(normal(`${path.split('.').at(-1)} ${value}`)))) issues.push(`Explicitly state ${path.split('.').at(-1)} ${value} yourself.`);
   };
   for (const c of p.changes) walk(c.value,current[c.section],c.section);
+  issues.push(...graphOpProblems(current, p, sources));
   return [...new Set(issues)].slice(0,20);
 }
 /** Public response text is server-owned: an off-topic or answer-generating model reply is never shown. */
 export function facilitatorQuestion(text: string, output: Record<string, unknown>, workflow: string): string {
   if (/\b(ssn|tax\s*id|tin)\b/i.test(text)) return 'Which jurisdiction and customer category apply, and which approved project rule requires this identifier or permits an alternative? State your own assessment.';
+  // Template-aware planner (Wave 2): the next required field the SME has not written yet, from the template profile.
+  const lookup = profileForWorkflow(workflow);
+  if (lookup.status === 'ok') {
+    const planned = planNextQuestion(lookup.profile, output, text);
+    if (planned) return planned.question;
+  }
   if (/rubric|grading|weight|criterion/i.test(text)) return 'In your own words, what earns full, partial and zero credit, and which failure is critical?';
   if (/policy|rule|exception/i.test(text)) return 'Which published project rule applies to which investigation step, and what facts or exceptions determine its applicability?';
   if (!(output as {scenario?: unknown}).scenario) return `Describe one ${workflow} case in your own words: the subject, evidence and complication.`;
@@ -38,4 +45,29 @@ export function facilitatorQuestion(text: string, output: Record<string, unknown
 }
 export function generationRequest(text: string) {
   return /(?:write|generate|draft|create|give|produce|solve|answer).{0,50}(?:for me|my answer|the answer|correct answer|reference solution|complete task)|(?:do|finish)\s+(?:my|the)\s+(?:task|work)|write\s+(?:a|an)\s+(?:poem|essay|story)|\b(?:weather|sports scores|stock price)\b/i.test(text);
+}
+
+/**
+ * Workflow changes a proposal carries (Wave 2): every label, instruction and prompt must come from the SME's own
+ * messages, and the operations must apply to the current graph. Applying happens only on the SME's confirmation.
+ */
+function graphOpProblems(current: Record<string, unknown>, p: ConversationProposal, normalisedSources: string[]): string[] {
+  if (!p.graphOps?.length) return [];
+  const issues: string[] = [];
+  p.graphOps.forEach((op, i) => {
+    for (const text of graphOpText(op)) {
+      const needle = normal(text);
+      if (needle && !normalisedSources.some((s) => s.includes(needle))) issues.push(`Type your own wording for workflow change ${i + 1} ("${text.slice(0, 60)}"); generated wording cannot be applied.`);
+    }
+  });
+  const graph = WorkflowGraph.safeParse(current.workflowGraph);
+  if (!graph.success) issues.push('Start the workflow in Classic before changing it in the chat.');
+  else {
+    try {
+      applyGraphOps(graph.data, p.graphOps);
+    } catch (e) {
+      issues.push(`Workflow change cannot apply: ${e instanceof Error ? e.message : 'invalid change'}.`);
+    }
+  }
+  return issues;
 }

@@ -126,8 +126,8 @@ describe('fixture files for Anvil', () => {
   });
 });
 
-describe('template starting workflows (Wave 1)', () => {
-  it.each(['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone'])('%s passes the checker with no errors or warnings', async (name) => {
+describe('template starting workflows (Waves 1 to 3)', () => {
+  it.each(['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone', 'Adverse media review', 'Enhanced due diligence', 'Customer risk rating', 'Q4 Global Paid Search Query Clustering', 'Fraud-risk/compliance handoffs', 'Compliance monitoring'])('%s passes the checker with no errors or warnings', async (name) => {
     const { templateStartingGraph } = await import('../src/workflow-graph');
     const g = templateStartingGraph(name)!;
     expect(g).not.toBeNull();
@@ -135,8 +135,46 @@ describe('template starting workflows (Wave 1)', () => {
     expect(r.errors).toEqual([]);
     expect(r.warnings).toEqual([]);
   });
-  it('has no starting workflow for templates outside Wave 1', async () => {
+  it('Wave 2 person steps (owner, 12 Nov): EDD approver always; adverse media reviewer only on escalate; CRR approver only on a proposed override', async () => {
+    const { templateStartingGraph, WAVE2_GRAPH_TEMPLATES, checkWorkflowGraph } = await import('../src/workflow-graph');
+    expect(WAVE2_GRAPH_TEMPLATES).toEqual(['Adverse media review', 'Enhanced due diligence', 'Customer risk rating']);
+    const g = (name: string) => templateStartingGraph(name)!;
+    const humans = (name: string) => g(name).nodes.filter((n) => n.type === 'human_step');
+    expect(humans('Enhanced due diligence')).toMatchObject([{ actorRole: 'Authorised approver' }]);
+    expect(humans('Adverse media review')).toMatchObject([{ actorRole: 'Compliance reviewer' }]);
+    expect(humans('Customer risk rating')).toMatchObject([{ actorRole: 'Senior compliance approver' }]);
+    // The conditional person steps sit behind a decision with exact routes, plus else and unknown to escalation.
+    const gate = (name: string) => g(name).nodes.find((n) => n.id === 'needs_person') as { conditions: Array<{ id: string; field: string; op: string; value?: unknown }> } | undefined;
+    expect(gate('Enhanced due diligence')).toBeUndefined();
+    expect(gate('Adverse media review')!.conditions).toEqual([
+      { id: 'yes', label: 'Escalate', field: 'result.recommendation', op: 'eq', value: 'escalate' },
+      { id: 'no', label: 'Close or request information', field: 'result.recommendation', op: 'neq', value: 'escalate' },
+    ]);
+    expect(gate('Customer risk rating')!.conditions.map((c) => [c.op, c.value])).toEqual([['in', ['proposed_increase', 'proposed_decrease']], ['eq', 'none']]);
+    for (const name of ['Adverse media review', 'Customer risk rating']) {
+      const ports = g(name).edges.filter((e) => e.from === 'needs_person').map((e) => [e.port, e.to]);
+      expect(ports).toEqual([['yes', 'human'], ['no', 'done'], ['else', 'escalate'], ['unknown', 'escalate']]);
+    }
+    for (const name of WAVE2_GRAPH_TEMPLATES) {
+      expect(g(name)).toMatchObject({ agentMode: 'SINGLE', loops: [expect.objectContaining({ maxIterations: 2, exhaustedTarget: 'escalate' })] });
+      expect(checkWorkflowGraph(g(name)).errors, name).toEqual([]);
+    }
+  });
+  it('Wave 3: single-agent workflows with a bounded request loop; only fraud handoffs has a person step (owner, 12 Nov)', async () => {
+    const { templateStartingGraph, WAVE3_GRAPH_TEMPLATES } = await import('../src/workflow-graph');
+    expect(WAVE3_GRAPH_TEMPLATES).toEqual(['Q4 Global Paid Search Query Clustering', 'Fraud-risk/compliance handoffs', 'Compliance monitoring']);
+    for (const name of WAVE3_GRAPH_TEMPLATES) {
+      const g = templateStartingGraph(name)!;
+      expect(g).toMatchObject({ agentMode: 'SINGLE', loops: [expect.objectContaining({ maxIterations: 2, exhaustedTarget: 'escalate' })] });
+      expect(g.nodes.filter((n) => n.type === 'human_step')).toHaveLength(name === 'Fraud-risk/compliance handoffs' ? 1 : 0);
+      expect(g.roles.every((r) => (r.tools ?? []).length === 0)).toBe(true);
+    }
+    expect(templateStartingGraph('Fraud-risk/compliance handoffs')!.nodes.find((n) => n.type === 'human_step')).toMatchObject({ actorRole: 'Receiving fraud or compliance team', responseSchema: [{ options: ['Accept', 'Return'] }] });
+    // The catalogue import may write an en dash.
+    expect(templateStartingGraph('Fraud–risk/compliance handoffs')!.templateId).toBe('fraud-risk-and-compliance-handoffs');
+  });
+  it('has no starting workflow for templates outside Waves 1 to 3', async () => {
     const { templateStartingGraph } = await import('../src/workflow-graph');
-    expect(templateStartingGraph('Customer risk rating')).toBeNull();
+    expect(templateStartingGraph('Communications surveillance')).toBeNull();
   });
 });

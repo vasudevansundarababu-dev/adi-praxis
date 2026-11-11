@@ -13,7 +13,7 @@ generator client {
 datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
-  extensions = [vector]
+  extensions = [vector, pg_trgm]
 }
 
 // ───────────────────────────── Enums ─────────────────────────────
@@ -170,6 +170,16 @@ enum TaskReviewDecision {
   ACCEPT
   REWORK
   REJECT
+  /// SME -> Expert -> PM route: the Expert completed review of this exact version and routed it to the PM.
+  PASS
+  /// SME -> Expert -> PM route: the Expert edited the task (a new version), with a recorded reason.
+  EDIT
+}
+
+/// Pending stage of a SUBMITTED task on the SME -> Expert -> PM route (null on the SME -> PM route).
+enum ReviewStage {
+  EXPERT_REVIEW
+  PM_APPROVAL
 }
 
 enum TaskRejectReason {
@@ -495,26 +505,45 @@ model DemographicAttribute {
 // ───────────────────────────── FLOW 1: projects ─────────────────────────────
 
 model JobDescription {
-  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId         String       @map("client_id") @db.Uuid
-  title            String
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String       @map("client_id") @db.Uuid
+  title              String
   /// Lower-cased, whitespace-collapsed title for FLOW 2 JD lookup.
-  normalizedTitle  String       @map("normalized_title")
-  responsibilities String
-  skills           String[]
-  wagePerTask      Decimal      @map("wage_per_task") @db.Decimal(12, 2)
-  wageCurrency     String       @map("wage_currency") @db.Char(3)
-  locationType     LocationType @map("location_type")
-  location         String?
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  normalizedTitle    String       @map("normalized_title")
+  responsibilities   String
+  skills             String[]
+  wagePerTask        Decimal      @map("wage_per_task") @db.Decimal(12, 2)
+  wageCurrency       String       @map("wage_currency") @db.Char(3)
+  locationType       LocationType @map("location_type")
+  location           String?
+  /// Generated JDs (12 Nov 2026): who the JD recruits.
+  role               JdRole       @default(AUTHOR)
+  /// True when Praxis generated it from the template for one project (projectId).
+  generated          Boolean      @default(false)
+  projectId          String?      @map("project_id") @db.Uuid
+  /// The template's skills; the PM may add skills but not remove these.
+  mandatorySkills    String[]     @default([]) @map("mandatory_skills")
+  minExperienceYears Int?         @map("min_experience_years")
+  /// Minimum ISCED level, e.g. ISCED_6.
+  educationLevel     String?      @map("education_level")
+  /// [{ key, label, text, required }] from the project's demographic filters.
+  demographicProfile Json         @default("[]") @map("demographic_profile")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
 
   templatesAsDefault Template[]               @relation("TemplateDefaultJd")
-  projects           Project[]
+  projects           Project[]                @relation("ProjectJd")
+  reviewerProjects   Project[]                @relation("ProjectReviewerJd")
   snapshots          JobDescriptionSnapshot[]
   campaigns          Campaign[]
 
+  @@unique([projectId, role])
   @@index([clientId, normalizedTitle])
+}
+
+enum JdRole {
+  AUTHOR
+  REVIEWER
 }
 
 /// Frozen copy of a JD at project submit; ApprovedTaskRecord.jd_snapshot_id points here.
@@ -548,65 +577,71 @@ enum ReviewRoute {
 }
 
 model Project {
-  id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId                String        @map("client_id") @db.Uuid
-  ownerId                 String        @map("owner_id") @db.Uuid
-  templateId              String        @map("template_id") @db.Uuid
-  templateVersion         Int           @map("template_version")
-  jobDescriptionId        String?       @map("job_description_id") @db.Uuid
-  jdSnapshotId            String?       @map("jd_snapshot_id") @db.Uuid
-  name                    String
-  description             String?
-  status                  ProjectStatus @default(DRAFT)
+  id                       String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId                 String               @map("client_id") @db.Uuid
+  ownerId                  String               @map("owner_id") @db.Uuid
+  templateId               String               @map("template_id") @db.Uuid
+  templateVersion          Int                  @map("template_version")
+  jobDescriptionId         String?              @map("job_description_id") @db.Uuid
+  jdSnapshotId             String?              @map("jd_snapshot_id") @db.Uuid
+  /// SME -> Expert -> PM: the generated reviewer JD and its snapshot at submit.
+  reviewerJobDescriptionId String?              @map("reviewer_job_description_id") @db.Uuid
+  reviewerJdSnapshot       Json?                @map("reviewer_jd_snapshot")
+  /// New projects generate their JDs from the template (false keeps a hand-picked JD; legacy projects).
+  jdGenerated              Boolean              @default(false) @map("jd_generated")
+  name                     String
+  description              String?
+  status                   ProjectStatus        @default(DRAFT)
   /// Null preserves both existing editors for legacy projects; new projects choose explicitly.
-  authoringExperience     AuthoringExperience? @map("authoring_experience")
+  authoringExperience      AuthoringExperience? @map("authoring_experience")
   /// SME -> PM (default) or SME -> Expert -> PM. Frozen once tasks exist.
-  reviewRoute             ReviewRoute   @default(SME_PM) @map("review_route")
-  taskMode                TaskMode      @default(AUTHORING) @map("task_mode")
+  reviewRoute              ReviewRoute          @default(SME_PM) @map("review_route")
+  taskMode                 TaskMode             @default(AUTHORING) @map("task_mode")
   /// Annotation projects: number of task instances.
-  taskCount               Int?          @map("task_count")
+  taskCount                Int?                 @map("task_count")
   /// Authoring projects: distinct-task target and per-expert cap.
-  distinctTarget          Int?          @map("distinct_target")
-  maxPerExpert            Int?          @map("max_per_expert")
-  openSlotShare           Decimal?      @map("open_slot_share") @db.Decimal(4, 3)
+  distinctTarget           Int?                 @map("distinct_target")
+  maxPerExpert             Int?                 @map("max_per_expert")
+  openSlotShare            Decimal?             @map("open_slot_share") @db.Decimal(4, 3)
   /// PM-raised coverage quotas (never below the template minimum).
-  coverageQuotas          Json?         @map("coverage_quotas")
-  tptMinutes              Int?          @map("tpt_minutes")
-  hoursPerWorkerDay       Decimal       @default(4) @map("hours_per_worker_day") @db.Decimal(4, 2)
-  startDate               DateTime?     @map("start_date") @db.Date
-  endDate                 DateTime?     @map("end_date") @db.Date
-  requiredWorkers         Int?          @map("required_workers")
+  coverageQuotas           Json?                @map("coverage_quotas")
+  tptMinutes               Int?                 @map("tpt_minutes")
+  hoursPerWorkerDay        Decimal              @default(4) @map("hours_per_worker_day") @db.Decimal(4, 2)
+  startDate                DateTime?            @map("start_date") @db.Date
+  endDate                  DateTime?            @map("end_date") @db.Date
+  requiredWorkers          Int?                 @map("required_workers")
   /// Computed fields frozen at submit: tasks, requiredAuthors, totalEffortHours, workingDays, labourBudget.
-  figures                 Json?
-  demographicsSnapshot    Json?         @map("demographics_snapshot")
-  autoLaunchCampaign      Boolean       @default(false) @map("auto_launch_campaign")
+  figures                  Json?
+  demographicsSnapshot     Json?                @map("demographics_snapshot")
+  autoLaunchCampaign       Boolean              @default(false) @map("auto_launch_campaign")
   /// M10 per-project switch (with the global SME_SUPPLY_ENABLED flag): requisitions and partner supply.
-  smeSupplyEnabled        Boolean       @default(false) @map("sme_supply_enabled")
-  openTaskCapPerCandidate Int           @default(3) @map("open_task_cap_per_candidate")
-  submittedAt             DateTime?     @map("submitted_at")
-  createdAt               DateTime      @default(now()) @map("created_at")
-  updatedAt               DateTime      @updatedAt @map("updated_at")
+  smeSupplyEnabled         Boolean              @default(false) @map("sme_supply_enabled")
+  openTaskCapPerCandidate  Int                  @default(3) @map("open_task_cap_per_candidate")
+  submittedAt              DateTime?            @map("submitted_at")
+  createdAt                DateTime             @default(now()) @map("created_at")
+  updatedAt                DateTime             @updatedAt @map("updated_at")
 
-  client             Client                     @relation(fields: [clientId], references: [id])
-  owner              User                       @relation("ProjectOwner", fields: [ownerId], references: [id])
-  template           Template                   @relation(fields: [templateId], references: [id])
-  jobDescription     JobDescription?            @relation(fields: [jobDescriptionId], references: [id])
-  jdSnapshot         JobDescriptionSnapshot?    @relation(fields: [jdSnapshotId], references: [id])
-  demographicFilters ProjectDemographicFilter[]
-  campaigns          Campaign[]
-  assignments        ProjectAssignment[]
-  tasks              TaskInstance[]
-  studioDeployments  StudioDeployment[]
-  smeAuthoredTasks   SmeAuthoredTask[]
-  slots              CoverageSlot[]
-  inputBatches       TaskInputBatch[]
-  opportunity        Opportunity?
-  reviewers          ProjectReviewer[]
-  requisitions       Requisition[]
-  matches            ProjectMatch[]
-  matchRejections    ProjectMatchRejection[]
+  client                 Client                     @relation(fields: [clientId], references: [id])
+  owner                  User                       @relation("ProjectOwner", fields: [ownerId], references: [id])
+  template               Template                   @relation(fields: [templateId], references: [id])
+  jobDescription         JobDescription?            @relation("ProjectJd", fields: [jobDescriptionId], references: [id])
+  jdSnapshot             JobDescriptionSnapshot?    @relation(fields: [jdSnapshotId], references: [id])
+  reviewerJobDescription JobDescription?            @relation("ProjectReviewerJd", fields: [reviewerJobDescriptionId], references: [id])
+  demographicFilters     ProjectDemographicFilter[]
+  campaigns              Campaign[]
+  assignments            ProjectAssignment[]
+  tasks                  TaskInstance[]
+  studioDeployments      StudioDeployment[]
+  smeAuthoredTasks       SmeAuthoredTask[]
+  slots                  CoverageSlot[]
+  inputBatches           TaskInputBatch[]
+  opportunities          Opportunity[]
+  reviewers              ProjectReviewer[]
+  requisitions           Requisition[]
+  matches                ProjectMatch[]
+  matchRejections        ProjectMatchRejection[]
   /// When the last FLOW 2 match run finished.
-  matchedAt          DateTime?                  @map("matched_at")
+  matchedAt              DateTime?                  @map("matched_at")
 
   @@unique([clientId, name])
   @@index([ownerId])
@@ -819,6 +854,13 @@ model TaskReview {
   /// Comments pinned to workbench sections: [{ section, text }]
   comments          Json               @default("[]")
   notes             String?
+  /// SME -> Expert -> PM route: the responsibility this decision was made under (null for SME -> PM decisions).
+  stage             ReviewStage?
+  /// sha256 of the stable JSON of the decided version's output; binds the decision to exact content.
+  contentHash       String?            @map("content_hash")
+  /// EDIT only: the Expert's recorded reason, and whether the edit is material (the author must reconfirm).
+  editReason        String?            @map("edit_reason")
+  material          Boolean?
   createdAt         DateTime           @default(now()) @map("created_at")
 
   taskInstance TaskInstance @relation(fields: [taskInstanceId], references: [id])
@@ -900,6 +942,8 @@ model TaskInstance {
   /// M9 drafting state, kept server-side so autosave cannot change it: per section { runId, draftedAt, draftHash,
   /// confirmedAt, editedAfterDraft }, plus the kinds of source used. Null for tasks written by hand.
   drafting            Json?
+  /// SME -> Expert -> PM route only: which responsibility the SUBMITTED task waits for. Null on the SME -> PM route.
+  reviewStage         ReviewStage?                @map("review_stage")
   createdAt           DateTime                    @default(now()) @map("created_at")
   updatedAt           DateTime                    @updatedAt @map("updated_at")
 
@@ -1028,6 +1072,8 @@ model RLReviewRequest {
   /// Inline steps, or { signedUrl } when large.
   trajectories    Json
   rubricId        String?               @map("rubric_id")
+  /// The run's final output.json when RL Gym / Anvil sends it (Q4 clustering F1 for the Reviewer).
+  finalOutput     Json?                 @map("final_output")
   priority        Int                   @default(0)
   dueBy           DateTime?             @map("due_by")
   status          RLReviewRequestStatus @default(RECEIVED)
@@ -1281,7 +1327,9 @@ model AlternativeIdentityCheck {
 model Opportunity {
   id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId            String            @map("client_id") @db.Uuid
-  projectId           String            @unique @map("project_id") @db.Uuid
+  projectId           String            @map("project_id") @db.Uuid
+  /// Owner, 12 Nov 2026: one job post per project and role (AUTHOR from the JD; REVIEWER from the reviewer JD).
+  role                JdRole            @default(AUTHOR)
   status              OpportunityStatus @default(DRAFT)
   /// Working copy the owner edits; publishing freezes it into a new OpportunityVersion.
   draftBrief          Json?             @map("draft_brief")
@@ -1295,6 +1343,8 @@ model Opportunity {
   versions    OpportunityVersion[]
   enrollments Enrollment[]
   documents   OpportunityDocument[]
+
+  @@unique([projectId, role])
 }
 
 enum OpportunityDocumentStatus {
@@ -2798,6 +2848,32 @@ enum PolicyDocumentOrigin {
   UPLOAD
   MANUAL_TEXT
   SEED
+  /// Accepted from an SME's policy proposal (authoring v2.1 Wave 3).
+  SME_PROPOSAL
+}
+
+enum PolicyProposalStatus {
+  PENDING
+  ACCEPTED
+  RETURNED
+  REJECTED
+}
+
+/// docs/authoring/handover-v2/07: source categories, not a hierarchy.
+enum PolicyProposalCategory {
+  BANK_POLICY
+  CUSTOMER_POLICY
+  REGULATION
+  SUPPORTING_REFERENCE
+}
+
+/// The reviewer's qualification of a proposed document (chapter 07). A document-workflow outcome, not a task state.
+enum PolicyQualification {
+  POLICY_CANDIDATE
+  SUPPORTING_REFERENCE
+  UNRELATED
+  UNREADABLE
+  SENSITIVE
 }
 
 enum ExtractionStatus {
@@ -2868,6 +2944,54 @@ model PolicyDocument {
   versions PolicyDocumentVersion[]
 
   @@index([clientId, projectId])
+}
+
+/// An SME's proposed policy document (authoring v2.1 Wave 3, handover chapter 07). Pending until an assigned Expert
+/// (Validator) or the project's PM/Admin decides. Nothing in a proposal is authoritative: accepting it only adds a
+/// project document version, whose rules still go through extraction, rule review and PM/Admin publication. The file
+/// columns and a decision, once made, are immutable (trigger).
+model PolicyProposal {
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String                 @map("client_id") @db.Uuid
+  projectId         String                 @map("project_id") @db.Uuid
+  taskInstanceId    String?                @map("task_instance_id") @db.Uuid
+  smeUserId         String                 @map("sme_user_id") @db.Uuid
+  title             String
+  category          PolicyProposalCategory
+  issuer            String?
+  versionLabel      String?                @map("version_label")
+  language          String?
+  jurisdiction      String?
+  effectiveFrom     DateTime?              @map("effective_from") @db.Date
+  effectiveTo       DateTime?              @map("effective_to") @db.Date
+  /// Why the SME needs this document for their task.
+  reason            String
+  rightsDeclared    Boolean                @map("rights_declared")
+  sha256            String
+  fileName          String                 @map("file_name")
+  mediaType         String                 @map("media_type")
+  format            String?
+  sizeBytes         Int                    @map("size_bytes")
+  pageCount         Int                    @default(0) @map("page_count")
+  storageKey        String                 @unique @map("storage_key")
+  /// Praxis's text reading; null when the file could not be read (flag UNREADABLE).
+  textStorageKey    String?                @map("text_storage_key")
+  textChars         Int                    @default(0) @map("text_chars")
+  /// Deterministic intake flags: [{ code, message }]. Advice to the reviewer only, never a decision.
+  intakeFlags       Json                   @default("[]") @map("intake_flags")
+  status            PolicyProposalStatus   @default(PENDING)
+  qualification     PolicyQualification?
+  decisionReason    String?                @map("decision_reason")
+  decidedById       String?                @map("decided_by_id") @db.Uuid
+  decidedRole       String?                @map("decided_role")
+  decidedAt         DateTime?              @map("decided_at")
+  documentId        String?                @map("document_id") @db.Uuid
+  documentVersionId String?                @map("document_version_id") @db.Uuid
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+
+  @@index([clientId, projectId, status])
+  @@index([smeUserId, projectId])
 }
 
 /// Immutable document version (S1 E04). Append-only in the database.
@@ -3110,4 +3234,24 @@ model TaskPolicySnapshot {
 
   @@unique([taskInstanceId, version])
   @@index([taskInstanceId, digest])
+}
+
+/// Console search bar (owner, 12 Nov 2026): a derived index of list records, kept in step on search.
+/// `text` is matched by letters (pg_trgm); `embedding` holds the professional text's meaning (never names or emails).
+model SearchDocument {
+  id              String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String                       @map("client_id") @db.Uuid
+  entityType      String                       @map("entity_type")
+  entityId        String                       @map("entity_id") @db.Uuid
+  text            String
+  /// sha256 of the meaning text; a change clears the embedding.
+  meaningHash     String                       @map("meaning_hash")
+  embedding       Unsupported("vector(768)")?
+  embeddingModel  String?                      @map("embedding_model")
+  sourceUpdatedAt DateTime                     @map("source_updated_at")
+  createdAt       DateTime                     @default(now()) @map("created_at")
+  updatedAt       DateTime                     @updatedAt @map("updated_at")
+
+  @@unique([entityType, entityId])
+  @@index([clientId, entityType])
 }

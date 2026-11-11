@@ -1,4 +1,5 @@
 import { TIER_LABELS } from '@praxis/shared';
+import { TableSearch } from '@/components/search/table-search';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { NoAccess } from '@/components/no-access';
@@ -26,7 +27,9 @@ export default async function PartnersPage() {
       {items.length === 0 ? (
         <Empty>No partners yet.{isAdmin ? ' Add the first one below.' : ' An Admin onboards partners.'}</Empty>
       ) : (
-        <div className="card mt-6 overflow-x-auto">
+        <>
+        <TableSearch type="partners" label="Search partners" placeholder="Search partners by name" />
+        <div data-search-scope="partners" className="card mt-6 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-line text-fg-muted">
               <tr>
@@ -40,7 +43,7 @@ export default async function PartnersPage() {
             </thead>
             <tbody className="divide-y divide-line">
               {items.map((p) => (
-                <tr key={p.id}>
+                <tr data-search-id={p.id} key={p.id}>
                   <td className={TD}>
                     {isAdmin ? (
                       <Link href={`/partners/${p.id}`} className="font-medium text-link hover:underline">
@@ -64,6 +67,7 @@ export default async function PartnersPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
       {isAdmin && <NewPartnerForm />}
     </div>

@@ -1,7 +1,7 @@
 import { WORKFLOW_GRAPH_SCHEMA, type WorkflowGraphInput } from './schema';
 
 /**
- * Starting workflows for the Wave 1 templates. An SME starts from the template's workflow with an explicit
+ * Starting workflows for the Wave 1, 2 and 3 templates. An SME starts from the template's workflow with an explicit
  * "Start from the template workflow" action, then edits it for the assigned case. These describe the template's
  * process shape only: they hold no case facts, answers or rubric judgements.
  */
@@ -13,6 +13,8 @@ interface Pattern {
   missing: { question: string; label: string; instruction: string };
   conclude: { label: string; instruction: string; output: string };
   human: { label: string; actorRole: string; prompt: string; choices: [string, string] } | null;
+  /** The person step is reached only when the result matches (owner, 12 Nov): e.g. an override was proposed. */
+  humanWhen?: { question: string; label: string; field: string; op: 'eq' | 'in'; value: string | string[]; otherwiseLabel: string; otherwise: { op: 'eq' | 'neq'; value: string } };
   outputLabel: string;
   escalation: string;
 }
@@ -56,8 +58,29 @@ function reviewPattern(p: Pattern, templateVersion = 1): WorkflowGraphInput {
       permittedEvidence: ['case_inputs', 'result'],
       timeoutMinutes: 1440,
     });
+    if (p.humanWhen) {
+      const w = p.humanWhen;
+      nodes.push({
+        id: 'needs_person',
+        type: 'decision',
+        label: w.question,
+        question: w.question,
+        conditions: [
+          { id: 'yes', label: w.label, field: w.field, op: w.op, value: w.value },
+          { id: 'no', label: w.otherwiseLabel, field: w.field, op: w.otherwise.op, value: w.otherwise.value },
+        ],
+      });
+      edges.push(
+        { id: 'e8', from: 'conclude', to: 'needs_person', label: '' },
+        { id: 'e11', from: 'needs_person', to: 'human', port: 'yes', label: w.label },
+        { id: 'e12', from: 'needs_person', to: 'done', port: 'no', label: w.otherwiseLabel },
+        { id: 'e13', from: 'needs_person', to: 'escalate', port: 'else', label: 'Other' },
+        { id: 'e14', from: 'needs_person', to: 'escalate', port: 'unknown', label: 'Unclear' },
+      );
+    } else {
+      edges.push({ id: 'e8', from: 'conclude', to: 'human', label: '' });
+    }
     edges.push(
-      { id: 'e8', from: 'conclude', to: 'human', label: '' },
       { id: 'e9', from: 'human', to: 'done', port: 'responded', label: 'Responded' },
       { id: 'e10', from: 'human', to: 'escalate', port: 'timeout', label: 'No response' },
     );
@@ -139,9 +162,86 @@ const PATTERNS: Record<string, Pattern> = {
     outputLabel: 'Launch plan',
     escalation: 'The plan cannot meet policy with the given brief.',
   },
+  // Wave 2. The tool catalogue of these templates is not qualified yet (task.md open questions), so roles list none.
+  'Adverse media review': {
+    templateId: 'adverse-media-review',
+    role: { name: 'Adverse media analyst', responsibility: 'Decide whether media is about the customer and whether it matters', tools: [] },
+    evidence: 'Customer identifiers, media extracts and source metadata',
+    review: { label: 'Assess media', instruction: 'Match each extract to the customer identifiers; judge source reliability and separate allegations from established facts, citing evidence IDs.', output: 'Match and source assessment' },
+    missing: { question: 'Identity resolved?', label: 'Request identifiers', instruction: 'Ask for the specific identifier or source detail needed to resolve the match.' },
+    conclude: { label: 'Recommend outcome', instruction: 'State the match status and relevance, then recommend an outcome with rationale.', output: 'Match status and recommendation' },
+    // Owner, 12 Nov: an "escalate" recommendation goes to a compliance reviewer.
+    human: { label: 'Compliance reviewer decides', actorRole: 'Compliance reviewer', prompt: 'Confirm or dismiss the escalated adverse media.', choices: ['Confirm', 'Dismiss'] },
+    humanWhen: { question: 'Escalation recommended?', label: 'Escalate', field: 'result.recommendation', op: 'eq', value: 'escalate', otherwiseLabel: 'Close or request information', otherwise: { op: 'neq', value: 'escalate' } },
+    outputLabel: 'Adverse media recommendation',
+    escalation: 'The match or its relevance cannot be resolved with the available evidence.',
+  },
+  'Enhanced due diligence': {
+    templateId: 'enhanced-due-diligence',
+    role: { name: 'EDD analyst', responsibility: 'Carry out enhanced checks on a higher-risk relationship', tools: [] },
+    evidence: 'High-risk case, funds, wealth, ownership and adverse findings',
+    review: { label: 'Perform enhanced checks', instruction: 'Check source of funds, source of wealth, ownership and adverse findings; record each evidence status with evidence IDs.', output: 'Enhanced check findings' },
+    missing: { question: 'Evidence sufficient?', label: 'Request evidence', instruction: 'Ask for exactly the missing or conflicting evidence and say why it is needed.' },
+    conclude: { label: 'Assess risk and recommend', instruction: 'Assess the relationship risk and recommend a next action with rationale and a hand-off.', output: 'Risk assessment, recommendation and hand-off' },
+    human: { label: 'Approver decides', actorRole: 'Authorised approver', prompt: 'Approve or decline the relationship on the EDD recommendation.', choices: ['Approve', 'Decline'] },
+    outputLabel: 'EDD recommendation',
+    escalation: 'The relationship cannot be assessed with the available evidence.',
+  },
+  'Customer risk rating': {
+    templateId: 'customer-risk-rating',
+    role: { name: 'Risk rating analyst', responsibility: 'Assess risk factors and propose a rating under the versioned methodology', tools: [] },
+    evidence: 'Customer profile, risk factors and rating methodology',
+    review: { label: 'Assess risk factors', instruction: 'Assess each factor the methodology names against the evidence, citing evidence IDs.', output: 'Factor assessments' },
+    missing: { question: 'Factors supported?', label: 'Request factor evidence', instruction: 'Ask for the specific evidence a risk factor needs.' },
+    conclude: { label: 'Propose rating', instruction: 'Calculate the rating where the methodology supports it; propose the risk and any override with rationale.', output: 'Proposed risk, override and rationale' },
+    // Owner, 12 Nov: a proposed override needs a senior compliance approver.
+    human: { label: 'Senior compliance approver decides', actorRole: 'Senior compliance approver', prompt: 'Approve or decline the proposed override of the calculated rating.', choices: ['Approve', 'Decline'] },
+    humanWhen: { question: 'Override proposed?', label: 'Override proposed', field: 'result.override', op: 'in', value: ['proposed_increase', 'proposed_decrease'], otherwiseLabel: 'No override', otherwise: { op: 'eq', value: 'none' } },
+    outputLabel: 'Proposed risk rating',
+    escalation: 'The rating cannot be determined with the available evidence.',
+  },
+  // Wave 3. As in Wave 2, the tool catalogue is not qualified yet (task.md open questions), so roles list none.
+  'Q4 Global Paid Search Query Clustering': {
+    templateId: 'q4-global-paid-search-query-clustering',
+    role: { name: 'Paid search analyst', responsibility: 'Cluster search queries and label their intent under the brief', tools: [] },
+    evidence: 'Query dataset, product brief, locale and channel constraints',
+    review: { label: 'Cluster and label queries', instruction: 'Group the queries into clusters under the brief’s rules; label each query’s intent and assign, exclude or flag it, citing evidence IDs.', output: 'Clusters and query labels' },
+    missing: { question: 'Brief sufficient?', label: 'Request clarification', instruction: 'Ask for the specific brief, locale or channel detail needed to place the ambiguous queries.' },
+    conclude: { label: 'Finalise clusters', instruction: 'State the clusters, query assignments, intent labels, exclusions and ambiguous queries with rationale.', output: 'Clusters, assignments, exclusions and rationale' },
+    human: null,
+    outputLabel: 'Query clustering',
+    escalation: 'The queries cannot be clustered with the available brief and constraints.',
+  },
+  'Fraud-risk/compliance handoffs': {
+    templateId: 'fraud-risk-and-compliance-handoffs',
+    role: { name: 'Fraud-compliance handoff analyst', responsibility: 'Establish the facts and route the case to the right team with a complete handoff', tools: [] },
+    evidence: 'Fraud alert, transaction records, case timeline, roles and escalation policy',
+    review: { label: 'Assess the case', instruction: 'Establish the facts from the records and timeline; identify fraud indicators and compliance concerns, keeping facts apart from suspicions and citing evidence IDs.', output: 'Facts, fraud indicators and compliance concerns' },
+    missing: { question: 'Facts established?', label: 'Request information', instruction: 'Ask for the specific record or timeline detail needed to establish the facts.' },
+    conclude: { label: 'Prepare handoff', instruction: 'Choose the handoff route under the escalation policy, assemble the handoff package and recommend a next action with rationale.', output: 'Handoff route, package and recommendation' },
+    // Owner, 12 Nov: the receiving team accepts or returns the handoff.
+    human: { label: 'Receiving team accepts handoff', actorRole: 'Receiving fraud or compliance team', prompt: 'Accept the handoff package, or return it saying what is missing.', choices: ['Accept', 'Return'] },
+    outputLabel: 'Handoff package',
+    escalation: 'The case cannot be routed with the available evidence.',
+  },
+  'Compliance monitoring': {
+    templateId: 'compliance-monitoring',
+    role: { name: 'Compliance monitoring analyst', responsibility: 'Test the records against each obligation in the monitoring scope', tools: [] },
+    evidence: 'Monitoring scope, records, obligations and monitoring period',
+    review: { label: 'Assess obligations', instruction: 'Map each obligation in scope to the records for the monitoring period and record its result with evidence IDs.', output: 'Obligation-to-evidence assessment' },
+    missing: { question: 'Evidence sufficient?', label: 'Request records', instruction: 'Ask for exactly the missing records and say which obligation needs them.' },
+    conclude: { label: 'Rate and propose follow-up', instruction: 'State the exceptions, their severity and the proposed follow-up with rationale.', output: 'Result, exceptions, severity and follow-up' },
+    human: null,
+    outputLabel: 'Monitoring result',
+    escalation: 'The obligations cannot be assessed with the available records.',
+  },
 };
 
-export const WAVE1_GRAPH_TEMPLATES = Object.keys(PATTERNS);
+/** Every template with a starting workflow (Waves 1 to 3). */
+export const STARTING_GRAPH_TEMPLATES = Object.keys(PATTERNS);
+export const WAVE1_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(0, 5);
+export const WAVE2_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(5, 8);
+export const WAVE3_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(8);
 
 /** The template's starting workflow, or null when the template has none yet. */
 export function templateStartingGraph(workflowName: string, templateVersion = 1): WorkflowGraphInput | null {

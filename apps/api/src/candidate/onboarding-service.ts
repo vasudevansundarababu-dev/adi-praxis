@@ -226,7 +226,7 @@ export async function assignmentEligibility(tx: Db | Tx, args: { smeUserId: stri
   if (!u || u.accountStatus !== 'ACTIVE') return { ok: false as const, reason: 'account not active' };
   if (!identityEligible(u.identityStatus)) return { ok: false as const, reason: 'identity not verified' };
   const e = await tx.enrollment.findFirst({
-    where: { smeUserId: args.smeUserId, opportunity: { projectId: args.projectId } },
+    where: { smeUserId: args.smeUserId, opportunity: { projectId: args.projectId, role: 'AUTHOR' } },
     include: { onboarding: true, qualificationScopes: { orderBy: { createdAt: 'desc' }, take: 1 }, profileVersion: true },
   });
   if (!e || e.status !== 'SELECTED') return { ok: false as const, reason: 'not selected for this pool' };

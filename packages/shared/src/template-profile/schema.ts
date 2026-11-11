@@ -85,6 +85,8 @@ export interface TemplateProfileField {
   max?: number;
   /** Array fields: minimum items when required (default 1). */
   minItems?: number;
+  /** Array fields: maximum items. */
+  maxItems?: number;
   /** repeated_array: the fields of each item. */
   itemFields?: TemplateProfileField[];
   /** Singular noun for one item ("evidence item"), used by Add/Remove. */
@@ -116,6 +118,7 @@ export const TemplateProfileFieldSchema: z.ZodType<TemplateProfileField> = z.laz
       min: z.number().optional(),
       max: z.number().optional(),
       minItems: z.number().int().min(0).optional(),
+      maxItems: z.number().int().positive().optional(),
       itemFields: z.array(TemplateProfileFieldSchema).optional(),
       itemLabel: z.string().optional(),
       idPrefix: z.string().regex(/^[A-Z]{1,4}$/).optional(),
@@ -172,6 +175,23 @@ export const ContractMapping = z
     decisionFields: FieldRef.nullable(),
     /** criterion field: the rubric. */
     criteria: FieldRef,
+    /**
+     * Owner, 12 Nov (Q4 paid search): one output.json field per item of a repeated S5 field, e.g. q01_intent. Graded
+     * fields get generated json_equals criteria sharing `weightShare` % of the score; the author's criteria share the
+     * rest. Anvil's task v1 has no list type and at most 50 criteria, hence `maxItems`.
+     */
+    perItemOutputs: z
+      .object({
+        from: FieldRef,
+        maxItems: z.number().int().positive().max(25),
+        prefix: z.string().regex(/^[a-z]{1,4}$/),
+        /** Item field shown to the agent to say which item a field is about (e.g. the query text). */
+        labelKey: z.string(),
+        fields: z.array(z.object({ key: z.string(), name: z.string().regex(/^[a-z_]{1,20}$/), label: z.string(), graded: z.boolean(), fallback: z.string().optional() }).strict()).min(1),
+        weightShare: z.number().int().min(1).max(99),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type ContractMapping = z.infer<typeof ContractMapping>;

@@ -8,6 +8,8 @@ import { Req, RequiredNote } from '@/components/required';
 
 export interface OwnerView {
   projectId: string;
+  /** Which job post: task authors or Expert reviewers (owner, 12 Nov 2026). */
+  role: 'AUTHOR' | 'REVIEWER';
   opportunityId: string | null;
   status: 'DRAFT' | 'PUBLISHED' | 'CLOSED';
   draft: { brief: OpportunityBrief; criteria: OpportunityCriteria };
@@ -72,20 +74,21 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
       setMessage({ kind: 'error', text: 'Fix the criteria first.', problems: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) });
       return false;
     }
-    return run('PUT', `/projects/${view.projectId}/opportunity/draft`, { brief, criteria, ...(policyEdit !== undefined ? { questionPolicy: policyEdit } : {}) }, 'Draft saved.');
+    return run('PUT', `/projects/${view.projectId}/opportunity/draft${q}`, { brief, criteria, ...(policyEdit !== undefined ? { questionPolicy: policyEdit } : {}) }, 'Draft saved.');
   };
 
   async function upload(file: File) {
     const form = new FormData();
     form.append('file', file);
     setPending(true);
-    const res = await fetch(`/api/v1/projects/${view.projectId}/opportunity/documents`, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: form });
+    const res = await fetch(`/api/v1/projects/${view.projectId}/opportunity/documents${q}`, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: form });
     setPending(false);
     const body = await res.json().catch(() => null);
     if (!res.ok) return setMessage({ kind: 'error', text: body?.message ?? 'Upload failed' });
     apply(body as OwnerView, 'Document imported. Review the extracted text below before using it.');
   }
 
+  const q = view.role === 'REVIEWER' ? '?role=REVIEWER' : '';
   const set = <K extends keyof OpportunityBrief>(k: K, v: OpportunityBrief[K]) => setBrief({ ...brief, [k]: v });
   const publicUrl = view.opportunityId ? `${candidateAppUrl}/opportunities/${view.opportunityId}` : null;
 
@@ -94,7 +97,7 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
       <Link href={`/projects/${view.projectId}`} className="text-sm text-link hover:underline">
         ← Project
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold">Opportunity page</h1>
+      <h1 className="mt-2 text-2xl font-semibold">{view.role === 'REVIEWER' ? 'Reviewer job post' : 'Opportunity page'}</h1>
       <p className="mt-1 text-sm text-fg-muted">
         What candidates read before applying. Status: <strong>{view.status.toLowerCase()}</strong>
         {view.versions[0] ? ` · published v${view.versions[0].version}` : ''}
@@ -121,10 +124,10 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
             </label>
             <textarea id="doc-text" aria-required="true" rows={10} value={docText} onChange={(e) => setDocText(e.target.value)} className={`${input} font-mono text-xs`} />
             <div className="mt-2 flex gap-2">
-              <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/documents/${pendingDoc.id}/confirm`, { text: docText }, 'Text confirmed and added to the full description.')} className="btn btn-primary">
+              <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/documents/${pendingDoc.id}/confirm${q}`, { text: docText }, 'Text confirmed and added to the full description.')} className="btn btn-primary">
                 Confirm text
               </button>
-              <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/documents/${pendingDoc.id}/discard`, {}, 'Document discarded.')} className="btn btn-secondary">
+              <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/documents/${pendingDoc.id}/discard${q}`, {}, 'Document discarded.')} className="btn btn-secondary">
                 Discard
               </button>
             </div>
@@ -271,12 +274,12 @@ export function OpportunityEditor({ initial, candidateAppUrl }: { initial: Owner
           Save draft
         </button>
         {view.status !== 'CLOSED' && (
-          <button type="button" disabled={pending} onClick={async () => { if (await save()) await run('POST', `/projects/${view.projectId}/opportunity/publish`, {}, 'Published. Candidates now see this version.'); }} className="btn btn-primary">
+          <button type="button" disabled={pending} onClick={async () => { if (await save()) await run('POST', `/projects/${view.projectId}/opportunity/publish${q}`, {}, 'Published. Candidates now see this version.'); }} className="btn btn-primary">
             Save and publish
           </button>
         )}
         {view.status === 'PUBLISHED' && (
-          <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/close`, {}, 'Closed to new applications.')} className="btn btn-secondary">
+          <button type="button" disabled={pending} onClick={() => run('POST', `/projects/${view.projectId}/opportunity/close${q}`, {}, 'Closed to new applications.')} className="btn btn-secondary">
             Close to new applications
           </button>
         )}

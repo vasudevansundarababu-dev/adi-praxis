@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { checkWorkflowGraph, type WorkflowGraph, type WorkflowGraphInput, type WorkflowNode } from '@praxis/shared';
+import { applyGraphOp, checkWorkflowGraph, GraphEditError, type GraphOp, type WorkflowGraph, type WorkflowGraphInput, type WorkflowNode } from '@praxis/shared';
 import { WorkflowGraphView } from './workflow-graph-view';
 
 const input = 'mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5';
@@ -112,24 +112,37 @@ export function WorkflowGraphPanel({
   );
 }
 
-/** Edit the selected node's content above the graph. Structure stays valid: ids and connections are not edited here. */
+/** Edit the selected node above the graph: its content, and the structure around it through the shared operations. */
 function NodeEditor({ graph, node, editable, onChange, onClose }: { graph: WorkflowGraph; node: WorkflowNode; editable: boolean; onChange(g: WorkflowGraph): void; onClose(): void }) {
   const set = (patch: Partial<WorkflowNode>) => onChange({ ...graph, nodes: graph.nodes.map((n) => (n.id === node.id ? ({ ...n, ...patch } as WorkflowNode) : n)) });
   const loop = graph.loops.find((l) => graph.edges.find((e) => e.id === l.returnEdgeId)?.from === node.id);
-  const canInsert = node.type === 'agent_step' && graph.edges.filter((e) => e.from === node.id && !graph.loops.some((l) => l.returnEdgeId === e.id)).length === 1;
-  const insertAfter = () => {
-    const n = graph.nodes.length + 1;
-    let id = `step${n}`;
-    while (graph.nodes.some((x) => x.id === id)) id = `${id}x`;
-    const nextEdge = graph.edges.find((e) => e.from === node.id && !graph.loops.some((l) => l.returnEdgeId === e.id))!;
-    const prev = node as Extract<WorkflowNode, { type: 'agent_step' }>;
-    onChange({
-      ...graph,
-      artifacts: [...graph.artifacts, { id: `${id}_out`, label: 'New step result', visibility: 'actor' }],
-      nodes: [...graph.nodes, { id, type: 'agent_step', label: 'New step', roleId: prev.roleId, instruction: 'Describe the observable work this step does.', inputRefs: [prev.outputArtifact], outputArtifact: `${id}_out`, policyRuleVersionIds: [], rubricCriterionIds: [] }],
-      edges: [...graph.edges.map((e) => (e.id === nextEdge.id ? { ...e, from: id } : e)), { id: `${id}_in`, from: node.id, to: id, label: '' }],
-    });
+  const [opError, setOpError] = useState('');
+  const [loopTarget, setLoopTarget] = useState('');
+  // Structural edits use the shared operations (also used by confirmed chatbot proposals). New items start with
+  // placeholder wording the author then replaces in their own words; the checker shows anything still missing.
+  const run = (op: GraphOp) => {
+    try {
+      setOpError('');
+      onChange(applyGraphOp(graph, op));
+    } catch (e) {
+      setOpError(e instanceof GraphEditError ? e.message : 'That change could not be applied.');
+    }
   };
+  const loopEdges = new Set(graph.loops.map((l) => l.returnEdgeId));
+  const outs = graph.edges.filter((e) => e.from === node.id && !loopEdges.has(e.id));
+  const ins = graph.edges.filter((e) => e.to === node.id && !loopEdges.has(e.id));
+  const plainNext = outs.length === 1 && !outs[0]!.port;
+  const canParallel = node.type === 'agent_step' && plainNext && ins.length === 1 && !ins[0]!.port;
+  // Earlier steps a correction loop may return to: ancestors of this decision.
+  const earlier = (() => {
+    const seen = new Set<string>();
+    const stack = [node.id];
+    while (stack.length) {
+      const id = stack.pop()!;
+      for (const e of graph.edges) if (e.to === id && !loopEdges.has(e.id) && !seen.has(e.from)) { seen.add(e.from); stack.push(e.from); }
+    }
+    return graph.nodes.filter((n) => seen.has(n.id) && n.type !== 'input');
+  })();
   return (
     <div className="rounded-md border border-line p-3" aria-label={`Edit ${node.label}`}>
       <div className="flex items-center justify-between gap-2">
@@ -223,11 +236,54 @@ function NodeEditor({ graph, node, editable, onChange, onClose }: { graph: Workf
             />
           </label>
         )}
-        {canInsert && editable && (
-          <button type="button" className="rounded border border-line p-2 text-sm" onClick={insertAfter}>
-            Add a step after this one
-          </button>
+        {editable && (
+          <div className="flex flex-wrap gap-2" aria-label="Change the workflow">
+            {plainNext && (node.type === 'agent_step' || node.type === 'input' || node.type === 'join') && (
+              <>
+                <button type="button" className="rounded border border-line p-2 text-sm" onClick={() => run({ op: 'add_step_after', nodeId: node.id, label: 'New step', instruction: 'Describe the observable work this step does.' })}>
+                  Add a step after
+                </button>
+                {node.type === 'agent_step' && (
+                  <button type="button" className="rounded border border-line p-2 text-sm" onClick={() => run({ op: 'add_decision_after', nodeId: node.id, question: 'New decision: what is decided here?', yesLabel: 'Yes', noLabel: 'No' })}>
+                    Add a decision after
+                  </button>
+                )}
+                <button type="button" className="rounded border border-line p-2 text-sm" onClick={() => run({ op: 'add_human_step_after', nodeId: node.id, label: 'Person in the case', actorRole: 'Case lead', prompt: 'What is this person asked to decide?' })}>
+                  Add a person step after
+                </button>
+              </>
+            )}
+            {canParallel && (
+              <button type="button" className="rounded border border-line p-2 text-sm" onClick={() => run({ op: 'add_parallel_step', nodeId: node.id, label: 'Parallel step', instruction: 'Describe the work done alongside this step.' })}>
+                Add a step that runs alongside
+              </button>
+            )}
+            {node.type === 'decision' && earlier.length > 0 && (
+              <span className="flex flex-wrap items-center gap-2 text-sm">
+                <label>
+                  Correction loop back to{' '}
+                  <select className="rounded-md border border-line bg-surface px-2 py-1" value={loopTarget} onChange={(e) => setLoopTarget(e.target.value)}>
+                    <option value="">Choose a step…</option>
+                    {earlier.map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" disabled={!loopTarget} className="rounded border border-line p-2 disabled:opacity-50" onClick={() => run({ op: 'add_correction_loop', decisionId: node.id, backToNodeId: loopTarget, label: 'Needs correction', maxIterations: 2 })}>
+                  Add correction loop
+                </button>
+              </span>
+            )}
+            {node.type !== 'input' && node.type !== 'output' && (
+              <button type="button" className="rounded border border-line p-2 text-sm text-error" onClick={() => { run({ op: 'remove_node', nodeId: node.id }); onClose(); }}>
+                Remove this {node.type === 'human_step' ? 'person step' : node.type === 'decision' ? 'decision' : 'step'}
+              </button>
+            )}
+          </div>
         )}
+        {opError && <p role="alert" className="text-sm text-error">{opError}</p>}
       </fieldset>
     </div>
   );

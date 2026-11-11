@@ -53,7 +53,7 @@ export async function executeConversation(db: Db, assistant: ConversationAssista
     if ((policy?.digest ?? 'none') !== start.policyDigest) throw new Error('Project policy changed before generation.');
     const turns = await db.taskInterviewTurn.findMany({ where: { taskInstanceId: task.id }, orderBy: { seq: 'asc' }, take: 301 });
     if (turns.length > 300) throw new Error('Conversation limit reached. No prior messages were silently discarded.');
-    const reviewFeedback = await db.taskReview.findMany({ where: { taskInstanceId: task.id }, orderBy: { createdAt: 'asc' }, select: { decision: true, comments: true, notes: true, submissionVersion: true } });
+    const reviewFeedback = await db.taskReview.findMany({ where: { taskInstanceId: task.id, OR: [{ decision: { in: ['ACCEPT', 'REWORK', 'REJECT'] } }, { decision: 'EDIT', material: true }] }, orderBy: { createdAt: 'asc' }, select: { decision: true, comments: true, notes: true, submissionVersion: true } });
     let proposal = ConversationProposal.parse(await assistant.propose({ workflow: task.project.template.workflowName, reviewFeedback, template: { primaryWork: task.project.template.primaryWork, verificationCriteria: task.project.template.verificationCriteria, humanGate: task.project.template.humanGate, taskDefinitionSchema: task.project.template.taskDefinitionSchema, collectionSchema: task.project.template.collectionSchema }, current: (task.output ?? {}) as Record<string, unknown>, slot: task.input, history: turns.map(x => ({ speaker: x.speaker, content: x.content })), policy: policy ? authoringPolicyView(policy.body) : null, previousUnresolved: chatOf(task).unresolved ?? [] }));
     const authors = turns.filter(t=>t.speaker==='AUTHOR' && t.questionId==='conversation' && t.clientMessageId?.startsWith('answer:')).map(t=>t.content);
     const unsupported = authoredChangeProblems((task.output ?? {}) as Record<string, unknown>, proposal, authors);
@@ -91,7 +91,12 @@ export async function decideProposal(tx: Tx, task: TaskInstance, runId: string, 
     const policy = await effectivePolicy(tx, task.clientId, task);
     if (task.revision !== pending.revision || (policy?.digest ?? 'none') !== pending.policyDigest) throw new AppError(409, 'STALE_REVISION', 'Task or project policy changed. Request a fresh proposal.');
     if (pending.problems.length) throw new AppError(422, 'PROPOSAL_BLOCKED', 'Resolve the proposal checks before applying changes.', { problems: pending.problems });
-    const output = applyConversationChanges((task.output ?? {}) as Record<string, unknown>, pending.proposal);
+    let output: Record<string, unknown>;
+    try {
+      output = applyConversationChanges((task.output ?? {}) as Record<string, unknown>, pending.proposal);
+    } catch (e) {
+      throw new AppError(422, 'PROPOSAL_BLOCKED', 'This proposal no longer applies to the task. Request a fresh one.', { problems: [e instanceof Error ? e.message : 'invalid change'] });
+    }
     chat.unresolved = pending.proposal.unresolved; chat.policyLinks = pending.proposal.ruleLinks; chat.needsReview = true; delete chat.declaration; delete chat.reviewedRevision; chat.policyDigest = pending.policyDigest;
     delete chat.pending;
     const drafting = draftingWith(task, chat) as { sections: Record<string, { confirmedAt: string | null }>; conversation: ChatState };

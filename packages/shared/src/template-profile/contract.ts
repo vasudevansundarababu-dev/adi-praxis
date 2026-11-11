@@ -1,6 +1,6 @@
 import { KYC_DISPOSITIONS, KYC_RISK, type KycTask } from '../kyc';
 import { praxisContractIssues, PRAXIS_CONTRACT_VERSION, type PraxisTaskContract } from '../praxis-contract';
-import { getFieldValue, isEmpty, profileApplies } from './helpers';
+import { getFieldValue, isEmpty, itemFieldsOf, profileApplies } from './helpers';
 import type { TemplateProfileField, SectionKey, TemplateProfile } from './schema';
 
 /**
@@ -109,6 +109,14 @@ class Builder {
   }
 }
 
+/**
+ * Owner, 12 Nov: failing a critical criterion fails the whole task. Anvil's task contract expresses that as a
+ * constraint with hard_failure, bound exactly like the criterion; the criterion keeps its weight for scoring.
+ */
+function criticalConstraint(id: string, description: string, binding: Binding): PraxisTaskContract['constraints'][number] {
+  return { id: `${id.slice(0, 70)}.critical`, description: clip(`Critical (failing it fails the task): ${description}`), hard_failure: true, binding };
+}
+
 function finish(b: Builder, ids: CompileIds, parts: { title: string; objective: string; taskVersion: string; source: string; evidence: PraxisTaskContract['evidence']; constraints: PraxisTaskContract['constraints']; criteria: PraxisTaskContract['rubric']['criteria']; initialState: Record<string, unknown> }): CompileResult {
   if (!ID.test(ids.taskId)) b.block('INVALID_ID', 'taskId', 'The task ID is not a valid contract ID');
   if (!ID.test(ids.revisionId)) b.block('INVALID_ID', 'revisionId', 'The revision ID is not a valid contract ID');
@@ -192,6 +200,30 @@ function compileSections(profile: TemplateProfile, output: Record<string, unknow
       b.addOutput({ name: str(item.name), type, allowed, description: str(item.description) }, item.referenceValue, `${p}.name`, `${p}.referenceValue`);
     });
 
+  // Per-item output fields (Q4 paid search: one set per query). Graded ones get generated criteria below.
+  const generated: { id: string; description: string; binding: Binding }[] = [];
+  const per = map.perItemOutputs;
+  if (per) {
+    const items = list(value(per.from));
+    const itemDefs = itemFieldsOf(fieldOf(per.from).field);
+    if (!items.length) b.block('MISSING_FIELD', per.from, 'Add at least one item');
+    if (items.length > per.maxItems) b.block('TOO_MANY_ITEMS', per.from, `At most ${per.maxItems} items can be graded in one task (Anvil allows 50 criteria); split the case`);
+    items.slice(0, per.maxItems).forEach((item, i) => {
+      if (!isObj(item)) return;
+      const n = String(i + 1).padStart(2, '0');
+      const label = str(item[per.labelKey]);
+      for (const f of per.fields) {
+        const def = itemDefs.find((x) => x.key === f.key);
+        const name = `${per.prefix}${n}_${f.name}`;
+        const allowed = def?.type === 'pick_list' ? (def.options ?? []).map((o) => o.value) : [];
+        const raw = isEmpty(item[f.key]) ? f.fallback : item[f.key];
+        b.addOutput({ name, type: 'string', allowed, description: `${f.label} of item ${i + 1} ("${label}")` }, raw, `${per.from}[${i}].${f.key}`, `${per.from}[${i}].${f.key}`);
+        const ref = b.reference[name];
+        if (f.graded && typeof ref === 'string') generated.push({ id: `${per.prefix}${n}-${f.name}`, description: clip(`${f.label} of "${label}" is ${ref}`), binding: { kind: 'json_equals', field: name, value: ref } as Binding });
+      }
+    });
+  }
+
   // Evidence: actor inputs, recorded responses (supplied up front: structured-decision-v1 has no tool replay), then private notes.
   const taken = new Set<string>();
   const evidence: PraxisTaskContract['evidence'] = [];
@@ -249,8 +281,27 @@ function compileSections(profile: TemplateProfile, output: Record<string, unknow
     const weight = typeof item.weight === 'number' ? item.weight : NaN;
     if (!(weight > 0) || !Number.isInteger(weight * 100)) return b.block('INVALID_VALUE', `${p}.weight`, 'Weight must be a positive number with at most two decimals');
     const binding = b.binding(item, p);
-    if (binding) criteria.push({ id, description: clip([str(item.name), str(item.passCondition)].filter(Boolean).join(': ') || id), weight_bps: Math.round(weight * 100), binding });
+    if (!binding) return;
+    const description = clip([str(item.name), str(item.passCondition)].filter(Boolean).join(': ') || id);
+    criteria.push({ id, description, weight_bps: Math.round(weight * 100), binding });
+    if (item.critical === true) constraints.push(criticalConstraint(id, description, binding));
   });
+
+  if (per && generated.length) {
+    // The author's criteria keep their proportions within (100 - share)%; generated ones split share% evenly. Exact bps.
+    if (criteria.length + generated.length > 50) b.block('TOO_MANY_CRITERIA', map.criteria, `${criteria.length} rubric criteria plus ${generated.length} per-item checks exceed Anvil's 50; remove criteria or items`);
+    const authoredTarget = (100 - per.weightShare) * 100;
+    const authoredTotal = criteria.reduce((n, c) => n + c.weight_bps, 0);
+    if (criteria.length && authoredTotal === 10000) {
+      let used = 0;
+      criteria.forEach((c, i) => {
+        c.weight_bps = i === criteria.length - 1 ? authoredTarget - used : Math.max(1, Math.floor((c.weight_bps * authoredTarget) / 10000));
+        used += c.weight_bps;
+      });
+    }
+    const share = per.weightShare * 100 + (criteria.length ? 0 : authoredTarget);
+    generated.forEach((g, i) => criteria.push({ id: g.id, description: g.description, weight_bps: i === generated.length - 1 ? share - Math.floor(share / generated.length) * (generated.length - 1) : Math.floor(share / generated.length), binding: g.binding }));
+  }
 
   return finish(b, ids, {
     title,
@@ -303,12 +354,16 @@ export function compileKycContract(task: KycTask, ids: CompileIds, profileVersio
   if (str(task.solution?.rationale)) evidence.push({ id: 'private-rationale', visibility: 'private', content: clip(`Reference rationale: ${str(task.solution?.rationale)}`) });
 
   const criteria: PraxisTaskContract['rubric']['criteria'] = [];
+  const kycConstraints: PraxisTaskContract['constraints'] = [];
   (task.rubric?.criteria ?? []).forEach((c, i) => {
     const p = `rubric.criteria[${i}]`;
     if (!ID.test(str(c.id))) return b.block('INVALID_ID', `${p}.id`, `"${str(c.id)}" is not a valid criterion ID`);
     if (!(c.weight > 0) || !Number.isInteger(c.weight * 100)) return b.block('INVALID_VALUE', `${p}.weight`, 'Weight must be a positive number with at most two decimals');
     const binding = b.binding(c as unknown as Record<string, unknown>, p);
-    if (binding) criteria.push({ id: c.id, description: clip([c.name, c.passCondition].filter(Boolean).join(': ')), weight_bps: Math.round(c.weight * 100), binding });
+    if (!binding) return;
+    const description = clip([c.name, c.passCondition].filter(Boolean).join(': '));
+    criteria.push({ id: c.id, description, weight_bps: Math.round(c.weight * 100), binding });
+    if (c.critical === true) kycConstraints.push(criticalConstraint(c.id, description, binding));
   });
 
   return finish(b, ids, {
@@ -317,7 +372,7 @@ export function compileKycContract(task: KycTask, ids: CompileIds, profileVersio
     taskVersion: `kyc-onboarding-and-refresh.v${profileVersion}`,
     source: 'Praxis authored task (KYC onboarding and refresh workbench). Synthetic case written by a Praxis expert.',
     evidence,
-    constraints: [],
+    constraints: kycConstraints,
     criteria,
     initialState: { synthetic: true, profile_id: 'kyc-onboarding-and-refresh', profile_version: profileVersion, available_tools: task.environment?.tools ?? [] },
   });

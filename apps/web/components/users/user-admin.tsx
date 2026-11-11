@@ -1,5 +1,6 @@
 'use client';
 
+import { TableSearch } from '@/components/search/table-search';
 import { INTERNAL_ROLES, roleLabel, type InternalRole, type InternalUserDto } from '@praxis/shared';
 import { useState } from 'react';
 import { Req, RequiredNote } from '@/components/required';
@@ -55,7 +56,8 @@ export function UserAdmin({ users, meId, signInAt }: { users: InternalUserDto[];
       {issued && <TemporaryPassword email={issued.email} password={issued.password} signInAt={signInAt} onDone={() => setIssued(null)} />}
       <ActionMessages error={a.error} problems={a.problems} notice={a.notice} />
 
-      <div className="overflow-x-auto card">
+      <TableSearch type="users" label="Search users" placeholder="Search users by name, email or role" />
+        <div data-search-scope="users" className="overflow-x-auto card">
         <table className="w-full text-left text-sm">
           <thead className="bg-surface">
             <tr>
@@ -73,7 +75,7 @@ export function UserAdmin({ users, meId, signInAt }: { users: InternalUserDto[];
             {users.map((u) => {
               const me = u.id === meId;
               return (
-                <tr key={u.id} className="border-t border-line">
+                <tr data-search-id={u.id} key={u.id} className="border-t border-line">
                   <td className={TD}>
                     {u.name}
                     {me && <span className="ml-1 text-xs text-fg-muted">(you)</span>}

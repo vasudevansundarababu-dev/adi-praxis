@@ -23,12 +23,14 @@ import {
   sectionProgress,
   setFieldValue,
   startProfileOutput,
+  TEMPLATE_PROFILES,
   WAVE1_PROFILES,
+  WAVE2_PROFILES,
   type KycTask,
   type TemplateProfile,
 } from '../src';
 
-const NON_KYC = WAVE1_PROFILES.filter((p) => p.storage === 'sections');
+const NON_KYC = TEMPLATE_PROFILES.filter((p) => p.storage === 'sections');
 const ids = { taskId: '3f0c1d2e-0000-4000-8000-000000000001', revisionId: '3f0c1d2e-0000-4000-8000-000000000001-r4' };
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
@@ -57,10 +59,47 @@ describe('template profile registry', () => {
     }
     expect(profileForWorkflow('launch of noise cancelling phone').status).toBe('ok');
     expect(profileForWorkflow('Omnichannel Creative & Locale Compliance').status).toBe('ok');
-    expect(profileForWorkflow('Adverse media review').status).toBe('none');
+    expect(profileForWorkflow('Compliance monitoring').status).toBe('none');
     expect(KYC_PROFILE.domainPlugin).toBe('kyc-workbench');
     expect(KYC_PROFILE.contractStatus).toBe('confirmed');
     for (const p of NON_KYC) expect(p.contractStatus).toBe('requires_confirmation');
+  });
+
+  it('registers the three Wave 2 profiles with their draft pick lists as typed S6 output fields', () => {
+    const s6 = (p: TemplateProfile) => Object.fromEntries(p.sections[5]!.fields.filter((f) => f.outputField).map((f) => [f.outputField, f.options!.map((o) => o.value)]));
+    expect(WAVE2_PROFILES.map((p) => [p.catalogWorkflowName, p.templateId])).toEqual([['Adverse media review', 'BK03'], ['Enhanced due diligence', 'BK10'], ['Customer risk rating', 'BK09']]);
+    for (const p of WAVE2_PROFILES) {
+      expect(checkProfile(p), p.profileId).toEqual([]);
+      expect(profileForWorkflow(p.catalogWorkflowName)).toMatchObject({ status: 'ok', profile: { profileId: p.profileId } });
+      expect(p).toMatchObject({ agentMode: 'SINGLE', storage: 'sections', contractStatus: 'requires_confirmation', domainPlugin: null });
+      // Reference values and the rubric are private.
+      for (const f of p.sections[5]!.fields.filter((x) => x.outputField)) expect(f.visibility, `${p.profileId} S6.${f.key}`).toBe('private_reference');
+      expect(itemFieldsOf(p.sections[5]!.fields.find((f) => f.key === 'decisionFields')!).find((f) => f.key === 'referenceValue')!.visibility).toBe('private_reference');
+      for (const f of p.sections[6]!.fields) expect(f.visibility, `${p.profileId} S7.${f.key}`).toBe('private_rubric');
+    }
+    const [adverse, edd, crr] = WAVE2_PROFILES;
+    expect(s6(adverse)).toEqual({ match: ['confirmed', 'possible', 'false_positive', 'unresolved'], recommendation: ['close', 'escalate', 'request_information'] });
+    expect(s6(edd)).toEqual({ recommendation: ['proceed_for_approval', 'request_information', 'escalate', 'recommend_decline'] });
+    expect(s6(crr)).toEqual({ risk: ['low', 'medium', 'high', 'undetermined'], override: ['none', 'proposed_increase', 'proposed_decrease'] });
+    // Template deliverables (S5) from each draft.
+    const s5 = (p: TemplateProfile) => p.sections[4]!.fields.map((f) => f.key);
+    expect(s5(adverse)).toEqual(expect.arrayContaining(['identityMatch', 'sourceReliability', 'allegationsVsFacts', 'relevance']));
+    expect(s5(edd)).toEqual(expect.arrayContaining(['enhancedChecks', 'evidenceGaps', 'riskAssessment', 'humanHandoff']));
+    expect(s5(crr)).toEqual(expect.arrayContaining(['factorAssessments', 'calculation', 'overrideRationale']));
+  });
+
+  it('Wave 2 conditional and template rules: EDD hand-off and finding evidence status, CRR override rationale', () => {
+    const [, edd, crr] = WAVE2_PROFILES;
+    const eddProblems = profileProblems(edd, setFieldValue(edd, sampleProfileOutput(edd), 'S5', 'humanHandoff', ''));
+    expect(eddProblems).toContainEqual(expect.objectContaining({ path: 'S5.humanHandoff', kind: 'required' }));
+    const findings = getFieldValue(edd, sampleProfileOutput(edd), 'S5', { key: 'findings' }) as Record<string, unknown>[];
+    expect(findings[0]!.evidenceStatus).toBe('verified');
+    const badStatus = profileProblems(edd, setFieldValue(edd, sampleProfileOutput(edd), 'S5', 'findings', [{ ...findings[0], evidenceStatus: 'probable' }]));
+    expect(badStatus).toContainEqual(expect.objectContaining({ path: 'S5.findings[0].evidenceStatus', kind: 'invalid' }));
+    let out = setFieldValue(crr, sampleProfileOutput(crr), 'S5', 'overrideRationale', '');
+    expect(profileProblems(crr, out).some((x) => x.path === 'S5.overrideRationale')).toBe(false);
+    out = setFieldValue(crr, out, 'S6', 'override', 'proposed_increase');
+    expect(profileProblems(crr, out)).toContainEqual(expect.objectContaining({ path: 'S5.overrideRationale', kind: 'conditional' }));
   });
 
   const base = (): TemplateProfile => clone(NON_KYC[0]!);

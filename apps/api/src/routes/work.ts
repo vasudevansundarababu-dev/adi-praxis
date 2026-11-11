@@ -17,7 +17,7 @@ import { conversationInputProblems } from '../tasks/conversation/guards';
 import { allowEditor, experienceOf } from '../tasks/authoring-experience';
 import { AUTHORSHIP_VERSION } from '../tasks/conversation/authorship';
 import { chatOf, draftingWith } from '../tasks/conversation/service';
-import { effectivePolicy, sidecar } from '../policy/task-policy';
+import { authoringPolicyView, effectivePolicy, sidecar } from '../policy/task-policy';
 import { profileSaveProblems } from '../tasks/profile-output';
 
 const IdParams = z.object({ id: z.string().uuid() });
@@ -162,9 +162,8 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
     if (snap) return { configured: true, readOnly: true, ...sidecar(snap, { agentVisibleOnly: true }) };
     const eff = await effectivePolicy(db, t.clientId, t);
     if (!eff) return { configured: false, readOnly: true, rules: [], task_changes: [] };
-    const rules = eff.body.rules.filter((r) => r.visibility === 'agent_visible');
-    const visible = new Set(rules.map((r) => r.rule_version_id));
-    return { configured: true, readOnly: true, snapshot_id: null, project_rule_set: eff.body.project_rule_set, rules, task_changes: eff.body.task_changes.filter((x) => visible.has(x.rule_version_id)) };
+    const view = authoringPolicyView(eff.body);
+    return { configured: true, readOnly: true, snapshot_id: null, project_rule_set: eff.body.project_rule_set, rules: view.rules, task_changes: view.task_changes };
   });
 
   // W01: a sample accepted task of the same workflow from a different coverage cell (accepted content is synthetic).

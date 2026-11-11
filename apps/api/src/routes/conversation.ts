@@ -8,7 +8,7 @@ import { z } from 'zod';
 import type { Db } from '../db';
 import { AppError } from '../lib/errors';
 import { runCandidateCommand } from '../platform/command';
-import { effectivePolicy } from '../policy/task-policy';
+import { retrievableRules, effectivePolicy } from '../policy/task-policy';
 import type { SelectionGate } from '../staffing/selection-gate';
 import { conversationInputProblems } from '../tasks/conversation/guards';
 import { appendTurn, chatOf, CONVERSATION_VERSION, conversationView, decideProposal, draftingWith, editable } from '../tasks/conversation/service';
@@ -37,7 +37,7 @@ export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: 
     const t = await load(db, req.params.id, req.candidate!.smeUserId), policy = await effectivePolicy(db, t.clientId, t);
     const output = (t.output ?? {}) as Record<string, unknown>;
     const workflowGraph = graphAgentView(t.output);
-    return { task: { ...(profileAgentView(t.project.template.workflowName, output) ?? authoringAgentView(output)), ...(workflowGraph ? { workflowGraph } : {}) }, policy: policy?.body.rules.filter(r => r.visibility === 'agent_visible') ?? [], note: 'Recorded responses are supplied only on matching tool calls. This is a preview, not execution.' };
+    return { task: { ...(profileAgentView(t.project.template.workflowName, output) ?? authoringAgentView(output)), ...(workflowGraph ? { workflowGraph } : {}) }, policy: policy ? retrievableRules(policy.body.rules) : [], note: 'Recorded responses are supplied only on matching tool calls. This is a preview, not execution.' };
   });
   app.post('/me/tasks/:id/conversation/messages', { config: { access: 'candidate', rateLimit: { max: 15, timeWindow: '1 minute' } }, schema: { params: Params, body: z.object({ content: z.string().trim().min(1).max(4000), expectedRevision: z.number().int().nonnegative() }).strict() } }, async (req, reply) => {
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit, emit }) => {

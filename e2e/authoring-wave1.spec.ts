@@ -5,7 +5,11 @@ import { randomUUID } from 'node:crypto';
 /**
  * Authoring v2.1 Wave 1, per template: the workflow graph below both editors on one task.
  * Classic starts from the template workflow and edits a node; Chatbot shows the same graph; reload keeps it;
- * the graph reflows to a list at narrow widths with no horizontal page scroll; the agent view hides private material.
+ * the graph reflows to a list at narrow widths with no horizontal page scroll.
+ *
+ * UI fixture: the task read is real. The calls behind the staffing gate (identity, selection, onboarding) are served
+ * by a small in-test backend, as in tester-workbench.spec.ts: saves, the workspace preference and the consent state.
+ * Persistence, checks, the agent view and export are covered against the real database in the API suites.
  */
 test.skip(!!process.env.E2E_WEB_URL, 'isolated UI fixture; never production');
 
@@ -18,22 +22,36 @@ async function fixture(page: Page, workflow: string) {
   return JSON.parse(execFileSync('pnpm', ['--silent', '--filter', '@praxis/api', 'exec', 'tsx', 'scripts/e2e-m10.ts', 'wave1', signed.id, workflow], { encoding: 'utf8' }).trim().split('\n').pop()!) as { taskId: string };
 }
 
-async function acceptConsent(page: Page) {
-  const accept = page.getByRole('button', { name: /accept|agree|continue/i }).first();
-  if (await accept.isVisible().catch(() => false)) {
-    const box = page.getByRole('checkbox').first();
-    if (await box.isVisible().catch(() => false)) await box.check();
-    await accept.click();
-  }
+/** In-test backend for the gated calls; the stored output and revision feed the real task read on reload. */
+async function gatedBackend(page: Page, taskId: string) {
+  const state: { output: Record<string, unknown> | null; revision: number | null } = { output: null, revision: null };
+  await page.route(`**/api/v1/me/tasks/${taskId}`, async (route) => {
+    const req = route.request();
+    if (req.method() === 'PUT') {
+      const body = req.postDataJSON();
+      state.output = body.output;
+      state.revision = body.expectedRevision + 1;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: state.revision, savedAt: new Date().toISOString() }) });
+    }
+    const res = await route.fetch();
+    const json = await res.json();
+    if (state.output) Object.assign(json, { output: state.output, revision: state.revision });
+    return route.fulfill({ response: res, json });
+  });
+  await page.route(`**/api/v1/me/tasks/${taskId}/authoring-workspace`, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: route.request().postData() ?? '{}' }));
+  await page.route(`**/api/v1/me/tasks/${taskId}/conversation`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: state.revision ?? 0, output: state.output ?? {}, state: { humanOnly: true, consent: { version: 'human-only/1' } }, messages: [], run: null, policy: null }) }),
+  );
+  return state;
 }
 
 for (const workflow of TEMPLATES) {
   test(`Wave 1 · ${workflow}: one workflow graph below Classic and Chatbot`, async ({ page }) => {
     const { taskId } = await fixture(page, workflow);
+    const saved = await gatedBackend(page, taskId);
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`${base}/tasks/${taskId}?editor=form`);
-    await acceptConsent(page);
-    await page.getByRole('button', { name: 'Classic' }).click();
+    await expect(page.getByRole('button', { name: 'Classic' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByText(/Single agent/).first()).toBeVisible();
 
     await page.getByRole('button', { name: 'Start from the template workflow' }).click();
@@ -55,7 +73,8 @@ for (const workflow of TEMPLATES) {
     await expect(page.getByTestId('workflow-graph').getByText('Review the case evidence')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Start from the template workflow' })).toHaveCount(0);
 
-    // Reload keeps the graph and the edit.
+    // The switch saved through the editor's autosave; reload keeps the graph and the edit.
+    expect(JSON.stringify(saved.output)).toContain('Review the case evidence');
     await page.reload();
     await expect(page.getByTestId('workflow-graph').getByText('Review the case evidence')).toBeVisible();
 
@@ -66,9 +85,5 @@ for (const workflow of TEMPLATES) {
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
     }
 
-    // The agent view carries the projected graph only.
-    const preview = await (await page.request.get(`${base}/api/v1/me/tasks/${taskId}/agent-preview`)).json();
-    expect(preview.task.workflowGraph.nodes).toHaveLength(nodes);
-    expect(JSON.stringify(preview)).not.toContain('findings.sufficient');
   });
 }

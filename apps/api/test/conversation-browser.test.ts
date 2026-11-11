@@ -196,6 +196,8 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
     let webChild: ReturnType<typeof spawn> | null = null;
     try {
       const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+      // A stalled step fails with its locator after 60 s instead of hanging until the 300 s test timeout.
+      page.setDefaultTimeout(60_000);
       await page.context().addCookies([{ name: 'praxis_candidate', value: a.cookie.split('=')[1]!, domain: '127.0.0.1', path: '/' }]);
       await page.goto(`http://127.0.0.1:${port}/tasks/${id}`, { waitUntil: 'networkidle' });
       await page.getByLabel('I agree to these terms.').check();

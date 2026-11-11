@@ -35,3 +35,19 @@ all model, email and payment providers mocked. Not deployed; no live model call.
 | Browser journeys, 5 templates | `npx playwright test -c e2e authoring-wave1` | 5 passed (KYC, KYB, AML, Omnichannel, phone launch): start from the template workflow, edit a node, save, same graph in Chatbot, list view and no sideways scroll at 736/390/320 px. Gated calls served by an in-test backend; run on alternate local ports |
 
 Not yet shown: the owner's live Vertex QA session and Anvil import (both required for Wave 1 sign-off).
+
+## Wave 2: review route, workflow building, planner and three templates (11 Nov 2026, local)
+
+Branch `feat/authoring-wave2` from `main` at `58dcd84b`, after merging `wave2-template-profiles` and `wave2-expert-pm`
+and the credentials hotfix. Same local stack; all providers mocked. Not pushed, not deployed, no live model call.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Typecheck, all packages | `pnpm -r typecheck` | pass |
+| API integration tests | `pnpm --filter @praxis/api test` | 58 files; 784 passed, 5 skipped, 1 failed: `conversation-browser.test.ts` timed out at 300 s under full-suite load; it passes alone (60 s) and now has a 60 s step timeout so a stall names its step |
+| Shared unit tests | `pnpm --filter @praxis/shared test` | 352 passed |
+| Candidate tests | `pnpm --filter @praxis/candidate test` | 37 passed |
+| Web tests | `pnpm --filter @praxis/web test` | 65 passed |
+| Browser journeys | `npx playwright test -c e2e authoring-wave` | 9 passed: the eight templates (graph below both editors) and Wave 2 workflow building (decision, person step, parallel step with join, correction loop) |
+
+Not yet shown: the owner's live session and Anvil import for the three new templates; Expert → PM in the browser.

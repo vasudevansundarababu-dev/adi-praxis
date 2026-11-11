@@ -419,3 +419,10 @@ help pack and the user's own data; required markers on every screen of all three
 - **(chosen by Claude)** An Admin may still set a known password through the API, with `requirePasswordChange` on by
   default. Test fixtures and the shared demo account `partner@praxis.demo` turn it off. The shared demo console
   accounts are created by the seed and demo job, not the API, so they are unaffected.
+
+## QA environment for authoring v2.1 waves (10 Nov 2026)
+
+- **(owner)** Wave builds reach QA through `main` (option A). Development builds and tests each wave on
+  `feat/authoring-v21`, then merges it to `main` through a pull request with CI green and owner approval. The QA
+  build and deploy (Nightly build, scheduled or on demand) then takes current `main`. The pipeline is unchanged, and
+  no branch builds go to QA. Consequence: the Saturday staging build also takes whatever waves are on `main`.

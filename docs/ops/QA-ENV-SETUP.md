@@ -47,8 +47,8 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 
 | # | Step | Status |
 | --- | --- | --- |
-| 1 | How a wave build reaches QA (branch build or PR to `main`) | Waiting for owner |
-| 2 | Vertex: Model Garden access for `AUTHORING_MODEL` (Claude) and Gemini, quota | Open |
+| 1 | How a wave build reaches QA | **Decided 10 Nov: option A.** Develop and test on `feat/authoring-v21`, PR to `main` (CI green, owner approves), then the Nightly build (or Run workflow / `/qa deploy`) deploys `main` to QA. Pipeline unchanged. |
+| 2 | Vertex: Model Garden access for `AUTHORING_MODEL` (Claude) and Gemini, quota | In progress (owner) |
 | 3 | Caps: deployer passes `AUTHORING_MODEL` and `AUTHORING_DAILY_CALL_CAP`; `llm.call` metric and alert; Vertex budget | Open |
 | 4 | Policy extraction in QA: Document AI layout parser, LlamaExtract key slot | Open (blocked by O2) |
 | 5 | Migrations (incl. `20261111000000_authoring_v21_modes`) and seed, catalogue templates | Open |

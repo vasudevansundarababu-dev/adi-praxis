@@ -1,8 +1,13 @@
-# Merge to main: test, build and push images, migrate, deploy every service to staging, then smoke-test staging.
+# Weekly build (Saturday 12:00 CST): test, build and push images, migrate, deploy every service to staging, then
+# smoke-test staging. Also runnable on demand (Actions -> Deploy staging -> Run workflow) for demos; an on-demand run
+# always deploys current main, the same artefact QA validated (docs/ops/DEPLOYMENT-PIPELINE.md).
+#
+# Merges to main no longer deploy to staging: staging is promoted on the weekly schedule or on demand.
 name: Deploy staging
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: '0 18 * * 6' # Saturday 12:00 CST (UTC-6); 13:00 CDT in summer
+  workflow_dispatch:
 permissions:
   contents: read
   id-token: write

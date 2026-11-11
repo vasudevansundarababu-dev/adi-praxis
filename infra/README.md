@@ -25,7 +25,10 @@ Everything is Terraform (`infra/terraform`) and GitHub Actions (`.github/workflo
 ## Day to day
 
 - **Pull request:** typecheck, unit and integration tests (docker compose), Playwright smoke tests, container builds, and `terraform plan` for changed infrastructure (read-only planner identity).
-- **Merge to `main`:** staging is deployed and smoke-tested.
+- **Merge to `main`:** nothing deploys automatically. `main` reaches **QA** on the nightly build (and on demand) and **staging** on the weekly build (Saturday 12:00 CST, and on demand). See `docs/ops/DEPLOYMENT-PIPELINE.md`.
+- **QA:** the existing test project (`TEST_GCP_PROJECT`). Pause the scheduled build with `NIGHTLY_ENABLED=false` or `/nightly off`; run it on demand with Actions → Nightly build → Run workflow.
+- **Staging:** weekly or on demand (Actions → Deploy staging → Run workflow); both deploy current `main`.
+- **Production:** the **Production agent** promotes the build already running on QA or staging (`/production deploy from qa|staging`), behind the `production` environment's required reviewers. It never rebuilds from a branch. Tag `v*` still runs the canary release.
 - **Tag `v*`:** needs approval, then migrations, new revisions with no traffic, 10% canary, smoke tests, and 100%. Any failure shifts traffic back.
 - **Rollback:** the **Roll back** workflow moves every service to the previous revision in one step. Migrations are written to stay backward-compatible for one release.
 - **Drift:** a weekly `terraform plan -detailed-exitcode` fails if anything changed outside Terraform.

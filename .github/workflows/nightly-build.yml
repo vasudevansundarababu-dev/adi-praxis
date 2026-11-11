@@ -1,6 +1,13 @@
 # Nightly build (02:00 IST, after the defect agent): if main changed since the last nightly, run all tests, deploy to
-# the TEST environment (real Claude on Vertex; simulated sign-in, identity check and email), smoke-test it, publish a
-# GitHub pre-release "nightly-YYYYMMDD-<sha>" with release notes, and ask testers to verify each fixed issue.
+# the QA environment (the existing TEST project; real Claude on Vertex; simulated sign-in, identity check and email),
+# smoke-test it, publish a GitHub pre-release "nightly-YYYYMMDD-<sha>" with release notes, and ask testers to verify
+# each fixed issue. This is the QA deployer (docs/ops/DEPLOYMENT-PIPELINE.md).
+#
+# On demand: run this workflow manually (Actions -> Nightly build -> Run workflow) to deploy current main to QA at any
+# time, for example to keep testing between weekly staging builds.
+#
+# Off-switch: set the repository variable NIGHTLY_ENABLED=false (or comment `/nightly off` on an issue) to pause the
+# scheduled nightly when no work happened that week. A manual run ignores the switch.
 #
 # Needs repository variables TEST_GCP_PROJECT, TEST_WIF_PROVIDER, TEST_DEPLOYER_SA (infra/test/setup-github-access.sh).
 name: Nightly build
@@ -24,7 +31,8 @@ concurrency:
 
 jobs:
   changes:
-    if: vars.TEST_GCP_PROJECT != ''
+    # The scheduled nightly is paused when NIGHTLY_ENABLED=false; a manual run ignores the switch.
+    if: ${{ vars.TEST_GCP_PROJECT != '' && (github.event_name != 'schedule' || vars.NIGHTLY_ENABLED != 'false') }}
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.c.outputs.changed }}
@@ -102,7 +110,7 @@ jobs:
         run: |
           range=${PREV:+$PREV..}HEAD
           {
-            echo "Deployed to the **test environment** on $(TZ=Asia/Kolkata date '+%d %b %Y %H:%M IST'). Build \`$LABEL\`."
+            echo "Deployed to the **QA environment** on $(TZ=Asia/Kolkata date '+%d %b %Y %H:%M IST'). Build \`$LABEL\`."
             echo
             echo "## Changes"
             git log --no-merges --format='- %s (%h)' $range | head -200
@@ -117,11 +125,17 @@ jobs:
           if [ -n "${issues// }" ]; then
             { echo; echo "## Please verify"; for n in $issues; do echo "- #$n"; done; } >> notes.md
           fi
-          git tag "$LABEL" HEAD && git push origin "$LABEL"
-          gh release create "$LABEL" -R "$REPO" --prerelease --title "$LABEL" --notes-file notes.md
+          # Idempotent: an on-demand run on a day that already has a nightly keeps the existing tag.
+          if git ls-remote --exit-code --tags origin "$LABEL" >/dev/null 2>&1; then
+            echo "Tag $LABEL already exists; updating the release notes." >> "$GITHUB_STEP_SUMMARY"
+            gh release edit "$LABEL" -R "$REPO" --notes-file notes.md || gh release create "$LABEL" -R "$REPO" --prerelease --title "$LABEL" --notes-file notes.md
+          else
+            git tag "$LABEL" HEAD && git push origin "$LABEL"
+            gh release create "$LABEL" -R "$REPO" --prerelease --title "$LABEL" --notes-file notes.md
+          fi
           for n in $issues; do
             state=$(gh issue view "$n" -R "$REPO" --json state -q .state 2>/dev/null || echo NONE)
             [ "$state" = "OPEN" ] || continue
             gh issue edit "$n" -R "$REPO" --add-label status:ready-to-verify --remove-label agent:pr-open,status:reopened || true
-            gh issue comment "$n" -R "$REPO" --body "The fix is in build **$LABEL**, now on the test environment. Please retest and comment \`/verified\` if it works or \`/failed\` with what you saw."
+            gh issue comment "$n" -R "$REPO" --body "The fix is in build **$LABEL**, now on the QA environment. Please retest and comment \`/verified\` if it works or \`/failed\` with what you saw."
           done

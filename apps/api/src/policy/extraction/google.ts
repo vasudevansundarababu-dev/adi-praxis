@@ -123,7 +123,7 @@ export class GoogleLayoutGeminiAdapter implements ExtractionAdapter {
 
   private async generate(model: string, chunks: Chunk[]) {
     const g = this.cfg.google;
-    const url = `https://${g.geminiLocation}-aiplatform.googleapis.com/v1/projects/${g.projectId}/locations/${g.geminiLocation}/publishers/google/models/${model}:generateContent`;
+    const url = geminiEndpoint(g.projectId, g.geminiLocation, model);
     const doc = chunks.map((c) => `<chunk id="${c.id}">\n${c.text}\n</chunk>`).join('\n');
     const body = {
       systemInstruction: { parts: [{ text: `${EXTRACTION_PROMPT}\nPut the IDs of the chunks that contain each sourceQuote in sourceRefs.` }] },
@@ -132,13 +132,14 @@ export class GoogleLayoutGeminiAdapter implements ExtractionAdapter {
       generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseJsonSchema: EXTRACTION_JSON_SCHEMA, maxOutputTokens: 32_768 },
     };
     const raw = (await this.post(url, body, 'Gemini')) as {
-      candidates?: Array<{ finishReason?: string; content?: { parts?: Array<{ text?: string }> } }>;
+      candidates?: Array<{ finishReason?: string; content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
       usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
       modelVersion?: string;
     };
     const c = raw.candidates?.[0];
     if (!c) throw new ProviderError('Gemini returned no candidate.', false);
-    const text = (c.content?.parts ?? []).map((p) => p.text ?? '').join('');
+    // Thinking models (Gemini 3.x) may return thought parts; only answer text is the extraction.
+    const text = (c.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? '').join('');
     let json: unknown = null;
     try {
       json = JSON.parse(text);
@@ -194,4 +195,10 @@ export function normaliseGemini(json: unknown, chunks: Chunk[], input: Pick<Extr
     else dropped++;
   }
   return { raw: json, candidates, partial: rules === null || dropped > 0, usage: { pages: null, credits: null, inputTokens: null, outputTokens: null, actualUsd: null } };
+}
+
+/** Vertex generateContent URL. Location `global` uses the global host (aiplatform.googleapis.com), as the chatbot does. */
+export function geminiEndpoint(projectId: string, location: string, model: string): string {
+  const host = location === 'global' ? 'https://aiplatform.googleapis.com' : `https://${location}-aiplatform.googleapis.com`;
+  return `${host}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
 }

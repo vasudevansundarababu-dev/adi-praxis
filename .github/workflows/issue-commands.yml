@@ -1,29 +1,81 @@
-# Testers close the loop with a comment on the issue:
-#   /verified  the fix works on the test environment  -> status:verified, issue closed
-#   /failed    it still fails (say how in the comment) -> status:reopened, issue open, back to triage
+# Owner commands on an issue or pull request comment (docs/ops/DEPLOYMENT-PIPELINE.md):
+#   /verified                 the fix works on QA                 -> status:verified, issue closed
+#   /failed                   it still fails (say how)            -> back to triage
+#   /nightly off | on         pause / resume the scheduled QA build (sets NIGHTLY_ENABLED)
+#   /qa deploy                deploy current main to QA now
+#   /staging deploy           deploy current main to staging now
+#   /production deploy from qa | from staging   promote the running build to production (owner approval required)
+#
+# Only the owner, members and collaborators may use these commands.
+#
+# /qa and /staging use the built-in token (actions: write). /nightly on|off and /production change repository state or
+# reach production: they use the optional PIPELINE_ADMIN_TOKEN secret (a fine-grained PAT with Variables: write). If it
+# is not set, the command replies with the exact Settings step instead.
 name: Issue commands
 on:
   issue_comment:
     types: [created]
 permissions:
+  contents: read
   issues: write
+  actions: write
 jobs:
   command:
-    if: ${{ !github.event.issue.pull_request && (startsWith(github.event.comment.body, '/verified') || startsWith(github.event.comment.body, '/failed')) }}
+    if: ${{ !github.event.issue.pull_request && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) && (startsWith(github.event.comment.body, '/verified') || startsWith(github.event.comment.body, '/failed') || startsWith(github.event.comment.body, '/nightly') || startsWith(github.event.comment.body, '/qa deploy') || startsWith(github.event.comment.body, '/staging deploy') || startsWith(github.event.comment.body, '/production deploy')) }}
     runs-on: ubuntu-latest
     steps:
       - env:
           GH_TOKEN: ${{ github.token }}
+          ADMIN_TOKEN: ${{ secrets.PIPELINE_ADMIN_TOKEN }}
           N: ${{ github.event.issue.number }}
           BODY: ${{ github.event.comment.body }}
           WHO: ${{ github.event.comment.user.login }}
           REPO: ${{ github.repository }}
         run: |
-          if [[ "$BODY" == /verified* ]]; then
-            gh issue edit "$N" -R "$REPO" --add-label status:verified --remove-label status:ready-to-verify,status:reopened || true
-            gh issue close "$N" -R "$REPO" --reason completed --comment "Verified by @$WHO on the test environment. Closing."
-          else
-            gh issue reopen "$N" -R "$REPO" || true
-            gh issue edit "$N" -R "$REPO" --add-label status:reopened,status:needs-triage --remove-label status:ready-to-verify,status:verified,agent:pr-open || true
-            gh issue comment "$N" -R "$REPO" --body "Verification failed (reported by @$WHO). Back to triage."
-          fi
+          reply() { gh issue comment "$N" -R "$REPO" --body "$1"; }
+          case "$BODY" in
+            /verified*)
+              gh issue edit "$N" -R "$REPO" --add-label status:verified --remove-label status:ready-to-verify,status:reopened || true
+              gh issue close "$N" -R "$REPO" --reason completed --comment "Verified by @$WHO on QA. Closing."
+              ;;
+            /failed*)
+              gh issue reopen "$N" -R "$REPO" || true
+              gh issue edit "$N" -R "$REPO" --add-label status:reopened,status:needs-triage --remove-label status:ready-to-verify,status:verified,agent:pr-open || true
+              reply "Verification failed (reported by @$WHO). Back to triage."
+              ;;
+            "/nightly off"*)
+              if [ -n "$ADMIN_TOKEN" ]; then
+                GH_TOKEN="$ADMIN_TOKEN" gh variable set NIGHTLY_ENABLED -R "$REPO" --body false
+                reply "Scheduled QA (nightly) build paused by @$WHO. Manual runs still work. Resume with \`/nightly on\`."
+              else
+                reply "@$WHO: set repository variable \`NIGHTLY_ENABLED\` to \`false\` (Settings -> Secrets and variables -> Actions -> Variables) to pause the scheduled QA build. Set the \`PIPELINE_ADMIN_TOKEN\` secret to enable this command."
+              fi
+              ;;
+            "/nightly on"*)
+              if [ -n "$ADMIN_TOKEN" ]; then
+                GH_TOKEN="$ADMIN_TOKEN" gh variable set NIGHTLY_ENABLED -R "$REPO" --body true
+                reply "Scheduled QA (nightly) build resumed by @$WHO."
+              else
+                reply "@$WHO: set repository variable \`NIGHTLY_ENABLED\` to \`true\` to resume the scheduled QA build."
+              fi
+              ;;
+            "/qa deploy"*)
+              gh workflow run nightly-build.yml -R "$REPO" --ref main
+              reply "On-demand QA build started by @$WHO from current \`main\`. Watch Actions -> Nightly build."
+              ;;
+            "/staging deploy"*)
+              gh workflow run deploy-staging.yml -R "$REPO" --ref main
+              reply "On-demand Staging build started by @$WHO from current \`main\`. Watch Actions -> Deploy staging."
+              ;;
+            "/production deploy from staging"*)
+              gh workflow run production-agent.yml -R "$REPO" --ref main -f source=staging
+              reply "Production promotion requested by @$WHO from **staging**. Approve it on the \`production\` environment to proceed."
+              ;;
+            "/production deploy from qa"*)
+              gh workflow run production-agent.yml -R "$REPO" --ref main -f source=qa
+              reply "Production promotion requested by @$WHO from **QA**. Approve it on the \`production\` environment to proceed."
+              ;;
+            "/production"*)
+              reply "@$WHO: say \`/production deploy from qa\` or \`/production deploy from staging\`."
+              ;;
+          esac

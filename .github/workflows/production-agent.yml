@@ -1,0 +1,135 @@
+# Production agent: promote the build ALREADY RUNNING on QA or staging to production. It does not rebuild from a
+# branch; it reads the image digest currently serving on the chosen source and deploys that same digest to production.
+#
+# Trigger: manual (Actions -> Production agent -> Run workflow) or an issue command
+# `/production deploy from qa` / `/production deploy from staging` (see issue-commands.yml).
+#
+# Owner approval: this job runs in the `production` GitHub environment, which must have the owner as a required
+# reviewer (Settings -> Environments -> production). The run pauses until the owner approves. No automatic path to
+# production exists (docs/ops/DEPLOYMENT-PIPELINE.md).
+name: Production agent
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Environment whose running build to promote
+        type: choice
+        options: [qa, staging]
+        required: true
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: promote-production
+  cancel-in-progress: false
+
+env:
+  REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  PROD_PROJECT: ${{ vars.GCP_PROJECT_PRODUCTION }}
+
+jobs:
+  promote:
+    if: vars.GCP_PROJECT_PRODUCTION != ''
+    # Playwright 1.56.1 cannot install Chromium on ubuntu-latest (26.04); unpin after upgrading Playwright.
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 90
+    env:
+      SOURCE: ${{ inputs.source }}
+      SRC_PROJECT: ${{ inputs.source == 'qa' && vars.TEST_GCP_PROJECT || vars.GCP_PROJECT_STAGING }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to the source environment (read the running image)
+        uses: ./.github/actions/gcp-auth
+        with:
+          provider: ${{ inputs.source == 'qa' && vars.TEST_WIF_PROVIDER || vars.GCP_WIF_PROVIDER_STAGING }}
+          service_account: ${{ inputs.source == 'qa' && vars.TEST_DEPLOYER_SA || vars.GCP_DEPLOYER_SA_STAGING }}
+          region: ${{ env.REGION }}
+      - name: Record the running image on the source environment
+        run: |
+          set -euo pipefail
+          if [ -z "${SRC_PROJECT}" ]; then echo "Source project is not configured for $SOURCE"; exit 1; fi
+          : > images.env
+          for app in api web candidate; do
+            img=$(gcloud run services describe "praxis-$app" --project "$SRC_PROJECT" --region "$REGION" \
+              --format='value(spec.template.spec.containers[0].image)')
+            if [ -z "$img" ]; then echo "No running image for praxis-$app in $SOURCE"; exit 1; fi
+            echo "${app^^}_IMAGE=$img" >> images.env
+            echo "$app -> $img"
+          done
+          echo "SOURCE_PROJECT=$SRC_PROJECT" >> images.env
+      - name: Authenticate to production
+        uses: ./.github/actions/gcp-auth
+        with:
+          provider: ${{ vars.GCP_WIF_PROVIDER_PRODUCTION }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA_PRODUCTION }}
+          region: ${{ env.REGION }}
+      - name: Confirm production target and the promoted digests
+        run: |
+          set -euo pipefail
+          if [ -z "${PROD_PROJECT}" ]; then echo "GCP_PROJECT_PRODUCTION is not configured"; exit 1; fi
+          source images.env
+          {
+            echo "## Production promotion"
+            echo
+            echo "Source: **$SOURCE** (\`$SOURCE_PROJECT\`)"
+            echo "Target: **production** (\`$PROD_PROJECT\`)"
+            echo
+            echo "| App | Image digest promoted |"
+            echo "| --- | --- |"
+            echo "| api | \`$API_IMAGE\` |"
+            echo "| web | \`$WEB_IMAGE\` |"
+            echo "| candidate | \`$CANDIDATE_IMAGE\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Run migrations for the promoted api image
+        run: |
+          set -euo pipefail
+          source images.env
+          gcloud run jobs update praxis-migrate --project "$PROD_PROJECT" --region "$REGION" --image "$API_IMAGE"
+          gcloud run jobs update praxis-verify-chains --project "$PROD_PROJECT" --region "$REGION" --image "$API_IMAGE"
+          gcloud run jobs execute praxis-migrate --project "$PROD_PROJECT" --region "$REGION" --wait
+      - name: Deploy the promoted digests without traffic
+        run: |
+          set -euo pipefail
+          source images.env
+          REV="promote-$(date -u +%Y%m%d-%H%M%S)"
+          echo "REV=$REV" >> "$GITHUB_ENV"
+          gcloud run deploy praxis-api       --project "$PROD_PROJECT" --region "$REGION" --image "$API_IMAGE"       --no-traffic --tag "rc-$REV"
+          gcloud run deploy praxis-web       --project "$PROD_PROJECT" --region "$REGION" --image "$WEB_IMAGE"       --no-traffic --tag "rc-$REV"
+          gcloud run deploy praxis-candidate --project "$PROD_PROJECT" --region "$REGION" --image "$CANDIDATE_IMAGE" --no-traffic --tag "rc-$REV"
+      - name: 10% canary
+        run: |
+          for s in praxis-api praxis-web praxis-candidate; do
+            gcloud run services update-traffic "$s" --project "$PROD_PROJECT" --region "$REGION" --to-tags "rc-$REV=10"
+          done
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+      - name: Automatic smoke tests during the canary
+        run: pnpm exec playwright test -c e2e
+        env:
+          PW_CHANNEL: ''
+          E2E_WEB_URL: ${{ vars.E2E_WEB_URL }}
+          E2E_CANDIDATE_URL: ${{ vars.E2E_CANDIDATE_URL }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          E2E_PM_EMAIL: ${{ secrets.E2E_PM_EMAIL }}
+          E2E_PM_PASSWORD: ${{ secrets.E2E_PM_PASSWORD }}
+      - name: Promote to 100%
+        run: |
+          set -euo pipefail
+          source images.env
+          for s in praxis-api praxis-web praxis-candidate; do
+            gcloud run services update-traffic "$s" --project "$PROD_PROJECT" --region "$REGION" --to-tags "rc-$REV=100"
+          done
+          gcloud run deploy praxis-worker --project "$PROD_PROJECT" --region "$REGION" --image "$API_IMAGE"
+      - name: Roll back the canary if anything failed
+        if: failure()
+        run: |
+          for s in praxis-api praxis-web praxis-candidate; do
+            PREV=$(gcloud run revisions list --service "$s" --project "$PROD_PROJECT" --region "$REGION" --format='value(metadata.name)' --sort-by='~metadata.creationTimestamp' | sed -n 2p)
+            [ -n "$PREV" ] && gcloud run services update-traffic "$s" --project "$PROD_PROJECT" --region "$REGION" --to-revisions "$PREV=100" || true
+          done

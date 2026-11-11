@@ -71,3 +71,20 @@ service, database guard, retrieval filters, review policy sources), `apps/api/te
 contract against mocks), Wave 3 cases in `template-profiles.test.ts`, shared profile and graph tests, and the web and
 candidate component tests. Not yet shown: the owner's live QA session (Waves 2 and 3), the open-model comparison on a
 real Model Garden model, and the Anvil import for the three new templates.
+
+## Owner field-contract answers and help chatbot (12 Nov 2026, local)
+
+Wave 2 answers committed on `feat/authoring-wave2` and merged into `feat/authoring-wave3`; Wave 3 answers and the help
+chatbot on `feat/authoring-wave3`. All providers mocked; not pushed, not deployed, no live model call.
+
+| Check | Result |
+| --- | --- |
+| `pnpm -r typecheck` | pass |
+| API integration tests | 61 files; 824 passed, 5 skipped, 0 failed |
+| Shared / web / candidate unit tests | 383 / 70 / 40 passed |
+| Browser journeys (`authoring-wave1`, `authoring-wave2`) | 12 passed |
+
+New tests: critical criteria exported as hard failures; Wave 2 and 3 person steps behind exact decisions; fraud lists,
+hidden hand-off, per-exception severity; Q4 per-query fields, 20-query limit, generated criteria weights;
+clustering F1 (`cluster-f1.test.ts`) and its RL review score end to end; help chatbot knowledge, template guides,
+SME route, Gemini path and ranking (`support-authoring.test.ts`).

@@ -19,3 +19,4 @@ for (const p of WAVE1_PROFILES) {
   const r = registerProfile(p);
   if (!r.ok) console.error(`Template profile ${p.profileId} is unsupported: ${r.problems.join('; ')}`);
 }
+export * from './planner';

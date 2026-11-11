@@ -1,4 +1,4 @@
-import { applyGraphOps, graphOpText, WorkflowGraph, type ConversationProposal } from '@praxis/shared';
+import { applyGraphOps, graphOpText, planNextQuestion, profileForWorkflow, WorkflowGraph, type ConversationProposal } from '@praxis/shared';
 export { AUTHORSHIP_VERSION, AUTHORSHIP_TERMS } from '@praxis/shared';
 const normal = (v: string) => v.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 /** Reject new substantive text not extractable from AUTHOR messages. This proves source linkage, not external authorship. */
@@ -32,6 +32,12 @@ export function authoredChangeProblems(current: Record<string, unknown>, p: Conv
 /** Public response text is server-owned: an off-topic or answer-generating model reply is never shown. */
 export function facilitatorQuestion(text: string, output: Record<string, unknown>, workflow: string): string {
   if (/\b(ssn|tax\s*id|tin)\b/i.test(text)) return 'Which jurisdiction and customer category apply, and which approved project rule requires this identifier or permits an alternative? State your own assessment.';
+  // Template-aware planner (Wave 2): the next required field the SME has not written yet, from the template profile.
+  const lookup = profileForWorkflow(workflow);
+  if (lookup.status === 'ok') {
+    const planned = planNextQuestion(lookup.profile, output, text);
+    if (planned) return planned.question;
+  }
   if (/rubric|grading|weight|criterion/i.test(text)) return 'In your own words, what earns full, partial and zero credit, and which failure is critical?';
   if (/policy|rule|exception/i.test(text)) return 'Which published project rule applies to which investigation step, and what facts or exceptions determine its applicability?';
   if (!(output as {scenario?: unknown}).scenario) return `Describe one ${workflow} case in your own words: the subject, evidence and complication.`;

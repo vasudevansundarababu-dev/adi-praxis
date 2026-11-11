@@ -2,6 +2,7 @@ import type { ProjectDto } from '@praxis/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProjectStatusBadge } from '@/components/projects/project-status';
+import { TableSearch } from '@/components/search/table-search';
 import { apiGet, getCurrentUser } from '@/lib/api';
 
 export const metadata: Metadata = { title: 'Projects' };
@@ -25,7 +26,9 @@ export default async function ProjectsPage() {
       {items.length === 0 ? (
         <p className="mt-8 text-fg-muted">No projects yet.</p>
       ) : (
-        <div className="mt-6 overflow-x-auto card">
+        <div className="mt-6">
+        <TableSearch type="projects" label="Search projects" placeholder="Search projects by name, workflow or what they are about" />
+        <div className="overflow-x-auto card" data-search-scope="projects">
           <table className="w-full text-left text-sm">
             <thead className="bg-surface">
               <tr>
@@ -39,7 +42,7 @@ export default async function ProjectsPage() {
             </thead>
             <tbody>
               {items.map((p) => (
-                <tr key={p.id} className="border-t border-line">
+                <tr key={p.id} data-search-id={p.id} className="border-t border-line">
                   <td className="px-4 py-2">
                     <Link href={`/projects/${p.id}`} className="text-link hover:underline">
                       {p.name}
@@ -58,6 +61,7 @@ export default async function ProjectsPage() {
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       )}
     </div>

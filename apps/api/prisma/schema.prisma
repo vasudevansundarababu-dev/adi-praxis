@@ -13,7 +13,7 @@ generator client {
 datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
-  extensions = [vector]
+  extensions = [vector, pg_trgm]
 }
 
 // ───────────────────────────── Enums ─────────────────────────────
@@ -3234,4 +3234,24 @@ model TaskPolicySnapshot {
 
   @@unique([taskInstanceId, version])
   @@index([taskInstanceId, digest])
+}
+
+/// Console search bar (owner, 12 Nov 2026): a derived index of list records, kept in step on search.
+/// `text` is matched by letters (pg_trgm); `embedding` holds the professional text's meaning (never names or emails).
+model SearchDocument {
+  id              String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String                       @map("client_id") @db.Uuid
+  entityType      String                       @map("entity_type")
+  entityId        String                       @map("entity_id") @db.Uuid
+  text            String
+  /// sha256 of the meaning text; a change clears the embedding.
+  meaningHash     String                       @map("meaning_hash")
+  embedding       Unsupported("vector(768)")?
+  embeddingModel  String?                      @map("embedding_model")
+  sourceUpdatedAt DateTime                     @map("source_updated_at")
+  createdAt       DateTime                     @default(now()) @map("created_at")
+  updatedAt       DateTime                     @updatedAt @map("updated_at")
+
+  @@unique([entityType, entityId])
+  @@index([clientId, entityType])
 }

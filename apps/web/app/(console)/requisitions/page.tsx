@@ -1,4 +1,5 @@
 import { REQUISITION_STATES } from '@praxis/shared';
+import { TableSearch } from '@/components/search/table-search';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { NoAccess } from '@/components/no-access';
@@ -38,7 +39,9 @@ export default async function RequisitionsPage({ searchParams }: { searchParams:
       {items.length === 0 ? (
         <Empty>{filter ? 'No requisitions in this state.' : canPlan ? 'No requisitions yet. Switch on SME supply for a project, then create one.' : 'No requisitions yet.'}</Empty>
       ) : (
-        <div className="card mt-6 overflow-x-auto">
+        <>
+        <TableSearch type="requisitions" label="Search requisitions" placeholder="Search requisitions by title, project, domain or skills" />
+        <div data-search-scope="requisitions" className="card mt-6 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-line text-fg-muted">
               <tr>
@@ -53,7 +56,7 @@ export default async function RequisitionsPage({ searchParams }: { searchParams:
             </thead>
             <tbody className="divide-y divide-line">
               {items.map((r) => (
-                <tr key={r.id}>
+                <tr data-search-id={r.id} key={r.id}>
                   <td className={TD}>
                     <Link href={`/requisitions/${r.id}`} className="font-medium text-link hover:underline">
                       {r.title}
@@ -73,6 +76,7 @@ export default async function RequisitionsPage({ searchParams }: { searchParams:
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

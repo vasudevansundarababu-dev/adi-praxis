@@ -692,3 +692,24 @@ Expert and PM with two audit events; Expert edits need a reason, and a material 
   active Validator account.
 - **Default:** author flows (staffing, matching, campaigns, assignment journeys) use the author post only. Requisitions
   for the Expert and Reviewer-SME tiers send candidates to the reviewer post when the project has one.
+
+### Console search bar (owner, 12 Nov 2026)
+
+- **(owner)** Projects, Templates, Candidates and the other lists get a search bar on top of the table; a few letters
+  must find a project or candidate, and search should be semantic. For Wave 3.
+- **Built:** `GET /search/:type?q=` for projects, templates, candidates (the Applications list; the console has no
+  separate candidate directory), requisitions, users and partners; `TableSearch` above each table. Typing filters the
+  table to the matches and lists the best matches as links (keyboard: arrows, Enter, Escape).
+- **Default: hybrid search.** By letters: title prefix, prefix of every query word, substring, then trigram similarity
+  (pg_trgm), so 2–3 letters and typos work. By meaning: from **4 characters**, the query and each record's
+  professional text are embedded with the same provider as near-duplicate detection (Vertex `text-embedding-005` in
+  QA and production, the hashing stand-in locally and in tests) and ranked by cosine similarity (match ≥ 0.6). If the
+  model fails, letters still work and the bar says so.
+- **Default: access.** Each list's own rule applies (PMs: their projects; Validators: applicants in their assigned
+  projects, never a declared conflict; Users: Admin only), so search never shows a record the list would not.
+- **Default: privacy.** Names, emails and other personal details are matched by letters in the database only; only
+  professional text (workflow, skills, specialties, jurisdictions, post titles, descriptions) goes to the embedding
+  model. Search queries of 4+ characters are embedded too.
+- **Default:** the index (`SearchDocument`) is derived data, refreshed from the source rows on each search (changed
+  text is re-indexed; changed meaning is re-embedded, at most 20 records per search). It holds no business state, so
+  index writes are not audited. Search ranks only; it never makes a decision.

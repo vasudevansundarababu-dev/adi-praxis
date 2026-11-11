@@ -1,6 +1,7 @@
 import type { DirectoryRowDto, TemplateDirectoryResponse } from '@praxis/shared';
 import { BLUEPRINT_SECTIONS } from '@praxis/shared';
 import Link from 'next/link';
+import { TableSearch } from '@/components/search/table-search';
 import { directoryHref, filterDomains, modesText, STATUS_PILLS, tptText, versionLabel } from '@/lib/mc/format';
 
 /** Screen 1: Templates & Active SME Applications Directory (S1-01 to S1-15). Server-rendered; filters live in the URL. */
@@ -51,6 +52,8 @@ export function DirectoryView({ data, domainFilter }: { data: TemplateDirectoryR
         </ul>
       </nav>
 
+      <div className="mt-6"><TableSearch type="templates" label="Search templates" placeholder="Search templates by workflow, domain or skills" /></div>
+      <div data-search-scope="templates">
       {domains.map((d) => (
         <section key={d.domainId} aria-labelledby={`domain-${d.domainId}`} className="mt-8">
           <h2 id={`domain-${d.domainId}`} className="flex items-center gap-2 text-lg font-semibold">
@@ -86,6 +89,7 @@ export function DirectoryView({ data, domainFilter }: { data: TemplateDirectoryR
           )}
         </section>
       ))}
+      </div>
 
       {data.domains.length === 0 && <p className="mt-8 text-fg-muted">{isAdmin ? 'No domains yet. Domains and workflows come from the seed.' : 'No published templates yet.'}</p>}
     </div>
@@ -97,7 +101,7 @@ function DirectoryRow({ row: r, isAdmin }: { row: DirectoryRowDto; isAdmin: bool
   const active = r.deployments.filter((d) => d.status === 'ACTIVE');
   const studio = active[0] ?? null;
   return (
-    <tr className="border-t border-line align-top">
+    <tr data-search-id={r.templateId} className="border-t border-line align-top">
       <td className="px-4 py-2">
         <Link href={`/templates/${r.templateId}`} className="font-medium text-link hover:underline">
           {r.workflowName}

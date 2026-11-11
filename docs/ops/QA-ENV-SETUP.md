@@ -74,7 +74,9 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 - **O6 — Claude quota DENIED (10 Nov, blocks the live chatbot).** Google denied the 30/min requests for
   `anthropic-claude-sonnet` and `anthropic-claude-haiku` within seconds (automatic denial, `stateDetail: Quota request
   denied`); `anthropic-count-tokens` still pending. Claude quota is 0 in every project (QA, staging, demo, Anvil), so
-  no project can call Claude on Vertex today. **Owner decision (10 Nov): both.** Owner appeals to Google (text in
+  no project can call Claude on Vertex today. Re-requested at 5/min with the full justification (10 Nov, after the owner's console attempts failed because a
+  request already existed): denied again automatically for Sonnet and Haiku. Only a Google support case or sales
+  contact can lift it. **Owner decision (10 Nov): both.** Owner appeals to Google (text in
   [CLAUDE-QUOTA-APPEAL.md](CLAUDE-QUOTA-APPEAL.md)); the code session adds a Gemini option for the chatbot
   (`gemini-3.8-flash`) so Wave 1 can run live on Gemini until Claude quota arrives. **Done on `feat/authoring-v21`:** `AUTHORING_MODEL=gemini:<model>` uses Gemini on Vertex (`generateContent`), a bare id or `claude:<model>` uses Claude; same cap, `llm.call` logging (`vendor`), admin page and smoke script. No Model Garden step needed for Google models; runtime account already has Vertex AI User.
 - **O7 — Gemini 2.5 is closed to this project.** Live check 10 Nov (owner approved one tiny call): `gemini-3.8-flash`

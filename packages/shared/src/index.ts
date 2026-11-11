@@ -22,3 +22,5 @@ export * from './policy';
 export * from "./authoring-conversation";
 
 export * from "./template-instructions";
+
+export * from "./template-profile";

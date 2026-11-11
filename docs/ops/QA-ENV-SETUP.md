@@ -23,23 +23,45 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 | GitHub wiring | `TEST_GCP_PROJECT`, `TEST_WIF_PROVIDER`, `TEST_DEPLOYER_SA`, `NIGHTLY_ENABLED=true` set |
 | Last Nightly build | Run 42757420232: CI green, deploy red at the demo-data step (O1) |
 
-## 2. Steps
+## 2. What authoring v2.1 adds (branch `feat/authoring-v21`, from the code session)
+
+| Setting (non-secret) | Default | Purpose |
+| --- | --- | --- |
+| `AUTHORING_MODEL` | `claude-opus-5` | The chatbot facilitator's model on Vertex. Needs Model Garden access in QA. |
+| `AUTHORING_DAILY_CALL_CAP` | `300` | Chatbot calls per client per UTC day; over the cap the API answers 429 `MODEL_DAILY_CAP`. |
+| `VERTEX_PROJECT_ID` / `VERTEX_LOCATION` | already set | Switch live mode on (blank = mock). |
+| `EMBEDDING_LOCATION` / `EMBEDDING_MODEL` | already set / `text-embedding-005` | Embeddings; also used by the smoke check. |
+
+- **Migration:** `20261111000000_authoring_v21_modes` (`Template.agent_mode`, `Project.review_route`). The QA deploy
+  already runs `praxis-migrate` before the services, so it is applied on the first wave deploy.
+- **Smoke check (two small billed calls; owner says yes first):**
+  `pnpm --filter @praxis/api exec tsx scripts/vertex-smoke.ts`, run inside QA as a one-off Cloud Run job on the API
+  image with the runtime service account. Prints model, latency and dimensions only. Exit 0 = live chatbot and
+  embedding calls worked; 2 = mock mode (`VERTEX_PROJECT_ID` not set); 1 = a call failed.
+- **Admin check:** `GET /api/v1/admin/model-providers` in the console must show mode `vertex`, the configured models
+  and today's chatbot calls against the cap.
+- **Usage logging:** every live call writes one structured log line with event `llm.call` (model, latency, tokens;
+  no prompt text). Suggested: a log-based metric on `llm.call` with an alert, alongside the billing budget.
+
+## 3. Steps
 
 | # | Step | Status |
 | --- | --- | --- |
 | 1 | How a wave build reaches QA (branch build or PR to `main`) | Waiting for owner |
-| 2 | Vertex: Model Garden access for Claude and Gemini, quota, smoke call | Open |
-| 3 | Spend caps: app caps passed by the deployer, Vertex budget alert | Open |
+| 2 | Vertex: Model Garden access for `AUTHORING_MODEL` (Claude) and Gemini, quota | Open |
+| 3 | Caps: deployer passes `AUTHORING_MODEL` and `AUTHORING_DAILY_CALL_CAP`; `llm.call` metric and alert; Vertex budget | Open |
 | 4 | Policy extraction in QA: Document AI layout parser, LlamaExtract key slot | Open (blocked by O2) |
-| 5 | Migrations and seed, catalogue templates | Open |
-| 6 | First wave deploy on the owner's go, smoke check | Open |
+| 5 | Migrations (incl. `20261111000000_authoring_v21_modes`) and seed, catalogue templates | Open |
+| 6 | First wave deploy on the owner's go; smoke job (exit 0); admin check shows `vertex` | Open |
 
-## 3. Open items
+## 4. Open items
 
 - **O1 — demo-data job fails on re-run.** `demo-setup` tries to create "SYNTHETIC TEST — Harbor marketing decisions"
   again and gets 409. Application code; passed to the authoring v2.1 code session.
 - **O2 — live policy extraction is refused in QA.** The app allows `POLICY_EXTRACTION_LIVE` only when
   `APP_ENV=staging`, and QA runs `APP_ENV=demo`. The Terraform `policy-extraction` module (PRs #36, #37) has the same
   staging-only rule and is not applied to QA. Needs an owner decision and a code change.
-- **O3 — no app spend caps in QA.** The deployer must pass the caps the authoring chatbot and planner read, once the
-  code session fixes their names.
+- **O3 — no app spend caps in QA.** `infra/demo/deploy-demo.sh` must pass `AUTHORING_MODEL` and
+  `AUTHORING_DAILY_CALL_CAP` (names now fixed by the code session). Infra change, made on the owner's go.
+- **O4 — smoke job.** A `praxis-vertex-smoke` Cloud Run job (API image, runtime service account) to run the smoke
+  check on demand. Added to the deployer with O3; executed only when the owner says yes.

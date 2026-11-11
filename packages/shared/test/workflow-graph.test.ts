@@ -135,15 +135,30 @@ describe('template starting workflows (Waves 1 to 3)', () => {
     expect(r.errors).toEqual([]);
     expect(r.warnings).toEqual([]);
   });
-  it('Wave 2: only Enhanced due diligence has a business human step (its draft names an approver hand-off)', async () => {
-    const { templateStartingGraph, WAVE2_GRAPH_TEMPLATES } = await import('../src/workflow-graph');
+  it('Wave 2 person steps (owner, 12 Nov): EDD approver always; adverse media reviewer only on escalate; CRR approver only on a proposed override', async () => {
+    const { templateStartingGraph, WAVE2_GRAPH_TEMPLATES, checkWorkflowGraph } = await import('../src/workflow-graph');
     expect(WAVE2_GRAPH_TEMPLATES).toEqual(['Adverse media review', 'Enhanced due diligence', 'Customer risk rating']);
-    const humans = (name: string) => templateStartingGraph(name)!.nodes.filter((n) => n.type === 'human_step');
-    expect(humans('Enhanced due diligence')).toHaveLength(1);
-    expect(humans('Enhanced due diligence')[0]).toMatchObject({ actorRole: 'Authorised approver' });
-    expect(humans('Adverse media review')).toHaveLength(0);
-    expect(humans('Customer risk rating')).toHaveLength(0);
-    for (const name of WAVE2_GRAPH_TEMPLATES) expect(templateStartingGraph(name)!).toMatchObject({ agentMode: 'SINGLE', loops: [expect.objectContaining({ maxIterations: 2, exhaustedTarget: 'escalate' })] });
+    const g = (name: string) => templateStartingGraph(name)!;
+    const humans = (name: string) => g(name).nodes.filter((n) => n.type === 'human_step');
+    expect(humans('Enhanced due diligence')).toMatchObject([{ actorRole: 'Authorised approver' }]);
+    expect(humans('Adverse media review')).toMatchObject([{ actorRole: 'Compliance reviewer' }]);
+    expect(humans('Customer risk rating')).toMatchObject([{ actorRole: 'Senior compliance approver' }]);
+    // The conditional person steps sit behind a decision with exact routes, plus else and unknown to escalation.
+    const gate = (name: string) => g(name).nodes.find((n) => n.id === 'needs_person') as { conditions: Array<{ id: string; field: string; op: string; value?: unknown }> } | undefined;
+    expect(gate('Enhanced due diligence')).toBeUndefined();
+    expect(gate('Adverse media review')!.conditions).toEqual([
+      { id: 'yes', label: 'Escalate', field: 'result.recommendation', op: 'eq', value: 'escalate' },
+      { id: 'no', label: 'Close or request information', field: 'result.recommendation', op: 'neq', value: 'escalate' },
+    ]);
+    expect(gate('Customer risk rating')!.conditions.map((c) => [c.op, c.value])).toEqual([['in', ['proposed_increase', 'proposed_decrease']], ['eq', 'none']]);
+    for (const name of ['Adverse media review', 'Customer risk rating']) {
+      const ports = g(name).edges.filter((e) => e.from === 'needs_person').map((e) => [e.port, e.to]);
+      expect(ports).toEqual([['yes', 'human'], ['no', 'done'], ['else', 'escalate'], ['unknown', 'escalate']]);
+    }
+    for (const name of WAVE2_GRAPH_TEMPLATES) {
+      expect(g(name)).toMatchObject({ agentMode: 'SINGLE', loops: [expect.objectContaining({ maxIterations: 2, exhaustedTarget: 'escalate' })] });
+      expect(checkWorkflowGraph(g(name)).errors, name).toEqual([]);
+    }
   });
   it('Wave 3: single-agent workflows with a bounded request loop and no business human step', async () => {
     const { templateStartingGraph, WAVE3_GRAPH_TEMPLATES } = await import('../src/workflow-graph');

@@ -622,3 +622,14 @@ Expert and PM with two audit events; Expert edits need a reason, and a material 
   comparison is deferred until Google approves the Model Garden quota for `adi-praxis-test-0928` (request pending with
   Google Cloud support). Wave 3 sign-off does not wait on it; switching later is a configuration change
   (`AUTHORING_MODEL=maas:<publisher>/<model>`, `AUTHORING_MAAS_LOCATION`) plus the smoke check, no new build.
+### Authoring v2.1 Wave 2: owner field-contract answers (12 Nov 2026)
+
+- **(owner)** The drafts' pick lists for Adverse media review, Enhanced due diligence and Customer risk rating are final.
+- **(owner)** Adverse media: per-source reliability from a fixed list (high / medium / low / unknown) with a reason; an
+  `escalate` recommendation goes to a "Compliance reviewer decides" person step.
+- **(owner)** EDD: a graded overall risk rating (low / medium / high / very_high) beside the recommendation.
+- **(owner)** CRR: a rating per risk factor (low / medium / high), no weights or formula; a proposed override goes to a
+  "Senior compliance approver decides" person step.
+- **(owner)** Failing a critical rubric criterion fails the whole task. Exported to Anvil as a hard-failure constraint
+  with the criterion's binding (Anvil's `praxis.anvil.task.v1` already has `constraints[].hard_failure`), so no new
+  Anvil field is invented.

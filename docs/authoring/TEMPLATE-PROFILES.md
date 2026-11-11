@@ -98,13 +98,23 @@ decides" human step (authorised approver, Approve/Decline, timeout → escalate)
 draft lists a human hand-off and a `proceed_for_approval` outcome. Adverse media review and customer risk rating have no
 business human step: their drafts do not describe one. Roles list no tools: the drafts leave the tool catalogue open.
 
-Not mapped from the drafts (left for the domain owner, nothing invented):
-- exact field names and enums outside these proposed labels, and the published agent mode;
-- the qualified tool catalogue and environment (S3 tools stay free entries, `allowCustom`);
-- adverse media: a per-extract reliability or allegation/fact enum (free text only);
-- EDD: an enum for the risk assessment (free text; the draft gives only the recommendation and evidence labels);
-- CRR: factor-level ratings, weights and a calculation schema; who approves a proposed override;
-- critical-failure scoring semantics beyond "at least one critical criterion".
+Owner decisions (12 Nov 2026), now built:
+- The pick lists above are final.
+- Adverse media: S5 source reliability is a repeated list (`MS1…`: source, reliability high / medium / low / unknown,
+  reason, evidence). The workflow sends an `escalate` recommendation to a person step "Compliance reviewer decides"
+  (Confirm / Dismiss, timeout → escalate) behind an "Escalation recommended?" decision; other recommendations go
+  straight to the output.
+- EDD: S6 adds a graded `risk_rating` (low / medium / high / very_high) beside the recommendation; the written risk
+  assessment stays in S5.
+- CRR: each factor assessment has a rating (low / medium / high). No weights or formula: the author's methodology
+  evidence decides the overall rating. A proposed override goes to "Senior compliance approver decides" (Approve /
+  Decline, timeout → escalate) behind an "Override proposed?" decision; no override goes straight to the output.
+- All templates: failing a critical criterion fails the whole task. The compiler exports each critical criterion
+  also as a `constraints[]` entry `<criterion id>.critical` with `hard_failure: true` and the same binding; the
+  criterion keeps its weight.
+
+Still not mapped (nothing invented): exact field names beyond these lists, the published agent mode, and the qualified
+tool catalogue (S3 tools stay free entries, `allowCustom`).
 
 
 ## Wave 3 profiles

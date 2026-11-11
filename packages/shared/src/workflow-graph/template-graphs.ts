@@ -13,6 +13,8 @@ interface Pattern {
   missing: { question: string; label: string; instruction: string };
   conclude: { label: string; instruction: string; output: string };
   human: { label: string; actorRole: string; prompt: string; choices: [string, string] } | null;
+  /** The person step is reached only when the result matches (owner, 12 Nov): e.g. an override was proposed. */
+  humanWhen?: { question: string; label: string; field: string; op: 'eq' | 'in'; value: string | string[]; otherwiseLabel: string; otherwise: { op: 'eq' | 'neq'; value: string } };
   outputLabel: string;
   escalation: string;
 }
@@ -56,8 +58,29 @@ function reviewPattern(p: Pattern, templateVersion = 1): WorkflowGraphInput {
       permittedEvidence: ['case_inputs', 'result'],
       timeoutMinutes: 1440,
     });
+    if (p.humanWhen) {
+      const w = p.humanWhen;
+      nodes.push({
+        id: 'needs_person',
+        type: 'decision',
+        label: w.question,
+        question: w.question,
+        conditions: [
+          { id: 'yes', label: w.label, field: w.field, op: w.op, value: w.value },
+          { id: 'no', label: w.otherwiseLabel, field: w.field, op: w.otherwise.op, value: w.otherwise.value },
+        ],
+      });
+      edges.push(
+        { id: 'e8', from: 'conclude', to: 'needs_person', label: '' },
+        { id: 'e11', from: 'needs_person', to: 'human', port: 'yes', label: w.label },
+        { id: 'e12', from: 'needs_person', to: 'done', port: 'no', label: w.otherwiseLabel },
+        { id: 'e13', from: 'needs_person', to: 'escalate', port: 'else', label: 'Other' },
+        { id: 'e14', from: 'needs_person', to: 'escalate', port: 'unknown', label: 'Unclear' },
+      );
+    } else {
+      edges.push({ id: 'e8', from: 'conclude', to: 'human', label: '' });
+    }
     edges.push(
-      { id: 'e8', from: 'conclude', to: 'human', label: '' },
       { id: 'e9', from: 'human', to: 'done', port: 'responded', label: 'Responded' },
       { id: 'e10', from: 'human', to: 'escalate', port: 'timeout', label: 'No response' },
     );
@@ -147,7 +170,9 @@ const PATTERNS: Record<string, Pattern> = {
     review: { label: 'Assess media', instruction: 'Match each extract to the customer identifiers; judge source reliability and separate allegations from established facts, citing evidence IDs.', output: 'Match and source assessment' },
     missing: { question: 'Identity resolved?', label: 'Request identifiers', instruction: 'Ask for the specific identifier or source detail needed to resolve the match.' },
     conclude: { label: 'Recommend outcome', instruction: 'State the match status and relevance, then recommend an outcome with rationale.', output: 'Match status and recommendation' },
-    human: null,
+    // Owner, 12 Nov: an "escalate" recommendation goes to a compliance reviewer.
+    human: { label: 'Compliance reviewer decides', actorRole: 'Compliance reviewer', prompt: 'Confirm or dismiss the escalated adverse media.', choices: ['Confirm', 'Dismiss'] },
+    humanWhen: { question: 'Escalation recommended?', label: 'Escalate', field: 'result.recommendation', op: 'eq', value: 'escalate', otherwiseLabel: 'Close or request information', otherwise: { op: 'neq', value: 'escalate' } },
     outputLabel: 'Adverse media recommendation',
     escalation: 'The match or its relevance cannot be resolved with the available evidence.',
   },
@@ -169,7 +194,9 @@ const PATTERNS: Record<string, Pattern> = {
     review: { label: 'Assess risk factors', instruction: 'Assess each factor the methodology names against the evidence, citing evidence IDs.', output: 'Factor assessments' },
     missing: { question: 'Factors supported?', label: 'Request factor evidence', instruction: 'Ask for the specific evidence a risk factor needs.' },
     conclude: { label: 'Propose rating', instruction: 'Calculate the rating where the methodology supports it; propose the risk and any override with rationale.', output: 'Proposed risk, override and rationale' },
-    human: null,
+    // Owner, 12 Nov: a proposed override needs a senior compliance approver.
+    human: { label: 'Senior compliance approver decides', actorRole: 'Senior compliance approver', prompt: 'Approve or decline the proposed override of the calculated rating.', choices: ['Approve', 'Decline'] },
+    humanWhen: { question: 'Override proposed?', label: 'Override proposed', field: 'result.override', op: 'in', value: ['proposed_increase', 'proposed_decrease'], otherwiseLabel: 'No override', otherwise: { op: 'eq', value: 'none' } },
     outputLabel: 'Proposed risk rating',
     escalation: 'The rating cannot be determined with the available evidence.',
   },

@@ -109,6 +109,14 @@ class Builder {
   }
 }
 
+/**
+ * Owner, 12 Nov: failing a critical criterion fails the whole task. Anvil's task contract expresses that as a
+ * constraint with hard_failure, bound exactly like the criterion; the criterion keeps its weight for scoring.
+ */
+function criticalConstraint(id: string, description: string, binding: Binding): PraxisTaskContract['constraints'][number] {
+  return { id: `${id.slice(0, 70)}.critical`, description: clip(`Critical (failing it fails the task): ${description}`), hard_failure: true, binding };
+}
+
 function finish(b: Builder, ids: CompileIds, parts: { title: string; objective: string; taskVersion: string; source: string; evidence: PraxisTaskContract['evidence']; constraints: PraxisTaskContract['constraints']; criteria: PraxisTaskContract['rubric']['criteria']; initialState: Record<string, unknown> }): CompileResult {
   if (!ID.test(ids.taskId)) b.block('INVALID_ID', 'taskId', 'The task ID is not a valid contract ID');
   if (!ID.test(ids.revisionId)) b.block('INVALID_ID', 'revisionId', 'The revision ID is not a valid contract ID');
@@ -249,7 +257,10 @@ function compileSections(profile: TemplateProfile, output: Record<string, unknow
     const weight = typeof item.weight === 'number' ? item.weight : NaN;
     if (!(weight > 0) || !Number.isInteger(weight * 100)) return b.block('INVALID_VALUE', `${p}.weight`, 'Weight must be a positive number with at most two decimals');
     const binding = b.binding(item, p);
-    if (binding) criteria.push({ id, description: clip([str(item.name), str(item.passCondition)].filter(Boolean).join(': ') || id), weight_bps: Math.round(weight * 100), binding });
+    if (!binding) return;
+    const description = clip([str(item.name), str(item.passCondition)].filter(Boolean).join(': ') || id);
+    criteria.push({ id, description, weight_bps: Math.round(weight * 100), binding });
+    if (item.critical === true) constraints.push(criticalConstraint(id, description, binding));
   });
 
   return finish(b, ids, {
@@ -303,12 +314,16 @@ export function compileKycContract(task: KycTask, ids: CompileIds, profileVersio
   if (str(task.solution?.rationale)) evidence.push({ id: 'private-rationale', visibility: 'private', content: clip(`Reference rationale: ${str(task.solution?.rationale)}`) });
 
   const criteria: PraxisTaskContract['rubric']['criteria'] = [];
+  const kycConstraints: PraxisTaskContract['constraints'] = [];
   (task.rubric?.criteria ?? []).forEach((c, i) => {
     const p = `rubric.criteria[${i}]`;
     if (!ID.test(str(c.id))) return b.block('INVALID_ID', `${p}.id`, `"${str(c.id)}" is not a valid criterion ID`);
     if (!(c.weight > 0) || !Number.isInteger(c.weight * 100)) return b.block('INVALID_VALUE', `${p}.weight`, 'Weight must be a positive number with at most two decimals');
     const binding = b.binding(c as unknown as Record<string, unknown>, p);
-    if (binding) criteria.push({ id: c.id, description: clip([c.name, c.passCondition].filter(Boolean).join(': ')), weight_bps: Math.round(c.weight * 100), binding });
+    if (!binding) return;
+    const description = clip([c.name, c.passCondition].filter(Boolean).join(': '));
+    criteria.push({ id: c.id, description, weight_bps: Math.round(c.weight * 100), binding });
+    if (c.critical === true) kycConstraints.push(criticalConstraint(c.id, description, binding));
   });
 
   return finish(b, ids, {
@@ -317,7 +332,7 @@ export function compileKycContract(task: KycTask, ids: CompileIds, profileVersio
     taskVersion: `kyc-onboarding-and-refresh.v${profileVersion}`,
     source: 'Praxis authored task (KYC onboarding and refresh workbench). Synthetic case written by a Praxis expert.',
     evidence,
-    constraints: [],
+    constraints: kycConstraints,
     criteria,
     initialState: { synthetic: true, profile_id: 'kyc-onboarding-and-refresh', profile_version: profileVersion, available_tools: task.environment?.tools ?? [] },
   });

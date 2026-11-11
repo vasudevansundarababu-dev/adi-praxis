@@ -61,3 +61,10 @@ changed field paths, voided decision ids), `task.rework_requested` (with `stage`
 - Review queue: Expert-review tasks for assigned Validators, PM-approval tasks for the project's PM; a stage pill.
 - SME task view: "Review pending: Expert review" / "Approval pending: PM approval" from the stored stage; a material
   edit shows its reason as the latest review.
+
+
+## Owner decisions of 11 Nov 2026
+
+- The PM may **reject** at PM approval (409/400 rules as for the Expert; reason required; nothing approved).
+- An Expert edit that changes the **rubric or the reference answer** is always material: the task returns to the author
+  to reconfirm, even if the Expert marked it minor. The audit keeps both the declared and the effective materiality.

@@ -305,7 +305,7 @@ export function StageActions({
       {action === 'EDIT' && (
         <fieldset className="card space-y-2 p-4">
           <legend className="px-1 font-semibold">Expert edit</legend>
-          <p className="text-xs text-fg-muted">Saving creates a new version, re-runs the task checks and voids earlier stage decisions. A material edit returns the task to the author to reconfirm.</p>
+          <p className="text-xs text-fg-muted">Saving creates a new version, re-runs the task checks and voids earlier stage decisions. A material edit returns the task to the author to reconfirm. Any change to the rubric or the reference answer is always material.</p>
           <label className="block">
             Task content (JSON)
             <textarea aria-label="Edited task content" value={draft} onChange={(e) => setDraft(e.target.value)} rows={14} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1 font-mono text-xs" />

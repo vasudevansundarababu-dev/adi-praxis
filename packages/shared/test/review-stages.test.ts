@@ -22,7 +22,7 @@ describe('Wave 2 review stages (shared contract)', () => {
     expect(StageDecisionRequest.safeParse({ ...base, stage: 'EXPERT_REVIEW', decision: 'PASS' }).success).toBe(false);
     expect(StageDecisionRequest.safeParse({ ...base, stage: 'PM_APPROVAL', decision: 'APPROVE' }).success).toBe(true);
     expect(StageDecisionRequest.safeParse({ ...base, stage: 'PM_APPROVAL', decision: 'PASS' }).success).toBe(false);
-    expect(StageDecisionRequest.safeParse({ ...base, stage: 'PM_APPROVAL', decision: 'REJECT', rejectReason: 'INCORRECT' }).success).toBe(false);
+    expect(StageDecisionRequest.safeParse({ ...base, stage: 'PM_APPROVAL', decision: 'REJECT', rejectReason: 'INCORRECT' }).success).toBe(true); // PM may reject (owner, 11 Nov 2026)
     expect(StageDecisionRequest.safeParse({ ...base, stage: 'PM_APPROVAL', decision: 'REWORK', comments: [] }).success).toBe(false);
     expect(StageDecisionRequest.safeParse({ ...base, stage: 'PM_APPROVAL', decision: 'REWORK', comments: [{ text: 'unpinned' }] }).success).toBe(false);
     expect(StageDecisionRequest.safeParse({ ...base, stage: 'PM_APPROVAL', decision: 'REWORK', comments: [{ target: { kind: 'node', id: 'n1' }, text: 'Fix the join.' }] }).success).toBe(true);
@@ -42,5 +42,21 @@ describe('Wave 2 review stages (shared contract)', () => {
       { path: 'e', before: null, after: true },
     ]);
     expect(jsonDiff({ a: 1 }, { a: 1 })).toEqual([]);
+  });
+});
+
+describe('owner decisions of 11 Nov 2026', () => {
+  it('the PM may reject at PM approval', async () => {
+    const { StageDecisionRequest } = await import('../src/review-stages');
+    expect(StageDecisionRequest.safeParse({ stage: 'PM_APPROVAL', decision: 'REJECT', rejectReason: 'INCORRECT', expectedRevision: 1, expectedVersion: 1 }).success).toBe(true);
+    expect(StageDecisionRequest.safeParse({ stage: 'PM_APPROVAL', decision: 'PASS', expectedRevision: 1, expectedVersion: 1 }).success).toBe(false);
+  });
+
+  it('changes to the rubric or reference answer are material on their own', async () => {
+    const { materialPaths } = await import('../src/review-stages');
+    const c = (path: string) => ({ path, before: 1, after: 2 });
+    expect(materialPaths([c('sections.S1.businessContext'), c('header.title')])).toEqual([]);
+    expect(materialPaths([c('sections.S7.criteria[0].name'), c('sections.S6.disposition'), c('sections.S5.steps[1].expectedResult'), c('rubric.criteria[0].weight'), c('solution.disposition')])).toHaveLength(5);
+    expect(materialPaths([c('solutionNotes'), c('sections.S70')])).toEqual([]);
   });
 });

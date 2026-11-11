@@ -564,3 +564,17 @@ Expert and PM with two audit events; Expert edits need a reason, and a material 
   existing access (Validators and Admins).
 - **Open (owner):** a field-level Expert editor (the console uses a JSON editor today); whether a PM may also reject;
   whether material edits should be detected automatically (e.g. any rubric or reference change).
+
+### Authoring v2.1 Wave 2: owner answers (11 Nov 2026)
+
+- **(owner)** The PM may reject a task at PM approval, as the Expert may at Expert review (same reasons, audited with
+  responsibility PM). The same person may act as Expert and PM; both decisions stay separate.
+- **(owner)** Any change to the rubric or the reference answer is a material edit, whatever the Expert declares: KYC
+  `rubric` and `solution`; profiled templates S5 (expected work), S6 (outcomes and reference values) and S7 (rubric).
+  The task returns to the author to reconfirm; the audit records the declared and the effective materiality and the
+  paths that forced it.
+- **(owner)** No field-level edit form for Experts: the JSON editor stays.
+- **(owner)** Policy sources on the review page move to Wave 3, with SME policy proposals.
+- **Open for the owner (12 Nov):** domain confirmation of the three Wave 2 field contracts (Adverse media review,
+  Enhanced due diligence, Customer risk rating; gaps listed in `docs/authoring/TEMPLATE-PROFILES.md`), and the owner's
+  live Wave 2 session in QA (`docs/authoring/WAVE-2-TEST-NOTES.md`).

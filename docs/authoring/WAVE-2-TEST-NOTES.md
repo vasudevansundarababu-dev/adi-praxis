@@ -11,7 +11,9 @@ marked "requires confirmation").
 2. As the SME, submit a task: the header shows **Review pending: Expert review**.
 3. As the Expert: return it with a comment pinned to a section or graph node, then after resubmission edit it with a
    reason (try a minor edit, then a material one: material sends it back to the author to reconfirm), then **Pass**.
-4. As the PM: the task shows **Approval pending: PM approval**; approve it. One approved record, one earning.
+4. As the PM: the task shows **Approval pending: PM approval**; approve it (or reject it: the PM may reject too). One
+   approved record, one earning.
+   An Expert edit to the rubric or the reference answer always goes back to the author, even if marked minor.
 5. Try a stale approval: after the Expert passes, have the Expert edit again, then approve as PM: refused with a reason.
 6. If the same person is Expert and PM, both decisions appear separately in the history.
 

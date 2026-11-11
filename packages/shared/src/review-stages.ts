@@ -26,7 +26,7 @@ const CHECKLIST_KEYS = ['realistic', 'correct', 'coversSlot', 'difficultyFair', 
 export const StageDecisionRequest = z
   .object({
     stage: z.enum(['EXPERT_REVIEW', 'PM_APPROVAL']),
-    /** Expert: PASS (route to PM), REWORK (return to the author) or REJECT. PM: APPROVE or REWORK. */
+    /** Expert: PASS (route to PM), REWORK (return to the author) or REJECT. PM: APPROVE, REWORK or REJECT. */
     decision: z.enum(['PASS', 'APPROVE', 'REWORK', 'REJECT']),
     expectedRevision: z.number().int().min(0),
     expectedVersion: z.number().int().min(1),
@@ -37,7 +37,8 @@ export const StageDecisionRequest = z
     notes: z.string().trim().max(4000).optional(),
     confirmedCoverage: z.object({ tags: z.record(z.string(), z.string()), edgeCase: z.string().trim().min(1).max(200) }).optional(),
   })
-  .refine((d) => (d.stage === 'EXPERT_REVIEW' ? ['PASS', 'REWORK', 'REJECT'] : ['APPROVE', 'REWORK']).includes(d.decision), { message: 'This decision is not available at this stage', path: ['decision'] })
+  // Owner decision (11 Nov 2026): the PM may also reject.
+  .refine((d) => (d.stage === 'EXPERT_REVIEW' ? ['PASS', 'REWORK', 'REJECT'] : ['APPROVE', 'REWORK', 'REJECT']).includes(d.decision), { message: 'This decision is not available at this stage', path: ['decision'] })
   .refine((d) => d.stage !== 'EXPERT_REVIEW' || !!d.checklist, { message: 'Answer every checklist item', path: ['checklist'] })
   .refine((d) => d.decision !== 'PASS' || Object.values(d.checklist ?? {}).every(Boolean), { message: 'Every checklist item must hold to pass to PM approval', path: ['checklist'] })
   .refine((d) => d.decision !== 'REJECT' || !!d.rejectReason, { message: 'Choose a reason for rejecting', path: ['rejectReason'] })
@@ -50,7 +51,10 @@ export const ExpertEditRequest = z.object({
   expectedVersion: z.number().int().min(1),
   output: z.record(z.string(), z.unknown()),
   reason: z.string().trim().min(5, 'Give the reason for the edit').max(2000),
-  /** Material edits change what the task asks or how it is graded; the author must reconfirm before review continues. */
+  /**
+   * Material edits change what the task asks or how it is graded; the author must reconfirm before review continues.
+   * An edit touching the rubric or the reference answer is always material (MATERIAL_PATHS), whatever this says.
+   */
   material: z.boolean(),
   /** Explanations for any possible-real-data flags the edit raises. */
   flagExplanations: z.record(z.string(), z.string().trim().min(1).max(500)).default({}),
@@ -82,4 +86,16 @@ export function jsonDiff(before: unknown, after: unknown, limit = 200): JsonChan
   };
   walk(before, after, '');
   return out;
+}
+
+/**
+ * Owner decision (11 Nov 2026): any change to the rubric or the reference answer is a material edit. KYC stores them
+ * under `rubric` and `solution`; profiled templates under S5 (expected work, the reference), S6 (outcomes and their
+ * reference values) and S7 (rubric).
+ */
+export const MATERIAL_PATH_PREFIXES = ['rubric', 'solution', 'sections.S5', 'sections.S6', 'sections.S7'] as const;
+
+/** The changed paths that make an edit material on their own. */
+export function materialPaths(changes: JsonChange[]): string[] {
+  return changes.map((c) => c.path).filter((p) => MATERIAL_PATH_PREFIXES.some((m) => p === m || p.startsWith(`${m}.`) || p.startsWith(`${m}[`)));
 }

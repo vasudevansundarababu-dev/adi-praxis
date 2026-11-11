@@ -158,7 +158,7 @@ describe('Authoring v2.1 Wave 2: SME -> Expert -> PM review route', () => {
     expect((await get(s.pm, '/review/tasks')).json().items.map((x: { stage: string }) => x.stage)).toEqual(['PM_APPROVAL']);
 
     const pmView = await reviewView(s.pm, s.id);
-    expect(pmView).toMatchObject({ stage: 'PM_APPROVAL', actions: ['APPROVE', 'REWORK'], expertPass: { version: 1 }, viewer: { canExpert: false, canPm: true } });
+    expect(pmView).toMatchObject({ stage: 'PM_APPROVAL', actions: ['APPROVE', 'REWORK', 'REJECT'], expertPass: { version: 1 }, viewer: { canExpert: false, canPm: true } });
     expect(pmView.stageHistory).toEqual([expect.objectContaining({ stage: 'EXPERT_REVIEW', decision: 'PASS', version: 1, void: false })]);
     const key = { 'idempotency-key': randomUUID() };
     const body = { stage: 'PM_APPROVAL', decision: 'APPROVE', expectedRevision: pmView.revision, expectedVersion: 1 };
@@ -314,7 +314,7 @@ describe('Authoring v2.1 Wave 2: SME -> Expert -> PM review route', () => {
     const r = await reviewView(s.pm, s.id);
     expect(r.viewer).toEqual({ canExpert: true, canPm: true, bothResponsibilities: true });
     expect((await pass(s.pm, s.id)).statusCode).toBe(200);
-    expect((await reviewView(s.pm, s.id)).actions).toEqual(['APPROVE', 'REWORK', 'EDIT']);
+    expect((await reviewView(s.pm, s.id)).actions).toEqual(['APPROVE', 'REWORK', 'REJECT', 'EDIT']);
     expect((await approve(s.pm, s.id)).statusCode).toBe(200);
     const passed = await audits(s.id, 'task.expert_passed');
     const accepted = await audits(s.id, 'task.accepted');
@@ -334,8 +334,34 @@ describe('Authoring v2.1 Wave 2: SME -> Expert -> PM review route', () => {
     expect(res.statusCode, res.body).toBe(200);
     expect((await view(s.a, s.id)).phase.phase).toBe('REJECTED');
     expect(await db.approvedTaskRecord.count({ where: { taskInstanceId: s.id } })).toBe(0);
-    // The PM cannot reject (only approve or return).
-    expect((await stage(s.pm, s.id, { stage: 'PM_APPROVAL', decision: 'REJECT', rejectReason: 'INCORRECT' })).statusCode).toBe(400);
+  });
+
+  it('the PM may reject at PM approval (owner decision, 11 Nov 2026): audited as the PM, nothing approved', async () => {
+    const s = await submitted();
+    expect((await pass(s.expert, s.id)).statusCode).toBe(200);
+    expect((await reviewView(s.pm, s.id)).actions).toEqual(expect.arrayContaining(['APPROVE', 'REWORK', 'REJECT']));
+    expect((await stage(s.pm, s.id, { stage: 'PM_APPROVAL', decision: 'REJECT' })).statusCode).toBe(400);
+    const res = await stage(s.pm, s.id, { stage: 'PM_APPROVAL', decision: 'REJECT', rejectReason: 'INCORRECT' });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json()).toMatchObject({ status: 'REJECTED' });
+    expect((await view(s.a, s.id)).phase.phase).toBe('REJECTED');
+    expect(await db.approvedTaskRecord.count({ where: { taskInstanceId: s.id } })).toBe(0);
+    expect((await audits(s.id, 'task.rejected'))[0]!.after).toMatchObject({ stage: 'PM_APPROVAL', responsibility: 'PM' });
+  });
+
+  it('an edit to the rubric or reference answer is always material (owner decision, 11 Nov 2026)', async () => {
+    const s = await submitted();
+    const r = await reviewView(s.expert, s.id);
+    const output = structuredClone(r.output) as { sections: Record<string, Record<string, unknown>> };
+    const criteria = output.sections.S7!.criteria as { name?: string }[];
+    criteria[0]!.name = `${criteria[0]!.name ?? 'Criterion'} (tightened by the Expert)`;
+    // The Expert says "minor", but a rubric change is material: the task goes back to the author to reconfirm.
+    const res = await post(s.expert, `/review/tasks/${s.id}/edit`, { expectedRevision: r.revision, expectedVersion: r.currentVersion, output, reason: 'Tighten the first criterion.', material: false });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json()).toMatchObject({ material: true, materialBecause: 'rubric or reference answer changed', status: 'REWORK' });
+    const a = (await audits(s.id, 'task.expert_edited'))[0]!.after as { material: boolean; materialDeclared: boolean; materialPaths: string[] };
+    expect(a).toMatchObject({ material: true, materialDeclared: false });
+    expect(a.materialPaths[0]).toMatch(/^sections\.S7\./);
   });
 
   it('SME -> PM projects behave exactly as before; stage endpoints refuse them', async () => {

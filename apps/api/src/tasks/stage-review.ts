@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { EXECUTABLE_WORKFLOW, jsonDiff, praxisContractChecks, STAGE_LABELS, type ExpertEditRequest, type PendingStage, type StageDecisionRequest } from '@praxis/shared';
+import { EXECUTABLE_WORKFLOW, jsonDiff, materialPaths, praxisContractChecks, STAGE_LABELS, type ExpertEditRequest, type PendingStage, type StageDecisionRequest } from '@praxis/shared';
 import type { InternalActor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
@@ -132,7 +132,7 @@ function assertRole(a: ReviewAccess, stage: PendingStage) {
   if (stage === 'PM_APPROVAL' && !a.canPm) throw new AppError(403, 'NOT_PROJECT_PM', 'Only the project’s PM or an Admin can give PM approval.');
 }
 
-/** A stage decision: Expert PASS / REWORK / REJECT, or PM APPROVE / REWORK. */
+/** A stage decision: Expert PASS / REWORK / REJECT, or PM APPROVE / REWORK / REJECT. */
 export async function decideStage(tx: Tx, actor: InternalActor, taskId: string, body: StageDecisionRequest, audit: Audit, emit: Emit) {
   await lock(tx, taskId);
   const a = await reviewAccess(tx, actor, taskId);
@@ -216,7 +216,7 @@ export async function decideStage(tx: Tx, actor: InternalActor, taskId: string, 
     return { status: 'REWORK', version: v.version };
   }
 
-  // Expert REJECT
+  // REJECT, by the Expert or (owner decision, 11 Nov 2026) the PM.
   await record('REJECT', { rejectReason: body.rejectReason!, duplicateDecision: flaggedDuplicate ? (body.duplicateDecision ?? null) : null });
   await rejectTask(tx, t, { reason: body.rejectReason!, now, extraUpdate: { ...common, reviewerId: actor.userId, reviewStage: null }, auditAfter: { version: v.version, stage: body.stage, responsibility } }, audit);
   return { status: 'REJECTED', version: v.version };
@@ -246,6 +246,9 @@ export async function expertEdit(tx: Tx, actor: InternalActor, taskId: string, b
   if (shape.length) throw new AppError(422, 'INVALID_PROFILE_OUTPUT', 'This edit does not match the template profile.', { problems: shape });
   const changes = jsonDiff(authoredContent(v.output), authoredContent(body.output));
   if (!changes.length) throw new AppError(400, 'NO_CHANGE', 'The edit changes nothing; pass or return the task instead.');
+  // Owner decision (11 Nov 2026): a change to the rubric or the reference answer is always material.
+  const forced = materialPaths(changes);
+  const material = body.material || forced.length > 0;
 
   const ev = await evaluateTask(tx, { ...t, output: body.output as Prisma.JsonValue });
   const failing = ev.checks.filter((c) => blocking(c) && !AUTHOR_ATTESTATION(c.id));
@@ -267,7 +270,7 @@ export async function expertEdit(tx: Tx, actor: InternalActor, taskId: string, b
 
   await tx.taskSubmission.create({ data: { clientId: t.clientId, taskInstanceId: t.id, version, policySnapshotId: v.policySnapshotId, output, coverageTags: (ev.coverage ?? undefined) as Prisma.InputJsonValue | undefined, checks: stored as unknown as Prisma.InputJsonValue } });
   await tx.taskReview.create({
-    data: { clientId: t.clientId, taskInstanceId: t.id, submissionVersion: version, reviewerId: actor.userId, decision: 'EDIT', stage: t.reviewStage, contentHash: hash, editReason: body.reason, material: body.material, checklist: {}, comments: [] },
+    data: { clientId: t.clientId, taskInstanceId: t.id, submissionVersion: version, reviewerId: actor.userId, decision: 'EDIT', stage: t.reviewStage, contentHash: hash, editReason: body.reason, material, checklist: {}, comments: [] },
   });
   await tx.taskInstance.update({
     where: { id: t.id },
@@ -278,18 +281,18 @@ export async function expertEdit(tx: Tx, actor: InternalActor, taskId: string, b
       coverageTags: (ev.coverage ?? undefined) as Prisma.InputJsonValue | undefined,
       revision: { increment: 1 },
       reviewNotes: body.reason,
-      ...(body.material ? { status: 'REWORK', reviewStage: null } : { reviewStage: 'EXPERT_REVIEW' }),
+      ...(material ? { status: 'REWORK', reviewStage: null } : { reviewStage: 'EXPERT_REVIEW' }),
     },
   });
-  const after = body.material ? { status: 'REWORK', stage: null, awaiting: 'AUTHOR_RECONFIRMATION' } : { status: 'SUBMITTED', stage: 'EXPERT_REVIEW' };
+  const after = material ? { status: 'REWORK', stage: null, awaiting: 'AUTHOR_RECONFIRMATION' } : { status: 'SUBMITTED', stage: 'EXPERT_REVIEW' };
   await audit({
     entityType: 'TaskInstance',
     entityId: t.id,
     action: 'task.expert_edited',
     before: { status: 'SUBMITTED', stage: t.reviewStage, version: v.version, contentHash: contentHash(v.output) },
-    after: { ...after, responsibility: 'EXPERT', version, contentHash: hash, reason: body.reason, material: body.material, changedPaths: changes.slice(0, 50).map((c) => c.path), voidedDecisions: voided },
+    after: { ...after, responsibility: 'EXPERT', version, contentHash: hash, reason: body.reason, material, materialDeclared: body.material, materialPaths: forced.slice(0, 50), changedPaths: changes.slice(0, 50).map((c) => c.path), voidedDecisions: voided },
   });
-  return { status: after.status, stage: after.stage, version, material: body.material, changed: changes.length };
+  return { status: after.status, stage: after.stage, version, material, materialBecause: forced.length ? 'rubric or reference answer changed' : body.material ? 'declared by the Expert' : null, changed: changes.length };
 }
 
 /** What the reviewer screen shows about stages: history with void markers, the diff and the viewer's actions. */
@@ -303,7 +306,7 @@ export async function stageView(db: Db | Tx, a: ReviewAccess) {
   const actions: string[] = [];
   if (a.twoStage && t.status === 'SUBMITTED') {
     if (t.reviewStage === 'EXPERT_REVIEW' && a.canExpert) actions.push('PASS', 'REWORK', 'REJECT', 'EDIT');
-    if (t.reviewStage === 'PM_APPROVAL' && a.canPm && inForce) actions.push('APPROVE', 'REWORK');
+    if (t.reviewStage === 'PM_APPROVAL' && a.canPm) actions.push(...(inForce ? ['APPROVE'] : []), 'REWORK', 'REJECT');
     if (t.reviewStage === 'PM_APPROVAL' && a.canExpert) actions.push('EDIT');
   }
   return {

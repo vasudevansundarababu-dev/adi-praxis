@@ -66,6 +66,8 @@ const Env = z.object({
   /** Authoring v2.1: the chatbot facilitator's model on Vertex (live in QA), and its per-client daily call cap. */
   AUTHORING_MODEL: z.string().default('claude-sonnet-5-5'),
   AUTHORING_DAILY_CALL_CAP: z.coerce.number().int().min(1).max(100_000).default(300),
+  /** Wave 3: Vertex location for AUTHORING_MODEL=maas:<publisher>/<model> (the region on the model card, or `global`). Blank = VERTEX_LOCATION. */
+  AUTHORING_MAAS_LOCATION: z.string().regex(/^$|^[a-z0-9-]+$/).default(''),
   /** M10c payouts through Trolley. Blank keys = the local mock (refused in production with SME supply on). */
   TROLLEY_ACCESS_KEY: z.string().default(''),
   TROLLEY_SECRET_KEY: z.string().default(''),
@@ -171,6 +173,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   if (c.NODE_ENV === 'production' && c.APP_ENV !== 'demo' && (candidateAuthMode === 'mock' || identityMode === 'mock' || assistantMode === 'mock' || emailMode === 'memory')) {
     throw new Error('Invalid configuration: production needs GOOGLE_OAUTH_CLIENT_ID, STRIPE_SECRET_KEY, STRIPE_IDENTITY_WEBHOOK_SECRET, VERTEX_PROJECT_ID and SMTP_HOST (mocks are local-only)');
+  }
+  if (c.AUTHORING_MODEL.startsWith('maas:') && !/^maas:[a-z0-9][a-z0-9-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(c.AUTHORING_MODEL)) {
+    throw new Error('Invalid configuration: AUTHORING_MODEL=maas:<publisher>/<model> needs the exact Model Garden id, e.g. maas:openai/gpt-oss-120b-maas');
   }
   const appEnv = c.APP_ENV ?? (c.NODE_ENV === 'production' ? 'production' : 'local');
   const metaCompiler = metaCompilerConfig(c, appEnv);

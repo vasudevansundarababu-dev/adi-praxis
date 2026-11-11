@@ -74,8 +74,9 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 - **O6 — Claude quota DENIED (10 Nov, blocks the live chatbot).** Google denied the 30/min requests for
   `anthropic-claude-sonnet` and `anthropic-claude-haiku` within seconds (automatic denial, `stateDetail: Quota request
   denied`); `anthropic-count-tokens` still pending. Claude quota is 0 in every project (QA, staging, demo, Anvil), so
-  no project can call Claude on Vertex today. Needs an owner decision: appeal to Google and/or a non-Claude path for
-  the chatbot.
+  no project can call Claude on Vertex today. **Owner decision (10 Nov): both.** Owner appeals to Google (text in
+  [CLAUDE-QUOTA-APPEAL.md](CLAUDE-QUOTA-APPEAL.md)); the code session adds a Gemini option for the chatbot
+  (suggested `gemini-2.5-flash`, GA in QA) so Wave 1 can run live on Gemini until Claude quota arrives.
 
 ## 5. Step 7: clean up (owner, after the QA setup is finished)
 

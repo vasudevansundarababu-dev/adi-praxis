@@ -1,11 +1,12 @@
 import type { ApprovedTaskRecord, Prisma } from '@prisma/client';
-import { praxisContractIssues, KYC_MCP_CATALOG_VERSION, KYC_MCP_TOOLS, replayBundle, type KycTask } from '@praxis/shared';
+import { KYC_MCP_CATALOG_VERSION, KYC_MCP_TOOLS, replayBundle, type KycTask } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db, Tx } from '../db';
 import { appendRecord, baseOf, recordContent, recordHash } from '../dataset/approved-records';
+import { praxisExport } from '../dataset/praxis-export';
 import { verifyApprovedChain } from '../dataset/verify';
-import { sha256, stableStringify } from '../lib/crypto';
+import { stableStringify } from '../lib/crypto';
 import { AppError, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { sidecarsById, snapshotIdsForRecords, withPolicy } from '../policy/task-policy';
@@ -83,18 +84,12 @@ export const datasetRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
   // Exact, versioned payload only. Sources/uploads are deliberately not joined into this export.
   app.get('/dataset/records/:id/praxis-contract', { config: { access: READ }, schema: { tags: ['dataset'], params: IdParams, querystring: z.object({ envelope: z.enum(['true', 'false']).default('false') }) } }, async (req, reply) => {
     const r = await findRecord(db, clientOf(req), req.params.id);
-    const contract = (r.output as Record<string, unknown>).praxisContract;
-    if (!contract) throw new AppError(409, 'NO_EXECUTABLE_CONTRACT', 'This record has no executable contract. Author a structured decision task first.');
-    const issues = praxisContractIssues(contract);
-    if (issues.length) throw new AppError(422, 'CONTRACT_INVALID', 'Export blocked: executable contract is invalid.', { issues });
-    if (recordHash(recordContent(baseOf(r)), r.prevHash) !== r.contentHash) throw new AppError(409, 'RECORD_INTEGRITY', 'Export blocked: source record hash does not verify.');
-    const payload = stableStringify(contract);
-    const envelope = { schema_version: 'praxis.anvil.export.v1', source: { record_id: r.id, record_hash: r.contentHash, project_id: r.projectId, client_id: r.clientId, submission_time: r.submittedAt.toISOString(), reviewer_id: r.reviewerId, review_decision_time: r.reviewDecisionAt.toISOString() }, payload_json: payload, payload_sha256: sha256(payload) };
+    const { contract, payload, payloadSha256, envelope } = praxisExport(r);
     return reply.header('content-type', 'application/json')
       .header('content-disposition', `attachment; filename="praxis-${r.id}${req.query.envelope === 'true' ? '-with-lineage' : ''}.json"`)
-      .header('x-praxis-payload-sha256', sha256(payload))
+      .header('x-praxis-payload-sha256', payloadSha256)
       .header('x-praxis-record-id', r.id).header('x-praxis-record-hash', r.contentHash)
-      .header('x-praxis-schema-version', (contract as { schema_version: string }).schema_version).send(req.query.envelope === 'true' ? stableStringify(envelope) : payload);
+      .header('x-praxis-schema-version', contract.schema_version).send(req.query.envelope === 'true' ? stableStringify(envelope) : payload);
   });
 
   // TASK-DRAFTING section 5: the task's MCP tools and recorded calls, enough to replay it on an MCP server.

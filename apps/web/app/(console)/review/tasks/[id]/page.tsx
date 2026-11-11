@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ReviewGraph } from '@/components/tasks/review-graph';
+import { ReviewPolicySources, type ReviewPolicySourcesData } from '@/components/tasks/review-policy-sources';
 import { TaskReview, type TaskReviewData } from '@/components/tasks/task-review';
 import { JudgeResultView } from '@/components/templates/tasks/judge-panel';
 import { apiGet } from '@/lib/api';
@@ -22,11 +23,12 @@ export default async function TaskReviewPage({ params }: { params: Promise<{ id:
   }
   if (!data) notFound();
   // Studio tasks only: the post-commit LLM judge result (Admin only; the API refuses everyone else).
-  const judge = await apiGet<{ judge: JudgeView | null }>(`/review/tasks/${id}/judge`);
+  const [judge, sources] = await Promise.all([apiGet<{ judge: JudgeView | null }>(`/review/tasks/${id}/judge`), apiGet<ReviewPolicySourcesData>(`/review/tasks/${id}/policy-sources`)]);
   return (
     <>
       <TaskReview data={data} />
       {!!data.output?.workflowGraph && <ReviewGraph graph={data.output.workflowGraph} />}
+      {sources.data && <ReviewPolicySources d={sources.data} />}
       {judge.data?.judge && (
         <section className="mt-6">
           <h2 className="mb-2 text-lg font-semibold">LLM judge</h2>

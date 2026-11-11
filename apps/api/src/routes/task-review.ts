@@ -13,6 +13,7 @@ import { CHECKLIST, completionStatus, decideTask, TaskDecisionRequest } from '..
 import type { StoredChecks } from '../tasks/submission';
 import { EXPERT_TASK_TYPES, templateRef } from '../tasks/task-service';
 import { loadProject } from './projects';
+import { reviewPolicySources } from '../policy/review-sources';
 
 const IdParams = z.object({ id: z.string().uuid() });
 const REVIEW = ['REVIEWER', 'ADMIN'] as const;
@@ -72,6 +73,12 @@ export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db; embeddings?: Embe
   });
 
   // R02: the full task read-only, automated check results, the similarity panel and what changed since the last version.
+  /** Wave 3: the policy the task was submitted against, with each rule's quoted source, for the reviewer. */
+  app.get('/review/tasks/:id/policy-sources', { config: { access: STAGED }, schema: { tags: ['review'], params: IdParams } }, async (req) => {
+    const { t } = await reviewAccess(db, req.actor!, req.params.id);
+    return reviewPolicySources(db, t);
+  });
+
   app.get('/review/tasks/:id', { config: { access: STAGED }, schema: { tags: ['review'], params: IdParams } }, async (req) => {
     const access = await reviewAccess(db, req.actor!, req.params.id);
     const t = access.t;

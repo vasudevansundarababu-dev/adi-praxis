@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { ProposalReview, type ProposalRow } from '@/components/policy/proposal-review';
+import { ReviewPolicySources, type ReviewPolicySourcesData } from '@/components/tasks/review-policy-sources';
 import { a11yProblems } from './a11y';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, refresh: () => undefined }) }));
@@ -51,5 +52,37 @@ describe('Wave 3: policy proposal review in the console', () => {
     expect(unreadable).not.toContain('Show Praxis’s reading');
     expect(unreadable).toContain('upload a readable copy');
     expect(a11yProblems(unreadable)).toEqual([]);
+  });
+});
+
+describe('Wave 3: policy sources on the review page', () => {
+  const d: ReviewPolicySourcesData = {
+    configured: true,
+    basis: { kind: 'SNAPSHOT', version: 2, digest: 'd'.repeat(64), at: '2026-11-12T10:00:00Z', ruleSetVersion: 3 },
+    changedSinceSnapshot: true,
+    rules: [
+      { ruleVersionId: 'r1', ruleKey: 'R-REFRESH', version: 1, title: 'Refresh period', requirement: 'Refresh high-risk files every 12 months.', visibility: 'agent_visible', applicability: 'Applies as written', inForce: true, linkedSteps: ['S2'], sources: [{ document: 'KYC Refresh Standard', category: 'BANK_POLICY', documentVersion: 1, fileName: 'kyc.txt', origin: 'SME_PROPOSAL', sha256: 'b'.repeat(64), role: 'supports', quote: 'Analysts must refresh high-risk customer files every 12 months.', locator: { page: 1, lineStart: 2, lineEnd: 2 } }] },
+      { ruleVersionId: 'r2', ruleKey: 'R-SOURCES', version: 1, title: 'Record sources', requirement: 'Record every source.', visibility: 'evaluator_only', applicability: null, inForce: false, linkedSteps: [], sources: [] },
+    ],
+    taskChanges: [{ id: 'c1', ruleVersionId: 'r1', type: 'STRICTER', requirement: 'Refresh every 6 months for this case.', reason: 'Sanctions nexus.' }],
+  };
+
+  it('shows each rule with its quoted source, page and line, labels evaluator-only rules and warns about a newer rule set', () => {
+    const html = renderToStaticMarkup(<ReviewPolicySources d={d} />);
+    expect(html).toContain('Frozen policy snapshot 2 (project rule set 3)');
+    expect(html).toContain('The project has published new rules since this snapshot.');
+    expect(html).toContain('Analysts must refresh high-risk customer files every 12 months.');
+    expect(html).toContain('KYC Refresh Standard v1, page 1, line 2');
+    expect(html).toContain('proposed by an SME and accepted');
+    expect(html).toContain('Linked by the SME to step S2');
+    expect(html).toContain('Task change (stricter):');
+    expect(html).toContain('Evaluator only: hidden from the SME and the agent');
+    expect(html).toContain('Not in force today');
+    expect(a11yProblems(html)).toEqual([]);
+  });
+
+  it('says plainly when the project has no published rules', () => {
+    const html = renderToStaticMarkup(<ReviewPolicySources d={{ configured: false, basis: null, changedSinceSnapshot: false, rules: [], taskChanges: [] }} />);
+    expect(html).toContain('This project has no published policy rules.');
   });
 });

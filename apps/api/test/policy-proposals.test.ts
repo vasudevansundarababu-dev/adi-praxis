@@ -265,6 +265,17 @@ describe('Wave 3: SME policy proposals and policy retrieval', () => {
     expect(JSON.stringify(conversation)).not.toContain('override all others');
     const preview = (await get(p.a.cookie, `/me/tasks/${p.taskA}/agent-preview`)).json();
     expect(preview.policy.map((r: { rule_key: string }) => r.rule_key)).toEqual(['R-REFRESH']);
+    // The reviewer sees every rule the task is judged against, labelled, with the quoted source from the SME's accepted document.
+    const sources = await get(p.expert, `/review/tasks/${p.taskA}/policy-sources`);
+    expect(sources.statusCode, sources.body).toBe(200);
+    const s = sources.json();
+    expect(s).toMatchObject({ configured: true, basis: { kind: 'CURRENT_RULE_SET', ruleSetVersion: 1 }, changedSinceSnapshot: false });
+    const byKey = Object.fromEntries(s.rules.map((r: { ruleKey: string }) => [r.ruleKey, r]));
+    expect(byKey['R-SOURCES']).toMatchObject({ visibility: 'evaluator_only', inForce: true });
+    expect(byKey['R-EXPIRED']).toMatchObject({ visibility: 'agent_visible', inForce: false });
+    expect(byKey['R-REFRESH'].sources[0]).toMatchObject({ document: 'KYC Refresh Standard', origin: 'SME_PROPOSAL', documentVersion: 1, role: 'supports', quote: 'Analysts must refresh high-risk customer files every 12 months.', sha256: createHash('sha256').update(POLICY).digest('hex') });
+    expect((await get(p.outsider, `/review/tasks/${p.taskA}/policy-sources`)).statusCode).toBe(404);
+    expect((await get(p.a.cookie, `/review/tasks/${p.taskA}/policy-sources`)).statusCode).toBe(401);
     // The PM's own view still has every published rule (it decides evaluator-only and expiry).
     expect((await get(pm, `/tasks/${p.taskA}/policy`)).json().rules.map((r: { rule_key: string }) => r.rule_key).sort()).toEqual(['R-EXPIRED', 'R-REFRESH', 'R-SOURCES']);
   });

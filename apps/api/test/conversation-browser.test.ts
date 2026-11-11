@@ -198,10 +198,33 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
       // A stalled step fails with its locator after 60 s instead of hanging until the 300 s test timeout.
       page.setDefaultTimeout(60_000);
+      // On a failure in CI, print what the page actually showed (text, console errors, failed requests).
+      const consoleLines: string[] = [];
+      page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') consoleLines.push(`${m.type()}: ${m.text()}`.slice(0, 500)); });
+      page.on('requestfailed', (r) => consoleLines.push(`requestfailed: ${r.method()} ${r.url()} ${r.failure()?.errorText ?? ''}`.slice(0, 500)));
+      page.on('response', (r) => { if (r.status() >= 400) consoleLines.push(`http ${r.status()}: ${r.request().method()} ${r.url()}`.slice(0, 500)); });
+      (globalThis as { __praxisBrowserDump?: () => Promise<string> }).__praxisBrowserDump = async () => {
+        const text = await page.locator('body').innerText().catch((e) => `innerText failed: ${String(e)}`);
+        return `URL ${page.url()}\n--- page text ---\n${text.slice(0, 4000)}\n--- console/network ---\n${consoleLines.slice(-40).join('\n')}\n--- dev server (tail) ---\n${logs.slice(-3000)}`;
+      };
       await page.context().addCookies([{ name: 'praxis_candidate', value: a.cookie.split('=')[1]!, domain: '127.0.0.1', path: '/' }]);
-      await page.goto(`http://127.0.0.1:${port}/tasks/${id}`, { waitUntil: 'networkidle' });
+      // Reproduce the slow-CI race deterministically: the page's first consent read answers only after the SME has
+      // accepted the terms. That late "not yet consented" answer must not bring the consent screen back.
+      let releaseFirstRead!: () => void;
+      const firstReadHeld = new Promise<void>((r) => { releaseFirstRead = r; });
+      let firstRead = true;
+      await page.route('**/me/tasks/*/conversation', async (route) => {
+        if (firstRead && route.request().method() === 'GET') { firstRead = false; const res = await route.fetch(); await firstReadHeld; return route.fulfill({ response: res }); }
+        return route.continue();
+      });
+      await page.goto(`http://127.0.0.1:${port}/tasks/${id}`, { waitUntil: 'load' });
       await page.getByLabel('I agree to these terms.').check();
       await page.getByRole('button',{name:'Accept authorship terms'}).click();
+      await page.getByRole('heading', { name: 'Build a case through conversation' }).waitFor();
+      releaseFirstRead();
+      // Give the late answer time to arrive and render: the consent screen must not come back.
+      await page.waitForTimeout(1500);
+      expect(await page.getByRole('button', { name: 'Accept authorship terms' }).count()).toBe(0);
       await page.getByRole('heading', { name: 'Build a case through conversation' }).waitFor();
       // The answer box is enabled only once the conversation state (consent) has loaded; wait for that explicitly
       // rather than relying on fill's implicit wait (flaky on a cold CI dev server).
@@ -333,6 +356,10 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       }
       await manager.screenshot({path:join(tmpdir(), 'praxis-mode-project-creation.png'),fullPage:true});
 
+    } catch (e) {
+      const dump = (globalThis as { __praxisBrowserDump?: () => Promise<string> }).__praxisBrowserDump;
+      if (dump) console.log(`conversation-browser failure state:\n${await dump().catch((x) => String(x))}`);
+      throw e;
     } finally { await browser.close(); if(webChild?.pid){try{process.kill(-webChild.pid,'SIGTERM');}catch{}} if (child.pid) { try { process.kill(-child.pid, 'SIGTERM'); } catch {} } }
   }, 300000);
 });

@@ -219,7 +219,8 @@ const PATTERNS: Record<string, Pattern> = {
     review: { label: 'Assess the case', instruction: 'Establish the facts from the records and timeline; identify fraud indicators and compliance concerns, keeping facts apart from suspicions and citing evidence IDs.', output: 'Facts, fraud indicators and compliance concerns' },
     missing: { question: 'Facts established?', label: 'Request information', instruction: 'Ask for the specific record or timeline detail needed to establish the facts.' },
     conclude: { label: 'Prepare handoff', instruction: 'Choose the handoff route under the escalation policy, assemble the handoff package and recommend a next action with rationale.', output: 'Handoff route, package and recommendation' },
-    human: null,
+    // Owner, 12 Nov: the receiving team accepts or returns the handoff.
+    human: { label: 'Receiving team accepts handoff', actorRole: 'Receiving fraud or compliance team', prompt: 'Accept the handoff package, or return it saying what is missing.', choices: ['Accept', 'Return'] },
     outputLabel: 'Handoff package',
     escalation: 'The case cannot be routed with the available evidence.',
   },

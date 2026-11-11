@@ -27,6 +27,11 @@ export const RLReviewRequestInput = z.object({
   /** Inline steps, or a signed URL when large. */
   trajectories: z.union([z.object({ steps: z.array(TrajectoryStep).min(1).max(2000) }), z.object({ signedUrl: z.string().url().max(4000) })]),
   rubric_id: z.string().max(200).nullable().optional(),
+  /**
+   * The run's final output.json, when RL Gym / Anvil sends it (optional; Praxis-side field, to be confirmed with Anvil).
+   * Used to score Q4 query clustering by pairwise F1 for the Reviewer; never a verdict on its own.
+   */
+  final_output: z.record(z.string(), z.unknown()).nullable().optional(),
   priority: z.number().int().min(0).max(100).default(0),
   due_by: z.string().datetime().nullable().optional(),
 });

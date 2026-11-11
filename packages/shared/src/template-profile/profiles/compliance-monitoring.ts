@@ -36,11 +36,26 @@ export const COMPLIANCE_MONITORING_PROFILE = sectionsProfile({
         field.refs('evidenceRefs', 'Evidence', 'Evidence IDs the assessment relies on.'),
       ],
     },
-    field.lt('exceptions', 'Exceptions', 'The exceptions the agent should identify, citing evidence IDs. Write "none" when there are none.', { required: true }),
+    // Owner, 12 Nov: each exception has its own severity; the overall severity (S6) stays the graded output.
+    {
+      key: 'exceptions',
+      type: 'repeated_array',
+      label: 'Exceptions',
+      help: 'Each exception (control gap) the agent should identify, with its own severity. Leave empty when there are none.',
+      itemLabel: 'exception',
+      idPrefix: 'EX',
+      example: 'EX1 · obligation OB2 not met: three payments released without the second approval · high · evidence E3',
+      itemFields: [
+        field.t('id', 'Exception ID', 'Stable exception ID.', { required: true }),
+        field.lt('description', 'Exception', 'What is wrong, citing the obligation it breaks.', { required: true }),
+        { key: 'severity', type: 'pick_list', label: 'Severity', help: 'How severe this exception is.', required: true, options: options('low', 'medium', 'high', 'critical') },
+        field.refs('evidenceRefs', 'Evidence', 'Evidence IDs that show it.', { required: true }),
+      ],
+    },
     field.lt('proposedFollowUp', 'Proposed follow-up', 'The follow-up the agent should propose for each exception. A proposal, not a remediation decision.', { required: true }),
   ],
   outcomes: [
     { key: 'result', type: 'pick_list', label: 'Monitoring result', help: 'The overall monitoring result for the scope and period.', required: true, options: RESULT, outputField: 'result' },
-    { key: 'severity', type: 'pick_list', label: 'Severity', help: 'The severity of the exceptions found. Use undetermined when the evidence cannot settle it.', required: true, options: options('low', 'medium', 'high', 'critical', 'undetermined'), outputField: 'severity' },
+    { key: 'severity', type: 'pick_list', label: 'Severity', help: 'The overall severity of the exceptions found (usually the highest, or as you judge and explain). Use undetermined when the evidence cannot settle it.', required: true, options: options('low', 'medium', 'high', 'critical', 'undetermined'), outputField: 'severity' },
   ],
 });

@@ -633,3 +633,17 @@ Expert and PM with two audit events; Expert edits need a reason, and a material 
 - **(owner)** Failing a critical rubric criterion fails the whole task. Exported to Anvil as a hard-failure constraint
   with the criterion's binding (Anvil's `praxis.anvil.task.v1` already has `constraints[].hard_failure`), so no new
   Anvil field is invented.
+
+### Authoring v2.1 Wave 3: owner field-contract answers (12 Nov 2026)
+
+- **(owner)** The drafts' pick lists for Q4 paid search, Fraud-risk/compliance handoffs and Compliance monitoring are final.
+- **(owner)** Q4: every query is graded. Built as per-query output.json fields (`q01_intent`, `q01_assignment`,
+  `q01_cluster`), at most 20 queries per task (Anvil task v1: no list type, 50 criteria). Generated per-query criteria
+  carry 50% of the score (default taken; the owner can change the share).
+- **(owner)** Q4: the catalogue's F1 ≥ 0.99 is checked automatically in Praxis on Anvil's results: pairwise clustering
+  F1 against the reference, shown to the RL Reviewer as advice. **Needs Anvil:** RL Gym / Anvil must send the run's
+  output.json as the new optional `final_output` field on `POST /integrations/rl-gym/review-requests`; without it the
+  screen says the score is not available.
+- **(owner)** Fraud handoffs: a "Receiving team accepts handoff" person step; fixed lists for fraud indicators and
+  compliance concerns (as approved); the common business hand-off is hidden.
+- **(owner)** Compliance monitoring: a severity per exception as well as the overall graded severity.

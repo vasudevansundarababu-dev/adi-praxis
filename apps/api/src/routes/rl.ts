@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { RLReviewRequestInput, RLVerdictRequest, rlVerdictProblems, type EvalResult, type TrajectoryStep } from '@praxis/shared';
+import { clusterFields, RLReviewRequestInput, RLVerdictRequest, rlVerdictProblems, scoreQueryClustering, type EvalResult, type TrajectoryStep } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { InternalActor } from '../auth/actor';
@@ -27,6 +27,19 @@ async function rlTask(tx: Db | Tx, actor: InternalActor, taskId: string) {
 const steps = (trajectories: unknown) => ((trajectories as { steps?: TrajectoryStep[] }).steps ?? null);
 
 /** SPEC FLOW 4: RL Gym result review. */
+/**
+ * Q4 query clustering (owner, 12 Nov 2026): pairwise F1 of the run's clusters against the approved task's reference
+ * output. Advice for the Reviewer only; the verdict stays theirs. Null when no source is a per-query clustering task.
+ */
+function clusteringFor(sourceOutputs: unknown[], finalOutput: unknown) {
+  const reference = sourceOutputs
+    .map((o) => (o as { praxisContract?: { rubric?: { reference_output?: Record<string, unknown> } } } | null)?.praxisContract?.rubric?.reference_output)
+    .find((ref) => ref && clusterFields(ref).length);
+  if (!reference) return null;
+  if (!finalOutput || typeof finalOutput !== 'object' || Array.isArray(finalOutput)) return { available: false as const, reason: 'RL Gym did not send the run\'s output.json (final_output), so clustering F1 cannot be computed.' };
+  return { available: true as const, ...scoreQueryClustering(reference, finalOutput as Record<string, unknown>)! };
+}
+
 export const rlRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db }) => {
   // Inbound request: exactly one RL_REVIEW task per (rl_run_id, rl_task_id); a duplicate creates nothing.
   app.post('/integrations/rl-gym/review-requests', { config: { access: RL_GYM, rateLimit: { max: 600, timeWindow: '1 minute' } }, schema: { tags: ['rl'], body: RLReviewRequestInput } }, async (req, reply) => {
@@ -50,6 +63,7 @@ export const rlRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db }) =
           evalResults: b.eval_results as Prisma.InputJsonValue,
           trajectories: b.trajectories as Prisma.InputJsonValue,
           rubricId: b.rubric_id ?? null,
+          finalOutput: (b.final_output ?? undefined) as Prisma.InputJsonValue | undefined,
           priority: b.priority,
           dueBy: b.due_by ? new Date(b.due_by) : null,
         },
@@ -116,6 +130,7 @@ export const rlRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db }) =
       rubric: r.rubricId ? { id: r.rubricId, text: null } : { id: null, text: t.project.template.verificationCriteria },
       sources: sources.map(toRecordDto),
       evalResults: r.evalResults,
+      clustering: clusteringFor(sources.map((x) => x.output), r.finalOutput),
       trajectory: steps(r.trajectories),
       trajectoryUrl: (r.trajectories as { signedUrl?: string }).signedUrl ?? null,
       reasonCodes: codes.map((c) => ({ code: c.code, label: c.label })),

@@ -153,11 +153,12 @@ describe('Wave 1 to Wave 3 template profiles: save, checks, agent view and Anvil
     const res = await submit(a, id);
     expect(res.statusCode).toBe(422);
     const failed = res.json().details.checks.filter((c: { ok: boolean }) => !c.ok).map((c: { id: string; section: string }) => `${c.section}:${c.id}`);
-    expect(failed).toEqual(expect.arrayContaining(['S1:profile.S1.businessContext', 'S2:profile.S2.evidence[0].content', 'S6:profile.S6.' + profile.sections[5]!.fields[0]!.key, 'S7:profile.S7.criteria', 'S8:profile.S8.sourcesUsed']));
+    const outcome = profile.sections[5]!.fields.find((f) => f.outputField);
+    expect(failed).toEqual(expect.arrayContaining(['S1:profile.S1.businessContext', 'S2:profile.S2.evidence[0].content', ...(outcome ? ['S6:profile.S6.' + outcome.key] : []), 'S7:profile.S7.criteria', 'S8:profile.S8.sourcesUsed']));
     expect(failed).not.toContain('S1:profile.S1.title');
     if (profile.profileId === 'enhanced-due-diligence') expect(failed).toContain('S5:profile.S5.humanHandoff');
     if (profile.profileId === 'customer-risk-rating') expect(failed).toEqual(expect.arrayContaining(['S5:profile.S5.factorAssessments', 'S6:profile.S6.override']));
-    if (profile.profileId === 'q4-global-paid-search-query-clustering') expect(failed).toEqual(expect.arrayContaining(['S5:profile.S5.clusters', 'S5:profile.S5.queryAssignments', 'S5:profile.S5.exclusions', 'S6:profile.S6.assignment']));
+    if (profile.profileId === 'q4-global-paid-search-query-clustering') expect(failed).toEqual(expect.arrayContaining(['S5:profile.S5.clusters', 'S5:profile.S5.queryAssignments', 'S5:profile.S5.exclusions']));
     if (profile.profileId === 'fraud-risk-and-compliance-handoffs') expect(failed).toEqual(expect.arrayContaining(['S5:profile.S5.handoffPackage', 'S6:profile.S6.recommendation']));
     if (profile.profileId === 'compliance-monitoring') expect(failed).toEqual(expect.arrayContaining(['S5:profile.S5.obligationAssessments', 'S5:profile.S5.proposedFollowUp', 'S6:profile.S6.severity']));
     expect((await db.taskInstance.findUniqueOrThrow({ where: { id } })).status).toBe('IN_PROGRESS');
@@ -198,6 +199,29 @@ describe('Wave 1 to Wave 3 template profiles: save, checks, agent view and Anvil
     expect(JSON.parse(env.payload_json)).toEqual(contract);
     const s6 = profile.sections[5]!.fields.filter((f) => f.outputField);
     for (const f of s6) expect(contract.rubric.reference_output[f.outputField!]).toBe(f.options![0]!.value);
+  });
+
+  it('Q4 paid search: every query is graded; Praxis scores the returned run by clustering F1 for the RL Reviewer (owner, 12 Nov)', async () => {
+    const profile = NON_KYC.find((p) => p.profileId === 'q4-global-paid-search-query-clustering')!;
+    const { a, id, reviewer } = await authoringTask(profile.catalogWorkflowName, 'Digital Marketing');
+    const queries = ['synthetic query one', 'synthetic query two', 'synthetic query three', 'synthetic query four'].map((query, i) => ({ query, clusterId: i < 2 ? 'CL1' : 'CL2', intent: 'commercial', assignment: 'assigned', evidenceRefs: ['E1'] }));
+    expect((await save(a, id, setFieldValue(profile, sampleProfileOutput(profile), 'S5', 'queryAssignments', queries))).statusCode).toBe(200);
+    expect((await submit(a, id)).statusCode).toBe(200);
+    const recordId = (await accept(reviewer, id)).json().recordId;
+    const contract = (await get(admin, `/dataset/records/${recordId}/praxis-contract`)).json();
+    expect(contract.rubric.reference_output).toMatchObject({ q01_cluster: 'CL1', q02_cluster: 'CL1', q03_cluster: 'CL2', q04_cluster: 'CL2', q04_intent: 'commercial' });
+    expect(contract.rubric.criteria.filter((c: { id: string }) => /^q\d\d-/.test(c.id))).toHaveLength(8);
+
+    const key = (await post(admin, '/api-clients', { name: 'RL Gym', kind: 'RL_GYM' })).json().key as string;
+    const send = (run: string, finalOutput?: object) =>
+      app.inject({ method: 'POST', url: '/api/v1/integrations/rl-gym/review-requests', headers: { authorization: `Bearer ${key}`, ...idem() }, payload: { rl_run_id: run, rl_task_id: 't', source_record_ids: [recordId], eval_results: [{ metric: 'intent', passed: true }], trajectories: { steps: [{ index: 0, action: 'write output' }] }, ...(finalOutput ? { final_output: finalOutput } : {}) } });
+    // Same grouping under the agent's own names: F1 1. One query in the wrong cluster: below 0.99.
+    const good = (await send('run-good', { q01_cluster: 'brand', q02_cluster: 'brand', q03_cluster: 'generic', q04_cluster: 'generic' })).json().taskId;
+    expect((await get(reviewer, `/review/rl/${good}`)).json().clustering).toMatchObject({ available: true, queries: 4, f1: 1, threshold: 0.99, passed: true });
+    const bad = (await send('run-bad', { q01_cluster: 'brand', q02_cluster: 'generic', q03_cluster: 'generic', q04_cluster: 'generic' })).json().taskId;
+    expect((await get(reviewer, `/review/rl/${bad}`)).json().clustering).toMatchObject({ available: true, passed: false });
+    const none = (await send('run-none')).json().taskId;
+    expect((await get(reviewer, `/review/rl/${none}`)).json().clustering).toMatchObject({ available: false });
   });
 
   it('a KYC workbench task submits, is approved and exports its compiled contract to Anvil', async () => {

@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { ProposalReview, type ProposalRow } from '@/components/policy/proposal-review';
+import { ClusteringScore } from '@/components/rl/rl-review';
 import { ReviewPolicySources, type ReviewPolicySourcesData } from '@/components/tasks/review-policy-sources';
 import { a11yProblems } from './a11y';
 
@@ -84,5 +85,15 @@ describe('Wave 3: policy sources on the review page', () => {
   it('says plainly when the project has no published rules', () => {
     const html = renderToStaticMarkup(<ReviewPolicySources d={{ configured: false, basis: null, changedSinceSnapshot: false, rules: [], taskChanges: [] }} />);
     expect(html).toContain('This project has no published policy rules.');
+  });
+});
+
+describe('Q4 clustering F1 on the RL review screen (owner, 12 Nov 2026)', () => {
+  it('shows the score against the 0.99 bar as advice, or why it is not available', () => {
+    const below = renderToStaticMarkup(<ClusteringScore c={{ available: true, queries: 4, precision: 0.5, recall: 1, f1: 0.6667, threshold: 0.99, passed: false }} />);
+    expect(below).toContain('Clustering F1 (Praxis): 0.6667 below the 0.99 bar');
+    expect(below).toContain('Advice for your verdict, not a verdict.');
+    expect(renderToStaticMarkup(<ClusteringScore c={{ available: false, reason: 'RL Gym did not send the run’s output.json.' }} />)).toContain('not available');
+    expect(a11yProblems(below)).toEqual([]);
   });
 });

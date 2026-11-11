@@ -149,6 +149,25 @@ Starting workflows use the common review pattern (case inputs → review → "su
 to escalation → request, returning to review in a bounded loop of 2 with exhausted → escalate → conclude → output).
 None of the three has a business human step: the drafts describe none. Roles list no tools.
 
+Owner decisions (12 Nov 2026), now built:
+- **Pick lists** above are final.
+- **Q4 paid search: every query is graded** (no focus query). Anvil's task v1 has no list type and allows 50 criteria,
+  so each query in S5 Query assignments (at most 20 per task, checked at save and export) becomes output.json fields
+  `q01_intent`, `q01_assignment` and `q01_cluster`, each described with its query text. Praxis generates one
+  `json_equals` criterion per query for intent and for assignment; together they carry 50% of the score and the author's
+  S7 criteria keep their proportions in the other 50%. Cluster labels are the agent's own, so Anvil does not grade them:
+  Praxis scores clustering by pairwise F1 (pass at 0.99, the catalogue's bar) when RL Gym / Anvil returns the run's
+  output.json as `final_output` on the review request, and shows it to the RL Reviewer as advice. `final_output` is a
+  new optional Praxis-side field: Anvil must send it for the score to appear.
+- **Fraud handoffs:** fraud indicators and compliance concerns are repeated items from fixed lists (indicators:
+  account_takeover, money_mule, synthetic_identity, first_party_fraud, authorised_push_payment_scam, card_fraud,
+  insider_fraud, other; concerns: suspicious_activity_report, sanctions, customer_due_diligence, data_protection,
+  conduct_risk, other), each with a description and evidence. The common business hand-off is hidden (the handoff package
+  is the hand-off). The workflow ends with a person step "Receiving team accepts handoff" (Accept / Return, timeout →
+  escalate).
+- **Compliance monitoring:** exceptions are repeated items, each with its own severity (low / medium / high / critical)
+  and evidence; the overall S6 severity stays the graded output.
+
 Requires confirmation (left for the domain owner, nothing invented):
 - all three: exact field names and enums beyond the proposed labels, published agent mode, qualified tool catalogue
   and environment, critical-failure scoring semantics, executable Anvil mapping (draft open questions);

@@ -1047,6 +1047,8 @@ model RLReviewRequest {
   /// Inline steps, or { signedUrl } when large.
   trajectories    Json
   rubricId        String?               @map("rubric_id")
+  /// The run's final output.json when RL Gym / Anvil sends it (Q4 clustering F1 for the Reviewer).
+  finalOutput     Json?                 @map("final_output")
   priority        Int                   @default(0)
   dueBy           DateTime?             @map("due_by")
   status          RLReviewRequestStatus @default(RECEIVED)

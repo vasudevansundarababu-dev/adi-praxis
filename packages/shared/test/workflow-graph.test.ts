@@ -160,15 +160,16 @@ describe('template starting workflows (Waves 1 to 3)', () => {
       expect(checkWorkflowGraph(g(name)).errors, name).toEqual([]);
     }
   });
-  it('Wave 3: single-agent workflows with a bounded request loop and no business human step', async () => {
+  it('Wave 3: single-agent workflows with a bounded request loop; only fraud handoffs has a person step (owner, 12 Nov)', async () => {
     const { templateStartingGraph, WAVE3_GRAPH_TEMPLATES } = await import('../src/workflow-graph');
     expect(WAVE3_GRAPH_TEMPLATES).toEqual(['Q4 Global Paid Search Query Clustering', 'Fraud-risk/compliance handoffs', 'Compliance monitoring']);
     for (const name of WAVE3_GRAPH_TEMPLATES) {
       const g = templateStartingGraph(name)!;
       expect(g).toMatchObject({ agentMode: 'SINGLE', loops: [expect.objectContaining({ maxIterations: 2, exhaustedTarget: 'escalate' })] });
-      expect(g.nodes.filter((n) => n.type === 'human_step')).toHaveLength(0);
+      expect(g.nodes.filter((n) => n.type === 'human_step')).toHaveLength(name === 'Fraud-risk/compliance handoffs' ? 1 : 0);
       expect(g.roles.every((r) => (r.tools ?? []).length === 0)).toBe(true);
     }
+    expect(templateStartingGraph('Fraud-risk/compliance handoffs')!.nodes.find((n) => n.type === 'human_step')).toMatchObject({ actorRole: 'Receiving fraud or compliance team', responseSchema: [{ options: ['Accept', 'Return'] }] });
     // The catalogue import may write an en dash.
     expect(templateStartingGraph('Fraud–risk/compliance handoffs')!.templateId).toBe('fraud-risk-and-compliance-handoffs');
   });

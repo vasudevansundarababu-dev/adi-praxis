@@ -275,6 +275,7 @@ function fieldProblems(f: ItemField, value: unknown, path: string, label: string
       }
       const min = f.minItems ?? 1;
       if (req.required && value.length < min) push('min_items', `add at least ${min}`);
+      if (f.maxItems !== undefined && value.length > f.maxItems) push('invalid', `at most ${f.maxItems} allowed (now ${value.length})`);
       const items = itemFieldsOf(f);
       const noun = f.itemLabel ?? 'item';
       value.forEach((item, i) => {

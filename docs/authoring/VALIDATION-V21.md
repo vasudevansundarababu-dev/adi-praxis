@@ -51,3 +51,23 @@ and the credentials hotfix. Same local stack; all providers mocked. Not pushed, 
 | Browser journeys | `npx playwright test -c e2e authoring-wave` | 9 passed: the eight templates (graph below both editors) and Wave 2 workflow building (decision, person step, parallel step with join, correction loop) |
 
 Not yet shown: the owner's live session and Anvil import for the three new templates; Expert → PM in the browser.
+
+## Wave 3: policy proposals, policy sources, open model and three templates (12 Nov 2026, local)
+
+Branch `feat/authoring-wave3` from the tip of `feat/authoring-wave2` (owner: build Wave 3 while Wave 2 waits for QA).
+Same local stack; all providers mocked. Not pushed, not deployed, no live model call.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Typecheck, all packages | `pnpm -r typecheck` | pass |
+| API integration tests | `pnpm --filter @praxis/api test` | 60 files; 817 passed, 5 skipped, 0 failed (browser chatbot test included) |
+| Shared unit tests | `pnpm --filter @praxis/shared test` | 375 passed |
+| Candidate tests | `pnpm --filter @praxis/candidate test` | 39 passed (accessibility checks on the new proposal panel) |
+| Web tests | `pnpm --filter @praxis/web test` | 69 passed (accessibility checks on the proposal review and policy sources panels) |
+| Browser journeys | `npx playwright test -c e2e authoring-wave` | 12 passed: all eleven templates (graph below both editors) and Wave 2 workflow building |
+
+New tests: `apps/api/test/policy-proposals.test.ts` (proposal intake, flags, access, accept through the document
+service, database guard, retrieval filters, review policy sources), `apps/api/test/maas-assistant.test.ts` (open-model
+contract against mocks), Wave 3 cases in `template-profiles.test.ts`, shared profile and graph tests, and the web and
+candidate component tests. Not yet shown: the owner's live QA session (Waves 2 and 3), the open-model comparison on a
+real Model Garden model, and the Anvil import for the three new templates.

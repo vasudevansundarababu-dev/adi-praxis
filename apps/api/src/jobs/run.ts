@@ -67,7 +67,9 @@ try {
     const dryRun = process.argv.includes('--dry-run');
     const { fetchHttp, optionsFromEnv, qaUsers } = await import('./qa-users');
     if (!dryRun && !process.env.API_URL) throw new Error('qa-users needs API_URL');
-    const r = await qaUsers(db, optionsFromEnv(process.env, config.appEnv, dryRun, fetchHttp(process.env.API_URL ?? '')), log);
+    const { defaultEvaluator } = await import('../app');
+    // The job also runs pending or failed assessments with this environment's model (SUITABILITY_MODEL).
+    const r = await qaUsers(db, { ...optionsFromEnv(process.env, config.appEnv, dryRun, fetchHttp(process.env.API_URL ?? '')), evaluator: defaultEvaluator(config) }, log);
     if (!dryRun && r.incomplete) process.exitCode = 3;
   } else if (job === 'catalog-import') {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');

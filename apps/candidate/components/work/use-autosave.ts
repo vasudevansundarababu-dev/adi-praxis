@@ -78,6 +78,7 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
             active.current -= delta;
             rev.current = body.revision;
             setRevision(body.revision);
+            window.dispatchEvent(new CustomEvent('praxis:task-saved',{detail:{taskId,output:JSON.parse(payload).output,revision:body.revision}}));
             if (!dirty.current) setState({ kind: 'saved', at: body.savedAt });
             return true;
           }
@@ -141,6 +142,8 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
     return () => { active = false; document.removeEventListener('click', leave, true); };
   }, [put, router]);
 
+  useEffect(()=>{const listener=(e:Event)=>{(e as CustomEvent<{saves:Promise<boolean>[]}>).detail.saves.push(put());};window.addEventListener('praxis:flush',listener);return()=>window.removeEventListener('praxis:flush',listener);},[put]);
+
   const update = useCallback((next: T | ((prev: T) => T)) => {
     if (readonlyNow.current) return;
     dirty.current = true;
@@ -149,6 +152,17 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
     setValue(updated);
     setState((s) => s.kind === 'saved' ? { kind: 'idle' } : s);
   }, []);
+
+  // Panels outside the editor (the workflow graph) change top-level output keys through this same autosave, so the
+  // task keeps one writer, one revision sequence and one save barrier.
+  useEffect(() => {
+    const listener = (e: Event) => {
+      const d = (e as CustomEvent<{ taskId: string; patch: Record<string, unknown> }>).detail;
+      if (d?.taskId === taskId && !targetRef.current) update((prev) => ({ ...prev, ...d.patch }));
+    };
+    window.addEventListener('praxis:patch-output', listener);
+    return () => window.removeEventListener('praxis:patch-output', listener);
+  }, [taskId, update]);
 
   return { value, update, revision, currentRevision: useCallback(() => rev.current, []), state, flush: put };
 }

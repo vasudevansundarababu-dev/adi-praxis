@@ -112,7 +112,9 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
   async function kycTask(workflowName?: string) {
     const templateId = await template(workflowName);
     const jd = (await post(pm, '/job-descriptions', { title: 'KYC Analyst', responsibilities: 'Author KYC cases.', skills: ['KYC'], wagePerTask: 40, wageCurrency: 'GBP', locationType: 'REMOTE' })).json();
-    const p = (await post(pm, '/projects', { templateId, name: `P ${randomUUID().slice(0, 6)}`, taskMode: 'AUTHORING', distinctTarget: 4, maxPerExpert: 4, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-10-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] })).json();
+    const p = (await post(pm, '/projects', { authoringExperience: 'BOTH', templateId, name: `P ${randomUUID().slice(0, 6)}`, taskMode: 'AUTHORING', distinctTarget: 4, maxPerExpert: 4, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-10-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] })).json();
+    // Model a migrated legacy project; dedicated experience tests cover newly configured projects.
+    await db.project.update({where:{id:p.id},data:{authoringExperience:null}});
     const sub = await post(pm, `/projects/${p.id}/submit`);
     expect(sub.statusCode, sub.body).toBe(200);
     expect((await post(pm, `/projects/${p.id}/match`)).statusCode).toBe(200);

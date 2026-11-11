@@ -1,7 +1,7 @@
 'use client';
 
 import { KYC_SECTIONS, type TaskCheck } from '@praxis/shared';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Req, RequiredNote } from '@/components/required';
 import type { CheckResult } from '@/lib/work-types';
 
@@ -12,6 +12,8 @@ const sectionTitle = (id: string) => KYC_SECTIONS.find((s) => s.id === id)?.titl
  * submits after the synthetic-data declaration. Submission is blocked by any failing check or unexplained flag.
  */
 export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolean>; revision: () => number; onSubmitted: () => void; onGoTo?: (section: string) => void; declaration?: string }) {
+  const [humanOnly,setHumanOnly]=useState(false),[questions,setQuestions]=useState<string[]>([]),[resolutions,setResolutions]=useState<Record<string,string>>({});
+  useEffect(()=>{void fetch(`/api/v1/me/tasks/${props.taskId}/conversation`).then(r=>r.ok?r.json():null).then(v=>{setHumanOnly(!!v?.state?.humanOnly);setQuestions(v?.state?.unresolved??[]);}).catch(()=>{});},[props.taskId]);
   const [result, setResult] = useState<CheckResult | null>(null);
   const [explanations, setExplanations] = useState<Record<string, string>>({});
   const [declared, setDeclared] = useState(false);
@@ -21,7 +23,7 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
   async function check() {
     setPending(true);
     setError(null);
-    await props.flush();
+    if (!await props.flush()) { setPending(false);setError('Save your changes before running checks.');return; }
     const res = await fetch(`/api/v1/me/tasks/${props.taskId}/check`, { method: 'POST' });
     setPending(false);
     if (!res.ok) return setError('Could not run the checks. Try again.');
@@ -33,6 +35,10 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
     if (!(await props.flush())) {
       setPending(false);
       return setError('Your latest changes could not be saved yet, so nothing was submitted.');
+    }
+    if (humanOnly) {
+      const review=await fetch(`/api/v1/me/tasks/${props.taskId}/conversation/review`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':crypto.randomUUID()},body:JSON.stringify({expectedRevision:props.revision(),ownWork:true,noExternalLlm:true,authorisedSources:true,resolutions:questions.map(question=>({question,answer:resolutions[question]??''}))})});
+      if(!review.ok){const problem=await review.json().catch(()=>null);setPending(false);setError(problem?.message??'Resolve authorship and reconciliation checks first.');return;}
     }
     const res = await fetch(`/api/v1/me/tasks/${props.taskId}/submit`, {
       method: 'POST',
@@ -55,6 +61,8 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
     <section aria-labelledby="w06-h" className="space-y-4">
       <h2 id="w06-h" className="text-lg font-semibold">Check and submit</h2>
       <RequiredNote />
+      {humanOnly&&<p className="text-sm">By submitting, I confirm this revision is my own work, no external LLM wrote the substantive answers, and all sources are authorised. Similarity signals require human review and do not prove authorship.</p>}
+      {humanOnly&&<div className="space-y-3">{questions.map(q=><label key={q} className="block text-sm">{q}<textarea value={resolutions[q]??''} onChange={e=>setResolutions(r=>({...r,[q]:e.target.value}))} className="mt-1 w-full rounded border border-line bg-surface p-2" placeholder="Explain how the saved task resolves this question…"/></label>)}<button type="button" disabled={pending||!declared} className="rounded border border-line p-2 disabled:opacity-50" onClick={async()=>{setPending(true);setError(null);if(!await props.flush()){setPending(false);setError('Save changes first.');return;}const r=await fetch(`/api/v1/me/tasks/${props.taskId}/conversation/review`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':crypto.randomUUID()},body:JSON.stringify({expectedRevision:props.revision(),ownWork:true,noExternalLlm:true,authorisedSources:true,resolutions:questions.map(question=>({question,answer:resolutions[question]??''}))})});setPending(false);if(!r.ok){const b=await r.json().catch(()=>null);setError(b?.message??'Resolve questions first.');}else{setQuestions([]);setResult(null);}}}>Confirm authorship and reconciliation</button></div>}
       <button type="button" disabled={pending} onClick={check} className="btn btn-secondary disabled:opacity-60">
         {pending ? 'Checking…' : 'Run checks'}
       </button>
@@ -126,7 +134,7 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
       <label className="flex items-start gap-2 text-sm">
         <input type="checkbox" aria-required="true" checked={declared} onChange={(e) => setDeclared(e.target.checked)} className="mt-1" />
         <span>
-          {props.declaration ?? 'This case is entirely synthetic. It contains no real customer, colleague, employer or confidential information.'}
+          {humanOnly ? 'This revision is my own work; no external LLM wrote the answers; all sources are authorised and the case contains no real personal or confidential data.' : props.declaration ?? 'This case is entirely synthetic. It contains no real customer, colleague, employer or confidential information.'}
           <Req />
         </span>
       </label>

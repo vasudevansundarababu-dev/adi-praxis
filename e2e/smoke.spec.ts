@@ -87,7 +87,7 @@ test('a prepared synthetic project exposes its unapproved draft download in the 
   if (template.status === 'DRAFT') await call('POST', `/templates/${template.id}/publish`);
   const jd = await call('POST', '/job-descriptions', { title: 'Synthetic marketing author', responsibilities: 'Author original fictional tasks.', skills: ['Marketing'], wagePerTask: 1, wageCurrency: 'USD', locationType: 'REMOTE' });
   const date = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
-  const project = await call('POST', '/projects', { templateId: template.id, name: `SYNTHETIC TEST — staged UI ${randomUUID().slice(0, 8)}`, distinctTarget: 1, maxPerExpert: 1, tptMinutes: 30, startDate: date(1), endDate: date(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: false }] });
+  const project = await call('POST', '/projects', { authoringExperience: 'BOTH', templateId: template.id, name: `SYNTHETIC TEST — staged UI ${randomUUID().slice(0, 8)}`, distinctTarget: 1, maxPerExpert: 1, tptMinutes: 30, startDate: date(1), endDate: date(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: false }] });
   await call('POST', `/projects/${project.id}/submit`);
   await page.goto(`${WEB}/projects/${project.id}`);
   await page.getByRole('link', { name: 'Tasks and invites' }).click();

@@ -1,0 +1,231 @@
+{
+  "schemaVersion": "praxis.workflow_graph.v1-proposed",
+  "templateId": "kyc-onboarding-and-refresh",
+  "templateVersion": 1,
+  "agentMode": "SINGLE",
+  "roles": [
+    {
+      "id": "analyst",
+      "name": "KYC analyst",
+      "responsibility": "Assess identity and address evidence for the applicant",
+      "tools": [
+        "document_check",
+        "request_info"
+      ],
+      "evidenceRefs": [
+        "case_file"
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "case_file",
+      "label": "Applicant evidence (E1 identity, E2 address)",
+      "visibility": "actor"
+    },
+    {
+      "id": "evidence_review",
+      "label": "Evidence review findings",
+      "visibility": "actor"
+    },
+    {
+      "id": "info_request",
+      "label": "Request for missing information",
+      "visibility": "actor"
+    },
+    {
+      "id": "recommendation",
+      "label": "Disposition and rationale",
+      "visibility": "actor"
+    },
+    {
+      "id": "reference_answer",
+      "label": "Reference disposition",
+      "visibility": "private_reference"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "input",
+      "label": "Case evidence",
+      "provides": [
+        "case_file"
+      ]
+    },
+    {
+      "id": "review",
+      "type": "agent_step",
+      "label": "Review evidence",
+      "roleId": "analyst",
+      "instruction": "Compare the identity and address records and list discrepancies with evidence IDs.",
+      "inputRefs": [
+        "case_file"
+      ],
+      "outputArtifact": "evidence_review"
+    },
+    {
+      "id": "complete",
+      "type": "decision",
+      "label": "Evidence complete?",
+      "question": "Is the evidence sufficient to assess the applicant?",
+      "conditions": [
+        {
+          "id": "yes",
+          "label": "Complete",
+          "field": "evidence_review.complete",
+          "op": "eq",
+          "value": true
+        },
+        {
+          "id": "no",
+          "label": "Missing evidence",
+          "field": "evidence_review.complete",
+          "op": "eq",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": "ask",
+      "type": "agent_step",
+      "label": "Request missing information",
+      "roleId": "analyst",
+      "instruction": "Write a request naming exactly which document is missing and why.",
+      "inputRefs": [
+        "evidence_review"
+      ],
+      "outputArtifact": "info_request"
+    },
+    {
+      "id": "decide",
+      "type": "agent_step",
+      "label": "Recommend disposition",
+      "roleId": "analyst",
+      "instruction": "Recommend approve, reject, request information or escalate, citing evidence.",
+      "inputRefs": [
+        "evidence_review"
+      ],
+      "outputArtifact": "recommendation",
+      "rubricCriterionIds": [
+        "C1"
+      ]
+    },
+    {
+      "id": "lead",
+      "type": "human_step",
+      "label": "Case lead confirms",
+      "actorRole": "Case lead",
+      "prompt": "Confirm or return the recommendation.",
+      "responseSchema": [
+        {
+          "key": "verdict",
+          "label": "Verdict",
+          "type": "choice",
+          "options": [
+            "Confirm",
+            "Return"
+          ]
+        }
+      ],
+      "permittedEvidence": [
+        "case_file",
+        "recommendation"
+      ],
+      "timeoutMinutes": 1440
+    },
+    {
+      "id": "done",
+      "type": "output",
+      "label": "Final recommendation",
+      "deliverable": "recommendation",
+      "completionCondition": "A disposition with cited evidence exists."
+    },
+    {
+      "id": "escalate",
+      "type": "escalation",
+      "label": "Escalate to approver",
+      "reason": "Evidence could not be completed within the allowed requests."
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "start",
+      "to": "review",
+      "label": ""
+    },
+    {
+      "id": "e2",
+      "from": "review",
+      "to": "complete",
+      "label": ""
+    },
+    {
+      "id": "e3",
+      "from": "complete",
+      "to": "decide",
+      "port": "yes",
+      "label": "Complete"
+    },
+    {
+      "id": "e4",
+      "from": "complete",
+      "to": "ask",
+      "port": "no",
+      "label": "Missing"
+    },
+    {
+      "id": "e5",
+      "from": "complete",
+      "to": "escalate",
+      "port": "else",
+      "label": "Other"
+    },
+    {
+      "id": "e6",
+      "from": "complete",
+      "to": "escalate",
+      "port": "unknown",
+      "label": "Unreadable"
+    },
+    {
+      "id": "e7",
+      "from": "ask",
+      "to": "review",
+      "label": "Re-review"
+    },
+    {
+      "id": "e8",
+      "from": "decide",
+      "to": "lead",
+      "label": ""
+    },
+    {
+      "id": "e9",
+      "from": "lead",
+      "to": "done",
+      "port": "responded",
+      "label": "Responded"
+    },
+    {
+      "id": "e10",
+      "from": "lead",
+      "to": "escalate",
+      "port": "timeout",
+      "label": "No response"
+    }
+  ],
+  "loops": [
+    {
+      "id": "info_loop",
+      "returnEdgeId": "e7",
+      "maxIterations": 2,
+      "exitCondition": "Evidence complete",
+      "exhaustedTarget": "escalate"
+    }
+  ],
+  "limits": {
+    "maxTransitions": 40
+  }
+}

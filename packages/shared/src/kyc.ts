@@ -88,7 +88,11 @@ export interface KycTask {
     humanHandoff?: string;
   };
   rubric?: {
-    criteria?: { id: string; name: string; weight: number; passCondition: string; critical?: boolean }[];
+    /**
+     * `outputField` / `comparison` / `expectedValue` are an optional, additive extension (template profile v1): the
+     * executable check on output.json (`disposition` or `risk_rating`) used by the Anvil compiler.
+     */
+    criteria?: { id: string; name: string; weight: number; passCondition: string; critical?: boolean; outputField?: string; comparison?: string; expectedValue?: string }[];
     commonErrors?: { description: string; caughtBy?: string }[];
     acceptableVariations?: string[];
   };

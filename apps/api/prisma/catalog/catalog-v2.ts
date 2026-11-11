@@ -2,12 +2,14 @@ import { Prisma, type AuditEvent, type Domain, type PrismaClient, type Template 
 import { publishProblems, sectionProblems, validSectionCount, BLUEPRINT_SECTIONS, type HarborBlueprint } from '@praxis/shared';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { CATALOG_V2, RETIRED_DOMAINS, loadCatalogBlueprint, normaliseName } from './index';
+import { CATALOG_V2, RETIRED_DOMAINS, loadCatalogBlueprint, normaliseName, type CatalogWorkflowFields } from './index';
 
 /**
  * The catalog change of PRD D15 / D15a (architecture §11, AD-07).
  * - `seedCatalogV2` upserts the mockup catalog: reuses existing lineages by normalised name, creates the missing
- *   domains and workflows as drafts, and publishes the full blueprints under the `publishProblems` rules.
+ *   domains and workflows, and publishes every workflow (the three full blueprints under the `publishProblems` rules,
+ *   the rest from the owner's publish fields; owner decision 10 Nov 2026: seeded templates are published by default).
+ *   An existing unused DRAFT is published with the fields; a draft used by a project and a RETIRED row keep their state.
  * - `retireOldCatalog` retires the D15a domains and every workflow of a catalog domain that is not in the mockup.
  * - `reverseCatalogV2` restores the statuses recorded in the audit log; rows the job created are retired. Running the
  *   job again after a reverse reinstates the catalog workflows that the reverse retired.
@@ -134,6 +136,24 @@ function assertPublishable(workflowName: string, bp: HarborBlueprint) {
   if (problems.length > 0) throw new Error(`Catalog blueprint for "${workflowName}" cannot be published: ${problems.join('; ')}`);
 }
 
+/** Template columns the owner's publish fields fill for a workflow without a blueprint (D15, 10 Nov 2026). */
+export function templateFieldsFromFields(f: CatalogWorkflowFields) {
+  return {
+    primaryWork: f.primaryWork,
+    verificationCriteria: f.verificationCriteria,
+    humanGate: f.humanGate,
+    skills: f.skills,
+    taskModes: f.taskModes,
+    defaultTptMinutes: f.defaultTptMinutes,
+  };
+}
+
+/** The publish route's rules (`publishProblems`) for a workflow seeded from the owner's fields. */
+function assertFieldsPublishable(workflowName: string, f: CatalogWorkflowFields) {
+  const problems = publishProblems({ workflowName, ...f });
+  if (problems.length > 0) throw new Error(`Catalog fields for "${workflowName}" cannot be published: ${problems.join('; ')}`);
+}
+
 /** One entry per lineage: its versions, newest first. The lineage is named after its newest version. */
 function lineages(templates: Template[]): Template[][] {
   const by = new Map<string, Template[]>();
@@ -173,11 +193,13 @@ async function seedInto(tx: Db, clientId: string, plan: CatalogPlan, apply: bool
 
     for (const w of d.workflows) {
       const bp = w.blueprint ? loadCatalogBlueprint(w.blueprint) : null;
+      const fields = w.fields ?? null;
       if (bp) assertPublishable(w.workflowName, bp);
+      if (fields) assertFieldsPublishable(w.workflowName, fields);
       const versions = existing.find((vs) => sameName(vs[0]!.workflowName, w.workflowName));
 
       if (!versions) {
-        const status = bp ? 'PUBLISHED' : 'DRAFT';
+        const status = bp || fields ? 'PUBLISHED' : 'DRAFT';
         let id: string | null = null;
         if (apply) {
           const t = await tx.template.create({
@@ -189,6 +211,7 @@ async function seedInto(tx: Db, clientId: string, plan: CatalogPlan, apply: bool
               workflowName: w.workflowName,
               status,
               ...(bp ? { ...templateFieldsFromBlueprint(bp), blueprintRevision: 1, publishedAt: new Date() } : {}),
+              ...(fields ? { ...templateFieldsFromFields(fields), publishedAt: new Date() } : {}),
             },
           });
           id = t.id;
@@ -215,6 +238,33 @@ async function seedInto(tx: Db, clientId: string, plan: CatalogPlan, apply: bool
         latest = { ...latest, status: reinstate.status };
       }
       const reused: CatalogNote = { kind: 'reused', entityType: 'Template', entityId: latest.id, domain: domainName, workflowName: latest.workflowName, version: latest.version, status: latest.status, detail: `lineage ${latest.lineageId} reused for "${w.workflowName}"` };
+
+      // Owner decision (10 Nov 2026): seeded templates are published by default. An unused DRAFT is published with the
+      // owner's fields; a draft used by a project and a RETIRED row keep their state (rows the job created are
+      // reinstated above). A row already PUBLISHED is left as it is.
+      if (fields) {
+        if (latest.status !== 'DRAFT') {
+          if (!reinstate) rec.note(reused);
+          continue;
+        }
+        if (used.get(latest.id)) {
+          rec.note({ ...reused, kind: 'kept_used_by_project', detail: `draft used by ${used.get(latest.id)} project(s); not changed` });
+          continue;
+        }
+        if (apply) {
+          const { count } = await tx.template.updateMany({
+            where: { id: latest.id, status: 'DRAFT' },
+            data: { ...templateFieldsFromFields(fields), status: 'PUBLISHED', publishedAt: new Date() },
+          });
+          if (count !== 1) throw new Error(`Template ${latest.id} changed while catalog-v2 was running; run it again`);
+        }
+        await rec.change(
+          { action: 'template.published', entityType: 'Template', entityId: latest.id, domain: domainName, workflowName: latest.workflowName, version: latest.version, from: 'DRAFT', to: 'PUBLISHED' },
+          { status: 'DRAFT', publishedAt: null, retiredAt: iso(latest.retiredAt), fields: overwrittenFields(latest) },
+        );
+        continue;
+      }
+
       if (!bp) {
         if (!reinstate) rec.note(reused);
         continue;

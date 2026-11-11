@@ -1,0 +1,60 @@
+{
+  "schema_version": "praxis.anvil.project_policy.v1",
+  "source_project": {
+    "id": "banking",
+    "version": "1",
+    "name": "Fictional KYC"
+  },
+  "project_default_policy_refs": [
+    {
+      "policy_id": "privacy",
+      "version": "1"
+    }
+  ],
+  "sources": [
+    {
+      "id": "source",
+      "path": "policies/privacy.txt",
+      "media_type": "text/plain",
+      "size_bytes": 60,
+      "sha256": "b86a84da2339e95a275823611ab37d4f038b290d7ec78e8e438892e2add85297"
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "privacy",
+      "version": "1",
+      "title": "Data destinations",
+      "source_id": "source",
+      "rules": [
+        {
+          "rule_id": "allowed",
+          "requirement": "Use approved destinations only",
+          "source_location": "paragraph 1",
+          "severity": "high",
+          "visibility": "agent_instruction"
+        },
+        {
+          "rule_id": "hidden",
+          "requirement": "PRIVATE TEST CANARY",
+          "source_location": "paragraph 1",
+          "severity": "high",
+          "visibility": "evaluator_only"
+        }
+      ]
+    }
+  ],
+  "task_bindings": [
+    {
+      "task_id": "kyc",
+      "task_version": "1",
+      "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "policy_refs": [
+        {
+          "policy_id": "privacy",
+          "version": "1"
+        }
+      ]
+    }
+  ]
+}

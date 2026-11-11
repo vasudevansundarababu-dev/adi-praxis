@@ -1,4 +1,4 @@
-import type { TaskCheck } from '@praxis/shared';
+import type { ExportStatusView, TaskCheck } from '@praxis/shared';
 
 export interface TaskSummary {
   id: string;
@@ -34,6 +34,14 @@ export interface SlotInput {
 }
 
 export interface TaskView extends TaskSummary {
+  authoringExperience?: 'CLASSIC'|'CHATBOT'|'BOTH'|null;
+  effectiveAuthoringExperience?: 'CLASSIC'|'CHATBOT'|'BOTH';
+  /** Authoring v2.1: fixed by the template, read-only here. */
+  agentMode?: 'SINGLE' | 'MULTI';
+  reviewRoute?: 'SME_PM' | 'SME_EXPERT_PM';
+  phase?: import('@praxis/shared').TaskPhaseView;
+  startingGraph?: import('@praxis/shared').WorkflowGraphInput | null;
+  authoringWorkspace?: {view:'CLASSIC'|'CHATBOT';answer:string}|null;
   projectId: string;
   projectName: string;
   tptMinutes: number | null;
@@ -52,6 +60,8 @@ export interface TaskView extends TaskSummary {
   output: Record<string, unknown> | null;
   coverageTags: { tags: Record<string, string>; edgeCase: string | null } | null;
   checks: TaskCheck[] | null;
+  /** Anvil export readiness of a template-profile task, compiled at submission. */
+  exportStatus?: ExportStatusView | null;
   readOnly: boolean;
   review: { decision: string; comments: { section: string; text: string }[]; notes: string | null; rejectReason: string | null; at: string } | null;
 }

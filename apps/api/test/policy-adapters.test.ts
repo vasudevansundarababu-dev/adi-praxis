@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config';
 import { readPolicyDocument, sniffPolicyFormat, zipEntry } from '../src/policy/document-reader';
-import { GoogleLayoutGeminiAdapter, normaliseGemini, textChunks } from '../src/policy/extraction/google';
+import { geminiEndpoint, GoogleLayoutGeminiAdapter, normaliseGemini, textChunks } from '../src/policy/extraction/google';
 import { LlamaExtractAdapter, normaliseLlama } from '../src/policy/extraction/llamaextract';
 import { findSpan, resolveCitation } from '../src/policy/extraction/normalise';
 import { ProviderError } from '../src/policy/extraction/types';
@@ -34,8 +34,23 @@ const profile = { id: 'llama-agentic-v1', provider: 'llamaextract' as const, rev
 describe('configuration guard (owner D-D1)', () => {
   const base = { NODE_ENV: 'test', DATABASE_URL: TEST_DATABASE_URL, REDIS_URL: TEST_REDIS_URL };
   it('refuses live extraction outside staging and without both ceilings', () => {
-    expect(() => loadConfig({ ...base, POLICY_EXTRACTION_LIVE: 'true' })).toThrow(/only allowed in staging/);
+    expect(() => loadConfig({ ...base, POLICY_EXTRACTION_LIVE: 'true' })).toThrow(/only allowed in staging or QA/);
     expect(loadConfig(base).policy.live).toBe(false);
+  });
+
+  it('allows live extraction in staging and QA (APP_ENV=demo) with both ceilings, never in tests, local or production', () => {
+    const dev = { ...base, NODE_ENV: 'development', MOCK_SECRET: 'qa-demo-mock-secret-0123456789abcdef' };
+    const budgets = { POLICY_BUDGET_LLAMA_USD: '5', POLICY_BUDGET_GOOGLE_USD: '5' };
+    for (const APP_ENV of ['staging', 'demo']) expect(loadConfig({ ...dev, APP_ENV, POLICY_EXTRACTION_LIVE: 'true', ...budgets }).policy.live).toBe(true);
+    expect(() => loadConfig({ ...dev, APP_ENV: 'demo', POLICY_EXTRACTION_LIVE: 'true' })).toThrow(/needs POLICY_BUDGET_LLAMA_USD and POLICY_BUDGET_GOOGLE_USD/);
+    expect(() => loadConfig({ ...dev, APP_ENV: 'demo', POLICY_EXTRACTION_LIVE: 'true', POLICY_BUDGET_LLAMA_USD: '5' })).toThrow(/needs POLICY_BUDGET/);
+    for (const APP_ENV of ['local', 'production']) expect(() => loadConfig({ ...dev, APP_ENV, POLICY_EXTRACTION_LIVE: 'true', ...budgets })).toThrow(/only allowed in staging or QA/);
+    expect(() => loadConfig({ ...base, MOCK_SECRET: dev.MOCK_SECRET, APP_ENV: 'demo', POLICY_EXTRACTION_LIVE: 'true', ...budgets })).toThrow(/only allowed in staging or QA/);
+  });
+
+  it('builds the Gemini URL for a regional or the global location', () => {
+    expect(geminiEndpoint('p1', 'global', 'gemini-3.8-flash')).toBe('https://aiplatform.googleapis.com/v1/projects/p1/locations/global/publishers/google/models/gemini-3.8-flash:generateContent');
+    expect(geminiEndpoint('p1', 'us-central1', 'gemini-3.8-flash')).toBe('https://us-central1-aiplatform.googleapis.com/v1/projects/p1/locations/us-central1/publishers/google/models/gemini-3.8-flash:generateContent');
   });
 });
 

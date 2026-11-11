@@ -9,7 +9,7 @@ import { createClient, createUser, db, resetDb } from './helpers';
 
 /** PRD D15a, part 2: the old-catalog Banking workflows that are retired. */
 const D15A_BANKING = [
-  'KYC onboarding and refresh',
+  // 'KYC onboarding and refresh' was kept in the catalog by the owner on 10 Nov 2026 (authoring v2.1 Wave 1).
   'Sanctions screening',
   'Suspicious activity and SAR/STR support',
   'Transaction investigation',
@@ -21,8 +21,16 @@ const D15A_BANKING = [
   'Third-party/vendor risk',
   'Operational risk events and RCSA',
   'Regulatory reporting validation',
+  // Removed from the mockup catalog by the owner on 10 Nov 2026, so now retired too.
+  'Control testing',
+  'Country-specific interpretation',
 ];
 const BLUEPRINT_WORKFLOWS = ['AML transaction-monitoring alerts', 'KYB and beneficial ownership', 'Launch of Noise Cancelling Phone'];
+/** Every seeded workflow is published (owner, 10 Nov 2026): the 3 blueprints plus the ones from the owner's fields.
+ *  Reused lineages keep the old catalog's name, so `Fraud–risk/compliance handoffs` keeps its en dash. */
+const PUBLISHED_WORKFLOWS = CATALOG_V2.flatMap((d) => d.workflows.map((w) => w.workflowName))
+  .map((n) => (n === 'Fraud-risk/compliance handoffs' ? 'Fraud–risk/compliance handoffs' : n))
+  .sort();
 const PUBLISH_FIELDS = { primaryWork: 'Synthetic work', verificationCriteria: 'Checked', humanGate: 'Reviewer', defaultTptMinutes: 60, skills: ['KYC'], taskModes: ['AUTHORING' as const] };
 
 let rows: TaskflowRow[];
@@ -77,20 +85,32 @@ describe('C6 catalog-v2 dry run (S1-16, D15, D15a)', () => {
     expect(await db.auditEvent.count({ where: { clientId } })).toBe(before.audits);
     expect(plan.applied).toBe(false);
 
-    // D15: Digital Marketing is new; the 12 mockup Banking workflows are reused, not duplicated.
+    // D15: Digital Marketing is new; the mockup Banking workflows are reused, not duplicated.
     expect(named(plan, 'domain.created')).toEqual(['Digital Marketing']);
     expect(plan.changes.filter((c) => c.action === 'template.created').map((c) => [c.domain, c.workflowName, c.to])).toEqual([
       ['Digital Marketing', 'Launch of Noise Cancelling Phone', 'PUBLISHED'],
-      ['Digital Marketing', 'Q4 Global Paid Search Query Clustering', 'DRAFT'],
-      ['Digital Marketing', 'Omnichannel Creative & Locale Compliance', 'DRAFT'],
+      ['Digital Marketing', 'Q4 Global Paid Search Query Clustering', 'PUBLISHED'],
+      ['Digital Marketing', 'Omnichannel Creative & Locale Compliance', 'PUBLISHED'],
     ]);
-    expect(plan.changes.filter((c) => c.action === 'template.published').map((c) => [c.domain, c.workflowName, c.from, c.to])).toEqual([
-      ['Banking', 'AML transaction-monitoring alerts', 'DRAFT', 'PUBLISHED'],
-      ['Banking', 'KYB and beneficial ownership', 'DRAFT', 'PUBLISHED'],
-    ]);
-    expect(plan.notes.filter((n) => n.kind === 'reused' && n.domain === 'Banking')).toHaveLength(10);
+    // Owner decision (10 Nov 2026): every seeded workflow is published, the 2 blueprints and the 8 from the fields.
+    // Reused lineages keep their existing name (en dash for Fraud), in catalog order.
+    expect(plan.changes.filter((c) => c.action === 'template.published').map((c) => [c.domain, c.workflowName, c.from, c.to])).toEqual(
+      [
+        ['Banking', 'Adverse media review', 'DRAFT', 'PUBLISHED'],
+        ['Banking', 'AML transaction-monitoring alerts', 'DRAFT', 'PUBLISHED'],
+        ['Banking', 'Audit and evidence preparation', 'DRAFT', 'PUBLISHED'],
+        ['Banking', 'Communications surveillance', 'DRAFT', 'PUBLISHED'],
+        ['Banking', 'Compliance monitoring', 'DRAFT', 'PUBLISHED'],
+        ['Banking', 'Customer risk rating', 'DRAFT', 'PUBLISHED'],
+        ['Banking', 'Enhanced due diligence', 'DRAFT', 'PUBLISHED'],
+        ['Banking', 'Fraud–risk/compliance handoffs', 'DRAFT', 'PUBLISHED'],
+        ['Banking', 'Issue and remediation tracking', 'DRAFT', 'PUBLISHED'],
+        ['Banking', 'KYB and beneficial ownership', 'DRAFT', 'PUBLISHED'],
+        ['Banking', 'KYC onboarding and refresh', 'DRAFT', 'PUBLISHED'],
+      ],
+    );
 
-    // D15a: the three old domains and the 12 non-mockup Banking workflows are retired.
+    // D15a: the three old domains and the old-catalog Banking workflows (incl. the 2 removed on 10 Nov 2026) are retired.
     expect(named(plan, 'domain.retired')).toEqual([...RETIRED_DOMAINS].sort());
     const retired = plan.changes.filter((c) => c.action === 'template.retired');
     expect(retired.filter((c) => c.domain === 'Banking').map((c) => c.workflowName).sort()).toEqual([...D15A_BANKING].sort());
@@ -98,7 +118,7 @@ describe('C6 catalog-v2 dry run (S1-16, D15, D15a)', () => {
       rows.filter((r) => r.domain !== 'Banking').map((r) => `${r.domain} / ${r.workflowName}`).sort(),
     );
     expect(retired.every((c) => c.from === 'DRAFT' && c.to === 'RETIRED')).toBe(true);
-    expect(plan.changes).toHaveLength(1 + 3 + 2 + 3 + 21);
+    expect(plan.changes).toHaveLength(1 + 3 + 11 + 3 + 22);
   });
 });
 
@@ -135,7 +155,7 @@ describe('C6 catalog-v2 apply', () => {
     const live = ts.filter((t) => t.status !== 'RETIRED' && t.domain.status === 'ACTIVE');
     const expected = CATALOG_V2.flatMap((d) => d.workflows.map((w) => `${d.name} / ${normaliseName(w.workflowName)}`)).sort();
     expect(live.map((t) => `${t.domain.name} / ${normaliseName(t.workflowName)}`).sort()).toEqual(expected);
-    expect(await offerable(clientId)).toEqual(BLUEPRINT_WORKFLOWS);
+    expect(await offerable(clientId)).toEqual(PUBLISHED_WORKFLOWS);
     expect(ts.filter((t) => D15A_BANKING.includes(t.workflowName)).every((t) => t.status === 'RETIRED' && t.retiredAt)).toBe(true);
   });
 
@@ -160,6 +180,28 @@ describe('C6 catalog-v2 apply', () => {
     const kyb = (await templatesOf(clientId)).find((t) => t.workflowName === 'KYB and beneficial ownership')!;
     expect(kyb.version).toBe(1);
     expect(kyb.primaryWork).toBe(loadCatalogBlueprint('kyb-and-beneficial-ownership.json').catalog.primary_work);
+  });
+
+  it('publishes the owner’s fields workflows with their values, offerable with a task mode (D15, 10 Nov 2026)', async () => {
+    const ts = await templatesOf(clientId);
+    const fromFields = CATALOG_V2.flatMap((d) => d.workflows.filter((w) => w.fields).map((w) => w));
+    expect(fromFields).toHaveLength(11);
+    for (const w of fromFields) {
+      const t = ts.find((x) => normaliseName(x.workflowName) === normaliseName(w.workflowName))!;
+      expect(t.status, w.workflowName).toBe('PUBLISHED');
+      expect(t.publishedAt, w.workflowName).not.toBeNull();
+      expect(t.blueprint, w.workflowName).toBeNull();
+      expect(t.primaryWork, w.workflowName).toBe(w.fields!.primaryWork);
+      expect(t.verificationCriteria, w.workflowName).toBe(w.fields!.verificationCriteria);
+      expect(t.humanGate, w.workflowName).toBe(w.fields!.humanGate);
+      expect(t.skills, w.workflowName).toEqual(w.fields!.skills);
+      expect(t.taskModes, w.workflowName).toEqual(w.fields!.taskModes);
+      expect(t.defaultTptMinutes, w.workflowName).toBe(w.fields!.defaultTptMinutes);
+      expect(publishProblems(t), w.workflowName).toEqual([]);
+    }
+    // Create Project uses the task mode, so every published workflow must allow one.
+    expect(ts.filter((t) => t.status === 'PUBLISHED').every((t) => t.taskModes.length > 0)).toBe(true);
+    expect(await offerable(clientId)).toEqual(PUBLISHED_WORKFLOWS);
   });
 
   it('audits every change as SYSTEM:catalog-v2 with the previous status', async () => {
@@ -215,8 +257,8 @@ describe('C6 running projects are unaffected', () => {
     ]);
     expect(plan.changes.find((c) => c.workflowName === 'KYB and beneficial ownership')).toMatchObject({ action: 'template.version_created', version: 2, to: 'PUBLISHED' });
     expect(projects.map((p) => p.templateVersion)).toEqual([1, 1, 1]);
-    // The old Healthcare workflow is no longer offered: its domain is retired.
-    expect(await offerable(clientId)).toEqual([...BLUEPRINT_WORKFLOWS, 'Sanctions screening'].sort());
+    // The old Healthcare workflow is no longer offered: its domain is retired. Sanctions screening stays (project row).
+    expect(await offerable(clientId)).toEqual([...PUBLISHED_WORKFLOWS, 'Sanctions screening'].sort());
   });
 
   it('reactivates a retired catalog domain and records its previous status', async () => {
@@ -227,12 +269,30 @@ describe('C6 running projects are unaffected', () => {
     expect((await domainsOf(clientId)).find((d) => d.name === 'Banking')!.status).toBe('ACTIVE');
   });
 
+  it('publishes an unused fields draft with the owner values, but keeps a project-used draft as it is', async () => {
+    const clientId = await oldCatalogClient();
+    const adverse = await db.template.findFirstOrThrow({ where: { clientId, workflowName: 'Adverse media review' } });
+    const customer = await db.template.findFirstOrThrow({ where: { clientId, workflowName: 'Customer risk rating' } });
+    await projectOn(clientId, customer.id, 1);
+
+    const plan = await applyCatalogV2(db, clientId, { apply: true });
+
+    const published = await db.template.findUniqueOrThrow({ where: { id: adverse.id } });
+    expect(published.status).toBe('PUBLISHED');
+    expect(published.primaryWork).toBe(CATALOG_V2.flatMap((d) => d.workflows).find((w) => w.workflowName === 'Adverse media review')!.fields!.primaryWork);
+    expect(plan.changes.find((c) => c.entityId === adverse.id)).toMatchObject({ action: 'template.published', from: 'DRAFT', to: 'PUBLISHED' });
+    // The draft a project uses keeps its state and is not touched.
+    expect((await db.template.findUniqueOrThrow({ where: { id: customer.id } })).status).toBe('DRAFT');
+    expect(plan.notes.find((n) => n.entityId === customer.id)).toMatchObject({ kind: 'kept_used_by_project' });
+    expect(plan.changes.some((c) => c.entityId === customer.id)).toBe(false);
+  });
+
   it('leaves an Admin’s own blueprint draft and an Admin-retired catalog workflow alone', async () => {
     const clientId = await oldCatalogClient();
     const aml = await db.template.findFirstOrThrow({ where: { clientId, workflowName: 'AML transaction-monitoring alerts' } });
     const edited = { ...JSON.parse(JSON.stringify(loadCatalogBlueprint('aml-transaction-monitoring-alerts.json'))), studio_id: 'admin-edited-aml' };
     await db.template.update({ where: { id: aml.id }, data: { blueprint: edited } });
-    const control = await db.template.findFirstOrThrow({ where: { clientId, workflowName: 'Control testing' } });
+    const control = await db.template.findFirstOrThrow({ where: { clientId, workflowName: 'Compliance monitoring' } });
     await db.template.update({ where: { id: control.id }, data: { status: 'RETIRED', retiredAt: new Date() } });
 
     const plan = await applyCatalogV2(db, clientId, { apply: true });
@@ -287,13 +347,16 @@ describe('C6 catalog-v2 --reverse', () => {
     const again = await applyCatalogV2(db, clientId, { apply: true });
     expect(named(again, 'domain.retired')).toEqual([...RETIRED_DOMAINS].sort());
     expect(again.changes.filter((c) => c.action === 'domain.activated').map((c) => c.domain)).toEqual(['Digital Marketing']);
-    expect(await offerable(clientId)).toEqual(BLUEPRINT_WORKFLOWS);
+    expect(await offerable(clientId)).toEqual(PUBLISHED_WORKFLOWS);
+    // All 3 Digital Marketing rows were created PUBLISHED, so the reverse retires them and forward reinstates them PUBLISHED.
     expect(again.changes.filter((c) => c.action === 'template.reinstated').map((c) => [c.workflowName, c.to])).toEqual([
       ['Launch of Noise Cancelling Phone', 'PUBLISHED'],
-      ['Q4 Global Paid Search Query Clustering', 'DRAFT'],
-      ['Omnichannel Creative & Locale Compliance', 'DRAFT'],
+      ['Q4 Global Paid Search Query Clustering', 'PUBLISHED'],
+      ['Omnichannel Creative & Locale Compliance', 'PUBLISHED'],
     ]);
-    expect(named(again, 'template.published')).toEqual(['AML transaction-monitoring alerts', 'KYB and beneficial ownership']);
+    expect(named(again, 'template.published')).toEqual(
+      ['AML transaction-monitoring alerts', 'KYB and beneficial ownership', 'Adverse media review', 'Audit and evidence preparation', 'Communications surveillance', 'Compliance monitoring', 'Customer risk rating', 'Enhanced due diligence', 'Fraud–risk/compliance handoffs', 'Issue and remediation tracking', 'KYC onboarding and refresh'].sort(),
+    );
     expect((await templatesOf(clientId)).map((t) => [t.id, t.status])).toEqual(afterForward.map((t) => [t.id, t.status]));
     expect((await applyCatalogV2(db, clientId, { apply: true })).changes).toEqual([]);
     expect((await reverseCatalogV2(db, clientId, { apply: true })).changes).toHaveLength(again.changes.length);
@@ -325,8 +388,14 @@ describe('C6 seed and job entrypoint', () => {
   it('seed() adds the Meta-Compiler catalog for new environments and stays idempotent', async () => {
     const env = { SEED_CLIENT_NAME: 'Catalog V2 Seed', SEED_ADMIN_EMAIL: 'admin@catalog-v2.test', SEED_ADMIN_PASSWORD: 'seed-password-123' };
     const first = await seed(db, env);
-    expect(first.catalog?.changes.map((c) => c.action).sort()).toEqual(['domain.created', 'template.created', 'template.created', 'template.created', 'template.published', 'template.published']);
-    expect(await offerable(first.client.id)).toEqual(BLUEPRINT_WORKFLOWS);
+    expect(first.catalog?.changes.map((c) => c.action).sort()).toEqual([
+      'domain.created',
+      'template.created',
+      'template.created',
+      'template.created',
+      ...Array(11).fill('template.published'),
+    ]);
+    expect(await offerable(first.client.id)).toEqual(PUBLISHED_WORKFLOWS);
     const second = await seed(db, env);
     expect(second.catalog?.changes).toEqual([]);
   });
@@ -347,15 +416,15 @@ describe('C6 seed and job entrypoint', () => {
     const [dry] = await runCatalogV2(db, { dryRun: true, reverse: false, clientName: name }, log);
     expect(dry!.applied).toBe(false);
     expect(await auditsOf(clientId)).toEqual([]);
-    expect(logs[0]!.message).toBe('catalog-v2 dry run: 30 change(s)');
-    expect(logs[0]!.extra).toMatchObject({ client: name, counts: { 'template.retired': 21, 'domain.retired': 3, 'template.created': 3, 'template.published': 2, 'domain.created': 1 } });
+    expect(logs[0]!.message).toBe('catalog-v2 dry run: 40 change(s)');
+    expect(logs[0]!.extra).toMatchObject({ client: name, counts: { 'template.retired': 22, 'domain.retired': 3, 'template.created': 3, 'template.published': 11, 'domain.created': 1 } });
     expect((logs[0]!.extra as { changes: string[] }).changes).toContain('template.retired Banking / Sanctions screening v1: DRAFT -> RETIRED');
 
     const [applied] = await runCatalogV2(db, { dryRun: false, reverse: false, clientName: name }, log);
     expect(withoutIds(applied!)).toEqual(withoutIds(dry!));
     const [reversed] = await runCatalogV2(db, { dryRun: false, reverse: true, clientName: name }, log);
-    expect(reversed!.changes).toHaveLength(30);
-    expect(logs.map((l) => l.message)).toEqual(['catalog-v2 dry run: 30 change(s)', 'catalog-v2: 30 change(s)', 'catalog-v2 reverse: 30 change(s)']);
+    expect(reversed!.changes).toHaveLength(40);
+    expect(logs.map((l) => l.message)).toEqual(['catalog-v2 dry run: 40 change(s)', 'catalog-v2: 40 change(s)', 'catalog-v2 reverse: 40 change(s)']);
 
     await expect(runCatalogV2(db, { dryRun: true, reverse: false, clientName: 'No such client' }, log)).rejects.toThrow(/not found/);
   });

@@ -53,7 +53,7 @@ describe('M4c: selection, onboarding and assignment acceptance (FLOW2 CF-19 to C
       t = await db.template.findUniqueOrThrow({ where: { id: created.id } });
     }
     const jd = (await post(pm, '/job-descriptions', { title: 'KYC Analyst', responsibilities: 'Author KYC cases.', skills: ['KYC', 'EDD'], wagePerTask: 40, wageCurrency: 'GBP', locationType: 'REMOTE' })).json();
-    const p = (await post(pm, '/projects', { templateId: t.id, name, distinctTarget: 8, maxPerExpert: 4, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-11-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: true }] })).json();
+    const p = (await post(pm, '/projects', { authoringExperience: 'BOTH', templateId: t.id, name, distinctTarget: 8, maxPerExpert: 4, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-11-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: true }] })).json();
     await post(pm, `/projects/${p.id}/submit`);
     await post(pm, `/projects/${p.id}/match`);
     expect((await post(pm, `/projects/${p.id}/opportunity/publish`)).statusCode).toBe(200);

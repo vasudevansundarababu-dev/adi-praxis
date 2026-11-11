@@ -33,7 +33,7 @@ describe(`match performance (${POOL.toLocaleString()} candidates)`, () => {
     await post(admin, `/templates/${templateId}/publish`);
     const jdId = (await post(pm, '/job-descriptions', { title: 'KYC Analyst', responsibilities: 'x', skills: ['KYC', 'EDD', 'AML'], wagePerTask: 40, wageCurrency: 'GBP', locationType: 'REMOTE' })).json().id;
     projectId = (
-      await post(pm, '/projects', {
+      await post(pm, '/projects', { authoringExperience: 'BOTH',
         templateId, name: 'Perf', distinctTarget: 50, maxPerExpert: 4, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-12-18', jobDescriptionId: jdId,
         demographicFilters: [
           { attributeKey: 'country', operator: 'IN', values: ['GB', 'IE', 'IN', 'US'], required: true },

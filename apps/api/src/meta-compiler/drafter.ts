@@ -138,14 +138,15 @@ export class GeminiVertexContentDrafter implements ContentDrafter {
     }
     if (!res.ok) throw new DrafterError(`Gemini call failed (${res.status})`);
     const body = (await res.json()) as {
-      candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
+      candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean; thoughtSignature?: string }[] } }[];
       usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
     };
     const c = body.candidates?.[0];
     if (!c) throw new DrafterError('Gemini returned no candidate');
     if (c.finishReason && !['STOP', 'FINISH_REASON_UNSPECIFIED'].includes(c.finishReason)) throw new DrafterError(`Model stopped: ${c.finishReason}`);
     return {
-      text: (c.content?.parts ?? []).map((x) => x.text ?? '').join(''),
+      // Thinking models (Gemini 3.x) may return thought summaries as parts marked `thought: true`; only answer text counts.
+      text: (c.content?.parts ?? []).filter((x) => !x.thought).map((x) => x.text ?? '').join(''),
       inputTokens: body.usageMetadata?.promptTokenCount ?? 0,
       outputTokens: body.usageMetadata?.candidatesTokenCount ?? 0,
     };

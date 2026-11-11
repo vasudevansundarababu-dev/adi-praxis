@@ -70,7 +70,7 @@ describe('M10c payments: earnings, pay runs, payouts, reconciliation and partner
     const t = (await post(admin, '/templates', { domainId, workflowName: 'KYC onboarding', primaryWork: 'x', verificationCriteria: 'x', humanGate: 'x', defaultTptMinutes: 60, skills: ['KYC'], taskModes: ['AUTHORING'] })).json();
     await post(admin, `/templates/${t.id}/publish`);
     const jd = (await post(pm, '/job-descriptions', { title: 'KYC Analyst', responsibilities: 'Author synthetic KYC cases.', skills: ['KYC'], wagePerTask: 40, wageCurrency: 'USD', locationType: 'REMOTE' })).json();
-    const p = (await post(pm, '/projects', { templateId: t.id, name: `P ${randomUUID().slice(0, 6)}`, distinctTarget: 8, maxPerExpert: 4, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-11-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['IN', 'GB'], required: false }] })).json();
+    const p = (await post(pm, '/projects', { authoringExperience: 'BOTH', templateId: t.id, name: `P ${randomUUID().slice(0, 6)}`, distinctTarget: 8, maxPerExpert: 4, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-11-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['IN', 'GB'], required: false }] })).json();
     expect((await post(pm, `/projects/${p.id}/submit`)).statusCode).toBe(200);
     expect((await post(pm, `/projects/${p.id}/match`)).statusCode).toBe(200);
     expect((await post(pm, `/projects/${p.id}/opportunity/publish`)).statusCode).toBe(200);

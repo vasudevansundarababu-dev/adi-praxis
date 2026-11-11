@@ -34,7 +34,7 @@ export async function demoSetup(db: Db, env: NodeJS.ProcessEnv, log: (level: str
   await executableDemoSetup(call, log);
   await executableDemoSetup(call, log, true);
 
-  if ((await call('p', 'GET', '/projects')).items.some((p: { name: string }) => p.name === 'KYC authoring demo')) {
+  if (await projectNamed(call, 'KYC authoring demo')) {
     log('info', 'demo project already exists');
     await supplySetup(db, client.id, env, call, log);
     return;
@@ -51,7 +51,7 @@ export async function demoSetup(db: Db, env: NodeJS.ProcessEnv, log: (level: str
   const end = new Date(Date.now() + 45 * 86_400_000);
   const d = (x: Date) => x.toISOString().slice(0, 10);
   // 12 distinct tasks, up to 12 per expert: one selected expert can staff the demo project on their own.
-  const p = await call('p', 'POST', '/projects', { templateId: t.id, name: 'KYC authoring demo', distinctTarget: 12, maxPerExpert: 12, tptMinutes: 90, startDate: d(start), endDate: d(end), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] });
+  const p = await call('p', 'POST', '/projects', { authoringExperience: 'BOTH', templateId: t.id, name: 'KYC authoring demo', distinctTarget: 12, maxPerExpert: 12, tptMinutes: 90, startDate: d(start), endDate: d(end), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] });
   await call('p', 'POST', `/projects/${p.id}/submit`);
   await call('p', 'POST', `/projects/${p.id}/match`);
   await call('p', 'POST', `/projects/${p.id}/opportunity/publish`);
@@ -116,13 +116,21 @@ async function supplySetup(db: Db, clientId: string, env: NodeJS.ProcessEnv, cal
   log('info', 'SME supply demo data ready', { partnerId: partner.id, requisitionId: r.id });
 }
 
+/** The client's project with this name (names are unique per client, case-insensitively), seen as Admin. */
+async function projectNamed(call: Call, name: string): Promise<{ id: string; status: string } | undefined> {
+  return (await call('a', 'GET', '/projects')).items.find((p: { name: string }) => p.name.toLowerCase() === name.toLowerCase());
+}
+
 /** Creates only reviewable demo configuration through public APIs. No task or rights approval is fabricated. */
 export async function executableDemoSetup(call: Call, log: (level: string, message: string, extra?: object) => void, staged = false) {
   const name = staged ? 'SYNTHETIC TEST — Harbor staged marketing decisions' : 'SYNTHETIC TEST — Harbor marketing decisions';
-  const existing = (await call('p', 'GET', '/projects')).items.find((p: { name: string }) => p.name === name);
+  // Look up as Admin: a PM lists only their own projects, but project names are unique across the client, so a
+  // same-named project owned by anyone else would otherwise make every re-run fail with 409 on create.
+  const existing = await projectNamed(call, name);
   if (existing) {
-    if (existing.status === 'DRAFT') await call('p', 'POST', `/projects/${existing.id}/submit`);
-    if (['DRAFT', 'READY_FOR_STAFFING'].includes(existing.status)) await call('p', 'POST', `/projects/${existing.id}/synthetic-example`);
+    if (existing.status === 'DRAFT') await call('a', 'POST', `/projects/${existing.id}/submit`);
+    if (['DRAFT', 'READY_FOR_STAFFING'].includes(existing.status)) await call('a', 'POST', `/projects/${existing.id}/synthetic-example`);
+    log('info', 'synthetic executable project already exists', { projectId: existing.id, status: existing.status });
     return;
   }
   const domains = (await call('a', 'GET', '/domains')).items;
@@ -140,7 +148,7 @@ export async function executableDemoSetup(call: Call, log: (level: string, messa
   if (t.status === 'DRAFT') await call('a', 'POST', `/templates/${t.id}/publish`);
   const jd = await call('p', 'POST', '/job-descriptions', { title: 'Synthetic marketing task author', responsibilities: 'Use the built-in synthetic decision example, inspect and edit the constraints, reference answer and rubric, and submit for independent human review.', skills: ['Marketing'], wagePerTask: 1, wageCurrency: 'USD', locationType: 'REMOTE' });
   const d = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
-  const project = await call('p', 'POST', '/projects', { templateId: t.id, name, distinctTarget: 1, maxPerExpert: 1, tptMinutes: 30, startDate: d(1), endDate: d(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] });
+  const project = await call('p', 'POST', '/projects', { authoringExperience: 'BOTH', templateId: t.id, name, distinctTarget: 1, maxPerExpert: 1, tptMinutes: 30, startDate: d(1), endDate: d(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN'], required: false }] });
   await call('p', 'POST', `/projects/${project.id}/submit`);
   const example = await call('p', 'POST', `/projects/${project.id}/synthetic-example`);
   log('info', 'synthetic executable draft created; awaits staffing and real author/reviewer actions', { projectId: project.id, templateId: t.id, taskId: example.taskId });

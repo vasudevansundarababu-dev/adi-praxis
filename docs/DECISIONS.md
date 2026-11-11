@@ -528,3 +528,39 @@ no field for several Anvil concepts, so the emitter maps conservatively. Details
 - **(chosen by Claude)** Anvil contract mapping and blockers: see `docs/authoring/TEMPLATE-PROFILES.md`. Export
   blockers never block submission. KYC criteria gain three optional binding keys (`outputField`, `comparison`,
   `expectedValue`); until the workbench edits them, KYC exports are reported as blocked.
+
+## Authoring v2.1 Wave 2: Expert → PM review route (12 Nov 2026)
+
+Route and rules: `docs/authoring/REVIEW-ROUTES.md`. Owner decisions already taken (plan §6): the same person may be
+Expert and PM with two audit events; Expert edits need a reason, and a material edit needs the author to reconfirm.
+
+- **(chosen by Claude)** **Data.** The pending stage lives on the task (`TaskInstance.reviewStage`); stage decisions
+  are `TaskReview` rows (already append-only) with `stage`, `contentHash`, `editReason`, `material` and two new
+  decisions `PASS` and `EDIT`. PM approval is stored as `ACCEPT` with `stage = PM_APPROVAL`. Chosen over a new table so
+  existing readers (author feedback, chatbot feedback) need only a filter; SME → PM rows are untouched (`stage` null).
+- **(chosen by Claude)** **Binding.** A decision binds to the submission version and the sha256 of its output (stable
+  JSON). It is in force only while that version is the latest with the same hash; any content change is a new
+  version, so voiding needs no update to an append-only row. Stale requests get 409 `STALE_STAGE_DECISION`.
+- **(chosen by Claude)** **Expert.** A Validator assigned to the project. Admins act as Expert only when assigned (the
+  Expert stage is a domain responsibility, not an admin power). On this route the author check applies to Admins too.
+- **(chosen by Claude)** **PM approval.** The project's owning PM or an Admin. The PM approves or returns; only the
+  Expert rejects (spec: "PM may approve the exact eligible revision or return it").
+- **(chosen by Claude)** **Expert edits** are allowed at Expert review and at PM approval (before the PM acts). An edit
+  at PM approval voids the pass and goes back to Expert review. The Expert declares materiality explicitly (required
+  boolean); the server does not guess it. Material: the task returns to the author (`REWORK`) to reconfirm by
+  resubmitting; it does not increment `reworkCount`. Minor: stays submitted at Expert review.
+- **(chosen by Claude)** **Checks on an edit.** All task checks re-run on the edited output except the author's own
+  attestations (`authoring.*`, `conversation.*` consent and declarations); new possible-real-data flags need an
+  explanation (earlier explanations carry over). The duplicate search re-runs; the export contract is recompiled. The
+  new version keeps the policy snapshot of the version it replaced.
+- **(chosen by Claude)** The one-step decision endpoint refuses two-stage tasks (409 `STAGE_DECISION_REQUIRED`), so a
+  Validator cannot accept without PM approval.
+- **(chosen by Claude)** Open-slot coverage tags are confirmed by the Expert at pass (the console confirms the author's
+  tags; correcting them in the stage panel is left for later). Duplicate decisions are taken by the Expert.
+- **(chosen by Claude)** Rework comments on this route can be pinned to a section (any section id, e.g. `S1`, `W04`), a
+  graph node or a field path. The one-step route keeps its W01–W06 rule.
+- **(chosen by Claude)** PMs see the review queue and task page only for their own two-stage projects; a PM without the
+  Validator role still gets 403 on SME → PM tasks, as before. Source-file downloads and the LLM judge panel keep their
+  existing access (Validators and Admins).
+- **Open (owner):** a field-level Expert editor (the console uses a JSON editor today); whether a PM may also reject;
+  whether material edits should be detected automatically (e.g. any rubric or reference change).

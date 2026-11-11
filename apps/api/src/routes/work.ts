@@ -46,8 +46,11 @@ export function outstanding(s: Step): never {
   throw new AppError(409, 'OUTSTANDING_STEP', s.message, s);
 }
 
+/** Decisions the author acts on: accept, rework, reject, and an Expert's material edit to reconfirm (not passes or minor edits). */
+const AUTHOR_FACING_REVIEWS = { OR: [{ decision: { in: ['ACCEPT', 'REWORK', 'REJECT'] } }, { decision: 'EDIT', material: true }] } satisfies Prisma.TaskReviewWhereInput;
+
 export async function ownTask(tx: Db | Tx, taskId: string, smeUserId: string) {
-  const t = await tx.taskInstance.findFirst({ where: { id: taskId, assignedTo: { smeUserId } }, include: { project: { include: { template: true } }, reviews: { orderBy: { createdAt: 'desc' }, take: 1 } } });
+  const t = await tx.taskInstance.findFirst({ where: { id: taskId, assignedTo: { smeUserId } }, include: { project: { include: { template: true } }, reviews: { where: AUTHOR_FACING_REVIEWS, orderBy: { createdAt: 'desc' }, take: 1 } } });
   if (!t) throw notFound('Task not found');
   return t;
 }
@@ -129,7 +132,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       effectiveAuthoringExperience: experienceOf(t.project),
       reviewRoute: t.project.reviewRoute,
       agentMode: t.project.template.agentMode,
-      phase: taskPhase(t.status, { reviewRoute: t.project.reviewRoute }),
+      phase: taskPhase(t.status, { reviewRoute: t.project.reviewRoute, pendingStage: t.reviewStage }),
       startingGraph: t.taskType === 'AUTHORING' ? templateStartingGraph(t.project.template.workflowName, t.project.templateVersion) : null,
       authoringWorkspace: (t.drafting as { workspace?: unknown } | null)?.workspace ?? null,
       tptMinutes: t.project.tptMinutes,
@@ -151,7 +154,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       exportStatus: checks?.export ?? null,
       // Authors see only the closest tasks' briefs, never other authors' content.
       readOnly: !['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(t.status),
-      review: review ? { decision: review.decision, comments: review.comments, notes: review.notes, rejectReason: review.rejectReason, at: review.createdAt.toISOString() } : null,
+      review: review ? { decision: review.decision, comments: review.comments, notes: review.notes, rejectReason: review.rejectReason, at: review.createdAt.toISOString(), stage: review.stage, editReason: review.editReason, version: review.submissionVersion } : null,
     };
   });
 

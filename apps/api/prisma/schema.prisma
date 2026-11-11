@@ -170,6 +170,16 @@ enum TaskReviewDecision {
   ACCEPT
   REWORK
   REJECT
+  /// SME -> Expert -> PM route: the Expert completed review of this exact version and routed it to the PM.
+  PASS
+  /// SME -> Expert -> PM route: the Expert edited the task (a new version), with a recorded reason.
+  EDIT
+}
+
+/// Pending stage of a SUBMITTED task on the SME -> Expert -> PM route (null on the SME -> PM route).
+enum ReviewStage {
+  EXPERT_REVIEW
+  PM_APPROVAL
 }
 
 enum TaskRejectReason {
@@ -819,6 +829,13 @@ model TaskReview {
   /// Comments pinned to workbench sections: [{ section, text }]
   comments          Json               @default("[]")
   notes             String?
+  /// SME -> Expert -> PM route: the responsibility this decision was made under (null for SME -> PM decisions).
+  stage             ReviewStage?
+  /// sha256 of the stable JSON of the decided version's output; binds the decision to exact content.
+  contentHash       String?            @map("content_hash")
+  /// EDIT only: the Expert's recorded reason, and whether the edit is material (the author must reconfirm).
+  editReason        String?            @map("edit_reason")
+  material          Boolean?
   createdAt         DateTime           @default(now()) @map("created_at")
 
   taskInstance TaskInstance @relation(fields: [taskInstanceId], references: [id])
@@ -900,6 +917,8 @@ model TaskInstance {
   /// M9 drafting state, kept server-side so autosave cannot change it: per section { runId, draftedAt, draftHash,
   /// confirmedAt, editedAfterDraft }, plus the kinds of source used. Null for tasks written by hand.
   drafting            Json?
+  /// SME -> Expert -> PM route only: which responsibility the SUBMITTED task waits for. Null on the SME -> PM route.
+  reviewStage         ReviewStage?                @map("review_stage")
   createdAt           DateTime                    @default(now()) @map("created_at")
   updatedAt           DateTime                    @updatedAt @map("updated_at")
 

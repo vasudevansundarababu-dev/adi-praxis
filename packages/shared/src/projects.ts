@@ -67,7 +67,7 @@ export type AuthoringExperience = (typeof AUTHORING_EXPERIENCES)[number];
 /** Platform review route (handover v2.1 ch. 08, 17 §2). SME_EXPERT_PM is enabled once its stage engine ships. */
 export const REVIEW_ROUTES = ['SME_PM', 'SME_EXPERT_PM'] as const;
 export type ReviewRoute = (typeof REVIEW_ROUTES)[number];
-export const ENABLED_REVIEW_ROUTES: readonly ReviewRoute[] = ['SME_PM'];
+export const ENABLED_REVIEW_ROUTES: readonly ReviewRoute[] = ['SME_PM', 'SME_EXPERT_PM'];
 export const REVIEW_ROUTE_LABELS: Record<ReviewRoute, string> = { SME_PM: 'SME → PM approval', SME_EXPERT_PM: 'SME → Expert review → PM approval' };
 
 export const ProjectFields = z.object({

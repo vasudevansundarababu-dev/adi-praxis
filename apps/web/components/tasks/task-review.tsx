@@ -7,8 +7,9 @@ import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
 import { TemplateInstructions } from './template-instructions';
 import { Req, RequiredNote } from '@/components/required';
+import { anchorOf, StageActions, StageSummary, type PinnedComment, type StageData } from './stage-review';
 
-export interface TaskReviewData {
+export interface TaskReviewData extends Partial<StageData> {
   id: string;
   status: string;
   revision: number;
@@ -32,7 +33,7 @@ export interface TaskReviewData {
   text: string;
   versions: { version: number; submittedAt: string }[];
   previousOutput: Record<string, unknown> | null;
-  reviews: { decision: string; comments: { section: string; text: string }[]; notes: string | null; at: string; version: number }[];
+  reviews: { decision: string; comments: PinnedComment[]; notes: string | null; at: string; version: number; stage?: string | null }[];
   checklist: { key: string; label: string }[];
   /** M9: how the task was made (null for annotation tasks). */
   drafting: Drafting | null;
@@ -229,6 +230,8 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
   const answered = d.checklist.every((c) => checklist[c.key] !== undefined);
   const allTrue = d.checklist.every((c) => checklist[c.key] === true);
   const canDecide = d.status === 'SUBMITTED';
+  const twoStage = d.reviewRoute === 'SME_EXPERT_PM';
+  const graphNodes = ((d.output?.workflowGraph as { nodes?: { id?: unknown }[] } | undefined)?.nodes ?? []).map((n) => n.id).filter((x): x is string => typeof x === 'string');
   const valid = answered && (decision !== 'ACCEPT' || allTrue) && (decision !== 'REJECT' || rejectReason) && (decision !== 'REWORK' || comments.some((c) => c.text.trim()));
   const match = d.similar[compare];
 
@@ -278,7 +281,7 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
           )}
         </p>
       )}
-      {changed.length > 0 && (
+      {changed.length > 0 && !twoStage && (
         <p role="status" className="mt-2 rounded-md border border-line p-2 text-sm">
           Resubmitted after rework. Changed since the last version: {changed.map((c) => (c === 'content' ? c : `${c} ${secTitle(c)}`)).join(', ')}.
         </p>
@@ -286,6 +289,7 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="min-w-0 space-y-6">
+          {twoStage && <StageSummary d={d as StageData} status={d.status} />}
           {d.drafting && <HowMade taskId={d.id} d={d.drafting} />}
           <section aria-labelledby="checks-h" className="card p-4 text-sm">
             <h2 id="checks-h" className="font-semibold">Automated checks</h2>
@@ -340,13 +344,13 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
             {kyc ? <KycView t={d.output as KycTask} /> : <pre tabIndex={0} aria-label="Task JSON" className="mt-2 max-h-[40rem] overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(d.taskType === 'ANNOTATION' ? { input: d.input, output: d.output } : d.output, null, 2)}</pre>}
           </section>
 
-          {d.reviews.length > 0 && (
+          {d.reviews.length > 0 && !twoStage && (
             <section className="card p-4 text-sm">
               <h2 className="font-semibold">Earlier decisions</h2>
               <ul className="mt-1 space-y-1">
                 {d.reviews.map((r, i) => (
                   <li key={i}>
-                    v{r.version} {r.decision.toLowerCase()} · {new Date(r.at).toLocaleString()} {r.comments.map((c) => `· ${c.section}: ${c.text}`).join(' ')}
+                    v{r.version} {r.decision.toLowerCase()} · {new Date(r.at).toLocaleString()} {r.comments.map((c) => `· ${anchorOf(c)}: ${c.text}`).join(' ')}
                   </li>
                 ))}
               </ul>
@@ -354,7 +358,9 @@ export function TaskReview({ data: d }: { data: TaskReviewData }) {
           )}
         </div>
 
-        {canDecide ? (
+        {twoStage ? (
+          <StageActions d={d as StageData} task={{ id: d.id, revision: d.revision, output: d.output, checklist: d.checklist, flaggedDuplicate: flaggedDup, openSlot: !!d.slot?.isOpen, coverageTags: d.coverageTags, nodeIds: graphNodes }} />
+        ) : canDecide ? (
           <aside className="space-y-4 text-sm" aria-label="Decision">
             <RequiredNote />
             <fieldset className="card p-4">

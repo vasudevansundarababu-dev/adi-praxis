@@ -79,6 +79,8 @@ export async function completionStatus(tx: Db | Tx, projectId: string) {
 
 export async function decideTask(tx: Tx, actor: InternalActor, taskId: string, body: TaskDecisionRequest, audit: Audit, emit: (e: OutboxInput) => Promise<void>) {
   const t = await reviewableTask(tx, actor, taskId);
+  // SME -> Expert -> PM: a one-step decision would skip a responsibility; those tasks use the stage decision.
+  if (t.project.reviewRoute === 'SME_EXPERT_PM') throw new AppError(409, 'STAGE_DECISION_REQUIRED', 'This project uses Expert review then PM approval; record a stage decision instead.');
   if (t.status !== 'SUBMITTED') throw new AppError(409, 'NOT_AWAITING_REVIEW', `This task is ${t.status.toLowerCase()}, not awaiting review.`);
   if (t.revision !== body.expectedRevision) throw new AppError(409, 'STALE_REVISION', 'The task changed; reload before deciding.');
   const checks = t.checks as StoredChecks | null;
@@ -115,18 +117,7 @@ export async function decideTask(tx: Tx, actor: InternalActor, taskId: string, b
   const common = { reviewerId: actor.userId, reviewNotes: body.notes ?? null, revision: { increment: 1 } };
 
   if (body.decision === 'ACCEPT') {
-    await tx.taskInstance.update({ where: { id: t.id }, data: { ...common, status: 'ACCEPTED', ...(coverage ? { coverageTags: coverage as Prisma.InputJsonValue } : {}) } });
-    if (t.slotId) await tx.coverageSlot.update({ where: { id: t.slotId }, data: { status: 'FILLED' } });
-    const record = await writeApprovedRecord(tx, { taskId: t.id, reviewerId: actor.userId, reviewNotes: body.notes ?? null, duplicateDecision: flaggedDuplicate ? 'ACCEPT_AS_DISTINCT' : null, decidedAt: now });
-    await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.accepted', before: { status: 'SUBMITTED' }, after: { status: 'ACCEPTED', recordId: record.id, version } });
-    await emit({ name: 'task.accepted', aggregateType: 'TaskInstance', aggregateId: t.id, payload: { taskId: t.id, projectId: t.projectId, recordId: record.id } });
-    if (t.slotId) await emit({ name: 'slot.filled', aggregateType: 'CoverageSlot', aggregateId: t.slotId, payload: { slotId: t.slotId, projectId: t.projectId, taskId: t.id } });
-    const done = await completionStatus(tx, t.projectId);
-    if (done.met && ['IN_PROGRESS', 'STAFFED', 'STAFFING'].includes(t.project.status)) {
-      await tx.project.update({ where: { id: t.projectId }, data: { status: 'COMPLETED' } });
-      await audit({ entityType: 'Project', entityId: t.projectId, action: 'project.completed', before: { status: t.project.status }, after: { status: 'COMPLETED', accepted: done.accepted, target: done.target } });
-      await emit({ name: 'project.completed', aggregateType: 'Project', aggregateId: t.projectId, payload: { projectId: t.projectId, accepted: done.accepted } });
-    }
+    const record = await acceptTask(tx, t, { reviewerId: actor.userId, notes: body.notes ?? null, coverage, duplicateDecision: flaggedDuplicate ? 'ACCEPT_AS_DISTINCT' : null, now, extraUpdate: common, auditAfter: { version } }, audit, emit);
     return { status: 'ACCEPTED', recordId: record.id };
   }
 
@@ -136,17 +127,54 @@ export async function decideTask(tx: Tx, actor: InternalActor, taskId: string, b
     return { status: 'REWORK' };
   }
 
-  // Reject: the slot goes back for another expert. Confirmed real data is quarantined and never enters the dataset.
-  const quarantine = body.rejectReason === 'REAL_DATA';
+  await rejectTask(tx, t, { reason: body.rejectReason!, now, extraUpdate: common, auditAfter: { version } }, audit);
+  return { status: 'REJECTED' };
+}
+
+type ReviewedTask = Awaited<ReturnType<typeof reviewableTask>>;
+
+/**
+ * Final acceptance (one transaction): ACCEPTED status, slot filled, the append-only ApprovedTaskRecord, the audit event
+ * and `task.accepted` (which records the single earning), then project completion. Shared by both review routes.
+ */
+export async function acceptTask(
+  tx: Tx,
+  t: Pick<ReviewedTask, 'id' | 'projectId' | 'slotId' | 'project'>,
+  args: { reviewerId: string; notes: string | null; coverage: CoverageTags | null; duplicateDecision: 'ACCEPT_AS_DISTINCT' | null; now: Date; extraUpdate: Prisma.TaskInstanceUpdateInput; auditAfter: Record<string, unknown> },
+  audit: Audit,
+  emit: (e: OutboxInput) => Promise<void>,
+) {
+  await tx.taskInstance.update({ where: { id: t.id }, data: { ...args.extraUpdate, status: 'ACCEPTED', ...(args.coverage ? { coverageTags: args.coverage as unknown as Prisma.InputJsonValue } : {}) } });
+  if (t.slotId) await tx.coverageSlot.update({ where: { id: t.slotId }, data: { status: 'FILLED' } });
+  const record = await writeApprovedRecord(tx, { taskId: t.id, reviewerId: args.reviewerId, reviewNotes: args.notes, duplicateDecision: args.duplicateDecision, decidedAt: args.now });
+  await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.accepted', before: { status: 'SUBMITTED' }, after: { status: 'ACCEPTED', recordId: record.id, ...args.auditAfter } });
+  await emit({ name: 'task.accepted', aggregateType: 'TaskInstance', aggregateId: t.id, payload: { taskId: t.id, projectId: t.projectId, recordId: record.id } });
+  if (t.slotId) await emit({ name: 'slot.filled', aggregateType: 'CoverageSlot', aggregateId: t.slotId, payload: { slotId: t.slotId, projectId: t.projectId, taskId: t.id } });
+  const done = await completionStatus(tx, t.projectId);
+  if (done.met && ['IN_PROGRESS', 'STAFFED', 'STAFFING'].includes(t.project.status)) {
+    await tx.project.update({ where: { id: t.projectId }, data: { status: 'COMPLETED' } });
+    await audit({ entityType: 'Project', entityId: t.projectId, action: 'project.completed', before: { status: t.project.status }, after: { status: 'COMPLETED', accepted: done.accepted, target: done.target } });
+    await emit({ name: 'project.completed', aggregateType: 'Project', aggregateId: t.projectId, payload: { projectId: t.projectId, accepted: done.accepted } });
+  }
+  return record;
+}
+
+/** Reject: the slot goes back for another expert. Confirmed real data is quarantined and never enters the dataset. */
+export async function rejectTask(
+  tx: Tx,
+  t: Pick<ReviewedTask, 'id' | 'slotId'>,
+  args: { reason: NonNullable<TaskDecisionRequest['rejectReason']>; now: Date; extraUpdate: Prisma.TaskInstanceUpdateInput; auditAfter: Record<string, unknown> },
+  audit: Audit,
+) {
+  const quarantine = args.reason === 'REAL_DATA';
   await tx.taskInstance.update({
     where: { id: t.id },
-    data: { ...common, status: 'REJECTED', rejectReason: body.rejectReason!, ...(quarantine ? { output: Prisma.DbNull, quarantinedAt: now } : {}) },
+    data: { ...args.extraUpdate, status: 'REJECTED', rejectReason: args.reason, ...(quarantine ? { output: Prisma.DbNull, quarantinedAt: args.now } : {}) },
   });
   if (quarantine) {
     await tx.$executeRaw`UPDATE "TaskInstance" SET embedding = NULL WHERE id = ${t.id}::uuid`;
     await tx.taskSubmission.updateMany({ where: { taskInstanceId: t.id }, data: { output: { quarantined: true } } });
   }
   if (t.slotId) await tx.coverageSlot.update({ where: { id: t.slotId }, data: { status: 'RELEASED', assignedToId: null } });
-  await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.rejected', before: { status: 'SUBMITTED' }, after: { status: 'REJECTED', reason: body.rejectReason, quarantined: quarantine, version } });
-  return { status: 'REJECTED' };
+  await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.rejected', before: { status: 'SUBMITTED' }, after: { status: 'REJECTED', reason: args.reason, quarantined: quarantine, ...args.auditAfter } });
 }

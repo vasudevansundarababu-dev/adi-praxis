@@ -63,6 +63,7 @@ import { reviewRoutes } from './routes/review';
 import { candidateAuthRoutes } from './routes/candidate-auth';
 import { candidateRoutes } from './routes/candidates';
 import { opportunityRoutes } from './routes/opportunities';
+import { reviewerRecruitmentRoutes } from './routes/reviewer-recruitment';
 import { projectRoutes } from './routes/projects';
 import { staffingRoutes } from './routes/staffing';
 import { OfflineGeocoder, type Geocoder } from './staffing/geocoder';
@@ -313,6 +314,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       });
       await v1.register(candidateRoutes, { db: deps.db });
       await v1.register(opportunityRoutes, { db: deps.db, config: deps.config });
+      await v1.register(reviewerRecruitmentRoutes, { db: deps.db });
       await v1.register(campaignRoutes, { db: deps.db, config: deps.config });
       await v1.register(profileRoutes, {
         db: deps.db,

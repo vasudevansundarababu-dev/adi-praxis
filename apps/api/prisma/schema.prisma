@@ -635,7 +635,7 @@ model Project {
   smeAuthoredTasks       SmeAuthoredTask[]
   slots                  CoverageSlot[]
   inputBatches           TaskInputBatch[]
-  opportunity            Opportunity?
+  opportunities          Opportunity[]
   reviewers              ProjectReviewer[]
   requisitions           Requisition[]
   matches                ProjectMatch[]
@@ -1327,7 +1327,9 @@ model AlternativeIdentityCheck {
 model Opportunity {
   id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId            String            @map("client_id") @db.Uuid
-  projectId           String            @unique @map("project_id") @db.Uuid
+  projectId           String            @map("project_id") @db.Uuid
+  /// Owner, 12 Nov 2026: one job post per project and role (AUTHOR from the JD; REVIEWER from the reviewer JD).
+  role                JdRole            @default(AUTHOR)
   status              OpportunityStatus @default(DRAFT)
   /// Working copy the owner edits; publishing freezes it into a new OpportunityVersion.
   draftBrief          Json?             @map("draft_brief")
@@ -1341,6 +1343,8 @@ model Opportunity {
   versions    OpportunityVersion[]
   enrollments Enrollment[]
   documents   OpportunityDocument[]
+
+  @@unique([projectId, role])
 }
 
 enum OpportunityDocumentStatus {

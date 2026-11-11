@@ -64,7 +64,7 @@ describe('M4b: conversational SME profile, review, evidence and submit', () => {
     await post(pm, `/projects/${p.id}/submit`);
     await post(pm, `/projects/${p.id}/match`);
     expect((await post(pm, `/projects/${p.id}/opportunity/publish`)).statusCode).toBe(200);
-    opportunityId = (await db.opportunity.findUniqueOrThrow({ where: { projectId: p.id } })).id;
+    opportunityId = (await db.opportunity.findUniqueOrThrow({ where: { projectId_role: { projectId: p.id, role: 'AUTHOR' } } })).id;
   });
 
   afterAll(async () => {

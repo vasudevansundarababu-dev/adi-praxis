@@ -160,7 +160,7 @@ export const journeyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; sele
         await tx.$executeRaw`SELECT 1 FROM "Candidate" WHERE id = ${candidate.id}::uuid FOR UPDATE`;
         const gate = await selectionGate.check(tx, { candidateId: candidate.id, projectId: a.projectId });
         if (!gate.ok) throw new AppError(409, 'NOT_ELIGIBLE', `You can’t accept this yet: ${gate.reason}.`);
-        const latest = await tx.opportunityVersion.findFirst({ where: { opportunity: { projectId: a.projectId }, publishedAt: { not: null } }, orderBy: { version: 'desc' } });
+        const latest = await tx.opportunityVersion.findFirst({ where: { opportunity: { projectId: a.projectId, role: 'AUTHOR' }, publishedAt: { not: null } }, orderBy: { version: 'desc' } });
         if (latest && latest.version !== a.requirementsVersion) throw new AppError(409, 'REQUIREMENTS_CHANGED', 'The requirements changed since this was proposed. The coordinator will send an updated proposal.');
         const scopeRoles = (gate.snapshot.scope as { contributionRoles?: string[] } | undefined)?.contributionRoles ?? [];
         const neededRoles = latest ? OpportunityBrief.parse(latest.brief).contributionRoles : [];

@@ -54,9 +54,9 @@ export async function campaignDto(tx: Db | Tx, c: Campaign): Promise<CampaignDto
 
 /** Launches a campaign for a staffing project with a published opportunity. Shared by the API and auto-launch. */
 export async function launchCampaign(tx: Tx, config: Config, projectId: string, channel: Channel) {
-  const p = await tx.project.findUniqueOrThrow({ where: { id: projectId }, include: { jobDescription: true, opportunity: true } });
+  const p = await tx.project.findUniqueOrThrow({ where: { id: projectId }, include: { jobDescription: true, opportunities: { where: { role: 'AUTHOR' } } } });
   if (p.status !== 'STAFFING') throw new AppError(409, 'NOT_STAFFING', 'Campaigns can be launched while a project is staffing.');
-  if (p.opportunity?.status !== 'PUBLISHED') throw new AppError(409, 'OPPORTUNITY_NOT_PUBLISHED', 'Publish the project’s opportunity page first; the apply link points to it.');
+  if (p.opportunities[0]?.status !== 'PUBLISHED') throw new AppError(409, 'OPPORTUNITY_NOT_PUBLISHED', 'Publish the project’s opportunity page first; the apply link points to it.');
   if (!p.jobDescription) throw new AppError(409, 'NO_JOB_DESCRIPTION', 'The project has no job description.');
   const active = await tx.campaign.findFirst({ where: { projectId, status: { in: [...ACTIVE] } } });
   if (active) throw new AppError(409, 'CAMPAIGN_ACTIVE', 'This project already has an active campaign.');
@@ -65,7 +65,7 @@ export async function launchCampaign(tx: Tx, config: Config, projectId: string, 
   const draft = await tx.campaign.create({
     data: { clientId: p.clientId, projectId, jobDescriptionId: p.jobDescription.id, channel, status: 'DRAFT' },
   });
-  const brief = (await tx.opportunityVersion.findFirst({ where: { opportunityId: p.opportunity.id }, orderBy: { version: 'desc' } }))!.brief as { summary?: string };
+  const brief = (await tx.opportunityVersion.findFirst({ where: { opportunityId: p.opportunities[0]!.id }, orderBy: { version: 'desc' } }))!.brief as { summary?: string };
   const applyUrl = applyUrlFor(config, draft.id);
   const jd = p.jobDescription;
   const published = await adapter.publish({
@@ -162,10 +162,10 @@ export const campaignRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }> =
     '/public/campaigns/:id/click',
     { config: { access: 'public', rateLimit: { max: 60, timeWindow: '1 minute' } }, schema: { tags: ['campaigns'], params: IdParams, response: { 200: z.object({ opportunityId: z.string().uuid().nullable(), live: z.boolean() }) } } },
     async (req) => {
-      const c = await db.campaign.findUnique({ where: { id: req.params.id }, include: { project: { include: { opportunity: true } } } });
+      const c = await db.campaign.findUnique({ where: { id: req.params.id }, include: { project: { include: { opportunities: { where: { role: 'AUTHOR' } } } } } });
       if (!c) throw notFound('Campaign not found');
       if (c.status === 'LIVE') await db.campaign.update({ where: { id: c.id }, data: { clicks: { increment: 1 } } });
-      return { opportunityId: c.project.opportunity?.id ?? null, live: c.status === 'LIVE' };
+      return { opportunityId: c.project.opportunities[0]?.id ?? null, live: c.status === 'LIVE' };
     },
   );
 

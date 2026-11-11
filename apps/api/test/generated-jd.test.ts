@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { seed } from '../prisma/seed';
+import { opportunityForTier } from '../src/supply/submissions';
 import { buildTestApp, createUser, db, idem, login, resetDb } from './helpers';
 
 /** Owner bug, 12 Nov 2026: the JD is generated from the template's skills plus the project's demographics and education. */
@@ -28,6 +29,7 @@ describe('Generated job descriptions (template skills, demographics, education; 
   let pm: string;
   let templateId: string;
   let domainId: string;
+  let clientId: string;
 
   beforeAll(async () => {
     app = await buildTestApp();
@@ -36,6 +38,7 @@ describe('Generated job descriptions (template skills, demographics, education; 
     await resetDb();
     const { client } = await seed(db, { SEED_CLIENT_NAME: 'ADI-Labs', SEED_ADMIN_EMAIL: 'admin@test.local', SEED_ADMIN_PASSWORD: 'admin-password-123', TASKFLOW_PATH: '/none' });
     admin = await login(app, 'admin@test.local', 'admin-password-123');
+    clientId = client.id;
     pm = await login(app, (await createUser(client.id, ['PM'])).email);
     domainId = (await post(admin, '/domains', { name: 'Banking' })).json().id;
     templateId = (await post(admin, '/templates', { domainId, workflowName: 'KYC onboarding and refresh', ...TEMPLATE })).json().id;
@@ -151,5 +154,103 @@ describe('Generated job descriptions (template skills, demographics, education; 
     const res = await post(pm, `/projects/${p.id}/submit`);
     expect(res.statusCode).toBe(422);
     expect(res.json().details.problems).toContain("The job description is missing the template's mandatory skills: EDD, Sanctions screening");
+  });
+
+  describe('reviewer job post (owner, 12 Nov 2026)', () => {
+    async function submitted(extra: object = {}) {
+      const p = await draft({ reviewRoute: 'SME_EXPERT_PM', ...extra });
+      const { author, reviewer } = await jds(p.id);
+      await setPay(author.id);
+      if (reviewer) await setPay(reviewer.id);
+      expect((await post(pm, `/projects/${p.id}/submit`)).statusCode).toBe(200);
+      return p;
+    }
+    /** A reviewer applicant the human selection step has already SELECTED (the candidate flow is covered elsewhere). */
+    async function selectedApplicant(opportunityId: string, email = `expert-${randomUUID().slice(0, 6)}@example.test`) {
+      const v = await db.opportunityVersion.findFirstOrThrow({ where: { opportunityId }, orderBy: { version: 'desc' } });
+      const u = await db.smeUser.create({ data: { clientId, displayName: 'Dana Expert', contactEmail: email, identityStatus: 'VERIFIED' } });
+      return db.enrollment.create({ data: { clientId, smeUserId: u.id, opportunityId, opportunityVersionId: v.id, status: 'SELECTED', submittedAt: new Date() } });
+    }
+
+    it('the reviewer post is built from the reviewer JD and published beside the author post', async () => {
+      const p = await submitted();
+      const view = (await get(pm, `/projects/${p.id}/opportunity?role=REVIEWER`)).json();
+      expect(view.role).toBe('REVIEWER');
+      expect(view.draft.brief.contributionRoles).toEqual(['REVIEWER']);
+      expect(view.draft.brief.title).toMatch(/expert reviewer/);
+      expect(view.draft.criteria.map((c: { text: string }) => c.text)).toContain('At least 9 years of experience in the domain');
+      // The author post is separate and unchanged.
+      const author = (await get(pm, `/projects/${p.id}/opportunity`)).json();
+      expect(author.role).toBe('AUTHOR');
+      expect(author.draft.criteria.map((c: { text: string }) => c.text)).toContain('At least 4 years of experience in the domain');
+
+      expect((await post(pm, `/projects/${p.id}/opportunity/publish?role=REVIEWER`)).statusCode).toBe(200);
+      expect((await post(pm, `/projects/${p.id}/opportunity/publish`)).statusCode).toBe(200);
+      const list = (await app.inject({ method: 'GET', url: '/api/v1/opportunities' })).json().items;
+      expect(list.map((o: { role: string }) => o.role).sort()).toEqual(['AUTHOR', 'REVIEWER']);
+      expect(await db.opportunity.count({ where: { projectId: p.id } })).toBe(2);
+    });
+
+    it('a project without the Expert route has no reviewer post', async () => {
+      const p = await draft();
+      const { author } = await jds(p.id);
+      await setPay(author.id);
+      expect((await post(pm, `/projects/${p.id}/submit`)).statusCode).toBe(200);
+      const res = await get(pm, `/projects/${p.id}/opportunity?role=REVIEWER`);
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe('NO_REVIEWER_JD');
+    });
+
+    it('a selected reviewer applicant becomes the project Expert; creating the account is an Admin step', async () => {
+      const p = await submitted();
+      expect((await post(pm, `/projects/${p.id}/opportunity/publish?role=REVIEWER`)).statusCode).toBe(200);
+      const opp = await db.opportunity.findUniqueOrThrow({ where: { projectId_role: { projectId: p.id, role: 'REVIEWER' } } });
+      const e = await selectedApplicant(opp.id);
+
+      const listed = (await get(pm, `/projects/${p.id}/reviewer-applicants`)).json().items;
+      expect(listed).toEqual([expect.objectContaining({ enrollmentId: e.id, status: 'SELECTED', identityVerified: true, expertUserId: null })]);
+
+      const byPm = await post(pm, `/projects/${p.id}/reviewer-applicants/${e.id}/make-expert`);
+      expect(byPm.statusCode).toBe(403);
+      expect(byPm.json().error).toBe('ASK_ADMIN');
+
+      const byAdmin = await post(admin, `/projects/${p.id}/reviewer-applicants/${e.id}/make-expert`);
+      expect(byAdmin.statusCode, byAdmin.body).toBe(200);
+      expect(byAdmin.json()).toMatchObject({ created: true });
+      expect(byAdmin.json().temporaryPassword).toEqual(expect.any(String));
+      const user = await db.user.findUniqueOrThrow({ where: { id: byAdmin.json().userId } });
+      expect(user).toMatchObject({ roles: ['REVIEWER'], mustChangePassword: true });
+      expect(await db.projectReviewer.count({ where: { projectId: p.id, userId: user.id } })).toBe(1);
+      expect((await get(pm, `/projects/${p.id}/reviewer-applicants`)).json().items[0].expertUserId).toBe(user.id);
+      expect(await db.auditEvent.count({ where: { entityId: p.id, action: 'project.reviewer_assigned' } })).toBe(1);
+
+      // Once the account exists, the PM can assign the same person to another Expert project.
+      const p2 = await submitted();
+      expect((await post(pm, `/projects/${p2.id}/opportunity/publish?role=REVIEWER`)).statusCode).toBe(200);
+      const opp2 = await db.opportunity.findUniqueOrThrow({ where: { projectId_role: { projectId: p2.id, role: 'REVIEWER' } } });
+      const e2 = await selectedApplicant(opp2.id, user.email);
+      const again = await post(pm, `/projects/${p2.id}/reviewer-applicants/${e2.id}/make-expert`);
+      expect(again.statusCode, again.body).toBe(200);
+      expect(again.json()).toEqual({ userId: user.id, created: false });
+    });
+
+    it('only a selected applicant can become the Expert', async () => {
+      const p = await submitted();
+      expect((await post(pm, `/projects/${p.id}/opportunity/publish?role=REVIEWER`)).statusCode).toBe(200);
+      const opp = await db.opportunity.findUniqueOrThrow({ where: { projectId_role: { projectId: p.id, role: 'REVIEWER' } } });
+      const e = await selectedApplicant(opp.id);
+      await db.enrollment.update({ where: { id: e.id }, data: { status: 'REVIEW_PENDING' } });
+      const res = await post(admin, `/projects/${p.id}/reviewer-applicants/${e.id}/make-expert`);
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe('NOT_SELECTED');
+    });
+
+    it('requisitions for Expert and Reviewer-SME tiers recruit through the reviewer post', () => {
+      const posts = [{ id: 'a', role: 'AUTHOR' }, { id: 'r', role: 'REVIEWER' }];
+      expect(opportunityForTier(posts, 'EXPERT')?.id).toBe('r');
+      expect(opportunityForTier(posts, 'REVIEWER_SME')?.id).toBe('r');
+      expect(opportunityForTier(posts, 'ANNOTATOR')?.id).toBe('a');
+      expect(opportunityForTier([posts[0]!], 'EXPERT')?.id).toBe('a');
+    });
   });
 });

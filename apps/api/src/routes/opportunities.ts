@@ -9,6 +9,8 @@ import {
   PublicOpportunityDto,
   SaveOpportunityDraftRequest,
   jdRequirementLines,
+  JD_ROLES,
+  type JdRole,
   type JdProfileLine,
 } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -25,13 +27,19 @@ import { runCandidateCommand, runCommand } from '../platform/command';
 import { loadProject } from './projects';
 
 const IdParams = z.object({ id: z.string().uuid() });
+/** Which job post: the authors' (default) or the Expert reviewers' (owner, 12 Nov 2026). */
+const RoleQuery = z.object({ role: z.enum(JD_ROLES).default('AUTHOR') });
 const ACCESS = ['PM', 'ADMIN'] as const;
 const OPEN_PROJECT = ['READY_FOR_STAFFING', 'STAFFING', 'STAFFED', 'IN_PROGRESS', 'PAUSED'];
 
 /** Default draft built from the submitted project: JD snapshot, template and FLOW2 guidance. */
-async function defaultDraft(tx: Db | Tx, projectId: string) {
+async function defaultDraft(tx: Db | Tx, projectId: string, role: JdRole = 'AUTHOR') {
   const p = await tx.project.findUniqueOrThrow({ where: { id: projectId }, include: { template: { include: { domain: true } }, jdSnapshot: true } });
-  const jd = (p.jdSnapshot?.data ?? {}) as {
+  // Owner, 12 Nov 2026: the reviewer post is built from the reviewer JD (SME -> Expert -> PM projects only).
+  if (role === 'REVIEWER' && !p.reviewerJdSnapshot) {
+    throw new AppError(409, 'NO_REVIEWER_JD', 'This project has no reviewer job description. Reviewer posts are for projects with the SME → Expert → PM review route.');
+  }
+  const jd = ((role === 'REVIEWER' ? p.reviewerJdSnapshot : p.jdSnapshot?.data) ?? {}) as {
     title?: string;
     responsibilities?: string;
     skills?: string[];
@@ -49,10 +57,12 @@ async function defaultDraft(tx: Db | Tx, projectId: string) {
     summary: jd.responsibilities ?? '',
     domain: p.template.domain.name,
     specialty: p.template.workflowName,
-    contributionRoles: p.taskMode === 'AUTHORING' ? ['TASK_AUTHOR'] : ['ANNOTATOR'],
+    contributionRoles: role === 'REVIEWER' ? ['REVIEWER'] : p.taskMode === 'AUTHORING' ? ['TASK_AUTHOR'] : ['ANNOTATOR'],
     // SPEC: wage and location are shown on every job post.
     compensation: jd.wagePerTask ? `${jd.wagePerTask} ${jd.wageCurrency} per accepted task` : null,
-    timeCommitment: p.tptMinutes ? `About ${p.tptMinutes} minutes per task (a planning target, not a deadline).` : '',
+    timeCommitment: role === 'REVIEWER'
+      ? 'Review tasks as authors submit them; the volume follows the project plan.'
+      : p.tptMinutes ? `About ${p.tptMinutes} minutes per task (a planning target, not a deadline).` : '',
     whatWeWillAsk:
       'A short guided conversation about the work you have actually done: your specialty, roles and responsibilities, the jurisdictions you worked in, a generic description of a typical case, and supporting evidence where it matters.',
     doNotDisclose:
@@ -72,18 +82,20 @@ async function defaultDraft(tx: Db | Tx, projectId: string) {
   return { brief, criteria };
 }
 
-async function currentDraft(tx: Db | Tx, projectId: string) {
-  const o = await tx.opportunity.findUnique({ where: { projectId } });
+const byRole = (projectId: string, role: JdRole) => ({ projectId_role: { projectId, role } });
+
+async function currentDraft(tx: Db | Tx, projectId: string, role: JdRole = 'AUTHOR') {
+  const o = await tx.opportunity.findUnique({ where: byRole(projectId, role) });
   if (o?.draftBrief && o.draftCriteria) return { brief: OpportunityBrief.parse(o.draftBrief), criteria: OpportunityCriteria.parse(o.draftCriteria) };
-  return defaultDraft(tx, projectId);
+  return defaultDraft(tx, projectId, role);
 }
 
-async function ensureOpportunity(tx: Tx, project: { id: string; clientId: string }) {
-  const existing = await tx.opportunity.findUnique({ where: { projectId: project.id } });
+async function ensureOpportunity(tx: Tx, project: { id: string; clientId: string }, role: JdRole = 'AUTHOR') {
+  const existing = await tx.opportunity.findUnique({ where: byRole(project.id, role) });
   if (existing) return existing;
-  const d = await defaultDraft(tx, project.id);
+  const d = await defaultDraft(tx, project.id, role);
   return tx.opportunity.create({
-    data: { clientId: project.clientId, projectId: project.id, draftBrief: d.brief as Prisma.InputJsonValue, draftCriteria: d.criteria as Prisma.InputJsonValue },
+    data: { clientId: project.clientId, projectId: project.id, role, draftBrief: d.brief as Prisma.InputJsonValue, draftCriteria: d.criteria as Prisma.InputJsonValue },
   });
 }
 
@@ -93,6 +105,7 @@ const latestVersion = (tx: Db | Tx, opportunityId: string) =>
 function publicDto(o: Opportunity, v: OpportunityVersion): PublicOpportunityDto {
   return {
     id: o.id,
+    role: o.role,
     version: v.version,
     status: o.status,
     brief: OpportunityBrief.parse(v.brief),
@@ -103,6 +116,7 @@ function publicDto(o: Opportunity, v: OpportunityVersion): PublicOpportunityDto 
 
 const OwnerDto = z.object({
   projectId: z.string().uuid(),
+  role: z.enum(JD_ROLES),
   opportunityId: z.string().uuid().nullable(),
   status: z.enum(['DRAFT', 'PUBLISHED', 'CLOSED']),
   draft: z.object({ brief: OpportunityBrief, criteria: OpportunityCriteria }),
@@ -115,15 +129,16 @@ const OwnerDto = z.object({
   ),
 });
 
-async function ownerView(tx: Db | Tx, projectId: string): Promise<z.infer<typeof OwnerDto>> {
+async function ownerView(tx: Db | Tx, projectId: string, role: JdRole = 'AUTHOR'): Promise<z.infer<typeof OwnerDto>> {
   const o = await tx.opportunity.findUnique({
-    where: { projectId },
+    where: byRole(projectId, role),
     include: { versions: { orderBy: { version: 'desc' } }, documents: { orderBy: { createdAt: 'desc' } } },
   });
-  const draft = await currentDraft(tx, projectId);
+  const draft = await currentDraft(tx, projectId, role);
   const owned = QuestionPolicy.safeParse(o?.draftQuestionPolicy);
   return {
     projectId,
+    role,
     opportunityId: o?.id ?? null,
     status: o?.status ?? 'DRAFT',
     draft,
@@ -149,18 +164,18 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }
     return p;
   };
 
-  app.get('/projects/:id/opportunity', { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams, response: { 200: OwnerDto } } }, async (req) => {
+  app.get('/projects/:id/opportunity', { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams, querystring: RoleQuery, response: { 200: OwnerDto } } }, async (req) => {
     const p = await loadProject(db, req.params.id, req.actor!);
-    return ownerView(db, p.id);
+    return ownerView(db, p.id, req.query.role);
   });
 
   app.put(
     '/projects/:id/opportunity/draft',
-    { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams, body: SaveOpportunityDraftRequest, response: { 200: OwnerDto } } },
+    { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams, querystring: RoleQuery, body: SaveOpportunityDraftRequest, response: { 200: OwnerDto } } },
     async (req, reply) => {
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const p = await ownedProject(tx, req.params.id, actor);
-        const o = await ensureOpportunity(tx, p);
+        const o = await ensureOpportunity(tx, p, req.query.role);
         if (o.status === 'CLOSED') throw new AppError(409, 'OPPORTUNITY_CLOSED', 'This opportunity is closed.');
         let policyUpdate: Prisma.OpportunityUpdateInput = {};
         if (req.body.questionPolicy === null) policyUpdate = { draftQuestionPolicy: Prisma.DbNull };
@@ -174,7 +189,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }
           data: { draftBrief: req.body.brief as Prisma.InputJsonValue, draftCriteria: req.body.criteria as Prisma.InputJsonValue, ...policyUpdate },
         });
         await audit({ entityType: 'Opportunity', entityId: o.id, action: 'opportunity.draft_saved', after: { criteria: req.body.criteria.length } });
-        return { status: 200, body: await ownerView(tx, p.id) };
+        return { status: 200, body: await ownerView(tx, p.id, req.query.role) };
       });
       return reply;
     },
@@ -183,7 +198,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }
   // Import a JD document. The extracted text is untrusted until the owner confirms it.
   app.post(
     '/projects/:id/opportunity/documents',
-    { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams, response: { 201: OwnerDto } } },
+    { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams, querystring: RoleQuery, response: { 201: OwnerDto } } },
     async (req, reply) => {
       const file = await req.file({ limits: { fileSize: MAX_DOCUMENT_BYTES + 1, files: 1 } });
       if (!file) throw badRequest('Attach a PDF or .docx file');
@@ -192,7 +207,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }
       const { kind, text } = await extractDocumentText(buf);
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const p = await ownedProject(tx, req.params.id, actor);
-        const o = await ensureOpportunity(tx, p);
+        const o = await ensureOpportunity(tx, p, req.query.role);
         const d = await tx.opportunityDocument.create({
           data: {
             clientId: p.clientId,
@@ -206,7 +221,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }
           },
         });
         await audit({ entityType: 'OpportunityDocument', entityId: d.id, action: 'opportunity.document_imported', after: { filename: d.filename, sizeBytes: d.sizeBytes, status: 'PENDING_REVIEW' } });
-        return { status: 201, body: await ownerView(tx, p.id) };
+        return { status: 201, body: await ownerView(tx, p.id, req.query.role) };
       });
       return reply;
     },
@@ -216,22 +231,22 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }
     '/projects/:id/opportunity/documents/:docId/confirm',
     {
       config: { access: ACCESS },
-      schema: { tags: ['opportunities'], params: IdParams.extend({ docId: z.string().uuid() }), body: z.object({ text: z.string().trim().min(1).max(50_000) }), response: { 200: OwnerDto } },
+      schema: { tags: ['opportunities'], params: IdParams.extend({ docId: z.string().uuid() }), querystring: RoleQuery, body: z.object({ text: z.string().trim().min(1).max(50_000) }), response: { 200: OwnerDto } },
     },
     async (req, reply) => {
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const p = await ownedProject(tx, req.params.id, actor);
-        const o = await ensureOpportunity(tx, p);
+        const o = await ensureOpportunity(tx, p, req.query.role);
         const d = await tx.opportunityDocument.findFirst({ where: { id: req.params.docId, opportunityId: o.id, status: 'PENDING_REVIEW' } });
         if (!d) throw notFound('Document awaiting review not found');
         await tx.opportunityDocument.update({ where: { id: d.id }, data: { status: 'CONFIRMED', confirmedText: req.body.text, reviewedById: actor.userId, reviewedAt: new Date() } });
-        const draft = await currentDraft(tx, p.id);
+        const draft = await currentDraft(tx, p.id, req.query.role);
         await tx.opportunity.update({
           where: { id: o.id },
           data: { draftBrief: { ...draft.brief, fullDescription: req.body.text } as Prisma.InputJsonValue, draftCriteria: draft.criteria as Prisma.InputJsonValue },
         });
         await audit({ entityType: 'OpportunityDocument', entityId: d.id, action: 'opportunity.document_confirmed', before: { status: 'PENDING_REVIEW' }, after: { status: 'CONFIRMED', edited: req.body.text !== d.extractedText } });
-        return { status: 200, body: await ownerView(tx, p.id) };
+        return { status: 200, body: await ownerView(tx, p.id, req.query.role) };
       });
       return reply;
     },
@@ -239,15 +254,15 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }
 
   app.post(
     '/projects/:id/opportunity/documents/:docId/discard',
-    { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams.extend({ docId: z.string().uuid() }), response: { 200: OwnerDto } } },
+    { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams.extend({ docId: z.string().uuid() }), querystring: RoleQuery, response: { 200: OwnerDto } } },
     async (req, reply) => {
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const p = await ownedProject(tx, req.params.id, actor);
-        const d = await tx.opportunityDocument.findFirst({ where: { id: req.params.docId, opportunity: { projectId: p.id }, status: 'PENDING_REVIEW' } });
+        const d = await tx.opportunityDocument.findFirst({ where: { id: req.params.docId, opportunity: { projectId: p.id, role: req.query.role }, status: 'PENDING_REVIEW' } });
         if (!d) throw notFound('Document awaiting review not found');
         await tx.opportunityDocument.update({ where: { id: d.id }, data: { status: 'DISCARDED', reviewedById: actor.userId, reviewedAt: new Date() } });
         await audit({ entityType: 'OpportunityDocument', entityId: d.id, action: 'opportunity.document_discarded', before: { status: 'PENDING_REVIEW' }, after: { status: 'DISCARDED' } });
-        return { status: 200, body: await ownerView(tx, p.id) };
+        return { status: 200, body: await ownerView(tx, p.id, req.query.role) };
       });
       return reply;
     },
@@ -256,15 +271,15 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }
   // Publishing always needs a human (FLOW2 C03) and freezes the draft into a new version.
   app.post(
     '/projects/:id/opportunity/publish',
-    { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams, response: { 200: OwnerDto } } },
+    { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams, querystring: RoleQuery, response: { 200: OwnerDto } } },
     async (req, reply) => {
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const p = await ownedProject(tx, req.params.id, actor);
-        const o = await ensureOpportunity(tx, p);
+        const o = await ensureOpportunity(tx, p, req.query.role);
         if (o.status === 'CLOSED') throw new AppError(409, 'OPPORTUNITY_CLOSED', 'This opportunity is closed.');
         const pending = await tx.opportunityDocument.count({ where: { opportunityId: o.id, status: 'PENDING_REVIEW' } });
         if (pending) throw new AppError(409, 'DOCUMENT_PENDING_REVIEW', 'Confirm or discard the imported document before publishing.');
-        const draft = await currentDraft(tx, p.id);
+        const draft = await currentDraft(tx, p.id, req.query.role);
         const problems = opportunityPublishProblems(draft.brief, draft.criteria);
         if (problems.length) throw new AppError(422, 'OPPORTUNITY_INCOMPLETE', `Cannot publish yet: ${problems.join('; ')}.`, { problems });
         const last = await tx.opportunityVersion.findFirst({ where: { opportunityId: o.id }, orderBy: { version: 'desc' } });
@@ -285,7 +300,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }
         });
         await tx.opportunity.update({ where: { id: o.id }, data: { status: 'PUBLISHED' } });
         await audit({ entityType: 'Opportunity', entityId: o.id, action: 'opportunity.published', before: { status: o.status }, after: { status: 'PUBLISHED', version: v.version } });
-        return { status: 200, body: await ownerView(tx, p.id) };
+        return { status: 200, body: await ownerView(tx, p.id, req.query.role) };
       });
       return reply;
     },
@@ -294,15 +309,15 @@ export const opportunityRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }
   // Closed pools accept no new enrollments (FLOW2 C03).
   app.post(
     '/projects/:id/opportunity/close',
-    { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams, response: { 200: OwnerDto } } },
+    { config: { access: ACCESS }, schema: { tags: ['opportunities'], params: IdParams, querystring: RoleQuery, response: { 200: OwnerDto } } },
     async (req, reply) => {
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const p = await loadProject(tx, req.params.id, actor);
-        const o = await tx.opportunity.findUnique({ where: { projectId: p.id } });
+        const o = await tx.opportunity.findUnique({ where: byRole(p.id, req.query.role) });
         if (!o || o.status !== 'PUBLISHED') throw new AppError(409, 'NOT_PUBLISHED', 'Only a published opportunity can be closed.');
         await tx.opportunity.update({ where: { id: o.id }, data: { status: 'CLOSED' } });
         await audit({ entityType: 'Opportunity', entityId: o.id, action: 'opportunity.closed', before: { status: 'PUBLISHED' }, after: { status: 'CLOSED' } });
-        return { status: 200, body: await ownerView(tx, p.id) };
+        return { status: 200, body: await ownerView(tx, p.id, req.query.role) };
       });
       return reply;
     },

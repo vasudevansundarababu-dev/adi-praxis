@@ -58,7 +58,7 @@ describe('M4c: selection, onboarding and assignment acceptance (FLOW2 CF-19 to C
     await post(pm, `/projects/${p.id}/match`);
     expect((await post(pm, `/projects/${p.id}/opportunity/publish`)).statusCode).toBe(200);
     expect((await post(pm, `/projects/${p.id}/reviewers`, { userId: reviewerId })).statusCode).toBe(200);
-    return { projectId: p.id as string, opportunityId: (await db.opportunity.findUniqueOrThrow({ where: { projectId: p.id } })).id };
+    return { projectId: p.id as string, opportunityId: (await db.opportunity.findUniqueOrThrow({ where: { projectId_role: { projectId: p.id, role: 'AUTHOR' } } })).id };
   }
 
   beforeAll(async () => {

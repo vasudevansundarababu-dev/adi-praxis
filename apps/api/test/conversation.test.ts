@@ -306,11 +306,11 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       expect(exported.headers['x-praxis-graph-content-hash']).toMatch(/^[a-f0-9]{64}$/); expect(String(exported.headers['x-praxis-graph-execution'])).toContain('not-executable');
       expect(exported.json().nodes.length).toBe(graph.nodes.length);
       expect((await get(pm, `/dataset/records/${record.id}/workflow-graph`)).statusCode).toBe(403);
-      // Review route: Expert -> PM is refused until its stage engine ships; the default is SME -> PM.
+      // Review route: the default is SME -> PM; Wave 2 enables SME -> Expert -> PM (its stage engine is tested in review-stages.test.ts).
       const project = (await get(pm, `/projects/${projectId}`)).json(); expect(project.reviewRoute).toBe('SME_PM'); expect(project.agentMode).toBe('SINGLE');
       const templateId = project.templateId;
       const expertRoute = await app.inject({ method: 'POST', url: '/api/v1/projects', headers: { cookie: pm, ...idem() }, payload: { templateId, name: 'Expert route', authoringExperience: 'BOTH', reviewRoute: 'SME_EXPERT_PM' } });
-      expect(expertRoute.statusCode).toBe(409); expect(expertRoute.json().error).toBe('REVIEW_ROUTE_NOT_AVAILABLE');
+      expect(expertRoute.statusCode, expertRoute.body).toBe(201); expect(expertRoute.json().reviewRoute).toBe('SME_EXPERT_PM');
     });
     it('authoring v2.1: Admins see which model providers are live; the chatbot stops at the daily call cap', async () => {
       const status = await get(admin, '/admin/model-providers'); expect(status.statusCode, status.body).toBe(200);

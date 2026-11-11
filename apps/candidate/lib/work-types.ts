@@ -36,6 +36,11 @@ export interface SlotInput {
 export interface TaskView extends TaskSummary {
   authoringExperience?: 'CLASSIC'|'CHATBOT'|'BOTH'|null;
   effectiveAuthoringExperience?: 'CLASSIC'|'CHATBOT'|'BOTH';
+  /** Authoring v2.1: fixed by the template, read-only here. */
+  agentMode?: 'SINGLE' | 'MULTI';
+  reviewRoute?: 'SME_PM' | 'SME_EXPERT_PM';
+  phase?: import('@praxis/shared').TaskPhaseView;
+  startingGraph?: import('@praxis/shared').WorkflowGraphInput | null;
   authoringWorkspace?: {view:'CLASSIC'|'CHATBOT';answer:string}|null;
   projectId: string;
   projectName: string;

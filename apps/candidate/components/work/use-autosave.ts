@@ -153,5 +153,16 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
     setState((s) => s.kind === 'saved' ? { kind: 'idle' } : s);
   }, []);
 
+  // Panels outside the editor (the workflow graph) change top-level output keys through this same autosave, so the
+  // task keeps one writer, one revision sequence and one save barrier.
+  useEffect(() => {
+    const listener = (e: Event) => {
+      const d = (e as CustomEvent<{ taskId: string; patch: Record<string, unknown> }>).detail;
+      if (d?.taskId === taskId && !targetRef.current) update((prev) => ({ ...prev, ...d.patch }));
+    };
+    window.addEventListener('praxis:patch-output', listener);
+    return () => window.removeEventListener('praxis:patch-output', listener);
+  }, [taskId, update]);
+
   return { value, update, revision, currentRevision: useCallback(() => rev.current, []), state, flush: put };
 }

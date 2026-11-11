@@ -5,6 +5,7 @@ import { AUTHORSHIP_VERSION } from '@praxis/shared';
 import { call } from '@/lib/client';
 import { AuthoringConsent } from './authoring-controls';
 import { InvestigationMap } from './investigation-map';
+import { WorkflowGraphPanel } from './workflow-graph-panel';
 import { TemplateInstructions } from './template-instructions';
 import { TypedAnswerBoundary } from './typed-answer-boundary';
 import { ConversationWorkbench } from './conversation-workbench';
@@ -61,7 +62,7 @@ export function TaskPage({ task }: { task: TaskView }) {
         ← {task.projectName}
       </Link>
       <p className="mt-1 text-xs text-fg-muted">
-        {TASK_STATUS[task.status]} · time target {task.tptMinutes ?? '—'} min · active so far {minutes(task.activeSeconds)} min. The time target is for planning and pay; your task never expires.
+        {current.phase?.label ?? TASK_STATUS[task.status]}{task.agentMode ? ` · ${task.agentMode === 'SINGLE' ? 'Single agent' : 'Multi agent'}` : ''} · time target {task.tptMinutes ?? '—'} min · active so far {minutes(task.activeSeconds)} min. The time target is for planning and pay; your task never expires.
       </p>
       {task.status === 'REJECTED' && task.review && (
         <p role="status" className="mt-3 rounded-md border border-line p-3 text-sm">
@@ -73,7 +74,8 @@ export function TaskPage({ task }: { task: TaskView }) {
       {task.taskType==='AUTHORING'&&task.authoringExperience&&!consented&&!current.readOnly?<AuthoringConsent taskId={task.id} readOnly={phone} onReady={()=>{setConsented(true);void refresh();}}/>:<TypedAnswerBoundary enabled={task.taskType === 'AUTHORING'}><div className="mt-4" key={allowedEditor}>
         {agentPreview!=null && <section className="space-y-3"><button className="rounded border border-line p-2" onClick={()=>setAgentPreview(null)}>Return to authoring</button><pre className="whitespace-pre-wrap break-words text-sm">{JSON.stringify(agentPreview,null,2)}</pre></section>}<div hidden={agentPreview!=null}>
         {task.taskType === 'AUTHORING' && !detailed ? <><ConversationWorkbench task={visibleTask} draftAnswer={draftAnswer} onDraftChange={setDraftAnswer}/>{!visibleTask.readOnly&&<SubmitPanel taskId={task.id} flush={flushAll} revision={()=>currentRef.current.revision} onSubmitted={done}/>}</> : current.definition === 'kyc-onboarding-v1' ? <KycWorkbench task={visibleTask} onSubmitted={done} /> : current.taskType === 'ANNOTATION' ? <AnnotationTask task={visibleTask} onSubmitted={done} /> : <GenericAuthoring task={visibleTask} onSubmitted={done} />}
-        {task.taskType==='AUTHORING'&&detailed&&<section className="mt-6 space-y-3"><TemplateInstructions workflow={task.template.workflow} audience="author"/><h2>Investigation map · {steps.length} steps</h2><InvestigationMap steps={steps} selected={selectedStep} onSelect={setSelectedStep}/>{steps.filter(s=>s.id===selectedStep).map(s=><div key={s.id} className="rounded border border-line p-3"><h3>{s.id}</h3><p>{s.why}</p><p>{s.expectedResult}</p></div>)}<button className="rounded border border-line p-2" onClick={async()=>{if(!await flushAll()){setSwitchError('Your changes could not be saved. Retry before opening the agent view.');return;}const r=await call<{task:unknown}>('GET',`/me/tasks/${task.id}/agent-preview`);if(r.ok&&r.data)setAgentPreview(r.data.task);}}>View as agent</button>{agentPreview!=null&&<pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(agentPreview,null,2)}</pre>}</section>}
+        {task.taskType==='AUTHORING'&&<WorkflowGraphPanel taskId={task.id} graph={(current.output as {workflowGraph?:unknown}|null)?.workflowGraph??null} startingGraph={task.startingGraph??null} agentMode={task.agentMode??'SINGLE'} editable={detailed&&!visibleTask.readOnly}/>}
+        {task.taskType==='AUTHORING'&&detailed&&<section className="mt-6 space-y-3"><TemplateInstructions workflow={task.template.workflow} audience="author"/>{steps.length>0&&<h2>Investigation map · {steps.length} steps</h2>}{steps.length>0&&<InvestigationMap steps={steps} selected={selectedStep} onSelect={setSelectedStep}/>}{steps.filter(s=>s.id===selectedStep).map(s=><div key={s.id} className="rounded border border-line p-3"><h3>{s.id}</h3><p>{s.why}</p><p>{s.expectedResult}</p></div>)}<button className="rounded border border-line p-2" onClick={async()=>{if(!await flushAll()){setSwitchError('Your changes could not be saved. Retry before opening the agent view.');return;}const r=await call<{task:unknown}>('GET',`/me/tasks/${task.id}/agent-preview`);if(r.ok&&r.data)setAgentPreview(r.data.task);}}>View as agent</button>{agentPreview!=null&&<pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(agentPreview,null,2)}</pre>}</section>}
         </div>
       </div></TypedAnswerBoundary>}
 

@@ -9,7 +9,7 @@ import { createClient, createUser, db, resetDb } from './helpers';
 
 /** PRD D15a, part 2: the old-catalog Banking workflows that are retired. */
 const D15A_BANKING = [
-  'KYC onboarding and refresh',
+  // 'KYC onboarding and refresh' was kept in the catalog by the owner on 10 Nov 2026 (authoring v2.1 Wave 1).
   'Sanctions screening',
   'Suspicious activity and SAR/STR support',
   'Transaction investigation',
@@ -106,6 +106,7 @@ describe('C6 catalog-v2 dry run (S1-16, D15, D15a)', () => {
         ['Banking', 'Fraud–risk/compliance handoffs', 'DRAFT', 'PUBLISHED'],
         ['Banking', 'Issue and remediation tracking', 'DRAFT', 'PUBLISHED'],
         ['Banking', 'KYB and beneficial ownership', 'DRAFT', 'PUBLISHED'],
+        ['Banking', 'KYC onboarding and refresh', 'DRAFT', 'PUBLISHED'],
       ],
     );
 
@@ -117,7 +118,7 @@ describe('C6 catalog-v2 dry run (S1-16, D15, D15a)', () => {
       rows.filter((r) => r.domain !== 'Banking').map((r) => `${r.domain} / ${r.workflowName}`).sort(),
     );
     expect(retired.every((c) => c.from === 'DRAFT' && c.to === 'RETIRED')).toBe(true);
-    expect(plan.changes).toHaveLength(1 + 3 + 10 + 3 + 23);
+    expect(plan.changes).toHaveLength(1 + 3 + 11 + 3 + 22);
   });
 });
 
@@ -184,7 +185,7 @@ describe('C6 catalog-v2 apply', () => {
   it('publishes the owner’s fields workflows with their values, offerable with a task mode (D15, 10 Nov 2026)', async () => {
     const ts = await templatesOf(clientId);
     const fromFields = CATALOG_V2.flatMap((d) => d.workflows.filter((w) => w.fields).map((w) => w));
-    expect(fromFields).toHaveLength(10);
+    expect(fromFields).toHaveLength(11);
     for (const w of fromFields) {
       const t = ts.find((x) => normaliseName(x.workflowName) === normaliseName(w.workflowName))!;
       expect(t.status, w.workflowName).toBe('PUBLISHED');
@@ -354,7 +355,7 @@ describe('C6 catalog-v2 --reverse', () => {
       ['Omnichannel Creative & Locale Compliance', 'PUBLISHED'],
     ]);
     expect(named(again, 'template.published')).toEqual(
-      ['AML transaction-monitoring alerts', 'KYB and beneficial ownership', 'Adverse media review', 'Audit and evidence preparation', 'Communications surveillance', 'Compliance monitoring', 'Customer risk rating', 'Enhanced due diligence', 'Fraud–risk/compliance handoffs', 'Issue and remediation tracking'].sort(),
+      ['AML transaction-monitoring alerts', 'KYB and beneficial ownership', 'Adverse media review', 'Audit and evidence preparation', 'Communications surveillance', 'Compliance monitoring', 'Customer risk rating', 'Enhanced due diligence', 'Fraud–risk/compliance handoffs', 'Issue and remediation tracking', 'KYC onboarding and refresh'].sort(),
     );
     expect((await templatesOf(clientId)).map((t) => [t.id, t.status])).toEqual(afterForward.map((t) => [t.id, t.status]));
     expect((await applyCatalogV2(db, clientId, { apply: true })).changes).toEqual([]);
@@ -392,7 +393,7 @@ describe('C6 seed and job entrypoint', () => {
       'template.created',
       'template.created',
       'template.created',
-      ...Array(10).fill('template.published'),
+      ...Array(11).fill('template.published'),
     ]);
     expect(await offerable(first.client.id)).toEqual(PUBLISHED_WORKFLOWS);
     const second = await seed(db, env);
@@ -416,7 +417,7 @@ describe('C6 seed and job entrypoint', () => {
     expect(dry!.applied).toBe(false);
     expect(await auditsOf(clientId)).toEqual([]);
     expect(logs[0]!.message).toBe('catalog-v2 dry run: 40 change(s)');
-    expect(logs[0]!.extra).toMatchObject({ client: name, counts: { 'template.retired': 23, 'domain.retired': 3, 'template.created': 3, 'template.published': 10, 'domain.created': 1 } });
+    expect(logs[0]!.extra).toMatchObject({ client: name, counts: { 'template.retired': 22, 'domain.retired': 3, 'template.created': 3, 'template.published': 11, 'domain.created': 1 } });
     expect((logs[0]!.extra as { changes: string[] }).changes).toContain('template.retired Banking / Sanctions screening v1: DRAFT -> RETIRED');
 
     const [applied] = await runCatalogV2(db, { dryRun: false, reverse: false, clientName: name }, log);

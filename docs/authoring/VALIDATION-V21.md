@@ -28,10 +28,10 @@ all model, email and payment providers mocked. Not deployed; no live model call.
 | Check | Command | Result |
 | --- | --- | --- |
 | Typecheck, all 6 packages | `pnpm -r typecheck` | pass |
-| API integration tests | `pnpm --filter @praxis/api test` | 57 files; 755 passed, 5 skipped |
+| API integration tests | `pnpm --filter @praxis/api test` | 57 files; 764 passed, 5 skipped (after the demo-setup, Sonnet 5.5, Gemini, QA policy and KYC catalog changes) |
 | Shared unit tests | `pnpm --filter @praxis/shared test` | 313 passed |
 | Candidate tests | `pnpm --filter @praxis/candidate test` | 37 passed |
 | Web tests | `pnpm --filter @praxis/web test` | 58 passed |
-| Browser journeys, 5 templates | `npx playwright test -c e2e authoring-wave1` | **not yet run to completion**: first run failed on the staffing gate (fixed by an in-test backend for gated calls); rerun blocked by leftover local test servers on ports 4300/3300 |
+| Browser journeys, 5 templates | `npx playwright test -c e2e authoring-wave1` | 5 passed (KYC, KYB, AML, Omnichannel, phone launch): start from the template workflow, edit a node, save, same graph in Chatbot, list view and no sideways scroll at 736/390/320 px. Gated calls served by an in-test backend; run on alternate local ports |
 
 Not yet shown: the owner's live Vertex QA session and Anvil import (both required for Wave 1 sign-off).

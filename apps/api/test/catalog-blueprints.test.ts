@@ -58,7 +58,7 @@ describe('C4 catalog blueprints (S1-17)', () => {
   it('the catalog lists exactly the mockup workflows (D15)', () => {
     expect(CATALOG_V2.map((d) => [d.name, d.workflows.length])).toEqual([
       ['Digital Marketing', 3],
-      ['Banking', 10],
+      ['Banking', 11],
     ]);
     expect(normaliseName('Fraud–risk/compliance handoffs')).toBe(normaliseName('Fraud-risk/compliance handoffs'));
     expect(normaliseName('  KYB and  Beneficial ownership ')).toBe('kyb and beneficial ownership');
@@ -84,6 +84,7 @@ describe('C4 catalog blueprints (S1-17)', () => {
         'Enhanced due diligence',
         'Fraud-risk/compliance handoffs',
         'Issue and remediation tracking',
+        'KYC onboarding and refresh',
       ].sort(),
     );
     for (const { workflowName, fields } of fromFields) {

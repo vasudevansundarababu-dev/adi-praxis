@@ -4,7 +4,8 @@ import path from 'node:path';
 
 /**
  * The Meta-Compiler catalog (PRD D15, D15a; architecture §11). Exactly the mockup catalog: Digital Marketing (3)
- * and Banking (10; Control testing and Country-specific interpretation were removed by the owner on 10 Nov 2026).
+ * and Banking (11; Control testing and Country-specific interpretation were removed by the owner on 10 Nov 2026;
+ * KYC onboarding and refresh was kept in the catalog by the owner on 10 Nov 2026).
  * Every seeded workflow is published: three carry a full synthetic `blueprint` file, the rest carry the owner's
  * publish `fields`. Everything else from the old Taskflow catalog is retired by `catalog-v2`.
  */
@@ -213,6 +214,21 @@ export const CATALOG_V2: CatalogDomain[] = [
         },
       },
       { workflowName: 'KYB and beneficial ownership', blueprint: 'kyb-and-beneficial-ownership.json' },
+      // Owner decision (10 Nov 2026): KYC onboarding and refresh stays in the catalog (authoring v2.1 Wave 1 template),
+      // so catalog-v2 never retires it. It keeps its own task definition (docs/TASK-KYC.md); these are its publish fields.
+      {
+        workflowName: 'KYC onboarding and refresh',
+        blueprint: null,
+        fields: {
+          primaryWork: 'Author realistic, fully synthetic KYC onboarding and periodic-refresh cases with their evidence, recorded tool responses, reference disposition and risk rating, and a scoring rubric.',
+          verificationCriteria:
+            'Check that identity, address and ownership evidence is internally consistent or deliberately flawed as stated, every step and finding cites evidence, the disposition and risk rating follow the stated policy, and rubric criteria are testable against the trajectory or outcome.',
+          humanGate: 'A separate qualified KYC reviewer approves, requests changes or rejects the Task before publication, recording the decision and reasons.',
+          skills: ['KYC', 'EDD', 'identity and document verification', 'sanctions and PEP screening', 'customer risk rating', 'Task and rubric authoring', 'confidential data handling'],
+          taskModes: ['AUTHORING'],
+          defaultTptMinutes: 90,
+        },
+      },
     ],
   },
 ];

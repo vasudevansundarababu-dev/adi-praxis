@@ -1,7 +1,7 @@
 import { WORKFLOW_GRAPH_SCHEMA, type WorkflowGraphInput } from './schema';
 
 /**
- * Starting workflows for the Wave 1 and Wave 2 templates. An SME starts from the template's workflow with an explicit
+ * Starting workflows for the Wave 1, 2 and 3 templates. An SME starts from the template's workflow with an explicit
  * "Start from the template workflow" action, then edits it for the assigned case. These describe the template's
  * process shape only: they hold no case facts, answers or rubric judgements.
  */
@@ -173,12 +173,47 @@ const PATTERNS: Record<string, Pattern> = {
     outputLabel: 'Proposed risk rating',
     escalation: 'The rating cannot be determined with the available evidence.',
   },
+  // Wave 3. As in Wave 2, the tool catalogue is not qualified yet (task.md open questions), so roles list none.
+  'Q4 Global Paid Search Query Clustering': {
+    templateId: 'q4-global-paid-search-query-clustering',
+    role: { name: 'Paid search analyst', responsibility: 'Cluster search queries and label their intent under the brief', tools: [] },
+    evidence: 'Query dataset, product brief, locale and channel constraints',
+    review: { label: 'Cluster and label queries', instruction: 'Group the queries into clusters under the brief’s rules; label each query’s intent and assign, exclude or flag it, citing evidence IDs.', output: 'Clusters and query labels' },
+    missing: { question: 'Brief sufficient?', label: 'Request clarification', instruction: 'Ask for the specific brief, locale or channel detail needed to place the ambiguous queries.' },
+    conclude: { label: 'Finalise clusters', instruction: 'State the clusters, query assignments, intent labels, exclusions and ambiguous queries with rationale.', output: 'Clusters, assignments, exclusions and rationale' },
+    human: null,
+    outputLabel: 'Query clustering',
+    escalation: 'The queries cannot be clustered with the available brief and constraints.',
+  },
+  'Fraud-risk/compliance handoffs': {
+    templateId: 'fraud-risk-and-compliance-handoffs',
+    role: { name: 'Fraud-compliance handoff analyst', responsibility: 'Establish the facts and route the case to the right team with a complete handoff', tools: [] },
+    evidence: 'Fraud alert, transaction records, case timeline, roles and escalation policy',
+    review: { label: 'Assess the case', instruction: 'Establish the facts from the records and timeline; identify fraud indicators and compliance concerns, keeping facts apart from suspicions and citing evidence IDs.', output: 'Facts, fraud indicators and compliance concerns' },
+    missing: { question: 'Facts established?', label: 'Request information', instruction: 'Ask for the specific record or timeline detail needed to establish the facts.' },
+    conclude: { label: 'Prepare handoff', instruction: 'Choose the handoff route under the escalation policy, assemble the handoff package and recommend a next action with rationale.', output: 'Handoff route, package and recommendation' },
+    human: null,
+    outputLabel: 'Handoff package',
+    escalation: 'The case cannot be routed with the available evidence.',
+  },
+  'Compliance monitoring': {
+    templateId: 'compliance-monitoring',
+    role: { name: 'Compliance monitoring analyst', responsibility: 'Test the records against each obligation in the monitoring scope', tools: [] },
+    evidence: 'Monitoring scope, records, obligations and monitoring period',
+    review: { label: 'Assess obligations', instruction: 'Map each obligation in scope to the records for the monitoring period and record its result with evidence IDs.', output: 'Obligation-to-evidence assessment' },
+    missing: { question: 'Evidence sufficient?', label: 'Request records', instruction: 'Ask for exactly the missing records and say which obligation needs them.' },
+    conclude: { label: 'Rate and propose follow-up', instruction: 'State the exceptions, their severity and the proposed follow-up with rationale.', output: 'Result, exceptions, severity and follow-up' },
+    human: null,
+    outputLabel: 'Monitoring result',
+    escalation: 'The obligations cannot be assessed with the available records.',
+  },
 };
 
-/** Every template with a starting workflow (Wave 1 and Wave 2). */
+/** Every template with a starting workflow (Waves 1 to 3). */
 export const STARTING_GRAPH_TEMPLATES = Object.keys(PATTERNS);
 export const WAVE1_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(0, 5);
-export const WAVE2_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(5);
+export const WAVE2_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(5, 8);
+export const WAVE3_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(8);
 
 /** The template's starting workflow, or null when the template has none yet. */
 export function templateStartingGraph(workflowName: string, templateVersion = 1): WorkflowGraphInput | null {

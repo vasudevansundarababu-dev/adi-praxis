@@ -1,7 +1,8 @@
-# Template profiles and the Anvil contract compiler (Wave 1 and Wave 2)
+# Template profiles and the Anvil contract compiler (Waves 1 to 3)
 
 Status: built on `wave1-template-profiles` for AUTHORING-V2.1-PLAN Wave 1; Wave 2 (adverse media review, enhanced due
-diligence, customer risk rating) on `wave2-template-profiles`. Field contracts outside KYC are marked
+diligence, customer risk rating) on `wave2-template-profiles`; Wave 3 (Q4 global paid search query clustering, fraud-risk and
+compliance handoffs, compliance monitoring) on `feat/authoring-wave3`. Field contracts outside KYC are marked
 `requires_confirmation` (plan §6) until the domain owner confirms them.
 
 Code: `packages/shared/src/template-profile/` (schema, registry, helpers, `contract.ts` compiler, one file per
@@ -105,3 +106,48 @@ Not mapped from the drafts (left for the domain owner, nothing invented):
 - CRR: factor-level ratings, weights and a calculation schema; who approves a proposed override;
 - critical-failure scoring semantics beyond "at least one critical criterion".
 
+
+## Wave 3 profiles
+
+Built exactly like Wave 2: `storage: 'sections'`, `agentMode: 'SINGLE'`, `contractStatus: 'requires_confirmation'`,
+`sectionsProfile` (`common.ts`) for the shared S1–S8 fields, and only the template-specific parts below taken from each
+`handover-v2/templates/<slug>/task.md` draft. Pick-list values are the drafts' "current proposed labels", verbatim. All
+three are in the catalogue (`apps/api/prisma/catalog/index.ts`); nothing was added to it. Q4 paid search is a Digital
+Marketing workflow: it uses no banking field names. The fraud handoff profile matches the catalogue name
+"Fraud-risk/compliance handoffs" and the seeded old-lineage name "Fraud–risk/compliance handoffs" (en dash), because
+lookups ignore dash style.
+
+| | Q4 global paid search query clustering (DM01) | Fraud-risk and compliance handoffs (BK11) | Compliance monitoring (BK06) |
+|---|---|---|---|
+| Profile file | `profiles/q4-global-paid-search-query-clustering.ts` | `profiles/fraud-risk-and-compliance-handoffs.ts` | `profiles/compliance-monitoring.ts` |
+| Catalogue name | Q4 Global Paid Search Query Clustering | Fraud-risk/compliance handoffs | Compliance monitoring |
+| S1 subject | Product or brand | Customer type | Monitored area |
+| S2 evidence types | query_dataset, product_brief, locale_constraint, channel_constraint, other | fraud_alert, transaction_records, case_timeline, roles, escalation_policy, other | monitoring_scope, records, obligations, monitoring_period, other |
+| S5 deliverables (private) | clusters (repeated: id `CL1…`, name, definition, evidenceRefs; required), queryAssignments (repeated: query, clusterId, intent, assignment, evidenceRefs; required), exclusions (required), ambiguousQueries (required) | facts, fraudIndicators, complianceConcerns, handoffPackage (all required) | obligationAssessments (repeated: id `OB1…`, obligation, assessment, result, evidenceRefs; required), exceptions (required), proposedFollowUp (required) |
+| S5 per-item pick lists | queryAssignments: `intent` and `assignment` (the draft lists, required) | none | obligationAssessments: `result` (the draft list, required) |
+| S6 output fields (private reference) | `intent`: informational, commercial, transactional, navigational, unclear; `assignment`: assigned, excluded, needs_review (both for the focus query) | `handoff`: fraud, compliance, joint_review; `recommendation`: request_information, escalate, close_with_rationale | `result`: compliant, noncompliant, insufficient_evidence, not_applicable; `severity`: low, medium, high, critical, undetermined |
+
+Contract mapping (`praxis.anvil.task.v1`, structured-decision-v1) is the common sections mapping, unchanged: S1
+business context and deliverable → `objective`; S2 evidence → actor evidence; S2 known gaps, S5 rationale and
+unresolved issues → private evidence; S4 → policies; each S6 pick list → a string output.json field whose allowed
+values are the pick list, with the author's selection as `rubric.reference_output`; S6 further output fields →
+additional output fields; S7 criteria bind to those fields. Per-item pick lists (Q4 query labels, compliance
+monitoring obligation results) are private reference material in S5, not output.json fields; an author who wants one
+graded adds a further output field.
+
+Starting workflows use the common review pattern (case inputs → review → "sufficient?" decision with else and unknown
+to escalation → request, returning to review in a bounded loop of 2 with exhausted → escalate → conclude → output).
+None of the three has a business human step: the drafts describe none. Roles list no tools.
+
+Requires confirmation (left for the domain owner, nothing invented):
+- all three: exact field names and enums beyond the proposed labels, published agent mode, qualified tool catalogue
+  and environment, critical-failure scoring semantics, executable Anvil mapping (draft open questions);
+- Q4 paid search: the draft's labels are per query, but the S6 contract holds scalar values, so S6 grades one "focus
+  query"; a list-valued output.json shape (every query's cluster and intent) is not supported yet. The catalogue's
+  verification criterion "F1 >= 0.99" against the SME oracle is not encoded as a profile check (no scoring contract);
+  cluster naming and coverage rules are case evidence (the brief), not profile rules;
+- fraud handoffs: whether the receiving team (fraud, compliance, joint review) is a business human step in the graph,
+  and its response schema; the contents of a handoff package (free text); no enum for fraud indicators or compliance
+  concerns; whether the S5 business hand-off should be required;
+- compliance monitoring: whether severity is rated per exception or overall (S6 holds one value); obligation and
+  threshold definitions are case evidence; no follow-up enum (free text, a proposal only).

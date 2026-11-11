@@ -126,8 +126,8 @@ describe('fixture files for Anvil', () => {
   });
 });
 
-describe('template starting workflows (Wave 1 and Wave 2)', () => {
-  it.each(['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone', 'Adverse media review', 'Enhanced due diligence', 'Customer risk rating'])('%s passes the checker with no errors or warnings', async (name) => {
+describe('template starting workflows (Waves 1 to 3)', () => {
+  it.each(['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone', 'Adverse media review', 'Enhanced due diligence', 'Customer risk rating', 'Q4 Global Paid Search Query Clustering', 'Fraud-risk/compliance handoffs', 'Compliance monitoring'])('%s passes the checker with no errors or warnings', async (name) => {
     const { templateStartingGraph } = await import('../src/workflow-graph');
     const g = templateStartingGraph(name)!;
     expect(g).not.toBeNull();
@@ -145,8 +145,20 @@ describe('template starting workflows (Wave 1 and Wave 2)', () => {
     expect(humans('Customer risk rating')).toHaveLength(0);
     for (const name of WAVE2_GRAPH_TEMPLATES) expect(templateStartingGraph(name)!).toMatchObject({ agentMode: 'SINGLE', loops: [expect.objectContaining({ maxIterations: 2, exhaustedTarget: 'escalate' })] });
   });
-  it('has no starting workflow for templates outside Waves 1 and 2', async () => {
+  it('Wave 3: single-agent workflows with a bounded request loop and no business human step', async () => {
+    const { templateStartingGraph, WAVE3_GRAPH_TEMPLATES } = await import('../src/workflow-graph');
+    expect(WAVE3_GRAPH_TEMPLATES).toEqual(['Q4 Global Paid Search Query Clustering', 'Fraud-risk/compliance handoffs', 'Compliance monitoring']);
+    for (const name of WAVE3_GRAPH_TEMPLATES) {
+      const g = templateStartingGraph(name)!;
+      expect(g).toMatchObject({ agentMode: 'SINGLE', loops: [expect.objectContaining({ maxIterations: 2, exhaustedTarget: 'escalate' })] });
+      expect(g.nodes.filter((n) => n.type === 'human_step')).toHaveLength(0);
+      expect(g.roles.every((r) => (r.tools ?? []).length === 0)).toBe(true);
+    }
+    // The catalogue import may write an en dash.
+    expect(templateStartingGraph('Fraud–risk/compliance handoffs')!.templateId).toBe('fraud-risk-and-compliance-handoffs');
+  });
+  it('has no starting workflow for templates outside Waves 1 to 3', async () => {
     const { templateStartingGraph } = await import('../src/workflow-graph');
-    expect(templateStartingGraph('Compliance monitoring')).toBeNull();
+    expect(templateStartingGraph('Communications surveillance')).toBeNull();
   });
 });

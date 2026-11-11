@@ -33,7 +33,7 @@ const KYC_BOUND: KycTask = {
   },
 };
 
-describe('Wave 1 and Wave 2 template profiles: save, checks, agent view and Anvil export', () => {
+describe('Wave 1 to Wave 3 template profiles: save, checks, agent view and Anvil export', () => {
   let app: FastifyInstance;
   const email = new MemoryEmailSender();
   const google = new MockGoogleVerifier(SECRET);
@@ -119,7 +119,7 @@ describe('Wave 1 and Wave 2 template profiles: save, checks, agent view and Anvi
   }
 
   it.each(NON_KYC.map((p) => [p.catalogWorkflowName, p] as const))('%s: every section saves and reloads', async (name, profile: TemplateProfile) => {
-    const { a, id } = await authoringTask(name, name.includes('Phone') || name.includes('Omnichannel') ? 'Digital Marketing' : 'Banking');
+    const { a, id } = await authoringTask(name, name.includes('Phone') || name.includes('Omnichannel') || name.includes('Paid Search') ? 'Digital Marketing' : 'Banking');
     expect((await view(a, id)).definition).toBe('generic');
     const full = sampleProfileOutput(profile);
     let out = emptyOutput(profile);
@@ -157,6 +157,9 @@ describe('Wave 1 and Wave 2 template profiles: save, checks, agent view and Anvi
     expect(failed).not.toContain('S1:profile.S1.title');
     if (profile.profileId === 'enhanced-due-diligence') expect(failed).toContain('S5:profile.S5.humanHandoff');
     if (profile.profileId === 'customer-risk-rating') expect(failed).toEqual(expect.arrayContaining(['S5:profile.S5.factorAssessments', 'S6:profile.S6.override']));
+    if (profile.profileId === 'q4-global-paid-search-query-clustering') expect(failed).toEqual(expect.arrayContaining(['S5:profile.S5.clusters', 'S5:profile.S5.queryAssignments', 'S5:profile.S5.exclusions', 'S6:profile.S6.assignment']));
+    if (profile.profileId === 'fraud-risk-and-compliance-handoffs') expect(failed).toEqual(expect.arrayContaining(['S5:profile.S5.handoffPackage', 'S6:profile.S6.recommendation']));
+    if (profile.profileId === 'compliance-monitoring') expect(failed).toEqual(expect.arrayContaining(['S5:profile.S5.obligationAssessments', 'S5:profile.S5.proposedFollowUp', 'S6:profile.S6.severity']));
     expect((await db.taskInstance.findUniqueOrThrow({ where: { id } })).status).toBe('IN_PROGRESS');
   });
 
@@ -170,9 +173,9 @@ describe('Wave 1 and Wave 2 template profiles: save, checks, agent view and Anvi
     expect(res.json().task.sections.S2.evidence[0]).toEqual({ id: 'E1', type: profile.sections[1]!.fields[0]!.options![0]!.value, source: 'Source / issuer (synthetic sample)', date: '2026-05-01', content: 'Content (synthetic sample)' });
   });
 
-  it.each(['kyb-and-beneficial-ownership', 'enhanced-due-diligence'])('%s: a profile task submits, is approved and exports its compiled contract to Anvil', async (profileId) => {
+  it.each(['kyb-and-beneficial-ownership', 'enhanced-due-diligence', 'q4-global-paid-search-query-clustering', 'fraud-risk-and-compliance-handoffs', 'compliance-monitoring'])('%s: a profile task submits, is approved and exports its compiled contract to Anvil', async (profileId) => {
     const profile = NON_KYC.find((p) => p.profileId === profileId)!;
-    const { a, id, reviewer } = await authoringTask(profile.catalogWorkflowName);
+    const { a, id, reviewer } = await authoringTask(profile.catalogWorkflowName, profile.templateId.startsWith('DM') ? 'Digital Marketing' : 'Banking');
     expect((await save(a, id, sampleProfileOutput(profile))).statusCode).toBe(200);
     const sub = await submit(a, id);
     expect(sub.statusCode, sub.body).toBe(200);
@@ -229,7 +232,7 @@ describe('Wave 1 and Wave 2 template profiles: save, checks, agent view and Anvi
   });
 
   it('a legacy generic task still saves and submits as before', async () => {
-    for (const workflow of ['Compliance monitoring', 'KYB and beneficial ownership', 'Enhanced due diligence']) {
+    for (const workflow of ['Communications surveillance', 'KYB and beneficial ownership', 'Enhanced due diligence', 'Compliance monitoring']) {
       const { a, id } = await authoringTask(workflow);
       const legacy = { header: { title: `Legacy ${workflow}` }, body: `A synthetic ${workflow} case written in the generic editor, with evidence, steps and a decision.` };
       expect((await save(a, id, legacy)).statusCode).toBe(200);

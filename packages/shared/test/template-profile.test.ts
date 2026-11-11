@@ -26,6 +26,7 @@ import {
   TEMPLATE_PROFILES,
   WAVE1_PROFILES,
   WAVE2_PROFILES,
+  WAVE3_PROFILES,
   type KycTask,
   type TemplateProfile,
 } from '../src';
@@ -59,7 +60,7 @@ describe('template profile registry', () => {
     }
     expect(profileForWorkflow('launch of noise cancelling phone').status).toBe('ok');
     expect(profileForWorkflow('Omnichannel Creative & Locale Compliance').status).toBe('ok');
-    expect(profileForWorkflow('Compliance monitoring').status).toBe('none');
+    expect(profileForWorkflow('Communications surveillance').status).toBe('none');
     expect(KYC_PROFILE.domainPlugin).toBe('kyc-workbench');
     expect(KYC_PROFILE.contractStatus).toBe('confirmed');
     for (const p of NON_KYC) expect(p.contractStatus).toBe('requires_confirmation');
@@ -100,6 +101,49 @@ describe('template profile registry', () => {
     expect(profileProblems(crr, out).some((x) => x.path === 'S5.overrideRationale')).toBe(false);
     out = setFieldValue(crr, out, 'S6', 'override', 'proposed_increase');
     expect(profileProblems(crr, out)).toContainEqual(expect.objectContaining({ path: 'S5.overrideRationale', kind: 'conditional' }));
+  });
+
+  it('registers the three Wave 3 profiles with their draft pick lists as typed S6 output fields', () => {
+    const s6 = (p: TemplateProfile) => Object.fromEntries(p.sections[5]!.fields.filter((f) => f.outputField).map((f) => [f.outputField, f.options!.map((o) => o.value)]));
+    expect(WAVE3_PROFILES.map((p) => [p.catalogWorkflowName, p.templateId])).toEqual([['Q4 Global Paid Search Query Clustering', 'DM01'], ['Fraud-risk/compliance handoffs', 'BK11'], ['Compliance monitoring', 'BK06']]);
+    for (const p of WAVE3_PROFILES) {
+      expect(checkProfile(p), p.profileId).toEqual([]);
+      expect(profileForWorkflow(p.catalogWorkflowName)).toMatchObject({ status: 'ok', profile: { profileId: p.profileId } });
+      expect(p).toMatchObject({ agentMode: 'SINGLE', storage: 'sections', contractStatus: 'requires_confirmation', domainPlugin: null });
+      expect(p.sections.map((s) => s.key)).toEqual(['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8']);
+      // Reference values and the rubric are private.
+      for (const f of p.sections[5]!.fields.filter((x) => x.outputField)) expect(f.visibility, `${p.profileId} S6.${f.key}`).toBe('private_reference');
+      for (const f of p.sections[4]!.fields) expect(f.visibility, `${p.profileId} S5.${f.key}`).toBe('private_reference');
+      expect(itemFieldsOf(p.sections[5]!.fields.find((f) => f.key === 'decisionFields')!).find((f) => f.key === 'referenceValue')!.visibility).toBe('private_reference');
+      for (const f of p.sections[6]!.fields) expect(f.visibility, `${p.profileId} S7.${f.key}`).toBe('private_rubric');
+    }
+    // The catalogue writes an en dash in some imports; the match ignores dash style.
+    expect(profileForWorkflow('Fraud–risk/compliance handoffs')).toMatchObject({ status: 'ok', profile: { profileId: 'fraud-risk-and-compliance-handoffs' } });
+    const [paidSearch, fraud, monitoring] = WAVE3_PROFILES;
+    expect(s6(paidSearch)).toEqual({ intent: ['informational', 'commercial', 'transactional', 'navigational', 'unclear'], assignment: ['assigned', 'excluded', 'needs_review'] });
+    expect(s6(fraud)).toEqual({ handoff: ['fraud', 'compliance', 'joint_review'], recommendation: ['request_information', 'escalate', 'close_with_rationale'] });
+    expect(s6(monitoring)).toEqual({ result: ['compliant', 'noncompliant', 'insufficient_evidence', 'not_applicable'], severity: ['low', 'medium', 'high', 'critical', 'undetermined'] });
+    // Template deliverables (S5) from each draft.
+    const s5 = (p: TemplateProfile) => p.sections[4]!.fields.map((f) => f.key);
+    expect(s5(paidSearch)).toEqual(expect.arrayContaining(['clusters', 'queryAssignments', 'exclusions', 'ambiguousQueries', 'rationale']));
+    expect(s5(fraud)).toEqual(expect.arrayContaining(['facts', 'fraudIndicators', 'complianceConcerns', 'handoffPackage', 'rationale']));
+    expect(s5(monitoring)).toEqual(expect.arrayContaining(['obligationAssessments', 'exceptions', 'proposedFollowUp', 'rationale']));
+    // The Q4 template is Digital Marketing: no banking field names.
+    expect(JSON.stringify(paidSearch.sections[4]!.fields.map((f) => f.key))).not.toMatch(/customer|kyc|risk/i);
+  });
+
+  it('Wave 3 per-item pick lists: Q4 query intent and assignment, compliance monitoring obligation result', () => {
+    const [paidSearch, , monitoring] = WAVE3_PROFILES;
+    const rows = getFieldValue(paidSearch, sampleProfileOutput(paidSearch), 'S5', { key: 'queryAssignments' }) as Record<string, unknown>[];
+    expect(rows[0]).toMatchObject({ intent: 'informational', assignment: 'assigned' });
+    const badIntent = profileProblems(paidSearch, setFieldValue(paidSearch, sampleProfileOutput(paidSearch), 'S5', 'queryAssignments', [{ ...rows[0], intent: 'brand' }]));
+    expect(badIntent).toContainEqual(expect.objectContaining({ path: 'S5.queryAssignments[0].intent', kind: 'invalid' }));
+    const missing = profileProblems(paidSearch, setFieldValue(paidSearch, sampleProfileOutput(paidSearch), 'S5', 'exclusions', ''));
+    expect(missing).toContainEqual(expect.objectContaining({ path: 'S5.exclusions', kind: 'required' }));
+    const obligations = getFieldValue(monitoring, sampleProfileOutput(monitoring), 'S5', { key: 'obligationAssessments' }) as Record<string, unknown>[];
+    expect(obligations[0]!.result).toBe('compliant');
+    const badResult = profileProblems(monitoring, setFieldValue(monitoring, sampleProfileOutput(monitoring), 'S5', 'obligationAssessments', [{ ...obligations[0], result: 'partly_compliant' }]));
+    expect(badResult).toContainEqual(expect.objectContaining({ path: 'S5.obligationAssessments[0].result', kind: 'invalid' }));
   });
 
   const base = (): TemplateProfile => clone(NON_KYC[0]!);

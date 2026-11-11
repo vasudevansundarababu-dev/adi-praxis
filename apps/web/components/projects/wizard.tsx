@@ -10,6 +10,9 @@ import {
   type ProjectDto,
   type TaskMode,
   type TemplateDto,
+  ENABLED_REVIEW_ROUTES,
+  REVIEW_ROUTE_LABELS,
+  REVIEW_ROUTES,
 } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -28,6 +31,7 @@ export interface WizardState {
   startDate: string;
   endDate: string;
   authoringExperience: 'CLASSIC' | 'CHATBOT' | 'BOTH' | '';
+  reviewRoute: 'SME_PM' | 'SME_EXPERT_PM';
   taskMode: TaskMode;
   taskCount: string;
   distinctTarget: string;
@@ -50,6 +54,7 @@ function initialState(project: ProjectDto | null, templates: TemplateDto[]): Wiz
       startDate: project.startDate ?? '',
       endDate: project.endDate ?? '',
       authoringExperience: project.authoringExperience ?? '',
+      reviewRoute: project.reviewRoute ?? 'SME_PM',
       taskMode: project.taskMode,
       taskCount: project.taskCount?.toString() ?? '',
       distinctTarget: project.distinctTarget?.toString() ?? '',
@@ -65,6 +70,7 @@ function initialState(project: ProjectDto | null, templates: TemplateDto[]): Wiz
   return {
     templateId: t?.id ?? '',
     authoringExperience: '',
+    reviewRoute: 'SME_PM',
     name: '',
     description: '',
     startDate: '',
@@ -130,6 +136,7 @@ export function ProjectWizard(props: {
       startDate: state.startDate || null,
       endDate: state.endDate || null,
       authoringExperience: state.authoringExperience || undefined,
+      reviewRoute: state.taskMode === 'AUTHORING' ? state.reviewRoute : undefined,
       taskMode: state.taskMode,
       taskCount: state.taskMode === 'ANNOTATION' ? num(state.taskCount) : null,
       distinctTarget: state.taskMode === 'AUTHORING' ? num(state.distinctTarget) : null,
@@ -267,6 +274,7 @@ export function ProjectWizard(props: {
           )}
 
           {step === 1 && state.taskMode === 'AUTHORING' && <fieldset className="mb-5 space-y-2"><legend className="font-medium">Authoring experience <Req /></legend><p className="text-sm text-fg-muted">Choose how SMEs author tasks. Agent type remains defined by the template.</p>{project && !project.authoringExperience && <p className="text-sm text-fg-muted">Legacy project: both existing views remain available. Leave this choice unchanged to preserve its current controls.</p>}<div className="grid gap-3 sm:grid-cols-3">{(['CLASSIC','CHATBOT','BOTH'] as const).map(mode=><label key={mode} className="rounded border border-line p-3"><input type="radio" name="authoringExperience" checked={state.authoringExperience===mode} onChange={()=>set({authoringExperience:mode})} /> <b>{mode==='CLASSIC'?'Classic':mode==='CHATBOT'?'Chatbot':'Both'}</b><p className="mt-2 text-sm">{mode==='CLASSIC'?'Guided fields and investigation map.':mode==='CHATBOT'?'Conversation-led authoring and investigation map.':'Switch views while editing the same task.'}</p></label>)}</div></fieldset>}
+          {step === 1 && state.taskMode === 'AUTHORING' && <fieldset className="mb-5 space-y-2"><legend className="font-medium">Review route</legend><p className="text-sm text-fg-muted">Who checks a submitted task. This is platform review; it is never a step inside the task&apos;s workflow.</p><div className="grid gap-3 sm:grid-cols-2">{REVIEW_ROUTES.map(route=>{const enabled=ENABLED_REVIEW_ROUTES.includes(route);return <label key={route} className={`rounded border border-line p-3 ${enabled?'':'opacity-60'}`}><input type="radio" name="reviewRoute" disabled={!enabled} checked={state.reviewRoute===route} onChange={()=>set({reviewRoute:route})} /> <b>{REVIEW_ROUTE_LABELS[route]}</b><p className="mt-2 text-sm">{route==='SME_PM'?'The PM (or an authorised reviewer) approves each submitted task.':'An Expert reviews first, then the PM approves the exact reviewed version.'}{!enabled&&' Coming in the next release.'}</p></label>;})}</div></fieldset>}
           {step === 1 && (
             <div className="mt-4 space-y-4">
               <RequiredNote />
@@ -480,6 +488,7 @@ function ReviewStep({ state, template, jd, attributes }: { state: WizardState; t
     ['Template', template ? `${template.domainName} — ${template.workflowName} (v${template.version})` : '—'],
     ['Name', state.name || '—'],
     ['Authoring experience', state.taskMode === 'AUTHORING' ? state.authoringExperience || 'Choose before saving' : 'Not applicable'],
+    ['Review route', state.taskMode === 'AUTHORING' ? REVIEW_ROUTE_LABELS[state.reviewRoute] : 'Not applicable'],
     ['Dates', state.startDate && state.endDate ? `${state.startDate} to ${state.endDate}` : '—'],
     ['Mode', state.taskMode === 'AUTHORING' ? `Authoring: ${state.distinctTarget || '?'} distinct tasks, max ${state.maxPerExpert || '?'} per expert` : `Annotation: ${state.taskCount || '?'} tasks`],
     ['TPT', state.tptMinutes ? `${state.tptMinutes} minutes` : '—'],

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { ReviewGraph } from '@/components/tasks/review-graph';
 import { TaskReview, type TaskReviewData } from '@/components/tasks/task-review';
 import { JudgeResultView } from '@/components/templates/tasks/judge-panel';
 import { apiGet } from '@/lib/api';
@@ -25,6 +26,7 @@ export default async function TaskReviewPage({ params }: { params: Promise<{ id:
   return (
     <>
       <TaskReview data={data} />
+      {!!data.output?.workflowGraph && <ReviewGraph graph={data.output.workflowGraph} />}
       {judge.data?.judge && (
         <section className="mt-6">
           <h2 className="mb-2 text-lg font-semibold">LLM judge</h2>

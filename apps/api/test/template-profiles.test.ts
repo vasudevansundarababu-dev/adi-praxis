@@ -100,7 +100,7 @@ describe('Wave 1 template profiles: save, checks, agent view and Anvil export', 
     expect((await post(pm, `/projects/${p.id}/assignments`, { candidateIds: [c.id] })).statusCode).toBe(200);
     await deliver('candidate.assigned');
     const mine = await db.taskInstance.findMany({ where: { projectId: p.id, assignedToId: c.id }, include: { slot: true } });
-    const t = (kyc ? mine.find((x) => x.slot?.edgeCase === EDGE) : mine.find((x) => !x.slot?.isOpen)) ?? mine[0]!;
+    const t = (kyc ? mine.find((x) => (x.input as { slot?: { edgeCase?: string | null } }).slot?.edgeCase === EDGE) : mine.find((x) => !x.slot?.isOpen)) ?? mine[0]!;
     return { a, id: t.id, reviewer: await login(app, r.email) };
   }
 

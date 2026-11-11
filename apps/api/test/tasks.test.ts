@@ -451,10 +451,11 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
   it('creates the synthetic demo configuration idempotently without inventing a human approval', async () => {
     const call = async (who: string, method: string, path: string, payload?: unknown) => {
       if (method === 'POST' && path.endsWith('/synthetic-example')) {
-        const status = (await get(pm, path.replace('/synthetic-example', '/tasks'))).json();
+        const as = who === 'a' ? admin : pm;
+        const status = (await get(as, path.replace('/synthetic-example', '/tasks'))).json();
         if (status.items.length === 0) {
           expect(status).toMatchObject({ syntheticDraftCanCreate: true, syntheticDraftAvailable: false });
-          expect((await get(pm, path)).statusCode).toBe(404);
+          expect((await get(as, path)).statusCode).toBe(404);
         } else expect(status).toMatchObject({ syntheticDraftCanCreate: false, syntheticDraftAvailable: true });
       }
       const response = await app.inject({ method: method as 'GET' | 'POST', url: `/api/v1${path}`, headers: { cookie: who === 'a' ? admin : pm, ...idem() }, ...(method === 'GET' ? {} : { payload: payload as object }) });
@@ -465,6 +466,16 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
     await executableDemoSetup(call, () => undefined);
     await executableDemoSetup(call, () => undefined, true);
     await executableDemoSetup(call, () => undefined, true);
+    // QA regression: the project exists but the demo PM does not own it (PMs list only their own projects).
+    // Re-running must find it by its client-unique name instead of failing with 409 on create.
+    const harbor = { name: { startsWith: 'SYNTHETIC TEST — Harbor' } };
+    const pmOwner = (await db.project.findFirstOrThrow({ where: harbor })).ownerId;
+    const otherOwner = await db.user.findFirstOrThrow({ where: { roles: { has: 'ADMIN' } } });
+    await db.project.updateMany({ where: harbor, data: { ownerId: otherOwner.id } });
+    await executableDemoSetup(call, () => undefined);
+    await executableDemoSetup(call, () => undefined, true);
+    expect(await db.project.count({ where: harbor })).toBe(2);
+    await db.project.updateMany({ where: harbor, data: { ownerId: pmOwner } });
     const staged = await db.project.findFirstOrThrow({ where: { name: 'SYNTHETIC TEST — Harbor staged marketing decisions' } });
     const stagedTask = await db.taskInstance.findFirstOrThrow({ where: { projectId: staged.id } });
     expect(stagedTask.output).toMatchObject({ praxisContract: { schema_version: 'praxis.anvil.task.v2' } });

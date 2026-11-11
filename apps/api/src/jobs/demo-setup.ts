@@ -34,7 +34,7 @@ export async function demoSetup(db: Db, env: NodeJS.ProcessEnv, log: (level: str
   await executableDemoSetup(call, log);
   await executableDemoSetup(call, log, true);
 
-  if ((await call('p', 'GET', '/projects')).items.some((p: { name: string }) => p.name === 'KYC authoring demo')) {
+  if (await projectNamed(call, 'KYC authoring demo')) {
     log('info', 'demo project already exists');
     await supplySetup(db, client.id, env, call, log);
     return;
@@ -116,13 +116,21 @@ async function supplySetup(db: Db, clientId: string, env: NodeJS.ProcessEnv, cal
   log('info', 'SME supply demo data ready', { partnerId: partner.id, requisitionId: r.id });
 }
 
+/** The client's project with this name (names are unique per client, case-insensitively), seen as Admin. */
+async function projectNamed(call: Call, name: string): Promise<{ id: string; status: string } | undefined> {
+  return (await call('a', 'GET', '/projects')).items.find((p: { name: string }) => p.name.toLowerCase() === name.toLowerCase());
+}
+
 /** Creates only reviewable demo configuration through public APIs. No task or rights approval is fabricated. */
 export async function executableDemoSetup(call: Call, log: (level: string, message: string, extra?: object) => void, staged = false) {
   const name = staged ? 'SYNTHETIC TEST — Harbor staged marketing decisions' : 'SYNTHETIC TEST — Harbor marketing decisions';
-  const existing = (await call('p', 'GET', '/projects')).items.find((p: { name: string }) => p.name === name);
+  // Look up as Admin: a PM lists only their own projects, but project names are unique across the client, so a
+  // same-named project owned by anyone else would otherwise make every re-run fail with 409 on create.
+  const existing = await projectNamed(call, name);
   if (existing) {
-    if (existing.status === 'DRAFT') await call('p', 'POST', `/projects/${existing.id}/submit`);
-    if (['DRAFT', 'READY_FOR_STAFFING'].includes(existing.status)) await call('p', 'POST', `/projects/${existing.id}/synthetic-example`);
+    if (existing.status === 'DRAFT') await call('a', 'POST', `/projects/${existing.id}/submit`);
+    if (['DRAFT', 'READY_FOR_STAFFING'].includes(existing.status)) await call('a', 'POST', `/projects/${existing.id}/synthetic-example`);
+    log('info', 'synthetic executable project already exists', { projectId: existing.id, status: existing.status });
     return;
   }
   const domains = (await call('a', 'GET', '/domains')).items;

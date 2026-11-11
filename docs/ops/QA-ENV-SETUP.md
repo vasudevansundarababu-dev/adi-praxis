@@ -71,8 +71,11 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
   `claude-sonnet-5-5`; the request sends no thinking, tool_choice or sampling settings, and a test pins that shape for
   Sonnet 5.5 and Haiku 5.5. Open owner decision: Sonnet 5.5 runs at its default effort (high); a lower effort would
   cut QA cost at some cost in chatbot quality.
-- **O6 — Claude quota.** Waiting for Google to grant the three increases above. Check: Cloud Quotas preference
-  `praxis-qa-anthropic-claude-sonnet` shows granted value 30.
+- **O6 — Claude quota DENIED (10 Nov, blocks the live chatbot).** Google denied the 30/min requests for
+  `anthropic-claude-sonnet` and `anthropic-claude-haiku` within seconds (automatic denial, `stateDetail: Quota request
+  denied`); `anthropic-count-tokens` still pending. Claude quota is 0 in every project (QA, staging, demo, Anvil), so
+  no project can call Claude on Vertex today. Needs an owner decision: appeal to Google and/or a non-Claude path for
+  the chatbot.
 
 ## 5. Step 7: clean up (owner, after the QA setup is finished)
 

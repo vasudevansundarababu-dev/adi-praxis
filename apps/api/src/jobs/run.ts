@@ -13,6 +13,8 @@ import { grantAppRole } from './grant-app-role';
  * - `catalog-v2 [--dry-run] [--reverse] [--client <name>]`: the Meta-Compiler catalog change (PRD D15, D15a).
  * - `catalog-import --file <abs-path> --client <clientId> [--dry-run]`: one private template as a client DRAFT.
  * - `policy-seed --client <clientId> --owner <pmUserId>`: fictional SEED policy projects (PRD PR-S01); never production.
+ * - `qa-users [--dry-run]`: QA-only synthetic users (30 staffing-ready SMEs, 10 Reviewers) through the public API at
+ *   API_URL; never production. Exit 3 when some candidates are not ready yet (re-run to continue).
  * Exits non-zero on failure so Cloud Run retries and alerts.
  */
 const job = process.argv[2];
@@ -58,11 +60,22 @@ try {
     const { defaultStorage } = await import('../app');
     const r = await policySeed(db, { storage: defaultStorage(config), appEnv: config.appEnv, clientId: arg('client'), ownerId: arg('owner') }, log);
     if (r.missingTemplates.length) process.exitCode = 3;
+  } else if (job === 'qa-users') {
+    if (config.appEnv === 'production') throw new Error('qa-users refuses to run with APP_ENV=production');
+    const extra = process.argv.slice(3).filter((a) => a !== '--dry-run');
+    if (extra.length) throw new Error(`Unknown qa-users argument "${extra[0]}". Use: --dry-run`);
+    const dryRun = process.argv.includes('--dry-run');
+    const { fetchHttp, optionsFromEnv, qaUsers } = await import('./qa-users');
+    if (!dryRun && !process.env.API_URL) throw new Error('qa-users needs API_URL');
+    const { defaultEvaluator } = await import('../app');
+    // The job also runs pending or failed assessments with this environment's model (SUITABILITY_MODEL).
+    const r = await qaUsers(db, { ...optionsFromEnv(process.env, config.appEnv, dryRun, fetchHttp(process.env.API_URL ?? '')), evaluator: defaultEvaluator(config) }, log);
+    if (!dryRun && r.incomplete) process.exitCode = 3;
   } else if (job === 'catalog-import') {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

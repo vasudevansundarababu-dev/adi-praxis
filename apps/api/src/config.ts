@@ -68,6 +68,8 @@ const Env = z.object({
   SUPPORT_MODEL: z.string().default(''),
   /** Authoring v2.1: the chatbot facilitator's model on Vertex (live in QA), and its per-client daily call cap. */
   AUTHORING_MODEL: z.string().default('claude-sonnet-5-5'),
+  /** FLOW2 suitability assessment model on Vertex: a Claude model id (default), or `gemini:<model>` (QA without Claude quota). */
+  SUITABILITY_MODEL: z.string().default('claude-opus-5'),
   AUTHORING_DAILY_CALL_CAP: z.coerce.number().int().min(1).max(100_000).default(300),
   /** Wave 3: Vertex location for AUTHORING_MODEL=maas:<publisher>/<model> (the region on the model card, or `global`). Blank = VERTEX_LOCATION. */
   AUTHORING_MAAS_LOCATION: z.string().regex(/^$|^[a-z0-9-]+$/).default(''),

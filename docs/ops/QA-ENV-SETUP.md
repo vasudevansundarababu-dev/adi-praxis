@@ -52,7 +52,7 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 | 3 | Caps: deployer passes `AUTHORING_MODEL` and `AUTHORING_DAILY_CALL_CAP`; `llm.call` metric and alert; Vertex budget | **Deployer done (local commit, 10 Nov):** `infra/demo/deploy-demo.sh` with `PRAXIS_VERTEX=1` sets `AUTHORING_MODEL=gemini:gemini-3.8-flash` (Claude quota denied; switch to `claude-sonnet-5-5` when granted, no code change) and `AUTHORING_DAILY_CALL_CAP=300` (both overridable) and deploys, never runs, job `praxis-vertex-smoke` when the build contains `apps/api/scripts/vertex-smoke.ts`. **Budget done (10 Nov):** owner created "PraxisQA All Services", 500 USD/month on My Billing Account, QA project only, all services, alerts at 50/90/100%. (The older 1000 USD QA budget counts one service only.) Optional later: an `llm.call` log metric and alert. |
 | 4 | Policy extraction in QA: Document AI layout parser, LlamaExtract key slot | **Owner decision 10 Nov: live in QA.** Code: guard allows `APP_ENV=demo` with both budgets, Gemini location `global` (`feat/authoring-v21` ee036e4c). Setup run 10 Nov with `infra/demo/setup-policy-extraction.sh` (owner approved): Document AI API on, processor `praxis-policy-layout` (`projects/742785092638/locations/us/processors/cd94e57fc61a40a5`), `roles/documentai.apiUser` for `praxis-demo-run`, empty secret `llamaextract-api-key`. Deployer sets processor, `POLICY_GEMINI_MODEL=gemini-3.8-flash`, `POLICY_GEMINI_LOCATION=global`, budgets 5 USD each, and `POLICY_EXTRACTION_LIVE=true` only when the build allows it (main does not yet). LlamaExtract (10 Nov): owner added the key to `llamaextract-api-key` (version 1) and the LlamaCloud project id is in secret `llamaextract-project-id`; the deployer wires both only when both have a version. |
 | 5 | Migrations (incl. `20261111000000_authoring_v21_modes`) and seed, catalogue templates | **Answered by the code session (10 Nov).** Migration is safe on existing QA data (adds `Template.agent_mode` default `SINGLE`, `Project.review_route` default `SME_PM`). The deploy already runs migrate and demo-setup. One extra job for Wave 1: `catalog-v2` (publishes Omnichannel Creative & Locale Compliance, keeps KYB/AML/Phone launch, retires Control testing and Country-specific interpretation and the Marketing domain for new projects). The deployer now deploys `praxis-catalog-v2` as a **dry run only**. After the Wave 1 deploy the owner runs the dry run, checks that *KYC onboarding and refresh* shows as `reused` (owner kept KYC in the catalog, commit 5602510c; if it shows `template.retired`, stop and tell the code session), then applies with `--args=src/jobs/run.ts,catalog-v2`. `--reverse` undoes it. Optional: `policy-seed --client <id> --owner <PM id>` for fictional seed policies. |
-| 6 | First wave deploy on the owner's go; smoke job (exit 0); admin check shows `vertex` | Open |
+| 6 | First wave deploy on the owner's go; smoke job (exit 0); admin check shows `vertex` | **Wave 1 deployed (11 Nov, ~18:30 UTC).** Build `nightly-20261111-7ad77a5` (main 7ad77a5c, with fixes #50 consent race and #51 evaluator-only rules), Nightly run 43057721824 green on attempt 3, release tag made. Attempt 1 failed on a GitHub runner outage (Ubuntu mirror); attempt 2 deployed but QA traffic was pinned since 10 Nov to the 2 Nov revisions, so on the owner's yes all three services now route to the latest revision. catalog-v2 dry run: 27 changes (retires 3 old domains and 24 draft templates; KYC and other Banking workflows reused). Smoke job praxis-vertex-smoke-p5z9c passed (exit 0): chatbot gemini-3.8-flash on vertex, 8.1 s; embeddings text-embedding-005, 768 dims. Owner still to do: admin model-providers check, catalog-v2 applied on the owner's yes (execution praxis-catalog-v2-vt6sz, 27 changes). |
 | 7 | Clean up old projects and budgets (owner, after steps 1–6) | Open. See section 5. |
 
 ## 4. Open items
@@ -111,3 +111,35 @@ the demo project goes. QA should keep an all-services budget on My Billing Accou
 Deleting a project (`gcloud projects delete <id>`, or IAM & Admin → Manage resources) stops its billing and can be
 undone for 30 days. Before deleting the demo project, check nothing still points at its URLs (handbook artifact, tester
 emails).
+
+## 6. QA seed users: `qa-users` job (11 Nov 2026)
+
+Synthetic test users for testing staffing, authoring and review at scale. QA (and local) only: the job refuses
+`APP_ENV=production`. Decisions: `docs/DECISIONS.md`, "QA seed users".
+
+- **Who:** 10 Reviewer console users `reviewer01..10@praxis.test` (role REVIEWER, demo client, one shared password from
+  the secret `QA_SEED_REVIEWER_PASSWORD`) and 30 SMEs `sme01..30@praxis.test`. Sign in as an SME on the candidate app's
+  mock Google screen with that email (any name). Names start with `SYNTHETIC QA`.
+- **Ready for staffing:** each published template (newest version, active domain) gets at least 3 SMEs selected and
+  onboarded in its pool project: the oldest live project with a published opportunity, or a new project
+  `SYNTHETIC QA pool — <workflow>` owned by `pm@praxis.demo`. All 30 SMEs get at least one pool. All 10 Reviewers are
+  Validators on every live project of those templates.
+- **How:** the real FLOW 2 journey over the public API (mock sign-in, mock identity, profile form, submit, the worker's
+  suitability assessment on live Vertex, a SELECTED decision by a named seeded Reviewer, onboarding). Needs the worker
+  running. Expect about 30–40 assessment calls on the first run and none on re-runs.
+- **Assessment model:** QA has no Claude quota, so set `SUITABILITY_MODEL=gemini:gemini-3.8-flash` on the job (and on
+  the worker, so testers' applications are assessed too). The job runs pending or failed assessments itself.
+- **Re-runs** resume from each SME's current state and create nothing twice. Exit code 3 means some SMEs are not ready
+  yet (usually still awaiting the assessment): run it again later.
+
+Deployer wiring (DevOps session, `infra/demo/deploy-demo.sh`), deployed as a dry run like `catalog-v2`:
+
+```bash
+gcloud run jobs deploy praxis-qa-users --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=3600s \
+  --args=src/jobs/run.ts,qa-users,--dry-run \
+  --set-secrets="$SECRETS,DEMO_ADMIN_PASSWORD=demo-admin-password:latest,DEMO_PM_PASSWORD=demo-pm-password:latest,QA_SEED_REVIEWER_PASSWORD=qa-seed-reviewer-password:latest"
+```
+
+Owner: create the secret `qa-seed-reviewer-password` (at least 12 characters) in Secret Manager, then
+plan with `gcloud run jobs execute praxis-qa-users --region <region> --wait` (writes nothing; read the logs) and apply
+with `gcloud run jobs execute praxis-qa-users --region <region> --wait --args=src/jobs/run.ts,qa-users`.

@@ -69,6 +69,11 @@ export function ProjectSummary({
           Opportunity page
         </Link>
       )}
+      {!['DRAFT', 'CANCELLED', 'COMPLETED'].includes(p.status) && reviewerJd && (
+        <Link href={`/projects/${p.id}/opportunity?role=REVIEWER`} className="ml-3 mt-6 inline-block btn btn-secondary">
+          Reviewer job post
+        </Link>
+      )}
       {p.status === 'READY_FOR_STAFFING' && p.name.startsWith('SYNTHETIC TEST — ') && (
         <Link href={`/projects/${p.id}/tasks`} className="ml-3 mt-6 inline-block btn btn-secondary">
           Tasks and invites

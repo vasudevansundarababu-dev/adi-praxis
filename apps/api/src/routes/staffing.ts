@@ -49,7 +49,7 @@ export const staffingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; geo
         // SPEC: auto-launch the sourcing campaign when enabled on the project and there is a shortfall.
         const list = await listMatches(tx, p.id, run.warnings);
         if (p.autoLaunchCampaign && list.shortfall > 0) {
-          const ready = await tx.opportunity.findFirst({ where: { projectId: p.id, status: 'PUBLISHED' } });
+          const ready = await tx.opportunity.findFirst({ where: { projectId: p.id, role: 'AUTHOR', status: 'PUBLISHED' } });
           const active = await tx.campaign.findFirst({ where: { projectId: p.id, status: { in: ['LIVE', 'PAUSED'] } } });
           if (ready && !active) {
             const c = await launchCampaign(tx, config, p.id, 'LINKEDIN_MANUAL');
@@ -120,7 +120,7 @@ export const staffingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; geo
         }
         if (problems.length) throw new AppError(409, 'NOT_ASSIGNABLE', `Cannot assign: ${problems.join('; ')}.`, { problems });
 
-        const opportunity = await tx.opportunityVersion.findFirst({ where: { opportunity: { projectId: p.id }, publishedAt: { not: null } }, orderBy: { version: 'desc' } });
+        const opportunity = await tx.opportunityVersion.findFirst({ where: { opportunity: { projectId: p.id, role: 'AUTHOR' }, publishedAt: { not: null } }, orderBy: { version: 'desc' } });
         for (const id of ids) {
           const score = eligible.get(id)!.score;
           const g = gates.get(id)! as Extract<Awaited<ReturnType<SelectionGate['check']>>, { ok: true }>;

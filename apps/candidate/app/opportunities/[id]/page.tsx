@@ -54,6 +54,12 @@ export default async function OpportunityPage({ params, searchParams }: { params
         </div>
         <h1 className="mt-3 text-3xl font-bold tracking-tight">{b.title}</h1>
         <p className="muted mt-2">Contribution role: {b.contributionRoles.map((r) => CONTRIBUTION_ROLE_LABELS[r]).join(', ')}</p>
+        {o.role === 'REVIEWER' && (
+          <p className="mt-2 text-sm">
+            This is an Expert reviewer role: you review tasks written by other experts before the project manager approves them. If you are selected, you get a reviewer
+            account for the review console.
+          </p>
+        )}
         {b.compensation && <p className="mt-3 text-lg font-semibold">{b.compensation}</p>}
         {apply}
         <p className="muted mt-3 text-xs">A few short questions, most answered with a tap. Applying does not guarantee selection; a person makes every decision.</p>

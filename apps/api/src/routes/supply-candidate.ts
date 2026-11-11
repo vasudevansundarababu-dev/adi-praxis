@@ -5,7 +5,7 @@ import type { Config } from '../config';
 import type { Db } from '../db';
 import { AppError, notFound } from '../lib/errors';
 import { runCandidateCommand } from '../platform/command';
-import { redeemInvite, submitCandidate } from '../supply/submissions';
+import { opportunityForTier, redeemInvite, submitCandidate } from '../supply/submissions';
 import { startOrResumeEnrollment } from './opportunities';
 
 const IdParams = z.object({ id: z.string().uuid() });
@@ -59,8 +59,8 @@ export const supplyCandidateRoutes: FastifyPluginAsyncZod<{ db: Db; config: Conf
           audit,
         );
         if (res.status !== 201) return { status: 409, body: { error: 'ALREADY_REGISTERED', message: 'You already have an application in progress for this role, or applied recently.' } };
-        const r = await tx.requisition.findUniqueOrThrow({ where: { id: req.params.id }, include: { project: { include: { opportunity: true } } } });
-        const opp = r.project.opportunity;
+        const r = await tx.requisition.findUniqueOrThrow({ where: { id: req.params.id }, include: { project: { include: { opportunities: true } } } });
+        const opp = opportunityForTier(r.project.opportunities, r.tier);
         if (!opp || opp.status !== 'PUBLISHED') throw new AppError(409, 'OPPORTUNITY_NOT_OPEN', 'This role is not open for profiles yet.');
         const e = await startOrResumeEnrollment(tx, { clientId: actor.clientId, smeUserId: actor.smeUserId, opportunityId: opp.id, requireLiveIdentity: config.requireLiveIdentity }, audit);
         await tx.partnerSubmission.update({ where: { id: (res.body as { candidateId: string }).candidateId }, data: { enrollmentId: e.id } });

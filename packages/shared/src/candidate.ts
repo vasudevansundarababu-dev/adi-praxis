@@ -76,6 +76,8 @@ export function opportunityPublishProblems(brief: OpportunityBrief, criteria: Op
 
 export const PublicOpportunityDto = z.object({
   id: z.string().uuid(),
+  /** AUTHOR: task authors (SMEs); REVIEWER: Expert reviewers for the SME -> Expert -> PM route. */
+  role: z.enum(['AUTHOR', 'REVIEWER']).default('AUTHOR'),
   version: z.number().int(),
   status: z.enum(['DRAFT', 'PUBLISHED', 'CLOSED']),
   brief: OpportunityBrief,

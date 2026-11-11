@@ -613,5 +613,16 @@ Expert and PM with two audit events; Expert edits need a reason, and a material 
 - **Recruitment:** the job post's criteria are generated from the JD (mandatory skills, experience, education and
   required demographics → REQUIRED; added skills and preferred demographics → PREFERRED). For the reviewer JD,
   requisitions (M10) get a "Fill from project JD" button that uses the reviewer JD for Expert and Reviewer-SME tiers.
-- **Open for the owner:** whether reviewers should also get their own public job post (today the opportunity page is
-  one post per project, for authors; Experts are staff users assigned by the PM or recruited through requisitions).
+- **(owner, 12 Nov 2026) Reviewers get their own public job post.** Built: one opportunity per project and role
+  (`Opportunity.role`, unique per project and role). SME → Expert → PM projects have a second post, built from the
+  reviewer JD (contribution role Reviewer; its criteria include the higher experience). The console's opportunity page
+  has "Task authors" and "Expert reviewers" tabs (`?role=REVIEWER` on every owner route); the candidate app shows the
+  post with a note that it is an Expert reviewer role.
+- **Default:** reviewer applicants go through the same candidate flow (profile, identity, human selection decision).
+  A SELECTED applicant with a verified identity becomes the project's Expert with "Make Expert"
+  (`POST /projects/:id/reviewer-applicants/:enrollmentId/make-expert`): a Validator (REVIEWER) staff account assigned
+  to the project. Creating that account, or adding the role to an existing account, stays an **Admin** action (as for
+  `/users`; the temporary password is shown once and must be changed). A PM can assign an applicant who already has an
+  active Validator account.
+- **Default:** author flows (staffing, matching, campaigns, assignment journeys) use the author post only. Requisitions
+  for the Expert and Reviewer-SME tiers send candidates to the reviewer post when the project has one.

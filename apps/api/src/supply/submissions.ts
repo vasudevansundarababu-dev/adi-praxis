@@ -244,8 +244,18 @@ export async function decideScreen(tx: Tx, clientId: string, ids: string[], deci
  * and an application to the requisition's opportunity is started or resumed. Identity is matched here too: an account
  * already owned through another partner makes this submission a duplicate.
  */
+/**
+ * The job post a requisition recruits for (owner, 12 Nov 2026): Expert and Reviewer-SME tiers use the project's
+ * reviewer post when it has one; every other tier (and projects without a reviewer post) uses the author post.
+ */
+export function opportunityForTier<O extends { role: string }>(opportunities: O[], tier: string): O | undefined {
+  const reviewer = opportunities.find((o) => o.role === 'REVIEWER');
+  if ((tier === 'EXPERT' || tier === 'REVIEWER_SME') && reviewer) return reviewer;
+  return opportunities.find((o) => o.role === 'AUTHOR');
+}
+
 export async function redeemInvite(tx: Tx, smeUserId: string, token: string, audit: Audit, startEnrollment: (opportunityId: string) => Promise<{ id: string }>) {
-  const s = await tx.partnerSubmission.findUnique({ where: { inviteTokenHash: sha256(token) }, include: { requisition: { include: { project: { include: { opportunity: true } } } }, candidate: true } });
+  const s = await tx.partnerSubmission.findUnique({ where: { inviteTokenHash: sha256(token) }, include: { requisition: { include: { project: { include: { opportunities: true } } } }, candidate: true } });
   if (!s || s.sandbox) throw notFound('This invitation link is not valid.');
   if (s.state !== 'INVITED' || s.endedAt) throw new AppError(410, 'INVITE_ENDED', 'This invitation is no longer active.');
   if (s.inviteExpiresAt && s.inviteExpiresAt < new Date() && !s.inviteAcceptedAt) throw new AppError(410, 'INVITE_EXPIRED', 'This invitation has expired. Ask the person who put you forward to submit you again.');
@@ -266,7 +276,7 @@ export async function redeemInvite(tx: Tx, smeUserId: string, token: string, aud
   } else if (!linked) {
     await tx.supplyCandidate.update({ where: { id: s.candidateId }, data: { smeUserId } });
   }
-  const opp = s.requisition.project.opportunity;
+  const opp = opportunityForTier(s.requisition.project.opportunities, s.requisition.tier);
   if (!opp || opp.status !== 'PUBLISHED') throw new AppError(409, 'OPPORTUNITY_NOT_OPEN', 'This opportunity is not open for applications yet. Try again later.');
   const e = await startEnrollment(opp.id);
   if (!s.inviteAcceptedAt) {

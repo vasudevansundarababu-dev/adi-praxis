@@ -37,6 +37,8 @@ export interface SectionsProfileSpec {
   findingFields?: TemplateProfileField[];
   /** S6: the template's outcome pick lists, each mapped to an output.json field. */
   outcomes: TemplateProfileField[];
+  /** S5: the draft lists the business hand-off as part of the expected deliverable, so it is required. */
+  handoffRequired?: boolean;
 }
 
 const t = (key: string, label: string, help: string, extra: Partial<TemplateProfileField> = {}): TemplateProfileField => ({ key, type: 'text', label, help, ...extra });
@@ -147,7 +149,7 @@ export function sectionsProfile(spec: SectionsProfileSpec): TemplateProfile {
       ...spec.deliverables.map((f) => ({ visibility: 'private_reference' as const, ...f })),
       lt('rationale', 'Rationale', 'Why the outcome follows from the evidence and the applicable rules.', { required: true, visibility: 'private_reference' }),
       lt('unresolvedIssues', 'Unresolved issues', 'What remains open and why.', { visibility: 'private_reference' }),
-      lt('humanHandoff', 'Business hand-off', 'What an authorised person must decide or do next. This is a case interaction, not the Praxis review.', { visibility: 'private_reference' }),
+      lt('humanHandoff', 'Business hand-off', 'What an authorised person must decide or do next. This is a case interaction, not the Praxis review.', { visibility: 'private_reference', ...(spec.handoffRequired ? { required: true } : {}) }),
     ],
     // S6 Allowed outcomes and values
     [

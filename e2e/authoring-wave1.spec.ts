@@ -12,9 +12,9 @@ import { base, fixture, gatedBackend } from './authoring-fixtures';
  */
 test.skip(!!process.env.E2E_WEB_URL, 'isolated UI fixture; never production');
 
-const TEMPLATES = ['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone'];
+const TEMPLATES = ['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone', 'Adverse media review', 'Enhanced due diligence', 'Customer risk rating'];
 for (const workflow of TEMPLATES) {
-  test(`Wave 1 · ${workflow}: one workflow graph below Classic and Chatbot`, async ({ page }) => {
+  test(`Template ${workflow}: one workflow graph below Classic and Chatbot`, async ({ page }) => {
     const { taskId } = await fixture(page, workflow);
     const saved = await gatedBackend(page, taskId);
     await page.setViewportSize({ width: 1280, height: 900 });

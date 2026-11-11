@@ -111,7 +111,7 @@ describe('profile routing', () => {
     expect(profileRouteFor({ ...base, output: { header: { title: 'x' }, body: 'Legacy content' } })).toBeNull();
     expect(profileRouteFor({ ...base, definition: 'kyc-onboarding-v1', template: { ...base.template, workflow: 'KYC onboarding and refresh' } })).toBeNull();
     expect(profileRouteFor({ ...base, template: { ...base.template, workflow: 'KYC onboarding and refresh' } })).toBeNull();
-    expect(profileRouteFor({ ...base, template: { ...base.template, workflow: 'Adverse media review' } })).toBeNull();
+    expect(profileRouteFor({ ...base, template: { ...base.template, workflow: 'Compliance monitoring' } })).toBeNull();
     expect(profileRouteFor({ ...base, taskType: 'ANNOTATION' })).toBeNull();
   });
 

@@ -271,6 +271,47 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       expect(await db.taskDraftRun.count({where:{taskInstanceId:id}})).toBe(0);
       expect(await db.approvedTaskRecord.count({where:{taskInstanceId:id}})).toBe(1);
     });
+    it('authoring v2.1: workflow graph is checked, projected for the agent, reviewed and exported beside the record', async () => {
+      const { a, id, projectId } = await kycTask(undefined, 'CLASSIC'); const v = await task(a, id);
+      // Task view: template-fixed agent mode, three-state phase, review route and the template's starting workflow.
+      expect(v.agentMode).toBe('SINGLE'); expect(v.reviewRoute).toBe('SME_PM'); expect(v.phase).toMatchObject({ phase: 'AUTHORING', stage: null });
+      expect(v.startingGraph?.schemaVersion).toBe('praxis.workflow_graph.v1-proposed');
+      const input = { slot: v.input.slot, template: { workflow: v.template.workflow, primaryWork: v.template.primaryWork, verificationCriteria: v.template.verificationCriteria, humanGate: v.template.humanGate, coverageDimensions: v.template.coverageDimensions }, current: {}, sections: [...DRAFT_SECTIONS], sources: [], interview: [], instruction: null, forbidden: [] };
+      const base = sanitizeDraft((await new MockTaskDrafter().draft(input)).task, input).task;
+      expect((await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-only/1', accepted: true })).statusCode).toBe(200);
+      // A decision with no else route blocks submission with a precise reason.
+      const broken = structuredClone(v.startingGraph); broken.edges = broken.edges.filter((e: { port?: string }) => e.port !== 'else');
+      let saved = await put(a.cookie, `/me/tasks/${id}`, { output: { ...base, workflowGraph: broken }, expectedRevision: v.revision, activeSecondsDelta: 0 }); expect(saved.statusCode, saved.body).toBe(200);
+      let checks = (await post(a.cookie, `/me/tasks/${id}/check`)).json().checks as { id: string; ok: boolean; message: string; section: string }[];
+      const missingElse = checks.find((c) => c.id.startsWith('graph.decision_missing_else'));
+      expect(missingElse).toMatchObject({ ok: false, section: 'GRAPH' }); expect(missingElse!.message).toContain('else');
+      // The graph's agent mode must match the template's.
+      saved = await put(a.cookie, `/me/tasks/${id}`, { output: { ...base, workflowGraph: { ...v.startingGraph, agentMode: 'MULTI' } }, expectedRevision: saved.json().revision, activeSecondsDelta: 0 });
+      checks = (await post(a.cookie, `/me/tasks/${id}/check`)).json().checks; expect(checks.find((c) => c.id === 'graph.agent_mode')?.ok).toBe(false);
+      // A valid graph with a private reference artifact: the agent view never shows it.
+      const graph = structuredClone(v.startingGraph); graph.artifacts.push({ id: 'reference_answer', label: 'Reference disposition', visibility: 'private_reference' });
+      saved = await put(a.cookie, `/me/tasks/${id}`, { output: { ...base, workflowGraph: graph }, expectedRevision: saved.json().revision, activeSecondsDelta: 0 });
+      checks = (await post(a.cookie, `/me/tasks/${id}/check`)).json().checks; expect(checks.find((c) => c.id === 'graph.valid')?.ok).toBe(true);
+      const preview = (await get(a.cookie, `/me/tasks/${id}/agent-preview`)).json();
+      expect(preview.task.workflowGraph.nodes.length).toBe(graph.nodes.length); expect(JSON.stringify(preview)).not.toContain('reference_answer'); expect(JSON.stringify(preview)).not.toContain('findings.sufficient');
+      expect((await post(a.cookie, `/me/tasks/${id}/conversation/review`, { expectedRevision: saved.json().revision })).statusCode).toBe(200);
+      const submitted = await submit(a, id); expect(submitted.statusCode, submitted.body).toBe(200);
+      expect((await task(a, id)).phase).toMatchObject({ phase: 'PENDING', stage: 'PM_APPROVAL' });
+      const review = (await get(admin, `/review/tasks/${id}`)).json();
+      const accepted = await post(admin, `/review/tasks/${id}/decision`, { expectedRevision: review.revision, decision: 'ACCEPT', checklist: { correct: true, realistic: true, coversSlot: true, difficultyFair: true, distinct: true, rubricCatches: true } }); expect(accepted.statusCode, accepted.body).toBe(200);
+      expect((await task(a, id)).phase).toMatchObject({ phase: 'APPROVED' });
+      const record = await db.approvedTaskRecord.findFirstOrThrow({ where: { taskInstanceId: id } });
+      const exported = await get(admin, `/dataset/records/${record.id}/workflow-graph`); expect(exported.statusCode, exported.body).toBe(200);
+      expect(exported.headers['x-praxis-schema-version']).toBe('praxis.workflow_graph.v1-proposed');
+      expect(exported.headers['x-praxis-graph-content-hash']).toMatch(/^[a-f0-9]{64}$/); expect(String(exported.headers['x-praxis-graph-execution'])).toContain('not-executable');
+      expect(exported.json().nodes.length).toBe(graph.nodes.length);
+      expect((await get(pm, `/dataset/records/${record.id}/workflow-graph`)).statusCode).toBe(403);
+      // Review route: Expert -> PM is refused until its stage engine ships; the default is SME -> PM.
+      const project = (await get(pm, `/projects/${projectId}`)).json(); expect(project.reviewRoute).toBe('SME_PM'); expect(project.agentMode).toBe('SINGLE');
+      const templateId = project.templateId;
+      const expertRoute = await app.inject({ method: 'POST', url: '/api/v1/projects', headers: { cookie: pm, ...idem() }, payload: { templateId, name: 'Expert route', authoringExperience: 'BOTH', reviewRoute: 'SME_EXPERT_PM' } });
+      expect(expertRoute.statusCode).toBe(409); expect(expertRoute.json().error).toBe('REVIEW_ROUTE_NOT_AVAILABLE');
+    });
     it('integrates chat with existing submit, Admin rework, resubmit, acceptance, hash chain and dataset export', async () => {
       const { a, id, projectId } = await kycTask();
       const view = await task(a, id);

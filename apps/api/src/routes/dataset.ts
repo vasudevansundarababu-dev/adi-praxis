@@ -1,5 +1,6 @@
+import { graphContentHash, graphOf } from '../tasks/workflow-graph';
 import type { ApprovedTaskRecord, Prisma } from '@prisma/client';
-import { praxisContractIssues, KYC_MCP_CATALOG_VERSION, KYC_MCP_TOOLS, replayBundle, type KycTask } from '@praxis/shared';
+import { checkWorkflowGraph, praxisContractIssues, KYC_MCP_CATALOG_VERSION, KYC_MCP_TOOLS, replayBundle, type KycTask } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db, Tx } from '../db';
@@ -95,6 +96,25 @@ export const datasetRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
       .header('x-praxis-payload-sha256', sha256(payload))
       .header('x-praxis-record-id', r.id).header('x-praxis-record-hash', r.contentHash)
       .header('x-praxis-schema-version', (contract as { schema_version: string }).schema_version).send(req.query.envelope === 'true' ? stableStringify(envelope) : payload);
+  });
+
+  // Authoring v2.1: the approved record's authored workflow graph, exported beside (never inside) the task contract.
+  // Anvil does not execute graphs yet, so the response says so; it is for inspection and the read-only task viewer.
+  app.get('/dataset/records/:id/workflow-graph', { config: { access: READ }, schema: { tags: ['dataset'], params: IdParams } }, async (req, reply) => {
+    const r = await findRecord(db, clientOf(req), req.params.id);
+    const raw = graphOf(r.output);
+    if (raw === undefined || raw === null) throw new AppError(409, 'NO_WORKFLOW_GRAPH', 'This record has no authored workflow graph.');
+    const check = checkWorkflowGraph(raw);
+    if (!check.ok || !check.graph) throw new AppError(422, 'GRAPH_INVALID', 'Export blocked: the workflow graph does not pass its checks.', { errors: check.errors });
+    if (recordHash(recordContent(baseOf(r)), r.prevHash) !== r.contentHash) throw new AppError(409, 'RECORD_INTEGRITY', 'Export blocked: source record hash does not verify.');
+    const body = stableStringify(check.graph);
+    return reply.header('content-type', 'application/json')
+      .header('content-disposition', `attachment; filename="praxis-${r.id}-workflow-graph.json"`)
+      .header('x-praxis-schema-version', check.graph.schemaVersion)
+      .header('x-praxis-graph-content-hash', graphContentHash(r.output)!)
+      .header('x-praxis-record-id', r.id).header('x-praxis-record-hash', r.contentHash)
+      .header('x-praxis-graph-execution', 'not-executable: Anvil executes the task contract only')
+      .send(body);
   });
 
   // TASK-DRAFTING section 5: the task's MCP tools and recorded calls, enough to replay it on an MCP server.

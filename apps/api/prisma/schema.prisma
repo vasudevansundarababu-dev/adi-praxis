@@ -460,6 +460,8 @@ model Template {
   blueprint             Json?
   blueprintRevision     Int            @default(0) @map("blueprint_revision")
   executionMode         ExecutionMode? @map("execution_mode")
+  /// Single or multi agent, fixed before SME assignment (handover v2.1 ch. 17 §2).
+  agentMode             AgentMode      @default(SINGLE) @map("agent_mode")
   variantOfId           String?        @map("variant_of_id") @db.Uuid
   createdAt             DateTime       @default(now()) @map("created_at")
   updatedAt             DateTime       @updatedAt @map("updated_at")
@@ -533,6 +535,18 @@ enum AuthoringExperience {
   BOTH
 }
 
+/// Handover v2.1: fixed by the published template; SMEs and reviewers cannot change it.
+enum AgentMode {
+  SINGLE
+  MULTI
+}
+
+/// Handover v2.1: platform review route chosen by the PM. Expert/PM review is never a node in the task graph.
+enum ReviewRoute {
+  SME_PM
+  SME_EXPERT_PM
+}
+
 model Project {
   id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId                String        @map("client_id") @db.Uuid
@@ -546,6 +560,8 @@ model Project {
   status                  ProjectStatus @default(DRAFT)
   /// Null preserves both existing editors for legacy projects; new projects choose explicitly.
   authoringExperience     AuthoringExperience? @map("authoring_experience")
+  /// SME -> PM (default) or SME -> Expert -> PM. Frozen once tasks exist.
+  reviewRoute             ReviewRoute   @default(SME_PM) @map("review_route")
   taskMode                TaskMode      @default(AUTHORING) @map("task_mode")
   /// Annotation projects: number of task instances.
   taskCount               Int?          @map("task_count")

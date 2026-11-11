@@ -358,7 +358,9 @@ export function checkWorkflowGraph(input: unknown, ctx: GraphCheckContext = {}):
     }
   }
   for (const n of g.nodes) {
-    if (n.type === 'agent_step' && !consumed.has(n.outputArtifact)) {
+    // An output carried back through a loop's return edge feeds the next iteration, so it is not ignored.
+    const carriedBack = out.get(n.id)!.some((e) => returnEdges.has(e.id));
+    if (n.type === 'agent_step' && !consumed.has(n.outputArtifact) && !carriedBack) {
       warn('IGNORED_OUTPUT', `Nothing uses the result of ${n.label}`, `nodes.${n.id}.outputArtifact`, n.id);
     }
   }

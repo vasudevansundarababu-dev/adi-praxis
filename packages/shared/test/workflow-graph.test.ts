@@ -125,3 +125,18 @@ describe('fixture files for Anvil', () => {
     for (const [rel, body] of renderWorkflowGraphFixtures()) expect(readFileSync(join(root, rel), 'utf8')).toBe(body);
   });
 });
+
+describe('template starting workflows (Wave 1)', () => {
+  it.each(['KYC onboarding and refresh', 'KYB and beneficial ownership', 'AML transaction-monitoring alerts', 'Omnichannel Creative & Locale Compliance', 'Launch of Noise Cancelling Phone'])('%s passes the checker with no errors or warnings', async (name) => {
+    const { templateStartingGraph } = await import('../src/workflow-graph');
+    const g = templateStartingGraph(name)!;
+    expect(g).not.toBeNull();
+    const r = checkWorkflowGraph(g);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([]);
+  });
+  it('has no starting workflow for templates outside Wave 1', async () => {
+    const { templateStartingGraph } = await import('../src/workflow-graph');
+    expect(templateStartingGraph('Customer risk rating')).toBeNull();
+  });
+});

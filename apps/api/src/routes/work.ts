@@ -1,3 +1,4 @@
+import { taskPhase, templateStartingGraph } from '@praxis/shared';
 import { Prisma } from '@prisma/client';
 import { CAPPED_TASK_STATUSES, identityEligible, OPEN_TASK_STATUSES, SaveTaskRequest, SubmitTaskRequest } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -125,6 +126,10 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       projectName: t.project.name,
       authoringExperience: t.project.authoringExperience,
       effectiveAuthoringExperience: experienceOf(t.project),
+      reviewRoute: t.project.reviewRoute,
+      agentMode: t.project.template.agentMode,
+      phase: taskPhase(t.status, { reviewRoute: t.project.reviewRoute }),
+      startingGraph: t.taskType === 'AUTHORING' ? templateStartingGraph(t.project.template.workflowName, t.project.templateVersion) : null,
       authoringWorkspace: (t.drafting as { workspace?: unknown } | null)?.workspace ?? null,
       tptMinutes: t.project.tptMinutes,
       definition: definitionFor(template).key,

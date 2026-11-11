@@ -24,3 +24,4 @@ export * from "./authoring-conversation";
 export * from "./template-instructions";
 
 export * from "./workflow-graph";
+export * from "./task-phase";

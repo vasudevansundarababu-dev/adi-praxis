@@ -1,3 +1,4 @@
+import { graphAgentView } from '../tasks/workflow-graph';
 import { allowEditor } from '../tasks/authoring-experience';
 import { AUTHORSHIP_VERSION, AUTHORSHIP_TERMS, generationRequest } from '../tasks/conversation/authorship';
 import type { Prisma } from '@prisma/client';
@@ -33,7 +34,8 @@ export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: 
   app.get('/me/tasks/:id/conversation', { config: { access: 'candidate' }, schema: { params: Params } }, async req => conversationView(db, await load(db, req.params.id, req.candidate!.smeUserId)));
   app.get('/me/tasks/:id/agent-preview', { config: { access: 'candidate' }, schema: { params: Params } }, async req => {
     const t = await load(db, req.params.id, req.candidate!.smeUserId), policy = await effectivePolicy(db, t.clientId, t);
-    return { task: authoringAgentView((t.output ?? {}) as Record<string, unknown>), policy: policy?.body.rules.filter(r => r.visibility === 'agent_visible') ?? [], note: 'Recorded responses are supplied only on matching tool calls. This is a preview, not execution.' };
+    const workflowGraph = graphAgentView(t.output);
+    return { task: { ...authoringAgentView((t.output ?? {}) as Record<string, unknown>), ...(workflowGraph ? { workflowGraph } : {}) }, policy: policy?.body.rules.filter(r => r.visibility === 'agent_visible') ?? [], note: 'Recorded responses are supplied only on matching tool calls. This is a preview, not execution.' };
   });
   app.post('/me/tasks/:id/conversation/messages', { config: { access: 'candidate', rateLimit: { max: 15, timeWindow: '1 minute' } }, schema: { params: Params, body: z.object({ content: z.string().trim().min(1).max(4000), expectedRevision: z.number().int().nonnegative() }).strict() } }, async (req, reply) => {
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit, emit }) => {

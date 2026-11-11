@@ -52,6 +52,9 @@ export class MockConversationAssistant implements ConversationAssistant {
  * Owner decision (10 Nov 2026): the QA fallback while the Claude quota on Vertex is under appeal. Same system prompt,
  * same strict proposal schema, same guards downstream; one call, never retried automatically.
  */
+/** Thinking budget plus the proposal JSON (Claude path uses 12000 without thinking). */
+export const GEMINI_MAX_OUTPUT_TOKENS = 24000;
+
 export class GeminiConversationAssistant implements ConversationAssistant {
   private readonly drafter: GeminiVertexContentDrafter;
   constructor(readonly model: string, opts: ConstructorParameters<typeof GeminiVertexContentDrafter>[1]) {
@@ -63,7 +66,9 @@ export class GeminiConversationAssistant implements ConversationAssistant {
     const started = Date.now();
     let out: Awaited<ReturnType<GeminiVertexContentDrafter['complete']>>;
     try {
-      out = await this.drafter.complete({ purpose: 'propose_field', system: CONVERSATION_SYSTEM, user, maxOutputTokens: 12000 });
+      // Gemini counts thinking tokens against maxOutputTokens: leave room for thinking plus the JSON proposal, so a
+      // long think never truncates the answer (a truncated answer stops with MAX_TOKENS and fails closed).
+      out = await this.drafter.complete({ purpose: 'propose_field', system: CONVERSATION_SYSTEM, user, maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS });
     } catch (e) {
       logModelCall({ feature: 'authoring-conversation', vendor: 'gemini', model: this.model, ok: false, latencyMs: Date.now() - started, error: e instanceof Error ? e.name : 'error' });
       throw e;

@@ -440,7 +440,7 @@ Plan: `docs/authoring/AUTHORING-V2.1-PLAN.md`. Source: handover v2.1, chapters 0
   `MULTI` is switched on per template once Anvil can run multi-agent graphs. Overrides the earlier "KYB = MULTI" idea.
 - **(owner, 10 Nov)** The QA chatbot runs on Claude Sonnet 5.5 (`claude-sonnet-5-5`) for cost, Haiku 5.5 as the cheap
   backup. Google denied the Claude quota on Vertex, so until the appeal succeeds QA uses Gemini through the same
-  setting: `AUTHORING_MODEL=gemini:gemini-2.5-flash`. Same prompt, proposal schema, guards, daily cap and logging.
+  setting: `AUTHORING_MODEL=gemini:gemini-3.8-flash` (gemini-2.5-flash returns 404 in the QA project). Same prompt, proposal schema, guards, daily cap and logging.
 - **(chosen by Claude)** The provider is a prefix on `AUTHORING_MODEL` (`gemini:` or `claude:`, bare = Claude) rather than
   a second setting, so one value fully describes the chatbot model. The Gemini path reuses the meta-compiler's
   `generateContent` caller (no new dependency). The chatbot request sends no thinking, tool_choice or sampling

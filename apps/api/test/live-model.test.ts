@@ -59,9 +59,25 @@ describe('Authoring v2.1 Gemini fallback for the chatbot (fake fetch, no network
     expect(url).toBe('https://aiplatform.googleapis.com/v1/projects/qa-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent');
     const body = JSON.parse(init.body);
     expect(body.systemInstruction.parts[0].text).toBe(CONVERSATION_SYSTEM);
-    expect(body.generationConfig).toMatchObject({ responseMimeType: 'application/json', maxOutputTokens: 12000 });
+    expect(body.generationConfig).toMatchObject({ responseMimeType: 'application/json', maxOutputTokens: 24000 });
     expect(JSON.parse(log.mock.calls.at(-1)![0] as string)).toMatchObject({ event: 'llm.call', vendor: 'gemini', model: 'gemini-2.5-flash', ok: true, inputTokens: 900, outputTokens: 60 });
     expect(JSON.stringify(log.mock.calls)).not.toContain('SECRET');
+  });
+
+  it('handles Gemini 3.8 Flash thinking: skips thought parts and the thought signature, keeps only the answer text', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const fetch = vi.fn().mockResolvedValue(ok({
+      modelVersion: 'gemini-3.8-flash',
+      candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'Thinking about which evidence is missing…', thought: true }, { text: JSON.stringify(proposal), thoughtSignature: 'c2lnbmF0dXJl' }] } }],
+      usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 40, thoughtsTokenCount: 78 },
+    }));
+    await expect(new GeminiConversationAssistant('gemini-3.8-flash', { projectId: 'qa-project', location: 'global', fetch, token: async () => 't' }).propose(input)).resolves.toMatchObject({ question: 'Which evidence is missing?' });
+  });
+
+  it('fails closed when thinking uses up the output budget (MAX_TOKENS)', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const fetch = vi.fn().mockResolvedValue(ok({ candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: '{"reply":"cut' }] } }] }));
+    await expect(gemini(fetch).propose(input)).rejects.toThrow('MAX_TOKENS');
   });
 
   it('fails closed on an HTTP error or an answer outside the proposal schema, logging without retrying', async () => {

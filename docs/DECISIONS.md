@@ -419,3 +419,24 @@ help pack and the user's own data; required markers on every screen of all three
 - **(chosen by Claude)** An Admin may still set a known password through the API, with `requirePasswordChange` on by
   default. Test fixtures and the shared demo account `partner@praxis.demo` turn it off. The shared demo console
   accounts are created by the seed and demo job, not the API, so they are unaffected.
+
+## Authoring v2.1 (owner-approved build, 10 Nov 2026)
+
+Plan: `docs/authoring/AUTHORING-V2.1-PLAN.md`. Source: handover v2.1, chapters 00-18.
+
+- **(owner)** Build in template waves: Wave 1 (5 templates) Wed 11 Nov, Wave 2 (3) Fri 13 Nov, Wave 3 (3) Sun 15 Nov,
+  weekends included. Each wave ends end to end: author, review, export, Anvil import. The OpenHands
+  `AUTHORING-V2-PLAN.md` is not used.
+- **(owner)** A live Vertex session in QA is mandatory for every wave. Automated tests keep the mocks (CLAUDE.md rule 5).
+- **(chosen by Claude)** Graph wire id `praxis.workflow_graph.v1-proposed` until Anvil allocates one; it never reuses
+  `praxis.anvil.task.v1/v2/v3`.
+- **(chosen by Claude)** Execution semantics for checks: non-choice nodes fan out to every successor; decisions take one
+  branch (each condition, plus mandatory `else` and `unknown`); human steps take `responded` or `timeout`. Every cycle
+  closes through a declared loop with a limit (1-50) and an exhausted exit outside the loop. Each artifact has one
+  producer (no last-writer-wins). These are recorded in `contracts/praxis/workflow-graph/README.md` for Anvil.
+- **(chosen by Claude)** Agent projection keeps decision outcome labels but removes their predicates, rubric bindings,
+  private artifacts and future evidence.
+- **(chosen by Claude)** All templates are `SINGLE` agent mode for now, KYB included, so every wave exports end to end;
+  `MULTI` is switched on per template once Anvil can run multi-agent graphs. Overrides the earlier "KYB = MULTI" idea.
+- **(chosen by Claude)** Existing KYC `dependsOn` steps are not migrated into graphs. A graph is a new optional part of
+  the task output; legacy outputs stay readable and unchanged.

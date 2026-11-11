@@ -1,0 +1,112 @@
+{
+  "schema": "praxis.workflow_graph.v1-proposed",
+  "note": "Each invalid fixture must produce at least these error codes. Valid fixtures must produce no errors.",
+  "valid": [
+    "single-agent-kyc.json",
+    "multi-agent-kyb.json"
+  ],
+  "invalid": {
+    "decision-without-else.json": {
+      "description": "A decision with no else route",
+      "expect": [
+        "DECISION_MISSING_ELSE"
+      ]
+    },
+    "decision-without-unknown.json": {
+      "description": "A decision with no unknown route",
+      "expect": [
+        "DECISION_MISSING_UNKNOWN"
+      ]
+    },
+    "loop-undeclared.json": {
+      "description": "A cycle that is not a declared loop",
+      "expect": [
+        "UNDECLARED_CYCLE"
+      ]
+    },
+    "loop-exhausted-inside.json": {
+      "description": "Exhausted route stays inside the loop",
+      "expect": [
+        "LOOP_EXHAUSTED_INSIDE_LOOP"
+      ]
+    },
+    "loop-no-exit.json": {
+      "description": "A loop whose body has no way out",
+      "expect": [
+        "LOOP_NO_EXIT"
+      ]
+    },
+    "loop-return-forward.json": {
+      "description": "A loop return edge that goes forward",
+      "expect": [
+        "LOOP_RETURN_NOT_BACKWARD"
+      ]
+    },
+    "unreachable-node.json": {
+      "description": "A node not reachable from the input",
+      "expect": [
+        "UNREACHABLE_NODE"
+      ]
+    },
+    "dead-end.json": {
+      "description": "A step that never reaches a terminal",
+      "expect": [
+        "NO_PATH_TO_TERMINAL"
+      ]
+    },
+    "no-terminal.json": {
+      "description": "No output or escalation node",
+      "expect": [
+        "NO_TERMINAL"
+      ]
+    },
+    "join-required-on-optional-branch.json": {
+      "description": "A join requires an input that only arrives on one decision branch",
+      "expect": [
+        "JOIN_REQUIRED_MAY_NOT_ARRIVE"
+      ]
+    },
+    "private-to-actor.json": {
+      "description": "An agent step reads the private rubric key",
+      "expect": [
+        "PRIVATE_TO_ACTOR"
+      ]
+    },
+    "single-mode-two-roles.json": {
+      "description": "Single-agent template with two roles",
+      "expect": [
+        "MODE_SINGLE_MULTIPLE_ROLES"
+      ]
+    },
+    "human-without-timeout.json": {
+      "description": "A human step with no timeout route",
+      "expect": [
+        "HUMAN_MISSING_TIMEOUT"
+      ]
+    },
+    "artifact-not-available.json": {
+      "description": "A step reads an artifact produced later",
+      "expect": [
+        "ARTIFACT_NOT_AVAILABLE"
+      ]
+    },
+    "unknown-role.json": {
+      "description": "An agent step names a role that does not exist",
+      "expect": [
+        "UNKNOWN_REFERENCE"
+      ]
+    },
+    "unbounded-loop-limit.json": {
+      "description": "A loop with no positive iteration limit",
+      "expect": [
+        "SCHEMA"
+      ]
+    },
+    "executable-text-is-rejected.json": {
+      "description": "Extra fields such as code are rejected by the strict schema",
+      "expect": [
+        "SCHEMA"
+      ]
+    }
+  }
+}

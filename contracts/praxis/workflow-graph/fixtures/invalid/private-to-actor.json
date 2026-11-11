@@ -1,0 +1,285 @@
+{
+  "schemaVersion": "praxis.workflow_graph.v1-proposed",
+  "templateId": "kyb-and-beneficial-ownership",
+  "templateVersion": 1,
+  "agentMode": "MULTI",
+  "roles": [
+    {
+      "id": "ownership",
+      "name": "Ownership analyst",
+      "responsibility": "Resolve the ownership chain",
+      "tools": [
+        "registry_lookup"
+      ],
+      "evidenceRefs": [
+        "case_file"
+      ]
+    },
+    {
+      "id": "screening",
+      "name": "Screening analyst",
+      "responsibility": "Screen controlling parties",
+      "tools": [
+        "sanctions_pep_screening"
+      ],
+      "evidenceRefs": [
+        "case_file"
+      ]
+    },
+    {
+      "id": "lead_analyst",
+      "name": "Lead analyst",
+      "responsibility": "Consolidate findings and recommend",
+      "tools": [],
+      "evidenceRefs": []
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "case_file",
+      "label": "Entity evidence",
+      "visibility": "actor"
+    },
+    {
+      "id": "ownership_map",
+      "label": "Ownership map",
+      "visibility": "actor"
+    },
+    {
+      "id": "screening_results",
+      "label": "Screening results",
+      "visibility": "actor"
+    },
+    {
+      "id": "consolidated",
+      "label": "Consolidated findings",
+      "visibility": "actor"
+    },
+    {
+      "id": "referral",
+      "label": "Referral note",
+      "visibility": "actor"
+    },
+    {
+      "id": "rubric_key",
+      "label": "Rubric answer key",
+      "visibility": "private_rubric"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "input",
+      "label": "Case evidence",
+      "provides": [
+        "case_file"
+      ]
+    },
+    {
+      "id": "own",
+      "type": "agent_step",
+      "label": "Map ownership",
+      "roleId": "ownership",
+      "instruction": "Build the ownership chain to natural persons with percentages.",
+      "inputRefs": [
+        "case_file"
+      ],
+      "outputArtifact": "ownership_map"
+    },
+    {
+      "id": "screen",
+      "type": "agent_step",
+      "label": "Screen parties",
+      "roleId": "screening",
+      "instruction": "Screen every controlling party and record outcomes.",
+      "inputRefs": [
+        "case_file"
+      ],
+      "outputArtifact": "screening_results"
+    },
+    {
+      "id": "join",
+      "type": "join",
+      "label": "Both specialists done",
+      "requiredInputs": [
+        "own",
+        "screen"
+      ],
+      "optionalInputs": []
+    },
+    {
+      "id": "consolidate",
+      "type": "agent_step",
+      "label": "Consolidate",
+      "roleId": "lead_analyst",
+      "instruction": "Combine both results into findings and a risk view.",
+      "inputRefs": [
+        "ownership_map",
+        "screening_results",
+        "rubric_key"
+      ],
+      "outputArtifact": "consolidated"
+    },
+    {
+      "id": "refer",
+      "type": "decision",
+      "label": "Human referral needed?",
+      "question": "Do the findings need a case lead decision?",
+      "conditions": [
+        {
+          "id": "refer_yes",
+          "label": "Refer",
+          "field": "consolidated.risk",
+          "op": "eq",
+          "value": "HIGH"
+        },
+        {
+          "id": "refer_no",
+          "label": "No referral",
+          "field": "consolidated.risk",
+          "op": "in",
+          "value": [
+            "LOW",
+            "MEDIUM"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note",
+      "type": "agent_step",
+      "label": "Write referral",
+      "roleId": "lead_analyst",
+      "instruction": "Write the referral note for the case lead.",
+      "inputRefs": [
+        "consolidated"
+      ],
+      "outputArtifact": "referral"
+    },
+    {
+      "id": "lead",
+      "type": "human_step",
+      "label": "Case lead decides",
+      "actorRole": "Case lead",
+      "prompt": "Decide on the referral.",
+      "responseSchema": [
+        {
+          "key": "decision",
+          "label": "Decision",
+          "type": "choice",
+          "options": [
+            "Approve",
+            "Reject"
+          ]
+        }
+      ],
+      "permittedEvidence": [
+        "referral"
+      ],
+      "timeoutMinutes": 2880
+    },
+    {
+      "id": "done",
+      "type": "output",
+      "label": "Final outcome",
+      "deliverable": "consolidated",
+      "completionCondition": "Findings and outcome are recorded."
+    },
+    {
+      "id": "escalate",
+      "type": "escalation",
+      "label": "Escalate",
+      "reason": "No decision could be reached."
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "start",
+      "to": "own",
+      "label": ""
+    },
+    {
+      "id": "e2",
+      "from": "start",
+      "to": "screen",
+      "label": ""
+    },
+    {
+      "id": "e3",
+      "from": "own",
+      "to": "join",
+      "label": ""
+    },
+    {
+      "id": "e4",
+      "from": "screen",
+      "to": "join",
+      "label": ""
+    },
+    {
+      "id": "e5",
+      "from": "join",
+      "to": "consolidate",
+      "label": ""
+    },
+    {
+      "id": "e6",
+      "from": "consolidate",
+      "to": "refer",
+      "label": ""
+    },
+    {
+      "id": "e7",
+      "from": "refer",
+      "to": "note",
+      "port": "refer_yes",
+      "label": "High risk"
+    },
+    {
+      "id": "e8",
+      "from": "refer",
+      "to": "done",
+      "port": "refer_no",
+      "label": "Low or medium"
+    },
+    {
+      "id": "e9",
+      "from": "refer",
+      "to": "escalate",
+      "port": "else",
+      "label": "Other"
+    },
+    {
+      "id": "e10",
+      "from": "refer",
+      "to": "escalate",
+      "port": "unknown",
+      "label": "Unknown risk"
+    },
+    {
+      "id": "e11",
+      "from": "note",
+      "to": "lead",
+      "label": ""
+    },
+    {
+      "id": "e12",
+      "from": "lead",
+      "to": "done",
+      "port": "responded",
+      "label": "Decided"
+    },
+    {
+      "id": "e13",
+      "from": "lead",
+      "to": "escalate",
+      "port": "timeout",
+      "label": "No response"
+    }
+  ],
+  "loops": [],
+  "limits": {
+    "maxTransitions": 30
+  }
+}

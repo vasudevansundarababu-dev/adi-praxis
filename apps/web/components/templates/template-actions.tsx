@@ -1,6 +1,6 @@
 'use client';
 
-import type { TemplateDto } from '@praxis/shared';
+import { profilesForWorkflow, type TemplateDto } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
@@ -23,8 +23,47 @@ export function TemplateActions({ template: t, hasDraft }: { template: TemplateD
   }
 
   const btn = 'btn btn-secondary disabled:opacity-60';
+  // Authoring form of this version (owner, 11 Nov 2026): a workflow may offer more than one, e.g. KYC v2 account opening.
+  const forms = profilesForWorkflow(t.workflowName);
+  const formLabel = (id: string | null) => {
+    const p = id ? forms.find((f) => f.profileId === id) : forms[0];
+    return p ? (p.handoverName ?? p.catalogWorkflowName) + (id ? '' : ' (default)') : id ? id : 'Default form';
+  };
   return (
     <div className="mt-4">
+      {forms.length > 1 && (
+        <div className="mb-3 text-sm">
+          {t.status === 'DRAFT' ? (
+            <label className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">Authoring form</span>
+              <select
+                className="rounded-md border border-line bg-surface px-2 py-1"
+                value={t.profileId ?? ''}
+                disabled={pending}
+                onChange={async (e) => {
+                  setPending(true);
+                  setError(null);
+                  const res = await mutate<TemplateDto>('PATCH', `/templates/${t.id}`, { profileId: e.target.value || null });
+                  setPending(false);
+                  if (!res.ok) setError(res.error);
+                  else router.refresh();
+                }}
+              >
+                {forms.map((f, i) => (
+                  <option key={f.profileId} value={i === 0 ? '' : f.profileId}>
+                    {formLabel(i === 0 ? null : f.profileId)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p>
+              <span className="font-medium">Authoring form:</span> {formLabel(t.profileId)}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-fg-muted">Projects keep the form of the version they were created from.</p>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {t.status === 'DRAFT' && (
           <button

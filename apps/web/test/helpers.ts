@@ -39,6 +39,7 @@ export function template(over: Partial<TemplateDto> = {}): TemplateDto {
     defaultMaxPerExpert: 4,
     openSlotShare: 0,
     similarityThreshold: 0.9,
+    profileId: null,
     publishedAt: null,
     retiredAt: null,
     createdAt: '2026-11-07T10:00:00.000Z',

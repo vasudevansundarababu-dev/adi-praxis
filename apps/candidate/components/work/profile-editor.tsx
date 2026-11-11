@@ -8,7 +8,7 @@ import {
   itemFieldsOf,
   newItem,
   profileApplies,
-  profileForWorkflow,
+  profileForTemplate,
   profileProblems,
   sectionProgress,
   setFieldValue,
@@ -39,7 +39,7 @@ export type ProfileRoute = { kind: 'editor'; profile: TemplateProfile } | { kind
  */
 export function profileRouteFor(task: Pick<TaskView, 'taskType' | 'definition' | 'output' | 'template'>): ProfileRoute {
   if (task.taskType !== 'AUTHORING' || task.definition === 'kyc-onboarding-v1') return null;
-  const found = profileForWorkflow(task.template.workflow);
+  const found = profileForTemplate({ workflowName: task.template.workflow, profileId: task.template.profileId });
   if (found.status === 'unsupported') return { kind: 'diagnostic', workflow: found.workflow, problems: found.problems };
   if (found.status !== 'ok' || found.profile.domainPlugin || found.profile.storage !== 'sections') return null;
   if (!profileApplies(found.profile, task.output) && !isBlankOutput(task.output)) return null;

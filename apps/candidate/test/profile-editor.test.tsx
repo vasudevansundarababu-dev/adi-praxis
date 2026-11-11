@@ -115,6 +115,15 @@ describe('profile routing', () => {
     expect(profileRouteFor({ ...base, taskType: 'ANNOTATION' })).toBeNull();
   });
 
+  it('a KYC template version 2 task opens the account-opening form (owner, 11 Nov 2026)', () => {
+    const route = profileRouteFor({ ...base, definition: 'profile:kyc-account-opening', template: { ...base.template, workflow: 'KYC onboarding and refresh', profileId: 'kyc-account-opening' } });
+    expect(route?.kind).toBe('editor');
+    expect(route?.kind === 'editor' && route.profile.profileId).toBe('kyc-account-opening');
+    const markup = renderToStaticMarkup(<ProfileEditor task={{ ...base, definition: 'profile:kyc-account-opening', template: { ...base.template, workflow: 'KYC onboarding and refresh', profileId: 'kyc-account-opening' } } as TaskView} profile={route?.kind === 'editor' ? route.profile : (null as never)} onSubmitted={() => undefined} />);
+    expect(text(markup)).toContain('Requested product');
+    expect(text(markup)).toContain('Application revision');
+  });
+
   it('an unsupported profile shows a diagnostic, not a blank form', () => {
     const broken = JSON.parse(JSON.stringify(KYB_PROFILE));
     broken.catalogWorkflowName = 'Broken Candidate Workflow';

@@ -35,6 +35,7 @@ import { campaignRoutes } from './routes/campaigns';
 import { journeyRoutes } from './routes/journey';
 import { taskRoutes } from './routes/tasks';
 import { taskReviewRoutes } from './routes/task-review';
+import { anvilRoutes } from './routes/anvil';
 import { datasetRoutes } from './routes/dataset';
 import { draftingRoutes } from './routes/drafting';
 import { partnerApiRoutes } from './routes/partner-api';
@@ -339,6 +340,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       }
       await v1.register(supportRoutes, { assistant: deps.support ?? defaultSupport(deps.config), partnerPortal: deps.config.SME_SUPPLY_ENABLED });
       await v1.register(datasetRoutes, { db: deps.db });
+      await v1.register(anvilRoutes, { db: deps.db, storage });
       await v1.register(rlRoutes, { db: deps.db });
       await v1.register(taskRoutes, { db: deps.db, config: deps.config, email: deps.email ?? defaultEmail(deps.config) });
       await v1.register(candidateAuthRoutes, {

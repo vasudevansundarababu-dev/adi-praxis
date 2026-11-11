@@ -440,3 +440,63 @@ Plan: `docs/authoring/AUTHORING-V2.1-PLAN.md`. Source: handover v2.1, chapters 0
   `MULTI` is switched on per template once Anvil can run multi-agent graphs. Overrides the earlier "KYB = MULTI" idea.
 - **(chosen by Claude)** Existing KYC `dependsOn` steps are not migrated into graphs. A graph is a new optional part of
   the task output; legacy outputs stay readable and unchanged.
+
+## Anvil project policy manifest v1 emitter (authoring v2.1 wave 1, 10 Nov 2026)
+
+Anvil's contract `praxis.anvil.project_policy.v1` (`contracts/anvil/project-policy-v1/`) is used unchanged. Praxis has
+no field for several Anvil concepts, so the emitter maps conservatively. Details and endpoints:
+`docs/integrations/ANVIL-PROJECT-POLICY-V1.md`.
+
+- **(chosen by Claude)** **Source project.** `source_project.id` is the Praxis project UUID (the same value as
+  `source.project_id` in every `praxis.anvil.export.v1` envelope, so the two can be cross-checked). `name` is the
+  project name. `version` is content-addressed: the sha256 of the manifest without that field. The same id and version
+  therefore always mean the same content, and any change (new rule set, new approved record, correction) gives a new
+  version. Praxis has no project version of its own that changes with all of these. *Owner/Anvil to confirm.*
+- **(chosen by Claude)** **Policy granularity.** One Anvil policy per (published rule set version, cited policy document
+  version). `policy_id` is the Praxis `PolicyDocument` id (stable across document and rule-set versions); `version` is
+  `rs<rule set version>.d<document version>`. Both parts are immutable in Praxis, so a policy id+version can never
+  change content. `title` is the document title; `source_id` is the document version id.
+- **(chosen by Claude)** **Which rules.** Only rules in published `ProjectRuleSet`s (Reviewed rule versions). Draft,
+  Needs definition and Excluded rules, unpublished documents and SME task-source uploads are never exported. A rule sits
+  under the document version of its requirement citation (the `supports` one first); review guarantees one exists. A
+  rule citing several documents is exported once, under that citation, not duplicated.
+- **(chosen by Claude)** **Rule fields.** `rule_id` is the Praxis rule key when it matches Anvil's id pattern, else
+  `rule-<rule uuid>`. `requirement` is the reviewed requirement text only: title, applicability, exceptions, evidence
+  needs, verification hints and task changes are not exported. `source_location` is a locator only ("document version
+  1: page 3; lines 4-6; section 2"), never quoted source text.
+- **(chosen by Claude)** **Severity.** Praxis rules have no severity (`required` is a publication gate and is mutable on
+  the rule, not part of the frozen rule set). Every rule is exported as `high`: not `critical` (no evidence that a
+  breach is a hard failure) and not lower (that could hide a real breach). *Owner to decide whether Praxis should
+  capture severity per rule.*
+- **(chosen by Claude)** **Visibility.** `agent_visible` → `agent_instruction`; `evaluator_only` → `evaluator_only`.
+  Nothing else is ever placed in an `agent_instruction` rule: no reference answers, rubric criteria or answer keys,
+  private evidence, evaluator-only text or task-change text.
+- **(chosen by Claude)** **Rubric and failure-mode links.** Omitted: Praxis does not link policy rules to rubric
+  criteria or failure modes, and inventing links is not allowed.
+- **(chosen by Claude)** **Project defaults.** The policies of the latest published rule set. Praxis rule sets use
+  inheritance mode `ALL_TASKS`, which is exactly "applies to every task by default"; any other mode blocks the export
+  (`UNSUPPORTED_INHERITANCE_MODE`).
+- **(chosen by Claude)** **Task bindings.** One per current approved record of the project that carries an executable
+  contract (`output.praxisContract`); superseded records are left out, so a corrected task is bound once, at its latest
+  version. `task_id`/`task_version` come from the contract; `payload_sha256` is computed by the same code as the
+  praxis-contract export (`apps/api/src/dataset/praxis-export.ts`). `policy_refs` are the policies of the rule set the
+  task's own frozen policy snapshot used (the submission the review approved). `excluded_project_policy_refs` lists
+  every current default not in `policy_refs`: a task frozen under an older rule set excludes the newer defaults, and a
+  task approved with no snapshot (the project had no rule set then) excludes all of them. Nothing is applied to a task
+  that its author and reviewer did not see.
+- **(chosen by Claude)** **Task changes.** Clarifications and stricter constraints cannot be expressed in the v1
+  manifest; the task is still bound to its base policies (they stay in the existing per-task sidecar). An exemption
+  would make Anvil penalise allowed behaviour, so any bound task whose snapshot has an exemption blocks the export
+  (409 `TASK_EXEMPTION_NOT_REPRESENTABLE`). *Owner/Anvil to decide how per-task changes should travel.*
+- **(chosen by Claude)** **Sources.** Each cited document version is one source at
+  `policies/<document id>/v<version>.<pdf|docx|txt|md>` with its stored size and sha256 and its exact original bytes.
+  `media_type` comes from the detected format (Praxis stores `text/markdown; charset=utf-8`; Anvil's enum has no
+  parameters).
+- **(chosen by Claude)** **Invalid state is never served.** The emitter runs the shared validator (schema, semantic
+  checks, source bytes, and binding against the real export envelopes) and answers 409 `PROJECT_POLICY_INVALID` with
+  every problem. A record whose own export is blocked (invalid contract, record hash) blocks the manifest too
+  (`TASK_EXPORT_BLOCKED`).
+- **(chosen by Claude)** **Access and audit.** Admin (any project of the tenant), the project's owning PM, and the
+  tenant's `RL_GYM` API client; anyone else gets 403 (wrong role or client kind) or 404 (other project or tenant).
+  Every export, source download and blocked attempt writes an audit event (`anvil.project_policy_exported`,
+  `anvil.project_policy_source_downloaded`, `anvil.project_policy_blocked`). Nothing else is written.

@@ -44,7 +44,16 @@ if (cmd === 'select') {
   const project = await db.project.create({ data: { clientId: client.id, ownerId: admin.id, templateId: template.id, templateVersion: template.version, name: `SYNTHETIC workbench UI fixture ${randomUUID()}`, status: 'IN_PROGRESS' } });
   const task = await db.taskInstance.create({ data: { clientId: client.id, projectId: project.id, taskType: 'AUTHORING', assignedToId: candidate.id, status: 'IN_PROGRESS', output: { header: { title: 'SYNTHETIC workbench UI fixture' } } } });
   console.log(JSON.stringify({ taskId: task.id, projectId: project.id }));
+} else if (cmd === 'wave1') {
+  // Authoring v2.1 UI fixture: an in-progress authoring task on a Both-experience project for the named template.
+  const workflowName = process.argv[4]!;
+  const user = await db.smeUser.findFirstOrThrow({ where: { id: arg!, clientId: client.id } });
+  const candidate = await db.candidate.upsert({ where: { smeUserId: user.id }, create: { clientId: client.id, smeUserId: user.id, specialties: [], jurisdictions: [], skills: [] }, update: {} });
+  const template = await db.template.findFirst({ where: { clientId: client.id, workflowName, status: 'PUBLISHED' }, orderBy: { version: 'desc' } }) ?? await db.template.findFirstOrThrow({ where: { clientId: client.id, workflowName }, orderBy: { version: 'desc' } });
+  const project = await db.project.create({ data: { clientId: client.id, ownerId: admin.id, templateId: template.id, templateVersion: template.version, name: `SYNTHETIC wave 1 ${workflowName} ${randomUUID()}`, status: 'IN_PROGRESS', authoringExperience: 'BOTH', reviewRoute: 'SME_PM' } });
+  const task = await db.taskInstance.create({ data: { clientId: client.id, projectId: project.id, taskType: 'AUTHORING', assignedToId: candidate.id, status: 'IN_PROGRESS', output: { header: { title: `SYNTHETIC ${workflowName}` } } } });
+  console.log(JSON.stringify({ taskId: task.id, projectId: project.id }));
 } else {
-  throw new Error('usage: e2e-m10 select <smeUserId> | payable | workbench <smeUserId>');
+  throw new Error('usage: e2e-m10 select <smeUserId> | payable | workbench <smeUserId> | wave1 <smeUserId> <workflowName>');
 }
 await db.$disconnect();

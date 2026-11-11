@@ -7,10 +7,11 @@ Omnichannel Creative & Locale Compliance · Launch of Noise Cancelling Phone.
 
 ## 0. Before you start (once per deploy)
 
-1. Admin → `GET /api/v1/admin/model-providers` shows `"mode": "vertex"` and the authoring model. If it says `mock`,
-   stop: QA is not on live Vertex.
-2. Run the smoke check in QA (two small billed calls): `pnpm --filter @praxis/api exec tsx scripts/vertex-smoke.ts`.
-   Exit 0 means the chatbot model and embeddings both answered.
+1. Admin → `GET /api/v1/admin/model-providers` shows `"mode": "vertex"` and the authoring model (in QA for now
+   `gemini:gemini-3.8-flash`, until the Claude quota appeal succeeds). If it says `mock`, stop: QA is not on live Vertex.
+2. Run the smoke check in QA (two small billed calls; the deployer creates this job):
+   `gcloud run jobs execute praxis-vertex-smoke --region us-central1 --wait`. Exit 0 means the chatbot model and
+   embeddings both answered; 2 means QA is on the mock; 1 means a call failed (the log line says which).
 3. The chatbot is capped at `AUTHORING_DAILY_CALL_CAP` calls per day (default 300). Past it, the SME sees a clear
    message and keeps authoring in Classic.
 

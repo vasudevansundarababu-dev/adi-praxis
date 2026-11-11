@@ -2,33 +2,53 @@ import { CoverageDimensions, CoverageQuotas, coverageStatus, effectiveCoverage, 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db } from '../db';
+import { ExpertEditRequest, StageDecisionRequest } from '@praxis/shared';
+import { AppError } from '../lib/errors';
+import type { EmbeddingProvider } from '../tasks/embeddings';
+import { decideStage, editPreview, expertEdit, reviewAccess, stageView } from '../tasks/stage-review';
 import { runCommand } from '../platform/command';
 import { definitionFor } from '../tasks/definitions';
 import { draftingView } from '../tasks/drafting/service';
-import { CHECKLIST, completionStatus, decideTask, reviewableTask, TaskDecisionRequest } from '../tasks/review-service';
+import { CHECKLIST, completionStatus, decideTask, TaskDecisionRequest } from '../tasks/review-service';
 import type { StoredChecks } from '../tasks/submission';
 import { EXPERT_TASK_TYPES, templateRef } from '../tasks/task-service';
 import { loadProject } from './projects';
 
 const IdParams = z.object({ id: z.string().uuid() });
 const REVIEW = ['REVIEWER', 'ADMIN'] as const;
+/** The SME -> Expert -> PM route adds the project's PM (PM approval); the stage engine checks who may do what. */
+const STAGED = ['REVIEWER', 'ADMIN', 'PM'] as const;
 const brief = (input: unknown) => (input as { slot?: { brief?: string } }).slot?.brief ?? null;
 
 /** TASK-KYC R01 to R03 (task review) and the SPEC coverage and PM dashboard. */
-export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db }) => {
+export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db; embeddings?: EmbeddingProvider }> = async (app, { db, embeddings }) => {
   // R01: flagged items first; never the reviewer's own tasks or tasks from an author they declared a conflict with.
-  app.get('/review/tasks', { config: { access: REVIEW }, schema: { tags: ['review'], querystring: z.object({ projectId: z.string().uuid().optional() }) } }, async (req) => {
+  // On SME -> Expert -> PM projects each item shows only to whoever holds its stage: assigned Validators at Expert review,
+  // the project's PM (or an Admin) at PM approval; never to the author, Admins included.
+  app.get('/review/tasks', { config: { access: STAGED }, schema: { tags: ['review'], querystring: z.object({ projectId: z.string().uuid().optional() }) } }, async (req) => {
     const actor = req.actor!;
+    const admin = actor.roles.includes('ADMIN');
+    const reviewer = admin || actor.roles.includes('REVIEWER');
     const me = await db.user.findUniqueOrThrow({ where: { id: actor.userId } });
-    const projectIds = actor.roles.includes('ADMIN') ? undefined : (await db.projectReviewer.findMany({ where: { userId: actor.userId } })).map((r) => r.projectId);
+    const assigned = new Set((await db.projectReviewer.findMany({ where: { userId: actor.userId } })).map((r) => r.projectId));
+    const owned = actor.roles.includes('PM') ? new Set((await db.project.findMany({ where: { clientId: actor.clientId, ownerId: actor.userId, reviewRoute: 'SME_EXPERT_PM' }, select: { id: true } })).map((p) => p.id)) : new Set<string>();
+    const projectIds = admin ? undefined : [...new Set([...assigned, ...owned])];
     const conflicted = new Set((await db.conflictDeclaration.findMany({ where: { reviewerId: actor.userId, resolvedAt: null } })).map((c) => c.smeUserId));
     const rows = await db.taskInstance.findMany({
       where: { clientId: actor.clientId, status: 'SUBMITTED', taskType: { in: ['AUTHORING', 'ANNOTATION'] }, ...(projectIds ? { projectId: { in: projectIds } } : {}), ...(req.query.projectId ? { projectId: req.query.projectId } : {}) },
       include: { project: { include: { template: true } }, assignedTo: { include: { smeUser: true } } },
       orderBy: { submittedAt: 'asc' },
     });
+    const isAuthor = (t: (typeof rows)[number]) => t.assignedTo?.smeUser?.contactEmail?.toLowerCase() === me.email.toLowerCase();
+    const visible = (t: (typeof rows)[number]) => {
+      if (t.assignedTo?.smeUser && conflicted.has(t.assignedTo.smeUserId)) return false;
+      if (t.project.reviewRoute !== 'SME_EXPERT_PM') return reviewer && (admin || assigned.has(t.projectId)) && (admin || !isAuthor(t));
+      if (isAuthor(t)) return false;
+      if (t.reviewStage === 'EXPERT_REVIEW') return admin || assigned.has(t.projectId);
+      return admin || owned.has(t.projectId) || assigned.has(t.projectId);
+    };
     const items = rows
-      .filter((t) => !t.assignedTo?.smeUser || (!conflicted.has(t.assignedTo.smeUserId) && (actor.roles.includes('ADMIN') || t.assignedTo.smeUser.contactEmail?.toLowerCase() !== me.email.toLowerCase())))
+      .filter(visible)
       .map((t) => {
         const checks = t.checks as StoredChecks | null;
         return {
@@ -43,6 +63,8 @@ export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, {
           reworkCount: t.reworkCount,
           flaggedDuplicate: (checks?.similar ?? []).some((m) => m.flagged),
           dataFlags: Array.isArray(t.flags) ? t.flags.length : 0,
+          reviewRoute: t.project.reviewRoute,
+          stage: t.project.reviewRoute === 'SME_EXPERT_PM' ? t.reviewStage : 'PM_APPROVAL',
         };
       })
       .sort((a, b) => Number(b.flaggedDuplicate || b.dataFlags > 0) - Number(a.flaggedDuplicate || a.dataFlags > 0));
@@ -50,8 +72,9 @@ export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, {
   });
 
   // R02: the full task read-only, automated check results, the similarity panel and what changed since the last version.
-  app.get('/review/tasks/:id', { config: { access: REVIEW }, schema: { tags: ['review'], params: IdParams } }, async (req) => {
-    const t = await reviewableTask(db, req.actor!, req.params.id);
+  app.get('/review/tasks/:id', { config: { access: STAGED }, schema: { tags: ['review'], params: IdParams } }, async (req) => {
+    const access = await reviewAccess(db, req.actor!, req.params.id);
+    const t = access.t;
     const template = await templateRef(db, t.project.templateId);
     const def = definitionFor(template);
     const checks = t.checks as StoredChecks | null;
@@ -85,7 +108,9 @@ export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, {
       text: t.output ? def.canonicalText(t.output as Record<string, unknown>) : '',
       versions: versions.map((v) => ({ version: v.version, submittedAt: v.submittedAt.toISOString() })),
       previousOutput: versions.length > 1 ? versions.at(-2)!.output : null,
-      reviews: t.reviews.map((r) => ({ decision: r.decision, comments: r.comments, notes: r.notes, rejectReason: r.rejectReason, at: r.createdAt.toISOString(), version: r.submissionVersion })),
+      reviews: t.reviews.map((r) => ({ decision: r.decision, comments: r.comments, notes: r.notes, rejectReason: r.rejectReason, at: r.createdAt.toISOString(), version: r.submissionVersion, stage: r.stage })),
+      // Authoring v2.1 Wave 2: route, stage, stage history (who, decision, version, void), version diff, viewer actions.
+      ...(await stageView(db, access)),
       checklist: CHECKLIST,
       // M9 "How this task was made": sources (files open via /review/tasks/:id/sources/:sourceId/file), interview, drafts.
       drafting: t.taskType === 'AUTHORING' ? await draftingView(db, t) : null,
@@ -95,6 +120,26 @@ export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, {
   // R03: accept (writes the ApprovedTaskRecord in the same transaction), rework with pinned comments, or reject.
   app.post('/review/tasks/:id/decision', { config: { access: REVIEW }, schema: { tags: ['review'], params: IdParams, body: TaskDecisionRequest } }, async (req, reply) => {
     await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => ({ status: 200, body: await decideTask(tx, actor, req.params.id, req.body, audit, emit) }));
+    return reply;
+  });
+
+  // Wave 2 stage decision (SME -> Expert -> PM): Expert PASS / REWORK / REJECT, PM APPROVE / REWORK, bound to a version.
+  app.post('/review/tasks/:id/stage-decision', { config: { access: STAGED }, schema: { tags: ['review'], params: IdParams, body: StageDecisionRequest } }, async (req, reply) => {
+    await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => ({ status: 200, body: await decideStage(tx, actor, req.params.id, req.body, audit, emit) }));
+    return reply;
+  });
+
+  // Wave 2 Expert edit: a new version with a recorded reason; checks re-run; earlier stage decisions void.
+  app.post('/review/tasks/:id/edit', { config: { access: STAGED }, schema: { tags: ['review'], params: IdParams, body: ExpertEditRequest } }, async (req, reply) => {
+    // The embedding (a model call) is computed before the transaction; the revision check inside keeps it consistent.
+    const ev = await editPreview(db, req.actor!, req.params.id, req.body).catch(() => null);
+    let embedding: number[] | null = null;
+    if (ev && embeddings) {
+      embedding = await embeddings.embed(ev.text).catch(() => {
+        throw new AppError(503, 'SIMILARITY_UNAVAILABLE', 'The duplicate check is unavailable right now; try the edit again shortly.');
+      });
+    }
+    await runCommand(db, req, reply, async ({ tx, actor, audit }) => ({ status: 200, body: await expertEdit(tx, actor, req.params.id, req.body, { embedding, embeddingModel: embedding ? embeddings!.model : null }, audit) }));
     return reply;
   });
 

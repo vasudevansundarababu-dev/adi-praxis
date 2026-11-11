@@ -320,7 +320,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(journeyRoutes, { db: deps.db, config: deps.config, selectionGate });
       await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
       await v1.register(candidateStudioRoutes, { db: deps.db, config: deps.config, storage, deps: resolveDeps(deps.metaCompiler?.deps), selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), faults: deps.metaCompiler?.studioFaults });
-      await v1.register(taskReviewRoutes, { db: deps.db });
+      await v1.register(taskReviewRoutes, { db: deps.db, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
       await v1.register(modelProviderRoutes, { db: deps.db, config: deps.config });
       await v1.register(conversationRoutes, { db: deps.db, selectionGate, dailyModelCallCap: deps.config.AUTHORING_DAILY_CALL_CAP });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });

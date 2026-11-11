@@ -79,18 +79,7 @@ export async function submitTask(
     throw new AppError(422, 'CHECKS_FAILED', 'Some checks need attention before you can submit.', { checks: ev.checks, flags: ev.flags, unexplained: unexplained.map((f) => f.id) });
   }
 
-  let similar: SimilarMatch[] = [];
-  if (args.embedding && t.taskType === 'AUTHORING') {
-    similar = await findSimilar(tx, { taskId: t.id, lineageId: ev.lineageId, embedding: args.embedding, coverage: ev.coverage, keyInputs: ev.keyInputs, threshold: ev.threshold });
-    await storeEmbedding(tx, t.id, args.embedding);
-    await tx.similarityCheck.deleteMany({ where: { taskInstanceId: t.id } });
-    await tx.similarityCheck.createMany({
-      data: similar.flatMap((m) => [
-        { clientId: t.clientId, taskInstanceId: t.id, comparedToId: m.taskId, score: m.embeddingScore.toFixed(4), method: 'EMBEDDING' as const, flagged: m.embeddingScore >= ev.threshold },
-        { clientId: t.clientId, taskInstanceId: t.id, comparedToId: m.taskId, score: m.structuredScore.toFixed(4), method: 'STRUCTURED' as const, flagged: m.flagged && m.embeddingScore < ev.threshold },
-      ]),
-    });
-  }
+  const similar = args.embedding && t.taskType === 'AUTHORING' ? await refreshSimilarity(tx, t, ev, args.embedding) : [];
 
   // Export readiness is separate from authoring: a blocked compile never blocks the submission.
   const compiled = t.taskType === 'AUTHORING' ? compileForSubmission(ev.template.workflowName, t.output as Record<string, unknown>, { taskId: t.id, revisionId: `${t.id}-r${t.revision}` }) : null;
@@ -108,6 +97,8 @@ export async function submitTask(
       checks: stored as unknown as Prisma.InputJsonValue,
       flags: flags as unknown as Prisma.InputJsonValue,
       revision: { increment: 1 },
+      // SME -> Expert -> PM: every submission (first, after rework or after reconfirming an Expert edit) starts at Expert review.
+      reviewStage: ev.project.reviewRoute === 'SME_EXPERT_PM' ? 'EXPERT_REVIEW' : null,
     },
   });
   if (!count) throw new AppError(409, 'STALE_REVISION', 'This task changed in another window. Reload to continue.');
@@ -116,7 +107,21 @@ export async function submitTask(
   const policy = await snapshotTask(tx, { clientId: t.clientId, task: { id: t.id, projectId: t.projectId }, actorId: 'task-submission' });
   await tx.taskSubmission.create({ data: { clientId: t.clientId, taskInstanceId: t.id, version, policySnapshotId: policy?.snapshot.id ?? null, output, coverageTags: (ev.coverage ?? undefined) as Prisma.InputJsonValue | undefined, checks: stored as unknown as Prisma.InputJsonValue } });
   const flagged = similar.filter((m) => m.flagged);
-  await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.submitted', before: { status: t.status }, after: { status: 'SUBMITTED', version, ...(compiled ? { export: compiled.status.status } : {}), flaggedDuplicates: flagged.map((m) => m.taskId), dataFlags: flags.length } });
+  await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.submitted', before: { status: t.status }, after: { status: 'SUBMITTED', version, ...(ev.project.reviewRoute === 'SME_EXPERT_PM' ? { stage: 'EXPERT_REVIEW' } : {}), ...(compiled ? { export: compiled.status.status } : {}), flaggedDuplicates: flagged.map((m) => m.taskId), dataFlags: flags.length } });
   await emit({ name: 'task.submitted', aggregateType: 'TaskInstance', aggregateId: t.id, payload: { taskId: t.id, projectId: t.projectId, version, flaggedDuplicate: flagged.length > 0 } });
   return { version, similar };
+}
+
+/** Near-duplicate search for the task's current text; replaces the task's stored similarity rows and embedding. */
+export async function refreshSimilarity(tx: Tx, t: Pick<TaskInstance, 'id' | 'clientId'>, ev: Pick<Awaited<ReturnType<typeof evaluateTask>>, 'lineageId' | 'coverage' | 'keyInputs' | 'threshold'>, embedding: number[]) {
+  const similar = await findSimilar(tx, { taskId: t.id, lineageId: ev.lineageId, embedding, coverage: ev.coverage, keyInputs: ev.keyInputs, threshold: ev.threshold });
+  await storeEmbedding(tx, t.id, embedding);
+  await tx.similarityCheck.deleteMany({ where: { taskInstanceId: t.id } });
+  await tx.similarityCheck.createMany({
+    data: similar.flatMap((m) => [
+      { clientId: t.clientId, taskInstanceId: t.id, comparedToId: m.taskId, score: m.embeddingScore.toFixed(4), method: 'EMBEDDING' as const, flagged: m.embeddingScore >= ev.threshold },
+      { clientId: t.clientId, taskInstanceId: t.id, comparedToId: m.taskId, score: m.structuredScore.toFixed(4), method: 'STRUCTURED' as const, flagged: m.flagged && m.embeddingScore < ev.threshold },
+    ]),
+  });
+  return similar;
 }

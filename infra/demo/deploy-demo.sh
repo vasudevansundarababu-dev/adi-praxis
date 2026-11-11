@@ -12,7 +12,7 @@
 #   PRAXIS_VERTEX=1        Real Claude and embeddings on Vertex AI (the testers' environment); sign-in, identity
 #                          check and email stay simulated. Claude must be enabled for the project in Model Garden.
 #                          Also sets the authoring chatbot model and daily cap (AUTHORING_MODEL, default
-#                          gemini:gemini-2.5-flash until Claude quota is granted, then claude-sonnet-5-5;
+#                          gemini:gemini-3.8-flash until Claude quota is granted, then claude-sonnet-5-5;
 #                          AUTHORING_DAILY_CALL_CAP, default 300) and deploys, but never runs, the
 #                          praxis-vertex-smoke job.
 #   PRAXIS_SME_SUPPLY=1    Switch on M10 SME supply (partners, certification, payments; docs/SME-SUPPLY.md) in the API,
@@ -160,7 +160,7 @@ if [ -n "$VERTEX" ]; then
   # Authoring v2.1 chatbot on Vertex (docs/ops/QA-ENV-SETUP.md). Owner's model is Claude Sonnet 5.5, but Claude quota
   # on Vertex was denied (10 Nov), so QA runs Gemini until it is granted; then set AUTHORING_MODEL=claude-sonnet-5-5.
   # The API refuses chatbot calls above the daily cap per client (429 MODEL_DAILY_CAP). Older builds ignore both.
-  printf 'AUTHORING_MODEL: "%s"\nAUTHORING_DAILY_CALL_CAP: "%s"\n' "${AUTHORING_MODEL:-gemini:gemini-2.5-flash}" "${AUTHORING_DAILY_CALL_CAP:-300}" >> "$ENVFILE"
+  printf 'AUTHORING_MODEL: "%s"\nAUTHORING_DAILY_CALL_CAP: "%s"\n' "${AUTHORING_MODEL:-gemini:gemini-3.8-flash}" "${AUTHORING_DAILY_CALL_CAP:-300}" >> "$ENVFILE"
 fi
 # gcloud accepts one env-vars file and no extra variables, so the runtime role name lives in the shared file.
 echo 'APP_DB_ROLE: praxis_app' >> "$ENVFILE"

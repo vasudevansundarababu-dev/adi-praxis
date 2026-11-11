@@ -1,4 +1,6 @@
 import { CONTRIBUTION_ROLES, FIELD_DEFS, OpportunityBrief, type ContributionRole } from '@praxis/shared';
+import { runAssessment } from '../candidate/selection-service';
+import type { SuitabilityEvaluator } from '../candidate/suitability';
 import type { Db } from '../db';
 
 /**
@@ -46,8 +48,14 @@ export interface QaUsersOptions {
   assessmentTimeoutMs: number;
   pollMs?: number;
   sleep?: (ms: number) => Promise<void>;
-  /** Called on each poll while waiting for assessments (tests deliver outbox events here; QA relies on the worker). */
+  /** Called on each poll while waiting for assessments (tests deliver outbox events here). */
   onPoll?: () => Promise<void>;
+  /**
+   * When set, the job also runs pending or failed assessments itself (the worker's own runAssessment, so the same
+   * claim, validation, SYSTEM audit and no decision), up to 3 tries each. Used in QA, where the worker's model may be
+   * unavailable. The worker and the job never both run one assessment: runAssessment claims it first.
+   */
+  evaluator?: SuitabilityEvaluator;
 }
 
 export interface Slot {
@@ -286,8 +294,10 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
   }
 
   const deadline = Date.now() + o.assessmentTimeoutMs;
+  const tries = new Map<string, number>();
   for (;;) {
     await o.onPoll?.();
+    if (o.evaluator) await assessPending(o.evaluator);
     const waiting = await db.enrollment.count({ where: { id: { in: slots.map((s) => s.enrollmentId!) }, status: 'SUBMITTED' } });
     if (waiting === 0 || Date.now() >= deadline) {
       if (waiting) log('warn', 'some profiles are still awaiting the suitability assessment; re-run the job to continue', { waiting });
@@ -323,6 +333,26 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
   return result;
 
   // ───────────────────────── steps ─────────────────────────
+
+  async function assessPending(evaluator: SuitabilityEvaluator) {
+    const submitted = await db.enrollment.findMany({ where: { id: { in: slots.map((s) => s.enrollmentId!) }, status: 'SUBMITTED' } });
+    const pending = await db.suitabilityAssessment.findMany({
+      where: { enrollmentId: { in: submitted.map((e) => e.id) }, status: { in: ['NOT_RUN', 'ERROR'] } },
+      orderBy: { createdAt: 'asc' },
+    });
+    const queue = pending.filter((a) => (tries.get(a.id) ?? 0) < 3);
+    const runOne = async () => {
+      for (let a = queue.shift(); a; a = queue.shift()) {
+        tries.set(a.id, (tries.get(a.id) ?? 0) + 1);
+        const r = await runAssessment(db, evaluator, a.id);
+        if (r === 'error') {
+          const failed = await db.suitabilityAssessment.findUniqueOrThrow({ where: { id: a.id } });
+          log('warn', 'assessment failed', { assessmentId: a.id, try: tries.get(a.id), model: evaluator.modelVersion, errorCode: failed.errorCode, detail: failed.limitations?.slice(0, 300) });
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: 5 }, runOne));
+  }
 
   async function createPool(t: (typeof templates)[number]) {
     const name = poolName(t.workflowName);

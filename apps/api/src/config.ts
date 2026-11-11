@@ -65,6 +65,8 @@ const Env = z.object({
   SUPPORT_MODEL: z.string().default('claude-sonnet-5'),
   /** Authoring v2.1: the chatbot facilitator's model on Vertex (live in QA), and its per-client daily call cap. */
   AUTHORING_MODEL: z.string().default('claude-sonnet-5-5'),
+  /** FLOW2 suitability assessment model on Vertex: a Claude model id (default), or `gemini:<model>` (QA without Claude quota). */
+  SUITABILITY_MODEL: z.string().default('claude-opus-5'),
   AUTHORING_DAILY_CALL_CAP: z.coerce.number().int().min(1).max(100_000).default(300),
   /** M10c payouts through Trolley. Blank keys = the local mock (refused in production with SME supply on). */
   TROLLEY_ACCESS_KEY: z.string().default(''),

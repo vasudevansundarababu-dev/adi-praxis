@@ -231,6 +231,40 @@ describe('qa-users: QA seed of 30 staffing-ready SMEs and 10 Reviewers', () => {
     expect(await db.selectionDecision.count()).toBe(6);
   }, 120_000);
 
+  it('runs failed assessments itself with its own model (QA without Claude quota), then finishes', async () => {
+    const small = { candidateEmails: defaultEmails('sme', 6), reviewerEmails: defaultEmails('reviewer', 2) };
+    // The worker's model is unavailable: every assessment ends in a recoverable ERROR and nobody is selected.
+    const down = { modelVersion: 'claude-opus-5', evaluate: async () => { throw new Error('429 quota'); } };
+    const broken = new HandlerRegistry().register(assessOnSubmit(down));
+    const workerDown = async () => {
+      for (const ev of await db.outboxEvent.findMany({ where: { name: 'enrollment.submitted' } })) await processDomainEvent(db, broken, ev.id).catch(() => undefined);
+    };
+    const first = await qaUsers(db, options({ ...small, onPoll: workerDown, assessmentTimeoutMs: 0 }), log);
+    expect(first.slots.every((s) => s.state === 'enrollment SUBMITTED')).toBe(true);
+    expect(await db.suitabilityAssessment.count({ where: { status: 'ERROR' } })).toBe(6);
+    // Re-run with a working model for the job: it claims the failed assessments, and Reviewers decide as usual.
+    const second = await qaUsers(db, options({ ...small, onPoll: undefined, evaluator: new MockSuitabilityEvaluator() }), log);
+    expect(second.incomplete).toBe(0);
+    expect(await db.suitabilityAssessment.count({ where: { status: 'FIT_RECOMMENDED', modelVersion: 'mock-rules-1' } })).toBe(6);
+    expect(await db.auditEvent.count({ where: { action: 'enrollment.assessed', actorType: 'SYSTEM' } })).toBe(6);
+    const reviewerIds = (await db.user.findMany({ where: { email: { in: small.reviewerEmails } } })).map((u) => u.id);
+    const decided = await db.auditEvent.findMany({ where: { action: 'enrollment.decided' } });
+    expect(decided).toHaveLength(6);
+    expect(decided.every((a) => a.actorType === 'USER' && reviewerIds.includes(a.actorId!))).toBe(true);
+  }, 120_000);
+
+  it('gives up on an assessment after 3 tries and leaves it undecided', async () => {
+    const small = { candidateEmails: defaultEmails('sme', 3), reviewerEmails: defaultEmails('reviewer', 1) };
+    let calls = 0;
+    const down = { modelVersion: 'gemini:x', evaluate: async () => { calls++; throw new Error('503'); } };
+    const r = await qaUsers(db, options({ ...small, onPoll: undefined, evaluator: down, assessmentTimeoutMs: 300 }), log);
+    // 3 candidates over 2 templates: 6 pool places, each assessment tried 3 times.
+    expect(r.incomplete).toBe(6);
+    expect(calls).toBe(18);
+    expect(await db.selectionDecision.count()).toBe(0);
+    expect(logs.join('\n')).toMatch(/assessment failed/);
+  }, 60_000);
+
   it('waits out the login rate limit (QA allows 10 sign-ins a minute) instead of failing', async () => {
     const waits: number[] = [];
     let limited = 0;

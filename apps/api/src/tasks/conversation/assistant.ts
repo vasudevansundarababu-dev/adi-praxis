@@ -16,12 +16,20 @@ export function logModelCall(entry: { feature: string; model: string; vendor?: '
 
 export class VertexConversationAssistant implements ConversationAssistant {
   readonly model: string;
-  private client: Pick<AnthropicVertex, 'messages'>;
+  private clientValue: Pick<AnthropicVertex, 'messages'> | undefined;
+  private readonly vertex: { projectId: string; region: string };
   constructor(opts: { projectId: string; region: string; model?: string; client?: Pick<AnthropicVertex, 'messages'> }) {
     // Owner decision (10 Nov 2026): Sonnet 5.5 for cost; Haiku 5.5 as the cheap backup. The request below sends no
     // thinking, tool_choice or sampling parameters, which Sonnet 5.5 rejects; omitting thinking runs adaptive.
     this.model = opts.model ?? 'claude-sonnet-5-5';
-    this.client = opts.client ?? new AnthropicVertex({ projectId: opts.projectId, region: opts.region, timeout: 90000, maxRetries: 0 });
+    // Created on the first call: constructing AnthropicVertex starts a Google credentials lookup, which must never
+    // happen when the assistant is only built (tests, mock-mode checks).
+    this.clientValue = opts.client;
+    this.vertex = { projectId: opts.projectId, region: opts.region };
+  }
+  private client(): Pick<AnthropicVertex, 'messages'> {
+    this.clientValue ??= new AnthropicVertex({ projectId: this.vertex.projectId, region: this.vertex.region, timeout: 90000, maxRetries: 0 });
+    return this.clientValue;
   }
   async propose(input: ConversationInput) {
     const content = JSON.stringify(input);
@@ -30,7 +38,7 @@ export class VertexConversationAssistant implements ConversationAssistant {
     let result: Message;
     try {
       // No automatic retry (maxRetries 0): an uncertain paid call is never resent silently.
-      result = (await this.client.messages.create({ model: this.model, max_tokens: 12000, system: CONVERSATION_SYSTEM, messages: [{ role: 'user', content }] })) as Message;
+      result = (await this.client().messages.create({ model: this.model, max_tokens: 12000, system: CONVERSATION_SYSTEM, messages: [{ role: 'user', content }] })) as Message;
     } catch (e) {
       logModelCall({ feature: 'authoring-conversation', model: this.model, ok: false, latencyMs: Date.now() - started, error: e instanceof Error ? e.name : 'error' });
       throw e;

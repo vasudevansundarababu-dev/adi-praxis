@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// No test may construct the real Vertex SDK client: its constructor starts a Google credentials lookup (CI has none).
+const vertexCtor = vi.hoisted(() => vi.fn());
+vi.mock('@anthropic-ai/vertex-sdk', () => ({ AnthropicVertex: vertexCtor }));
 import { authoringAssistant, CONVERSATION_SYSTEM, GeminiConversationAssistant, parseAuthoringModel, VertexConversationAssistant } from '../src/tasks/conversation/assistant';
 
 const input = { workflow: 'KYC onboarding and refresh', current: {}, slot: { brief: 'SECRET-CASE-TEXT' }, history: [{ speaker: 'AUTHOR', content: 'SECRET-ANSWER-TEXT' }], policy: null, previousUnresolved: [] };
@@ -98,5 +102,14 @@ describe('Authoring v2.1 Gemini fallback for the chatbot (fake fetch, no network
     expect(authoringAssistant({ ...base, assistantMode: 'vertex', AUTHORING_MODEL: 'gemini:gemini-2.5-flash' })).toBeInstanceOf(GeminiConversationAssistant);
     expect(authoringAssistant({ ...base, assistantMode: 'vertex', AUTHORING_MODEL: 'claude-sonnet-5-5' })).toBeInstanceOf(VertexConversationAssistant);
     expect(authoringAssistant({ ...base, assistantMode: 'mock', AUTHORING_MODEL: 'gemini:gemini-2.5-flash' }).model).toBe('mock-conversation-no-model');
+  });
+});
+
+describe('no credentials lookup when the chatbot is only built', () => {
+  it('creates the Vertex client on the first call, not when the assistant is constructed', () => {
+    vertexCtor.mockClear();
+    authoringAssistant({ VERTEX_PROJECT_ID: 'p', VERTEX_LOCATION: 'global', assistantMode: 'vertex', AUTHORING_MODEL: 'claude-sonnet-5-5' });
+    new VertexConversationAssistant({ projectId: 'p', region: 'global' });
+    expect(vertexCtor).not.toHaveBeenCalled();
   });
 });

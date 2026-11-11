@@ -1,4 +1,4 @@
-# Praxis task-authoring handover v2.0
+# Praxis SME Authoring specification and handover v2.1
 
 Prepared 10 November 2026, America/Chicago. Product requirements, design and implementation handover. Latest local product commit inspected: de758bac9247fe7c53d36f033e225964f34f75f0 on feat/conversational-case-authoring. Source repository: https://github.com/vasudevansundarababu-dev/adi-praxis.git; owner's source branch: feat/catalog-published-defaults. No push, merge, deployment, paid model call or training is included in this documentation delivery.
 
@@ -28,3 +28,7 @@ The human-review node is a business step inside the authored case. Praxis Expert
 01 Requirements and acceptance; 02 System/chatbot architecture; 03 Project setup fields; 04 SME screens and section fields; 05 Shared templates and graph contract; 06 Chatbot memory and guardrails; 07 Policy intake/RAG; 08 Expert/PM review; 09 User journeys; 10 Existing-code change impact; 11 Vertex model choice and cost; 12 Build order and validation; 13 Help text and operating guides; 14 Decision register and continuation handoff; 15 KYC field contract; 16 Template catalogue supplement. Existing per-template six-section guides accompany the package as appendices.
 
 This v2 handover resolves conflicting historical notes. In particular: remove unrestricted SME agent-mode pickers; remove blanket chat-default assumptions; never put platform approval into the investigation graph; keep human substantive authorship; put the connected graph below BOTH editors; use one template-driven authoring system. Older mockups are historical references.
+
+## Consolidated multi-agent extension - approved to build
+
+Chapter 17 incorporates the approved LangChain/LangGraph and Harbor architecture, shared graph fields, runtime boundaries, human interactions, review changes and acceptance gates. Chapter 18 records the latest decisions and actual implementation limits. These chapters supersede earlier approval-pending language. Local implementation is authorised; deployment and paid execution remain separate. The consolidated v2.1 PDF and refreshed sharing ZIP include every chapter.

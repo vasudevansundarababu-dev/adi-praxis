@@ -52,3 +52,7 @@ Owner/domain reviewers must confirm all published template agent modes, final fi
 ## Next-session checklist
 
 Read this index, then 00 and 10. Confirm current branch/status before editing. Inspect current sources instead of replaying stale older instructions. Update the decision register and affected chapters for each material correction. Record implementation commit, checks actually run, failures/limits and deployment status. Avoid secret/config/runtime credential reads. Keep Anvil/Praxis independence and cloud-spend authority separate. Do not restart old agents or treat monitoring prompts as coding instructions.
+
+## Consolidation update - 10 November 2026
+
+The owner approved local implementation of the shared workflow contract and Anvil read-only task viewer first, then the wider Praxis/LangGraph/Harbor integration. No OpenHands is to be used. Clicking a benchmark task name/ID should open the exact task-version graph in read-only mode; export is one graph at a time. Task graphs are excluded from benchmark PDF reports, bulk export deferred; existing report PDFs remain unchanged. The first local Anvil implementation supports captured ordered stages and individual SVG export (d7c2536). It does not implement complete decision/human/loop graphs or deploy to QA. See chapters 17 and 18. The user requested one consolidated specification PDF and refreshed ZIP for team sharing.

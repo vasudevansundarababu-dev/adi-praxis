@@ -11,3 +11,6 @@ PR-16,Payments,reuse existing eligibility,08,one earning per eligible acceptance
 PR-18,Executable export,partial adapters; gaps explicit,15,unsupported graph or missing contract blocked
 MODEL-01,Vertex MaaS provider,recommendation; no paid call,11,contract tests then authorised live pilot
 GUIDE-01,Per-template instructions,14 local guides plus new draft specs,13,"field definition, action, example, review check"
+MA-01,Shared LangGraph/Harbor graph contract,approved to build; not fully implemented,17,"TS/Python versioned fixtures, graph validation and native execution receipts"
+MA-02,"Human response, replay and bounded loops",approved architecture; qualification pending,17,"authorised interrupt/resume, bounded cycles, Unknown retention and visibility tests"
+VIEW-01,Read-only benchmark task graph and individual export,ordered-stage local viewer d7c2536; full graph pending,18,"exact task version, read-only details, SVG export; no PDF/bulk changes"

@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "policy_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Policy Id",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Version",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "source_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/PolicyRule"
+          },
+          "maxItems": 500,
+          "title": "Rules",
+          "type": "array"
+        }
+      },
+      "required": [
+        "policy_id",
+        "version",
+        "title",
+        "source_id",
+        "rules"
+      ],
+      "title": "Policy",
+      "type": "object"
+    },
+    "PolicyRef": {
+      "additionalProperties": false,
+      "properties": {
+        "policy_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Policy Id",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy_id",
+        "version"
+      ],
+      "title": "PolicyRef",
+      "type": "object"
+    },
+    "PolicyRule": {
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "requirement": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Requirement",
+          "type": "string"
+        },
+        "source_location": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Source Location",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "visibility": {
+          "enum": [
+            "agent_instruction",
+            "evaluator_only"
+          ],
+          "title": "Visibility",
+          "type": "string"
+        },
+        "rubric_criterion_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Rubric Criterion Ids",
+          "type": "array"
+        },
+        "failure_mode_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Failure Mode Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "rule_id",
+        "requirement",
+        "source_location",
+        "severity",
+        "visibility"
+      ],
+      "title": "PolicyRule",
+      "type": "object"
+    },
+    "PolicySource": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "media_type": {
+          "enum": [
+            "text/plain",
+            "text/markdown",
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          ],
+          "title": "Media Type",
+          "type": "string"
+        },
+        "size_bytes": {
+          "maximum": 10485760,
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "media_type",
+        "size_bytes",
+        "sha256"
+      ],
+      "title": "PolicySource",
+      "type": "object"
+    },
+    "Project": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "name"
+      ],
+      "title": "Project",
+      "type": "object"
+    },
+    "TaskPolicyBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Task Id",
+          "type": "string"
+        },
+        "task_version": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+          "title": "Task Version",
+          "type": "string"
+        },
+        "payload_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Payload Sha256",
+          "type": "string"
+        },
+        "policy_refs": {
+          "items": {
+            "$ref": "#/$defs/PolicyRef"
+          },
+          "maxItems": 100,
+          "title": "Policy Refs",
+          "type": "array"
+        },
+        "excluded_project_policy_refs": {
+          "items": {
+            "$ref": "#/$defs/PolicyRef"
+          },
+          "maxItems": 100,
+          "title": "Excluded Project Policy Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id",
+        "task_version",
+        "payload_sha256",
+        "policy_refs"
+      ],
+      "title": "TaskPolicyBinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "praxis.anvil.project_policy.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_project": {
+      "$ref": "#/$defs/Project"
+    },
+    "project_default_policy_refs": {
+      "items": {
+        "$ref": "#/$defs/PolicyRef"
+      },
+      "maxItems": 100,
+      "title": "Project Default Policy Refs",
+      "type": "array"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/PolicySource"
+      },
+      "maxItems": 100,
+      "title": "Sources",
+      "type": "array"
+    },
+    "policies": {
+      "items": {
+        "$ref": "#/$defs/Policy"
+      },
+      "maxItems": 100,
+      "title": "Policies",
+      "type": "array"
+    },
+    "task_bindings": {
+      "items": {
+        "$ref": "#/$defs/TaskPolicyBinding"
+      },
+      "maxItems": 10000,
+      "title": "Task Bindings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "source_project",
+    "project_default_policy_refs",
+    "sources",
+    "policies",
+    "task_bindings"
+  ],
+  "title": "ProjectPolicyManifest",
+  "type": "object"
+}

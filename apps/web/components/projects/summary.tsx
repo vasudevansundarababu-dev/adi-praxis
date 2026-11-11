@@ -26,6 +26,7 @@ export function ProjectSummary({
   const rows: [string, React.ReactNode][] = [
     ['Workflow', `${p.domainName} — ${p.workflowName} (template v${p.templateVersion})`],
     ['Owner', p.ownerName],
+    ['Authoring experience', p.taskMode === 'AUTHORING' ? p.authoringExperience ?? 'Both (legacy)' : 'Not applicable'],
     ['Dates', p.startDate && p.endDate ? `${p.startDate} to ${p.endDate}` : '—'],
     ['Mode', p.taskMode === 'AUTHORING' ? `Authoring: ${p.distinctTarget} distinct tasks, max ${p.maxPerExpert} per expert` : `Annotation: ${p.taskCount} tasks`],
     ['TPT', p.tptMinutes ? `${p.tptMinutes} minutes (${p.hoursPerWorkerDay} h per worker per day)` : '—'],

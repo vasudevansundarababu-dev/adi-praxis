@@ -16,7 +16,7 @@ test('manual answers redact sensitive identifiers and cleared answers cannot be 
   await post(`/templates/${template.id}/publish`);
   const jd = await post('/job-descriptions', { title: 'KYC author', responsibilities: 'Author synthetic cases.', skills: ['KYC'], wagePerTask: 1, wageCurrency: 'USD', locationType: 'REMOTE' });
   const date = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
-  const project = await post('/projects', { templateId: template.id, name: 'FORM REGRESSION ' + randomUUID(), distinctTarget: 8, maxPerExpert: 4, tptMinutes: 60, startDate: date(1), endDate: date(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: true }] });
+  const project = await post('/projects', { authoringExperience: 'BOTH', templateId: template.id, name: 'FORM REGRESSION ' + randomUUID(), distinctTarget: 8, maxPerExpert: 4, tptMinutes: 60, startDate: date(1), endDate: date(30), jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: true }] });
   for (const action of ['submit', 'match', 'opportunity/publish']) await post(`/projects/${project.id}/${action}`);
   const detail = await (await request.get(base + `/projects/${project.id}/opportunity`)).json();
   const candidateBase = 'http://localhost:3301';

@@ -115,6 +115,7 @@ function Rows<T>(p: { title: string; items: T[]; onChange: (items: T[]) => void;
   return (
     <div className="space-y-3">
       <h3 className="font-semibold">{p.title}</h3>
+      {p.items.length === 0 && <p className="text-sm text-fg-muted">No {p.title.toLowerCase()} recorded.{!p.disabled && ' Add an item below to open its editable fields.'}</p>}
       {p.items.map((it, i) => (
         <div key={i} className="rounded-md border border-line p-3">
           <div className="mb-2 flex items-center">
@@ -184,10 +185,21 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
   const readOnly = task.readOnly || phone;
   const { value, update, currentRevision, state, flush } = useAutosave<KycTask & Record<string, unknown>>(task.id, (task.output ?? { header: {} }) as KycTask & Record<string, unknown>, task.revision, readOnly);
   // M9: KYC authoring tasks can start from a document, a transcript or an AI interview (W00).
-  const draftable = task.definition === 'kyc-onboarding-v1' && task.taskType === 'AUTHORING';
+  const draftable = !task.authoringExperience && task.definition === 'kyc-onboarding-v1' && task.taskType === 'AUTHORING';
   const drafting = useDrafting(task.id, draftable);
   const blank = !task.output || Object.keys(task.output).every((k) => k === 'header' && !Object.values((task.output as KycTask).header ?? {}).some(Boolean));
   const [section, setSection] = useState<string>(draftable && blank && !task.readOnly ? 'W00' : 'W01');
+  const [changingSection, setChangingSection] = useState(false);
+  const [sectionError, setSectionError] = useState('');
+  async function changeSection(next: string) {
+    if (changingSection || next === section) return;
+    setChangingSection(true);
+    setSectionError('');
+    try {
+      if (await flush()) setSection(next);
+      else setSectionError('Your changes could not be saved. Stay in this section and retry.');
+    } finally { setChangingSection(false); }
+  }
   const drafted = drafting.view?.sections ?? {};
   const [sample, setSample] = useState<{ source: string; output: KycTask | null } | null>(null);
   // While a draft is being written the editor is paused, so nothing typed is lost when the draft lands.
@@ -218,6 +230,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
         <h1 className="text-xl font-semibold">{t.header?.title || 'New KYC task'}</h1>
         <SaveIndicator state={state} readOnly={ro} />
       </div>
+      {sectionError && <p role="alert" className="text-error">{sectionError}</p>}
       <p className="text-sm text-fg-muted">{slot?.brief}</p>
       <p className="mt-2 rounded-md border border-line p-2 text-xs text-fg-muted md:hidden">The workbench is designed for a larger screen. On a phone it is read-only.</p>
 
@@ -226,7 +239,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
           <ol className="relative flex gap-2 overflow-x-auto md:flex-col">
             {draftable && (
               <li>
-                <button type="button" onClick={() => setSection('W00')} aria-current={section === 'W00' ? 'step' : undefined} className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm md:whitespace-normal ${section === 'W00' ? 'bg-surface font-semibold' : ''}`}>
+                <button type="button" disabled={changingSection} onClick={() => void changeSection('W00')} aria-current={section === 'W00' ? 'step' : undefined} className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm md:whitespace-normal ${section === 'W00' ? 'bg-surface font-semibold' : ''}`}>
                   <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full bg-brand-gradient" />
                   W00 Start from a document or interview
                 </button>
@@ -234,7 +247,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
             )}
             {KYC_SECTIONS.map((s) => (
               <li key={s.id}>
-                <button type="button" onClick={() => setSection(s.id)} aria-current={section === s.id ? 'step' : undefined} className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm md:whitespace-normal ${section === s.id ? 'bg-surface font-semibold' : ''}`}>
+                <button type="button" disabled={changingSection} onClick={() => void changeSection(s.id)} aria-current={section === s.id ? 'step' : undefined} className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm md:whitespace-normal ${section === s.id ? 'bg-surface font-semibold' : ''}`}>
                   <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${s.id === 'W06' ? 'bg-line' : sectionOk(s.id) ? 'bg-success' : 'bg-warning'}`} />
                   {s.id} {s.title}
                   {drafted[s.id] && !drafted[s.id]!.confirmedAt && <span className="pill pill-warning ml-auto text-[10px]">AI draft</span>}
@@ -254,7 +267,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
               <ul className="mt-1 list-disc pl-5">
                 {task.review.comments.map((c, i) => (
                   <li key={i}>
-                    <button type="button" className="text-link underline" onClick={() => setSection(c.section)}>
+                    <button type="button" className="text-link underline" onClick={() => void changeSection(c.section)}>
                       {c.section}
                     </button>
                     : {c.text}
@@ -272,7 +285,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
           )}
 
           {section !== 'W00' && section !== 'W06' && <RequiredNote />}
-          {section !== 'W00' && section !== 'W06' && <SectionDraftBanner taskId={task.id} section={section} state={drafted[section]} running={drafting.running} readOnly={ro} onChanged={() => void drafting.load()} beforeDraft={flush} />}
+          {section !== 'W00' && section !== 'W06' && <SectionDraftBanner taskId={task.id} section={section} state={drafted[section]} running={drafting.running} readOnly={ro || !!drafting.view?.humanOnly} onChanged={() => void drafting.load()} beforeDraft={flush} />}
 
           {section === 'W01' && (
             <section className="space-y-4">
@@ -493,7 +506,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
 
           {section === 'W05' && (
             <section className="space-y-4">
-              <Rows<{ id: string; name: string; weight: number; passCondition: string; critical?: boolean }>
+              <Rows<{ id: string; name: string; weight: number; passCondition: string; critical?: boolean; outputField?: string; comparison?: string; expectedValue?: string }>
                 title="Criteria"
                 items={t.rubric?.criteria ?? []}
                 disabled={ro}
@@ -508,6 +521,11 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                     <label className="flex items-center gap-2 text-sm">
                       <input type="checkbox" checked={!!c.critical} onChange={(e) => setC({ ...c, critical: e.target.checked })} /> Critical
                     </label>
+                    {/* Anvil executes a typed check on output.json; each criterion names the field it checks and the expected value. */}
+                    <Pick label="Output field this criterion checks (for Anvil export)" value={c.outputField} options={['disposition', 'risk_rating']} format={(v) => (v === 'disposition' ? 'Disposition' : 'Risk rating')} onChange={(outputField) => setC({ ...c, outputField, comparison: 'json_equals', expectedValue: undefined })} />
+                    {c.outputField && (
+                      <Pick label="Expected value" value={c.expectedValue} options={c.outputField === 'disposition' ? KYC_DISPOSITIONS : KYC_RISK} format={(v) => v.replace(/_/g, ' ').toLowerCase()} onChange={(expectedValue) => setC({ ...c, comparison: 'json_equals', expectedValue })} />
+                    )}
                   </>
                 )}
               />
@@ -540,9 +558,9 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
             </ul>
           )}
         </fieldset>
-        {section === 'W00' && <StartPanel taskId={task.id} drafting={drafting} onBlank={() => setSection('W01')} beforeDraft={flush} readOnly={ro} />}
+        {section === 'W00' && <StartPanel taskId={task.id} drafting={drafting} onBlank={() => void changeSection('W01')} beforeDraft={flush} readOnly={ro} />}
         {/* W06 sits in the same column as the other sections (outside the fieldset so its own controls stay usable). */}
-        {section === 'W06' && !ro && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={setSection} />}
+        {section === 'W06' && !ro && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(next) => void changeSection(next)} />}
         {section === 'W06' && ro && <p>This task is read-only.</p>}
         </div>
       </div>

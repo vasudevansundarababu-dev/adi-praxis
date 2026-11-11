@@ -419,3 +419,105 @@ help pack and the user's own data; required markers on every screen of all three
 - **(chosen by Claude)** An Admin may still set a known password through the API, with `requirePasswordChange` on by
   default. Test fixtures and the shared demo account `partner@praxis.demo` turn it off. The shared demo console
   accounts are created by the seed and demo job, not the API, so they are unaffected.
+
+## Authoring v2.1 (owner-approved build, 10 Nov 2026)
+
+Plan: `docs/authoring/AUTHORING-V2.1-PLAN.md`. Source: handover v2.1, chapters 00-18.
+
+- **(owner)** Build in template waves: Wave 1 (5 templates) Wed 11 Nov, Wave 2 (3) Fri 13 Nov, Wave 3 (3) Sun 15 Nov,
+  weekends included. Each wave ends end to end: author, review, export, Anvil import. The OpenHands
+  `AUTHORING-V2-PLAN.md` is not used.
+- **(owner)** A live Vertex session in QA is mandatory for every wave. Automated tests keep the mocks (CLAUDE.md rule 5).
+- **(chosen by Claude)** Graph wire id `praxis.workflow_graph.v1-proposed` until Anvil allocates one; it never reuses
+  `praxis.anvil.task.v1/v2/v3`.
+- **(chosen by Claude)** Execution semantics for checks: non-choice nodes fan out to every successor; decisions take one
+  branch (each condition, plus mandatory `else` and `unknown`); human steps take `responded` or `timeout`. Every cycle
+  closes through a declared loop with a limit (1-50) and an exhausted exit outside the loop. Each artifact has one
+  producer (no last-writer-wins). These are recorded in `contracts/praxis/workflow-graph/README.md` for Anvil.
+- **(chosen by Claude)** Agent projection keeps decision outcome labels but removes their predicates, rubric bindings,
+  private artifacts and future evidence.
+- **(chosen by Claude)** All templates are `SINGLE` agent mode for now, KYB included, so every wave exports end to end;
+  `MULTI` is switched on per template once Anvil can run multi-agent graphs. Overrides the earlier "KYB = MULTI" idea.
+- **(owner, 10 Nov)** The QA chatbot runs on Claude Sonnet 5.5 (`claude-sonnet-5-5`) for cost, Haiku 5.5 as the cheap
+  backup. Google denied the Claude quota on Vertex, so until the appeal succeeds QA uses Gemini through the same
+  setting: `AUTHORING_MODEL=gemini:gemini-3.8-flash` (gemini-2.5-flash returns 404 in the QA project). Same prompt, proposal schema, guards, daily cap and logging.
+- **(chosen by Claude)** The provider is a prefix on `AUTHORING_MODEL` (`gemini:` or `claude:`, bare = Claude) rather than
+  a second setting, so one value fully describes the chatbot model. The Gemini path reuses the meta-compiler's
+  `generateContent` caller (no new dependency). The chatbot request sends no thinking, tool_choice or sampling
+  parameters, which Sonnet 5.5 rejects.
+- **(chosen by Claude)** Existing KYC `dependsOn` steps are not migrated into graphs. A graph is a new optional part of
+  the task output; legacy outputs stay readable and unchanged.
+
+## Anvil project policy manifest v1 emitter (authoring v2.1 wave 1, 10 Nov 2026)
+
+Anvil's contract `praxis.anvil.project_policy.v1` (`contracts/anvil/project-policy-v1/`) is used unchanged. Praxis has
+no field for several Anvil concepts, so the emitter maps conservatively. Details and endpoints:
+`docs/integrations/ANVIL-PROJECT-POLICY-V1.md`.
+
+- **(chosen by Claude)** **Source project.** `source_project.id` is the Praxis project UUID (the same value as
+  `source.project_id` in every `praxis.anvil.export.v1` envelope, so the two can be cross-checked). `name` is the
+  project name. `version` is content-addressed: the sha256 of the manifest without that field. The same id and version
+  therefore always mean the same content, and any change (new rule set, new approved record, correction) gives a new
+  version. Praxis has no project version of its own that changes with all of these. *Owner/Anvil to confirm.*
+- **(chosen by Claude)** **Policy granularity.** One Anvil policy per (published rule set version, cited policy document
+  version). `policy_id` is the Praxis `PolicyDocument` id (stable across document and rule-set versions); `version` is
+  `rs<rule set version>.d<document version>`. Both parts are immutable in Praxis, so a policy id+version can never
+  change content. `title` is the document title; `source_id` is the document version id.
+- **(chosen by Claude)** **Which rules.** Only rules in published `ProjectRuleSet`s (Reviewed rule versions). Draft,
+  Needs definition and Excluded rules, unpublished documents and SME task-source uploads are never exported. A rule sits
+  under the document version of its requirement citation (the `supports` one first); review guarantees one exists. A
+  rule citing several documents is exported once, under that citation, not duplicated.
+- **(chosen by Claude)** **Rule fields.** `rule_id` is the Praxis rule key when it matches Anvil's id pattern, else
+  `rule-<rule uuid>`. `requirement` is the reviewed requirement text only: title, applicability, exceptions, evidence
+  needs, verification hints and task changes are not exported. `source_location` is a locator only ("document version
+  1: page 3; lines 4-6; section 2"), never quoted source text.
+- **(chosen by Claude)** **Severity.** Praxis rules have no severity (`required` is a publication gate and is mutable on
+  the rule, not part of the frozen rule set). Every rule is exported as `high`: not `critical` (no evidence that a
+  breach is a hard failure) and not lower (that could hide a real breach). *Owner to decide whether Praxis should
+  capture severity per rule.*
+- **(chosen by Claude)** **Visibility.** `agent_visible` → `agent_instruction`; `evaluator_only` → `evaluator_only`.
+  Nothing else is ever placed in an `agent_instruction` rule: no reference answers, rubric criteria or answer keys,
+  private evidence, evaluator-only text or task-change text.
+- **(chosen by Claude)** **Rubric and failure-mode links.** Omitted: Praxis does not link policy rules to rubric
+  criteria or failure modes, and inventing links is not allowed.
+- **(chosen by Claude)** **Project defaults.** The policies of the latest published rule set. Praxis rule sets use
+  inheritance mode `ALL_TASKS`, which is exactly "applies to every task by default"; any other mode blocks the export
+  (`UNSUPPORTED_INHERITANCE_MODE`).
+- **(chosen by Claude)** **Task bindings.** One per current approved record of the project that carries an executable
+  contract (`output.praxisContract`); superseded records are left out, so a corrected task is bound once, at its latest
+  version. `task_id`/`task_version` come from the contract; `payload_sha256` is computed by the same code as the
+  praxis-contract export (`apps/api/src/dataset/praxis-export.ts`). `policy_refs` are the policies of the rule set the
+  task's own frozen policy snapshot used (the submission the review approved). `excluded_project_policy_refs` lists
+  every current default not in `policy_refs`: a task frozen under an older rule set excludes the newer defaults, and a
+  task approved with no snapshot (the project had no rule set then) excludes all of them. Nothing is applied to a task
+  that its author and reviewer did not see.
+- **(chosen by Claude)** **Task changes.** Clarifications and stricter constraints cannot be expressed in the v1
+  manifest; the task is still bound to its base policies (they stay in the existing per-task sidecar). An exemption
+  would make Anvil penalise allowed behaviour, so any bound task whose snapshot has an exemption blocks the export
+  (409 `TASK_EXEMPTION_NOT_REPRESENTABLE`). *Owner/Anvil to decide how per-task changes should travel.*
+- **(chosen by Claude)** **Sources.** Each cited document version is one source at
+  `policies/<document id>/v<version>.<pdf|docx|txt|md>` with its stored size and sha256 and its exact original bytes.
+  `media_type` comes from the detected format (Praxis stores `text/markdown; charset=utf-8`; Anvil's enum has no
+  parameters).
+- **(chosen by Claude)** **Invalid state is never served.** The emitter runs the shared validator (schema, semantic
+  checks, source bytes, and binding against the real export envelopes) and answers 409 `PROJECT_POLICY_INVALID` with
+  every problem. A record whose own export is blocked (invalid contract, record hash) blocks the manifest too
+  (`TASK_EXPORT_BLOCKED`).
+- **(chosen by Claude)** **Access and audit.** Admin (any project of the tenant), the project's owning PM, and the
+  tenant's `RL_GYM` API client; anyone else gets 403 (wrong role or client kind) or 404 (other project or tenant).
+  Every export, source download and blocked attempt writes an audit event (`anvil.project_policy_exported`,
+  `anvil.project_policy_source_downloaded`, `anvil.project_policy_blocked`). Nothing else is written.
+
+## Authoring v2.1 Wave 1: template profiles (10 Nov 2026)
+
+- **(chosen by Claude)** All five Wave 1 profiles are agent mode `SINGLE` (owner default, plan §6). Non-KYC field
+  contracts are built from `templates/*/task.md` and marked `requires_confirmation`.
+- **(chosen by Claude)** Profiles match the catalogue workflow name; the handover's "Noise Cancelling Headphones Launch"
+  and "Omnichannel Creative and Locale Compliance" are recorded as `handoverName` only.
+- **(chosen by Claude)** A task that already holds legacy generic content keeps the generic editor; only blank or
+  profile outputs open the profile editor. No silent migration.
+- **(chosen by Claude)** The KYC agent preview keeps its existing view; the KYC profile drives progress, checks and
+  projection in shared code, and `kycChecks` stays authoritative at submission.
+- **(chosen by Claude)** Anvil contract mapping and blockers: see `docs/authoring/TEMPLATE-PROFILES.md`. Export
+  blockers never block submission. KYC criteria gain three optional binding keys (`outputField`, `comparison`,
+  `expectedValue`); until the workbench edits them, KYC exports are reported as blocked.

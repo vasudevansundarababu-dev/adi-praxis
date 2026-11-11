@@ -69,7 +69,7 @@ describe('M3 FLOW 2 core: matching and staffing', () => {
   /** A submitted project needing 2 workers (8 tasks, cap 4). */
   async function readyProject(filters: unknown[] = BASE_FILTERS, extra: object = {}) {
     const p = (
-      await post(pm, '/projects', {
+      await post(pm, '/projects', { authoringExperience: 'BOTH',
         templateId,
         name: `Project ${randomUUID().slice(0, 6)}`,
         distinctTarget: 8,
@@ -116,7 +116,7 @@ describe('M3 FLOW 2 core: matching and staffing', () => {
     });
 
     it('cannot open a draft or a cancelled project', async () => {
-      const draft = (await post(pm, '/projects', { templateId, name: 'Draft only' })).json();
+      const draft = (await post(pm, '/projects', { authoringExperience: 'BOTH', templateId, name: 'Draft only' })).json();
       expect((await post(pm, `/projects/${draft.id}/match`)).json().error).toBe('NOT_STAFFING');
     });
   });

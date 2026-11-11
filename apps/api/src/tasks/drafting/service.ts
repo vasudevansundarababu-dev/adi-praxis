@@ -48,9 +48,11 @@ export async function assertDraftable(tx: Db | Tx, t: Pick<TaskInstance, 'taskTy
 /** W06: every drafted section must be confirmed by the author before submit (TASK-DRAFTING section 4). */
 export function draftingChecks(t: Pick<TaskInstance, 'drafting'>): TaskCheck[] {
   const sections = Object.entries(draftingOf(t).sections) as [DraftSection, SectionState][];
-  if (!sections.length) return [];
+  const chat = (t.drafting as { conversation?: { pending?: unknown; needsReview?: boolean; unresolved?: string[]; humanOnly?: boolean; consent?: {version:string}; declaration?: {revision:number} } } | null)?.conversation;
+  const chatChecks: TaskCheck[] = chat ? [{ id: 'conversation.review', section: 'W06', ok: !chat.pending && !chat.needsReview && !(chat.unresolved?.length) && (!chat.humanOnly || (!!chat.consent && !!chat.declaration)), message: 'Resolve conversation questions and review coordinated edits before submission' }] : [];
+  if (!sections.length) return chatChecks;
   const open = sections.filter(([, s]) => !s.confirmedAt).map(([k]) => k).sort();
-  return [{ id: 'drafting.confirmed', section: 'W06', ok: open.length === 0, message: open.length ? `Check and confirm the AI-drafted section(s): ${open.join(', ')}` : 'Every AI-drafted section was checked and confirmed by you' }];
+  return [...chatChecks, { id: 'drafting.confirmed', section: 'W06', ok: open.length === 0, message: open.length ? `Check and confirm the AI-drafted section(s): ${open.join(', ')}` : 'Every AI-drafted section was checked and confirmed by you' }];
 }
 
 // ───────────────────────── Sources ─────────────────────────
@@ -147,7 +149,9 @@ export async function answerInterview(tx: Tx, args: { task: TaskInstance; client
 export async function requestDraft(tx: Tx, args: { task: TaskInstance; smeUserId: string; section: DraftSection | null; instruction: string | null }, audit: Audit, emit: Emit) {
   assertEditable(args.task);
   await assertDraftable(tx, args.task);
+  if ((await tx.project.findUniqueOrThrow({where:{id:args.task.projectId}})).authoringExperience) throw new AppError(409,'HUMAN_AUTHORING_ONLY','Model-generated answers are disabled for this project.');
   await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${args.task.id}::uuid FOR UPDATE`;
+  if ((args.task.drafting as {conversation?: {humanOnly?: boolean}} | null)?.conversation?.humanOnly) throw new AppError(409,'HUMAN_AUTHORING_ONLY','AI drafting is disabled for human-authored conversational tasks. Write the answer yourself.');
   const running = await tx.taskDraftRun.findFirst({ where: { taskInstanceId: args.task.id, status: { in: ['QUEUED', 'RUNNING'] } } });
   if (running) throw new AppError(409, 'DRAFT_IN_PROGRESS', 'A draft is already being written for this task. Wait for it to finish.', { runId: running.id });
   const sources = await tx.taskSource.findMany({ where: { taskInstanceId: args.task.id, deletedAt: null }, select: { id: true } });
@@ -186,10 +190,12 @@ async function fail(db: Db, run: TaskDraftRun, error: string, problems: string[]
  */
 export async function executeDraft(db: Db, deps: { drafter: TaskDrafter; storage: ObjectStorage }, runId: string) {
   const run = await db.taskDraftRun.findUnique({ where: { id: runId } });
-  if (!run || run.status === 'SUCCEEDED' || run.status === 'FAILED') return;
+  if (!run || run.section === 'CHAT' || run.status === 'SUCCEEDED' || run.status === 'FAILED') return;
   const claimed = await db.taskDraftRun.updateMany({ where: { id: run.id, status: { in: ['QUEUED', 'RUNNING'] } }, data: { status: 'RUNNING', startedAt: new Date() } });
   if (!claimed.count) return;
   const task = await db.taskInstance.findUniqueOrThrow({ where: { id: run.taskInstanceId }, include: { project: true } });
+  if ((await db.project.findUniqueOrThrow({where:{id:task.projectId}})).authoringExperience) return fail(db,run,'Project requires human authorship.');
+  if ((task.drafting as {conversation?:{humanOnly?:boolean}}|null)?.conversation?.humanOnly) return fail(db,run,'Human-authorship controls prohibit AI drafting.');
   if (!EDITABLE.includes(task.status)) return fail(db, run, 'The task was submitted or closed before the draft finished.');
 
   const state = draftingOf(task);
@@ -242,6 +248,7 @@ export async function executeDraft(db: Db, deps: { drafter: TaskDrafter; storage
   await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${task.id}::uuid FOR UPDATE`;
     const fresh = await tx.taskInstance.findUniqueOrThrow({ where: { id: task.id } });
+    if ((fresh.drafting as {conversation?:{humanOnly?:boolean}}|null)?.conversation?.humanOnly) throw new AppError(409,'HUMAN_AUTHORING_ONLY','Task now requires human authorship.');
     if (!EDITABLE.includes(fresh.status)) throw new AppError(409, 'READ_ONLY', 'The task was submitted before the draft finished.');
     const merged: KycTask = { ...((fresh.output ?? {}) as KycTask) };
     const st = draftingOf(fresh);
@@ -311,6 +318,8 @@ export async function draftingView(tx: Db | Tx, t: TaskInstance) {
   const st = draftingOf(t);
   const out = (t.output ?? {}) as KycTask;
   return {
+    authorship: (t.drafting as {conversation?:{humanOnly?:boolean;consent?:unknown;declaration?:unknown}}|null)?.conversation?.humanOnly ? {mode:"HUMAN_ONLY",consent:(t.drafting as any).conversation.consent,declaration:(t.drafting as any).conversation.declaration,limitations:"Consent and similarity are review signals, not proof of external LLM use."} : null,
+    humanOnly: !!(t.drafting as {conversation?:{humanOnly?:boolean}}|null)?.conversation?.humanOnly,
     sources: sources.map(sourceView),
     interview,
     runs: runs.map(runView),
@@ -320,7 +329,7 @@ export async function draftingView(tx: Db | Tx, t: TaskInstance) {
 
 /** Provenance written into the ApprovedTaskRecord: kinds, hashes, model and versions; never source content. */
 export async function provenanceFor(tx: Db | Tx, t: TaskInstance, workflow: string) {
-  if (t.taskType !== 'AUTHORING' || workflow.toLowerCase() !== KYC_WORKFLOW) return null;
+  if (t.taskType !== 'AUTHORING' || (workflow.toLowerCase() !== KYC_WORKFLOW && !(t.drafting as any)?.conversation?.humanOnly)) return null;
   const [sources, runs, answers] = await Promise.all([
     tx.taskSource.findMany({ where: { taskInstanceId: t.id }, orderBy: { createdAt: 'asc' } }),
     tx.taskDraftRun.findMany({ where: { taskInstanceId: t.id, status: 'SUCCEEDED' }, orderBy: { createdAt: 'asc' } }),
@@ -330,10 +339,11 @@ export async function provenanceFor(tx: Db | Tx, t: TaskInstance, workflow: stri
   const out = (t.output ?? {}) as KycTask;
   return {
     mcpCatalogVersion: KYC_MCP_CATALOG_VERSION,
-    drafted: runs.length > 0,
+    drafted: runs.some(r=>r.section!=='CHAT'),
+    ...((t.drafting as any)?.conversation?.humanOnly ? {authorship:{mode:"HUMAN_ONLY",consent:(t.drafting as any).conversation.consent,declaration:(t.drafting as any).conversation.declaration},facilitationRuns:runs.filter(r=>r.section==='CHAT').map(r=>({model:r.model,promptVersion:r.promptVersion}))} : {}),
     sources: sources.map((s) => ({ kind: s.kind, sha256: s.sha256, removed: !!s.deletedAt })),
     interviewAnswers: answers,
-    draftRuns: runs.map((r) => ({ model: r.model, promptVersion: r.promptVersion, sections: r.sections })),
+    draftRuns: runs.filter(r=>r.section!=='CHAT').map((r) => ({ model: r.model, promptVersion: r.promptVersion, sections: r.sections })),
     sections: Object.fromEntries((Object.entries(st.sections) as [DraftSection, SectionState][]).map(([k, s]) => [k, { drafted: true, confirmed: !!s.confirmedAt, editedAfterDraft: sectionHash(out, k) !== s.draftHash }])),
   };
 }

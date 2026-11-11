@@ -1,0 +1,173 @@
+{
+  "handoverVersion": "2.0",
+  "currentTemplates": [
+    {
+      "templateId": "DM01",
+      "name": "Q4 Global Paid Search Query Clustering",
+      "slug": "q4-global-paid-search-query-clustering",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/q4-global-paid-search-query-clustering/task.md"
+    },
+    {
+      "templateId": "DM02",
+      "name": "Omnichannel Creative and Locale Compliance",
+      "slug": "omnichannel-creative-and-locale-compliance",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/omnichannel-creative-and-locale-compliance/task.md"
+    },
+    {
+      "templateId": "BK03",
+      "name": "Adverse Media Review",
+      "slug": "adverse-media-review",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/adverse-media-review/task.md"
+    },
+    {
+      "templateId": "BK04",
+      "name": "Audit and Evidence Preparation",
+      "slug": "audit-and-evidence-preparation",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/audit-and-evidence-preparation/task.md"
+    },
+    {
+      "templateId": "BK05",
+      "name": "Communications Surveillance",
+      "slug": "communications-surveillance",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/communications-surveillance/task.md"
+    },
+    {
+      "templateId": "BK06",
+      "name": "Compliance Monitoring",
+      "slug": "compliance-monitoring",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/compliance-monitoring/task.md"
+    },
+    {
+      "templateId": "BK09",
+      "name": "Customer Risk Rating",
+      "slug": "customer-risk-rating",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/customer-risk-rating/task.md"
+    },
+    {
+      "templateId": "BK10",
+      "name": "Enhanced Due Diligence",
+      "slug": "enhanced-due-diligence",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/enhanced-due-diligence/task.md"
+    },
+    {
+      "templateId": "BK12",
+      "name": "Issue and Remediation Tracking",
+      "slug": "issue-and-remediation-tracking",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/issue-and-remediation-tracking/task.md"
+    },
+    {
+      "templateId": "BK13",
+      "name": "KYB and Beneficial Ownership",
+      "slug": "kyb-and-beneficial-ownership",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/kyb-and-beneficial-ownership/task.md"
+    },
+    {
+      "templateId": "BK14",
+      "name": "KYC Onboarding and Refresh",
+      "slug": "kyc-onboarding-and-refresh",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "existing_kyc_types_with_target_extensions",
+      "spec": "templates/kyc-onboarding-and-refresh/task.md"
+    },
+    {
+      "templateId": "BK15",
+      "name": "AML Transaction-Monitoring Alerts",
+      "slug": "aml-transaction-monitoring-alerts",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/aml-transaction-monitoring-alerts/task.md"
+    },
+    {
+      "templateId": "BK11",
+      "name": "Fraud-Risk and Compliance Handoffs",
+      "slug": "fraud-risk-and-compliance-handoffs",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/fraud-risk-and-compliance-handoffs/task.md"
+    },
+    {
+      "templateId": "DM03",
+      "name": "Noise Cancelling Headphones Launch",
+      "slug": "noise-cancelling-headphones-launch",
+      "status": "handover_draft_not_published",
+      "sharedClassicRenderer": true,
+      "sharedChatbot": true,
+      "graphPlacement": "below_authoring",
+      "graphDirection": "left_to_right_desktop",
+      "schemaStatus": "domain_contract_requires_confirmation",
+      "spec": "templates/noise-cancelling-headphones-launch/task.md"
+    }
+  ]
+}

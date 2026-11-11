@@ -20,7 +20,7 @@ test('#123: phone workbench blocks keyboard edits and autosave, desktop remains 
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: saves, savedAt: new Date().toISOString() }) });
   });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`${base}/tasks/${fixture.taskId}`);
+  await page.goto(`${base}/tasks/${fixture.taskId}?editor=form`);
   const title = page.getByRole('textbox', { name: /^Title/ });
   await expect(title).toBeDisabled();
   await title.evaluate((element) => (element as HTMLInputElement).focus());
@@ -59,7 +59,7 @@ test('#121: immediate in-app back waits for the latest draft save', async ({ pag
     await held;
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: payload.expectedRevision + 1, savedAt: new Date().toISOString() }) });
   });
-  const current = `${fixture.base}/tasks/${fixture.taskId}`;
+  const current = `${fixture.base}/tasks/${fixture.taskId}?editor=form`;
   await page.goto(current);
   await page.getByRole('textbox', { name: /^Title/ }).fill('The newest unsaved title');
   await page.locator('a[data-save-before-leaving]').click();
@@ -84,7 +84,7 @@ test('#121: in-flight edits save serially with acknowledged revisions before lea
     active--;
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: body.expectedRevision + 1, savedAt: new Date().toISOString() }) });
   });
-  const current = `${fixture.base}/tasks/${fixture.taskId}`;
+  const current = `${fixture.base}/tasks/${fixture.taskId}?editor=form`;
   await page.goto(current);
   const title = page.getByRole('textbox', { name: /^Title/ });
   await title.fill('First snapshot');
@@ -113,7 +113,7 @@ for (const invalidAck of [false, true]) {
       if (route.request().method() !== 'PUT') return route.continue();
       await route.fulfill({ status: invalidAck ? 200 : 409, contentType: 'application/json', body: JSON.stringify(invalidAck ? { revision: 99, savedAt: new Date().toISOString() } : { error: 'STALE_REVISION', message: 'The task changed. Reload before saving.' }) });
     });
-    const current = `${fixture.base}/tasks/${fixture.taskId}`;
+    const current = `${fixture.base}/tasks/${fixture.taskId}?editor=form`;
     await page.goto(current);
     const title = page.getByRole('textbox', { name: /^Title/ });
     await title.fill('Keep these unsaved edits');

@@ -61,7 +61,18 @@ export const CoverageQuotas = z.object({
 });
 export type CoverageQuotas = z.infer<typeof CoverageQuotas>;
 
+export const AUTHORING_EXPERIENCES = ['CLASSIC', 'CHATBOT', 'BOTH'] as const;
+export type AuthoringExperience = (typeof AUTHORING_EXPERIENCES)[number];
+
+/** Platform review route (handover v2.1 ch. 08, 17 §2). SME_EXPERT_PM is enabled once its stage engine ships. */
+export const REVIEW_ROUTES = ['SME_PM', 'SME_EXPERT_PM'] as const;
+export type ReviewRoute = (typeof REVIEW_ROUTES)[number];
+export const ENABLED_REVIEW_ROUTES: readonly ReviewRoute[] = ['SME_PM'];
+export const REVIEW_ROUTE_LABELS: Record<ReviewRoute, string> = { SME_PM: 'SME → PM approval', SME_EXPERT_PM: 'SME → Expert review → PM approval' };
+
 export const ProjectFields = z.object({
+  authoringExperience: z.enum(AUTHORING_EXPERIENCES).optional(),
+  reviewRoute: z.enum(REVIEW_ROUTES).optional(),
   templateId: z.string().uuid(),
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(5000).nullable().optional(),
@@ -254,6 +265,9 @@ export function submitProblems(p: ProjectForSubmit, ctx: SubmitContext): { probl
 }
 
 export const ProjectDto = z.object({
+  authoringExperience: z.enum(AUTHORING_EXPERIENCES).nullable().optional(),
+  reviewRoute: z.enum(REVIEW_ROUTES).optional(),
+  agentMode: z.enum(['SINGLE', 'MULTI']).optional(),
   id: z.string().uuid(),
   status: z.enum(PROJECT_STATUSES),
   name: z.string(),

@@ -1,3 +1,4 @@
+import { taskPhase, templateStartingGraph } from '@praxis/shared';
 import { Prisma } from '@prisma/client';
 import { CAPPED_TASK_STATUSES, identityEligible, OPEN_TASK_STATUSES, SaveTaskRequest, SubmitTaskRequest } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -12,7 +13,12 @@ import { redeemInvite } from '../tasks/invites';
 import { findSimilar } from '../tasks/similarity';
 import { evaluateTask, submitTask, type StoredChecks } from '../tasks/submission';
 import { activeAssignment, allocateTasks, templateRef } from '../tasks/task-service';
+import { conversationInputProblems } from '../tasks/conversation/guards';
+import { allowEditor, experienceOf } from '../tasks/authoring-experience';
+import { AUTHORSHIP_VERSION } from '../tasks/conversation/authorship';
+import { chatOf, draftingWith } from '../tasks/conversation/service';
 import { effectivePolicy, sidecar } from '../policy/task-policy';
+import { profileSaveProblems } from '../tasks/profile-output';
 
 const IdParams = z.object({ id: z.string().uuid() });
 
@@ -119,6 +125,13 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       ...taskSummary(t),
       projectId: t.projectId,
       projectName: t.project.name,
+      authoringExperience: t.project.authoringExperience,
+      effectiveAuthoringExperience: experienceOf(t.project),
+      reviewRoute: t.project.reviewRoute,
+      agentMode: t.project.template.agentMode,
+      phase: taskPhase(t.status, { reviewRoute: t.project.reviewRoute }),
+      startingGraph: t.taskType === 'AUTHORING' ? templateStartingGraph(t.project.template.workflowName, t.project.templateVersion) : null,
+      authoringWorkspace: (t.drafting as { workspace?: unknown } | null)?.workspace ?? null,
       tptMinutes: t.project.tptMinutes,
       definition: definitionFor(template).key,
       template: {
@@ -135,6 +148,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       output: t.quarantinedAt ? null : t.output,
       coverageTags: t.coverageTags,
       checks: checks?.results ?? null,
+      exportStatus: checks?.export ?? null,
       // Authors see only the closest tasks' briefs, never other authors' content.
       readOnly: !['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(t.status),
       review: review ? { decision: review.decision, comments: review.comments, notes: review.notes, rejectReason: review.rejectReason, at: review.createdAt.toISOString() } : null,
@@ -168,17 +182,41 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
   });
 
   // Autosave (TASK-KYC W01–W06): the draft, time actively spent, and optimistic concurrency by revision.
+  app.post('/me/tasks/:id/authoring-workspace', {config:{access:'candidate'}, schema:{params:IdParams,body:z.object({view:z.enum(['CLASSIC','CHATBOT']),answer:z.string().max(4000)}).strict()}},async(req,reply)=>{
+    await runCandidateCommand(db,req,reply,async({tx,actor,audit})=>{
+      await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${req.params.id}::uuid FOR UPDATE`;
+      const t=await ownTask(tx,req.params.id,actor.smeUserId);const ctx=await workContext(tx,selectionGate,actor.smeUserId,t.projectId);if(!ctx.ok)outstanding(ctx);
+      if(t.taskType!=='AUTHORING'||!['ASSIGNED','IN_PROGRESS','REWORK'].includes(t.status)||t.quarantinedAt)throw new AppError(409,'READ_ONLY','This task is read-only.');
+      if(t.project.status==='PAUSED')throw new AppError(409,'PROJECT_PAUSED','Project is paused.');
+      allowEditor(t.project,req.body.view);
+      if(req.body.answer && t.project.authoringExperience==='CLASSIC')throw new AppError(403,'AUTHORING_VIEW_DISABLED','Chatbot is disabled.');
+      if(req.body.answer&&conversationInputProblems(req.body.answer).length)throw new AppError(422,'UNSAFE_INPUT','Remove sensitive data or instruction override attempts before saving.');
+      const workspace={view:req.body.view,answer:req.body.answer};
+      await tx.taskInstance.update({where:{id:t.id},data:{drafting:{...((t.drafting??{}) as object),workspace} as Prisma.InputJsonValue}});
+      await audit({entityType:'TaskInstance',entityId:t.id,action:'task.workspace.saved',after:{view:req.body.view}});
+      return {status:200,body:workspace};
+    });return reply;
+  });
+
   app.put('/me/tasks/:id', { config: { access: 'candidate', rateLimit: { max: 120, timeWindow: '1 minute' } }, schema: { tags: ['work'], params: IdParams, body: SaveTaskRequest } }, async (req, reply) => {
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => {
+      await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${req.params.id}::uuid FOR UPDATE`;
       const t = await ownTask(tx, req.params.id, actor.smeUserId);
+      if (t.taskType === 'AUTHORING') {
+        allowEditor(t.project,'CLASSIC');
+        if (t.project.authoringExperience && chatOf(t).consent?.version !== AUTHORSHIP_VERSION) throw new AppError(409,'AUTHORSHIP_CONSENT_REQUIRED','Accept the human-authorship terms before editing.');
+      }
       const ctx = await workContext(tx, selectionGate, actor.smeUserId, t.projectId);
       if (!ctx.ok) outstanding(ctx);
       if (!['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(t.status)) throw new AppError(409, 'READ_ONLY', 'This task is read-only now.');
       if (t.project.status === 'PAUSED') throw new AppError(409, 'PROJECT_PAUSED', 'This project is paused. Your work is saved; you can continue when it resumes.');
+      const shape = t.taskType === 'AUTHORING' ? profileSaveProblems(t.project.template.workflowName, req.body.output) : [];
+      if (shape.length) throw new AppError(422, 'INVALID_PROFILE_OUTPUT', 'This draft does not match the template profile.', { problems: shape });
       const now = new Date();
       const { count } = await tx.taskInstance.updateMany({
         where: { id: t.id, revision: req.body.expectedRevision },
         data: {
+          ...(t.taskType === 'AUTHORING' && t.project.authoringExperience ? {drafting: JSON.parse(JSON.stringify(draftingWith(t,{...chatOf(t),humanOnly:true,declaration:undefined,needsReview:true}))) as Prisma.InputJsonValue} : {}),
           output: req.body.output as Prisma.InputJsonValue,
           status: 'IN_PROGRESS',
           startedAt: t.startedAt ?? now,

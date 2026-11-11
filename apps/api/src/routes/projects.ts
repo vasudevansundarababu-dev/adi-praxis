@@ -1,5 +1,8 @@
 import type { Domain, JobDescriptionSnapshot, Prisma, Project, ProjectDemographicFilter, Template, User } from '@prisma/client';
 import {
+  ENABLED_REVIEW_ROUTES,
+  REVIEW_ROUTE_LABELS,
+  type ReviewRoute,
   CANCELLABLE_STATUSES,
   computeProjectFigures,
   CoverageQuotas,
@@ -51,6 +54,9 @@ export function toProjectDto(p: ProjectFull): ProjectDto {
     templateVersion: p.templateVersion,
     workflowName: p.template.workflowName,
     domainName: p.template.domain.name,
+    authoringExperience: p.authoringExperience,
+    reviewRoute: p.reviewRoute,
+    agentMode: p.template.agentMode,
     taskMode: p.taskMode,
     taskCount: p.taskCount,
     distinctTarget: p.distinctTarget,
@@ -123,8 +129,17 @@ async function replaceFilters(tx: Tx, project: { id: string; clientId: string },
   });
 }
 
+/** SME -> Expert -> PM is accepted once its stage engine ships (authoring v2.1 Wave 2). */
+function assertReviewRouteEnabled(route: ReviewRoute | undefined) {
+  if (route && !ENABLED_REVIEW_ROUTES.includes(route)) {
+    throw new AppError(409, 'REVIEW_ROUTE_NOT_AVAILABLE', `${REVIEW_ROUTE_LABELS[route]} is not available yet; use ${REVIEW_ROUTE_LABELS.SME_PM}.`);
+  }
+}
+
 function scalarData(body: z.infer<typeof UpdateProjectRequest>): Prisma.ProjectUncheckedUpdateInput {
   const d: Prisma.ProjectUncheckedUpdateInput = {};
+  if (body.authoringExperience !== undefined) d.authoringExperience = body.authoringExperience;
+  if (body.reviewRoute !== undefined) d.reviewRoute = body.reviewRoute;
   if (body.name !== undefined) d.name = body.name;
   if (body.description !== undefined) d.description = body.description;
   if (body.startDate !== undefined) d.startDate = toDate(body.startDate);
@@ -180,6 +195,8 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         await assertUniqueName(tx, actor.clientId, req.body.name);
         await assertJd(tx, req.body.jobDescriptionId, actor.clientId);
         const taskMode = req.body.taskMode ?? (t.taskModes.includes('AUTHORING') ? 'AUTHORING' : t.taskModes[0]!);
+        if (taskMode === 'AUTHORING' && !req.body.authoringExperience) throw new AppError(400, 'AUTHORING_EXPERIENCE_REQUIRED', 'Choose Classic, Chatbot or Both before creating an authoring project.');
+        assertReviewRouteEnabled(req.body.reviewRoute);
         if (!t.taskModes.includes(taskMode)) throw badRequest(`This template does not allow ${taskMode.toLowerCase()} projects`);
 
         // Defaults come from the template; the PM's values override them.
@@ -202,7 +219,7 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         if (req.body.demographicFilters) await replaceFilters(tx, created, req.body.demographicFilters);
         const p = await loadProject(tx, created.id, actor);
         const body = toProjectDto(p);
-        await audit({ entityType: 'Project', entityId: p.id, action: 'project.created', after: { status: 'DRAFT', name: p.name, templateId: t.id, templateVersion: t.version } });
+        await audit({ entityType: 'Project', entityId: p.id, action: 'project.created', after: { status: 'DRAFT', name: p.name, templateId: t.id, templateVersion: t.version, authoringExperience: p.authoringExperience, reviewRoute: p.reviewRoute } });
         return { status: 201, body };
       });
       return reply;
@@ -218,6 +235,9 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         if (before.status !== 'DRAFT') {
           throw new AppError(409, 'PROJECT_NOT_EDITABLE', 'Only draft projects can be edited; submitted projects keep their snapshot.');
         }
+        assertReviewRouteEnabled(req.body.reviewRoute);
+        if (req.body.reviewRoute && req.body.reviewRoute !== before.reviewRoute && await tx.taskInstance.count({ where: { projectId: before.id } })) throw new AppError(409, 'REVIEW_ROUTE_FROZEN', 'The review route cannot change after tasks are assigned.');
+        if (req.body.authoringExperience && req.body.authoringExperience !== before.authoringExperience && await tx.taskInstance.count({where:{projectId:before.id}})) throw new AppError(409,'AUTHORING_CONFIGURATION_FROZEN','Authoring experience cannot change after tasks are assigned.');
         const data = scalarData(req.body);
         if (req.body.templateId !== undefined && req.body.templateId !== before.templateId) {
           const t = await offerableTemplate(tx, req.body.templateId, actor.clientId);

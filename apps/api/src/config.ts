@@ -63,6 +63,9 @@ const Env = z.object({
   CERT_BULK_MODEL: z.string().default(''),
   /** Support Bot model on Vertex (docs/SUPPORT-BOT.md). Used only when VERTEX_PROJECT_ID is set; otherwise a local mock. */
   SUPPORT_MODEL: z.string().default('claude-sonnet-5'),
+  /** Authoring v2.1: the chatbot facilitator's model on Vertex (live in QA), and its per-client daily call cap. */
+  AUTHORING_MODEL: z.string().default('claude-sonnet-5-5'),
+  AUTHORING_DAILY_CALL_CAP: z.coerce.number().int().min(1).max(100_000).default(300),
   /** M10c payouts through Trolley. Blank keys = the local mock (refused in production with SME supply on). */
   TROLLEY_ACCESS_KEY: z.string().default(''),
   TROLLEY_SECRET_KEY: z.string().default(''),
@@ -180,7 +183,11 @@ function policyConfig(c: z.infer<typeof Env>, appEnv: Config['appEnv']): Config[
   const budgets = { llamaextract: usdOrNull('POLICY_BUDGET_LLAMA_USD', c.POLICY_BUDGET_LLAMA_USD), google: usdOrNull('POLICY_BUDGET_GOOGLE_USD', c.POLICY_BUDGET_GOOGLE_USD) };
   const prices = { llamaextract: usdOrNull('POLICY_PRICE_LLAMA_USD_PER_PAGE', c.POLICY_PRICE_LLAMA_USD_PER_PAGE) ?? 0, google: usdOrNull('POLICY_PRICE_GOOGLE_USD_PER_PAGE', c.POLICY_PRICE_GOOGLE_USD_PER_PAGE) ?? 0 };
   if (c.POLICY_EXTRACTION_LIVE) {
-    if (appEnv !== 'staging' || c.NODE_ENV === 'test') throw new Error('Invalid configuration: POLICY_EXTRACTION_LIVE is only allowed in staging');
+    // Owner decisions: staging (D-D1) and, from 10 Nov 2026, the QA environment (APP_ENV=demo) for the authoring v2.1
+    // live sessions. Never in tests, local development or production; always with both spending ceilings set.
+    if (!(appEnv === 'staging' || appEnv === 'demo') || c.NODE_ENV === 'test') {
+      throw new Error('Invalid configuration: POLICY_EXTRACTION_LIVE is only allowed in staging or QA (APP_ENV=staging or demo), never in tests, local or production');
+    }
     if (budgets.llamaextract === null || budgets.google === null) throw new Error('Invalid configuration: POLICY_EXTRACTION_LIVE needs POLICY_BUDGET_LLAMA_USD and POLICY_BUDGET_GOOGLE_USD');
   }
   return {

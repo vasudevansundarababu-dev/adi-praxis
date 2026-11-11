@@ -11,6 +11,7 @@ export interface SourceFlag {
   preview: string;
 }
 export interface DraftingView {
+  humanOnly?: boolean;
   sources: { id: string; kind: 'DOCUMENT' | 'TRANSCRIPT'; fileName: string; contentType: string; sizeBytes: number; textChars: number; flags: SourceFlag[]; uploadedAt: string }[];
   interview: {
     turns: { id: string; speaker: 'ASSISTANT' | 'AUTHOR'; questionId: string; content: string; redacted: boolean }[];
@@ -212,6 +213,7 @@ export function StartPanel(props: { taskId: string; drafting: ReturnType<typeof 
   const [error, setError] = useState<string | null>(null);
   const [confirmReplace, setConfirmReplace] = useState(false);
   if (!view) return <p className="text-sm text-fg-muted">Loading…</p>;
+  if (view.humanOnly) return <section className="space-y-2 rounded border border-line p-3"><h2>Human-authored task</h2><p>AI generation and redrafting are disabled for this task. Write the case, reference solution and rubric yourself.</p><button onClick={props.onBlank} className="rounded border border-line p-2">Continue writing manually</button></section>;
   const latest = view.runs[0];
   const hasDraft = Object.keys(view.sections).length > 0;
   const canDraft = view.sources.length > 0 || view.interview.answered >= 3;

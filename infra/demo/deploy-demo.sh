@@ -175,13 +175,14 @@ if [ -n "$VERTEX" ] && [ "${PRAXIS_POLICY_LIVE:-1}" != "0" ]; then
     printf 'DOCUMENTAI_PROCESSOR: "%s"\nDOCUMENTAI_LOCATION: "us"\nPOLICY_GEMINI_MODEL: "%s"\nPOLICY_GEMINI_LOCATION: "%s"\nPOLICY_BUDGET_LLAMA_USD: "%s"\nPOLICY_BUDGET_GOOGLE_USD: "%s"\n' \
       "$POLICY_PROCESSOR" "${POLICY_GEMINI_MODEL:-gemini-3.8-flash}" "${POLICY_GEMINI_LOCATION:-global}" \
       "${POLICY_BUDGET_LLAMA_USD:-5}" "${POLICY_BUDGET_GOOGLE_USD:-5}" >> "$ENVFILE"
-    if [ -n "${LLAMAEXTRACT_PROJECT_ID:-}" ]; then printf 'LLAMAEXTRACT_PROJECT_ID: "%s"\n' "$LLAMAEXTRACT_PROJECT_ID" >> "$ENVFILE"; fi
     if grep -q "POLICY_EXTRACTION_LIVE is only allowed in staging'" "$ROOT/apps/api/src/config.ts"; then
       echo "Policy extraction stays off: this build allows it live in staging only."
     else
       echo 'POLICY_EXTRACTION_LIVE: "true"' >> "$ENVFILE"
-      if [ -n "$(gcloud secrets versions list llamaextract-api-key --filter=state=ENABLED --limit=1 --format='value(name)' 2>/dev/null)" ]; then
-        LLAMA_SECRET=,LLAMAEXTRACT_API_KEY=llamaextract-api-key:latest
+      # LlamaExtract needs both the key and the LlamaCloud project id (kept in Secret Manager: the repository is public).
+      has_version() { [ -n "$(gcloud secrets versions list "$1" --filter=state=ENABLED --limit=1 --format='value(name)' 2>/dev/null)" ]; }
+      if has_version llamaextract-api-key && has_version llamaextract-project-id; then
+        LLAMA_SECRET=,LLAMAEXTRACT_API_KEY=llamaextract-api-key:latest,LLAMAEXTRACT_PROJECT_ID=llamaextract-project-id:latest
       fi
     fi
   fi

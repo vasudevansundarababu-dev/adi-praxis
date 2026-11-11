@@ -38,9 +38,11 @@ say "Runtime service account may call Document AI"
 gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" --role=roles/documentai.apiUser \
   --condition=None >/dev/null
 
-say "LlamaExtract key slot (empty)"
-exists gcloud secrets describe llamaextract-api-key --project="$PROJECT_ID" ||
-  gcloud secrets create llamaextract-api-key --project="$PROJECT_ID" --replication-policy=automatic
+say "LlamaExtract key and project id slots (empty; the owner adds the values in Secret Manager)"
+for s in llamaextract-api-key llamaextract-project-id; do
+  exists gcloud secrets describe "$s" --project="$PROJECT_ID" ||
+    gcloud secrets create "$s" --project="$PROJECT_ID" --replication-policy=automatic
+done
 # The runtime account already has roles/secretmanager.secretAccessor on the project (deploy-demo.sh).
 
 say "Done"

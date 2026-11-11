@@ -66,9 +66,7 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
   (its own PR, or with Wave 1) before the Nightly build uses it.
 - **O4 — smoke job.** `praxis-vertex-smoke` is deployed by the deployer; run it only on the owner's yes:
   `gcloud run jobs execute praxis-vertex-smoke --region us-central1 --wait` (exit 0 live, 2 mock, 1 a call failed).
-- **O5 — chatbot model.** `AUTHORING_MODEL` defaults to `claude-opus-5`; QA will set `claude-sonnet-5-5`. The code
+- **O5 — chatbot model.** The code session changed the `AUTHORING_MODEL` default to `claude-sonnet-5-5`; the QA deployer also sets it. The code
   session must confirm the chatbot's request shape works on Sonnet 5.5 (it rejects `thinking: disabled`).
 - **O6 — Claude quota.** Waiting for Google to grant the three increases above. Check: Cloud Quotas preference
   `praxis-qa-anthropic-claude-sonnet` shows granted value 30.
-- **O4 — smoke job.** A `praxis-vertex-smoke` Cloud Run job (API image, runtime service account) to run the smoke
-  check on demand. Added to the deployer with O3; executed only when the owner says yes.

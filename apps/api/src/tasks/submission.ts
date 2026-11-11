@@ -35,7 +35,7 @@ export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 
   const def = definitionFor(template);
   const output = (task.output ?? {}) as Record<string, unknown>;
   const slot = task.taskType === 'AUTHORING' ? ((task.input as { slot?: SlotRef }).slot ?? null) : null;
-  const checks: TaskCheck[] = [...coverageChecks(template, slot, output), ...(def.key === 'kyc-onboarding-v1' ? praxisContractChecks(output) : []), ...def.validateSubmission(template, output, slot), ...(task.taskType === 'AUTHORING' ? profileChecks(template.workflowName, output) : []), ...draftingChecks(task), ...(task.taskType === 'AUTHORING' ? graphChecks(output, project.template) : [])];
+  const checks: TaskCheck[] = [...coverageChecks(template, slot, output), ...(def.key === 'kyc-onboarding-v1' ? praxisContractChecks(output) : []), ...def.validateSubmission(template, output, slot), ...(task.taskType === 'AUTHORING' ? profileChecks(template, output) : []), ...draftingChecks(task), ...(task.taskType === 'AUTHORING' ? graphChecks(output, project.template) : [])];
   const chat = chatOf(task);
   if (task.taskType === 'AUTHORING' && project.authoringExperience) checks.push({id:'authoring.consent',section:'W06',ok:!!chat.consent && !!chat.humanOnly,message:'Accept human-authorship terms and review this revision before submission'});
   if (chat.humanOnly) checks.push({id:'conversation.authorship',section:'W06',ok:chat.declaration?.revision===task.revision,message:'Confirm human authorship, no external LLM generation and authorised sources for this revision'});
@@ -44,6 +44,7 @@ export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 
     const policy = await effectivePolicy(tx, project.clientId, task);
     checks.push({ id: 'conversation.policy_version', section: 'W06', ok: chat.policyDigest === (policy?.digest ?? 'none'), message: 'Reconcile conversation against current published project rules' });
   }
+  if (task.taskType === 'AUTHORING' && template.profileId) checks.push(...(await boundRuleChecks(tx, project.clientId, task, output)));
   const coverage: CoverageTags | null = task.taskType === 'AUTHORING' ? finalCoverage(slot, output) : null;
   return {
     project,
@@ -82,7 +83,7 @@ export async function submitTask(
   const similar = args.embedding && t.taskType === 'AUTHORING' ? await refreshSimilarity(tx, t, ev, args.embedding) : [];
 
   // Export readiness is separate from authoring: a blocked compile never blocks the submission.
-  const compiled = t.taskType === 'AUTHORING' ? compileForSubmission(ev.template.workflowName, t.output as Record<string, unknown>, { taskId: t.id, revisionId: `${t.id}-r${t.revision}` }) : null;
+  const compiled = t.taskType === 'AUTHORING' ? compileForSubmission(ev.template, t.output as Record<string, unknown>, { taskId: t.id, revisionId: `${t.id}-r${t.revision}` }) : null;
   const output = (compiled?.output ?? t.output) as Prisma.InputJsonValue;
   const stored: StoredChecks = { results: ev.checks, keyInputs: ev.keyInputs, similar, embeddingModel: args.embeddingModel, ...(compiled ? { export: compiled.status } : {}) };
   const flags = ev.flags.map((f) => ({ ...f, explanation: args.body.flagExplanations[f.id] }));
@@ -124,4 +125,25 @@ export async function refreshSimilarity(tx: Tx, t: Pick<TaskInstance, 'id' | 'cl
     ]),
   });
   return similar;
+}
+
+/**
+ * Policy binding for template versions with a chosen form (owner, 11 Nov 2026; Golden KYC reference: "bind exact
+ * federal/state/product versions"). Every rule cited in S4 must be a rule version published for this project and
+ * applying to this task, cited by its rule key and exact version ID. Missing project policy is reported as a
+ * configuration problem, never as a case fact.
+ */
+export async function boundRuleChecks(tx: Db | Tx, clientId: string, task: { id: string; projectId: string }, output: Record<string, unknown>): Promise<TaskCheck[]> {
+  const cited = ((output.sections as Record<string, { policies?: unknown }> | undefined)?.S4?.policies ?? []) as { ruleId?: string; ruleVersion?: string }[];
+  if (!Array.isArray(cited) || !cited.length) return [];
+  const policy = await effectivePolicy(tx, clientId, task);
+  if (!policy) return [{ id: 'policy.bound-versions', section: 'S4', ok: false, message: 'This project has no published rules yet, so the cited rules cannot be bound. Ask the PM to publish the project policy (a configuration gap, not a case fact).' }];
+  const byVersion = new Map(policy.body.rules.map((r) => [r.rule_version_id, r]));
+  const bad = cited.filter((c) => {
+    const r = c.ruleVersion ? byVersion.get(c.ruleVersion) : undefined;
+    // Rule keys are stored with an `R-` prefix (R-GB-01); authors may cite either form.
+    const key = (k: string | null | undefined) => (k ?? '').replace(/^R-/i, '').toLowerCase();
+    return !r || (!!c.ruleId && key(c.ruleId) !== key(r.rule_key) && c.ruleId !== r.rule_id);
+  });
+  return [{ id: 'policy.bound-versions', section: 'S4', ok: bad.length === 0, message: bad.length ? `Cite published project rules by key and exact version: ${bad.map((c) => c.ruleId ?? c.ruleVersion ?? '?').join(', ')} ${bad.length === 1 ? 'is' : 'are'} not published for this project (or the key and version do not match)` : `Every cited rule is a published project rule version (${cited.length})` }];
 }

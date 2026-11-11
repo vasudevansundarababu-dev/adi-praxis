@@ -1,4 +1,4 @@
-import { agentProjection, compilePraxisContract, profileApplies, profileForWorkflow, profileProblems, profileShapeProblems, type ContractBlocker, type TaskCheck, type TemplateProfile } from '@praxis/shared';
+import { agentProjection, compilePraxisContract, profileApplies, profileForTemplate, profileProblems, profileShapeProblems, type ContractBlocker, type TaskCheck, type TemplateProfile } from '@praxis/shared';
 
 /**
  * Server side of the template profile registry (handover v2.1 ch. 05): save-time shape checks, submission checks,
@@ -6,14 +6,19 @@ import { agentProjection, compilePraxisContract, profileApplies, profileForWorkf
  * canonical KYC contract) are touched; legacy generic outputs keep their old behaviour.
  */
 
-/** The registered profile of a workflow, if it is supported. */
-export function profileFor(workflowName: string): TemplateProfile | null {
-  const r = profileForWorkflow(workflowName);
+/** A template version's form: its workflow name and the profile it chose (null = the workflow default). A bare name
+ * means the workflow default. */
+export type TemplateForm = string | { workflowName: string; profileId?: string | null };
+const formOf = (f: TemplateForm) => (typeof f === 'string' ? { workflowName: f, profileId: null } : f);
+
+/** The registered profile of a template version, if it is supported. */
+export function profileFor(form: TemplateForm): TemplateProfile | null {
+  const r = profileForTemplate(formOf(form));
   return r.status === 'ok' ? r.profile : null;
 }
 
 /** A profile whose values live in `output.sections` (every Wave 1 profile except KYC). */
-export function sectionsProfileFor(workflowName: string): TemplateProfile | null {
+export function sectionsProfileFor(workflowName: TemplateForm): TemplateProfile | null {
   const p = profileFor(workflowName);
   return p?.storage === 'sections' ? p : null;
 }
@@ -21,15 +26,15 @@ export function sectionsProfileFor(workflowName: string): TemplateProfile | null
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** Problems that block a save. Outputs without `profile` are legacy and pass unchanged. */
-export function profileSaveProblems(workflowName: string, output: Record<string, unknown>): string[] {
+export function profileSaveProblems(workflowName: TemplateForm, output: Record<string, unknown>): string[] {
   if (!Object.hasOwn(output, 'profile')) return [];
   const p = sectionsProfileFor(workflowName);
-  if (!p) return [`${workflowName} has no template profile; save the task without a profile reference`];
+  if (!p) return [`${formOf(workflowName).workflowName} has no template profile; save the task without a profile reference`];
   return profileShapeProblems(p, output);
 }
 
 /** Required and conditional profile checks for a profile-driven output, one check per problem. */
-export function profileChecks(workflowName: string, output: Record<string, unknown>): TaskCheck[] {
+export function profileChecks(workflowName: TemplateForm, output: Record<string, unknown>): TaskCheck[] {
   const p = sectionsProfileFor(workflowName);
   if (!p || !profileApplies(p, output)) return [];
   const problems = profileProblems(p, output);
@@ -38,7 +43,7 @@ export function profileChecks(workflowName: string, output: Record<string, unkno
 }
 
 /** The agent view of a profile-driven output, or null to fall back to the legacy view. */
-export function profileAgentView(workflowName: string, output: Record<string, unknown>): Record<string, unknown> | null {
+export function profileAgentView(workflowName: TemplateForm, output: Record<string, unknown>): Record<string, unknown> | null {
   const p = sectionsProfileFor(workflowName);
   return p ? agentProjection(p, output) : null;
 }
@@ -56,7 +61,7 @@ export const COMPILED_MARKER = 'praxisContractCompiled';
  * Compiles the contract for a submission. Returns the output to store (contract added, or a stale compiled contract
  * removed) and the export status, or null when the task is not profile-driven. Never blocks the submission.
  */
-export function compileForSubmission(workflowName: string, output: Record<string, unknown>, ids: { taskId: string; revisionId: string }): { output: Record<string, unknown>; status: ExportStatus } | null {
+export function compileForSubmission(workflowName: TemplateForm, output: Record<string, unknown>, ids: { taskId: string; revisionId: string }): { output: Record<string, unknown>; status: ExportStatus } | null {
   const p = profileFor(workflowName);
   if (!p || !profileApplies(p, output)) return null;
   // A hand-written executable contract (generic legacy editor) is never replaced.

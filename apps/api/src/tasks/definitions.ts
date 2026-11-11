@@ -2,6 +2,8 @@ import { EXECUTABLE_WORKFLOW, praxisContractIssues, praxisContractChecks, kycCan
 
 export interface TemplateRef {
   workflowName: string;
+  /** The version's chosen authoring form (null = the workflow default). */
+  profileId?: string | null;
   domainName: string;
   taskDefinitionSchema: unknown;
   collectionSchema: unknown;
@@ -48,7 +50,12 @@ const registry = new Map<string, TaskDefinition>();
 export function registerDefinition(domainName: string, workflowName: string, d: TaskDefinition) {
   registry.set(`${domainName} / ${workflowName}`.toLowerCase(), d);
 }
-export const definitionFor = (t: Pick<TemplateRef, 'domainName' | 'workflowName'>) => registry.get(`${t.domainName} / ${t.workflowName}`.toLowerCase()) ?? genericDefinition;
+/**
+ * A template version that chose an alternate (sections) form uses the profile checks, not its workflow's own
+ * definition: KYC v2 (account opening) is not checked as a KYC v1 workbench task (owner, 11 Nov 2026).
+ */
+export const definitionFor = (t: Pick<TemplateRef, 'domainName' | 'workflowName' | 'profileId'>): TaskDefinition =>
+  t.profileId ? { ...genericDefinition, key: `profile:${t.profileId}` } : (registry.get(`${t.domainName} / ${t.workflowName}`.toLowerCase()) ?? genericDefinition);
 
 /** Banking / KYC onboarding and refresh (docs/TASK-KYC.md). */
 export const kycDefinition: TaskDefinition = {

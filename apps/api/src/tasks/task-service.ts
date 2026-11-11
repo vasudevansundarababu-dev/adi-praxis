@@ -16,6 +16,7 @@ export async function templateRef(tx: Db | Tx, templateId: string): Promise<Temp
   const edges = (Array.isArray(t.edgeCaseCatalog) ? t.edgeCaseCatalog : []) as { name?: string }[];
   return {
     workflowName: t.workflowName,
+    profileId: t.profileId,
     domainName: t.domain.name,
     taskDefinitionSchema: t.taskDefinitionSchema,
     collectionSchema: t.collectionSchema,

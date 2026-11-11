@@ -139,6 +139,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       definition: definitionFor(template).key,
       template: {
         workflow: template.workflowName,
+        profileId: template.profileId ?? null,
         domain: template.domainName,
         primaryWork: t.project.template.primaryWork,
         verificationCriteria: t.project.template.verificationCriteria,
@@ -212,7 +213,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       if (!ctx.ok) outstanding(ctx);
       if (!['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(t.status)) throw new AppError(409, 'READ_ONLY', 'This task is read-only now.');
       if (t.project.status === 'PAUSED') throw new AppError(409, 'PROJECT_PAUSED', 'This project is paused. Your work is saved; you can continue when it resumes.');
-      const shape = t.taskType === 'AUTHORING' ? profileSaveProblems(t.project.template.workflowName, req.body.output) : [];
+      const shape = t.taskType === 'AUTHORING' ? profileSaveProblems(t.project.template, req.body.output) : [];
       if (shape.length) throw new AppError(422, 'INVALID_PROFILE_OUTPUT', 'This draft does not match the template profile.', { problems: shape });
       const now = new Date();
       const { count } = await tx.taskInstance.updateMany({

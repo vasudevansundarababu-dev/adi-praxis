@@ -464,6 +464,8 @@ model Template {
   defaultMaxPerExpert   Int            @default(4) @map("default_max_per_expert")
   openSlotShare         Decimal        @default(0.2) @map("open_slot_share") @db.Decimal(4, 3)
   similarityThreshold   Decimal        @default(0.90) @map("similarity_threshold") @db.Decimal(4, 3)
+  /// Authoring form of this version (a registered alternate profile); null = the workflow default (owner, 11 Nov 2026).
+  profileId             String?        @map("profile_id")
   publishedAt           DateTime?      @map("published_at")
   retiredAt             DateTime?      @map("retired_at")
   /// Harbor blueprint (packages/shared/src/blueprint). Null for templates outside the Meta-Compiler catalog.

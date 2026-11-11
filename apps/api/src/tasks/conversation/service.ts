@@ -4,7 +4,7 @@ import { applyConversationChanges, ConversationProposal, type KycTask } from '@p
 import type { Db, Tx } from '../../db';
 import { AppError } from '../../lib/errors';
 import { sha256, stableStringify } from '../../lib/crypto';
-import { effectivePolicy } from '../../policy/task-policy';
+import { authoringPolicyView, effectivePolicy } from '../../policy/task-policy';
 import type { ConversationAssistant } from './assistant';
 import { proposalProblems } from './guards';
 
@@ -37,7 +37,7 @@ export async function conversationView(db: Db | Tx, t: TaskInstance) {
     db.taskDraftRun.findMany({ where: { taskInstanceId: t.id, section: 'CHAT' }, orderBy: { createdAt: 'desc' }, take: 1 }),
     effectivePolicy(db, t.clientId, t),
   ]);
-  return { revision: t.revision, output: t.output ?? {}, state: chatOf(t), messages: turns.map(x => ({ id: x.id, speaker: x.speaker, content: x.content })), run: runs[0] ? { id: runs[0].id, status: runs[0].status, error: runs[0].error, model: runs[0].model } : null, policy: policy?.body ?? null };
+  return { revision: t.revision, output: t.output ?? {}, state: chatOf(t), messages: turns.map(x => ({ id: x.id, speaker: x.speaker, content: x.content })), run: runs[0] ? { id: runs[0].id, status: runs[0].status, error: runs[0].error, model: runs[0].model } : null, policy: policy ? authoringPolicyView(policy.body) : null };
 }
 /** Model call outside transactions. Claim only QUEUED: uncertain RUNNING calls are never paid-retried automatically. */
 export async function executeConversation(db: Db, assistant: ConversationAssistant, runId: string) {
@@ -54,7 +54,7 @@ export async function executeConversation(db: Db, assistant: ConversationAssista
     const turns = await db.taskInterviewTurn.findMany({ where: { taskInstanceId: task.id }, orderBy: { seq: 'asc' }, take: 301 });
     if (turns.length > 300) throw new Error('Conversation limit reached. No prior messages were silently discarded.');
     const reviewFeedback = await db.taskReview.findMany({ where: { taskInstanceId: task.id, OR: [{ decision: { in: ['ACCEPT', 'REWORK', 'REJECT'] } }, { decision: 'EDIT', material: true }] }, orderBy: { createdAt: 'asc' }, select: { decision: true, comments: true, notes: true, submissionVersion: true } });
-    let proposal = ConversationProposal.parse(await assistant.propose({ workflow: task.project.template.workflowName, reviewFeedback, template: { primaryWork: task.project.template.primaryWork, verificationCriteria: task.project.template.verificationCriteria, humanGate: task.project.template.humanGate, taskDefinitionSchema: task.project.template.taskDefinitionSchema, collectionSchema: task.project.template.collectionSchema }, current: (task.output ?? {}) as Record<string, unknown>, slot: task.input, history: turns.map(x => ({ speaker: x.speaker, content: x.content })), policy: policy?.body ?? null, previousUnresolved: chatOf(task).unresolved ?? [] }));
+    let proposal = ConversationProposal.parse(await assistant.propose({ workflow: task.project.template.workflowName, reviewFeedback, template: { primaryWork: task.project.template.primaryWork, verificationCriteria: task.project.template.verificationCriteria, humanGate: task.project.template.humanGate, taskDefinitionSchema: task.project.template.taskDefinitionSchema, collectionSchema: task.project.template.collectionSchema }, current: (task.output ?? {}) as Record<string, unknown>, slot: task.input, history: turns.map(x => ({ speaker: x.speaker, content: x.content })), policy: policy ? authoringPolicyView(policy.body) : null, previousUnresolved: chatOf(task).unresolved ?? [] }));
     const authors = turns.filter(t=>t.speaker==='AUTHOR' && t.questionId==='conversation' && t.clientMessageId?.startsWith('answer:')).map(t=>t.content);
     const unsupported = authoredChangeProblems((task.output ?? {}) as Record<string, unknown>, proposal, authors);
     const latestAnswer = authors.at(-1) ?? '';

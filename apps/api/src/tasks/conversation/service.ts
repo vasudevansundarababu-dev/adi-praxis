@@ -91,7 +91,12 @@ export async function decideProposal(tx: Tx, task: TaskInstance, runId: string, 
     const policy = await effectivePolicy(tx, task.clientId, task);
     if (task.revision !== pending.revision || (policy?.digest ?? 'none') !== pending.policyDigest) throw new AppError(409, 'STALE_REVISION', 'Task or project policy changed. Request a fresh proposal.');
     if (pending.problems.length) throw new AppError(422, 'PROPOSAL_BLOCKED', 'Resolve the proposal checks before applying changes.', { problems: pending.problems });
-    const output = applyConversationChanges((task.output ?? {}) as Record<string, unknown>, pending.proposal);
+    let output: Record<string, unknown>;
+    try {
+      output = applyConversationChanges((task.output ?? {}) as Record<string, unknown>, pending.proposal);
+    } catch (e) {
+      throw new AppError(422, 'PROPOSAL_BLOCKED', 'This proposal no longer applies to the task. Request a fresh one.', { problems: [e instanceof Error ? e.message : 'invalid change'] });
+    }
     chat.unresolved = pending.proposal.unresolved; chat.policyLinks = pending.proposal.ruleLinks; chat.needsReview = true; delete chat.declaration; delete chat.reviewedRevision; chat.policyDigest = pending.policyDigest;
     delete chat.pending;
     const drafting = draftingWith(task, chat) as { sections: Record<string, { confirmedAt: string | null }>; conversation: ChatState };

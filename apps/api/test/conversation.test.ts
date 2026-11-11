@@ -4,7 +4,7 @@ import type { ConversationAssistant, ConversationInput } from '../src/tasks/conv
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { KYC_EXAMPLE_TASK, replayCall, type KycTask } from '@praxis/shared';
+import { checkWorkflowGraph, KYC_EXAMPLE_TASK, replayCall, type KycTask } from '@praxis/shared';
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MockGoogleVerifier } from '../src/candidate/google';
@@ -330,6 +330,32 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
         await db.taskDraftRun.deleteMany({ where: { promptVersion: 'cap-test' } });
       }
       void v;
+    });
+    it('authoring v2.1 Wave 2: the chatbot proposes workflow changes in the SME\'s words; they apply only on confirmation', async () => {
+      const { a, id } = await kycTask(); const v = await task(a, id);
+      expect((await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-only/1', accepted: true })).statusCode).toBe(200);
+      const saved = await put(a.cookie, `/me/tasks/${id}`, { output: { header: { title: 'Graph chat case' }, workflowGraph: v.startingGraph }, expectedRevision: v.revision, activeSecondsDelta: 0 }); expect(saved.statusCode, saved.body).toBe(200);
+      const words = 'After the recommendation, add a step called Screen sanctions lists: Check every party against the sanctions lists before the approver decides.';
+      const own = { op: 'add_step_after', nodeId: 'conclude', label: 'Screen sanctions lists', instruction: 'Check every party against the sanctions lists before the approver decides.' };
+      const scripted = (graphOps: unknown[]): ConversationAssistant => ({ model: 'graph-test-mock', async propose() { return { reply: 'ok', question: 'Anything else?', changes: [], ruleLinks: [], unresolved: [], graphOps } as never; } });
+      // 1. The SME's own words: the proposal is pending with no problems, nothing changes until confirmed.
+      const m1 = await post(a.cookie, `/me/tasks/${id}/conversation/messages`, { content: words, expectedRevision: (await task(a, id)).revision }); expect(m1.statusCode, m1.body).toBe(202);
+      await executeConversation(db, scripted([own]), m1.json().runId);
+      let conv = (await get(a.cookie, `/me/tasks/${id}/conversation`)).json();
+      expect(conv.state.pending.proposal.graphOps).toEqual([own]); expect(conv.state.pending.problems).toEqual([]);
+      expect(((await task(a, id)).output.workflowGraph.nodes as { label: string }[]).some((n) => n.label === 'Screen sanctions lists')).toBe(false);
+      expect((await post(a.cookie, `/me/tasks/${id}/conversation/decision`, { runId: m1.json().runId, accept: true })).statusCode).toBe(200);
+      const after = (await task(a, id)).output.workflowGraph;
+      expect(after.nodes.some((n: { label: string }) => n.label === 'Screen sanctions lists')).toBe(true);
+      expect(checkWorkflowGraph(after).errors).toEqual([]);
+      // 2. Wording the SME never wrote, or a change that cannot apply: blocked with a precise reason.
+      const m2 = await post(a.cookie, `/me/tasks/${id}/conversation/messages`, { content: 'Please add a person step.', expectedRevision: (await task(a, id)).revision });
+      await executeConversation(db, scripted([{ op: 'add_human_step_after', nodeId: 'ghost', label: 'Compliance officer approves', actorRole: 'Compliance officer', prompt: 'Approve the file.' }]), m2.json().runId);
+      conv = (await get(a.cookie, `/me/tasks/${id}/conversation`)).json();
+      expect(conv.state.pending.problems.join(' ')).toMatch(/Type your own wording for workflow change 1/);
+      expect(conv.state.pending.problems.join(' ')).toMatch(/cannot apply: There is no step ghost/);
+      const blocked = await post(a.cookie, `/me/tasks/${id}/conversation/decision`, { runId: m2.json().runId, accept: true });
+      expect(blocked.statusCode).toBe(422); expect(blocked.json().error).toBe('PROPOSAL_BLOCKED');
     });
     it('integrates chat with existing submit, Admin rework, resubmit, acceptance, hash chain and dataset export', async () => {
       const { a, id, projectId } = await kycTask();

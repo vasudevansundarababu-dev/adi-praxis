@@ -590,3 +590,28 @@ Expert and PM with two audit events; Expert edits need a reason, and a material 
 - **(owner)** Failing a critical rubric criterion fails the whole task. Exported to Anvil as a hard-failure constraint
   with the criterion's binding (Anvil's `praxis.anvil.task.v1` already has `constraints[].hard_failure`), so no new
   Anvil field is invented.
+
+### Generated job descriptions (owner bug report, 12 Nov 2026)
+
+- **(owner)** Each template has skills. When a PM creates a project, the JD is generated with the template's skills as
+  **mandatory** skills, plus the demographic and education profile, so the JD is complete. If the project needs a
+  reviewer (route SME → Expert → PM), a **reviewer JD** is generated with the same skills and more years of
+  experience. Both go to recruitment.
+- **Built (Wave 2 branch, merged into Wave 3):** shared `packages/shared/src/jd-generator.ts` (deterministic, no
+  model); API `apps/api/src/projects/generated-jd.ts` runs on project create and every draft edit; new
+  `GET /projects/:id/job-descriptions`; wizard step 5 defaults to "Generate from the template".
+- **Default (decided, change on request):** experience = the project's Domain experience filter minimum, else
+  **5 years**; education = the lowest level the project's Education filter accepts, else **Bachelor's or equivalent
+  (ISCED 6)**; reviewer = author + **5 years**. The demographic profile lists every other filter in plain words with
+  required / preferred.
+- **Default:** the PM may edit the title, responsibilities, pay and location and add skills; the template's skills
+  cannot be removed (API 400 `MANDATORY_SKILLS_REQUIRED` and a database CHECK). Requirements re-follow the template and
+  the filters on every draft save; title and responsibilities are rewritten only if the template changes.
+- **Default:** a generated JD starts with no pay (pay comes from the template's default JD when it has one); submit is
+  blocked until each JD has a wage per task. A hand-picked JD is still allowed but must include the template's skills.
+- **Default:** generated JDs belong to their project and are hidden from the reusable JD list.
+- **Recruitment:** the job post's criteria are generated from the JD (mandatory skills, experience, education and
+  required demographics → REQUIRED; added skills and preferred demographics → PREFERRED). For the reviewer JD,
+  requisitions (M10) get a "Fill from project JD" button that uses the reviewer JD for Expert and Reviewer-SME tiers.
+- **Open for the owner:** whether reviewers should also get their own public job post (today the opportunity page is
+  one post per project, for authors; Experts are staff users assigned by the PM or recruited through requisitions).

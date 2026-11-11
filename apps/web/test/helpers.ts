@@ -71,6 +71,8 @@ export function project(over: Partial<ProjectDto> = {}): ProjectDto {
     requiredWorkers: 2,
     demographicFilters: [],
     jobDescriptionId: null,
+    reviewerJobDescriptionId: null,
+    jdGenerated: false,
     jdSnapshotId: null,
     jdSnapshot: null,
     demographicsSnapshot: null,

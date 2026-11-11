@@ -8,6 +8,8 @@ import {
   reconcilePolicy,
   PublicOpportunityDto,
   SaveOpportunityDraftRequest,
+  jdRequirementLines,
+  type JdProfileLine,
 } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -29,7 +31,19 @@ const OPEN_PROJECT = ['READY_FOR_STAFFING', 'STAFFING', 'STAFFED', 'IN_PROGRESS'
 /** Default draft built from the submitted project: JD snapshot, template and FLOW2 guidance. */
 async function defaultDraft(tx: Db | Tx, projectId: string) {
   const p = await tx.project.findUniqueOrThrow({ where: { id: projectId }, include: { template: { include: { domain: true } }, jdSnapshot: true } });
-  const jd = (p.jdSnapshot?.data ?? {}) as { title?: string; responsibilities?: string; skills?: string[]; wagePerTask?: number; wageCurrency?: string; locationType?: string; location?: string | null };
+  const jd = (p.jdSnapshot?.data ?? {}) as {
+    title?: string;
+    responsibilities?: string;
+    skills?: string[];
+    wagePerTask?: number;
+    wageCurrency?: string;
+    locationType?: string;
+    location?: string | null;
+    mandatorySkills?: string[];
+    minExperienceYears?: number | null;
+    educationLevel?: string | null;
+    demographicProfile?: JdProfileLine[];
+  };
   const brief = OpportunityBrief.parse({
     title: jd.title ?? p.name,
     summary: jd.responsibilities ?? '',
@@ -44,8 +58,16 @@ async function defaultDraft(tx: Db | Tx, projectId: string) {
     doNotDisclose:
       'Do not share real customer information, account numbers, internal reports or filings, your employer’s non-public policies, or any credentials. Describe work in generic or synthetic terms.',
   });
+  // Generated JDs (12 Nov 2026): mandatory skills, experience, education and required demographics are REQUIRED;
+  // added skills and preferred demographics are PREFERRED. A hand-picked JD keeps the old rule (first skill required).
+  const lines = jdRequirementLines({ skills: jd.skills ?? [], mandatorySkills: jd.mandatorySkills, minExperienceYears: jd.minExperienceYears, educationLevel: jd.educationLevel, demographicProfile: jd.demographicProfile });
   const criteria = OpportunityCriteria.parse(
-    (jd.skills ?? []).slice(0, 5).map((s, i) => ({ id: `skill-${i + 1}`, text: `Hands-on experience with ${s}`, kind: i === 0 ? 'REQUIRED' : 'PREFERRED' })),
+    jd.mandatorySkills?.length
+      ? [
+          ...lines.required.slice(0, 40).map((text, i) => ({ id: `req-${i + 1}`, text, kind: 'REQUIRED' as const })),
+          ...lines.preferred.slice(0, 10).map((text, i) => ({ id: `pref-${i + 1}`, text, kind: 'PREFERRED' as const })),
+        ]
+      : (jd.skills ?? []).slice(0, 5).map((s, i) => ({ id: `skill-${i + 1}`, text: `Hands-on experience with ${s}`, kind: i === 0 ? 'REQUIRED' : 'PREFERRED' })),
   );
   return { brief, criteria };
 }

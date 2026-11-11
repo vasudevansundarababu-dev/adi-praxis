@@ -505,26 +505,45 @@ model DemographicAttribute {
 // ───────────────────────────── FLOW 1: projects ─────────────────────────────
 
 model JobDescription {
-  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId         String       @map("client_id") @db.Uuid
-  title            String
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String       @map("client_id") @db.Uuid
+  title              String
   /// Lower-cased, whitespace-collapsed title for FLOW 2 JD lookup.
-  normalizedTitle  String       @map("normalized_title")
-  responsibilities String
-  skills           String[]
-  wagePerTask      Decimal      @map("wage_per_task") @db.Decimal(12, 2)
-  wageCurrency     String       @map("wage_currency") @db.Char(3)
-  locationType     LocationType @map("location_type")
-  location         String?
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  normalizedTitle    String       @map("normalized_title")
+  responsibilities   String
+  skills             String[]
+  wagePerTask        Decimal      @map("wage_per_task") @db.Decimal(12, 2)
+  wageCurrency       String       @map("wage_currency") @db.Char(3)
+  locationType       LocationType @map("location_type")
+  location           String?
+  /// Generated JDs (12 Nov 2026): who the JD recruits.
+  role               JdRole       @default(AUTHOR)
+  /// True when Praxis generated it from the template for one project (projectId).
+  generated          Boolean      @default(false)
+  projectId          String?      @map("project_id") @db.Uuid
+  /// The template's skills; the PM may add skills but not remove these.
+  mandatorySkills    String[]     @default([]) @map("mandatory_skills")
+  minExperienceYears Int?         @map("min_experience_years")
+  /// Minimum ISCED level, e.g. ISCED_6.
+  educationLevel     String?      @map("education_level")
+  /// [{ key, label, text, required }] from the project's demographic filters.
+  demographicProfile Json         @default("[]") @map("demographic_profile")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
 
   templatesAsDefault Template[]               @relation("TemplateDefaultJd")
-  projects           Project[]
+  projects           Project[]                @relation("ProjectJd")
+  reviewerProjects   Project[]                @relation("ProjectReviewerJd")
   snapshots          JobDescriptionSnapshot[]
   campaigns          Campaign[]
 
+  @@unique([projectId, role])
   @@index([clientId, normalizedTitle])
+}
+
+enum JdRole {
+  AUTHOR
+  REVIEWER
 }
 
 /// Frozen copy of a JD at project submit; ApprovedTaskRecord.jd_snapshot_id points here.
@@ -558,65 +577,71 @@ enum ReviewRoute {
 }
 
 model Project {
-  id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId                String        @map("client_id") @db.Uuid
-  ownerId                 String        @map("owner_id") @db.Uuid
-  templateId              String        @map("template_id") @db.Uuid
-  templateVersion         Int           @map("template_version")
-  jobDescriptionId        String?       @map("job_description_id") @db.Uuid
-  jdSnapshotId            String?       @map("jd_snapshot_id") @db.Uuid
-  name                    String
-  description             String?
-  status                  ProjectStatus @default(DRAFT)
+  id                       String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId                 String               @map("client_id") @db.Uuid
+  ownerId                  String               @map("owner_id") @db.Uuid
+  templateId               String               @map("template_id") @db.Uuid
+  templateVersion          Int                  @map("template_version")
+  jobDescriptionId         String?              @map("job_description_id") @db.Uuid
+  jdSnapshotId             String?              @map("jd_snapshot_id") @db.Uuid
+  /// SME -> Expert -> PM: the generated reviewer JD and its snapshot at submit.
+  reviewerJobDescriptionId String?              @map("reviewer_job_description_id") @db.Uuid
+  reviewerJdSnapshot       Json?                @map("reviewer_jd_snapshot")
+  /// New projects generate their JDs from the template (false keeps a hand-picked JD; legacy projects).
+  jdGenerated              Boolean              @default(false) @map("jd_generated")
+  name                     String
+  description              String?
+  status                   ProjectStatus        @default(DRAFT)
   /// Null preserves both existing editors for legacy projects; new projects choose explicitly.
-  authoringExperience     AuthoringExperience? @map("authoring_experience")
+  authoringExperience      AuthoringExperience? @map("authoring_experience")
   /// SME -> PM (default) or SME -> Expert -> PM. Frozen once tasks exist.
-  reviewRoute             ReviewRoute   @default(SME_PM) @map("review_route")
-  taskMode                TaskMode      @default(AUTHORING) @map("task_mode")
+  reviewRoute              ReviewRoute          @default(SME_PM) @map("review_route")
+  taskMode                 TaskMode             @default(AUTHORING) @map("task_mode")
   /// Annotation projects: number of task instances.
-  taskCount               Int?          @map("task_count")
+  taskCount                Int?                 @map("task_count")
   /// Authoring projects: distinct-task target and per-expert cap.
-  distinctTarget          Int?          @map("distinct_target")
-  maxPerExpert            Int?          @map("max_per_expert")
-  openSlotShare           Decimal?      @map("open_slot_share") @db.Decimal(4, 3)
+  distinctTarget           Int?                 @map("distinct_target")
+  maxPerExpert             Int?                 @map("max_per_expert")
+  openSlotShare            Decimal?             @map("open_slot_share") @db.Decimal(4, 3)
   /// PM-raised coverage quotas (never below the template minimum).
-  coverageQuotas          Json?         @map("coverage_quotas")
-  tptMinutes              Int?          @map("tpt_minutes")
-  hoursPerWorkerDay       Decimal       @default(4) @map("hours_per_worker_day") @db.Decimal(4, 2)
-  startDate               DateTime?     @map("start_date") @db.Date
-  endDate                 DateTime?     @map("end_date") @db.Date
-  requiredWorkers         Int?          @map("required_workers")
+  coverageQuotas           Json?                @map("coverage_quotas")
+  tptMinutes               Int?                 @map("tpt_minutes")
+  hoursPerWorkerDay        Decimal              @default(4) @map("hours_per_worker_day") @db.Decimal(4, 2)
+  startDate                DateTime?            @map("start_date") @db.Date
+  endDate                  DateTime?            @map("end_date") @db.Date
+  requiredWorkers          Int?                 @map("required_workers")
   /// Computed fields frozen at submit: tasks, requiredAuthors, totalEffortHours, workingDays, labourBudget.
-  figures                 Json?
-  demographicsSnapshot    Json?         @map("demographics_snapshot")
-  autoLaunchCampaign      Boolean       @default(false) @map("auto_launch_campaign")
+  figures                  Json?
+  demographicsSnapshot     Json?                @map("demographics_snapshot")
+  autoLaunchCampaign       Boolean              @default(false) @map("auto_launch_campaign")
   /// M10 per-project switch (with the global SME_SUPPLY_ENABLED flag): requisitions and partner supply.
-  smeSupplyEnabled        Boolean       @default(false) @map("sme_supply_enabled")
-  openTaskCapPerCandidate Int           @default(3) @map("open_task_cap_per_candidate")
-  submittedAt             DateTime?     @map("submitted_at")
-  createdAt               DateTime      @default(now()) @map("created_at")
-  updatedAt               DateTime      @updatedAt @map("updated_at")
+  smeSupplyEnabled         Boolean              @default(false) @map("sme_supply_enabled")
+  openTaskCapPerCandidate  Int                  @default(3) @map("open_task_cap_per_candidate")
+  submittedAt              DateTime?            @map("submitted_at")
+  createdAt                DateTime             @default(now()) @map("created_at")
+  updatedAt                DateTime             @updatedAt @map("updated_at")
 
-  client             Client                     @relation(fields: [clientId], references: [id])
-  owner              User                       @relation("ProjectOwner", fields: [ownerId], references: [id])
-  template           Template                   @relation(fields: [templateId], references: [id])
-  jobDescription     JobDescription?            @relation(fields: [jobDescriptionId], references: [id])
-  jdSnapshot         JobDescriptionSnapshot?    @relation(fields: [jdSnapshotId], references: [id])
-  demographicFilters ProjectDemographicFilter[]
-  campaigns          Campaign[]
-  assignments        ProjectAssignment[]
-  tasks              TaskInstance[]
-  studioDeployments  StudioDeployment[]
-  smeAuthoredTasks   SmeAuthoredTask[]
-  slots              CoverageSlot[]
-  inputBatches       TaskInputBatch[]
-  opportunity        Opportunity?
-  reviewers          ProjectReviewer[]
-  requisitions       Requisition[]
-  matches            ProjectMatch[]
-  matchRejections    ProjectMatchRejection[]
+  client                 Client                     @relation(fields: [clientId], references: [id])
+  owner                  User                       @relation("ProjectOwner", fields: [ownerId], references: [id])
+  template               Template                   @relation(fields: [templateId], references: [id])
+  jobDescription         JobDescription?            @relation("ProjectJd", fields: [jobDescriptionId], references: [id])
+  jdSnapshot             JobDescriptionSnapshot?    @relation(fields: [jdSnapshotId], references: [id])
+  reviewerJobDescription JobDescription?            @relation("ProjectReviewerJd", fields: [reviewerJobDescriptionId], references: [id])
+  demographicFilters     ProjectDemographicFilter[]
+  campaigns              Campaign[]
+  assignments            ProjectAssignment[]
+  tasks                  TaskInstance[]
+  studioDeployments      StudioDeployment[]
+  smeAuthoredTasks       SmeAuthoredTask[]
+  slots                  CoverageSlot[]
+  inputBatches           TaskInputBatch[]
+  opportunity            Opportunity?
+  reviewers              ProjectReviewer[]
+  requisitions           Requisition[]
+  matches                ProjectMatch[]
+  matchRejections        ProjectMatchRejection[]
   /// When the last FLOW 2 match run finished.
-  matchedAt          DateTime?                  @map("matched_at")
+  matchedAt              DateTime?                  @map("matched_at")
 
   @@unique([clientId, name])
   @@index([ownerId])

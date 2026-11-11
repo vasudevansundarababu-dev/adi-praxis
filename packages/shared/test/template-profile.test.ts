@@ -6,6 +6,7 @@ import {
   compileKycContract,
   compilePraxisContract,
   emptyOutput,
+  exportStatusLine,
   getFieldValue,
   isBlankOutput,
   itemFieldsOf,
@@ -228,6 +229,12 @@ describe('Anvil contract compiler (praxis.anvil.task.v1)', () => {
     expect(blockers([{ ...crit, expectedValue: 'not-an-option' }])).toContain('INVALID_VALUE@S7.criteria[0].expectedValue');
     const other = p.sections[5]!.fields.find((f) => f.outputField)!.options![1]!.value;
     expect(blockers([{ ...crit, expectedValue: other }])).toContain('REFERENCE_FAILS_RULE@S7.criteria[0]');
+  });
+
+  it('export status reads "Approved; export adapter blocked: <reason>"', () => {
+    expect(exportStatusLine('Approved', { status: 'blocked', blockers: [{ code: 'MISSING_BINDING', path: 'rubric.criteria[0].outputField', message: 'Name the output field' }, { code: 'X', path: 'y', message: 'z' }] })).toBe('Approved; export adapter blocked: Name the output field (rubric.criteria[0].outputField) and 1 more');
+    expect(exportStatusLine('Submitted', { status: 'ready', blockers: [] })).toBe('Submitted; export adapter ready (praxis.anvil.task.v1)');
+    expect(exportStatusLine('Approved', null)).toBeNull();
   });
 
   it('KYC: the workbench output compiles; criteria without a binding block with their path', () => {

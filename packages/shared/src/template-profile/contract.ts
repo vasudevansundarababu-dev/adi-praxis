@@ -323,6 +323,20 @@ export function compileKycContract(task: KycTask, ids: CompileIds, profileVersio
   });
 }
 
+/** Export readiness stored with a profile-driven submission. */
+export interface ExportStatusView {
+  status: 'ready' | 'blocked';
+  blockers: ContractBlocker[];
+}
+
+/** "Approved; export adapter blocked: <reason>" for the task view and review screen. Null when not applicable. */
+export function exportStatusLine(statusLabel: string, s: ExportStatusView | null | undefined): string | null {
+  if (!s) return null;
+  if (s.status === 'ready') return `${statusLabel}; export adapter ready (praxis.anvil.task.v1)`;
+  const [first, ...rest] = s.blockers;
+  return `${statusLabel}; export adapter blocked: ${first ? `${first.message} (${first.path})` : 'unknown reason'}${rest.length ? ` and ${rest.length} more` : ''}`;
+}
+
 /** Compiles a task output for its profile. KYC (canonical storage) uses the KYC compiler. */
 export function compilePraxisContract(profile: TemplateProfile, output: unknown, ids: CompileIds): CompileResult {
   if (!profileApplies(profile, output)) return { blockers: [{ code: 'PROFILE_NOT_APPLICABLE', path: 'profile', message: `This output was not authored with the ${profile.profileId} profile` }] };

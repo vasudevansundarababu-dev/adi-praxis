@@ -12,6 +12,7 @@ import type { SelectionGate } from '../staffing/selection-gate';
 import { conversationInputProblems } from '../tasks/conversation/guards';
 import { appendTurn, chatOf, CONVERSATION_VERSION, conversationView, decideProposal, draftingWith, editable } from '../tasks/conversation/service';
 import { ownTask, outstanding, workContext } from './work';
+import { profileAgentView } from '../tasks/profile-output';
 const Params = z.object({ id: z.string().uuid() });
 export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: SelectionGate }> = async (app, { db, selectionGate }) => {
   const load = async (tx: Parameters<typeof ownTask>[0], id: string, sme: string) => {
@@ -33,7 +34,8 @@ export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: 
   app.get('/me/tasks/:id/conversation', { config: { access: 'candidate' }, schema: { params: Params } }, async req => conversationView(db, await load(db, req.params.id, req.candidate!.smeUserId)));
   app.get('/me/tasks/:id/agent-preview', { config: { access: 'candidate' }, schema: { params: Params } }, async req => {
     const t = await load(db, req.params.id, req.candidate!.smeUserId), policy = await effectivePolicy(db, t.clientId, t);
-    return { task: authoringAgentView((t.output ?? {}) as Record<string, unknown>), policy: policy?.body.rules.filter(r => r.visibility === 'agent_visible') ?? [], note: 'Recorded responses are supplied only on matching tool calls. This is a preview, not execution.' };
+    const output = (t.output ?? {}) as Record<string, unknown>;
+    return { task: profileAgentView(t.project.template.workflowName, output) ?? authoringAgentView(output), policy: policy?.body.rules.filter(r => r.visibility === 'agent_visible') ?? [], note: 'Recorded responses are supplied only on matching tool calls. This is a preview, not execution.' };
   });
   app.post('/me/tasks/:id/conversation/messages', { config: { access: 'candidate', rateLimit: { max: 15, timeWindow: '1 minute' } }, schema: { params: Params, body: z.object({ content: z.string().trim().min(1).max(4000), expectedRevision: z.number().int().nonnegative() }).strict() } }, async (req, reply) => {
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit, emit }) => {

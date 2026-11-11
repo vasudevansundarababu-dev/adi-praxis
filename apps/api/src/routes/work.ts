@@ -17,6 +17,7 @@ import { allowEditor, experienceOf } from '../tasks/authoring-experience';
 import { AUTHORSHIP_VERSION } from '../tasks/conversation/authorship';
 import { chatOf, draftingWith } from '../tasks/conversation/service';
 import { effectivePolicy, sidecar } from '../policy/task-policy';
+import { profileSaveProblems } from '../tasks/profile-output';
 
 const IdParams = z.object({ id: z.string().uuid() });
 
@@ -142,6 +143,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       output: t.quarantinedAt ? null : t.output,
       coverageTags: t.coverageTags,
       checks: checks?.results ?? null,
+      exportStatus: checks?.export ?? null,
       // Authors see only the closest tasks' briefs, never other authors' content.
       readOnly: !['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(t.status),
       review: review ? { decision: review.decision, comments: review.comments, notes: review.notes, rejectReason: review.rejectReason, at: review.createdAt.toISOString() } : null,
@@ -203,6 +205,8 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       if (!ctx.ok) outstanding(ctx);
       if (!['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(t.status)) throw new AppError(409, 'READ_ONLY', 'This task is read-only now.');
       if (t.project.status === 'PAUSED') throw new AppError(409, 'PROJECT_PAUSED', 'This project is paused. Your work is saved; you can continue when it resumes.');
+      const shape = t.taskType === 'AUTHORING' ? profileSaveProblems(t.project.template.workflowName, req.body.output) : [];
+      if (shape.length) throw new AppError(422, 'INVALID_PROFILE_OUTPUT', 'This draft does not match the template profile.', { problems: shape });
       const now = new Date();
       const { count } = await tx.taskInstance.updateMany({
         where: { id: t.id, revision: req.body.expectedRevision },

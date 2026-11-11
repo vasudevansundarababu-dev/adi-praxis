@@ -15,7 +15,8 @@ export function proposalProblems(current: Record<string, unknown>, p: Conversati
   }
   // Policy in the shared task is free text and cannot safely encode evaluator-only visibility.
   if (p.changes.some(c => c.section === 'policy')) issues.push('Project policy cannot be rewritten by chat; link published rules instead');
-  if (current.praxisContract && p.changes.length) issues.push('Executable contract tasks require a dedicated adapter; existing contract is preserved');
+  // A contract compiled from the template profile at submission is regenerated on the next submission.
+  if (current.praxisContract && !current.praxisContractCompiled && p.changes.length) issues.push('Executable contract tasks require a dedicated adapter; existing contract is preserved');
   const before = current as KycTask, after = next as KycTask;
   if (kyc) {
     const prior = new Set(kycChecks(before, null).filter(c => !c.ok && c.severity !== 'warning').map(c => c.id));

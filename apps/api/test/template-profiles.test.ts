@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { emptyOutput, KYC_EXAMPLE_TASK, praxisContractIssues, sampleProfileOutput, setFieldValue, WAVE1_PROFILES, type KycTask, type SectionKey, type TemplateProfile } from '@praxis/shared';
+import { emptyOutput, KYC_EXAMPLE_TASK, praxisContractIssues, sampleProfileOutput, setFieldValue, TEMPLATE_PROFILES, type KycTask, type SectionKey, type TemplateProfile } from '@praxis/shared';
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MockGoogleVerifier } from '../src/candidate/google';
@@ -17,7 +17,7 @@ import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 const SECRET = 'test-mock-secret';
 const EDGE = 'Complex or circular ownership';
 type Who = { cookie: string; smeUserId: string; candidateId: string };
-const NON_KYC = WAVE1_PROFILES.filter((p) => p.storage === 'sections');
+const NON_KYC = TEMPLATE_PROFILES.filter((p) => p.storage === 'sections');
 const allTrue = { realistic: true, correct: true, coversSlot: true, difficultyFair: true, distinct: true, rubricCatches: true };
 
 /** The KYC example with typed criterion bindings, so it compiles to an Anvil contract. */
@@ -33,7 +33,7 @@ const KYC_BOUND: KycTask = {
   },
 };
 
-describe('Wave 1 template profiles: save, checks, agent view and Anvil export', () => {
+describe('Wave 1 and Wave 2 template profiles: save, checks, agent view and Anvil export', () => {
   let app: FastifyInstance;
   const email = new MemoryEmailSender();
   const google = new MockGoogleVerifier(SECRET);
@@ -155,6 +155,8 @@ describe('Wave 1 template profiles: save, checks, agent view and Anvil export', 
     const failed = res.json().details.checks.filter((c: { ok: boolean }) => !c.ok).map((c: { id: string; section: string }) => `${c.section}:${c.id}`);
     expect(failed).toEqual(expect.arrayContaining(['S1:profile.S1.businessContext', 'S2:profile.S2.evidence[0].content', 'S6:profile.S6.' + profile.sections[5]!.fields[0]!.key, 'S7:profile.S7.criteria', 'S8:profile.S8.sourcesUsed']));
     expect(failed).not.toContain('S1:profile.S1.title');
+    if (profile.profileId === 'enhanced-due-diligence') expect(failed).toContain('S5:profile.S5.humanHandoff');
+    if (profile.profileId === 'customer-risk-rating') expect(failed).toEqual(expect.arrayContaining(['S5:profile.S5.factorAssessments', 'S6:profile.S6.override']));
     expect((await db.taskInstance.findUniqueOrThrow({ where: { id } })).status).toBe('IN_PROGRESS');
   });
 
@@ -168,8 +170,8 @@ describe('Wave 1 template profiles: save, checks, agent view and Anvil export', 
     expect(res.json().task.sections.S2.evidence[0]).toEqual({ id: 'E1', type: profile.sections[1]!.fields[0]!.options![0]!.value, source: 'Source / issuer (synthetic sample)', date: '2026-05-01', content: 'Content (synthetic sample)' });
   });
 
-  it('a non-KYC profile task submits, is approved and exports its compiled contract to Anvil', async () => {
-    const profile = NON_KYC.find((p) => p.profileId === 'kyb-and-beneficial-ownership')!;
+  it.each(['kyb-and-beneficial-ownership', 'enhanced-due-diligence'])('%s: a profile task submits, is approved and exports its compiled contract to Anvil', async (profileId) => {
+    const profile = NON_KYC.find((p) => p.profileId === profileId)!;
     const { a, id, reviewer } = await authoringTask(profile.catalogWorkflowName);
     expect((await save(a, id, sampleProfileOutput(profile))).statusCode).toBe(200);
     const sub = await submit(a, id);
@@ -191,6 +193,8 @@ describe('Wave 1 template profiles: save, checks, agent view and Anvil export', 
     expect(env).toMatchObject({ schema_version: 'praxis.anvil.export.v1', source: { record_id: recordId, client_id: clientId } });
     expect(env.payload_sha256).toBe(createHash('sha256').update(env.payload_json).digest('hex'));
     expect(JSON.parse(env.payload_json)).toEqual(contract);
+    const s6 = profile.sections[5]!.fields.filter((f) => f.outputField);
+    for (const f of s6) expect(contract.rubric.reference_output[f.outputField!]).toBe(f.options![0]!.value);
   });
 
   it('a KYC workbench task submits, is approved and exports its compiled contract to Anvil', async () => {
@@ -225,7 +229,7 @@ describe('Wave 1 template profiles: save, checks, agent view and Anvil export', 
   });
 
   it('a legacy generic task still saves and submits as before', async () => {
-    for (const workflow of ['Adverse media review', 'KYB and beneficial ownership']) {
+    for (const workflow of ['Compliance monitoring', 'KYB and beneficial ownership', 'Enhanced due diligence']) {
       const { a, id } = await authoringTask(workflow);
       const legacy = { header: { title: `Legacy ${workflow}` }, body: `A synthetic ${workflow} case written in the generic editor, with evidence, steps and a decision.` };
       expect((await save(a, id, legacy)).statusCode).toBe(200);

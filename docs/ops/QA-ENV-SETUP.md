@@ -127,6 +127,8 @@ Synthetic test users for testing staffing, authoring and review at scale. QA (an
 - **How:** the real FLOW 2 journey over the public API (mock sign-in, mock identity, profile form, submit, the worker's
   suitability assessment on live Vertex, a SELECTED decision by a named seeded Reviewer, onboarding). Needs the worker
   running. Expect about 30–40 assessment calls on the first run and none on re-runs.
+- **Assessment model:** QA has no Claude quota, so set `SUITABILITY_MODEL=gemini:gemini-3.8-flash` on the job (and on
+  the worker, so testers' applications are assessed too). The job runs pending or failed assessments itself.
 - **Re-runs** resume from each SME's current state and create nothing twice. Exit code 3 means some SMEs are not ready
   yet (usually still awaiting the assessment): run it again later.
 

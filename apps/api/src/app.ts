@@ -28,7 +28,7 @@ import { jobDescriptionRoutes } from './routes/job-descriptions';
 import { GoogleIdTokenVerifier, MockGoogleVerifier, type GoogleVerifier } from './candidate/google';
 import { MockIdentityProvider, StripeIdentityProvider, type IdentityProvider } from './candidate/identity-provider';
 import { ClaudeVertexProfileAssistant, MockProfileAssistant, type ProfileAssistant } from './candidate/profile-assistant';
-import { ClaudeVertexSuitabilityEvaluator, MockSuitabilityEvaluator, type SuitabilityEvaluator } from './candidate/suitability';
+import { MockSuitabilityEvaluator, vertexSuitabilityEvaluator, type SuitabilityEvaluator } from './candidate/suitability';
 import { GcsStorage, stubScanner, type MalwareScanner, type ObjectStorage } from './candidate/storage';
 import { defaultAdapters, type Adapters } from './policy/extraction/service';
 import { policyRoutes } from './routes/policy';
@@ -162,7 +162,7 @@ export function defaultDrafter(config: Config): TaskDrafter {
 
 export function defaultEvaluator(config: Config): SuitabilityEvaluator {
   return config.assistantMode === 'vertex'
-    ? new ClaudeVertexSuitabilityEvaluator({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION })
+    ? vertexSuitabilityEvaluator(config.SUITABILITY_MODEL, { projectId: config.VERTEX_PROJECT_ID, location: config.VERTEX_LOCATION })
     : new MockSuitabilityEvaluator();
 }
 

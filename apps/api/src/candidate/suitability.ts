@@ -1,4 +1,5 @@
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
+import { GeminiVertexContentDrafter } from '../meta-compiler/drafter';
 import { AssessmentOutput, CONTRIBUTION_ROLES, CRITERION_RESULTS, fieldLabel, ProfileData, type OpportunityCriteria } from '@praxis/shared';
 
 /**
@@ -90,22 +91,28 @@ const schemaFor = (criteriaIds: string[], itemIds: string[]) => ({
 
 const clean = (s: string) => s.replace(/<\/?(items|item|criteria|criterion|opportunity)>/gi, '');
 
+const userPrompt = (input: SuitabilityInput) =>
+  [
+    `<opportunity>${clean(`${input.opportunity.title} — ${input.opportunity.domain} / ${input.opportunity.specialty}`)}</opportunity>`,
+    `<criteria>\n${input.criteria.map((c) => `${c.id} [${c.kind}]: ${clean(c.text)}${c.evidence ? ` (evidence expected: ${clean(c.evidence)})` : ''}${c.equivalence ? ` (equivalent: ${clean(c.equivalence)})` : ''}`).join('\n')}\n</criteria>`,
+    `<items>\n${input.items.map((i) => `${i.id} | ${clean(i.label)}: ${clean(i.value)}`).join('\n')}\n</items>`,
+  ].join('\n\n');
+
 export class ClaudeVertexSuitabilityEvaluator implements SuitabilityEvaluator {
   static readonly MODEL = 'claude-opus-5';
   static readonly FALLBACK_MODEL = 'claude-opus-4-8';
-  readonly modelVersion = ClaudeVertexSuitabilityEvaluator.MODEL;
+  readonly modelVersion: string;
   private readonly client: Pick<AnthropicVertex, 'messages'>;
+  private readonly model: string;
 
-  constructor(opts: { projectId: string; region: string; client?: Pick<AnthropicVertex, 'messages'> }) {
+  constructor(opts: { projectId: string; region: string; client?: Pick<AnthropicVertex, 'messages'>; model?: string }) {
     this.client = opts.client ?? new AnthropicVertex({ projectId: opts.projectId, region: opts.region });
+    this.model = opts.model ?? ClaudeVertexSuitabilityEvaluator.MODEL;
+    this.modelVersion = this.model;
   }
 
   async evaluate(input: SuitabilityInput): Promise<AssessmentOutput> {
-    const user = [
-      `<opportunity>${clean(`${input.opportunity.title} — ${input.opportunity.domain} / ${input.opportunity.specialty}`)}</opportunity>`,
-      `<criteria>\n${input.criteria.map((c) => `${c.id} [${c.kind}]: ${clean(c.text)}${c.evidence ? ` (evidence expected: ${clean(c.evidence)})` : ''}${c.equivalence ? ` (equivalent: ${clean(c.equivalence)})` : ''}`).join('\n')}\n</criteria>`,
-      `<items>\n${input.items.map((i) => `${i.id} | ${clean(i.label)}: ${clean(i.value)}`).join('\n')}\n</items>`,
-    ].join('\n\n');
+    const user = userPrompt(input);
     const request = (model: string) =>
       this.client.messages.create({
         model,
@@ -117,8 +124,8 @@ export class ClaudeVertexSuitabilityEvaluator implements SuitabilityEvaluator {
       });
     let response;
     try {
-      response = await request(ClaudeVertexSuitabilityEvaluator.MODEL);
-      if (response.stop_reason === 'refusal') response = await request(ClaudeVertexSuitabilityEvaluator.FALLBACK_MODEL);
+      response = await request(this.model);
+      if (response.stop_reason === 'refusal' && this.model !== ClaudeVertexSuitabilityEvaluator.FALLBACK_MODEL) response = await request(ClaudeVertexSuitabilityEvaluator.FALLBACK_MODEL);
     } catch (err) {
       throw new EvaluatorUnavailableError(err instanceof Error ? err.message : 'Model call failed');
     }
@@ -129,6 +136,52 @@ export class ClaudeVertexSuitabilityEvaluator implements SuitabilityEvaluator {
     if (!parsed.success) throw new EvaluatorUnavailableError('Output failed validation');
     return parsed.data;
   }
+}
+
+// ───────────────────────── Gemini on Vertex ─────────────────────────
+
+/**
+ * Gemini on Vertex (SUITABILITY_MODEL=gemini:<model>), for environments without Claude quota (QA, 11 Nov 2026). Same
+ * system prompt and items; the output schema travels in the prompt (JSON mode) and the result goes through the same
+ * validation: AssessmentOutput here, then citations and criteria in runAssessment. Still advisory only.
+ */
+export class GeminiVertexSuitabilityEvaluator implements SuitabilityEvaluator {
+  readonly modelVersion: string;
+  private readonly drafter: Pick<GeminiVertexContentDrafter, 'complete'>;
+
+  constructor(model: string, opts: ConstructorParameters<typeof GeminiVertexContentDrafter>[1] & { drafter?: Pick<GeminiVertexContentDrafter, 'complete'> }) {
+    this.modelVersion = `gemini:${model}`;
+    this.drafter = opts.drafter ?? new GeminiVertexContentDrafter(model, opts);
+  }
+
+  async evaluate(input: SuitabilityInput): Promise<AssessmentOutput> {
+    const schema = schemaFor(input.criteria.map((c) => c.id), input.items.map((i) => i.id));
+    const system = `${SYSTEM}\n\nAnswer with one JSON object only, matching this JSON schema exactly:\n${JSON.stringify(schema)}`;
+    let text: string;
+    try {
+      // Thinking counts against maxOutputTokens: room for thinking plus the JSON answer.
+      text = (await this.drafter.complete({ purpose: 'propose_field', system, user: userPrompt(input), maxOutputTokens: 24000 })).text;
+    } catch (err) {
+      throw new EvaluatorUnavailableError(err instanceof Error ? err.message : 'Model call failed');
+    }
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw new EvaluatorUnavailableError('No structured output');
+    }
+    const parsed = AssessmentOutput.safeParse(json);
+    if (!parsed.success) throw new EvaluatorUnavailableError('Output failed validation');
+    return parsed.data;
+  }
+}
+
+/** SUITABILITY_MODEL: `gemini:<model>` uses Gemini on Vertex; anything else (optionally `claude:`) uses Claude. */
+export function vertexSuitabilityEvaluator(setting: string, opts: { projectId: string; location: string }): SuitabilityEvaluator {
+  const [prefix, ...rest] = setting.split(':');
+  if (rest.length && prefix === 'gemini') return new GeminiVertexSuitabilityEvaluator(rest.join(':'), { projectId: opts.projectId, location: opts.location });
+  const model = rest.length && prefix === 'claude' ? rest.join(':') : setting;
+  return new ClaudeVertexSuitabilityEvaluator({ projectId: opts.projectId, region: opts.location, model });
 }
 
 /**

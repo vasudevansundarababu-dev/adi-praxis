@@ -559,3 +559,9 @@ no field for several Anvil concepts, so the emitter maps conservatively. Details
   contribution roles); blanks default to the template's domain, GB and IN, and Task author; language English; no expiry.
 - **(chosen by Claude)** **Login rate limit.** QA allows 10 sign-ins a minute per route; the job waits out a 429 rather
   than failing, so a first run takes a few minutes.
+- **(owner, 11 Nov 2026)** **Gemini option for the suitability assessment.** In QA every assessment failed: the
+  evaluator was Claude Opus only and QA's Claude quota is 0. New setting `SUITABILITY_MODEL` (default `claude-opus-5`,
+  unchanged); `gemini:<model>` uses Gemini on Vertex with the same prompt, the schema in the prompt (JSON mode) and the
+  same validation. Still advisory: a Reviewer decides. *(chosen by Claude)* The `qa-users` job also runs pending or
+  failed assessments itself with its environment's model (the worker's own `runAssessment`, so the same claim and
+  SYSTEM audit), five at a time, at most 3 tries each; an assessment that still fails leaves the SME undecided.

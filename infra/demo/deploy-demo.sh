@@ -225,6 +225,18 @@ gcloud run jobs deploy praxis-catalog-v2 --image="$REPO/api:$TAG" "${COMMON[@]}"
   --args=src/jobs/run.ts,catalog-v2,--dry-run --set-secrets="$SECRETS"
 fi
 
+# QA seed users (30 staffing-ready SMEs, 10 Reviewers). Deployed as a dry run, only when the job exists and the owner has
+# put a value in the secret qa-seed-reviewer-password. Never run here; see docs/ops/QA-ENV-SETUP.md section 6.
+# Plan:  gcloud run jobs execute praxis-qa-users --region <region> --wait
+# Apply: gcloud run jobs execute praxis-qa-users --region <region> --wait --args=src/jobs/run.ts,qa-users
+if [ -f "$ROOT/apps/api/src/jobs/qa-users.ts" ] &&
+  [ -n "$(gcloud secrets versions list qa-seed-reviewer-password --filter=state=ENABLED --limit=1 --format='value(name)' 2>/dev/null)" ]; then
+say "QA seed users job (deployed only, as a dry run)"
+gcloud run jobs deploy praxis-qa-users --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=3600s \
+  --args=src/jobs/run.ts,qa-users,--dry-run \
+  --set-secrets="$SECRETS,DEMO_ADMIN_PASSWORD=demo-admin-password:latest,DEMO_PM_PASSWORD=demo-pm-password:latest,QA_SEED_REVIEWER_PASSWORD=qa-seed-reviewer-password:latest"
+fi
+
 if [ "${SKIP_DEMO_SETUP:-0}" != "1" ]; then
 say "Demo data (users and a published KYC project)"
 gcloud run jobs deploy praxis-demo-setup --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 \

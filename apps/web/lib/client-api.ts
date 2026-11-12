@@ -13,12 +13,13 @@ export interface MutationResult<T> {
  * State-changing API call from the browser. Every call carries a fresh Idempotency-Key, so a double-click or
  * network retry of the same call is applied once (the API replays the first response).
  */
-export async function mutate<T>(method: 'POST' | 'PATCH' | 'PUT', path: string, body?: unknown): Promise<MutationResult<T>> {
+export async function mutate<T>(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body?: unknown): Promise<MutationResult<T>> {
   try {
     const res = await fetch(`/api/v1${path}`, {
       method,
-      headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
-      body: JSON.stringify(body ?? {}),
+      // A DELETE carries no body.
+      headers: method === 'DELETE' ? { 'idempotency-key': crypto.randomUUID() } : { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+      ...(method === 'DELETE' ? {} : { body: JSON.stringify(body ?? {}) }),
     });
     const json = (await res.json().catch(() => null)) as (T & { message?: string; details?: { problems?: string[] } }) | null;
     return {

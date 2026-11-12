@@ -365,6 +365,48 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
     },
   );
 
+  /**
+   * Issue #61 (owner, 12 Nov 2026): a DRAFT version can be deleted; a published or retired one never can (retire it).
+   * A draft that anything has already used (a project, generation run, deployment, authored task, approved record,
+   * qualification or revocation) is kept, so no history loses its template. An Anvil proposal that created the draft
+   * stays on record; its readback then shows the template as gone.
+   */
+  app.delete(
+    '/templates/:id',
+    { config: { access: ADMIN }, schema: { tags: ['templates'], params: IdParams, response: { 200: z.object({ deleted: z.literal(true), id: z.string().uuid(), version: z.number().int() }) } } },
+    async (req, reply) => {
+      await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+        const t = await findTemplate(tx, req.params.id, actor.clientId);
+        if (!t) throw notFound('Template not found');
+        if (t.status !== 'DRAFT') {
+          throw new AppError(409, 'TEMPLATE_NOT_DRAFT', `Only draft versions can be deleted. This version is ${t.status.toLowerCase()}; retire it instead.`);
+        }
+        await lockLineage(tx, t.lineageId);
+        const where = { templateId: t.id };
+        const [projects, runs, deployments, authored, approved, qualifications, revocations, requirements] = await Promise.all([
+          tx.project.count({ where }),
+          tx.compilerGenerationRun.count({ where }),
+          tx.studioDeployment.count({ where }),
+          tx.smeAuthoredTask.count({ where }),
+          tx.approvedTaskRecord.count({ where }),
+          tx.templateQualification.count({ where }),
+          tx.anvilRevocationEvent.count({ where }),
+          tx.projectPolicyRequirement.count({ where }),
+        ]);
+        const uses = Object.entries({ projects, 'generation runs': runs, deployments, 'authored tasks': authored, 'approved records': approved, qualifications, revocations, 'project policy requirements': requirements }).filter(([, n]) => n > 0);
+        if (uses.length) {
+          throw new AppError(409, 'TEMPLATE_IN_USE', `This draft is already used (${uses.map(([k, n]) => `${n} ${k}`).join(', ')}), so it is kept.`);
+        }
+        await tx.templatePolicyProfile.deleteMany({ where });
+        const { count } = await tx.template.deleteMany({ where: { id: t.id, status: 'DRAFT' } });
+        if (count === 0) throw new AppError(409, 'TEMPLATE_NOT_DRAFT', 'This draft was published meanwhile.');
+        await audit({ entityType: 'Template', entityId: t.id, action: 'template.draft_deleted', before: { ...toTemplateDto(t) }, after: null });
+        return { status: 200, body: { deleted: true as const, id: t.id, version: t.version } };
+      });
+      return reply;
+    },
+  );
+
   app.post(
     '/templates/:id/retire',
     { config: { access: ADMIN }, schema: { tags: ['templates'], params: IdParams, response: { 200: TemplateDto } } },

@@ -13,12 +13,24 @@ export interface FormOption {
   isDefault: boolean;
 }
 
-/** Admin lifecycle actions: publish a draft, start a new version, retire a published workflow. */
+/** Admin lifecycle actions: publish or delete a draft, start a new version, retire a published workflow. */
 export function TemplateActions({ template: t, hasDraft, forms: fromApi }: { template: TemplateDto; hasDraft: boolean; forms?: FormOption[] }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [confirmRetire, setConfirmRetire] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Issue #61: only a draft version can be deleted; published versions are retired instead.
+  async function deleteDraft() {
+    setPending(true);
+    setError(null);
+    const res = await mutate<{ deleted: true }>('DELETE', `/templates/${t.id}`);
+    setPending(false);
+    if (!res.ok) return setError(res.error);
+    router.push('/templates');
+    router.refresh();
+  }
 
   async function run(path: string, then?: (data: TemplateDto) => void) {
     setPending(true);
@@ -89,6 +101,21 @@ export function TemplateActions({ template: t, hasDraft, forms: fromApi }: { tem
             Publish
           </button>
         )}
+        {t.status === 'DRAFT' &&
+          (confirmDelete ? (
+            <>
+              <button type="button" disabled={pending} onClick={deleteDraft} className={`${btn} border-error text-error`}>
+                Confirm delete draft
+              </button>
+              <button type="button" onClick={() => setConfirmDelete(false)} className={btn}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button type="button" disabled={pending} onClick={() => setConfirmDelete(true)} className={btn}>
+              Delete draft
+            </button>
+          ))}
         {t.status !== 'DRAFT' && !hasDraft && (
           <button
             type="button"
@@ -117,6 +144,11 @@ export function TemplateActions({ template: t, hasDraft, forms: fromApi }: { tem
       </div>
       {t.status === 'DRAFT' && (
         <p className="mt-2 text-xs text-fg-muted">Save your changes before publishing. Published versions can’t be edited.</p>
+      )}
+      {confirmDelete && (
+        <p className="mt-2 text-sm text-fg-muted">
+          Deleting removes this draft version for good. Published versions are not affected. A draft already used by a project or task can’t be deleted.
+        </p>
       )}
       {confirmRetire && (
         <p className="mt-2 text-sm text-fg-muted">

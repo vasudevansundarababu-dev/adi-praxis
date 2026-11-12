@@ -44,6 +44,9 @@ describe('M1 template catalog', () => {
   function patch(cookie: string, url: string, payload: unknown) {
     return app.inject({ method: 'PATCH', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload: payload as object });
   }
+  function del(cookie: string, url: string) {
+    return app.inject({ method: 'DELETE', url: `/api/v1${url}`, headers: { cookie, ...idem() } });
+  }
   function get(cookie: string, url: string) {
     return app.inject({ method: 'GET', url: `/api/v1${url}`, headers: { cookie } });
   }
@@ -316,6 +319,48 @@ describe('M1 template catalog', () => {
       expect(v2).toMatchObject({ version: 2, status: 'DRAFT' });
       await post(admin, `/templates/${v2.id}/publish`);
       expect((await pmList()).map((t) => t.id)).toEqual([v2.id]);
+    });
+  });
+
+  describe('delete a draft version (issue #61)', () => {
+    it('an Admin deletes a draft; it is gone and the deletion is audited', async () => {
+      const t = await createTemplate();
+      const res = await del(admin, `/templates/${t.id}`);
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json()).toMatchObject({ deleted: true, id: t.id, version: 1 });
+      expect(await db.template.count({ where: { id: t.id } })).toBe(0);
+      expect(await db.auditEvent.count({ where: { action: 'template.draft_deleted', entityId: t.id } })).toBe(1);
+    });
+
+    it('a published or retired version cannot be deleted', async () => {
+      const pub = await publishedTemplate();
+      expect((await del(admin, `/templates/${pub.id}`)).json().error).toBe('TEMPLATE_NOT_DRAFT');
+      await post(admin, `/templates/${pub.id}/retire`);
+      expect((await del(admin, `/templates/${pub.id}`)).json().error).toBe('TEMPLATE_NOT_DRAFT');
+      expect(await db.template.count({ where: { id: pub.id } })).toBe(1);
+    });
+
+    it('deleting a new draft version leaves the published version and lets a new draft start again', async () => {
+      const v1 = await publishedTemplate();
+      const v2 = (await post(admin, `/templates/${v1.id}/versions`)).json();
+      expect((await del(admin, `/templates/${v2.id}`)).statusCode).toBe(200);
+      expect((await get(admin, `/templates/${v1.id}`)).json().status).toBe('PUBLISHED');
+      const again = (await post(admin, `/templates/${v1.id}/versions`)).json();
+      expect(again).toMatchObject({ version: 2, status: 'DRAFT' });
+    });
+
+    it('a draft that is already used is kept', async () => {
+      const t = await createTemplate();
+      await db.templateQualification.create({ data: { clientId: (await db.template.findUniqueOrThrow({ where: { id: t.id } })).clientId, templateId: t.id, templateVersionHash: 'a'.repeat(64), status: 'QUALIFIED', receiptId: 'r1', receipt: {}, apiClientId: randomUUID() } });
+      const res = await del(admin, `/templates/${t.id}`);
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe('TEMPLATE_IN_USE');
+      expect(await db.template.count({ where: { id: t.id } })).toBe(1);
+    });
+
+    it('PMs and Reviewers cannot delete drafts', async () => {
+      const t = await createTemplate();
+      for (const cookie of [pm, reviewer]) expect((await del(cookie, `/templates/${t.id}`)).statusCode).toBe(403);
     });
   });
 

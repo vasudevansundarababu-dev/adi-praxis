@@ -889,3 +889,22 @@ what does not depend on Anvil's open questions.
 - **Waiting on the owner:**
   - an Anvil export token and a Praxis `ANVIL` key, each in its secret store;
   - QA deploy approval.
+
+## Anvil's eight answers: owner decisions (11 Nov 2026)
+
+Anvil answered the eight contract questions (`Anvil-Praxis-eight-answers-v1.md`). Praxis feedback:
+`docs/anvil/ANVIL-EIGHT-ANSWERS-PRAXIS-FEEDBACK.md`. The owner accepted these four recommendations:
+
+- **(owner)** **Anvil key lifetime.** A Praxis `ANVIL` key never outlives the pilot bound
+  (`ANVIL_CREDENTIAL_NOT_AFTER`, today 2026-12-11T05:48:04Z, the same bound as Anvil's testing window). It also stops
+  working on every call once the Admin who issued it is no longer an active Admin. Within the bound the default stays
+  30 days. No bound configured means no Anvil key can be issued.
+- **(owner)** **Weights on Anvil-proposed templates.** Every criterion weight is above 0, has at most two decimals, and
+  the weights total exactly 100 (checked in basis points). Other templates keep their rules.
+- **(owner)** **5/2/0 descriptions on Anvil-proposed templates.** Every criterion states full credit (pass condition),
+  partial credit and fail. The new optional `failCondition` field is required only there; current KYC forms are
+  unchanged.
+- **(owner)** **One Anvil project per environment** receives all Praxis exports. `ANVIL_EXPORT_BASE_URL` points at
+  that project's generic path, `…/api/v1/projects/{project}/dataset-exports/generic`.
+- **(chosen by Claude)** Revocation keeps authoring and flags affected projects, as Anvil answered (Q5) and the owner
+  proposed. Anvil generic support is detected by the exact contract ID, never a similar name.

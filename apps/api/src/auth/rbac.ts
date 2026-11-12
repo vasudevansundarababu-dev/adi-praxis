@@ -31,7 +31,7 @@ async function resolveApiClient(db: Db, header: string | undefined): Promise<Api
   const m = header?.match(/^Bearer\s+(\S{20,200})$/);
   if (!m) return null;
   const c = await db.apiClient.findUnique({ where: { keyHash: sha256(m[1]!) } });
-  if (!c || c.revokedAt) return null;
+  if (!c || c.revokedAt || (c.expiresAt && c.expiresAt <= new Date())) return null;
   return { type: 'SERVICE', apiClientId: c.id, clientId: c.clientId, kind: c.kind };
 }
 

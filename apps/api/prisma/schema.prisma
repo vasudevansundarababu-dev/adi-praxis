@@ -233,6 +233,8 @@ enum RLReviewRequestStatus {
 enum ApiClientKind {
   CLIENT_API
   RL_GYM
+  /// Anvil calling the Praxis template API (Praxis-Anvil contract, 12 Nov 2026). Must expire.
+  ANVIL
 }
 
 // FLOW2 section 10: independent candidate state dimensions.
@@ -413,6 +415,8 @@ model ApiClient {
   kind      ApiClientKind
   keyHash   String        @unique @map("key_hash")
   revokedAt DateTime?     @map("revoked_at")
+  /// Keys stop working after this time (required for ANVIL keys; optional for the others).
+  expiresAt DateTime?     @map("expires_at")
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt @map("updated_at")
 
@@ -466,6 +470,9 @@ model Template {
   similarityThreshold   Decimal        @default(0.90) @map("similarity_threshold") @db.Decimal(4, 3)
   /// Authoring form of this version (a registered alternate profile); null = the workflow default (owner, 11 Nov 2026).
   profileId             String?        @map("profile_id")
+  /// Anvil-owned parts of a template proposed by Anvil: requirement reference, execution part, skills. Never edited
+  /// by Praxis (Praxis-Anvil contract, 12 Nov 2026).
+  anvilSpec             Json?          @map("anvil_spec")
   publishedAt           DateTime?      @map("published_at")
   retiredAt             DateTime?      @map("retired_at")
   /// Harbor blueprint (packages/shared/src/blueprint). Null for templates outside the Meta-Compiler catalog.
@@ -3294,4 +3301,38 @@ model UploadedProfile {
   createdAt    DateTime @default(now()) @map("created_at")
 
   @@index([clientId, workflowName])
+}
+
+/// Template proposals from Anvil (Praxis-Anvil contract, 12 Nov 2026). Append-only. Anvil starts every new template or
+/// template change; Praxis stores the proposal and creates a DRAFT template version for a Praxis Admin to publish.
+model TemplateProposal {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  apiClientId   String   @map("api_client_id") @db.Uuid
+  requirementId String   @map("requirement_id")
+  profileId     String   @map("profile_id")
+  /// The draft template version created from the proposal.
+  templateId    String   @map("template_id") @db.Uuid
+  spec          Json
+  specSha256    String   @map("spec_sha256")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([clientId, createdAt])
+}
+
+/// Anvil's qualification receipts per template version hash (Praxis-Anvil contract). Append-only: a revocation is a
+/// new row. The latest row for a version hash is its current state.
+model TemplateQualification {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId            String   @map("client_id") @db.Uuid
+  templateId          String   @map("template_id") @db.Uuid
+  templateVersionHash String   @map("template_version_hash")
+  /// QUALIFIED or REVOKED.
+  status              String
+  receiptId           String   @map("receipt_id")
+  receipt             Json
+  apiClientId         String   @map("api_client_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([templateId, createdAt])
 }

@@ -250,18 +250,28 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
   // ── API clients (Admin): keys are shown once and stored as hashes ──
   app.get('/api-clients', { config: { access: ['ADMIN'] }, schema: { tags: ['admin'] } }, async (req) => {
     const rows = await db.apiClient.findMany({ where: { clientId: req.actor!.clientId }, orderBy: { createdAt: 'desc' } });
-    return { items: rows.map((c) => ({ id: c.id, name: c.name, kind: c.kind, createdAt: c.createdAt.toISOString(), revokedAt: c.revokedAt?.toISOString() ?? null })) };
+    return { items: rows.map((c) => ({ id: c.id, name: c.name, kind: c.kind, createdAt: c.createdAt.toISOString(), revokedAt: c.revokedAt?.toISOString() ?? null, expiresAt: c.expiresAt?.toISOString() ?? null })) };
   });
   app.post(
     '/api-clients',
-    { config: { access: ['ADMIN'] }, schema: { tags: ['admin'], body: z.object({ name: z.string().trim().min(1).max(100), kind: z.enum(['CLIENT_API', 'RL_GYM']) }) } },
+    {
+      config: { access: ['ADMIN'] },
+      schema: {
+        tags: ['admin'],
+        // Anvil keys (Praxis-Anvil contract, 12 Nov 2026) must expire: 1 hour to 90 days, default 30 days.
+        body: z.object({ name: z.string().trim().min(1).max(100), kind: z.enum(['CLIENT_API', 'RL_GYM', 'ANVIL']), expiresInHours: z.number().int().min(1).max(2160).optional() }),
+      },
+    },
     async (req, reply) => {
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const key = `pk_${newToken()}`;
-        const c = await tx.apiClient.create({ data: { clientId: actor.clientId, name: req.body.name, kind: req.body.kind, keyHash: sha256(key) } });
-        await audit({ entityType: 'ApiClient', entityId: c.id, action: 'api_client.created', after: { name: c.name, kind: c.kind } });
+        const hours = req.body.expiresInHours ?? (req.body.kind === 'ANVIL' ? 720 : undefined);
+        const expiresAt = hours ? new Date(Date.now() + hours * 3_600_000) : null;
+        const c = await tx.apiClient.create({ data: { clientId: actor.clientId, name: req.body.name, kind: req.body.kind, keyHash: sha256(key), expiresAt } });
+        await audit({ entityType: 'ApiClient', entityId: c.id, action: 'api_client.created', after: { name: c.name, kind: c.kind, expiresAt: expiresAt?.toISOString() ?? null } });
         // The key is returned once and never stored; a replay of this request does not return it again.
-        return { status: 201, body: { id: c.id, name: c.name, kind: c.kind, key }, replayBody: { id: c.id, name: c.name, kind: c.kind, key: null } };
+        const out = { id: c.id, name: c.name, kind: c.kind, expiresAt: expiresAt?.toISOString() ?? null };
+        return { status: 201, body: { ...out, key }, replayBody: { ...out, key: null } };
       });
       return reply;
     },

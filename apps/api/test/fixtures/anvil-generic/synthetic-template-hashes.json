@@ -1,0 +1,9 @@
+{
+  "template_sha256": "7fbf4b08f5c0668a2b6c621ece0b10b67f9b2d478047d5cdfdc850a67e59aa10",
+  "part_hashes": {
+    "authoring": "e1d3740fc2052f2009ae14b4c1b8f11b15e92a540bf08326315e5397eb062554",
+    "execution": "f5fd843deb12f7a97b8c0f568eccc6442a5cf0a93a354ae2b1c787e2f28961c8",
+    "skills": "87d0766558c9649e21e49f37e000b7d67cef0379e4a17a137a57207b4db525e7"
+  },
+  "status": "synthetic_not_published_or_qualified"
+}

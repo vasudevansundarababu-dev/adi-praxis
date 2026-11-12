@@ -1,0 +1,117 @@
+{
+  "schema_version": "anvil.capability-catalogue.v1",
+  "version": "1.0.0",
+  "environment_adapters": [
+    {
+      "id": "structured-decision-v1",
+      "version": "1",
+      "status": "software_qualifiable",
+      "network": "none",
+      "reset": "new_episode",
+      "isolation": "per_episode"
+    },
+    {
+      "id": "recorded-tools-v1",
+      "version": "1",
+      "status": "qualification_required",
+      "network": "none",
+      "reset": "new_episode",
+      "isolation": "per_episode"
+    },
+    {
+      "id": "golden-kyc-postgres-v1",
+      "version": "1",
+      "status": "frozen_golden_profile_only"
+    },
+    {
+      "id": "multi-agent-graph-v1",
+      "version": "1",
+      "status": "structural_only"
+    }
+  ],
+  "evaluator_kinds": [
+    {
+      "id": "output-reference-v1",
+      "version": "1",
+      "status": "software_qualifiable",
+      "evidence_source": "output"
+    },
+    {
+      "id": "run-evidence-v1",
+      "version": "1",
+      "status": "normalizer_qualification_required",
+      "evidence_source": "run_evidence"
+    },
+    {
+      "id": "trace-v1",
+      "version": "1",
+      "status": "normalizer_qualification_required",
+      "evidence_source": "trace"
+    },
+    {
+      "id": "business-table-v1",
+      "version": "1",
+      "status": "table_qualification_required",
+      "evidence_source": "business_table"
+    },
+    {
+      "id": "human-judge-v1",
+      "version": "1",
+      "status": "independent_human_assignment_required",
+      "evidence_source": "human"
+    }
+  ],
+  "graph": {
+    "schema": "praxis.workflow_graph.v1",
+    "status": "structural_only",
+    "node_types": [
+      "input",
+      "agent_step",
+      "decision",
+      "join",
+      "human_step",
+      "output",
+      "escalation"
+    ],
+    "maximum_nodes": 100,
+    "maximum_edges": 300
+  },
+  "json_schema": {
+    "dialect": "anvil-bounded-json-schema-v1",
+    "keywords": [
+      "additionalProperties",
+      "const",
+      "description",
+      "enum",
+      "items",
+      "maxItems",
+      "maxLength",
+      "maximum",
+      "minItems",
+      "minLength",
+      "minimum",
+      "properties",
+      "required",
+      "title",
+      "type"
+    ],
+    "remote_refs": false
+  },
+  "praxis_field_types": [
+    "criterion",
+    "date",
+    "evidence_record",
+    "graph_binding",
+    "long_text",
+    "multi_select",
+    "number",
+    "pick_list",
+    "policy_citation",
+    "repeated_array",
+    "text",
+    "tool_call"
+  ],
+  "run_admission": "separate_not_granted",
+  "paid_calls": false,
+  "sha256": "e4b1bcf83efd90334a212c6b0c48ecef0f9561fcf2e3491ed134e20c70203d44"
+}

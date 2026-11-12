@@ -1,0 +1,222 @@
+{
+  "schemaVersion": "praxis.anvil.template-spec.v1",
+  "anvil_template_key": "account-opening-v2",
+  "template_id": "94cd922a-5aae-4bab-82a3-bdf5b730c521",
+  "version": 2,
+  "requirement": {
+    "reference": "synthetic-contract-example-not-domain-qualified"
+  },
+  "authoring": {
+    "profile": {
+      "schemaVersion": "praxis.template_profile.v1",
+      "profileId": "account-opening-v2",
+      "version": 2,
+      "agentMode": "SINGLE",
+      "sections": [
+        {
+          "key": "S1",
+          "fields": [
+            {
+              "key": "title",
+              "type": "text",
+              "required": true
+            },
+            {
+              "key": "businessContext",
+              "type": "long_text",
+              "required": true
+            }
+          ]
+        },
+        {
+          "key": "S2",
+          "fields": [
+            {
+              "key": "evidence",
+              "type": "evidence_record",
+              "required": true
+            }
+          ]
+        },
+        {
+          "key": "S3",
+          "fields": [
+            {
+              "key": "environment",
+              "type": "pick_list",
+              "options": [
+                {
+                  "value": "none"
+                }
+              ],
+              "required": true
+            },
+            {
+              "key": "recordedResponses",
+              "type": "tool_call",
+              "visibility": "private_reference"
+            }
+          ]
+        },
+        {
+          "key": "S4",
+          "fields": [
+            {
+              "key": "policies",
+              "type": "policy_citation"
+            }
+          ]
+        },
+        {
+          "key": "S5",
+          "fields": [
+            {
+              "key": "steps",
+              "type": "repeated_array",
+              "itemFields": [
+                {
+                  "key": "id",
+                  "type": "text"
+                },
+                {
+                  "key": "instruction",
+                  "type": "long_text"
+                },
+                {
+                  "key": "expectedResult",
+                  "type": "long_text",
+                  "visibility": "private_reference"
+                }
+              ]
+            },
+            {
+              "key": "rationale",
+              "type": "long_text",
+              "visibility": "private_reference",
+              "required": true
+            }
+          ]
+        },
+        {
+          "key": "S6",
+          "fields": [
+            {
+              "key": "decisionFields",
+              "type": "repeated_array",
+              "itemFields": [
+                {
+                  "key": "name",
+                  "type": "text"
+                },
+                {
+                  "key": "referenceValue",
+                  "type": "text",
+                  "visibility": "private_reference"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "S7",
+          "fields": [
+            {
+              "key": "criteria",
+              "type": "criterion",
+              "visibility": "private_rubric",
+              "required": true
+            }
+          ]
+        },
+        {
+          "key": "S8",
+          "fields": [
+            {
+              "key": "sourcesUsed",
+              "type": "text",
+              "visibility": "private_reference"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "execution": {
+    "schema_version": "anvil.template-execution.v1",
+    "catalogue_version": "1.0.0",
+    "environment": {
+      "id": "structured-decision-v1",
+      "version": "1"
+    },
+    "tools": [],
+    "evaluators": [
+      {
+        "criterion_id": "C1",
+        "capability": {
+          "id": "output-reference-v1",
+          "version": "1"
+        },
+        "evidence_source": "output"
+      },
+      {
+        "criterion_id": "C2",
+        "capability": {
+          "id": "output-reference-v1",
+          "version": "1"
+        },
+        "evidence_source": "output"
+      }
+    ],
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "recommendation": {
+          "type": "string",
+          "enum": [
+            "request_information",
+            "specialist_review",
+            "ready_for_approval"
+          ]
+        }
+      },
+      "required": [
+        "recommendation"
+      ],
+      "additionalProperties": false
+    },
+    "conformance_output": {
+      "recommendation": "request_information"
+    },
+    "limits": {
+      "tool_calls": 0,
+      "wall_seconds": 900,
+      "output_bytes": 4096,
+      "transitions": 10
+    },
+    "graph_node_types": [],
+    "rules": [],
+    "network": "none",
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "paid_calls": false
+  },
+  "skills": {
+    "schema_version": "anvil.template-skills.v1",
+    "authoring": {
+      "mandatory": [
+        "Evidence-based synthetic task authoring"
+      ],
+      "languages": [
+        "en"
+      ]
+    },
+    "reviewing": {
+      "mandatory": [
+        "Independent rubric review"
+      ],
+      "languages": [
+        "en"
+      ]
+    }
+  }
+}

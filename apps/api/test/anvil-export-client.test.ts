@@ -70,8 +70,11 @@ describe('Anvil-gated validator', () => {
   it('generic support is the exact contract ID, never a similar name (Anvil Q3)', async () => {
     const similar = new AnvilGatedValidator(new AnvilExportClient(BASE, TOKEN, fake(200, { data: { contracts: [{ id: 'praxis.authored-task-export.v1-proposed' }, { id: 'praxis.authored-task-export.v10' }] } })));
     expect((await similar.validate([item]))[0]).toMatchObject({ status: 'not_validated', issues: [{ code: 'ANVIL_CONTRACT_UNAVAILABLE' }] });
-    const exact = new AnvilGatedValidator(new AnvilExportClient(BASE, TOKEN, fake(200, { data: { contracts: [{ id: 'praxis.authored-task-export.v1', status: 'enabled' }] } })));
-    expect((await exact.validate([item]))[0]).toMatchObject({ status: 'not_validated', issues: [{ code: 'ANVIL_PACKAGE_FORMAT_PENDING' }] });
+    // Four confirmations, point 3: the exact ID in data.contracts AND data.enabled true; listed but off is not support.
+    const off = new AnvilGatedValidator(new AnvilExportClient(BASE, TOKEN, fake(200, { data: { contracts: ['praxis.authored-task-export.v1'], contract: 'praxis.authored-task-export.v1', enabled: false } })));
+    expect((await off.validate([item]))[0]).toMatchObject({ status: 'not_validated', issues: [{ code: 'ANVIL_CONTRACT_DISABLED' }] });
+    const elsewhere = new AnvilGatedValidator(new AnvilExportClient(BASE, TOKEN, fake(200, { data: { contract: 'praxis.authored-task-export.v1', enabled: true, notes: ['praxis.authored-task-export.v1'] } })));
+    expect((await elsewhere.validate([item]))[0]).toMatchObject({ status: 'not_validated', issues: [{ code: 'ANVIL_CONTRACT_UNAVAILABLE' }] });
   });
 
   it('an authentication failure is reported as such, not as a task problem', async () => {

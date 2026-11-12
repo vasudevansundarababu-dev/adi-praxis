@@ -1,12 +1,20 @@
 'use client';
 
-import { profilesForWorkflow, type TemplateDto } from '@praxis/shared';
+import { profileForWorkflow, profilesForWorkflow, type TemplateDto } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
 
+/** An authoring form a template version may choose (built-in or uploaded golden task pack), from the API. */
+export interface FormOption {
+  profileId: string;
+  name: string;
+  source: 'builtin' | 'uploaded';
+  isDefault: boolean;
+}
+
 /** Admin lifecycle actions: publish a draft, start a new version, retire a published workflow. */
-export function TemplateActions({ template: t, hasDraft }: { template: TemplateDto; hasDraft: boolean }) {
+export function TemplateActions({ template: t, hasDraft, forms: fromApi }: { template: TemplateDto; hasDraft: boolean; forms?: FormOption[] }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -24,14 +32,19 @@ export function TemplateActions({ template: t, hasDraft }: { template: TemplateD
 
   const btn = 'btn btn-secondary disabled:opacity-60';
   // Authoring form of this version (owner, 11 Nov 2026): a workflow may offer more than one, e.g. KYC v2 account opening.
-  const forms = profilesForWorkflow(t.workflowName);
+  // The API lists uploaded forms too; the built-in registry is the fallback. The workflow default comes first.
+  const builtinDefault = profileForWorkflow(t.workflowName);
+  const forms: FormOption[] = fromApi ?? profilesForWorkflow(t.workflowName).map((p) => ({ profileId: p.profileId, name: p.handoverName ?? p.catalogWorkflowName, source: 'builtin' as const, isDefault: builtinDefault.status === 'ok' && builtinDefault.profile.profileId === p.profileId }));
+  const fallback = forms.find((f) => f.isDefault);
+  const alternates = forms.filter((f) => !f.isDefault);
   const formLabel = (id: string | null) => {
-    const p = id ? forms.find((f) => f.profileId === id) : forms[0];
-    return p ? (p.handoverName ?? p.catalogWorkflowName) + (id ? '' : ' (default)') : id ? id : 'Default form';
+    if (!id) return fallback ? `${fallback.name} (default)` : 'Default form';
+    const p = forms.find((f) => f.profileId === id);
+    return p ? p.name + (p.source === 'uploaded' ? ' (uploaded)' : '') : id;
   };
   return (
     <div className="mt-4">
-      {forms.length > 1 && (
+      {alternates.length > 0 && (
         <div className="mb-3 text-sm">
           {t.status === 'DRAFT' ? (
             <label className="flex flex-wrap items-center gap-2">
@@ -49,9 +62,10 @@ export function TemplateActions({ template: t, hasDraft }: { template: TemplateD
                   else router.refresh();
                 }}
               >
-                {forms.map((f, i) => (
-                  <option key={f.profileId} value={i === 0 ? '' : f.profileId}>
-                    {formLabel(i === 0 ? null : f.profileId)}
+                <option value="">{formLabel(null)}</option>
+                {alternates.map((f) => (
+                  <option key={f.profileId} value={f.profileId}>
+                    {formLabel(f.profileId)}
                   </option>
                 ))}
               </select>

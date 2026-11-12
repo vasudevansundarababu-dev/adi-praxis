@@ -6,7 +6,7 @@ import { BlueprintSummary } from '@/components/templates/compiler/blueprint-summ
 import { MetaCompiler } from '@/components/templates/compiler/meta-compiler';
 import { McHeader } from '@/components/templates/mc-header';
 import { StatusBadge } from '@/components/templates/status-badge';
-import { TemplateActions } from '@/components/templates/template-actions';
+import { TemplateActions, type FormOption } from '@/components/templates/template-actions';
 import { apiGet, getCurrentUser } from '@/lib/api';
 import { mcServer } from '@/lib/mc/server';
 
@@ -49,11 +49,12 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
     );
   }
 
-  const [versions, presets, directory, jds] = await Promise.all([
+  const [versions, presets, directory, jds, forms] = await Promise.all([
     mcServer.versions(id).then((r) => r.data?.items ?? []),
     mcServer.presets(t.domainId).then((r) => r.data?.items ?? []),
     mcServer.directory().then((r) => r.data),
     apiGet<{ items: JobDescriptionDto[] }>('/job-descriptions').then((r) => r.data?.items ?? []),
+    apiGet<{ items: FormOption[] }>(`/template-profiles?workflow=${encodeURIComponent(t.workflowName)}`).then((r) => r.data?.items),
   ]);
   const switcher = (directory?.domains ?? []).flatMap((d) => d.rows.map((r) => ({ id: r.templateId, label: `${d.domainName} // ${r.workflowName} (v${r.version})` })));
   if (!switcher.some((o) => o.id === t.id)) switcher.unshift({ id: t.id, label: `${t.domainName} // ${t.workflowName} (v${t.version})` });
@@ -64,7 +65,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
       <McHeader isAdmin active={{ workflowName: t.workflowName, version: t.version }} />
       {heading}
       {/* keyed on updatedAt so stale action errors clear after a save */}
-      <TemplateActions key={t.updatedAt} template={t} hasDraft={versions.some((v) => v.status === 'DRAFT')} />
+      <TemplateActions key={t.updatedAt} template={t} hasDraft={versions.some((v) => v.status === 'DRAFT')} forms={forms} />
       {versions.length > 1 && (
         <nav aria-label="Version history" className="mt-3 flex flex-wrap items-center gap-2 text-sm">
           <span className="text-fg-muted">Versions:</span>

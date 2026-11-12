@@ -792,3 +792,23 @@ Owner chose a **new KYC template version** (not a separate template, not a chang
   reference, not an agreed Praxis-to-Anvil export format. Execution, evaluation and reporting stay in Anvil.
 - **Open (owner):** the four other cell slots for the products (adult joint, individual, custodial) are authored by SMEs;
   only one worked case ships. The marketing multi-agent golden task will follow the same route when it arrives.
+
+## Golden task packs: upload a form without a code change (12 Nov 2026)
+
+Owner: "Marketing is taking time … I need an utility to upload it later, hopefully without any code changes." Guide:
+`docs/authoring/GOLDEN-PACK.md`.
+
+- **(chosen by Claude)** **Format.** A pack (`praxis.golden_pack.v1`) is the authoring form, which is already declarative
+  data (`praxis.template_profile.v1`), plus up to 20 worked cases. It may also carry the template for a new workflow,
+  because the console has no "new workflow" control.
+- **(chosen by Claude)** **Checking.** A pack is checked before anything is stored (`POST /template-profiles/check`):
+  - the form must register;
+  - it uses sections storage and no specialised editor;
+  - its ID must be unused;
+  - every example must pass the form's checks.
+- **(chosen by Claude)** **Storage.** `UploadedProfile` is append-only (database triggers); a form ID is never reused.
+  Upload, and any template it creates, are audited. Admin only; PMs can list forms.
+- **(chosen by Claude)** **New workflow.** A pack with `template` creates the workflow's template as a **draft** that
+  already uses the form. The Admin reviews and publishes it: nothing goes live from an upload alone.
+- **(chosen by Claude)** **Runtime.** Each API instance registers uploaded forms at start, after an upload and every
+  minute. The server sends the chosen form with each task, so the SME app and the console need no rebuild.

@@ -20,6 +20,13 @@ describe('template authoring form', () => {
     expect(text(markup)).toContain('Authoring form: KYC account opening (Golden Bank reference)');
   });
 
+  it('forms from the API include uploaded golden packs, also for a workflow with no built-in form', () => {
+    const markup = html(<TemplateActions template={template({ workflowName: 'Golden marketing campaign', status: 'DRAFT' })} hasDraft forms={[{ profileId: 'golden-marketing-v1', name: 'Golden marketing form', source: 'uploaded', isDefault: false }]} />);
+    expect(markup).toContain('value="golden-marketing-v1"');
+    expect(text(markup)).toContain('Golden marketing form (uploaded)');
+    expect(text(markup)).toContain('Default form');
+  });
+
   it('a workflow with one form shows no choice', () => {
     expect(text(html(<TemplateActions template={template({ status: 'DRAFT' })} hasDraft />))).not.toContain('Authoring form');
   });

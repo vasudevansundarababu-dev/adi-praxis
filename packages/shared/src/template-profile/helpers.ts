@@ -77,6 +77,8 @@ export function itemFieldsOf(field: ItemField): ItemField[] {
         { key: 'partialCredit', type: 'long_text', label: 'Partial credit', help: 'What incomplete but useful work earns.' },
         { key: 'critical', type: 'flag', label: 'Critical', help: 'Failing this criterion is a critical failure (separate from a zero-weight criterion).' },
         { key: 'evidenceRefs', type: 'multi_select', label: 'Evidence or rule links', help: 'Evidence, rule or step IDs this criterion checks.', allowCustom: true },
+        // Praxis-Anvil contract (12 Nov 2026): on a template Anvil proposed, the kind must be one the template allows.
+        { key: 'evaluatorKind', type: 'text', label: 'Evaluator kind', help: 'How Anvil grades this criterion (one of the kinds the template allows, e.g. run_evidence). Leave empty if the template has no Anvil spec.' },
         ...BINDING_FIELDS('The output.json field this criterion checks. Needed for executable export.'),
       ];
     default:

@@ -5,6 +5,7 @@ import { GOLDEN_KYC_EXAMPLE, KYC_ACCOUNT_OPENING_PROFILE, KYC_V2_TOOLS } from '@
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
+import { anvilSpecChecks } from '../src/tasks/submission';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
 /**
@@ -154,5 +155,15 @@ describe('Praxis template API for Anvil', () => {
     const again = await anvil('POST', '/proposals', spec({ workflow: first.pack.profile.catalogWorkflowName, withTemplate: false }));
     expect(again.statusCode).toBe(409);
     expect(again.json().error ?? again.json().code).toBeTruthy();
+  });
+
+  it('tasks on an Anvil-proposed template use only its evaluator kinds and described tools', () => {
+    const anvilSpec = { execution: { evaluatorKinds: ['run_evidence'], tools: [{ name: 'identity.check' }] } };
+    const good = { sections: { S7: { criteria: [{ id: 'C01', evaluatorKind: 'run_evidence' }] }, S3: { recordedResponses: [{ id: 'R1', tool: 'identity.check' }] } } };
+    expect(anvilSpecChecks(anvilSpec, good).every((c) => c.ok)).toBe(true);
+    const bad = { sections: { S7: { criteria: [{ id: 'C01' }, { id: 'C02', evaluatorKind: 'llm_judge' }] }, S3: { recordedResponses: [{ id: 'R1', tool: 'funds.transfer' }] } } };
+    const r = anvilSpecChecks(anvilSpec, bad);
+    expect(r.find((c) => c.id === 'anvil.evaluator-kinds')).toMatchObject({ ok: false, message: expect.stringContaining('C01, C02') });
+    expect(r.find((c) => c.id === 'anvil.tools')).toMatchObject({ ok: false, message: expect.stringContaining('R1 (funds.transfer)') });
   });
 });

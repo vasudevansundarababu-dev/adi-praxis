@@ -45,6 +45,7 @@ export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 
     checks.push({ id: 'conversation.policy_version', section: 'W06', ok: chat.policyDigest === (policy?.digest ?? 'none'), message: 'Reconcile conversation against current published project rules' });
   }
   if (task.taskType === 'AUTHORING' && template.profileId) checks.push(...(await boundRuleChecks(tx, project.clientId, task, output)));
+  if (task.taskType === 'AUTHORING' && project.template.anvilSpec) checks.push(...anvilSpecChecks(project.template.anvilSpec, output));
   const coverage: CoverageTags | null = task.taskType === 'AUTHORING' ? finalCoverage(slot, output) : null;
   return {
     project,
@@ -146,4 +147,24 @@ export async function boundRuleChecks(tx: Db | Tx, clientId: string, task: { id:
     return !r || (!!c.ruleId && key(c.ruleId) !== key(r.rule_key) && c.ruleId !== r.rule_id);
   });
   return [{ id: 'policy.bound-versions', section: 'S4', ok: bad.length === 0, message: bad.length ? `Cite published project rules by key and exact version: ${bad.map((c) => c.ruleId ?? c.ruleVersion ?? '?').join(', ')} ${bad.length === 1 ? 'is' : 'are'} not published for this project (or the key and version do not match)` : `Every cited rule is a published project rule version (${cited.length})` }];
+}
+
+/**
+ * Template versions Anvil proposed carry its execution part (Praxis-Anvil contract, 12 Nov 2026). A task must use only
+ * what that part declares: each rubric criterion names one of the allowed evaluator kinds, and each recorded tool call
+ * uses a tool Anvil described with its schemas.
+ */
+export function anvilSpecChecks(anvilSpec: unknown, output: Record<string, unknown>): TaskCheck[] {
+  const exec = (anvilSpec as { execution?: { evaluatorKinds?: string[]; tools?: { name: string }[] } }).execution ?? {};
+  const kinds = new Set(exec.evaluatorKinds ?? []);
+  const tools = new Set((exec.tools ?? []).map((t) => t.name));
+  const sections = (output.sections ?? {}) as Record<string, Record<string, unknown> | undefined>;
+  const criteria = (Array.isArray(sections.S7?.criteria) ? sections.S7!.criteria : []) as { id?: string; evaluatorKind?: string }[];
+  const badKinds = criteria.filter((c) => !c.evaluatorKind || !kinds.has(c.evaluatorKind));
+  const calls = (Array.isArray(sections.S3?.recordedResponses) ? sections.S3!.recordedResponses : []) as { id?: string; tool?: string }[];
+  const badTools = calls.filter((c) => !c.tool || !tools.has(c.tool));
+  return [
+    { id: 'anvil.evaluator-kinds', section: 'S7', ok: badKinds.length === 0, message: badKinds.length ? `Choose an evaluator kind the template allows (${[...kinds].join(', ')}) for criteria ${badKinds.map((c) => c.id ?? '?').join(', ')}` : 'Every criterion uses an evaluator kind the template allows' },
+    { id: 'anvil.tools', section: 'S3', ok: badTools.length === 0, message: badTools.length ? `Recorded calls must use tools Anvil described for this template: ${badTools.map((c) => `${c.id ?? '?'} (${c.tool ?? 'no tool'})`).join(', ')}` : 'Every recorded call uses a tool Anvil described' },
+  ];
 }

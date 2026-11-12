@@ -74,7 +74,9 @@ export function itemFieldsOf(field: ItemField): ItemField[] {
         { key: 'name', type: 'text', label: 'What is assessed', help: 'A short name for the criterion.', required: true },
         { key: 'weight', type: 'number', label: 'Weight', help: 'Contribution to the total score.', required: true, min: 0, max: 100 },
         { key: 'passCondition', type: 'long_text', label: 'Pass condition', help: 'Observable against the case evidence, tool calls or output.', required: true },
-        { key: 'partialCredit', type: 'long_text', label: 'Partial credit', help: 'What incomplete but useful work earns.' },
+        { key: 'partialCredit', type: 'long_text', label: 'Partial credit', help: 'What incomplete but useful work earns (scores 2 of 5).' },
+        // Owner, 11 Nov 2026 (Anvil Q4): required on templates Anvil proposed, so each criterion states 5, 2 and 0.
+        { key: 'failCondition', type: 'long_text', label: 'Fail', help: 'What scores 0. Required when the template was proposed by Anvil.' },
         { key: 'critical', type: 'flag', label: 'Critical', help: 'Failing this criterion is a critical failure (separate from a zero-weight criterion).' },
         { key: 'evidenceRefs', type: 'multi_select', label: 'Evidence or rule links', help: 'Evidence, rule or step IDs this criterion checks.', allowCustom: true },
         // Praxis-Anvil contract (12 Nov 2026): on a template Anvil proposed, the kind must be one the template allows.

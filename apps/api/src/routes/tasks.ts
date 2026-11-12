@@ -258,7 +258,7 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
       config: { access: ['ADMIN'] },
       schema: {
         tags: ['admin'],
-        // Anvil keys (Praxis-Anvil contract, 12 Nov 2026) must expire: 1 hour to 90 days, default 30 days.
+        // Anvil keys must expire: 1 hour to 90 days, default 30 days, and never after ANVIL_CREDENTIAL_NOT_AFTER.
         body: z.object({ name: z.string().trim().min(1).max(100), kind: z.enum(['CLIENT_API', 'RL_GYM', 'ANVIL']), expiresInHours: z.number().int().min(1).max(2160).optional() }),
       },
     },
@@ -266,8 +266,14 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const key = `pk_${newToken()}`;
         const hours = req.body.expiresInHours ?? (req.body.kind === 'ANVIL' ? 720 : undefined);
-        const expiresAt = hours ? new Date(Date.now() + hours * 3_600_000) : null;
-        const c = await tx.apiClient.create({ data: { clientId: actor.clientId, name: req.body.name, kind: req.body.kind, keyHash: sha256(key), expiresAt } });
+        let expiresAt = hours ? new Date(Date.now() + hours * 3_600_000) : null;
+        if (req.body.kind === 'ANVIL') {
+          // Owner, 11 Nov 2026 (Anvil Q7): never past the pilot bound.
+          const bound = config.ANVIL_CREDENTIAL_NOT_AFTER ? new Date(config.ANVIL_CREDENTIAL_NOT_AFTER) : null;
+          if (!bound || bound.getTime() <= Date.now() + 60_000) throw new AppError(409, 'ANVIL_CREDENTIAL_BOUND', 'Anvil keys cannot be issued: no pilot end is configured, or it has passed.');
+          if (expiresAt! > bound) expiresAt = bound;
+        }
+        const c = await tx.apiClient.create({ data: { clientId: actor.clientId, name: req.body.name, kind: req.body.kind, keyHash: sha256(key), expiresAt, issuedById: actor.userId } });
         await audit({ entityType: 'ApiClient', entityId: c.id, action: 'api_client.created', after: { name: c.name, kind: c.kind, expiresAt: expiresAt?.toISOString() ?? null } });
         // The key is returned once and never stored; a replay of this request does not return it again.
         const out = { id: c.id, name: c.name, kind: c.kind, expiresAt: expiresAt?.toISOString() ?? null };

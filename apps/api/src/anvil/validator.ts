@@ -60,8 +60,16 @@ export function validationItem(record: ApprovedTaskRecord, title: string, compil
   }
 }
 
-/** The generic Praxis export contract Anvil must advertise under /contracts (contract open question 1). */
-export const GENERIC_EXPORT_CONTRACTS = ['praxis.authored-task-export.v1', 'praxis.authored-task-export.v1-proposed'];
+/** The generic Praxis export contract Anvil advertises under /contracts (Anvil's answer Q1, 11 Nov 2026). */
+export const GENERIC_EXPORT_CONTRACTS = ['praxis.authored-task-export.v1'];
+
+/** Every string value in Anvil's /contracts reply. Support is an exact ID among them, never a similar name (Anvil Q3). */
+function advertisedIds(v: unknown, out = new Set<string>()): Set<string> {
+  if (typeof v === 'string') out.add(v);
+  else if (Array.isArray(v)) v.forEach((x) => advertisedIds(x, out));
+  else if (v && typeof v === 'object') Object.values(v).forEach((x) => advertisedIds(x, out));
+  return out;
+}
 
 /**
  * Connected to Anvil (ANVIL_EXPORT_BASE_URL set). Discovers Anvil's contracts first. Until Anvil advertises the generic
@@ -82,8 +90,8 @@ export class AnvilGatedValidator implements AnvilTaskValidator {
     if (c.kind !== 'business') {
       reason = { code: `ANVIL_${c.kind.toUpperCase()}`, message: `${c.message}${c.requestId ? ` (Anvil request ${c.requestId})` : ''}` };
     } else {
-      const advertised = JSON.stringify(c.data);
-      const generic = GENERIC_EXPORT_CONTRACTS.find((id) => advertised.includes(id));
+      const advertised = advertisedIds(c.data);
+      const generic = GENERIC_EXPORT_CONTRACTS.find((id) => advertised.has(id));
       reason = generic
         ? { code: 'ANVIL_PACKAGE_FORMAT_PENDING', message: `Anvil advertises ${generic}; Praxis sends packages once the package format is agreed (contract question 1).` }
         : { code: 'ANVIL_CONTRACT_UNAVAILABLE', message: `Anvil does not yet support generic Praxis task export (receiver_contract_unavailable)${c.requestId ? `; Anvil request ${c.requestId}` : ''}.` };

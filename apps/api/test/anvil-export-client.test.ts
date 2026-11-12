@@ -67,6 +67,13 @@ describe('Anvil-gated validator', () => {
     expect(r).toMatchObject({ status: 'not_validated', issues: [{ code: 'ANVIL_CONTRACT_UNAVAILABLE' }] });
   });
 
+  it('generic support is the exact contract ID, never a similar name (Anvil Q3)', async () => {
+    const similar = new AnvilGatedValidator(new AnvilExportClient(BASE, TOKEN, fake(200, { data: { contracts: [{ id: 'praxis.authored-task-export.v1-proposed' }, { id: 'praxis.authored-task-export.v10' }] } })));
+    expect((await similar.validate([item]))[0]).toMatchObject({ status: 'not_validated', issues: [{ code: 'ANVIL_CONTRACT_UNAVAILABLE' }] });
+    const exact = new AnvilGatedValidator(new AnvilExportClient(BASE, TOKEN, fake(200, { data: { contracts: [{ id: 'praxis.authored-task-export.v1', status: 'enabled' }] } })));
+    expect((await exact.validate([item]))[0]).toMatchObject({ status: 'not_validated', issues: [{ code: 'ANVIL_PACKAGE_FORMAT_PENDING' }] });
+  });
+
   it('an authentication failure is reported as such, not as a task problem', async () => {
     const v = new AnvilGatedValidator(new AnvilExportClient(BASE, TOKEN, fake(401, { error: { code: 'UNAUTHENTICATED', message: 'Expired export client.' } })));
     const [r] = await v.validate([item]);

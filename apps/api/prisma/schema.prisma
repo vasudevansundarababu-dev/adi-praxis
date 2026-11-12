@@ -417,6 +417,8 @@ model ApiClient {
   revokedAt DateTime?     @map("revoked_at")
   /// Keys stop working after this time (required for ANVIL keys; optional for the others).
   expiresAt DateTime?     @map("expires_at")
+  /// Admin who issued the key. An ANVIL key stops working once this user is no longer an active Admin (owner, 11 Nov 2026).
+  issuedById String?      @map("issued_by_id") @db.Uuid
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt @map("updated_at")
 

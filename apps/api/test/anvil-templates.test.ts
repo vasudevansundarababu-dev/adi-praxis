@@ -40,6 +40,9 @@ function spec(over: { workflow?: string; profileId?: string; withTemplate?: bool
   };
 }
 
+/** The pilot bound for these tests: 60 days ahead, so the 30-day default fits inside it. */
+const BOUND = new Date(Date.now() + 60 * 86_400_000);
+
 describe('Praxis template API for Anvil', () => {
   let app: FastifyInstance;
   let admin: string;
@@ -47,7 +50,7 @@ describe('Praxis template API for Anvil', () => {
   let anvilKey: string;
 
   beforeAll(async () => {
-    app = await buildApp({ config: testConfig(), db, pingRedis: async () => true, selectionGate: stubSelectionGate });
+    app = await buildApp({ config: testConfig({ ANVIL_CREDENTIAL_NOT_AFTER: BOUND.toISOString() }), db, pingRedis: async () => true, selectionGate: stubSelectionGate });
   });
   beforeEach(async () => {
     await resetDb();
@@ -78,6 +81,37 @@ describe('Praxis template API for Anvil', () => {
     expect((await anvil('GET', '/contracts')).statusCode).toBe(401);
     await db.apiClient.update({ where: { id: row.id }, data: { expiresAt: null } });
     expect((await app.inject({ method: 'POST', url: `/api/v1/api-clients/${row.id}/revoke`, headers: { cookie: admin, ...idem() } })).statusCode).toBe(200);
+    expect((await anvil('GET', '/contracts')).statusCode).toBe(401);
+  });
+
+  it('owner, 11 Nov (Anvil Q7): an ANVIL key never outlives the pilot bound and stops when its issuing Admin loses access', async () => {
+    const issue = (a: FastifyInstance, hours?: number) => a.inject({ method: 'POST', url: '/api/v1/api-clients', headers: { cookie: admin, ...idem() }, payload: { name: 'Anvil QA 2', kind: 'ANVIL', ...(hours ? { expiresInHours: hours } : {}) } });
+    // Asking for 90 days is cut to the bound.
+    const long = await issue(app, 2160);
+    expect(long.statusCode).toBe(201);
+    expect(new Date(long.json().expiresAt).getTime()).toBe(BOUND.getTime());
+    const row = await db.apiClient.findUniqueOrThrow({ where: { id: long.json().id } });
+    const issuer = await db.user.findUniqueOrThrow({ where: { email: 'admin@test.local' } });
+    expect(row.issuedById).toBe(issuer.id);
+    // No bound configured, or a bound already passed: no Anvil key is issued (other kinds still are).
+    for (const cfg of [{}, { ANVIL_CREDENTIAL_NOT_AFTER: new Date(Date.now() - 1000).toISOString() }] as Record<string, string>[]) {
+      const other = await buildApp({ config: testConfig(cfg), db, pingRedis: async () => true, selectionGate: stubSelectionGate });
+      const r = await issue(other);
+      expect(r.statusCode).toBe(409);
+      expect(r.json().error).toBe('ANVIL_CREDENTIAL_BOUND');
+      expect((await other.inject({ method: 'POST', url: '/api/v1/api-clients', headers: { cookie: admin, ...idem() }, payload: { name: 'RL', kind: 'RL_GYM' } })).statusCode).toBe(201);
+      await other.close();
+    }
+    // The issuing Admin loses the Admin role, then is disabled: the key is refused on every call; restored, it works.
+    expect((await anvil('GET', '/contracts')).statusCode).toBe(200);
+    await db.user.update({ where: { id: issuer.id }, data: { roles: ['PM'] } });
+    expect((await anvil('GET', '/contracts')).statusCode).toBe(401);
+    await db.user.update({ where: { id: issuer.id }, data: { roles: ['ADMIN'], status: 'DISABLED' } });
+    expect((await anvil('GET', '/contracts')).statusCode).toBe(401);
+    await db.user.update({ where: { id: issuer.id }, data: { status: 'ACTIVE' } });
+    expect((await anvil('GET', '/contracts')).statusCode).toBe(200);
+    // A key with no recorded issuer (issued before this rule) is refused.
+    await db.apiClient.updateMany({ where: { kind: 'ANVIL' }, data: { issuedById: null } });
     expect((await anvil('GET', '/contracts')).statusCode).toBe(401);
   });
 
@@ -159,11 +193,25 @@ describe('Praxis template API for Anvil', () => {
 
   it('tasks on an Anvil-proposed template use only its evaluator kinds and described tools', () => {
     const anvilSpec = { execution: { evaluatorKinds: ['run_evidence'], tools: [{ name: 'identity.check' }] } };
-    const good = { sections: { S7: { criteria: [{ id: 'C01', evaluatorKind: 'run_evidence' }] }, S3: { recordedResponses: [{ id: 'R1', tool: 'identity.check' }] } } };
+    const anchors = { passCondition: 'Names both parties.', partialCredit: 'Names one party.', failCondition: 'Names neither.' };
+    const good = { sections: { S7: { criteria: [{ id: 'C01', evaluatorKind: 'run_evidence', weight: 60.5, ...anchors }, { id: 'C02', evaluatorKind: 'run_evidence', weight: 39.5, ...anchors }] }, S3: { recordedResponses: [{ id: 'R1', tool: 'identity.check' }] } } };
     expect(anvilSpecChecks(anvilSpec, good).every((c) => c.ok)).toBe(true);
     const bad = { sections: { S7: { criteria: [{ id: 'C01' }, { id: 'C02', evaluatorKind: 'llm_judge' }] }, S3: { recordedResponses: [{ id: 'R1', tool: 'funds.transfer' }] } } };
     const r = anvilSpecChecks(anvilSpec, bad);
     expect(r.find((c) => c.id === 'anvil.evaluator-kinds')).toMatchObject({ ok: false, message: expect.stringContaining('C01, C02') });
     expect(r.find((c) => c.id === 'anvil.tools')).toMatchObject({ ok: false, message: expect.stringContaining('R1 (funds.transfer)') });
+  });
+
+  it('owner, 11 Nov (Anvil Q4): weights above 0 with at most two decimals total exactly 100; every criterion states 5, 2 and 0', () => {
+    const anvilSpec = { execution: { evaluatorKinds: ['run_evidence'], tools: [] } };
+    const a = { evaluatorKind: 'run_evidence', passCondition: 'Full.', partialCredit: 'Partial.', failCondition: 'Fail.' };
+    const check = (criteria: object[], id: string) => anvilSpecChecks(anvilSpec, { sections: { S7: { criteria } } }).find((c) => c.id === id)!;
+    expect(check([{ id: 'C01', weight: 100, ...a }], 'anvil.criteria-weights').ok).toBe(true);
+    expect(check([{ id: 'C01', weight: 100, ...a }, { id: 'C02', weight: 0, ...a }], 'anvil.criteria-weights')).toMatchObject({ ok: false, message: expect.stringContaining('C02') });
+    expect(check([{ id: 'C01', weight: 33.333, ...a }, { id: 'C02', weight: 66.667, ...a }], 'anvil.criteria-weights')).toMatchObject({ ok: false, message: expect.stringContaining('C01, C02') });
+    expect(check([{ id: 'C01', weight: 99.99, ...a }], 'anvil.criteria-weights')).toMatchObject({ ok: false, message: 'Weights must total exactly 100 (now 99.99)' });
+    expect(check([], 'anvil.criteria-weights').ok).toBe(false);
+    expect(check([{ id: 'C01', weight: 100, ...a, failCondition: ' ' }, { id: 'C02', weight: 0.01, passCondition: 'Full.' }], 'anvil.criteria-anchors')).toMatchObject({ ok: false, message: expect.stringContaining('C01, C02') });
+    expect(check([{ id: 'C01', weight: 100, ...a }], 'anvil.criteria-anchors').ok).toBe(true);
   });
 });

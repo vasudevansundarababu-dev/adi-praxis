@@ -839,3 +839,53 @@ Owner: "Marketing is taking time … I need an utility to upload it later, hopef
   already uses the form. The Admin reviews and publishes it: nothing goes live from an upload alone.
 - **(chosen by Claude)** **Runtime.** Each API instance registers uploaded forms at start, after an upload and every
   minute. The server sends the chosen form with each task, so the SME app and the console need no rebuild.
+
+## Praxis-Anvil contract: Praxis side built (12 Nov 2026)
+
+The owner approved the final contract (`docs/anvil/PRAXIS-ANVIL-CONTRACT-FINAL.md`) and said to build. Praxis builds
+what does not depend on Anvil's open questions.
+
+- **(chosen by Claude)** **Anvil keys.** Anvil calls Praxis with an Admin-issued `ANVIL` API key (existing API-client
+  mechanism: shown once, stored hashed, revocable).
+  - New: keys can expire; `ANVIL` keys must (default 30 days, at most 90).
+  - Expired or revoked keys get 401; other key kinds and staff sessions get 403.
+- **(chosen by Claude)** **Template API** at `/api/v1/integrations/anvil/templates`: `contracts`, `validate`,
+  `proposals`, `proposals/{id}`, `qualifications`.
+  - Anvil's `{data, meta.request_id}` envelope.
+  - `errors[]` holds what Anvil must fix; `praxis_requirements[]` holds staffing advice as counts only;
+    `review_gates[]` is separate.
+  - A reused Idempotency-Key with a different body gets **409**, as the contract says (Praxis's other routes keep 422).
+- **(chosen by Claude)** **Proposal format.** The spec is `praxis.template_spec.v1-proposed`: a golden pack (authoring
+  part) plus Anvil's requirement reference, execution part (environment, tool schemas, allowed evaluator kinds,
+  output schema) and authoring/reviewing skills. The joint format is open question 1, so only this wrapper may
+  change.
+- **(chosen by Claude)** **Drafts from proposals.** A proposal creates a DRAFT template version:
+  - version 1 for a new workflow (the pack must carry its template);
+  - the next version of an existing workflow (409 when a draft is already open).
+
+  The draft stores Anvil's part unchanged (`Template.anvilSpec`) and takes the authoring skills as the template skills
+  (which drive the generated JDs). A Praxis Admin publishes; nothing goes live from the API.
+- **(chosen by Claude)** **Qualification.** Anvil qualifies the exact template version hash: sha256 over RFC 8785
+  JSON of workflow, version, form, execution part and skills (open question 2).
+  - Receipts and revocations are append-only rows (`TemplateQualification`).
+  - The console shows "Anvil-ready for benchmarks" only when the version is published and its latest receipt is
+    QUALIFIED.
+  - Variants copied from a template do not inherit its form or Anvil spec.
+- **(chosen by Claude)** **Template gaps closed for Anvil-proposed templates.** Rubric criteria have an evaluator kind.
+  On a template version with Anvil's spec, submission requires each criterion to use an allowed kind and each recorded
+  tool call to use a tool Anvil described. Graph node types wait for Anvil's catalogue (question 3).
+- **(chosen by Claude)** **Anvil export client.** Server-side only (`ANVIL_EXPORT_BASE_URL`, `ANVIL_EXPORT_TOKEN`;
+  https only).
+  - Raw ZIP, bearer token, no cookies or CSRF.
+  - Business results are kept apart from auth, availability, transport, conflict and internal errors.
+  - 1 MiB upload bound; a timeout.
+  - The token is never logged or echoed.
+- **(chosen by Claude)** **Gated validator.** When connected, project export checks `/contracts` first. Until Anvil
+  advertises the generic Praxis export contract, no package is sent: tasks show Praxis's own issues plus "not
+  validated by Anvil" with the exact reason. A task is never reported valid unless Anvil returned that.
+- **Waiting on Anvil:**
+  - the package format (Q1), canonical JSON (Q2), catalogue (Q3) and new codes (Q6);
+  - then the package builder and the validate/resolve wiring.
+- **Waiting on the owner:**
+  - an Anvil export token and a Praxis `ANVIL` key, each in its secret store;
+  - QA deploy approval.

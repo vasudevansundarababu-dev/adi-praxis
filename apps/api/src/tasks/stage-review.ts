@@ -242,7 +242,7 @@ export async function expertEdit(tx: Tx, actor: InternalActor, taskId: string, b
   assertRole(a, 'EXPERT_REVIEW');
   const v = assertCurrent(t, body);
   const workflow = t.project.template.workflowName;
-  const shape = t.taskType === 'AUTHORING' ? profileSaveProblems(workflow, body.output) : [];
+  const shape = t.taskType === 'AUTHORING' ? profileSaveProblems(t.project.template, body.output) : [];
   if (shape.length) throw new AppError(422, 'INVALID_PROFILE_OUTPUT', 'This edit does not match the template profile.', { problems: shape });
   const changes = jsonDiff(authoredContent(v.output), authoredContent(body.output));
   if (!changes.length) throw new AppError(400, 'NO_CHANGE', 'The edit changes nothing; pass or return the task instead.');
@@ -261,7 +261,7 @@ export async function expertEdit(tx: Tx, actor: InternalActor, taskId: string, b
 
   let similar: SimilarMatch[] = ((t.checks as StoredChecks | null)?.similar ?? []);
   if (sim.embedding && t.taskType === 'AUTHORING') similar = await refreshSimilarity(tx, t, ev, sim.embedding);
-  const compiled = t.taskType === 'AUTHORING' ? compileForSubmission(workflow, body.output, { taskId: t.id, revisionId: `${t.id}-r${t.revision}` }) : null;
+  const compiled = t.taskType === 'AUTHORING' ? compileForSubmission(t.project.template, body.output, { taskId: t.id, revisionId: `${t.id}-r${t.revision}` }) : null;
   const output = (compiled?.output ?? body.output) as Prisma.InputJsonValue;
   const stored: StoredChecks = { results: ev.checks, keyInputs: ev.keyInputs, similar, embeddingModel: sim.embeddingModel ?? (t.checks as StoredChecks | null)?.embeddingModel ?? null, ...(compiled ? { export: compiled.status } : {}) };
   const version = v.version + 1;

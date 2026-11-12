@@ -106,6 +106,8 @@ export const TemplateFields = z.object({
   defaultMaxPerExpert: z.number().int().min(1).max(1000).optional(),
   openSlotShare: z.number().min(0).max(1).optional(),
   similarityThreshold: z.number().min(0).max(1).optional(),
+  /** The authoring form of this version (a registered profile of the same workflow); null = the workflow's default. */
+  profileId: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).nullable().optional(),
 });
 
 export const CreateTemplateRequest = TemplateFields.extend({ domainId: z.string().uuid() });
@@ -145,6 +147,7 @@ export const TemplateDto = z.object({
   defaultMaxPerExpert: z.number().int(),
   openSlotShare: z.number(),
   similarityThreshold: z.number(),
+  profileId: z.string().nullable(),
   publishedAt: z.string().nullable(),
   retiredAt: z.string().nullable(),
   createdAt: z.string(),

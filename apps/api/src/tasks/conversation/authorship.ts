@@ -1,4 +1,4 @@
-import { applyGraphOps, graphOpText, planNextQuestion, profileForWorkflow, WorkflowGraph, type ConversationProposal } from '@praxis/shared';
+import { applyGraphOps, graphOpText, planNextQuestion, profileForTemplate, WorkflowGraph, type ConversationProposal } from '@praxis/shared';
 export { AUTHORSHIP_VERSION, AUTHORSHIP_TERMS } from '@praxis/shared';
 const normal = (v: string) => v.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 /** Reject new substantive text not extractable from AUTHOR messages. This proves source linkage, not external authorship. */
@@ -30,10 +30,12 @@ export function authoredChangeProblems(current: Record<string, unknown>, p: Conv
   return [...new Set(issues)].slice(0,20);
 }
 /** Public response text is server-owned: an off-topic or answer-generating model reply is never shown. */
-export function facilitatorQuestion(text: string, output: Record<string, unknown>, workflow: string): string {
+export function facilitatorQuestion(text: string, output: Record<string, unknown>, template: string | { workflowName: string; profileId?: string | null }): string {
+  const form = typeof template === 'string' ? { workflowName: template, profileId: null } : template;
+  const workflow = form.workflowName;
   if (/\b(ssn|tax\s*id|tin)\b/i.test(text)) return 'Which jurisdiction and customer category apply, and which approved project rule requires this identifier or permits an alternative? State your own assessment.';
   // Template-aware planner (Wave 2): the next required field the SME has not written yet, from the template profile.
-  const lookup = profileForWorkflow(workflow);
+  const lookup = profileForTemplate(form);
   if (lookup.status === 'ok') {
     const planned = planNextQuestion(lookup.profile, output, text);
     if (planned) return planned.question;

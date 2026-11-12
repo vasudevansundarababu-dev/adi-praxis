@@ -58,7 +58,7 @@ export async function executeConversation(db: Db, assistant: ConversationAssista
     const authors = turns.filter(t=>t.speaker==='AUTHOR' && t.questionId==='conversation' && t.clientMessageId?.startsWith('answer:')).map(t=>t.content);
     const unsupported = authoredChangeProblems((task.output ?? {}) as Record<string, unknown>, proposal, authors);
     const latestAnswer = authors.at(-1) ?? '';
-    const safeQuestion = facilitatorQuestion(latestAnswer, (task.output ?? {}) as Record<string, unknown>, task.project.template.workflowName);
+    const safeQuestion = facilitatorQuestion(latestAnswer, (task.output ?? {}) as Record<string, unknown>, task.project.template);
     proposal = { ...proposal, reply: unsupported.length ? 'I cannot generate task answers. Type the assessment yourself; I can help organise your words.' : 'I can organise your typed answer. Review its placement before confirming.', question: safeQuestion, changes: unsupported.length ? [] : proposal.changes.map(c=>({...c,reason:'Extracted from SME-authored content; confirm the placement.'})), ruleLinks: proposal.ruleLinks.map(l=>({...l,reason:'Suggested project-rule link; SME applicability confirmation required.'})), unresolved: unsupported.length ? ['SME must type the missing substantive content.'] : proposal.unresolved.map(()=> 'Confirm the outstanding evidence or policy applicability in your own words.') };
     const problems = [...unsupported, ...proposalProblems((task.output ?? {}) as Record<string, unknown>, proposal, policy?.body.rules ?? [], task.project.template.workflowName.toLowerCase() === 'kyc onboarding and refresh')];
     await db.$transaction(async tx => {

@@ -130,16 +130,20 @@ export function checkProfile(raw: unknown): string[] {
 
 export type RegistrationResult = { ok: true; profile: TemplateProfile } | { ok: false; workflow: string | null; problems: string[] };
 
-/** Registers a profile for its catalogue workflow. An unsupported profile is recorded as a diagnostic. */
-export function registerProfile(raw: unknown): RegistrationResult {
+/**
+ * Registers a profile for its catalogue workflow. An unsupported profile is recorded as a diagnostic. An `alternate`
+ * profile is registered by ID only: the workflow's default form is unchanged, and a template version opts in through
+ * `Template.profileId` (owner, 11 Nov 2026: KYC template version 2 follows the Golden Bank reference).
+ */
+export function registerProfile(raw: unknown, opts: { alternate?: boolean } = {}): RegistrationResult {
   const problems = checkProfile(raw);
   const workflow = isObj(raw) && typeof raw.catalogWorkflowName === 'string' ? raw.catalogWorkflowName : null;
   if (problems.length) {
-    if (workflow) registry.set(workflowKey(workflow), { status: 'unsupported', workflow, problems });
+    if (workflow && !opts.alternate) registry.set(workflowKey(workflow), { status: 'unsupported', workflow, problems });
     return { ok: false, workflow, problems };
   }
   const profile = TemplateProfileSchema.parse(raw);
-  registry.set(workflowKey(profile.catalogWorkflowName), { status: 'ok', profile });
+  if (!opts.alternate) registry.set(workflowKey(profile.catalogWorkflowName), { status: 'ok', profile });
   byId.set(profile.profileId, profile);
   return { ok: true, profile };
 }
@@ -154,3 +158,22 @@ export const profileById = (id: string): TemplateProfile | undefined => byId.get
 
 /** Every supported profile. */
 export const registeredProfiles = (): TemplateProfile[] => [...byId.values()];
+
+/**
+ * The form of one template version: its chosen profile (`profileId`) when set, else the workflow's default. A chosen
+ * profile must belong to the same workflow.
+ */
+export function profileForTemplate(t: { workflowName: string; profileId?: string | null }): ProfileLookup {
+  if (!t.profileId) return profileForWorkflow(t.workflowName);
+  const p = byId.get(t.profileId);
+  if (!p) return { status: 'unsupported', workflow: t.workflowName, problems: [`Unknown template profile ${t.profileId}`] };
+  if (workflowKey(p.catalogWorkflowName) !== workflowKey(t.workflowName)) return { status: 'unsupported', workflow: t.workflowName, problems: [`Profile ${t.profileId} belongs to ${p.catalogWorkflowName}, not ${t.workflowName}`] };
+  return { status: 'ok', profile: p };
+}
+
+/** Every supported profile a template of this workflow may choose (the default first). */
+export function profilesForWorkflow(name: string): TemplateProfile[] {
+  const def = profileForWorkflow(name);
+  const all = [...byId.values()].filter((p) => workflowKey(p.catalogWorkflowName) === workflowKey(name));
+  return def.status === 'ok' ? [def.profile, ...all.filter((p) => p !== def.profile)] : all;
+}

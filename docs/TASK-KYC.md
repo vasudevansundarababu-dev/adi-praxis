@@ -1,5 +1,12 @@
 # Task definition and workbench — Banking / KYC onboarding (draft)
 
+> **Template version 2 (11 Nov 2026).** This document describes KYC **v1** (the KYC workbench). KYC v2 uses the
+> account-opening form `kyc-account-opening`, which follows the Golden Bank KYC authoring reference: golden tool
+> catalogue, four-way recommendation (`ready_for_approval`, `request_information`, `specialist_review`,
+> `not_eligible_for_requested_product`), products and states, parties and roles, follow-up rounds, rules bound by
+> published version, and 5/2/0 rubric checks. See `docs/DECISIONS.md`, "KYC template version 2". A template version
+> chooses its form with `profileId`; projects keep the version they were created from.
+
 Draft for review. Defines what an expert-authored KYC onboarding task contains, the screens an expert uses to write it, and how a Reviewer accepts it into the Approved Task Dataset. Other workflows reuse the same structure with their own fields. Built in M5.
 
 Source: template row "KYC onboarding and refresh" in Taskflow.xlsx — primary work: assemble identity evidence, reconcile fields, detect gaps, recommend a risk-based disposition; verification: document/data checks, completeness, policy adherence, reviewer agreement; human gate: approval, rejection and high-risk classification remain authorized decisions.

@@ -750,3 +750,45 @@ Expert and PM with two audit events; Expert edits need a reason, and a material 
   same validation. Still advisory: a Reviewer decides. *(chosen by Claude)* The `qa-users` job also runs pending or
   failed assessments itself with its environment's model (the worker's own `runAssessment`, so the same claim and
   SYSTEM audit), five at a time, at most 3 tries each; an assessment that still fails leaves the SME undecided.
+
+## KYC template version 2: Golden Bank account opening (11 Nov 2026)
+
+Owner: Anvil benchmarks Praxis with a golden KYC task (Golden Bank KYC authoring reference, golden-kyc-1.0.0); SMEs and
+Reviewers must be able to author and accept tasks of that kind on the KYC template, so the whole cycle can be validated.
+Owner chose a **new KYC template version** (not a separate template, not a change to the v1 form).
+
+- **(owner)** KYC v1 keeps the KYC workbench; Wave 1 tasks are untouched. KYC v2 uses a new form,
+  `kyc-account-opening`, built on the eight-section profile engine.
+- **(chosen by Claude)** A template version chooses its form with `Template.profileId` (null = the workflow's default).
+  The Admin picks it on a draft version ("Authoring form") and it is checked on save and publish (400 `UNKNOWN_PROFILE`).
+  Projects keep the version they were created from, so a project's form never changes under it. The form is an
+  *alternate* profile registered by ID only; the workflow's default lookup is unchanged.
+- **(chosen by Claude)** What the form holds, from the reference:
+  - S1: product (4 golden products), state (CA/NY/TX/FL/IL), application revision, assessment clock and calendar,
+    execution limits, and the private scenario slot (1–10).
+  - S2: evidence, parties with claimed roles (owner, teen/adult owner, parent, guardian, custodian, beneficiary,
+    transferor, signer, attorney-in-fact) and the requested account terms.
+  - S3: the fixed golden tool catalogue (21 tools, no free entries) with recorded responses, including 503/429 and
+    pending observations.
+  - S4: rules cited by key and exact published version.
+  - S5: per-party assessment (CIP customer, identity status, open conditions), follow-up rounds (at most 3) and the
+    specialist referral.
+  - S6: the four-way recommendation.
+  - S7: 5-point checks with the 2-point partial-credit anchor, critical failures and the scoring rule.
+  - Private answers stay out of the agent view.
+- **(chosen by Claude)** **Policy binding.** For a template version with a chosen form, every rule cited in S4 must be a
+  rule version published for the project (key and exact version ID). Otherwise submission is blocked by
+  `policy.bound-versions`. A project with no published rules is reported as a configuration gap, not a case fact.
+- **(chosen by Claude)** One worked golden case ships as reference data (`GOLDEN_KYC_EXAMPLE`: teen joint checking, NY,
+  slot 5, resolvable identity gap → `ready_for_approval`). `test/golden-kyc.test.ts` runs the whole cycle with it:
+  template v2, project, published GB-01…GB-07, staffing, authoring, checks, Expert pass, PM approval, Approved Task
+  Dataset.
+- **(owner, 11 Nov 2026)** **Anvil export stays blocked** for golden-style tasks (`MISSING_BINDING` on the
+  evaluator-graded checks). Authoring, review and the Approved Task Dataset continue. The golden checks need Anvil's
+  task, environment and evaluator bindings and recorded run evidence. Praxis must **not** turn them into extra
+  agent-output fields: that would change what is evaluated and could let the agent claim its own compliance. The Anvil
+  team defines and documents how these bindings travel, including evaluator versions, evidence references and the
+  handling of missing checks, and Praxis implements against that agreed contract. The Golden pack is an authoring
+  reference, not an agreed Praxis-to-Anvil export format. Execution, evaluation and reporting stay in Anvil.
+- **Open (owner):** the four other cell slots for the products (adult joint, individual, custodial) are authored by SMEs;
+  only one worked case ships. The marketing multi-agent golden task will follow the same route when it arrives.

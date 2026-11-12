@@ -48,6 +48,8 @@ export interface TaskView extends TaskSummary {
   definition: string;
   template: {
     workflow: string;
+    /** The template version's chosen form (null = the workflow default). */
+    profileId?: string | null;
     domain: string;
     primaryWork: string | null;
     verificationCriteria: string | null;

@@ -5,6 +5,7 @@ import {
   CreateTemplateRequest,
   DomainDto,
   EdgeCaseCatalog,
+  profileForTemplate,
   publishProblems,
   TemplateDto,
   UpdateTemplateRequest,
@@ -18,6 +19,13 @@ import { AppError, conflict, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 
 type TemplateWithDomain = Template & { domain: Domain };
+
+/** A chosen authoring form must be a registered profile of the same workflow (owner, 11 Nov 2026). */
+function assertProfile(workflowName: string, profileId: string | null | undefined) {
+  if (!profileId) return;
+  const r = profileForTemplate({ workflowName, profileId });
+  if (r.status !== 'ok') throw new AppError(400, 'UNKNOWN_PROFILE', r.status === 'unsupported' ? r.problems.join('; ') : `Unknown template profile ${profileId}`);
+}
 
 export function toTemplateDto(t: TemplateWithDomain): TemplateDto {
   return {
@@ -42,6 +50,7 @@ export function toTemplateDto(t: TemplateWithDomain): TemplateDto {
     defaultMaxPerExpert: t.defaultMaxPerExpert,
     openSlotShare: Number(t.openSlotShare),
     similarityThreshold: Number(t.similarityThreshold),
+    profileId: t.profileId,
     publishedAt: t.publishedAt?.toISOString() ?? null,
     retiredAt: t.retiredAt?.toISOString() ?? null,
     createdAt: t.createdAt.toISOString(),
@@ -115,6 +124,7 @@ function fieldData(body: z.infer<typeof UpdateTemplateRequest>): Prisma.Template
   if (body.defaultMaxPerExpert !== undefined) data.defaultMaxPerExpert = body.defaultMaxPerExpert;
   if (body.openSlotShare !== undefined) data.openSlotShare = body.openSlotShare;
   if (body.similarityThreshold !== undefined) data.similarityThreshold = body.similarityThreshold;
+  if (body.profileId !== undefined) data.profileId = body.profileId;
   return data;
 }
 
@@ -215,6 +225,7 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
         const domain = await tx.domain.findFirst({ where: { id: req.body.domainId, clientId: actor.clientId } });
         if (!domain) throw notFound('Domain not found');
         await assertUniqueWorkflowName(tx, actor.clientId, domain.id, req.body.workflowName);
+        assertProfile(req.body.workflowName, req.body.profileId);
         const { domainId, ...fields } = req.body;
         const t = await tx.template.create({
           data: {
@@ -252,6 +263,7 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
         if (req.body.workflowName !== undefined) {
           await assertUniqueWorkflowName(tx, actor.clientId, before.domainId, req.body.workflowName, before.lineageId);
         }
+        assertProfile(req.body.workflowName ?? before.workflowName, req.body.profileId === undefined ? before.profileId : req.body.profileId);
         // Guard against a concurrent publish: only update while still DRAFT.
         const { count } = await tx.template.updateMany({ where: { id: before.id, status: 'DRAFT' }, data: fieldData(req.body) });
         if (count === 0) throw new AppError(409, 'TEMPLATE_NOT_EDITABLE', 'This draft was published or retired meanwhile.');
@@ -324,6 +336,7 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
         if (!t) throw notFound('Template not found');
         if (t.status !== 'DRAFT') throw new AppError(409, 'NOT_A_DRAFT', `Only drafts can be published (this one is ${t.status}).`);
         if (t.domain.status !== 'ACTIVE') throw conflict('The domain is retired');
+        assertProfile(t.workflowName, t.profileId);
         const problems = publishProblems(t);
         if (problems.length > 0) {
           throw new AppError(422, 'TEMPLATE_INCOMPLETE', `Cannot publish yet: ${problems.join('; ')}.`);

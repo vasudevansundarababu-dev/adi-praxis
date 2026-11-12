@@ -102,13 +102,18 @@ export class ClaudeVertexSuitabilityEvaluator implements SuitabilityEvaluator {
   static readonly MODEL = 'claude-opus-5';
   static readonly FALLBACK_MODEL = 'claude-opus-4-8';
   readonly modelVersion: string;
-  private readonly client: Pick<AnthropicVertex, 'messages'>;
+  private clientInstance: Pick<AnthropicVertex, 'messages'> | undefined;
   private readonly model: string;
 
-  constructor(opts: { projectId: string; region: string; client?: Pick<AnthropicVertex, 'messages'>; model?: string }) {
-    this.client = opts.client ?? new AnthropicVertex({ projectId: opts.projectId, region: opts.region });
+  constructor(private readonly opts: { projectId: string; region: string; client?: Pick<AnthropicVertex, 'messages'>; model?: string }) {
+    this.clientInstance = opts.client;
     this.model = opts.model ?? ClaudeVertexSuitabilityEvaluator.MODEL;
     this.modelVersion = this.model;
+  }
+
+  /** Created on first call: the Vertex client looks up Google credentials as soon as it exists (as in #49). */
+  private get client(): Pick<AnthropicVertex, 'messages'> {
+    return (this.clientInstance ??= new AnthropicVertex({ projectId: this.opts.projectId, region: this.opts.region }));
   }
 
   async evaluate(input: SuitabilityInput): Promise<AssessmentOutput> {

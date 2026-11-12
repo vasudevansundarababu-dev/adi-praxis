@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { BlueprintSummary } from '@/components/templates/compiler/blueprint-summary';
 import { MetaCompiler } from '@/components/templates/compiler/meta-compiler';
+import { AnvilReadinessBadge, type AnvilReadiness } from '@/components/templates/anvil-readiness';
 import { McHeader } from '@/components/templates/mc-header';
 import { StatusBadge } from '@/components/templates/status-badge';
 import { TemplateActions, type FormOption } from '@/components/templates/template-actions';
@@ -27,7 +28,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const user = (await getCurrentUser())!;
   const isAdmin = user.roles.includes('ADMIN');
-  const [{ data: t }, { data: bp }] = await Promise.all([mcServer.template(id), mcServer.blueprint(id)]);
+  const [{ data: t }, { data: bp }, { data: anvil }] = await Promise.all([mcServer.template(id), mcServer.blueprint(id), apiGet<AnvilReadiness>(`/templates/${id}/anvil`)]);
   if (!t || !bp) notFound();
 
   const heading = (
@@ -36,6 +37,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
       <span className="text-fg-muted">v{t.version}</span>
       <StatusBadge status={t.status} />
       <span className="text-sm text-fg-muted">{t.domainName}</span>
+      {anvil && <AnvilReadinessBadge r={anvil} />}
     </div>
   );
 

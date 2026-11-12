@@ -1,4 +1,4 @@
-import { GoogleAuth, OAuth2Client, type IdTokenClient } from 'google-auth-library';
+import { OAuth2Client } from 'google-auth-library';
 
 /**
  * Keyless Praxis <-> Anvil authentication (owner, 12 Nov 2026: "no API keys between Anvil and Praxis").
@@ -39,6 +39,8 @@ export class GoogleServiceIdentityVerifier implements ServiceIdentityVerifier {
     private readonly loadCerts: () => Promise<Record<string, string>> = async () => (await this.client.getFederatedSignonCertsAsync()).certs as Record<string, string>,
   ) {
     if (!expected.audience || !expected.subject || !expected.email) throw new Error('Keyless inbound needs an audience, subject and service account');
+    if (!/^\d{10,30}$/.test(expected.subject)) throw new Error('The caller subject must be the numeric Google service-account ID');
+    if (!/^https:\/\/[^/\s]+$/.test(expected.audience)) throw new Error('The audience must be an exact https origin');
   }
 
   async verify(token: string): Promise<ServiceCaller | null> {
@@ -56,17 +58,29 @@ export class GoogleServiceIdentityVerifier implements ServiceIdentityVerifier {
   }
 }
 
-/** Outbound: a Google identity token for this service's runtime account, for `audience` (Anvil). Cached by the library. */
-export function googleIdTokenProvider(audience: string): () => Promise<string> {
-  const auth = new GoogleAuth();
-  let client: Promise<IdTokenClient> | null = null;
+/**
+ * Outbound: a Google identity token for this service's attached runtime account, for `audience` (Anvil), fetched ONLY
+ * from the Cloud Run / GCE metadata server (never a key file or other credential source). Bounded: 5 s timeout; the token
+ * is cached in memory until 5 minutes before it expires and is never logged.
+ */
+export function googleIdTokenProvider(audience: string, fetchImpl: typeof fetch = fetch, timeoutMs = 5000): () => Promise<string> {
+  const url = `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}`;
+  let cached: { token: string; exp: number } | null = null;
   return async () => {
-    client ??= auth.getIdTokenClient(audience);
-    const headers = (await (await client).getRequestHeaders()) as unknown as Record<string, string> | Headers;
-    const value = headers instanceof Headers ? headers.get('authorization') : (headers.Authorization ?? headers.authorization);
-    const m = value?.match(/^Bearer\s+(\S+)$/);
-    if (!m) throw new Error('No Google identity token is available for this service');
-    return m[1]!;
+    if (cached && cached.exp - 300 > Date.now() / 1000) return cached.token;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetchImpl(url, { headers: { 'Metadata-Flavor': 'Google' }, signal: ctrl.signal, redirect: 'error' });
+      if (res.status !== 200) throw new Error(`metadata server answered ${res.status}`);
+      const token = (await res.text()).trim();
+      const payload = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')) as { exp?: number };
+      if (!JWT_BEARER.test(`Bearer ${token}`) || typeof payload.exp !== 'number') throw new Error('metadata server returned no identity token');
+      cached = { token, exp: payload.exp };
+      return token;
+    } finally {
+      clearTimeout(timer);
+    }
   };
 }
 

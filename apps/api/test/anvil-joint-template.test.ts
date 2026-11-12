@@ -53,7 +53,7 @@ describe('joint template object and revocation events', () => {
   let anvilKey: string;
 
   beforeAll(async () => {
-    app = await buildApp({ config: testConfig({ ANVIL_CREDENTIAL_NOT_AFTER: BOUND.toISOString(), ANVIL_ENVIRONMENT: 'qa', ANVIL_EXPORT_BASE_URL: BASE }), db, pingRedis: async () => true, selectionGate: stubSelectionGate });
+    app = await buildApp({ config: testConfig({ ANVIL_CREDENTIAL_NOT_AFTER: BOUND.toISOString(), ANVIL_ENVIRONMENT: 'qa', ANVIL_EXPORT_BASE_URL: BASE }), db, pingRedis: async () => true, selectionGate: stubSelectionGate, anvilIdTokenProvider: async () => 'test-identity' });
   });
   beforeEach(async () => {
     await resetDb();

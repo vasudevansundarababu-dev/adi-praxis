@@ -76,8 +76,6 @@ const Env = z.object({
    * The token is an Anvil-issued export-client secret: server only, never logged, never sent to a browser.
    */
   ANVIL_EXPORT_BASE_URL: z.string().regex(/^$|^https:\/\/[^\s]+$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/[^\s]*$/, 'ANVIL_EXPORT_BASE_URL must be https (or http on localhost)').default(''),
-  /** Optional legacy static token. Blank (the default, owner 12 Nov 2026) = Praxis calls Anvil keylessly with its own Google identity token. */
-  ANVIL_EXPORT_TOKEN: z.string().default(''),
   /** Audience of Praxis's identity token when calling Anvil. Blank = the origin of ANVIL_EXPORT_BASE_URL. */
   ANVIL_OUTBOUND_AUDIENCE: z.string().default(''),
   /**

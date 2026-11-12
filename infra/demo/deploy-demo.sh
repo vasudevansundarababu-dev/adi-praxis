@@ -197,20 +197,17 @@ printf 'ANVIL_CREDENTIAL_NOT_AFTER: "%s"\n' "${ANVIL_CREDENTIAL_NOT_AFTER:-2026-
 printf 'ANVIL_ENVIRONMENT: "%s"\n' "${ANVIL_ENVIRONMENT:-qa}" >> "$ENVFILE"
 # Export to Anvil is connected when the Anvil project's generic export address is known: from ANVIL_EXPORT_BASE_URL or
 # the secret anvil-export-base-url (kept out of this public repository). Keyless (owner, 12 Nov 2026; Keystone K6):
-# Praxis calls Anvil with its runtime account's Google identity token, so no Anvil token is needed. A legacy
-# anvil-export-token secret, if present, is still passed (and then used instead). Otherwise export runs Praxis's pre-check.
+# Praxis calls Anvil with its runtime account's Google identity token. No static Anvil token is passed (no fallback);
+# a leftover anvil-export-token secret is ignored. Without the address, export runs Praxis's pre-check.
 # Values are passed as secret references: the deployer never reads them; Cloud Run's runtime account resolves them.
 ANVIL_SECRET=
 anvil_version() { [ -n "$(gcloud secrets versions list "$1" --filter=state=ENABLED --limit=1 --format='value(name)' 2>/dev/null)" ]; }
-ANVIL_TOKEN_REF=
-if anvil_version anvil-export-token; then ANVIL_TOKEN_REF=,ANVIL_EXPORT_TOKEN=anvil-export-token:latest; fi
 if [ -n "${ANVIL_EXPORT_BASE_URL:-}" ]; then
   printf 'ANVIL_EXPORT_BASE_URL: "%s"\n' "$ANVIL_EXPORT_BASE_URL" >> "$ENVFILE"
-  ANVIL_SECRET=$ANVIL_TOKEN_REF
-  echo "Anvil export connected (address from ANVIL_EXPORT_BASE_URL; ${ANVIL_TOKEN_REF:+static token}${ANVIL_TOKEN_REF:-keyless})."
+  echo "Anvil export connected keylessly (address from ANVIL_EXPORT_BASE_URL)."
 elif anvil_version anvil-export-base-url; then
-  ANVIL_SECRET=,ANVIL_EXPORT_BASE_URL=anvil-export-base-url:latest$ANVIL_TOKEN_REF
-  echo "Anvil export connected (${ANVIL_TOKEN_REF:+static token}${ANVIL_TOKEN_REF:-keyless})."
+  ANVIL_SECRET=,ANVIL_EXPORT_BASE_URL=anvil-export-base-url:latest
+  echo "Anvil export connected keylessly."
 else
   echo "Anvil export not connected (needs the secret anvil-export-base-url)."
 fi

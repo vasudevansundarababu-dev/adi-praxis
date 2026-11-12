@@ -18,7 +18,13 @@ export async function ensureAnvilGrant(db: Db, clientId: string, env: { ANVIL_CA
     return null;
   }
   const existing = await db.apiClient.findUnique({ where: { serviceAccount: email } });
-  if (existing) return existing;
+  if (existing) {
+    // Fail closed on a grant that belongs to another client (tenancy); never move or re-enable it silently.
+    if (existing.clientId !== clientId || existing.kind !== 'ANVIL') throw new Error(`The keyless grant for ${email} belongs to another client or kind; refusing to use it.`);
+    // A longer stored expiry is harmless (requests also stop at ANVIL_CREDENTIAL_NOT_AFTER) but is reported.
+    if (existing.expiresAt && existing.expiresAt > stop) log('warn', 'Anvil keyless grant expires after the configured pilot stop; requests still stop at the pilot stop', { grantId: existing.id });
+    return existing;
+  }
   return db.$transaction(async (tx) => {
     const c = await tx.apiClient.create({ data: { clientId, name: 'Anvil (keyless service identity)', kind: 'ANVIL', keyHash: sha256(`unusable:${randomBytes(32).toString('hex')}`), serviceAccount: email, expiresAt: stop } });
     await writeAudit(tx, { clientId, actorType: 'SYSTEM', actorId: null }, { entityType: 'ApiClient', entityId: c.id, action: 'api_client.keyless_granted', after: { kind: 'ANVIL', serviceAccount: email, expiresAt: stop.toISOString() } });

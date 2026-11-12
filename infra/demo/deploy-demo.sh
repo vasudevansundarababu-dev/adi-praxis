@@ -190,11 +190,29 @@ if [ -n "$VERTEX" ] && [ "${PRAXIS_POLICY_LIVE:-1}" != "0" ]; then
     fi
   fi
 fi
+# Praxis-Anvil integration (docs/anvil/PRAXIS-ANVIL-CONTRACT-FINAL.md; owner decisions 11 Nov 2026 in docs/DECISIONS.md).
+# Praxis ANVIL keys never outlive the pilot end. Older builds ignore it.
+printf 'ANVIL_CREDENTIAL_NOT_AFTER: "%s"\n' "${ANVIL_CREDENTIAL_NOT_AFTER:-2026-12-11T05:48:04Z}" >> "$ENVFILE"
+# Export to Anvil is connected only when the owner has stored, in this project's Secret Manager, Anvil's export token
+# (secret anvil-export-token) and the Anvil project's generic export address (secret anvil-export-base-url, kept out of
+# this public repository). Otherwise project export runs Praxis's own pre-check.
+ANVIL_SECRET=
+anvil_version() { [ -n "$(gcloud secrets versions list "$1" --filter=state=ENABLED --limit=1 --format='value(name)' 2>/dev/null)" ]; }
+if [ -z "${ANVIL_EXPORT_BASE_URL:-}" ] && anvil_version anvil-export-base-url; then
+  ANVIL_EXPORT_BASE_URL=$(gcloud secrets versions access latest --secret=anvil-export-base-url 2>/dev/null | tr -d '[:space:]')
+fi
+if [ -n "${ANVIL_EXPORT_BASE_URL:-}" ] && anvil_version anvil-export-token; then
+  printf 'ANVIL_EXPORT_BASE_URL: "%s"\n' "$ANVIL_EXPORT_BASE_URL" >> "$ENVFILE"
+  ANVIL_SECRET=,ANVIL_EXPORT_TOKEN=anvil-export-token:latest
+  echo "Anvil export connected."
+else
+  echo "Anvil export not connected (needs secrets anvil-export-base-url and anvil-export-token)."
+fi
 # gcloud accepts one env-vars file and no extra variables, so the runtime role name lives in the shared file.
 echo 'APP_DB_ROLE: praxis_app' >> "$ENVFILE"
 COMMON=(--region="$REGION" --service-account="$SA" --set-cloudsql-instances="$CONN" --env-vars-file="$ENVFILE"
   --network=default --subnet=default --vpc-egress=private-ranges-only)
-SECRETS=DATABASE_URL=database-url-app:latest,REDIS_URL=redis-url:latest,MOCK_SECRET=mock-secret:latest$LLAMA_SECRET
+SECRETS=DATABASE_URL=database-url-app:latest,REDIS_URL=redis-url:latest,MOCK_SECRET=mock-secret:latest$LLAMA_SECRET$ANVIL_SECRET
 
 say "Database migrations (Cloud Run job, migration role)"
 gcloud run jobs deploy praxis-migrate --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=1800s \

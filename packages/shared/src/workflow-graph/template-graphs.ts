@@ -1,3 +1,4 @@
+import { marketingTask2Graph } from './marketing-task2-graph';
 import { WORKFLOW_GRAPH_SCHEMA, type WorkflowGraphInput } from './schema';
 
 /**
@@ -243,8 +244,15 @@ export const WAVE1_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(0, 5);
 export const WAVE2_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(5, 8);
 export const WAVE3_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(8);
 
-/** The template's starting workflow, or null when the template has none yet. */
-export function templateStartingGraph(workflowName: string, templateVersion = 1): WorkflowGraphInput | null {
+/** Starting workflows owned by an alternate form (a template version that chooses that form gets this graph). */
+const PROFILE_GRAPHS: Record<string, (templateVersion: number) => WorkflowGraphInput> = {
+  'marketing-campaign-task2': marketingTask2Graph,
+};
+
+/** The template's starting workflow, or null when the template has none yet. A form with its own graph wins. */
+export function templateStartingGraph(workflowName: string, templateVersion = 1, profileId?: string | null): WorkflowGraphInput | null {
+  const own = profileId ? PROFILE_GRAPHS[profileId] : undefined;
+  if (own) return own(templateVersion);
   const key = Object.keys(PATTERNS).find((k) => normalise(k) === normalise(workflowName));
   return key ? reviewPattern(PATTERNS[key]!, templateVersion) : null;
 }

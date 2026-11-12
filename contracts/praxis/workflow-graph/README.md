@@ -4,7 +4,7 @@ Schema id: `praxis.workflow_graph.v1-proposed`. Provisional until Anvil allocate
 reuse `praxis.anvil.task.v1`, `v2` or `v3` (handover v2.1 chapter 17 §5).
 
 The graph an SME authors for a task: roles, artifacts, nodes (`input`, `agent_step`, `decision`, `join`,
-`human_step`, `output`, `escalation`), labelled edges, bounded loops and a global transition limit. It is declarative
+`human_step`, `external_system`, `output`, `escalation`), labelled edges, bounded loops and a global transition limit. It is declarative
 data only: the strict schema rejects any extra field, so code, commands or import paths cannot be smuggled in.
 
 - Source of truth: `packages/shared/src/workflow-graph/` (`schema.ts`, `validate.ts`, `projection.ts`, `layout.ts`).
@@ -24,7 +24,13 @@ data only: the strict schema rejects any extra field, so code, commands or impor
   producer.
 - Artifacts marked `private_reference` or `private_rubric` never reach an agent step, a role or a human step. An
   artifact with `revealAtNodeId` is withheld until the trial reaches that node.
-- A `human_step` is a business person inside the case. It is never Praxis Expert review or PM approval.
+- A `human_step` is a business person inside the case. It is never Praxis Expert review or PM approval. With
+  `simulated: true` the environment plays that person (a scripted fixture), so its response is never a real human
+  decision.
+- An `external_system` (added 12 Nov 2026 for Marketing Task2) is a system outside the evaluated team, such as Task3
+  media production: the team sends `sendsRefs` and receives `returnsArtifact`. It is neither an agent nor a person,
+  never receives private material, and its behaviour is supplied by the environment. Proposed to Anvil; Anvil does not
+  execute it yet.
 
 ## Content hash
 

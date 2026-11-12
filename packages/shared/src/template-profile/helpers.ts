@@ -73,10 +73,22 @@ export function itemFieldsOf(field: ItemField): ItemField[] {
         { key: 'id', type: 'text', label: 'Criterion ID', help: 'Stable ID that common errors refer to.', required: true },
         { key: 'name', type: 'text', label: 'What is assessed', help: 'A short name for the criterion.', required: true },
         { key: 'weight', type: 'number', label: 'Weight', help: 'Contribution to the total score.', required: true, min: 0, max: 100 },
-        { key: 'passCondition', type: 'long_text', label: 'Pass condition', help: 'Observable against the case evidence, tool calls or output.', required: true },
-        { key: 'partialCredit', type: 'long_text', label: 'Partial credit', help: 'What incomplete but useful work earns (scores 2 of 5).' },
-        // Owner, 11 Nov 2026 (Anvil Q4): required on templates Anvil proposed, so each criterion states 5, 2 and 0.
-        { key: 'failCondition', type: 'long_text', label: 'Fail', help: 'What scores 0. Required when the template was proposed by Anvil.' },
+        { key: 'passCondition', type: 'long_text', label: field.scale === 'zero_to_four' ? 'Level 4 (complete)' : 'Pass condition', help: 'Observable against the case evidence, tool calls or output.', required: true },
+        ...(field.scale === 'zero_to_four'
+          ? ([
+              { key: 'level3', type: 'long_text', label: 'Level 3 (minor gap)', help: 'What scores 3 of 4.' },
+              { key: 'level2', type: 'long_text', label: 'Level 2 (material gap)', help: 'What scores 2 of 4.', required: true },
+              { key: 'level1', type: 'long_text', label: 'Level 1 (weak)', help: 'What scores 1 of 4.' },
+              { key: 'failCondition', type: 'long_text', label: 'Level 0 (failed)', help: 'What scores 0.', required: true },
+            ] as ItemField[])
+          : ([
+              { key: 'partialCredit', type: 'long_text', label: 'Partial credit', help: 'What incomplete but useful work earns (scores 2 of 5).' },
+              // Owner, 11 Nov 2026 (Anvil Q4): required on templates Anvil proposed, so each criterion states 5, 2 and 0.
+              { key: 'failCondition', type: 'long_text', label: 'Fail', help: 'What scores 0. Required when the template was proposed by Anvil.' },
+            ] as ItemField[])),
+        ...(field.groups?.length
+          ? ([{ key: 'group', type: 'pick_list', label: 'Group', help: 'The rubric group this criterion counts towards.', required: true, options: field.groups.map((g) => ({ value: g.id, label: `${g.id} · ${g.label} (${g.weight})` })) }] as ItemField[])
+          : []),
         { key: 'critical', type: 'flag', label: 'Critical', help: 'Failing this criterion is a critical failure (separate from a zero-weight criterion).' },
         { key: 'evidenceRefs', type: 'multi_select', label: 'Evidence or rule links', help: 'Evidence, rule or step IDs this criterion checks.', allowCustom: true },
         // Praxis-Anvil contract (12 Nov 2026): on a template Anvil proposed, the kind must be one the template allows.
@@ -297,6 +309,12 @@ function fieldProblems(f: ItemField, value: unknown, path: string, label: string
         const total = value.reduce<number>((n, x) => n + (isObj(x) && typeof x.weight === 'number' ? x.weight : 0), 0);
         if (f.weightTotal !== undefined && value.length && Math.abs(total - f.weightTotal) > 0.01) push('invalid', `weights must total ${f.weightTotal} (now ${total})`);
         if (f.requireCritical && value.length && !value.some((x) => isObj(x) && x.critical === true)) push('invalid', 'mark at least one criterion as critical');
+        if (f.groups?.length && value.length) {
+          for (const g of f.groups) {
+            const sum = value.reduce<number>((n, x) => n + (isObj(x) && x.group === g.id && typeof x.weight === 'number' ? x.weight : 0), 0);
+            if (Math.abs(sum - g.weight) > 0.01) push('invalid', `group ${g.id} (${g.label}) weights must total ${g.weight} (now ${sum})`);
+          }
+        }
       }
     }
   }

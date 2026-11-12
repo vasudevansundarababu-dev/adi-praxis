@@ -101,7 +101,27 @@ export interface TemplateProfileField {
   weightTotal?: number;
   /** criterion: at least one criterion must be marked critical. */
   requireCritical?: boolean;
+  /**
+   * criterion: the scoring scale. `five_two_zero` (default): full 5, partial 2, fail 0. `zero_to_four`: levels 0-4,
+   * each criterion scoring weight x level / 4 (Marketing Task2 rubric, owner decision 12 Nov 2026).
+   */
+  scale?: CriterionScale;
+  /** criterion: weighted groups; each criterion names one, and the criteria of a group total its weight. */
+  groups?: CriterionGroup[];
 }
+
+export const CRITERION_SCALES = ['five_two_zero', 'zero_to_four'] as const;
+export type CriterionScale = (typeof CRITERION_SCALES)[number];
+/** A rubric group (e.g. "B Adaptation", weight 20). `minimum`: a pass needs at least this many of its points. */
+export interface CriterionGroup {
+  id: string;
+  label: string;
+  weight: number;
+  minimum?: number;
+}
+const CriterionGroupSchema = z
+  .object({ id: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,31}$/), label: z.string().min(1), weight: z.number().positive(), minimum: z.number().nonnegative().optional() })
+  .strict();
 
 export const TemplateProfileFieldSchema: z.ZodType<TemplateProfileField> = z.lazy(() =>
   z
@@ -126,6 +146,8 @@ export const TemplateProfileFieldSchema: z.ZodType<TemplateProfileField> = z.laz
       outputField: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/).optional(),
       weightTotal: z.number().positive().optional(),
       requireCritical: z.boolean().optional(),
+      scale: z.enum(CRITERION_SCALES).optional(),
+      groups: z.array(CriterionGroupSchema).min(1).max(20).optional(),
     })
     .strict(),
 );

@@ -4,3 +4,4 @@ export * from './layout';
 export * from './projection';
 export * from './template-graphs';
 export * from './edit';
+export * from './marketing-task2-graph';

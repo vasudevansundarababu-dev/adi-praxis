@@ -8,6 +8,7 @@ import { FRAUD_HANDOFF_PROFILE } from './profiles/fraud-risk-and-compliance-hand
 import { KYB_PROFILE } from './profiles/kyb-and-beneficial-ownership';
 import { KYC_PROFILE } from './profiles/kyc-onboarding-and-refresh';
 import { KYC_ACCOUNT_OPENING_PROFILE } from './profiles/kyc-account-opening';
+import { MARKETING_CAMPAIGN_TASK2_PROFILE } from './profiles/marketing-campaign-task2';
 import { NOISE_CANCELLING_PROFILE } from './profiles/noise-cancelling-phone-launch';
 import { OMNICHANNEL_PROFILE } from './profiles/omnichannel-creative-and-locale-compliance';
 import { Q4_PAID_SEARCH_PROFILE } from './profiles/q4-global-paid-search-query-clustering';
@@ -20,7 +21,9 @@ export { sampleProfileOutput } from './sample';
 export * from './golden-pack';
 export * from './template-spec';
 export { GOLDEN_KYC_EXAMPLE, withRuleVersions } from './golden-kyc-example';
+export { GOLDEN_MARKETING_EXAMPLE } from './golden-marketing-example';
 export { KYC_ACCOUNT_OPENING_PROFILE, KYC_V2_TOOLS, KYC_V2_RECOMMENDATIONS, KYC_V2_PRODUCTS, KYC_V2_STATES, KYC_V2_PARTY_ROLES, KYC_V2_SLOTS, KYC_V2_CRITICAL_FAILURES } from './profiles/kyc-account-opening';
+export { MARKETING_CAMPAIGN_TASK2_PROFILE, MARKETING_T2_LOCALES, MARKETING_T2_ROLES, MARKETING_T2_OUTCOMES, MARKETING_T2_ACTIONS, MARKETING_T2_CRITICAL_FAILURES, MARKETING_T2_GROUPS } from './profiles/marketing-campaign-task2';
 export { AML_PROFILE, KYB_PROFILE, KYC_PROFILE, NOISE_CANCELLING_PROFILE, OMNICHANNEL_PROFILE };
 export { ADVERSE_MEDIA_PROFILE, CUSTOMER_RISK_RATING_PROFILE, EDD_PROFILE };
 export { COMPLIANCE_MONITORING_PROFILE, FRAUD_HANDOFF_PROFILE, Q4_PAID_SEARCH_PROFILE };
@@ -43,7 +46,7 @@ for (const p of TEMPLATE_PROFILES) {
 }
 
 /** Alternate forms a template version may choose (`Template.profileId`). */
-export const ALTERNATE_PROFILES = [KYC_ACCOUNT_OPENING_PROFILE] as const;
+export const ALTERNATE_PROFILES = [KYC_ACCOUNT_OPENING_PROFILE, MARKETING_CAMPAIGN_TASK2_PROFILE] as const;
 for (const p of ALTERNATE_PROFILES) {
   const r = registerProfile(p, { alternate: true });
   if (!r.ok) console.error(`Template profile ${p.profileId} is unsupported: ${r.problems.join('; ')}`);

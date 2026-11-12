@@ -154,5 +154,5 @@ export const GOLDEN_KYC_EXAMPLE: ProfileOutput = {
 
 /** The example with `{{GB-xx}}` placeholders replaced by the project's published rule version IDs. */
 export function withRuleVersions(output: ProfileOutput, versions: Record<string, string>): ProfileOutput {
-  return JSON.parse(JSON.stringify(output).replace(/\{\{(GB-\d\d)\}\}/g, (_m, id: string) => versions[id] ?? `{{${id}}}`)) as ProfileOutput;
+  return JSON.parse(JSON.stringify(output).replace(/\{\{((?:GB|POL)-\d\d)\}\}/g, (_m, id: string) => versions[id] ?? `{{${id}}}`)) as ProfileOutput;
 }

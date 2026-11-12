@@ -28,6 +28,12 @@ describe('template authoring form', () => {
   });
 
   it('a workflow with one form shows no choice', () => {
-    expect(text(html(<TemplateActions template={template({ status: 'DRAFT' })} hasDraft />))).not.toContain('Authoring form');
+    expect(text(html(<TemplateActions template={template({ workflowName: 'KYB and beneficial ownership', status: 'DRAFT' })} hasDraft />))).not.toContain('Authoring form');
+  });
+
+  it('a DM03 draft offers the five-agent Task2 form beside its default form (owner, 12 Nov 2026)', () => {
+    const markup = html(<TemplateActions template={template({ status: 'DRAFT' })} hasDraft />);
+    expect(markup).toContain('value="marketing-campaign-task2"');
+    expect(text(markup)).toContain('Golden Task2: campaign planning and weekly intent optimisation (five agents)');
   });
 });

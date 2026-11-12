@@ -6,6 +6,7 @@ import {
   DomainDto,
   EdgeCaseCatalog,
   profileForTemplate,
+  profileForWorkflow,
   publishProblems,
   TemplateDto,
   UpdateTemplateRequest,
@@ -26,6 +27,15 @@ function assertProfile(workflowName: string, profileId: string | null | undefine
   if (!profileId) return;
   const r = profileForTemplate({ workflowName, profileId });
   if (r.status !== 'ok') throw new AppError(400, 'UNKNOWN_PROFILE', r.status === 'unsupported' ? r.problems.join('; ') : `Unknown template profile ${profileId}`);
+}
+
+/**
+ * A template version's agent mode follows the form it chooses (owner, 12 Nov 2026, Marketing Task2): a multi-agent form
+ * makes the version multi-agent; clearing the form returns to the workflow's default form. Set only when the form is.
+ */
+function agentModeFor(workflowName: string, profileId: string | null): 'SINGLE' | 'MULTI' {
+  const r = profileId ? profileForTemplate({ workflowName, profileId }) : profileForWorkflow(workflowName);
+  return r.status === 'ok' ? r.profile.agentMode : 'SINGLE';
 }
 
 export function toTemplateDto(t: TemplateWithDomain): TemplateDto {
@@ -232,6 +242,7 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
         const t = await tx.template.create({
           data: {
             ...(fieldData(fields) as Prisma.TemplateUncheckedCreateInput),
+            ...(req.body.profileId !== undefined ? { agentMode: agentModeFor(req.body.workflowName, req.body.profileId ?? null) } : {}),
             clientId: actor.clientId,
             domainId,
             workflowName: req.body.workflowName,
@@ -268,7 +279,8 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
         await loadUploadedProfiles(tx as unknown as Db);
         assertProfile(req.body.workflowName ?? before.workflowName, req.body.profileId === undefined ? before.profileId : req.body.profileId);
         // Guard against a concurrent publish: only update while still DRAFT.
-        const { count } = await tx.template.updateMany({ where: { id: before.id, status: 'DRAFT' }, data: fieldData(req.body) });
+        const mode = req.body.profileId !== undefined ? agentModeFor(req.body.workflowName ?? before.workflowName, req.body.profileId ?? null) : before.agentMode;
+        const { count } = await tx.template.updateMany({ where: { id: before.id, status: 'DRAFT' }, data: { ...fieldData(req.body), agentMode: mode } });
         if (count === 0) throw new AppError(409, 'TEMPLATE_NOT_EDITABLE', 'This draft was published or retired meanwhile.');
         const after = (await findTemplate(tx, before.id, actor.clientId))!;
         const changed = Object.keys(req.body) as (keyof TemplateDto)[];
@@ -277,8 +289,8 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
           entityType: 'Template',
           entityId: before.id,
           action: 'template.updated',
-          before: pick(toTemplateDto(before)),
-          after: pick(toTemplateDto(after)),
+          before: { ...pick(toTemplateDto(before)), ...(mode !== before.agentMode ? { agentMode: before.agentMode } : {}) },
+          after: { ...pick(toTemplateDto(after)), ...(mode !== before.agentMode ? { agentMode: after.agentMode } : {}) },
         });
         return { status: 200, body: toTemplateDto(after) };
       });

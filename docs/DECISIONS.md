@@ -959,3 +959,21 @@ Owner: "Finish the remaining tasks. Will make one final build." Defaults taken, 
   - The corrected KYC therefore does not inherit v4/v5's target of 200 and their quotas.
   - Published versions are untouched.
 - **Form IDs are never reused.** v4 and v5 keep `golden-kyc-openenv-v2`; the corrected form needs a new ID.
+
+## Marketing Task2 (12 Nov 2026)
+
+Review of the Golden Task2 Marketing handoff v1.1; details in `docs/authoring/MARKETING-TASK2.md`.
+
+- **(owner)** **Rubric scale.** Keep the author's approved 0-4 scale with groups A-G and the B minimum. Praxis adds a
+  `zero_to_four` criterion scale with groups beside 5/2/0, and asks Anvil to accept it as an exception to its Q4 answer.
+- **(owner)** **Real source data.** FineQuestions and ESCI rows stay in Anvil's fixture archive; Praxis stores only
+  dataset, record range, checksum and licence.
+- **(owner)** **Route.** DM03 template version 2 with the alternate form `marketing-campaign-task2`, a worked US case
+  and an end-to-end test, as for KYC v2.
+- **(owner)** **Graph additions.** An `external_system` step (Task3), a `simulated` flag on person steps, and an
+  evidence release schedule in the form; the controller's weekly release is the loop back to intake.
+- **(chosen by Claude)** A template version's agent mode follows the form it chooses (set when the form is set,
+  audited). Without this no template version could be multi-agent.
+- **(chosen by Claude)** A form may own its starting workflow (`templateStartingGraph(workflow, version, profileId)`).
+- **(chosen by Claude)** The two "several incoming routes" graph warnings on the Task2 workflow stay: both steps are
+  reached by exclusive routes. Refining the checker is later work.

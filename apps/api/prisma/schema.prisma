@@ -3278,3 +3278,20 @@ model ProjectValidationRun {
 
   @@index([projectId, createdAt])
 }
+
+/// Golden task pack (owner, 12 Nov 2026): an uploaded authoring form plus its worked golden cases. Append-only:
+/// a changed form is uploaded under a new profile ID, so a template version's form never changes under its projects.
+model UploadedProfile {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  profileId    String   @unique @map("profile_id")
+  workflowName String   @map("workflow_name")
+  source       String
+  profile      Json
+  examples     Json
+  contentHash  String   @map("content_hash")
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([clientId, workflowName])
+}

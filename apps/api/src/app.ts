@@ -74,6 +74,7 @@ import { OfflineGeocoder, type Geocoder } from './staffing/geocoder';
 import { dbSelectionGate, type SelectionGate } from './staffing/selection-gate';
 import { taxonomyRoutes } from './routes/taxonomy';
 import { templateRoutes } from './routes/templates';
+import { templateProfileRoutes } from './routes/template-profiles';
 import { metaCompilerRoutes } from './routes/meta-compiler';
 import { metaCompilerRunRoutes } from './routes/meta-compiler-runs';
 import { metaCompilerAssistantRoutes } from './routes/meta-compiler-assistant';
@@ -302,6 +303,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(userRoutes, { db: deps.db });
       await v1.register(templateRoutes, { db: deps.db });
       await v1.register(projectExportRoutes, { db: deps.db, storage, validator: deps.anvilValidator ?? new PraxisPrecheckValidator() });
+      await v1.register(templateProfileRoutes, { db: deps.db });
       await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });
       const drafters = deps.metaCompiler?.drafters ?? defaultDrafterFactory(deps.config);
       const mcDeps = resolveDeps(deps.metaCompiler?.deps);

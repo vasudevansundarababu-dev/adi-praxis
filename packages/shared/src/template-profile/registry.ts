@@ -177,3 +177,19 @@ export function profilesForWorkflow(name: string): TemplateProfile[] {
   const all = [...byId.values()].filter((p) => workflowKey(p.catalogWorkflowName) === workflowKey(name));
   return def.status === 'ok' ? [def.profile, ...all.filter((p) => p !== def.profile)] : all;
 }
+
+const uploaded = new Set<string>();
+
+/**
+ * Registers an uploaded form (golden task pack) as an alternate profile. Idempotent for the same ID; the server loads
+ * stored packs at start and after each upload. Returns the problems when the form is not supported.
+ */
+export function registerUploadedProfile(raw: unknown): string[] {
+  const r = registerProfile(raw, { alternate: true });
+  if (!r.ok) return r.problems;
+  uploaded.add(r.profile.profileId);
+  return [];
+}
+
+/** Whether a form came from an uploaded pack (as opposed to a built-in form). */
+export const isUploadedProfile = (id: string) => uploaded.has(id);

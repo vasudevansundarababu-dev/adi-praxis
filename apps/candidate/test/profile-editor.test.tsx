@@ -115,6 +115,15 @@ describe('profile routing', () => {
     expect(profileRouteFor({ ...base, taskType: 'ANNOTATION' })).toBeNull();
   });
 
+  it('an uploaded form (golden task pack) is not built into the app: the server sends it with the task', () => {
+    const uploaded = { ...KYB_PROFILE, profileId: 'uploaded-pack-form', catalogWorkflowName: 'Uploaded pack workflow', handoverName: 'Uploaded pack form' };
+    const task = { ...base, definition: 'profile:uploaded-pack-form', template: { ...base.template, workflow: 'Uploaded pack workflow', profileId: 'uploaded-pack-form', profile: uploaded } };
+    const route = profileRouteFor(task);
+    expect(route?.kind === 'editor' && route.profile.profileId).toBe('uploaded-pack-form');
+    // Without the form from the server, the app shows a diagnostic instead of a blank form.
+    expect(profileRouteFor({ ...task, template: { ...task.template, profile: null } })?.kind).toBe('diagnostic');
+  });
+
   it('a KYC template version 2 task opens the account-opening form (owner, 11 Nov 2026)', () => {
     const route = profileRouteFor({ ...base, definition: 'profile:kyc-account-opening', template: { ...base.template, workflow: 'KYC onboarding and refresh', profileId: 'kyc-account-opening' } });
     expect(route?.kind).toBe('editor');

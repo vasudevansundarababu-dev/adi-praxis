@@ -1,3 +1,4 @@
+import { evaluatorMap, JOINT_TEMPLATE_SPEC, jointToolIds } from '../anvil/joint-template';
 import type { Prisma, TaskInstance } from '@prisma/client';
 import { praxisContractChecks } from '@praxis/shared';
 import type { CoverageTags, SubmitTaskRequest, TaskCheck } from '@praxis/shared';
@@ -156,6 +157,7 @@ export async function boundRuleChecks(tx: Db | Tx, clientId: string, task: { id:
  * descriptions on every criterion.
  */
 export function anvilSpecChecks(anvilSpec: unknown, output: Record<string, unknown>): TaskCheck[] {
+  if ((anvilSpec as { schemaVersion?: unknown }).schemaVersion === JOINT_TEMPLATE_SPEC) return jointSpecChecks(anvilSpec as { execution: Record<string, unknown> }, output);
   const exec = (anvilSpec as { execution?: { evaluatorKinds?: string[]; tools?: { name: string }[] } }).execution ?? {};
   const kinds = new Set(exec.evaluatorKinds ?? []);
   const tools = new Set((exec.tools ?? []).map((t) => t.name));
@@ -185,6 +187,50 @@ export function anvilSpecChecks(anvilSpec: unknown, output: Record<string, unkno
     },
     { id: 'anvil.criteria-anchors', section: 'S7', ok: badAnchors.length === 0, message: badAnchors.length ? `State the pass condition (5), partial credit (2) and fail (0) for criteria ${badAnchors.map((c) => c.id ?? '?').join(', ')}` : 'Every criterion states full, partial and fail' },
     { id: 'anvil.evaluator-kinds', section: 'S7', ok: badKinds.length === 0, message: badKinds.length ? `Choose an evaluator kind the template allows (${[...kinds].join(', ')}) for criteria ${badKinds.map((c) => c.id ?? '?').join(', ')}` : 'Every criterion uses an evaluator kind the template allows' },
+    { id: 'anvil.tools', section: 'S3', ok: badTools.length === 0, message: badTools.length ? `Recorded calls must use tools Anvil described for this template: ${badTools.map((c) => `${c.id ?? '?'} (${c.tool ?? 'no tool'})`).join(', ')}` : 'Every recorded call uses a tool Anvil described' },
+  ];
+}
+
+/** Shared weight and 5/2/0 anchor checks (owner, 11 Nov 2026, Anvil Q4). */
+function weightAndAnchorChecks(criteria: { id?: string; weight?: unknown; passCondition?: unknown; partialCredit?: unknown; failCondition?: unknown }[]): TaskCheck[] {
+  const bps = criteria.map((c) => (typeof c.weight === 'number' && Number.isFinite(c.weight) ? Math.round(c.weight * 100) : NaN));
+  const badWeights = criteria.filter((c, i) => !(bps[i]! > 0) || Math.abs((c.weight as number) * 100 - bps[i]!) > 1e-6);
+  const total = bps.reduce((n, b) => n + (Number.isNaN(b) ? 0 : b), 0);
+  const weightsOk = criteria.length > 0 && badWeights.length === 0 && total === 10_000;
+  const text = (v: unknown) => typeof v === 'string' && v.trim() !== '';
+  const badAnchors = criteria.filter((c) => !text(c.passCondition) || !text(c.partialCredit) || !text(c.failCondition));
+  return [
+    { id: 'anvil.criteria-weights', section: 'S7', ok: weightsOk, message: weightsOk ? 'Every weight is above 0 with at most two decimals, and the weights total exactly 100' : badWeights.length ? `Give criteria ${badWeights.map((c) => c.id ?? '?').join(', ')} a weight above 0 with at most two decimals` : `Weights must total exactly 100 (now ${total / 100})` },
+    { id: 'anvil.criteria-anchors', section: 'S7', ok: badAnchors.length === 0, message: badAnchors.length ? `State the pass condition (5), partial credit (2) and fail (0) for criteria ${badAnchors.map((c) => c.id ?? '?').join(', ')}` : 'Every criterion states full, partial and fail' },
+  ];
+}
+
+/**
+ * Checks for a template in the joint format (Anvil's four confirmations, 11 Nov 2026): each criterion uses the exact
+ * evaluator (id, version) its template maps to that criterion ID; output-reference criteria name an output field of
+ * the template's output schema and a private expected value; at least one criterion is critical; recorded calls use
+ * tools the execution part declares.
+ */
+function jointSpecChecks(spec: { execution: Record<string, unknown> }, output: Record<string, unknown>): TaskCheck[] {
+  const sections = (output.sections ?? {}) as Record<string, Record<string, unknown> | undefined>;
+  type C = { id?: string; evaluatorKind?: unknown; evaluatorVersion?: unknown; weight?: unknown; passCondition?: unknown; partialCredit?: unknown; failCondition?: unknown; critical?: unknown; outputField?: unknown; expectedValue?: unknown };
+  const criteria = (Array.isArray(sections.S7?.criteria) ? sections.S7!.criteria : []) as C[];
+  const map = evaluatorMap(spec);
+  const outputs = Object.keys(((spec.execution.output_schema as { properties?: object } | undefined)?.properties ?? {}) as object);
+  const unmapped = criteria.filter((c) => !c.id || !map.has(c.id));
+  const wrong = criteria.filter((c) => c.id && map.has(c.id) && (c.evaluatorKind !== map.get(c.id)!.id || c.evaluatorVersion !== map.get(c.id)!.version));
+  const filled = (v: unknown) => v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '');
+  const noReference = criteria.filter((c) => c.id && map.get(c.id)?.evidenceSource === 'output' && (!filled(c.outputField) || !outputs.includes(String(c.outputField)) || !filled(c.expectedValue)));
+  const tools = new Set(jointToolIds(spec as never));
+  const calls = (Array.isArray(sections.S3?.recordedResponses) ? sections.S3!.recordedResponses : []) as { id?: string; tool?: string }[];
+  const badTools = calls.filter((c) => !c.tool || !tools.has(c.tool));
+  const hasCritical = criteria.some((c) => c.critical === true);
+  return [
+    ...weightAndAnchorChecks(criteria),
+    { id: 'anvil.evaluator-binding', section: 'S7', ok: unmapped.length === 0, message: unmapped.length ? `Criteria ${unmapped.map((c) => c.id ?? '?').join(', ')} have no evaluator in this template; use the template’s criterion IDs (${[...map.keys()].join(', ')})` : 'Every criterion has an evaluator in the template' },
+    { id: 'anvil.evaluator-kinds', section: 'S7', ok: wrong.length === 0, message: wrong.length ? `Use the template’s evaluator and version for ${wrong.map((c) => `${c.id} (${map.get(c.id!)!.id} v${map.get(c.id!)!.version})`).join(', ')}` : 'Every criterion uses the evaluator and version its template maps to it' },
+    { id: 'anvil.output-reference', section: 'S7', ok: noReference.length === 0, message: noReference.length ? `Criteria ${noReference.map((c) => c.id).join(', ')} check the final answer: name an output field (${outputs.join(', ') || 'none declared'}) and the private expected value` : 'Every output check names an output field and its expected value' },
+    { id: 'anvil.critical', section: 'S7', ok: hasCritical, message: hasCritical ? 'At least one criterion is critical' : 'Mark at least one criterion critical' },
     { id: 'anvil.tools', section: 'S3', ok: badTools.length === 0, message: badTools.length ? `Recorded calls must use tools Anvil described for this template: ${badTools.map((c) => `${c.id ?? '?'} (${c.tool ?? 'no tool'})`).join(', ')}` : 'Every recorded call uses a tool Anvil described' },
   ];
 }

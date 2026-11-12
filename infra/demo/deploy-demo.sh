@@ -198,14 +198,16 @@ printf 'ANVIL_ENVIRONMENT: "%s"\n' "${ANVIL_ENVIRONMENT:-qa}" >> "$ENVFILE"
 # Export to Anvil is connected only when the owner has stored, in this project's Secret Manager, Anvil's export token
 # (secret anvil-export-token) and the Anvil project's generic export address (secret anvil-export-base-url, kept out of
 # this public repository). Otherwise project export runs Praxis's own pre-check.
+# Both are passed to Cloud Run as secret references: the deployer never reads either value (its CI account may only list
+# secrets, not read them), and Cloud Run's runtime account resolves them. Store the address without a trailing newline.
 ANVIL_SECRET=
 anvil_version() { [ -n "$(gcloud secrets versions list "$1" --filter=state=ENABLED --limit=1 --format='value(name)' 2>/dev/null)" ]; }
-if [ -z "${ANVIL_EXPORT_BASE_URL:-}" ] && anvil_version anvil-export-base-url; then
-  ANVIL_EXPORT_BASE_URL=$(gcloud secrets versions access latest --secret=anvil-export-base-url 2>/dev/null | tr -d '[:space:]')
-fi
 if [ -n "${ANVIL_EXPORT_BASE_URL:-}" ] && anvil_version anvil-export-token; then
   printf 'ANVIL_EXPORT_BASE_URL: "%s"\n' "$ANVIL_EXPORT_BASE_URL" >> "$ENVFILE"
   ANVIL_SECRET=,ANVIL_EXPORT_TOKEN=anvil-export-token:latest
+  echo "Anvil export connected (address from ANVIL_EXPORT_BASE_URL)."
+elif anvil_version anvil-export-base-url && anvil_version anvil-export-token; then
+  ANVIL_SECRET=,ANVIL_EXPORT_BASE_URL=anvil-export-base-url:latest,ANVIL_EXPORT_TOKEN=anvil-export-token:latest
   echo "Anvil export connected."
 else
   echo "Anvil export not connected (needs secrets anvil-export-base-url and anvil-export-token)."

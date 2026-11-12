@@ -19,6 +19,7 @@ import { randomUUID } from 'node:crypto';
 import './auth/actor';
 import { z } from 'zod';
 import { rbacPlugin } from './auth/rbac';
+import { anvilAudience, googleIdTokenProvider, GoogleServiceIdentityVerifier, type ServiceIdentityVerifier } from './anvil/service-identity';
 import type { Config } from './config';
 import type { Db } from './db';
 import { AppError } from './lib/errors';
@@ -93,6 +94,8 @@ export interface AppDeps {
   config: Config;
   /** Anvil task validation for project export; defaults to Praxis's own pre-check until Anvil's API is connected. */
   anvilValidator?: AnvilTaskValidator;
+  /** Keyless Anvil caller verification; tests inject one with local keys. */
+  anvilIdentity?: ServiceIdentityVerifier;
   db: Db;
   pingRedis: () => Promise<boolean>;
   logger?: boolean | Record<string, unknown>;
@@ -293,7 +296,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     transform: jsonSchemaTransform,
   });
   await app.register(swaggerUi, { routePrefix: '/docs' });
-  await app.register(rbacPlugin, { db: deps.db });
+  // Keyless Anvil -> Praxis (K6): on only when the audience, subject and account are all configured.
+  const anvilIdentity = deps.anvilIdentity ?? (deps.config.ANVIL_INBOUND_AUDIENCE && deps.config.ANVIL_CALLER_SUBJECT && deps.config.ANVIL_CALLER_SERVICE_ACCOUNT
+    ? new GoogleServiceIdentityVerifier({ audience: deps.config.ANVIL_INBOUND_AUDIENCE, subject: deps.config.ANVIL_CALLER_SUBJECT, email: deps.config.ANVIL_CALLER_SERVICE_ACCOUNT })
+    : undefined);
+  await app.register(rbacPlugin, { db: deps.db, anvilIdentity, anvilPilotStop: deps.config.ANVIL_CREDENTIAL_NOT_AFTER ? new Date(deps.config.ANVIL_CREDENTIAL_NOT_AFTER) : null });
 
   await app.register(healthRoutes, { db: deps.db, pingRedis: deps.pingRedis });
   await app.register(
@@ -304,7 +311,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(authRoutes, { db: deps.db, config: deps.config });
       await v1.register(userRoutes, { db: deps.db });
       await v1.register(templateRoutes, { db: deps.db });
-      await v1.register(projectExportRoutes, { db: deps.db, storage, validator: deps.anvilValidator ?? (deps.config.ANVIL_EXPORT_BASE_URL && deps.config.ANVIL_EXPORT_TOKEN ? new AnvilGatedValidator(new AnvilExportClient(deps.config.ANVIL_EXPORT_BASE_URL, deps.config.ANVIL_EXPORT_TOKEN)) : new PraxisPrecheckValidator()) });
+      await v1.register(projectExportRoutes, { db: deps.db, storage, validator: deps.anvilValidator ?? (deps.config.ANVIL_EXPORT_BASE_URL ? new AnvilGatedValidator(new AnvilExportClient(deps.config.ANVIL_EXPORT_BASE_URL, deps.config.ANVIL_EXPORT_TOKEN || googleIdTokenProvider(anvilAudience(deps.config.ANVIL_EXPORT_BASE_URL, deps.config.ANVIL_OUTBOUND_AUDIENCE)))) : new PraxisPrecheckValidator()) });
       await v1.register(templateProfileRoutes, { db: deps.db });
       await v1.register(anvilTemplateRoutes, { db: deps.db, anvil: { environment: deps.config.ANVIL_ENVIRONMENT, exportBaseUrl: deps.config.ANVIL_EXPORT_BASE_URL } });
       await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });

@@ -5,6 +5,7 @@ import { AppError, forbidden, unauthorized } from '../lib/errors';
 import { sha256 } from '../lib/crypto';
 import { ErrorDto } from '@praxis/shared';
 import type { AccessPolicy, ApiClientActor, CandidateActor, PartnerActor } from './actor';
+import { JWT_BEARER, type ServiceIdentityVerifier } from '../anvil/service-identity';
 import { CANDIDATE_SESSION_COOKIE, PARTNER_SESSION_COOKIE, resolveCandidateSession, resolveInternalSession, resolvePartnerSession, resolvePartnerToken, SESSION_COOKIE } from './sessions';
 
 /** Pure RBAC decision, shared by the hook and unit tests. */
@@ -27,13 +28,27 @@ export function checkAccess(policy: AccessPolicy, actor: FastifyRequest['actor']
 }
 
 /** Resolves `Authorization: Bearer <key>` to an active API client. Keys are stored only as SHA-256 hashes. */
-async function resolveApiClient(db: Db, header: string | undefined): Promise<ApiClientActor | null> {
-  const m = header?.match(/^Bearer\s+(\S{20,200})$/);
-  if (!m) return null;
-  const c = await db.apiClient.findUnique({ where: { keyHash: sha256(m[1]!) } });
+async function resolveApiClient(db: Db, header: string | undefined, identity?: ServiceIdentityVerifier, pilotStop?: Date | null): Promise<ApiClientActor | null> {
+  const jwt = header?.match(JWT_BEARER);
+  let c;
+  if (jwt) {
+    // Keyless (K6, 12 Nov 2026): a raw Google identity token for the pinned Anvil account, checked on every request,
+    // then its grant row: not revoked, not expired, and never after the pilot stop.
+    if (!identity) return null;
+    const who = await identity.verify(jwt[1]!);
+    if (!who) return null;
+    c = await db.apiClient.findUnique({ where: { serviceAccount: who.email } });
+    if (!c || c.kind !== 'ANVIL') return null;
+    if (!pilotStop || pilotStop <= new Date()) return null;
+  } else {
+    const m = header?.match(/^Bearer\s+(\S{20,200})$/);
+    if (!m) return null;
+    c = await db.apiClient.findUnique({ where: { keyHash: sha256(m[1]!) } });
+    if (c?.serviceAccount) return null; // a keyless grant never authenticates by key
+  }
   if (!c || c.revokedAt || (c.expiresAt && c.expiresAt <= new Date())) return null;
   // Owner, 11 Nov 2026 (Anvil Q7): an ANVIL key works only while the Admin who issued it is still an active Admin.
-  if (c.kind === 'ANVIL') {
+  if (c.kind === 'ANVIL' && !c.serviceAccount) {
     const issuer = c.issuedById ? await db.user.findFirst({ where: { id: c.issuedById, clientId: c.clientId } }) : null;
     if (!issuer || issuer.status !== 'ACTIVE' || !issuer.roles.includes('ADMIN')) return null;
   }
@@ -44,7 +59,7 @@ async function resolveApiClient(db: Db, header: string | undefined): Promise<Api
  * Resolves the session on every request and enforces each route's declared access policy.
  * A route without `config.access` fails at registration, so no endpoint can ship without RBAC.
  */
-export const rbacPlugin = fp(async (app: FastifyInstance, opts: { db: Db }) => {
+export const rbacPlugin = fp(async (app: FastifyInstance, opts: { db: Db; anvilIdentity?: ServiceIdentityVerifier; anvilPilotStop?: Date | null }) => {
   app.decorateRequest('actor', null);
   app.decorateRequest('candidate', null);
   app.decorateRequest('apiClient', null);
@@ -88,7 +103,7 @@ export const rbacPlugin = fp(async (app: FastifyInstance, opts: { db: Db }) => {
     }
 
     if (policy && typeof policy === 'object' && 'apiClient' in policy && !req.actor) {
-      req.apiClient = await resolveApiClient(opts.db, req.headers.authorization);
+      req.apiClient = await resolveApiClient(opts.db, req.headers.authorization, policy.apiClient === 'ANVIL' ? opts.anvilIdentity : undefined, opts.anvilPilotStop);
     }
 
     if (!policy) return; // 404s and swagger-ui static assets

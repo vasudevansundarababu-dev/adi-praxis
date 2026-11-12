@@ -195,23 +195,32 @@ fi
 printf 'ANVIL_CREDENTIAL_NOT_AFTER: "%s"\n' "${ANVIL_CREDENTIAL_NOT_AFTER:-2026-12-11T05:48:04Z}" >> "$ENVFILE"
 # One Anvil project per environment; QA and demo bind to Anvil's qa environment for revocation events.
 printf 'ANVIL_ENVIRONMENT: "%s"\n' "${ANVIL_ENVIRONMENT:-qa}" >> "$ENVFILE"
-# Export to Anvil is connected only when the owner has stored, in this project's Secret Manager, Anvil's export token
-# (secret anvil-export-token) and the Anvil project's generic export address (secret anvil-export-base-url, kept out of
-# this public repository). Otherwise project export runs Praxis's own pre-check.
-# Both are passed to Cloud Run as secret references: the deployer never reads either value (its CI account may only list
-# secrets, not read them), and Cloud Run's runtime account resolves them. Store the address without a trailing newline.
+# Export to Anvil is connected when the Anvil project's generic export address is known: from ANVIL_EXPORT_BASE_URL or
+# the secret anvil-export-base-url (kept out of this public repository). Keyless (owner, 12 Nov 2026; Keystone K6):
+# Praxis calls Anvil with its runtime account's Google identity token, so no Anvil token is needed. A legacy
+# anvil-export-token secret, if present, is still passed (and then used instead). Otherwise export runs Praxis's pre-check.
+# Values are passed as secret references: the deployer never reads them; Cloud Run's runtime account resolves them.
 ANVIL_SECRET=
 anvil_version() { [ -n "$(gcloud secrets versions list "$1" --filter=state=ENABLED --limit=1 --format='value(name)' 2>/dev/null)" ]; }
-if [ -n "${ANVIL_EXPORT_BASE_URL:-}" ] && anvil_version anvil-export-token; then
+ANVIL_TOKEN_REF=
+if anvil_version anvil-export-token; then ANVIL_TOKEN_REF=,ANVIL_EXPORT_TOKEN=anvil-export-token:latest; fi
+if [ -n "${ANVIL_EXPORT_BASE_URL:-}" ]; then
   printf 'ANVIL_EXPORT_BASE_URL: "%s"\n' "$ANVIL_EXPORT_BASE_URL" >> "$ENVFILE"
-  ANVIL_SECRET=,ANVIL_EXPORT_TOKEN=anvil-export-token:latest
-  echo "Anvil export connected (address from ANVIL_EXPORT_BASE_URL)."
-elif anvil_version anvil-export-base-url && anvil_version anvil-export-token; then
-  ANVIL_SECRET=,ANVIL_EXPORT_BASE_URL=anvil-export-base-url:latest,ANVIL_EXPORT_TOKEN=anvil-export-token:latest
-  echo "Anvil export connected."
+  ANVIL_SECRET=$ANVIL_TOKEN_REF
+  echo "Anvil export connected (address from ANVIL_EXPORT_BASE_URL; ${ANVIL_TOKEN_REF:+static token}${ANVIL_TOKEN_REF:-keyless})."
+elif anvil_version anvil-export-base-url; then
+  ANVIL_SECRET=,ANVIL_EXPORT_BASE_URL=anvil-export-base-url:latest$ANVIL_TOKEN_REF
+  echo "Anvil export connected (${ANVIL_TOKEN_REF:+static token}${ANVIL_TOKEN_REF:-keyless})."
 else
-  echo "Anvil export not connected (needs secrets anvil-export-base-url and anvil-export-token)."
+  echo "Anvil export not connected (needs the secret anvil-export-base-url)."
 fi
+# Keyless Anvil -> Praxis: accepted only from Anvil's pinned Google account (repository variables, not secrets, but kept
+# out of this public repository), for exactly this API's URL. Blank = Anvil cannot call Praxis.
+if [ -n "${ANVIL_CALLER_SERVICE_ACCOUNT:-}" ] && [ -n "${ANVIL_CALLER_SUBJECT:-}" ]; then
+  printf 'ANVIL_INBOUND_AUDIENCE: "%s"\nANVIL_CALLER_SERVICE_ACCOUNT: "%s"\nANVIL_CALLER_SUBJECT: "%s"\n' "$API_URL" "$ANVIL_CALLER_SERVICE_ACCOUNT" "$ANVIL_CALLER_SUBJECT" >> "$ENVFILE"
+  echo "Anvil keyless calls into Praxis accepted for audience $API_URL."
+fi
+if [ -n "${ANVIL_OUTBOUND_AUDIENCE:-}" ]; then printf 'ANVIL_OUTBOUND_AUDIENCE: "%s"\n' "$ANVIL_OUTBOUND_AUDIENCE" >> "$ENVFILE"; fi
 # gcloud accepts one env-vars file and no extra variables, so the runtime role name lives in the shared file.
 echo 'APP_DB_ROLE: praxis_app' >> "$ENVFILE"
 COMMON=(--region="$REGION" --service-account="$SA" --set-cloudsql-instances="$CONN" --env-vars-file="$ENVFILE"

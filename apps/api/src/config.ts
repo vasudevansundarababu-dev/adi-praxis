@@ -76,7 +76,18 @@ const Env = z.object({
    * The token is an Anvil-issued export-client secret: server only, never logged, never sent to a browser.
    */
   ANVIL_EXPORT_BASE_URL: z.string().regex(/^$|^https:\/\/[^\s]+$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/[^\s]*$/, 'ANVIL_EXPORT_BASE_URL must be https (or http on localhost)').default(''),
+  /** Optional legacy static token. Blank (the default, owner 12 Nov 2026) = Praxis calls Anvil keylessly with its own Google identity token. */
   ANVIL_EXPORT_TOKEN: z.string().default(''),
+  /** Audience of Praxis's identity token when calling Anvil. Blank = the origin of ANVIL_EXPORT_BASE_URL. */
+  ANVIL_OUTBOUND_AUDIENCE: z.string().default(''),
+  /**
+   * Keyless Anvil -> Praxis (K6, 12 Nov 2026): Anvil sends a raw Google-signed identity token. It is accepted only with
+   * issuer https://accounts.google.com, exactly this audience (this API's URL), this numeric subject and this account.
+   * Any of the three blank = keyless inbound is off.
+   */
+  ANVIL_INBOUND_AUDIENCE: z.string().default(''),
+  ANVIL_CALLER_SERVICE_ACCOUNT: z.string().regex(/^$|^[a-z0-9-]+@[a-z0-9-]+\.iam\.gserviceaccount\.com$/, 'ANVIL_CALLER_SERVICE_ACCOUNT must be a Google service account').default(''),
+  ANVIL_CALLER_SUBJECT: z.string().regex(/^$|^\d{10,30}$/, 'ANVIL_CALLER_SUBJECT must be the numeric Google subject').default(''),
   /**
    * Anvil environment this Praxis environment is bound to (Anvil's four confirmations, point 4): a revocation event is
    * accepted only for this environment and the project in ANVIL_EXPORT_BASE_URL. Blank = revocations are refused.

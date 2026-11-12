@@ -1,3 +1,4 @@
+import { ensureAnvilGrant } from '../anvil/grant';
 import { EXECUTABLE_WORKFLOW } from '@praxis/shared';
 import { hashPassword } from '../auth/password';
 import type { Db } from '../db';
@@ -13,6 +14,8 @@ export async function demoSetup(db: Db, env: NodeJS.ProcessEnv, log: (level: str
   const pw = { admin: env.DEMO_ADMIN_PASSWORD, pm: env.DEMO_PM_PASSWORD, reviewer: env.DEMO_REVIEWER_PASSWORD };
   if (!api || !pw.admin || !pw.pm || !pw.reviewer) throw new Error('API_URL and DEMO_*_PASSWORD are required');
   const { client } = await seed(db, { ...env, SEED_ADMIN_EMAIL: 'admin@praxis.demo', SEED_ADMIN_PASSWORD: pw.admin });
+  // Keyless Anvil grant (K6): only when Anvil's service account is configured for this environment.
+  await ensureAnvilGrant(db, client.id, env, log);
   for (const [email, name, role, password] of [['pm@praxis.demo', 'Pat Morgan', 'PM', pw.pm], ['reviewer@praxis.demo', 'Riley Chen', 'REVIEWER', pw.reviewer]] as const) {
     if (!(await db.user.findUnique({ where: { email } }))) {
       await db.user.create({ data: { clientId: client.id, email, name, roles: [role], passwordHash: await hashPassword(password) } });

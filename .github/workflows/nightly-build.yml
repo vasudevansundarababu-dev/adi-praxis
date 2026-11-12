@@ -84,6 +84,10 @@ jobs:
           PRAXIS_SME_SUPPLY: '1' # M10 on in the tester environment from the Release 1.1 test build (28 Sep 2026)
           PRAXIS_ENV_LABEL: Test environment
           PRAXIS_BUILD: ${{ env.LABEL }}
+          # Keyless Anvil (owner 12 Nov 2026; K6): Anvil's pinned Google account, as repository variables.
+          ANVIL_CALLER_SERVICE_ACCOUNT: ${{ vars.ANVIL_CALLER_SERVICE_ACCOUNT }}
+          ANVIL_CALLER_SUBJECT: ${{ vars.ANVIL_CALLER_SUBJECT }}
+          ANVIL_OUTBOUND_AUDIENCE: ${{ vars.ANVIL_OUTBOUND_AUDIENCE }}
         run: infra/demo/deploy-demo.sh "$PROJECT" unused "$REGION"
       - name: Smoke test
         run: |

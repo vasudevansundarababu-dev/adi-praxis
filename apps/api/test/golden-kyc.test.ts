@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { GOLDEN_KYC_EXAMPLE, withRuleVersions, type CandidateRule } from '@praxis/shared';
+import { GOLDEN_KYC_EXAMPLE, KYC_ACCOUNT_OPENING_PROFILE, withRuleVersions, type CandidateRule } from '@praxis/shared';
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MockGoogleVerifier } from '../src/candidate/google';
@@ -68,6 +68,12 @@ describe('Golden KYC: the full Praxis cycle on KYC template version 2', () => {
   const post = (cookie: string, url: string, payload: object = {}) => app.inject({ method: 'POST', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
   const patch = (cookie: string, url: string, payload: object) => app.inject({ method: 'PATCH', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
   const put = (cookie: string, url: string, payload: object) => app.inject({ method: 'PUT', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
+  /** POST that must succeed; the body is shown when it does not. */
+  const ok = async (cookie: string, url: string, payload: object = {}) => {
+    const r = await post(cookie, url, payload);
+    expect(r.statusCode, `${url}: ${r.body}`).toBe(200);
+    return r;
+  };
   const get = (cookie: string, url: string) => app.inject({ method: 'GET', url: `/api/v1${url}`, headers: { cookie } });
 
   beforeAll(async () => {
@@ -131,25 +137,26 @@ describe('Golden KYC: the full Praxis cycle on KYC template version 2', () => {
   }
 
   /** Project on KYC v2 with the Expert -> PM route, rules published, one Expert and one SME assigned. */
-  async function staffedProject(templateId: string) {
+  async function staffedProject(templateId: string, skills = ['KYC', 'CIP', 'Account opening']) {
     const pmUser = await createUser(clientId, ['PM']);
     const pm = await login(app, pmUser.email);
-    const jd = (await post(pm, '/job-descriptions', { title: 'KYC analyst (account opening)', responsibilities: 'Author synthetic account-opening investigations.', skills: ['KYC', 'CIP', 'Account opening'], wagePerTask: 60, wageCurrency: 'USD', locationType: 'REMOTE' })).json();
+    const jd = (await post(pm, '/job-descriptions', { title: 'KYC analyst (account opening)', responsibilities: 'Author synthetic account-opening investigations.', skills, wagePerTask: 60, wageCurrency: 'USD', locationType: 'REMOTE' })).json();
     const created = await post(pm, '/projects', { authoringExperience: 'CLASSIC', reviewRoute: 'SME_EXPERT_PM', templateId, name: 'Golden KYC pilot', taskMode: 'AUTHORING', distinctTarget: 1, maxPerExpert: 1, tptMinutes: 90, startDate: '2026-11-16', endDate: '2026-11-30', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['US'], required: true }] });
     expect(created.statusCode, created.body).toBe(201);
     const p = created.json();
     await db.project.update({ where: { id: p.id }, data: { authoringExperience: null } });
     const versions = await publishGoldenRules(p.id, pmUser.id);
-    expect((await post(pm, `/projects/${p.id}/submit`)).statusCode).toBe(200);
-    expect((await post(pm, `/projects/${p.id}/match`)).statusCode).toBe(200);
+    const submitted = await post(pm, `/projects/${p.id}/submit`);
+    expect(submitted.statusCode, submitted.body).toBe(200);
+    await ok(pm, `/projects/${p.id}/match`);
     const expertUser = await createUser(clientId, ['REVIEWER']);
-    expect((await post(pm, `/projects/${p.id}/reviewers`, { userId: expertUser.id })).statusCode).toBe(200);
+    await ok(pm, `/projects/${p.id}/reviewers`, { userId: expertUser.id });
     const mail = `${randomUUID().slice(0, 8)}@example.test`;
     const res = await app.inject({ method: 'POST', url: '/api/v1/auth/google', payload: { credential: google.mint({ subject: `sub-${mail}`, email: mail, name: 'Kai Author' }), adultAttested: true } });
     const smeUserId = res.json().id as string;
     await db.smeUser.update({ where: { id: smeUserId }, data: { identityStatus: 'VERIFIED' } });
-    const c = await db.candidate.create({ data: { clientId, smeUserId, country: 'US', languages: [{ language: 'en', level: 'C2' }], specialties: ['KYC'], skills: ['KYC', 'CIP'], jurisdictions: ['US-NY'], domainExperienceYears: 10, hoursPerWeek: 20, timezone: 'America/New_York', lastValidatedAt: new Date() } });
-    expect((await post(pm, `/projects/${p.id}/assignments`, { candidateIds: [c.id] })).statusCode).toBe(200);
+    const c = await db.candidate.create({ data: { clientId, smeUserId, country: 'US', languages: [{ language: 'en', level: 'C2' }], specialties: skills, skills, jurisdictions: ['US-NY'], domainExperienceYears: 10, hoursPerWeek: 20, timezone: 'America/New_York', lastValidatedAt: new Date() } });
+    await ok(pm, `/projects/${p.id}/assignments`, { candidateIds: [c.id] });
     for (const ev of await db.outboxEvent.findMany({ where: { name: 'candidate.assigned' }, orderBy: { createdAt: 'asc' } })) await processDomainEvent(db, defaultHandlers({ email, config }), ev.id);
     const task = await db.taskInstance.findFirstOrThrow({ where: { projectId: p.id, assignedToId: c.id } });
     const sme = `praxis_candidate=${res.cookies.find((x) => x.name === 'praxis_candidate')!.value}`;
@@ -225,5 +232,54 @@ describe('Golden KYC: the full Praxis cycle on KYC template version 2', () => {
     expect(output.profile.id).toBe('kyc-account-opening');
     expect(output.sections.S6.recommendation).toBe('ready_for_approval');
     expect(output.sections.S4.policies.map((p) => p.ruleVersion).sort()).toEqual(Object.values(s.versions).sort());
+  });
+
+  it('a golden task pack is uploaded without a code change: new workflow, draft template, full cycle on the uploaded form', async () => {
+    const id = `golden-pack-${randomUUID().slice(0, 8)}`;
+    const workflow = `Golden pack demo ${id}`;
+    const profile = { ...KYC_ACCOUNT_OPENING_PROFILE, profileId: id, catalogWorkflowName: workflow, agentMode: 'MULTI' as const, handoverName: 'Golden pack demo form' };
+    const example = { ...GOLDEN_KYC_EXAMPLE, profile: { id, version: 1 } };
+    const pack = {
+      schemaVersion: 'praxis.golden_pack.v1',
+      source: 'Golden reference (synthetic) for the upload test',
+      profile,
+      template: { domainName: 'Marketing', primaryWork: 'Author a synthetic investigation with its reference and rubric.', verificationCriteria: 'Evidence, reference and rubric agree.', humanGate: 'A person approves; the agent only recommends.', skills: ['Campaign compliance'], defaultTptMinutes: 90, coverageDimensions: { dimensions: [{ key: 'product', label: 'Product', values: ['teen_joint_checking'] }], cells: [{ tags: { product: 'teen_joint_checking' }, quota: 1, required: true }] } },
+      examples: [{ name: 'Worked case 1', output: example }],
+    };
+
+    // Check first: nothing is stored. A broken pack lists its problems; PMs cannot upload.
+    const bad = await post(admin, '/template-profiles/check', { ...pack, examples: [{ name: 'Broken', output: { ...example, sections: { ...example.sections, S6: {} } } }] });
+    expect(bad.json().ok).toBe(false);
+    expect(bad.json().problems.join(' ')).toMatch(/example "Broken"/);
+    const pmUser = await createUser(clientId, ['PM']);
+    expect((await post(await login(app, pmUser.email), '/template-profiles', pack)).statusCode).toBe(403);
+    expect((await post(admin, '/template-profiles/check', pack)).json()).toMatchObject({ ok: true, examples: [{ name: 'Worked case 1', problems: [] }] });
+    expect(await db.uploadedProfile.count()).toBe(0);
+
+    // Upload: the form is stored append-only, and the new workflow gets a draft template that uses it.
+    const up = await post(admin, '/template-profiles', pack);
+    expect(up.statusCode, up.body).toBe(201);
+    const templateId = up.json().createdTemplateId as string;
+    expect(up.json()).toMatchObject({ profileId: id, source: 'uploaded', agentMode: 'MULTI', examples: 1 });
+    expect((await post(admin, '/template-profiles', pack)).statusCode).toBe(422);
+    await expect(db.$executeRawUnsafe(`UPDATE "UploadedProfile" SET source = 'x' WHERE profile_id = '${id}'`)).rejects.toThrow();
+    expect((await get(admin, `/template-profiles?workflow=${encodeURIComponent(workflow)}`)).json().items).toEqual([expect.objectContaining({ profileId: id, source: 'uploaded', isDefault: false })]);
+    const draft = (await get(admin, `/templates/${templateId}`)).json();
+    expect(draft).toMatchObject({ workflowName: workflow, status: 'DRAFT', profileId: id, domainName: 'Marketing' });
+    const pub = await post(admin, `/templates/${templateId}/publish`);
+    expect(pub.statusCode, pub.body).toBe(200);
+
+    // The full cycle on the uploaded form: the SME gets the form itself from the server.
+    const s = await staffedProject(templateId, ['Campaign compliance']);
+    const t = await view(s.sme, s.taskId);
+    expect(t.template).toMatchObject({ workflow, profileId: id, profile: { profileId: id, agentMode: 'MULTI' } });
+    expect((await save(s.sme, s.taskId, withRuleVersions(example, s.versions))).statusCode).toBe(200);
+    const sub = await submit(s.sme, s.taskId);
+    expect(sub.statusCode, sub.body).toBe(200);
+    expect((await stage(s.expert, s.taskId, { stage: 'EXPERT_REVIEW', decision: 'PASS', checklist: allTrue })).statusCode).toBe(200);
+    expect((await stage(s.pm, s.taskId, { stage: 'PM_APPROVAL', decision: 'APPROVE' })).statusCode).toBe(200);
+    const record = await db.approvedTaskRecord.findFirstOrThrow({ where: { taskInstanceId: s.taskId } });
+    expect((record.output as { profile: { id: string } }).profile.id).toBe(id);
+    expect(await db.auditEvent.count({ where: { action: 'template_profile.uploaded' } })).toBe(1);
   });
 });

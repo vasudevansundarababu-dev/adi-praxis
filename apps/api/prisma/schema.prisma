@@ -3241,19 +3241,36 @@ model TaskPolicySnapshot {
 /// Console search bar (owner, 12 Nov 2026): a derived index of list records, kept in step on search.
 /// `text` is matched by letters (pg_trgm); `embedding` holds the professional text's meaning (never names or emails).
 model SearchDocument {
-  id              String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId        String                       @map("client_id") @db.Uuid
-  entityType      String                       @map("entity_type")
-  entityId        String                       @map("entity_id") @db.Uuid
+  id              String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String                      @map("client_id") @db.Uuid
+  entityType      String                      @map("entity_type")
+  entityId        String                      @map("entity_id") @db.Uuid
   text            String
   /// sha256 of the meaning text; a change clears the embedding.
-  meaningHash     String                       @map("meaning_hash")
+  meaningHash     String                      @map("meaning_hash")
   embedding       Unsupported("vector(768)")?
-  embeddingModel  String?                      @map("embedding_model")
-  sourceUpdatedAt DateTime                     @map("source_updated_at")
-  createdAt       DateTime                     @default(now()) @map("created_at")
-  updatedAt       DateTime                     @updatedAt @map("updated_at")
+  embeddingModel  String?                     @map("embedding_model")
+  sourceUpdatedAt DateTime                    @map("source_updated_at")
+  createdAt       DateTime                    @default(now()) @map("created_at")
+  updatedAt       DateTime                    @updatedAt @map("updated_at")
 
   @@unique([entityType, entityId])
   @@index([clientId, entityType])
+}
+
+/// Golden task pack (owner, 12 Nov 2026): an uploaded authoring form plus its worked golden cases. Append-only:
+/// a changed form is uploaded under a new profile ID, so a template version's form never changes under its projects.
+model UploadedProfile {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  profileId    String   @unique @map("profile_id")
+  workflowName String   @map("workflow_name")
+  source       String
+  profile      Json
+  examples     Json
+  contentHash  String   @map("content_hash")
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([clientId, workflowName])
 }

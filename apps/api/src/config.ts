@@ -70,6 +70,13 @@ const Env = z.object({
   AUTHORING_MODEL: z.string().default('claude-sonnet-5-5'),
   /** FLOW2 suitability assessment model on Vertex: a Claude model id (default), or `gemini:<model>` (QA without Claude quota). */
   SUITABILITY_MODEL: z.string().default('claude-opus-5'),
+  /**
+   * Praxis-Anvil contract (12 Nov 2026): Anvil's project-scoped dataset-export API, e.g.
+   * https://anvil-qa.adi-labs.ai/api/v1/projects/<project>/dataset-exports. Blank = not connected (Praxis pre-check).
+   * The token is an Anvil-issued export-client secret: server only, never logged, never sent to a browser.
+   */
+  ANVIL_EXPORT_BASE_URL: z.string().regex(/^$|^https:\/\/[^\s]+$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/[^\s]*$/, 'ANVIL_EXPORT_BASE_URL must be https (or http on localhost)').default(''),
+  ANVIL_EXPORT_TOKEN: z.string().default(''),
   AUTHORING_DAILY_CALL_CAP: z.coerce.number().int().min(1).max(100_000).default(300),
   /** Wave 3: Vertex location for AUTHORING_MODEL=maas:<publisher>/<model> (the region on the model card, or `global`). Blank = VERTEX_LOCATION. */
   AUTHORING_MAAS_LOCATION: z.string().regex(/^$|^[a-z0-9-]+$/).default(''),

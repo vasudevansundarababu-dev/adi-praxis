@@ -59,3 +59,35 @@ export function validationItem(record: ApprovedTaskRecord, title: string, compil
     return { ...base, envelope: null, exportProblems: details.length ? details.map((d) => ({ code: e.code, path: d.path, message: d.message })) : [{ code: e.code, path: null, message: e.message }] };
   }
 }
+
+/** The generic Praxis export contract Anvil must advertise under /contracts (contract open question 1). */
+export const GENERIC_EXPORT_CONTRACTS = ['praxis.authored-task-export.v1', 'praxis.authored-task-export.v1-proposed'];
+
+/**
+ * Connected to Anvil (ANVIL_EXPORT_BASE_URL set). Discovers Anvil's contracts first. Until Anvil advertises the generic
+ * Praxis export contract, no package is sent: each task keeps Praxis's own pre-check issues and is marked "not
+ * validated by Anvil" with the exact reason (unsupported contract, authentication, availability). A task is never
+ * reported valid unless Anvil returned that verdict.
+ */
+export class AnvilGatedValidator implements AnvilTaskValidator {
+  readonly name = 'anvil-discovery+praxis-precheck';
+  readonly version = 'praxis-anvil-contract-2026-11-12';
+  private readonly pre = new PraxisPrecheckValidator();
+  constructor(private readonly client: import('./export-client').AnvilExportClient) {}
+
+  async validate(items: ValidationItem[]): Promise<TaskValidationResult[]> {
+    const local = await this.pre.validate(items);
+    const c = await this.client.contracts();
+    let reason: { code: string; message: string };
+    if (c.kind !== 'business') {
+      reason = { code: `ANVIL_${c.kind.toUpperCase()}`, message: `${c.message}${c.requestId ? ` (Anvil request ${c.requestId})` : ''}` };
+    } else {
+      const advertised = JSON.stringify(c.data);
+      const generic = GENERIC_EXPORT_CONTRACTS.find((id) => advertised.includes(id));
+      reason = generic
+        ? { code: 'ANVIL_PACKAGE_FORMAT_PENDING', message: `Anvil advertises ${generic}; Praxis sends packages once the package format is agreed (contract question 1).` }
+        : { code: 'ANVIL_CONTRACT_UNAVAILABLE', message: `Anvil does not yet support generic Praxis task export (receiver_contract_unavailable)${c.requestId ? `; Anvil request ${c.requestId}` : ''}.` };
+    }
+    return local.map((r) => ({ ...r, status: r.status === 'needs_fix' ? 'needs_fix' : 'not_validated', issues: [...r.issues, { code: reason.code, path: null, message: reason.message }] }));
+  }
+}

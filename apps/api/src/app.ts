@@ -66,7 +66,8 @@ import { opportunityRoutes } from './routes/opportunities';
 import { reviewerRecruitmentRoutes } from './routes/reviewer-recruitment';
 import { searchRoutes } from './routes/search';
 import { projectExportRoutes } from './routes/project-export';
-import { PraxisPrecheckValidator, type AnvilTaskValidator } from './anvil/validator';
+import { AnvilGatedValidator, PraxisPrecheckValidator, type AnvilTaskValidator } from './anvil/validator';
+import { AnvilExportClient } from './anvil/export-client';
 import { SearchService } from './search/service';
 import { projectRoutes } from './routes/projects';
 import { staffingRoutes } from './routes/staffing';
@@ -303,7 +304,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(authRoutes, { db: deps.db, config: deps.config });
       await v1.register(userRoutes, { db: deps.db });
       await v1.register(templateRoutes, { db: deps.db });
-      await v1.register(projectExportRoutes, { db: deps.db, storage, validator: deps.anvilValidator ?? new PraxisPrecheckValidator() });
+      await v1.register(projectExportRoutes, { db: deps.db, storage, validator: deps.anvilValidator ?? (deps.config.ANVIL_EXPORT_BASE_URL && deps.config.ANVIL_EXPORT_TOKEN ? new AnvilGatedValidator(new AnvilExportClient(deps.config.ANVIL_EXPORT_BASE_URL, deps.config.ANVIL_EXPORT_TOKEN)) : new PraxisPrecheckValidator()) });
       await v1.register(templateProfileRoutes, { db: deps.db });
       await v1.register(anvilTemplateRoutes, { db: deps.db });
       await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });

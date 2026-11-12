@@ -408,3 +408,24 @@ This supersedes Addendum 1, point 4 (ownership). Template qualification by Anvil
 
    Q18. Will Anvil send the role profiles with the template proposal, and may Praxis return staffing feasibility
         counts (no personal data) in the validation response?
+
+7A. AMENDMENT TO SECTION 7 (owner, 12 Nov 2026): ANVIL GIVES SKILLS; PRAXIS DECIDES THE ROLES
+    This replaces 7(a) where they differ.
+    - Anvil provides only the SKILLS needed for authoring and for reviewing a template's tasks (mandatory and
+      preferred skills, specialties, jurisdictions and languages, and any certification the benchmark needs).
+      Anvil does not define Praxis roles or the review route.
+    - Praxis decides, from those skills, how authoring and reviewing are split into roles:
+        - who authors;
+        - which review stages exist (e.g. SME -> PM, or SME -> Expert -> PM);
+        - experience and education levels;
+        - volumes;
+        - TPT.
+    - Praxis has the autonomy to MERGE roles, e.g. the Reviewer (Expert) and PM as one role held by one person. Each
+      decision is still recorded and audited separately, and a person never reviews their own authored task. Praxis
+      already lets the same person act as Expert and PM with two audit events (Wave 2 decision).
+    - Validation therefore checks that the skills are sufficient to build author and reviewer job descriptions
+      (errors such as TP_SKILLS_MISSING). Role codes such as TP_ROLE_MISSING, TP_ROLE_UNSUPPORTED,
+      TP_REVIEWER_PROFILE_MISSING and TP_REVIEW_ROUTE_UNSUPPORTED no longer apply to Anvil's proposal; role and route
+      choices are Praxis's.
+    - Q18 becomes: will Anvil send authoring and reviewing skills with the template proposal, and may Praxis return
+      staffing feasibility counts (no personal data) in the validation response?

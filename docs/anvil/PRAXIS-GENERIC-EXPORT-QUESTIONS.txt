@@ -429,3 +429,17 @@ This supersedes Addendum 1, point 4 (ownership). Template qualification by Anvil
       choices are Praxis's.
     - Q18 becomes: will Anvil send authoring and reviewing skills with the template proposal, and may Praxis return
       staffing feasibility counts (no personal data) in the validation response?
+
+7B. PRECISION (owner, 12 Nov 2026): THE ROLE SPLIT IS DECIDED AT PROJECT CREATION
+    - The template version carries Anvil's authoring and reviewing skills, and nothing about roles.
+    - When a PM creates a project from that template version, Praxis decides the role split for that project:
+        - review route: SME -> PM, or SME -> Expert -> PM;
+        - whether the Reviewer (Expert) and PM are one person;
+        - experience and education levels;
+        - volumes and TPT.
+    - Praxis then generates the author and reviewer job descriptions from the template's skills: mandatory skills
+      come from the template; reviewers get more years of experience.
+    - Two projects on the same template version may therefore have different role splits. Anvil sees only exported
+      tasks and their review provenance, never staffing.
+    - This already works in Praxis today: the review route is chosen at project creation; generated author and
+      reviewer JDs; the same person may act as Expert and PM, with separate audit events.

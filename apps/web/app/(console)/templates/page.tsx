@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { DirectoryView } from '@/components/templates/directory/directory-view';
 import { McHeader } from '@/components/templates/mc-header';
 import { getCurrentUser } from '@/lib/api';
@@ -19,6 +20,11 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
           ? 'Templates and active SME applications by domain. Open a workflow to edit its blueprint, then generate, verify and deploy its SME studio.'
           : 'Published workflow templates you can create projects from.'}
       </p>
+      {isAdmin && (
+        <p className="mt-2 text-sm">
+          <Link href="/templates/forms">Authoring forms and golden packs</Link>
+        </p>
+      )}
       {data ? (
         <DirectoryView data={data} domainFilter={domain} />
       ) : (

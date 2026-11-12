@@ -18,7 +18,7 @@ export interface ApiClientActor {
   type: 'SERVICE';
   apiClientId: string;
   clientId: string;
-  kind: 'CLIENT_API' | 'RL_GYM';
+  kind: 'CLIENT_API' | 'RL_GYM' | 'ANVIL';
 }
 
 /** A candidate (SME user), resolved from the separate candidate session cookie. A different token audience. */

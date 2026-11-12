@@ -792,3 +792,119 @@ Owner chose a **new KYC template version** (not a separate template, not a chang
   reference, not an agreed Praxis-to-Anvil export format. Execution, evaluation and reporting stay in Anvil.
 - **Open (owner):** the four other cell slots for the products (adult joint, individual, custodial) are authored by SMEs;
   only one worked case ships. The marketing multi-agent golden task will follow the same route when it arrives.
+
+## Project export with Anvil validation (12 Nov 2026)
+
+The owner asked for an Export button on the project page. PMs and Admins who may export validate one task at any time
+and export once the project is complete. On export, Praxis calls Anvil's validate API, which says which tasks need to be
+fixed. The owner has asked the Anvil team for that API.
+
+- **(chosen by Claude)** **Who.** The project's owning PM or an Admin; anyone else gets 404, as for the project page.
+- **(chosen by Claude)** **When.**
+  - Validate needs at least one approved task (current records; a correction replaces the record it corrects).
+  - Export needs that, plus one of: the distinct-task target is reached, the project is COMPLETED, or the end date has
+    come.
+  - Drafts and cancelled projects cannot export.
+- **(chosen by Claude)** **Validate** takes exactly one task. **Export** validates every approved task and writes one
+  file with one JSON line per task: the dataset record, its `praxis.anvil.export.v1` envelope (null when the task has
+  no executable contract), and the verdict. The file is stored with its sha256 and can be downloaded again.
+- **(chosen by Claude)** **Anvil's API is not published**, so its wire format is not invented. Praxis calls it through
+  `AnvilTaskValidator`. Until the Anvil adapter is written against Anvil's documented contract, Praxis runs
+  `PraxisPrecheckValidator`: the same checks as the per-record Anvil export. It is labelled "Anvil validation is not
+  connected yet" in the console and recorded as `praxis-precheck` on every run.
+- **(chosen by Claude)** **The verdict is advice only.**
+  - It changes no task, review decision or dataset record. The PM decides what to do; the console links each flagged
+    task.
+  - If the validator does not answer, tasks are "not validated", never assumed valid.
+  - Runs (`ProjectValidationRun`) are append-only and audited (`project.validated`, `project.exported`).
+- **Open (Anvil):** the validate API contract: request (envelopes or records), response per task, evaluator versions,
+  and error and timeout behaviour. Then the `anvil` adapter replaces the pre-check.
+
+## Golden task packs: upload a form without a code change (12 Nov 2026)
+
+Owner: "Marketing is taking time … I need an utility to upload it later, hopefully without any code changes." Guide:
+`docs/authoring/GOLDEN-PACK.md`.
+
+- **(chosen by Claude)** **Format.** A pack (`praxis.golden_pack.v1`) is the authoring form, which is already declarative
+  data (`praxis.template_profile.v1`), plus up to 20 worked cases. It may also carry the template for a new workflow,
+  because the console has no "new workflow" control.
+- **(chosen by Claude)** **Checking.** A pack is checked before anything is stored (`POST /template-profiles/check`):
+  - the form must register;
+  - it uses sections storage and no specialised editor;
+  - its ID must be unused;
+  - every example must pass the form's checks.
+- **(chosen by Claude)** **Storage.** `UploadedProfile` is append-only (database triggers); a form ID is never reused.
+  Upload, and any template it creates, are audited. Admin only; PMs can list forms.
+- **(chosen by Claude)** **New workflow.** A pack with `template` creates the workflow's template as a **draft** that
+  already uses the form. The Admin reviews and publishes it: nothing goes live from an upload alone.
+- **(chosen by Claude)** **Runtime.** Each API instance registers uploaded forms at start, after an upload and every
+  minute. The server sends the chosen form with each task, so the SME app and the console need no rebuild.
+
+## Praxis-Anvil contract: Praxis side built (12 Nov 2026)
+
+The owner approved the final contract (`docs/anvil/PRAXIS-ANVIL-CONTRACT-FINAL.md`) and said to build. Praxis builds
+what does not depend on Anvil's open questions.
+
+- **(chosen by Claude)** **Anvil keys.** Anvil calls Praxis with an Admin-issued `ANVIL` API key (existing API-client
+  mechanism: shown once, stored hashed, revocable).
+  - New: keys can expire; `ANVIL` keys must (default 30 days, at most 90).
+  - Expired or revoked keys get 401; other key kinds and staff sessions get 403.
+- **(chosen by Claude)** **Template API** at `/api/v1/integrations/anvil/templates`: `contracts`, `validate`,
+  `proposals`, `proposals/{id}`, `qualifications`.
+  - Anvil's `{data, meta.request_id}` envelope.
+  - `errors[]` holds what Anvil must fix; `praxis_requirements[]` holds staffing advice as counts only;
+    `review_gates[]` is separate.
+  - A reused Idempotency-Key with a different body gets **409**, as the contract says (Praxis's other routes keep 422).
+- **(chosen by Claude)** **Proposal format.** The spec is `praxis.template_spec.v1-proposed`: a golden pack (authoring
+  part) plus Anvil's requirement reference, execution part (environment, tool schemas, allowed evaluator kinds,
+  output schema) and authoring/reviewing skills. The joint format is open question 1, so only this wrapper may
+  change.
+- **(chosen by Claude)** **Drafts from proposals.** A proposal creates a DRAFT template version:
+  - version 1 for a new workflow (the pack must carry its template);
+  - the next version of an existing workflow (409 when a draft is already open).
+
+  The draft stores Anvil's part unchanged (`Template.anvilSpec`) and takes the authoring skills as the template skills
+  (which drive the generated JDs). A Praxis Admin publishes; nothing goes live from the API.
+- **(chosen by Claude)** **Qualification.** Anvil qualifies the exact template version hash: sha256 over RFC 8785
+  JSON of workflow, version, form, execution part and skills (open question 2).
+  - Receipts and revocations are append-only rows (`TemplateQualification`).
+  - The console shows "Anvil-ready for benchmarks" only when the version is published and its latest receipt is
+    QUALIFIED.
+  - Variants copied from a template do not inherit its form or Anvil spec.
+- **(chosen by Claude)** **Template gaps closed for Anvil-proposed templates.** Rubric criteria have an evaluator kind.
+  On a template version with Anvil's spec, submission requires each criterion to use an allowed kind and each recorded
+  tool call to use a tool Anvil described. Graph node types wait for Anvil's catalogue (question 3).
+- **(chosen by Claude)** **Anvil export client.** Server-side only (`ANVIL_EXPORT_BASE_URL`, `ANVIL_EXPORT_TOKEN`;
+  https only).
+  - Raw ZIP, bearer token, no cookies or CSRF.
+  - Business results are kept apart from auth, availability, transport, conflict and internal errors.
+  - 1 MiB upload bound; a timeout.
+  - The token is never logged or echoed.
+- **(chosen by Claude)** **Gated validator.** When connected, project export checks `/contracts` first. Until Anvil
+  advertises the generic Praxis export contract, no package is sent: tasks show Praxis's own issues plus "not
+  validated by Anvil" with the exact reason. A task is never reported valid unless Anvil returned that.
+- **Waiting on Anvil:**
+  - the package format (Q1), canonical JSON (Q2), catalogue (Q3) and new codes (Q6);
+  - then the package builder and the validate/resolve wiring.
+- **Waiting on the owner:**
+  - an Anvil export token and a Praxis `ANVIL` key, each in its secret store;
+  - QA deploy approval.
+
+## Anvil's eight answers: owner decisions (11 Nov 2026)
+
+Anvil answered the eight contract questions (`Anvil-Praxis-eight-answers-v1.md`). Praxis feedback:
+`docs/anvil/ANVIL-EIGHT-ANSWERS-PRAXIS-FEEDBACK.md`. The owner accepted these four recommendations:
+
+- **(owner)** **Anvil key lifetime.** A Praxis `ANVIL` key never outlives the pilot bound
+  (`ANVIL_CREDENTIAL_NOT_AFTER`, today 2026-12-11T05:48:04Z, the same bound as Anvil's testing window). It also stops
+  working on every call once the Admin who issued it is no longer an active Admin. Within the bound the default stays
+  30 days. No bound configured means no Anvil key can be issued.
+- **(owner)** **Weights on Anvil-proposed templates.** Every criterion weight is above 0, has at most two decimals, and
+  the weights total exactly 100 (checked in basis points). Other templates keep their rules.
+- **(owner)** **5/2/0 descriptions on Anvil-proposed templates.** Every criterion states full credit (pass condition),
+  partial credit and fail. The new optional `failCondition` field is required only there; current KYC forms are
+  unchanged.
+- **(owner)** **One Anvil project per environment** receives all Praxis exports. `ANVIL_EXPORT_BASE_URL` points at
+  that project's generic path, `…/api/v1/projects/{project}/dataset-exports/generic`.
+- **(chosen by Claude)** Revocation keeps authoring and flags affected projects, as Anvil answered (Q5) and the owner
+  proposed. Anvil generic support is detected by the exact contract ID, never a similar name.

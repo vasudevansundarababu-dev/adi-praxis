@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { CancelProjectButton } from './cancel-button';
 import { PauseResumeButton } from './pause-resume';
 import { ProjectStatusBadge } from './project-status';
+import { ExportPanel, type ExportState } from './export-panel';
 import { ReviewersPanel } from './reviewers-panel';
 
 /** Read-only view of a submitted (or later) project, showing its frozen snapshots. */
@@ -12,7 +13,10 @@ export function ProjectSummary({
   attributes,
   jobDescriptions,
   reviewers,
+  exportState = null,
 }: {
+  /** Export and validation (owner, 12 Nov 2026); null when not loaded. */
+  exportState?: ExportState | null;
   reviewers: { items: { userId: string; name: string; email: string }[]; available: { userId: string; name: string; email: string }[] } | null;
   project: ProjectDto;
   template: TemplateDto | null;
@@ -97,6 +101,7 @@ export function ProjectSummary({
       {(p.status === 'IN_PROGRESS' || p.status === 'PAUSED') && <PauseResumeButton projectId={p.id} paused={p.status === 'PAUSED'} />}
       {CANCELLABLE_STATUSES.includes(p.status) && <CancelProjectButton projectId={p.id} />}
       {reviewers && !['CANCELLED', 'COMPLETED'].includes(p.status) && <ReviewersPanel projectId={p.id} initial={reviewers} />}
+      {exportState && <ExportPanel projectId={p.id} initial={exportState} />}
     </div>
   );
 }

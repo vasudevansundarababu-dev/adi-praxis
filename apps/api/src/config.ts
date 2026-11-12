@@ -70,6 +70,18 @@ const Env = z.object({
   AUTHORING_MODEL: z.string().default('claude-sonnet-5-5'),
   /** FLOW2 suitability assessment model on Vertex: a Claude model id (default), or `gemini:<model>` (QA without Claude quota). */
   SUITABILITY_MODEL: z.string().default('claude-opus-5'),
+  /**
+   * Praxis-Anvil contract (12 Nov 2026): Anvil's project-scoped dataset-export API, e.g.
+   * https://anvil-qa.adi-labs.ai/api/v1/projects/<project>/dataset-exports/generic (one Anvil project per environment). Blank = not connected (Praxis pre-check).
+   * The token is an Anvil-issued export-client secret: server only, never logged, never sent to a browser.
+   */
+  ANVIL_EXPORT_BASE_URL: z.string().regex(/^$|^https:\/\/[^\s]+$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/[^\s]*$/, 'ANVIL_EXPORT_BASE_URL must be https (or http on localhost)').default(''),
+  ANVIL_EXPORT_TOKEN: z.string().default(''),
+  /**
+   * Owner, 11 Nov 2026 (Anvil Q7): no ANVIL key outlives this instant (the pilot's testing-window end, ISO 8601 UTC).
+   * Blank = Anvil keys cannot be issued.
+   */
+  ANVIL_CREDENTIAL_NOT_AFTER: z.string().regex(/^$|^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/, 'ANVIL_CREDENTIAL_NOT_AFTER must be an ISO 8601 UTC time').default(''),
   AUTHORING_DAILY_CALL_CAP: z.coerce.number().int().min(1).max(100_000).default(300),
   /** Wave 3: Vertex location for AUTHORING_MODEL=maas:<publisher>/<model> (the region on the model card, or `global`). Blank = VERTEX_LOCATION. */
   AUTHORING_MAAS_LOCATION: z.string().regex(/^$|^[a-z0-9-]+$/).default(''),

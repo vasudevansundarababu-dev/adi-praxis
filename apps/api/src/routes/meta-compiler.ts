@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import {
   BlueprintResponse,
   HarborBlueprint,
@@ -155,6 +155,9 @@ export const metaCompilerRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config 
             collectionSchema: copy.collectionSchema as Prisma.InputJsonValue,
             coverageDimensions: copy.coverageDimensions as Prisma.InputJsonValue,
             edgeCaseCatalog: copy.edgeCaseCatalog as Prisma.InputJsonValue,
+            // A variant is a new workflow: a chosen form and Anvil's spec belong to the source workflow, not to it.
+            profileId: null,
+            anvilSpec: Prisma.DbNull,
             workflowName: label,
             lineageId,
             version: 1,

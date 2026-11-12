@@ -31,7 +31,12 @@ async function resolveApiClient(db: Db, header: string | undefined): Promise<Api
   const m = header?.match(/^Bearer\s+(\S{20,200})$/);
   if (!m) return null;
   const c = await db.apiClient.findUnique({ where: { keyHash: sha256(m[1]!) } });
-  if (!c || c.revokedAt) return null;
+  if (!c || c.revokedAt || (c.expiresAt && c.expiresAt <= new Date())) return null;
+  // Owner, 11 Nov 2026 (Anvil Q7): an ANVIL key works only while the Admin who issued it is still an active Admin.
+  if (c.kind === 'ANVIL') {
+    const issuer = c.issuedById ? await db.user.findFirst({ where: { id: c.issuedById, clientId: c.clientId } }) : null;
+    if (!issuer || issuer.status !== 'ACTIVE' || !issuer.roles.includes('ADMIN')) return null;
+  }
   return { type: 'SERVICE', apiClientId: c.id, clientId: c.clientId, kind: c.kind };
 }
 

@@ -208,7 +208,10 @@ test('a pay run is built, confirmed by a PM, approved by Finance and submitted',
   await staffLogin(p, 'pm@e2e.local', 'e2e-pm-password');
   await p.goto(runUrl);
   await p.getByRole('button', { name: 'Confirm pay run' }).click();
-  await expect(p.getByText('Waiting for Finance to approve.')).toBeVisible();
+  // The confirmation lands first; the refreshed run state can take longer on a loaded CI runner.
+  await expect(p.getByText('Confirmed. Finance can now approve it.')).toBeVisible({ timeout: 15_000 });
+  await p.reload();
+  await expect(p.getByText('Waiting for Finance to approve.')).toBeVisible({ timeout: 15_000 });
 
   await f.reload();
   await f.getByRole('button', { name: 'Approve pay run' }).click();

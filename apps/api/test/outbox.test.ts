@@ -158,6 +158,29 @@ describe('Transactional outbox and worker', () => {
     expect(row.lastError).toContain('transient failure 2');
   });
 
+  it('two workers handling the same event at once: one commits, the other ends quietly with no error recorded', async () => {
+    let entered = 0;
+    let release!: () => void;
+    const bothIn = new Promise<void>((r) => (release = r));
+    const registry = new HandlerRegistry().register({
+      name: 'test.race',
+      event: 'user.created',
+      handle: async () => {
+        entered += 1;
+        if (entered === 2) release();
+        await bothIn; // both transactions are past the "already done" check before either commits
+      },
+    });
+    await createUserViaApi();
+    const [event] = await db.outboxEvent.findMany();
+    await Promise.all([processDomainEvent(db, registry, event!.id), processDomainEvent(db, registry, event!.id)]);
+    expect(entered).toBe(2);
+    expect(await db.eventHandlerReceipt.count()).toBe(1);
+    const row = await db.outboxEvent.findUniqueOrThrow({ where: { id: event!.id } });
+    expect(row.attempts).toBe(0);
+    expect(row.lastError).toBeNull();
+  });
+
   it('a handler failure rolls back that handler’s own writes', async () => {
     const registry = new HandlerRegistry().register({
       name: 'test.partial',

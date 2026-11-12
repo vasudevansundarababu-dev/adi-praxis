@@ -784,7 +784,7 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
         await expect(db.taskReview.updateMany({ data: { notes: 'x' } })).rejects.toThrow(/append-only|permission denied/);
         expect((await db.approvedTaskRecord.findUniqueOrThrow({ where: { id } })).reviewNotes).toBeNull();
         // Every append-only table has the trigger and no UPDATE/DELETE privilege for the application role.
-        const tables = ['ApprovedTaskRecord', 'RLReviewRecord', 'AuditEvent', 'SelectionDecision', 'TaskReview', 'CandidateStateEvent', 'SmeStanding', 'EarningEntry', 'PartnerFeeEntry', 'PolicyDocumentVersion', 'ProjectRuleSet', 'TaskPolicySnapshot', 'ExtractionSpend'];
+        const tables = ['ApprovedTaskRecord', 'RLReviewRecord', 'AuditEvent', 'SelectionDecision', 'TaskReview', 'CandidateStateEvent', 'SmeStanding', 'EarningEntry', 'PartnerFeeEntry', 'PolicyDocumentVersion', 'ProjectRuleSet', 'TaskPolicySnapshot', 'ExtractionSpend', 'ProjectValidationRun', 'UploadedProfile', 'TemplateProposal', 'TemplateQualification'];
         const triggers = await db.$queryRaw<{ t: string }[]>`SELECT c.relname AS t FROM pg_trigger g JOIN pg_class c ON c.oid = g.tgrelid WHERE g.tgname LIKE '%_append_only'`;
         expect(triggers.map((x) => x.t).sort()).toEqual([...tables].sort());
         // Grants are revoked (the local superuser bypasses grants, so the triggers above are what stop it here).

@@ -65,6 +65,9 @@ import { candidateRoutes } from './routes/candidates';
 import { opportunityRoutes } from './routes/opportunities';
 import { reviewerRecruitmentRoutes } from './routes/reviewer-recruitment';
 import { searchRoutes } from './routes/search';
+import { projectExportRoutes } from './routes/project-export';
+import { AnvilGatedValidator, PraxisPrecheckValidator, type AnvilTaskValidator } from './anvil/validator';
+import { AnvilExportClient } from './anvil/export-client';
 import { SearchService } from './search/service';
 import { projectRoutes } from './routes/projects';
 import { staffingRoutes } from './routes/staffing';
@@ -72,6 +75,8 @@ import { OfflineGeocoder, type Geocoder } from './staffing/geocoder';
 import { dbSelectionGate, type SelectionGate } from './staffing/selection-gate';
 import { taxonomyRoutes } from './routes/taxonomy';
 import { templateRoutes } from './routes/templates';
+import { templateProfileRoutes } from './routes/template-profiles';
+import { anvilTemplateRoutes } from './routes/anvil-templates';
 import { metaCompilerRoutes } from './routes/meta-compiler';
 import { metaCompilerRunRoutes } from './routes/meta-compiler-runs';
 import { metaCompilerAssistantRoutes } from './routes/meta-compiler-assistant';
@@ -86,6 +91,8 @@ import { userRoutes } from './routes/users';
 
 export interface AppDeps {
   config: Config;
+  /** Anvil task validation for project export; defaults to Praxis's own pre-check until Anvil's API is connected. */
+  anvilValidator?: AnvilTaskValidator;
   db: Db;
   pingRedis: () => Promise<boolean>;
   logger?: boolean | Record<string, unknown>;
@@ -297,6 +304,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(authRoutes, { db: deps.db, config: deps.config });
       await v1.register(userRoutes, { db: deps.db });
       await v1.register(templateRoutes, { db: deps.db });
+      await v1.register(projectExportRoutes, { db: deps.db, storage, validator: deps.anvilValidator ?? (deps.config.ANVIL_EXPORT_BASE_URL && deps.config.ANVIL_EXPORT_TOKEN ? new AnvilGatedValidator(new AnvilExportClient(deps.config.ANVIL_EXPORT_BASE_URL, deps.config.ANVIL_EXPORT_TOKEN)) : new PraxisPrecheckValidator()) });
+      await v1.register(templateProfileRoutes, { db: deps.db });
+      await v1.register(anvilTemplateRoutes, { db: deps.db });
       await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });
       const drafters = deps.metaCompiler?.drafters ?? defaultDrafterFactory(deps.config);
       const mcDeps = resolveDeps(deps.metaCompiler?.deps);

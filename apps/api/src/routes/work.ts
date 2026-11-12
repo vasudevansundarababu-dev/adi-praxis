@@ -1,4 +1,4 @@
-import { taskPhase, templateStartingGraph } from '@praxis/shared';
+import { taskPhase, templateStartingGraph, profileById } from '@praxis/shared';
 import { Prisma } from '@prisma/client';
 import { CAPPED_TASK_STATUSES, identityEligible, OPEN_TASK_STATUSES, SaveTaskRequest, SubmitTaskRequest } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -140,6 +140,8 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       template: {
         workflow: template.workflowName,
         profileId: template.profileId ?? null,
+        // The chosen form itself: an uploaded form (golden task pack) is not in the browser's built-in registry.
+        profile: template.profileId ? (profileById(template.profileId) ?? null) : null,
         domain: template.domainName,
         primaryWork: t.project.template.primaryWork,
         verificationCriteria: t.project.template.verificationCriteria,

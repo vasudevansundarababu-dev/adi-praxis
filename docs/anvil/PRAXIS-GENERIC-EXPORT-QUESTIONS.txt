@@ -1,0 +1,445 @@
+PRAXIS -> ANVIL: GENERIC EXPORT REQUIREMENT, NINE QUESTIONS AND EXAMPLE SHAPES
+From: Praxis (Claude Code, Praxis implementation session), for owner Vasudevan. 12 Nov 2026.
+Status: FOR AGREEMENT. Praxis builds no Anvil connector until the owner agrees the contract.
+Nothing here is a claim that Anvil supports these schemas.
+No secrets, credentials, real customer data or private evaluator material are included.
+All example content is synthetic placeholder text produced by Praxis's form engine.
+
+======================================================================
+A. THE REQUIREMENT
+======================================================================
+
+The owner's requirement: Praxis export to Anvil must be available for EVERY approved Praxis task, not only the 200
+frozen Golden KYC tasks. Anvil's deployed f50b9a8/schema077 export API accepts only the Golden profile and frozen
+task sources, so every SME-authored task fails as PX_TASK_UNKNOWN or PX_TASK_PAYLOAD.
+
+Praxis needs one versioned export contract that Anvil can validate (and later resolve) for:
+  1. Any template:
+     - KYC v1 (workbench) and KYC v2 (account opening, Golden structure);
+     - the other Banking and Marketing templates;
+     - forms uploaded by Admins as golden task packs (praxis.golden_pack.v1);
+     - single-agent and multi-agent (workflow graph) tasks.
+  2. Any approved task in a project: one task (validate before export) up to the whole project.
+  3. The frozen Golden tasks, which stay supported exactly as today on their own profile.
+
+What Praxis holds for each approved task (immutable, hash-chained record):
+  - Header: task ID and revision; template and workflow; form ID and version; project; as-of date; language;
+    jurisdiction or state; product.
+  - Agent-visible content: brief (objective, assignment, deliverable); evidence records with stable IDs, source and
+    date; parties and claimed roles; tool catalogue; recorded tool calls with arguments and responses (including
+    error, 503/429 and pending observations); execution limits; assessment clock and calendar.
+  - Bound policy: project rule versions (rule key, version ID, content hash, quotation, where each rule applies).
+  - Private reference (never agent-visible): expected steps, findings, per-party assessment, follow-up rounds,
+    reference outcome values, rationale, business hand-off.
+  - Rubric: criteria with weights totalling 100, pass condition, partial-credit anchor (5/2/0), critical flag,
+    evidence links, common errors and acceptable variations.
+  - Provenance: author attestations, Expert and PM review decisions, synthetic-data declaration.
+  - Where a criterion binds to an output field, Praxis also compiles a praxis.anvil.task.v1 contract (legacy,
+    output-field grading).
+
+Constraints Praxis keeps (owner decisions):
+  - Evaluator-graded checks are NOT turned into agent-output fields.
+  - Private expectations never enter the actor or public views.
+  - valid:true is not approval; Praxis review status is not Anvil approval.
+  - Paid model calls stay OFF for export, validation and resolution.
+
+======================================================================
+B. PRAXIS RESPONSE TO ANVIL'S PROPOSED BOUNDARY (points 1-7)
+======================================================================
+
+Praxis agrees with all seven points. Additions and precisions:
+
+1. Generic validation. Agreed. Praxis declares two schema IDs per task: the form schema
+   (praxis.template_profile.v1) and, for multi-agent, the graph schema (praxis.workflow_graph.v1-proposed). The
+   package manifest schema is Praxis-proposed (praxis.authored-task-export.v1-proposed) until Anvil names its own.
+   Unknown versions should return "unsupported contract", as Anvil proposes.
+
+2. Form vs evaluator. Agreed. A Praxis form is versioned and immutable: a changed form gets a new form ID. Praxis
+   sends the full form file with the package, so Anvil can register or match it explicitly. Praxis does not treat a
+   form as an evaluator program.
+
+3. Rubric. Agreed. Each criterion keeps its stable ID (C01...), weight, pass condition, partial-credit text,
+   critical flag and evidence links. A missing evaluator mapping is Anvil readiness, not source invalidity.
+
+4. Environment. Agreed. Recorded tool calls are evidence of the authored path, not an environment. Graphs may
+   validate structurally and stay execution-blocked.
+
+5. Private assets. Agreed. In the examples, the private file is a separate member with
+   purpose: grader_only_reference_and_rubric and access: private_rubric. The actor file is Praxis's own server-side
+   agent projection, which already removes every private field and private graph artifact. Praxis includes no
+   executable code.
+
+6. Separate states. Agreed. Praxis will show these as separate labels:
+     package validity | Anvil readiness (environment/evaluators) | human/rights review | Run/paid authority
+   Praxis will never trigger a Run.
+
+7. Discovery, receipts, batching. Agreed. Praxis proposes that a large project export is split into independent
+   packages within the published bounds. Each package carries a shared project batch ID and its own package ID and
+   version. Anvil to confirm or specify.
+
+======================================================================
+C. THE NINE QUESTIONS (complete)
+======================================================================
+
+Q1. PROFILE MODEL. How does a Praxis-authored task declare how it is evaluated?
+    (a) Anvil publishes one generic "Praxis authored task" profile; or
+    (b) Praxis submits each form (praxis.template_profile.v1, sent in the package) and Anvil registers and qualifies
+        it as a profile; or
+    (c) another mechanism.
+    What profile ID and version format should Praxis put in the manifest, and how does Praxis learn that a form is
+    registered or qualified (via /contracts)?
+
+Q2. CRITERIA MAPPING. How does an authored criterion map to an Anvil evaluator configuration?
+    The criterion holds: ID, weight, pass condition, partial-credit text, critical flag, evidence links, and an
+    optional output-field binding.
+    Options: run-evidence check, business table, trace check, human judge, or LLM judge (stays off while paid calls
+    are off).
+    Must weights be 5-point checks (20 x 5), or may Praxis send other weights totalling 100 (e.g. 40/30/30)?
+    How should Praxis send the 5/2/0 anchors: free text in partialCredit today, or a structured field?
+
+Q3. ENVIRONMENT. Recorded tool calls today are {id, tool, arguments, response, evidenceRef}.
+    Should they become an MCP replay environment? Which manifest fields describe it (tools, actions/observations,
+    reset, isolation)?
+    Which logical environment hash, if any, should Praxis compute, and with which canonical JSON?
+    (Golden uses Python json.dumps sort_keys; Praxis graphs use RFC 8785.)
+
+Q4. PRIVATE CHANNEL. Is the separate private member inside the same ZIP acceptable (as in the examples), or must
+    private assets go through a separate grader-only intake endpoint?
+    Which purpose and access classifications should Praxis use?
+    May the private member hold the complete authored task (as in the examples), or only the private fields?
+
+Q5. PACKAGE FORMAT AND LIMITS.
+    - Same ZIP envelope (manifest + files) with a new schema_version?
+    - Required file layout and path rules (the examples use forms/, tasks/<id>/actor.json and
+      private/<id>/reference.json)?
+    - Limits: 1 MiB compressed, 30 MiB expanded, 1200 entries, 1-200 tasks? A project may hold more approved
+      tasks; confirm the batching rule (section B.7).
+
+Q6. RESPONSES AND CODES.
+    Praxis will display errors[] (file, pointer, message, fix), anvil_requirements[] and review_gates[] separately,
+    and keep auth, transport and internal errors apart.
+    Please list:
+    - the new PX_* codes for the generic path;
+    - the new AV_* and REVIEW_* codes;
+    - the result for an unsupported schema, form or profile.
+
+Q7. DISCOVERY. Will GET /contracts list every supported schema, form or profile, with version, status
+    (supported / registered / qualified) and limits? Praxis wants to tell a PM before export that a template is not
+    yet supported by Anvil, instead of failing at validate.
+
+Q8. RESOLUTION AND RECEIPTS. For the generic path:
+    - Are the same Idempotency-Key, immutable receipt, 202 provisioning and package-version-conflict rules kept?
+    - What does a receipt contain when a task validates but its evaluators or environment are not ready?
+    - Is resolve per package or per batch?
+
+Q9. DATES AND ORDER. When can Anvil QA accept a generic Praxis export, and in what order?
+    Praxis suggests:
+      (1) KYC v2 account-opening tasks (closest to Golden);
+      (2) other single-agent sections forms;
+      (3) multi-agent graphs.
+    Which Anvil source revision and schema migration will carry it?
+    (Staging stays on hold until QA acceptance.)
+
+======================================================================
+D. REPRESENTATIVE NON-GOLDEN EXPORT SHAPES (folder Praxis-generic-export-examples/)
+======================================================================
+
+Both are generated by Praxis's real form engine and agent projection from synthetic placeholder content. The
+manifest schema is PROPOSED by Praxis.
+
+D1. single-agent-enhanced-due-diligence/   (non-Golden Banking template, SINGLE agent)
+    praxis-export.json                       Proposed manifest (praxis.authored-task-export.v1-proposed).
+    forms/enhanced-due-diligence.v1.json     The form (praxis.template_profile.v1), sent unchanged.
+    tasks/PX-EDD-0001/actor.json             Agent-visible projection (sections S1-S4 public fields only).
+    tasks/PX-EDD-0001/praxis-anvil-task-v1.json   Existing legacy output-field contract, for reference only.
+    private/PX-EDD-0001/reference.json       Grader-only: the complete authored task, including S5 expected work,
+                                             S6 reference outcome and S7 rubric.
+
+D2. multi-agent-graph-kyb/                 (KYB template, MULTI agent with workflow graph)
+    The same layout, plus:
+    - the actor file has workflowGraph = the agent projection of the graph (roles, nodes, edges, loops, limits;
+      private artifacts, rubric bindings and decision predicates removed);
+    - the private file holds the full graph (praxis.workflow_graph.v1-proposed) with the private_rubric artifact.
+
+Hashes in the manifests use Praxis's canonical JSON (RFC 8785, sha256), pending the answer to Q3.
+
+======================================================================
+E. WHAT STAYS ON HOLD
+======================================================================
+
+- No Anvil connector, no push, no deploy until the owner agrees the contract.
+- Paid calls OFF for integration tests.
+- No Staging work.
+- Praxis has a project Export screen built locally with a Praxis-only pre-check, clearly labelled "Anvil validation
+  is not connected yet". It is not deployed.
+
+======================================================================
+ADDENDUM 1 (12 Nov 2026, owner-confirmed approach): QUALIFY TEMPLATES, THEN VALIDATE TASKS
+======================================================================
+
+Owner's direction: every Praxis task is authored from a seeded template version, so the main check is whether that
+TEMPLATE VERSION can be executed in Anvil for benchmarks. It must have enough to work on: inputs, policy and rule
+binding, evaluations, environment, and tool and API calls. Per-task validation then becomes a light conformance
+check. This replaces "validate arbitrary tasks" as the main ask in section C.
+
+1. TWO LEVELS
+   a) Template qualification: once per template version, by Anvil.
+      Praxis sends the template version (form + execution declarations). Anvil returns:
+        - qualified, with an immutable receipt; or
+        - not qualified, with reasons split into Praxis fixes vs Anvil capability gaps.
+      Praxis shows "Anvil-ready for benchmarks" (or why not) on the template, and warns before a PM creates a
+      project from a version that is not qualified.
+   b) Task validation: per task, at Validate and Export.
+      The task must conform to its qualified template version and be complete and consistent:
+        - cited rule versions are published;
+        - every tool step has a recorded call;
+        - criteria reference existing evidence;
+        - private expectations are present.
+
+2. WHAT A TEMPLATE VERSION MUST DECLARE TO BE EXECUTABLE
+   - Inputs: evidence types, parties, as-of date and calendar.
+   - Policy and rule binding: a citation field bound to published project rule versions (key, version ID, hash).
+   - Evaluations: an evaluator kind for each rubric criterion, chosen from Anvil's catalogue. Anchors (5/2/0),
+     weights, critical flags.
+   - Environment and tool/API calls: each tool's input and output schema, error, 429/503 and pending behaviour,
+     reset and isolation, and the environment adapter (e.g. MCP replay). Chosen from Anvil's catalogue.
+   - Output: the final-answer schema (e.g. golden-kyc-recommendation-v1-style).
+   - Multi-agent: graph node types, roles and handoffs supported by Anvil's runtime.
+
+3. KNOWN PRAXIS-SIDE GAPS (Praxis will fix after agreement)
+   - Most template tool catalogues are tool NAMES only. KYC v1 has full MCP tool schemas; KYC v2 and the other
+     sections templates do not.
+   - Rubric criteria have no evaluator kind; they hold free text plus anchors.
+   - Graph node and handoff types have not been checked against Anvil's runtime.
+
+4. OWNERSHIP OF THE TEMPLATE SPECIFICATION (Praxis proposal, owner to confirm with Anvil)
+   - Praxis owns the template specification: the authoring form, guidance, coverage, review route, synthetic-data
+     rules, and which tools, rules, criteria and outputs a task uses. Admins version templates in Praxis; templates
+     are seeded or uploaded as packs.
+   - Anvil owns the execution vocabulary and the qualification: a published, versioned capability catalogue
+     (environment adapters, tool/API schemas, evaluator kinds, output schemas, run limits), and the qualification
+     receipt per template version.
+   - Rule: a Praxis template may reference only capabilities Anvil has published.
+   - Change: a Praxis template change is a new template version, which needs new qualification; projects keep the
+     receipt of their version. An Anvil capability change is a new capability version; existing receipts stay valid
+     until Anvil explicitly revokes them.
+
+5. GENERATING TEMPLATES FROM A SPECIFICATION (Praxis capability, later)
+   Praxis will be able to draft a template version from:
+     - a domain specification (like the Golden KYC reference); plus
+     - Anvil's capability catalogue (tool schemas and evaluator kinds are picked from it, never invented).
+   The draft passes Praxis's form checks, then Anvil qualification, then an Admin publishes it. Any AI-assisted
+   drafting stays a draft until a person publishes it. Paid model use for drafting is a separate owner decision.
+
+6. ADDITIONAL QUESTIONS FOR ANVIL
+   Q10. Will Anvil publish a capability catalogue (environment adapters, tool/API schema format, evaluator kinds,
+        output schemas, versions) under /contracts?
+   Q11. What is the template-qualification call? Its request (form + execution declarations), response (qualified
+        or reasons, separated by owner) and receipt (template version hash, capability versions, expiry/revocation).
+   Q12. After qualification, may per-task validation rely on the template receipt, checking only conformance and
+        completeness?
+   Q13. Do you agree with the ownership split in point 4?
+
+======================================================================
+ADDENDUM 2 (12 Nov 2026, owner-agreed): ANVIL INITIATES TEMPLATES; PRAXIS VALIDATES AUTHORABILITY
+======================================================================
+
+Owner's direction:
+- Both Praxis and Anvil need to generate a new template from customer requirements or from a new segment's
+  requirements (by sales channel).
+- Benchmarks evolve, and that also changes templates.
+- Anvil is the customer-facing platform, so ANVIL INITIATES new template creation and template changes.
+- Praxis provides an API that Anvil calls to validate a proposed template: can Praxis collect (author, review and
+  accept) tasks from it?
+
+This supersedes Addendum 1, point 4 (ownership). Template qualification by Anvil (Addendum 1, points 1-3) stays.
+
+1. SPLIT OF RESPONSIBILITY
+
+   | Area                                          | Anvil                                      | Praxis                                          |
+   |-----------------------------------------------|--------------------------------------------|-------------------------------------------------|
+   | Customer and segment requirement (by channel) | OWNS: captures it, decides a benchmark is needed | Informed                                  |
+   | Initiating a new template or template change  | OWNS: starts it, including benchmark evolution | Responds                                    |
+   | Benchmark and execution part of the template  | OWNS: environment, tool/API schemas, evaluator kinds, output schema, run limits, scoring | Must not change it; may only reference it |
+   | Authoring part of the template                | Proposes (may draft it)                    | OWNS: form fields, SME guidance, coverage dimensions, skills for JDs, review route, synthetic-data rules, checks |
+   | Template generation from a requirement        | Generates the proposal (both parts)        | Generates or completes the authoring part; can also draft on request |
+   | Validation                                    | Qualifies execution (template-qualification receipt) | Validates authorability (Praxis template-validation API, below) |
+   | Publishing for authoring                      | -                                          | Admin publishes the template version in Praxis  |
+   | Versioning                                    | New benchmark or execution version = new template version | New authoring version = new template version |
+   | Task collection                               | Receives exported tasks; validates and resolves them | SMEs author; Expert and PM review; Praxis exports |
+
+   Rule: a template version is complete only when BOTH sides have accepted the same template version hash:
+   Praxis "authorable" and Anvil "qualified". Neither side edits the other side's part.
+
+2. LIFECYCLE (one template version)
+   a) Anvil captures the customer or segment requirement (sales channel) and drafts the template proposal: the
+      execution part, plus a proposed authoring part.
+   b) Anvil calls Praxis POST /templates/validate. Praxis returns authorability: what to fix, split by owner.
+   c) Anvil submits the proposal (POST /templates/proposals, idempotent). Praxis stores it append-only and creates
+      a DRAFT template version (new workflow or new version of an existing one).
+   d) A Praxis Admin reviews and completes the authoring part, then publishes. Nothing goes live from the API alone.
+   e) Anvil qualifies the published version (template-qualification receipt) and Praxis records the receipt. PMs
+      see "Anvil-ready for benchmarks" only when both are true.
+   f) Benchmark evolves: Anvil repeats from (a) with a new version. Projects keep the version they were created on;
+      Praxis never silently upgrades a running project.
+
+3. PRAXIS TEMPLATE-VALIDATION API (Praxis builds after contract agreement; proposed shape)
+   All under /api/v1/integrations/anvil/templates.
+
+   Auth: a Praxis-issued, Anvil-scoped service credential.
+     - Bearer token, server-to-server only.
+     - Issued and revoked by a Praxis Admin.
+     - Stored hashed; expiring.
+     - Can only call these endpoints; no browser cookies.
+
+   Endpoints:
+     GET  /contracts
+          Supported template-spec schema versions, field types, limits, and the Anvil capability catalogue
+          version(s) Praxis understands.
+     POST /validate
+          Body: a template spec (JSON; format agreed under Q14).
+          Read-only: nothing is stored or created.
+     POST /proposals
+          Same body, plus an Idempotency-Key.
+          Stores the proposal append-only and creates a DRAFT template version for Admin review.
+          Same key with a different body returns 409.
+     GET  /proposals/{id}
+          Status: received / draft_created / published / rejected_by_admin, with the Praxis template version ID and
+          hash.
+     POST /qualifications
+          Anvil records its qualification receipt (or revocation) for a published Praxis template version hash.
+
+   Response (mirrors Anvil's export API):
+     data.valid, data.status, data.errors[], data.praxis_requirements[], data.review_gates[], meta.request_id
+     - errors[] lists only what ANVIL must fix in the proposal: code, owner "anvil", file, pointer, message, fix.
+       E.g. TP_FIELD_TYPE_UNSUPPORTED, TP_SECTION_MISSING, TP_TOOL_SCHEMA_MISSING, TP_CRITERIA_WEIGHTS,
+       TP_EVALUATOR_KIND_UNKNOWN, TP_OUTPUT_SCHEMA, TP_PRIVATE_FIELD_EXPOSED.
+     - praxis_requirements[] lists Praxis-side work, e.g. a new field type or editor, or a review route Praxis
+       lacks. These are not Anvil errors.
+     - review_gates[] lists human work: domain-owner sign-off and Praxis Admin publication.
+     - valid:true means "Praxis can collect tasks from this template once published". It is not publication or
+       approval.
+     - Auth, transport and internal errors use a separate error shape and are never reported as template errors.
+
+   What Praxis checks (authorability):
+     - The form registers (praxis.template_profile.v1 rules).
+     - Every section is authorable by an SME in Praxis's editors.
+     - Private fields stay out of the agent view.
+     - Rubric weights total 100, with a critical criterion.
+     - Policy citation is bound to published rule versions.
+     - The skills list is present (drives generated JDs and matching).
+     - Coverage dimensions and edge cases are valid; the review route is supported.
+     - Every referenced Anvil capability (tool, evaluator kind, output schema) exists in the catalogue version the
+       proposal declares.
+     - Worked examples, if any, pass the form.
+
+   Paid calls: OFF. Validation and proposals never call a model.
+
+4. GENERATION FROM REQUIREMENTS (both sides)
+   - Anvil: generates a template proposal from customer or segment requirements and the benchmark design.
+   - Praxis: generates or completes the authoring part from the same requirement (on Anvil's request or Admin's).
+     It uses Praxis's form engine and template compiler and picks only published Anvil capabilities.
+   - Any AI-assisted drafting on either side stays a draft until a human publishes it. Paid model use for drafting
+     is a separate owner decision.
+
+5. QUESTIONS FOR ANVIL (adds to Q1-Q13; Q13 is answered by this addendum)
+   Q14. Template-spec format: will Anvil send Praxis's praxis.golden_pack.v1 / praxis.template_profile.v1 extended
+        with an execution part, or a joint "template spec v1" both sides version? Who maintains its schema? Praxis
+        proposes a joint schema, with each part owned as in the table above.
+   Q15. How does Anvil carry the customer or segment requirement and sales channel into the proposal (fields, IDs),
+        without customer-confidential data entering Praxis task content (which must stay synthetic)?
+   Q16. Credential lifecycle for the Praxis-issued Anvil service credential: expiry window, rotation, and who in
+        Anvil holds it (server only).
+   Q17. When the benchmark evolves, may Anvil revoke qualification of an older template version, and what should
+        Praxis do with projects still running on it (keep authoring and flag them, or pause)?
+
+6. WHAT STAYS ON HOLD
+   - Praxis builds neither the template-validation API nor the Anvil export connector until the contract is agreed.
+   - No push, deploy or Staging work. Paid calls OFF.
+
+7. PEOPLE: SMEs, REVIEWERS AND OTHER ROLES (Addendum 2, owner 12 Nov 2026)
+   Praxis can collect tasks from a template only if it can staff it. A template proposal therefore also declares
+   the people it needs, and Praxis's validation checks it.
+
+   a) What the proposal declares, per role:
+      Roles:
+        - SME author;
+        - Expert reviewer (SME -> Expert -> PM route);
+        - Validator / Reviewer;
+        - PM;
+        - any human-in-the-loop role inside the case (e.g. specialist, approver), as distinct from Praxis review.
+      For each role:
+        - mandatory and preferred skills (these drive the generated JD and matching);
+        - minimum years of experience (reviewer = author + 5 by default);
+        - minimum education;
+        - domain specialties;
+        - jurisdictions and languages;
+        - required certifications or tier (e.g. EXPERT, REVIEWER_SME);
+        - conflict-of-interest rules;
+        - expected volume (distinct tasks, max per expert);
+        - TPT;
+        - review route.
+      Pay is a Praxis/commercial decision and is NOT part of Anvil's proposal.
+
+   b) Who owns what:
+      - Anvil proposes the expertise the benchmark needs (from the customer or segment requirement).
+      - Praxis owns everything else: the role model, sourcing, the generated JDs and job posts, identity and
+        suitability checks, selection (always a human decision), onboarding, certification, pay and staffing.
+      - Praxis never shares SME or Reviewer personal data with Anvil.
+
+   c) What Praxis validates:
+      - every role maps to a Praxis role and review route;
+      - skills and years produce a complete JD for authors and reviewers;
+      - the review route has its reviewer roles defined;
+      - human-in-the-loop roles are case roles, not Praxis review;
+      - conflict rules are enforceable.
+
+   d) Staffing feasibility, reported as ADVICE in praxis_requirements[] (never as an Anvil error):
+      - how many eligible SMEs and Reviewers Praxis already has for the role profile, in counts only, no personal
+        data;
+      - whether recruitment or partner supply is needed (requisition tiers);
+      - an estimated time to staff, when known.
+
+   e) More codes for errors[] (Anvil to fix in the proposal):
+        TP_ROLE_MISSING, TP_ROLE_UNSUPPORTED, TP_SKILLS_MISSING, TP_REVIEWER_PROFILE_MISSING,
+        TP_REVIEW_ROUTE_UNSUPPORTED, TP_HUMAN_ROLE_AMBIGUOUS
+      Example praxis_requirements[] entries:
+        PR_SUPPLY_INSUFFICIENT, PR_RECRUITMENT_NEEDED, PR_CERTIFICATION_NEEDED
+
+   Q18. Will Anvil send the role profiles with the template proposal, and may Praxis return staffing feasibility
+        counts (no personal data) in the validation response?
+
+7A. AMENDMENT TO SECTION 7 (owner, 12 Nov 2026): ANVIL GIVES SKILLS; PRAXIS DECIDES THE ROLES
+    This replaces 7(a) where they differ.
+    - Anvil provides only the SKILLS needed for authoring and for reviewing a template's tasks (mandatory and
+      preferred skills, specialties, jurisdictions and languages, and any certification the benchmark needs).
+      Anvil does not define Praxis roles or the review route.
+    - Praxis decides, from those skills, how authoring and reviewing are split into roles:
+        - who authors;
+        - which review stages exist (e.g. SME -> PM, or SME -> Expert -> PM);
+        - experience and education levels;
+        - volumes;
+        - TPT.
+    - Praxis has the autonomy to MERGE roles, e.g. the Reviewer (Expert) and PM as one role held by one person. Each
+      decision is still recorded and audited separately, and a person never reviews their own authored task. Praxis
+      already lets the same person act as Expert and PM with two audit events (Wave 2 decision).
+    - Validation therefore checks that the skills are sufficient to build author and reviewer job descriptions
+      (errors such as TP_SKILLS_MISSING). Role codes such as TP_ROLE_MISSING, TP_ROLE_UNSUPPORTED,
+      TP_REVIEWER_PROFILE_MISSING and TP_REVIEW_ROUTE_UNSUPPORTED no longer apply to Anvil's proposal; role and route
+      choices are Praxis's.
+    - Q18 becomes: will Anvil send authoring and reviewing skills with the template proposal, and may Praxis return
+      staffing feasibility counts (no personal data) in the validation response?
+
+7B. PRECISION (owner, 12 Nov 2026): THE ROLE SPLIT IS DECIDED AT PROJECT CREATION
+    - The template version carries Anvil's authoring and reviewing skills, and nothing about roles.
+    - When a PM creates a project from that template version, Praxis decides the role split for that project:
+        - review route: SME -> PM, or SME -> Expert -> PM;
+        - whether the Reviewer (Expert) and PM are one person;
+        - experience and education levels;
+        - volumes and TPT.
+    - Praxis then generates the author and reviewer job descriptions from the template's skills: mandatory skills
+      come from the template; reviewers get more years of experience.
+    - Two projects on the same template version may therefore have different role splits. Anvil sees only exported
+      tasks and their review provenance, never staffing.
+    - This already works in Praxis today: the review route is chosen at project creation; generated author and
+      reviewer JDs; the same person may act as Expert and PM, with separate audit events.

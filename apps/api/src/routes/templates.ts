@@ -17,6 +17,7 @@ import type { Actor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { AppError, conflict, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
+import { loadUploadedProfiles } from '../templates/uploaded-profiles';
 
 type TemplateWithDomain = Template & { domain: Domain };
 
@@ -225,6 +226,7 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
         const domain = await tx.domain.findFirst({ where: { id: req.body.domainId, clientId: actor.clientId } });
         if (!domain) throw notFound('Domain not found');
         await assertUniqueWorkflowName(tx, actor.clientId, domain.id, req.body.workflowName);
+        await loadUploadedProfiles(tx as unknown as Db);
         assertProfile(req.body.workflowName, req.body.profileId);
         const { domainId, ...fields } = req.body;
         const t = await tx.template.create({
@@ -263,6 +265,7 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
         if (req.body.workflowName !== undefined) {
           await assertUniqueWorkflowName(tx, actor.clientId, before.domainId, req.body.workflowName, before.lineageId);
         }
+        await loadUploadedProfiles(tx as unknown as Db);
         assertProfile(req.body.workflowName ?? before.workflowName, req.body.profileId === undefined ? before.profileId : req.body.profileId);
         // Guard against a concurrent publish: only update while still DRAFT.
         const { count } = await tx.template.updateMany({ where: { id: before.id, status: 'DRAFT' }, data: fieldData(req.body) });
@@ -336,6 +339,7 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
         if (!t) throw notFound('Template not found');
         if (t.status !== 'DRAFT') throw new AppError(409, 'NOT_A_DRAFT', `Only drafts can be published (this one is ${t.status}).`);
         if (t.domain.status !== 'ACTIVE') throw conflict('The domain is retired');
+        await loadUploadedProfiles(tx as unknown as Db);
         assertProfile(t.workflowName, t.profileId);
         const problems = publishProblems(t);
         if (problems.length > 0) {

@@ -233,6 +233,8 @@ enum RLReviewRequestStatus {
 enum ApiClientKind {
   CLIENT_API
   RL_GYM
+  /// Anvil calling the Praxis template API (Praxis-Anvil contract, 12 Nov 2026). Must expire.
+  ANVIL
 }
 
 // FLOW2 section 10: independent candidate state dimensions.
@@ -413,6 +415,10 @@ model ApiClient {
   kind      ApiClientKind
   keyHash   String        @unique @map("key_hash")
   revokedAt DateTime?     @map("revoked_at")
+  /// Keys stop working after this time (required for ANVIL keys; optional for the others).
+  expiresAt DateTime?     @map("expires_at")
+  /// Admin who issued the key. An ANVIL key stops working once this user is no longer an active Admin (owner, 11 Nov 2026).
+  issuedById String?      @map("issued_by_id") @db.Uuid
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt @map("updated_at")
 
@@ -466,6 +472,9 @@ model Template {
   similarityThreshold   Decimal        @default(0.90) @map("similarity_threshold") @db.Decimal(4, 3)
   /// Authoring form of this version (a registered alternate profile); null = the workflow default (owner, 11 Nov 2026).
   profileId             String?        @map("profile_id")
+  /// Anvil-owned parts of a template proposed by Anvil: requirement reference, execution part, skills. Never edited
+  /// by Praxis (Praxis-Anvil contract, 12 Nov 2026).
+  anvilSpec             Json?          @map("anvil_spec")
   publishedAt           DateTime?      @map("published_at")
   retiredAt             DateTime?      @map("retired_at")
   /// Harbor blueprint (packages/shared/src/blueprint). Null for templates outside the Meta-Compiler catalog.
@@ -3241,19 +3250,91 @@ model TaskPolicySnapshot {
 /// Console search bar (owner, 12 Nov 2026): a derived index of list records, kept in step on search.
 /// `text` is matched by letters (pg_trgm); `embedding` holds the professional text's meaning (never names or emails).
 model SearchDocument {
-  id              String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId        String                       @map("client_id") @db.Uuid
-  entityType      String                       @map("entity_type")
-  entityId        String                       @map("entity_id") @db.Uuid
+  id              String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String                      @map("client_id") @db.Uuid
+  entityType      String                      @map("entity_type")
+  entityId        String                      @map("entity_id") @db.Uuid
   text            String
   /// sha256 of the meaning text; a change clears the embedding.
-  meaningHash     String                       @map("meaning_hash")
+  meaningHash     String                      @map("meaning_hash")
   embedding       Unsupported("vector(768)")?
-  embeddingModel  String?                      @map("embedding_model")
-  sourceUpdatedAt DateTime                     @map("source_updated_at")
-  createdAt       DateTime                     @default(now()) @map("created_at")
-  updatedAt       DateTime                     @updatedAt @map("updated_at")
+  embeddingModel  String?                     @map("embedding_model")
+  sourceUpdatedAt DateTime                    @map("source_updated_at")
+  createdAt       DateTime                    @default(now()) @map("created_at")
+  updatedAt       DateTime                    @updatedAt @map("updated_at")
 
   @@unique([entityType, entityId])
   @@index([clientId, entityType])
+}
+
+/// Project export and validation runs (owner, 12 Nov 2026). Append-only: each validation or export is kept with the
+/// validator's verdict per task. Advice for the PM only; it never changes a task or the Approved Task Dataset.
+model ProjectValidationRun {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId         String   @map("client_id") @db.Uuid
+  projectId        String   @map("project_id") @db.Uuid
+  /// VALIDATE (one task, before export) or EXPORT (every approved task).
+  kind             String
+  validator        String
+  validatorVersion String   @map("validator_version")
+  recordIds        String[] @map("record_ids") @db.Uuid
+  results          Json
+  /// EXPORT only: object-storage key of the exported newline-delimited JSON, and its sha256.
+  fileKey          String?  @map("file_key")
+  fileSha256       String?  @map("file_sha256")
+  requestedById    String   @map("requested_by_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+}
+
+/// Golden task pack (owner, 12 Nov 2026): an uploaded authoring form plus its worked golden cases. Append-only:
+/// a changed form is uploaded under a new profile ID, so a template version's form never changes under its projects.
+model UploadedProfile {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  profileId    String   @unique @map("profile_id")
+  workflowName String   @map("workflow_name")
+  source       String
+  profile      Json
+  examples     Json
+  contentHash  String   @map("content_hash")
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([clientId, workflowName])
+}
+
+/// Template proposals from Anvil (Praxis-Anvil contract, 12 Nov 2026). Append-only. Anvil starts every new template or
+/// template change; Praxis stores the proposal and creates a DRAFT template version for a Praxis Admin to publish.
+model TemplateProposal {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  apiClientId   String   @map("api_client_id") @db.Uuid
+  requirementId String   @map("requirement_id")
+  profileId     String   @map("profile_id")
+  /// The draft template version created from the proposal.
+  templateId    String   @map("template_id") @db.Uuid
+  spec          Json
+  specSha256    String   @map("spec_sha256")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([clientId, createdAt])
+}
+
+/// Anvil's qualification receipts per template version hash (Praxis-Anvil contract). Append-only: a revocation is a
+/// new row. The latest row for a version hash is its current state.
+model TemplateQualification {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId            String   @map("client_id") @db.Uuid
+  templateId          String   @map("template_id") @db.Uuid
+  templateVersionHash String   @map("template_version_hash")
+  /// QUALIFIED or REVOKED.
+  status              String
+  receiptId           String   @map("receipt_id")
+  receipt             Json
+  apiClientId         String   @map("api_client_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([templateId, createdAt])
 }

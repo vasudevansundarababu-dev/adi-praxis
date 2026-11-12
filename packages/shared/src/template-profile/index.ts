@@ -17,6 +17,8 @@ export * from './helpers';
 export * from './registry';
 export * from './contract';
 export { sampleProfileOutput } from './sample';
+export * from './golden-pack';
+export * from './template-spec';
 export { GOLDEN_KYC_EXAMPLE, withRuleVersions } from './golden-kyc-example';
 export { KYC_ACCOUNT_OPENING_PROFILE, KYC_V2_TOOLS, KYC_V2_RECOMMENDATIONS, KYC_V2_PRODUCTS, KYC_V2_STATES, KYC_V2_PARTY_ROLES, KYC_V2_SLOTS, KYC_V2_CRITICAL_FAILURES } from './profiles/kyc-account-opening';
 export { AML_PROFILE, KYB_PROFILE, KYC_PROFILE, NOISE_CANCELLING_PROFILE, OMNICHANNEL_PROFILE };

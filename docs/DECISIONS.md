@@ -792,3 +792,30 @@ Owner chose a **new KYC template version** (not a separate template, not a chang
   reference, not an agreed Praxis-to-Anvil export format. Execution, evaluation and reporting stay in Anvil.
 - **Open (owner):** the four other cell slots for the products (adult joint, individual, custodial) are authored by SMEs;
   only one worked case ships. The marketing multi-agent golden task will follow the same route when it arrives.
+
+## Project export with Anvil validation (12 Nov 2026)
+
+The owner asked for an Export button on the project page. PMs and Admins who may export validate one task at any time
+and export once the project is complete. On export, Praxis calls Anvil's validate API, which says which tasks need to be
+fixed. The owner has asked the Anvil team for that API.
+
+- **(chosen by Claude)** **Who.** The project's owning PM or an Admin; anyone else gets 404, as for the project page.
+- **(chosen by Claude)** **When.**
+  - Validate needs at least one approved task (current records; a correction replaces the record it corrects).
+  - Export needs that, plus one of: the distinct-task target is reached, the project is COMPLETED, or the end date has
+    come.
+  - Drafts and cancelled projects cannot export.
+- **(chosen by Claude)** **Validate** takes exactly one task. **Export** validates every approved task and writes one
+  file with one JSON line per task: the dataset record, its `praxis.anvil.export.v1` envelope (null when the task has
+  no executable contract), and the verdict. The file is stored with its sha256 and can be downloaded again.
+- **(chosen by Claude)** **Anvil's API is not published**, so its wire format is not invented. Praxis calls it through
+  `AnvilTaskValidator`. Until the Anvil adapter is written against Anvil's documented contract, Praxis runs
+  `PraxisPrecheckValidator`: the same checks as the per-record Anvil export. It is labelled "Anvil validation is not
+  connected yet" in the console and recorded as `praxis-precheck` on every run.
+- **(chosen by Claude)** **The verdict is advice only.**
+  - It changes no task, review decision or dataset record. The PM decides what to do; the console links each flagged
+    task.
+  - If the validator does not answer, tasks are "not validated", never assumed valid.
+  - Runs (`ProjectValidationRun`) are append-only and audited (`project.validated`, `project.exported`).
+- **Open (Anvil):** the validate API contract: request (envelopes or records), response per task, evaluator versions,
+  and error and timeout behaviour. Then the `anvil` adapter replaces the pre-check.

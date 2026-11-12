@@ -356,3 +356,55 @@ This supersedes Addendum 1, point 4 (ownership). Template qualification by Anvil
 6. WHAT STAYS ON HOLD
    - Praxis builds neither the template-validation API nor the Anvil export connector until the contract is agreed.
    - No push, deploy or Staging work. Paid calls OFF.
+
+7. PEOPLE: SMEs, REVIEWERS AND OTHER ROLES (Addendum 2, owner 12 Nov 2026)
+   Praxis can collect tasks from a template only if it can staff it. A template proposal therefore also declares
+   the people it needs, and Praxis's validation checks it.
+
+   a) What the proposal declares, per role:
+      Roles:
+        - SME author;
+        - Expert reviewer (SME -> Expert -> PM route);
+        - Validator / Reviewer;
+        - PM;
+        - any human-in-the-loop role inside the case (e.g. specialist, approver), as distinct from Praxis review.
+      For each role:
+        - mandatory and preferred skills (these drive the generated JD and matching);
+        - minimum years of experience (reviewer = author + 5 by default);
+        - minimum education;
+        - domain specialties;
+        - jurisdictions and languages;
+        - required certifications or tier (e.g. EXPERT, REVIEWER_SME);
+        - conflict-of-interest rules;
+        - expected volume (distinct tasks, max per expert);
+        - TPT;
+        - review route.
+      Pay is a Praxis/commercial decision and is NOT part of Anvil's proposal.
+
+   b) Who owns what:
+      - Anvil proposes the expertise the benchmark needs (from the customer or segment requirement).
+      - Praxis owns everything else: the role model, sourcing, the generated JDs and job posts, identity and
+        suitability checks, selection (always a human decision), onboarding, certification, pay and staffing.
+      - Praxis never shares SME or Reviewer personal data with Anvil.
+
+   c) What Praxis validates:
+      - every role maps to a Praxis role and review route;
+      - skills and years produce a complete JD for authors and reviewers;
+      - the review route has its reviewer roles defined;
+      - human-in-the-loop roles are case roles, not Praxis review;
+      - conflict rules are enforceable.
+
+   d) Staffing feasibility, reported as ADVICE in praxis_requirements[] (never as an Anvil error):
+      - how many eligible SMEs and Reviewers Praxis already has for the role profile, in counts only, no personal
+        data;
+      - whether recruitment or partner supply is needed (requisition tiers);
+      - an estimated time to staff, when known.
+
+   e) More codes for errors[] (Anvil to fix in the proposal):
+        TP_ROLE_MISSING, TP_ROLE_UNSUPPORTED, TP_SKILLS_MISSING, TP_REVIEWER_PROFILE_MISSING,
+        TP_REVIEW_ROUTE_UNSUPPORTED, TP_HUMAN_ROLE_AMBIGUOUS
+      Example praxis_requirements[] entries:
+        PR_SUPPLY_INSUFFICIENT, PR_RECRUITMENT_NEEDED, PR_CERTIFICATION_NEEDED
+
+   Q18. Will Anvil send the role profiles with the template proposal, and may Praxis return staffing feasibility
+        counts (no personal data) in the validation response?

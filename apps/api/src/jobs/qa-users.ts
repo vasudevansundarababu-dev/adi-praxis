@@ -290,7 +290,7 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
     const opp = await db.opportunity.findUniqueOrThrow({ where: { projectId_role: { projectId: s.projectId, role: 'AUTHOR' } } });
     const e = (await call(who, 'POST', '/me/enrollments', { opportunityId: opp.id })).body as { id: string; status: string };
     s.enrollmentId = e.id;
-    if (e.status === 'DRAFT') await completeAndSubmit(who, e.id);
+    if (e.status === 'DRAFT') await completeAndSubmit(who, e.id, s.template.skills.length ? s.template.skills : [s.template.domain.name]);
   }
 
   const deadline = Date.now() + o.assessmentTimeoutMs;
@@ -407,7 +407,7 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
   }
 
   /** The accessible profile form (CF-30): confirms or answers every question, then the explicit submit (C05). */
-  async function completeAndSubmit(who: string, enrollmentId: string) {
+  async function completeAndSubmit(who: string, enrollmentId: string, skills: string[]) {
     let s = (await call(who, 'GET', `/me/enrollments/${enrollmentId}/conversation`)).body;
     const fields: { fieldKey: string; action: string; value?: unknown }[] = [];
     const seen = new Set<string>();
@@ -418,7 +418,7 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
         const cur = s.profile.fields[f] as { status: string; value: unknown } | undefined;
         if (cur?.status === 'CONFIRMED') continue;
         if (cur?.status === 'PROPOSED' && cur.value !== null) fields.push({ fieldKey: f, action: 'CONFIRM' });
-        else fields.push({ fieldKey: f, action: 'EDIT', value: answerFor(f, q) });
+        else fields.push({ fieldKey: f, action: 'EDIT', value: answerFor(f, q, skills) });
       }
     }
     const roles = (s.profile.roles as { id: string; status: string }[]).filter((r) => r.status === 'PROPOSED').map((r) => ({ action: 'CONFIRM', id: r.id }));
@@ -468,9 +468,13 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
 }
 
 /** A bland synthetic answer of the right shape for a profile field. */
-function answerFor(field: string, q: { answerType: string; options: string[] }): string | number | string[] {
+/** Skill-bearing list fields are answered with the pool template's own skills (owner, 12 Nov 2026), so each seeded SME
+ * carries that template's skill set into staffing; everything else stays a bland synthetic answer. */
+export const SKILL_FIELDS = ['specialties', 'compliance_areas', 'tools_methods'] as const;
+export function answerFor(field: string, q: { answerType: string; options: string[] }, skills: string[] = []): string | number | string[] {
   const kind = FIELD_DEFS[field]?.kind ?? 'text';
   const choice = q.answerType === 'choice' && q.options.length ? q.options[0]! : null;
+  if (kind === 'list' && skills.length && (SKILL_FIELDS as readonly string[]).includes(field)) return skills.slice(0, 20);
   if (kind === 'number') return field === 'hours_per_week' ? 20 : 10;
   if (kind === 'list') return [choice ?? 'Synthetic QA test entry'];
   return choice ?? 'Synthetic QA test answer: this account and its profile are synthetic test data.';

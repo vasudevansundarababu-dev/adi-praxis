@@ -69,13 +69,13 @@ describe('qa-users: QA seed of 30 staffing-ready SMEs and 10 Reviewers', () => {
     const pm = await login(app, 'pm@praxis.demo', PM_PW);
     const post = (cookie: string, url: string, payload: object = {}) => app.inject({ method: 'POST', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
     const domainId = (await post(admin, '/domains', { name: 'Banking' })).json().id;
-    const template = async (workflowName: string) => {
-      const t = (await post(admin, '/templates', { domainId, workflowName, primaryWork: 'x', verificationCriteria: 'x', humanGate: 'x', defaultTptMinutes: 60, skills: ['KYC'], taskModes: ['AUTHORING'], defaultDistinctTarget: 8, defaultMaxPerExpert: 4 })).json();
+    const template = async (workflowName: string, skills = ['KYC']) => {
+      const t = (await post(admin, '/templates', { domainId, workflowName, primaryWork: 'x', verificationCriteria: 'x', humanGate: 'x', defaultTptMinutes: 60, skills, taskModes: ['AUTHORING'], defaultDistinctTarget: 8, defaultMaxPerExpert: 4 })).json();
       expect((await post(admin, `/templates/${t.id}/publish`)).statusCode).toBe(200);
       return t.id as string;
     };
     templateA = await template('KYC onboarding and refresh');
-    templateB = await template('Sanctions screening');
+    templateB = await template('Sanctions screening', ['Sanctions screening', 'Name matching']);
     // A draft template is not covered.
     await post(admin, '/templates', { domainId, workflowName: 'Draft only', primaryWork: 'x', verificationCriteria: 'x', humanGate: 'x', defaultTptMinutes: 60, skills: ['KYC'], taskModes: ['AUTHORING'] });
     // Template A already has a project with a published opportunity: the job reuses it as A's pool.
@@ -187,6 +187,13 @@ describe('qa-users: QA seed of 30 staffing-ready SMEs and 10 Reviewers', () => {
       // The real staffing gate agrees each one can be proposed for work.
       const { assignmentEligibility } = await import('../src/candidate/onboarding-service');
       for (const e of ready) expect((await assignmentEligibility(db, { smeUserId: e.smeUserId, projectId: pool.id })).ok).toBe(true);
+      // Each seeded SME carries the pool template's skill set, in its profile answers and its staffing record.
+      const tpl = await db.template.findUniqueOrThrow({ where: { id: pool.templateId } });
+      for (const e of ready) {
+        const c = await db.candidate.findUniqueOrThrow({ where: { smeUserId: e.smeUserId } });
+        for (const k of tpl.skills) expect(c.skills).toContain(k);
+        for (const k of tpl.skills) expect(c.specialties).toContain(k);
+      }
     }
     expect(r.slots.every((s) => s.state === 'READY_FOR_STAFFING')).toBe(true);
     expect(await db.candidate.count()).toBe(30);

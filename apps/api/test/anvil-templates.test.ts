@@ -117,7 +117,7 @@ describe('Praxis template API for Anvil', () => {
 
   it('contracts list the schemas, limits and codes; paid calls are off', async () => {
     const c = (await anvil('GET', '/contracts')).json();
-    expect(c.data).toMatchObject({ template_spec_schema_versions: ['praxis.template_spec.v1-proposed'], pack_schema_version: 'praxis.golden_pack.v1', paid_calls: false });
+    expect(c.data).toMatchObject({ template_spec_schema_versions: ['praxis.anvil.template-spec.v1', 'praxis.template_spec.v1-proposed'], pack_schema_version: 'praxis.golden_pack.v1', paid_calls: false });
     expect(c.data.error_codes).toContain('TP_TOOL_SCHEMA_MISSING');
     expect(c.meta.request_id).toBeTruthy();
   });

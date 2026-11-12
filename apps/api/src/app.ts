@@ -306,7 +306,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(templateRoutes, { db: deps.db });
       await v1.register(projectExportRoutes, { db: deps.db, storage, validator: deps.anvilValidator ?? (deps.config.ANVIL_EXPORT_BASE_URL && deps.config.ANVIL_EXPORT_TOKEN ? new AnvilGatedValidator(new AnvilExportClient(deps.config.ANVIL_EXPORT_BASE_URL, deps.config.ANVIL_EXPORT_TOKEN)) : new PraxisPrecheckValidator()) });
       await v1.register(templateProfileRoutes, { db: deps.db });
-      await v1.register(anvilTemplateRoutes, { db: deps.db });
+      await v1.register(anvilTemplateRoutes, { db: deps.db, anvil: { environment: deps.config.ANVIL_ENVIRONMENT, exportBaseUrl: deps.config.ANVIL_EXPORT_BASE_URL } });
       await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });
       const drafters = deps.metaCompiler?.drafters ?? defaultDrafterFactory(deps.config);
       const mcDeps = resolveDeps(deps.metaCompiler?.deps);

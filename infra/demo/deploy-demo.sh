@@ -232,6 +232,11 @@ for app in web candidate; do
     --set-env-vars="^|^API_BASE_URL=$API_URL|CANDIDATE_APP_URL=$CAND_URL|PRAXIS_DEMO=1|PRAXIS_BUILD=$BUILD|PRAXIS_ENV_LABEL=$ENV_LABEL|SME_SUPPLY_ENABLED=${SME_SUPPLY:+true}" \
     --no-invoker-iam-check --port=8080 --min-instances=0 --max-instances=3
 done
+# A plain deploy keeps a traffic pin set by hand (e.g. a console rollback), so the new revision would get 0% and the
+# environment would keep serving old code. Always send all traffic to the revision just deployed.
+for svc in praxis-api praxis-worker praxis-web praxis-candidate; do
+  gcloud run services update-traffic "$svc" --region="$REGION" --to-latest --quiet
+done
 
 if [ -n "$VERTEX" ] && [ -f "$ROOT/apps/api/scripts/vertex-smoke.ts" ]; then
 say "Vertex smoke job (deployed only; it makes two small billed calls, so it runs only when the owner says so)"

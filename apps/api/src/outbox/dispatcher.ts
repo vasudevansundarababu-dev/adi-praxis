@@ -1,4 +1,5 @@
 import { Queue, Worker, type ConnectionOptions, type Job } from 'bullmq';
+import { Prisma } from '@prisma/client';
 import type { Db } from '../db';
 import type { HandlerRegistry } from './handlers';
 
@@ -69,6 +70,9 @@ export async function processDomainEvent(db: Db, registry: HandlerRegistry, even
         await tx.eventHandlerReceipt.create({ data: { eventId, handler: handler.name } });
       });
     } catch (err) {
+      // Another worker handled this event at the same moment: its transaction committed the receipt and the effects,
+      // ours rolled back. That is the idempotent outcome, not a failure.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002' && String(err.meta?.target ?? err.message).includes('handler')) continue;
       await db.outboxEvent.update({
         where: { id: eventId },
         data: { attempts: { increment: 1 }, lastError: `${handler.name}: ${String(err).slice(0, 1000)}` },

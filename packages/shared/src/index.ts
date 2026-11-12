@@ -31,3 +31,4 @@ export * from "./template-profile";
 export * from "./review-stages";
 export * from './policy-proposal';
 export * from './cluster-f1';
+export * from './project-export';

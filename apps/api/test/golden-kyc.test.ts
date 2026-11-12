@@ -16,7 +16,8 @@ import { publishRuleSet } from '../src/policy/rule-sets';
 import { createRuleFromCandidate, markReviewed } from '../src/policy/rules';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
-import { PraxisPrecheckValidator, type AnvilTaskValidator, type ValidationItem } from '../src/anvil/validator';
+import { AnvilExportClient } from '../src/anvil/export-client';
+import { AnvilGatedValidator, PraxisPrecheckValidator, type AnvilTaskValidator, type ValidationItem } from '../src/anvil/validator';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
 /**
@@ -66,8 +67,13 @@ describe('Golden KYC: the full Praxis cycle on KYC template version 2', () => {
   let clientId: string;
   let admin: string;
   /** Praxis's pre-check, switchable to "Anvil did not answer". */
-  const switchable = { down: false, inner: new PraxisPrecheckValidator() };
-  const validator: AnvilTaskValidator = { name: 'praxis-precheck', version: 'test', validate: (items: ValidationItem[]) => (switchable.down ? Promise.reject(new Error('503 from validator')) : switchable.inner.validate(items)) };
+  const switchable: { down: boolean; inner: PraxisPrecheckValidator; gated: AnvilGatedValidator | null } = { down: false, inner: new PraxisPrecheckValidator(), gated: null };
+  const validator: AnvilTaskValidator = {
+    name: 'praxis-precheck',
+    version: 'test',
+    validate: (items: ValidationItem[]) => (switchable.down ? Promise.reject(new Error('503 from validator')) : switchable.inner.validate(items)),
+    run: (items, ctx, opts) => (switchable.down ? Promise.reject(new Error('503 from validator')) : switchable.gated ? switchable.gated.run(items, ctx, opts) : switchable.inner.validate(items).then((results) => ({ results }))),
+  };
 
   const post = (cookie: string, url: string, payload: object = {}) => app.inject({ method: 'POST', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
   const patch = (cookie: string, url: string, payload: object) => app.inject({ method: 'PATCH', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
@@ -286,6 +292,23 @@ describe('Golden KYC: the full Praxis cycle on KYC template version 2', () => {
       expect(down.json()).toMatchObject({ counts: { valid: 0, needsFix: 0, notValidated: 1 }, results: [{ status: 'not_validated', issues: [{ code: 'VALIDATOR_UNAVAILABLE' }] }] });
     } finally {
       switchable.down = false;
+    }
+    // Anvil has the generic contract enabled (mock transport): the export builds packages from the template versions.
+    // This KYC template was not proposed by Anvil in the joint format, so nothing is sent and the run says why.
+    const seen: string[] = [];
+    switchable.gated = new AnvilGatedValidator(new AnvilExportClient('https://anvil-qa.example.test/api/v1/projects/a7454c18-602e-4907-bdd9-277067c36233/dataset-exports/generic', 'tok-0123456789', async (url) => {
+      seen.push(url);
+      return { status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ data: { contracts: ['praxis.authored-task-export.v1'], enabled: true } }) };
+    }));
+    try {
+      const gated = await post(admin, `/projects/${s.projectId}/exports`);
+      expect(gated.statusCode, gated.body).toBe(201);
+      expect(gated.json()).toMatchObject({ counts: { notValidated: 1 }, results: [{ status: 'not_validated', issues: [{ code: 'GENERIC_TEMPLATE_NOT_JOINT' }] }] });
+      const run = await db.projectValidationRun.findUniqueOrThrow({ where: { id: gated.json().id } });
+      expect(run.anvil).toMatchObject({ contract: 'praxis.authored-task-export.v1', support: 'enabled', parts: [], problems: [{ code: 'GENERIC_TEMPLATE_NOT_JOINT', recordId }] });
+      expect(seen.every((u) => u.endsWith('/contracts'))).toBe(true);
+    } finally {
+      switchable.gated = null;
     }
     // Runs are append-only; the task and the dataset record are untouched by validation.
     await expect(db.$executeRawUnsafe(`UPDATE "ProjectValidationRun" SET kind = 'VALIDATE' WHERE project_id = '${s.projectId}'`)).rejects.toThrow();

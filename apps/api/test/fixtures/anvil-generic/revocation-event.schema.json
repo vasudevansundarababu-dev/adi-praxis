@@ -1,0 +1,88 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "anvil.template-revocation.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "environment": {
+      "enum": [
+        "qa",
+        "staging",
+        "local"
+      ],
+      "title": "Environment",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "anvil_template_key": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+      "title": "Anvil Template Key",
+      "type": "string"
+    },
+    "template_id": {
+      "title": "Template Id",
+      "type": "string"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "template_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Template Sha256",
+      "type": "string"
+    },
+    "receipt_id": {
+      "title": "Receipt Id",
+      "type": "string"
+    },
+    "receipt_hash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Receipt Hash",
+      "type": "string"
+    },
+    "status": {
+      "const": "revoked",
+      "title": "Status",
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 1,
+      "title": "Sequence",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "event_id",
+    "environment",
+    "project_id",
+    "anvil_template_key",
+    "template_id",
+    "version",
+    "template_sha256",
+    "receipt_id",
+    "receipt_hash",
+    "status",
+    "reason",
+    "sequence"
+  ],
+  "title": "RevocationEvent",
+  "type": "object"
+}

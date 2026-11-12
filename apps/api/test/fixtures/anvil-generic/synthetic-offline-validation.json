@@ -1,0 +1,38 @@
+{
+  "schema_version": "anvil.generic-export-validation.v1",
+  "contract": "praxis.authored-task-export.v1",
+  "valid": true,
+  "status": "export_valid",
+  "errors": [],
+  "error_count": 0,
+  "errors_truncated": false,
+  "anvil_requirements": [
+    {
+      "code": "AV_TEMPLATE_NOT_QUALIFIED",
+      "owner": "anvil",
+      "status": "blocked",
+      "task_id": "NEW-SME-9001"
+    }
+  ],
+  "review_gates": [
+    {
+      "code": "REVIEW_DOMAIN_SIGNOFF",
+      "owner": "human_review",
+      "status": "pending"
+    },
+    {
+      "code": "REVIEW_DATA_RIGHTS",
+      "owner": "human_review",
+      "status": "pending"
+    },
+    {
+      "code": "REVIEW_CASE_EXPECTATIONS",
+      "owner": "human_review",
+      "status": "pending"
+    }
+  ],
+  "package_sha256": "05316f18ea709630208c0725d46b73730a6dfb6cc2117dcbc7461018b60c8ca5",
+  "validation_coverage": "registered_template_conformance",
+  "run_authority": "not_granted",
+  "paid_calls": false
+}

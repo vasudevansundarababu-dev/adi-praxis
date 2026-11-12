@@ -193,6 +193,8 @@ fi
 # Praxis-Anvil integration (docs/anvil/PRAXIS-ANVIL-CONTRACT-FINAL.md; owner decisions 11 Nov 2026 in docs/DECISIONS.md).
 # Praxis ANVIL keys never outlive the pilot end. Older builds ignore it.
 printf 'ANVIL_CREDENTIAL_NOT_AFTER: "%s"\n' "${ANVIL_CREDENTIAL_NOT_AFTER:-2026-12-11T05:48:04Z}" >> "$ENVFILE"
+# One Anvil project per environment; QA and demo bind to Anvil's qa environment for revocation events.
+printf 'ANVIL_ENVIRONMENT: "%s"\n' "${ANVIL_ENVIRONMENT:-qa}" >> "$ENVFILE"
 # Export to Anvil is connected only when the owner has stored, in this project's Secret Manager, Anvil's export token
 # (secret anvil-export-token) and the Anvil project's generic export address (secret anvil-export-base-url, kept out of
 # this public repository). Otherwise project export runs Praxis's own pre-check.

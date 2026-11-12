@@ -3282,6 +3282,8 @@ model ProjectValidationRun {
   /// EXPORT only: object-storage key of the exported newline-delimited JSON, and its sha256.
   fileKey          String?  @map("file_key")
   fileSha256       String?  @map("file_sha256")
+  /// Generic Anvil export: packages sent (IDs and hashes, never content) and Anvil's validate/resolve outcome.
+  anvil            Json?
   requestedById    String   @map("requested_by_id") @db.Uuid
   createdAt        DateTime @default(now()) @map("created_at")
 
@@ -3337,4 +3339,26 @@ model TemplateQualification {
   createdAt           DateTime @default(now()) @map("created_at")
 
   @@index([templateId, createdAt])
+}
+
+/// Anvil's revocation events (four confirmations, 11 Nov 2026, point 4). Append-only, enforced in the database.
+model AnvilRevocationEvent {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String   @map("client_id") @db.Uuid
+  apiClientId    String   @map("api_client_id") @db.Uuid
+  eventId        String   @unique @map("event_id") @db.Uuid
+  environment    String
+  anvilProjectId String   @map("anvil_project_id") @db.Uuid
+  receiptId      String   @map("receipt_id")
+  sequence       Int
+  /// The Template row (version) the event revokes.
+  templateId     String   @map("template_id") @db.Uuid
+  eventSha256    String   @map("event_sha256")
+  event          Json
+  /// applied or already_applied
+  outcome        String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([environment, anvilProjectId, sequence])
+  @@index([receiptId])
 }

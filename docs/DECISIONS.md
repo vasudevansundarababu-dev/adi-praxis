@@ -908,3 +908,19 @@ Anvil answered the eight contract questions (`Anvil-Praxis-eight-answers-v1.md`)
   that project's generic path, `…/api/v1/projects/{project}/dataset-exports/generic`.
 - **(chosen by Claude)** Revocation keeps authoring and flags affected projects, as Anvil answered (Q5) and the owner
   proposed. Anvil generic support is detected by the exact contract ID, never a similar name.
+
+## Anvil's four confirmations: Praxis defaults (12 Nov 2026)
+
+Owner: "Finish the remaining tasks. Will make one final build." Defaults taken, details in
+`docs/anvil/ANVIL-FOUR-CONFIRMATIONS-PRAXIS.md`:
+
+- `template_id` in the joint object is the template **lineage** UUID (stable across versions); the version row ID is
+  returned as `template_version_id`. Both proposal formats stay accepted so earlier proposals keep working.
+- A joint template's qualification hash is `template_sha256`; a qualification may name `(template_id, version)`.
+- Readiness: a revocation event revokes only its receipt; an earlier-format REVOKED row still revokes all receipts.
+- The export sends only the agent view of a workflow graph, and refuses any task whose Anvil public view would differ
+  from Praxis's agent view (`GENERIC_PRIVATE_EXPOSURE`), rather than letting private sub-fields reach `actor.json`.
+- Export resolves each Anvil-valid package with `Idempotency-Key: praxis-<package_sha256>`; validate never resolves.
+- Package review provenance is `praxis-approved-record:<record id>:<content hash prefix>` (opaque, no person).
+- `ANVIL_ENVIRONMENT` (default `qa` in the deploy script) binds revocation events with the project in
+  `ANVIL_EXPORT_BASE_URL`; unbound environments refuse revocations.

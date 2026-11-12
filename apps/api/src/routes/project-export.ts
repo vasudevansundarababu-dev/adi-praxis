@@ -1,4 +1,4 @@
-import type { ApprovedTaskRecord } from '@prisma/client';
+import type { ApprovedTaskRecord, Prisma } from '@prisma/client';
 import { exportEligibility, TaskValidationResult, ValidateRequest, ValidationRunDto } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -7,7 +7,7 @@ import type { Db, Tx } from '../db';
 import { sha256 } from '../lib/crypto';
 import { AppError, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
-import { validationItem, type AnvilTaskValidator } from '../anvil/validator';
+import { validationItem, type AnvilRunRecord, type AnvilTaskValidator, type ValidationItem } from '../anvil/validator';
 import { toRecordDto } from './dataset';
 import { loadProject } from './projects';
 
@@ -35,13 +35,15 @@ function runDto(r: { id: string; projectId: string; kind: string; validator: str
   return { id: r.id, projectId: r.projectId, kind: r.kind as 'VALIDATE' | 'EXPORT', validator: r.validator, validatorVersion: r.validatorVersion, results, counts: counts(results), requestedById: r.requestedById, createdAt: r.createdAt.toISOString(), downloadPath: r.fileKey ? `/projects/${r.projectId}/exports/${r.id}/download` : null };
 }
 
-/** Validates the records; a validator failure marks them not validated instead of guessing. */
-async function validate(tx: Db | Tx, validator: AnvilTaskValidator, records: ApprovedTaskRecord[]) {
+/** Validates the records (and, on export, lets Anvil resolve them); a validator failure marks them not validated. */
+async function validate(tx: Db | Tx, validator: AnvilTaskValidator, records: ApprovedTaskRecord[], projectId: string, resolve = false): Promise<{ items: ValidationItem[]; results: TaskValidationResult[]; anvil?: AnvilRunRecord; zips?: Map<number, Buffer> }> {
   const tasks = await tx.taskInstance.findMany({ where: { id: { in: records.map((r) => r.taskInstanceId) } }, select: { id: true, checks: true } });
   const blockers = new Map(tasks.map((t) => [t.id, ((t.checks as { export?: { blockers?: { code: string; path: string; message: string }[] } } | null)?.export?.blockers ?? [])]));
   const items = records.map((r) => validationItem(r, titleOf(r), blockers.get(r.taskInstanceId) ?? []));
+  const templates = new Map((await tx.template.findMany({ where: { id: { in: [...new Set(records.map((r) => r.templateId))] } } })).map((t) => [t.id, t]));
   try {
-    return { items, results: await validator.validate(items) };
+    if (validator.run) return { items, ...(await validator.run(items, { projectId, templates }, { resolve })) };
+    return { items, results: await validator.validate(items, { projectId, templates }) };
   } catch (e) {
     const message = `The validator did not answer: ${e instanceof Error ? e.message : String(e)}`;
     return { items, results: items.map((i) => ({ recordId: i.record.id, taskId: i.taskId, title: i.title, status: 'not_validated' as const, issues: [{ code: 'VALIDATOR_UNAVAILABLE', path: null, message }] })) };
@@ -75,9 +77,9 @@ export const projectExportRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Objec
       if (!e.canValidate) throw new AppError(409, 'NOT_VALIDATABLE', e.reason ?? 'Nothing to validate.');
       const records = e.records.filter((r) => req.body.recordIds.includes(r.id));
       if (records.length !== req.body.recordIds.length) throw notFound('Approved task not found in this project');
-      const { results } = await validate(tx, validator, records);
-      const run = await tx.projectValidationRun.create({ data: { clientId: actor.clientId, projectId: p.id, kind: 'VALIDATE', validator: validator.name, validatorVersion: validator.version, recordIds: records.map((r) => r.id), results, requestedById: actor.userId } });
-      await audit({ entityType: 'Project', entityId: p.id, action: 'project.validated', after: { runId: run.id, validator: validator.name, ...counts(results) } });
+      const { results, anvil } = await validate(tx, validator, records, p.id);
+      const run = await tx.projectValidationRun.create({ data: { clientId: actor.clientId, projectId: p.id, kind: 'VALIDATE', validator: validator.name, validatorVersion: validator.version, recordIds: records.map((r) => r.id), results, ...(anvil ? { anvil: anvil as unknown as Prisma.InputJsonValue } : {}), requestedById: actor.userId } });
+      await audit({ entityType: 'Project', entityId: p.id, action: 'project.validated', after: { runId: run.id, validator: validator.name, ...counts(results), ...(anvil ? { anvilBatchId: anvil.batchId, packages: anvil.parts.map((x) => x.packageSha256) } : {}) } });
       return { status: 201, body: runDto(run) };
     });
     return reply;
@@ -88,15 +90,23 @@ export const projectExportRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Objec
       const p = await loadProject(tx, req.params.id, actor);
       const e = await eligibility(tx, actor.clientId, p);
       if (!e.canExport) throw new AppError(409, 'NOT_EXPORTABLE', e.reason ?? 'The project cannot be exported yet.');
-      const { items, results } = await validate(tx, validator, e.records);
+      const { items, results, anvil, zips } = await validate(tx, validator, e.records, p.id, true);
       const byRecord = new Map(results.map((r) => [r.recordId, r]));
       // One line per approved task: the dataset record, its Anvil export envelope (when it has one) and the verdict.
       const file = items.map((i) => JSON.stringify({ record: toRecordDto(i.record), anvilExport: i.envelope, validation: byRecord.get(i.record.id) ?? null })).join('\n') + '\n';
       const id = crypto.randomUUID();
       const key = `exports/${actor.clientId}/${p.id}/${id}.ndjson`;
       await storage.put(key, Buffer.from(file, 'utf8'), 'application/x-ndjson');
-      const run = await tx.projectValidationRun.create({ data: { id, clientId: actor.clientId, projectId: p.id, kind: 'EXPORT', validator: validator.name, validatorVersion: validator.version, recordIds: items.map((i) => i.record.id), results, fileKey: key, fileSha256: sha256(file), requestedById: actor.userId } });
-      await audit({ entityType: 'Project', entityId: p.id, action: 'project.exported', after: { runId: run.id, tasks: items.length, validator: validator.name, fileSha256: run.fileSha256, ...counts(results) } });
+      // The generic packages sent to Anvil are kept with the run (private storage, same access as the export file).
+      const kept = anvil ? { ...anvil, parts: await Promise.all(anvil.parts.map(async (part) => {
+        const zip = zips?.get(part.partIndex);
+        if (!zip) return part;
+        const zipKey = `exports/${actor.clientId}/${p.id}/${id}-anvil-p${part.partIndex}.zip`;
+        await storage.put(zipKey, zip, 'application/zip');
+        return { ...part, zipKey };
+      })) } : null;
+      const run = await tx.projectValidationRun.create({ data: { id, clientId: actor.clientId, projectId: p.id, kind: 'EXPORT', validator: validator.name, validatorVersion: validator.version, recordIds: items.map((i) => i.record.id), results, fileKey: key, fileSha256: sha256(file), ...(kept ? { anvil: kept as unknown as Prisma.InputJsonValue } : {}), requestedById: actor.userId } });
+      await audit({ entityType: 'Project', entityId: p.id, action: 'project.exported', after: { runId: run.id, tasks: items.length, validator: validator.name, fileSha256: run.fileSha256, ...counts(results), ...(kept ? { anvilBatchId: kept.batchId, packages: kept.parts.map((x) => ({ sha256: x.packageSha256, resolve: x.resolve?.status ?? null })) } : {}) } });
       return { status: 201, body: runDto(run) };
     });
     return reply;

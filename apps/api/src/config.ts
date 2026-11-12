@@ -78,6 +78,11 @@ const Env = z.object({
   ANVIL_EXPORT_BASE_URL: z.string().regex(/^$|^https:\/\/[^\s]+$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/[^\s]*$/, 'ANVIL_EXPORT_BASE_URL must be https (or http on localhost)').default(''),
   ANVIL_EXPORT_TOKEN: z.string().default(''),
   /**
+   * Anvil environment this Praxis environment is bound to (Anvil's four confirmations, point 4): a revocation event is
+   * accepted only for this environment and the project in ANVIL_EXPORT_BASE_URL. Blank = revocations are refused.
+   */
+  ANVIL_ENVIRONMENT: z.enum(['', 'qa', 'staging', 'local']).default(''),
+  /**
    * Owner, 11 Nov 2026 (Anvil Q7): no ANVIL key outlives this instant (the pilot's testing-window end, ISO 8601 UTC).
    * Blank = Anvil keys cannot be issued.
    */

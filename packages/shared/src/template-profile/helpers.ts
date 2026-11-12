@@ -81,6 +81,8 @@ export function itemFieldsOf(field: ItemField): ItemField[] {
         { key: 'evidenceRefs', type: 'multi_select', label: 'Evidence or rule links', help: 'Evidence, rule or step IDs this criterion checks.', allowCustom: true },
         // Praxis-Anvil contract (12 Nov 2026): on a template Anvil proposed, the kind must be one the template allows.
         { key: 'evaluatorKind', type: 'text', label: 'Evaluator kind', help: 'How Anvil grades this criterion (one of the kinds the template allows, e.g. run_evidence). Leave empty if the template has no Anvil spec.' },
+        // Anvil's four confirmations (11 Nov 2026), point 3: the evaluator is an exact (id, version) pair from Anvil's catalogue.
+        { key: 'evaluatorVersion', type: 'text', label: 'Evaluator version', help: 'The version of that evaluator in the template’s execution part (e.g. 1). Leave empty if the template has no Anvil spec.' },
         ...BINDING_FIELDS('The output.json field this criterion checks. Needed for executable export.'),
       ];
     default:

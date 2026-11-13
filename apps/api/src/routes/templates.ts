@@ -368,8 +368,8 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
   /**
    * Issue #61 (owner, 12 Nov 2026): a DRAFT version can be deleted; a published or retired one never can (retire it).
    * A draft that anything has already used (a project, generation run, deployment, authored task, approved record,
-   * qualification or revocation) is kept, so no history loses its template. An Anvil proposal that created the draft
-   * stays on record; its readback then shows the template as gone.
+   * qualification, revocation or Anvil proposal) is kept, so no history loses its template. A draft Anvil proposed is
+   * step 3 of the template lifecycle (requirement 49172, section 7.2); it is published or left, never deleted.
    */
   app.delete(
     '/templates/:id',
@@ -383,7 +383,7 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
         }
         await lockLineage(tx, t.lineageId);
         const where = { templateId: t.id };
-        const [projects, runs, deployments, authored, approved, qualifications, revocations, requirements] = await Promise.all([
+        const [projects, runs, deployments, authored, approved, qualifications, revocations, requirements, proposals] = await Promise.all([
           tx.project.count({ where }),
           tx.compilerGenerationRun.count({ where }),
           tx.studioDeployment.count({ where }),
@@ -392,8 +392,9 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
           tx.templateQualification.count({ where }),
           tx.anvilRevocationEvent.count({ where }),
           tx.projectPolicyRequirement.count({ where }),
+          tx.templateProposal.count({ where }),
         ]);
-        const uses = Object.entries({ projects, 'generation runs': runs, deployments, 'authored tasks': authored, 'approved records': approved, qualifications, revocations, 'project policy requirements': requirements }).filter(([, n]) => n > 0);
+        const uses = Object.entries({ projects, 'generation runs': runs, deployments, 'authored tasks': authored, 'approved records': approved, qualifications, revocations, 'project policy requirements': requirements, 'Anvil proposals': proposals }).filter(([, n]) => n > 0);
         if (uses.length) {
           throw new AppError(409, 'TEMPLATE_IN_USE', `This draft is already used (${uses.map(([k, n]) => `${n} ${k}`).join(', ')}), so it is kept.`);
         }

@@ -358,6 +358,17 @@ describe('M1 template catalog', () => {
       expect(await db.template.count({ where: { id: t.id } })).toBe(1);
     });
 
+    it('a draft Anvil proposed is kept (lifecycle step 3: published or left, never deleted)', async () => {
+      const t = await createTemplate();
+      const clientId = (await db.template.findUniqueOrThrow({ where: { id: t.id } })).clientId;
+      await db.templateProposal.create({ data: { clientId, apiClientId: randomUUID(), requirementId: 'req-1', profileId: 'p-1', templateId: t.id, spec: {}, specSha256: 'b'.repeat(64) } });
+      const res = await del(admin, `/templates/${t.id}`);
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe('TEMPLATE_IN_USE');
+      expect(res.json().message).toContain('Anvil proposals');
+      expect(await db.template.count({ where: { id: t.id } })).toBe(1);
+    });
+
     it('PMs and Reviewers cannot delete drafts', async () => {
       const t = await createTemplate();
       for (const cookie of [pm, reviewer]) expect((await del(cookie, `/templates/${t.id}`)).statusCode).toBe(403);

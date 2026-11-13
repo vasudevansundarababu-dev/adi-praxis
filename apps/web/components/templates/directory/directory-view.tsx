@@ -106,7 +106,8 @@ function DirectoryRow({ row: r, isAdmin }: { row: DirectoryRowDto; isAdmin: bool
         <Link href={`/templates/${r.templateId}`} className="font-medium text-link hover:underline">
           {r.workflowName}
         </Link>
-        {isAdmin && r.hasBlueprint && (
+        {isAdmin && r.definedByAnvil && <span className="ml-2 text-xs text-fg-muted">Defined by Anvil</span>}
+        {isAdmin && r.hasBlueprint && !r.definedByAnvil && (
           <span className={`ml-2 text-xs ${r.validSections === BLUEPRINT_SECTIONS.length ? 'text-success' : 'text-fg-muted'}`}>
             {r.validSections}/{BLUEPRINT_SECTIONS.length} valid
           </span>

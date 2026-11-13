@@ -311,6 +311,7 @@ const routes: Route[] = [
           modes: bp.template_meta.modes,
           validSections: validSectionCount(sectionProblems(bp)),
           hasBlueprint: true,
+          definedByAnvil: false,
           variantOfId: (t as TemplateDto & { variantOfId?: string }).variantOfId ?? null,
           projectCount: new Set(deps.map((d) => d.projectId)).size,
           authoredTaskCount: [...s.tasks.values()].filter((x) => x.dto.templateId === t.id).length,

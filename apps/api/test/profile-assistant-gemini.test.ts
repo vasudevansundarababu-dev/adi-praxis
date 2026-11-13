@@ -69,7 +69,8 @@ describe('PROFILE_MODEL: Gemini option for the FLOW2 SME profile chat', () => {
   });
 
   it('the setting selects the provider; empty follows a Gemini AUTHORING_MODEL, else Claude Opus as before', () => {
-    const opts = { projectId: 'p', location: 'global' };
+    // A stub Claude client: the real one starts a Google credential lookup when created (never in tests).
+    const opts = { projectId: 'p', location: 'global', claudeClient: { messages: {} } as never };
     expect(vertexProfileAssistant('gemini:gemini-3.8-flash', opts)).toBeInstanceOf(GeminiVertexProfileAssistant);
     const claude = vertexProfileAssistant('claude-opus-5', opts);
     expect(claude).toBeInstanceOf(ClaudeVertexProfileAssistant);

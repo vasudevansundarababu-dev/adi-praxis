@@ -245,11 +245,12 @@ export function profileModel(config: { PROFILE_MODEL: string; AUTHORING_MODEL: s
   return config.PROFILE_MODEL || (config.AUTHORING_MODEL.startsWith('gemini:') ? config.AUTHORING_MODEL : ClaudeVertexProfileAssistant.MODEL);
 }
 
-export function vertexProfileAssistant(setting: string, opts: { projectId: string; location: string }): ProfileAssistant {
+/** `claudeClient` lets tests avoid the real Vertex client, which starts a credential lookup when created. */
+export function vertexProfileAssistant(setting: string, opts: { projectId: string; location: string; claudeClient?: Pick<AnthropicVertex, 'messages'> }): ProfileAssistant {
   const [prefix, ...rest] = setting.split(':');
-  if (rest.length && prefix === 'gemini') return new GeminiVertexProfileAssistant(rest.join(':'), opts);
+  if (rest.length && prefix === 'gemini') return new GeminiVertexProfileAssistant(rest.join(':'), { projectId: opts.projectId, location: opts.location });
   const model = rest.length && prefix === 'claude' ? rest.join(':') : setting;
-  return new ClaudeVertexProfileAssistant({ projectId: opts.projectId, region: opts.location, model });
+  return new ClaudeVertexProfileAssistant({ projectId: opts.projectId, region: opts.location, model, client: opts.claudeClient });
 }
 
 // ───────────────────────── Local dev mock (never used in production) ─────────────────────────

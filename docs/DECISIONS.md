@@ -924,3 +924,11 @@ Owner: "Finish the remaining tasks. Will make one final build." Defaults taken, 
 - Package review provenance is `praxis-approved-record:<record id>:<content hash prefix>` (opaque, no person).
 - `ANVIL_ENVIRONMENT` (default `qa` in the deploy script) binds revocation events with the project in
   `ANVIL_EXPORT_BASE_URL`; unbound environments refuse revocations.
+
+## Draft template delete, seeded SME skills (12 Nov 2026)
+
+- **Draft template versions can be deleted** (issue #61; owner: "you can delete Template which is Draft Stage. You cannot delete the Template which is published").
+  - Only DRAFT, Admin only, audited as `template.draft_deleted`.
+  - Kept (409 `TEMPLATE_IN_USE`) when anything has used it, including an Anvil proposal: an Anvil-proposed draft is step 3 of the template lifecycle (requirement 49172 section 7.2).
+  - Published and retired versions are retired, never deleted.
+- **QA seed:** each seeded SME's profile skills are the pool template's skills, so staffing lists SMEs with that template's skill set.

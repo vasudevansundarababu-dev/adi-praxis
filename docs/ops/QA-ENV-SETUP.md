@@ -12,16 +12,16 @@ QA = the existing test project `adi-praxis-test-0928` (project number 7427850926
 | Item | State |
 | --- | --- |
 | Project, billing | Active, billing linked |
-| Cloud Run services | `praxis-api`, `praxis-worker`, `praxis-web`, `praxis-candidate` ready, build `nightly-20261110-79a8a9e` (`APP_ENV=demo`) |
-| Cloud Run jobs | `praxis-migrate` (succeeds), `praxis-demo-setup` (**fails**, see open item O1) |
+| Cloud Run services | `praxis-api`, `praxis-worker`, `praxis-web`, `praxis-candidate` ready, build `nightly-20261113-8eea5e5` (`APP_ENV=demo`), all four on 100% latest revision |
+| Cloud Run jobs | `praxis-migrate`, `praxis-demo-setup` (both succeed, 13 Nov), `praxis-qa-users` (deployed as a dry run) |
 | APIs | Vertex AI (`aiplatform`), Run, SQL, Redis, Secret Manager enabled. **Document AI not enabled.** |
 | Runtime service account `praxis-demo-run` | `aiplatform.user`, `cloudsql.client`, `secretmanager.secretAccessor`, `logging.logWriter`, `monitoring.metricWriter` |
 | Vertex wiring | `VERTEX_PROJECT_ID=adi-praxis-test-0928`, `VERTEX_LOCATION=global` on the API and worker |
 | Spend caps in the app | None set (`deploy-demo.sh` passes no caps) |
 | Billing budget | "Bugdet Alert For Praxis", 1000 USD, this project but one service only; from 10 Nov also "PraxisQA All Services", 500 USD, all services |
 | Secrets | Database, Redis, mock secret, demo passwords. **No `llamaextract-api-key`.** |
-| GitHub wiring | `TEST_GCP_PROJECT`, `TEST_WIF_PROVIDER`, `TEST_DEPLOYER_SA`, `NIGHTLY_ENABLED=true` set |
-| Last Nightly build | Run 42757420232: CI green, deploy red at the demo-data step (O1) |
+| GitHub wiring | `TEST_GCP_PROJECT`, `TEST_WIF_PROVIDER`, `TEST_DEPLOYER_SA`; `ANVIL_CALLER_SERVICE_ACCOUNT`, `ANVIL_CALLER_SUBJECT`, `ANVIL_OUTBOUND_AUDIENCE` (keyless Anvil, 13 Nov). `NIGHTLY_ENABLED=false` during end-to-end testing: the scheduled run skips, a manual Run workflow still deploys. Set it back to `true` when testing ends. |
+| Last Nightly build | Run 43359847461 (manual, 13 Nov): main 8eea5e57 (#62 keyless Anvil), all green. Anvil export token no longer bound; inbound audience is the numeric API URL; grant "Anvil (keyless service identity)" created by `praxis-demo-setup`. Revoke of the old Anvil token not done (last step of the joint QA plan). |
 
 ## 2. What authoring v2.1 adds (branch `feat/authoring-v21`, from the code session)
 

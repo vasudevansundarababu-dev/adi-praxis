@@ -1,4 +1,4 @@
-import { checkGoldenPack, checkTemplateSpec, FIELD_TYPES, GOLDEN_PACK_SCHEMA_VERSION, PROFILE_SCHEMA_VERSION, profileById, TEMPLATE_SPEC_SCHEMA, TemplateSpec, templateVersionContent, type TemplateSpecCheck } from '@praxis/shared';
+import { anvilDefinition, checkGoldenPack, checkTemplateSpec, FIELD_TYPES, GOLDEN_PACK_SCHEMA_VERSION, PROFILE_SCHEMA_VERSION, profileById, TEMPLATE_SPEC_SCHEMA, TemplateSpec, templateStartingGraph, templateVersionContent, type TemplateSpecCheck } from '@praxis/shared';
 import type { Prisma, Template } from '@prisma/client';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -300,7 +300,15 @@ export const anvilTemplateRoutes: FastifyPluginAsyncZod<{ db: Db; anvil?: { envi
     const t = await db.template.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
     if (!t) throw notFound('Template not found');
     const spec = (t.anvilSpec ?? null) as { requirement?: { id?: string; channel?: string; reference?: string }; anvil_template_key?: string } | null;
-    return { ...(await anvilReadiness(db, t)), requirementId: spec?.requirement?.id ?? spec?.requirement?.reference ?? null, channel: spec?.requirement?.channel ?? null, anvilTemplateKey: spec?.anvil_template_key ?? null };
+    // Read-only summary of Anvil's parts for the template page ("Defined by Anvil" instead of the n/6 counter).
+    const roleIds = (templateStartingGraph(t.workflowName, t.version, t.profileId)?.roles ?? []).map((r) => r.id);
+    return {
+      ...(await anvilReadiness(db, t)),
+      requirementId: spec?.requirement?.id ?? spec?.requirement?.reference ?? null,
+      channel: spec?.requirement?.channel ?? null,
+      anvilTemplateKey: spec?.anvil_template_key ?? null,
+      definition: anvilDefinition(t.anvilSpec, roleIds),
+    };
   });
 
   app.post('/integrations/anvil/templates/qualifications', { config: { access: ANVIL }, schema: { tags: ['anvil'], body: QualificationBody } }, async (req, reply) => {

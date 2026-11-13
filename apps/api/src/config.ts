@@ -71,6 +71,11 @@ const Env = z.object({
   /** FLOW2 suitability assessment model on Vertex: a Claude model id (default), or `gemini:<model>` (QA without Claude quota). */
   SUITABILITY_MODEL: z.string().default('claude-opus-5'),
   /**
+   * FLOW2 SME profile assistant model on Vertex: `gemini:<model>`, `claude:<model>` or a Claude id. Empty follows a
+   * Gemini AUTHORING_MODEL (QA without Claude quota), otherwise claude-opus-5.
+   */
+  PROFILE_MODEL: z.string().default(''),
+  /**
    * Praxis-Anvil contract (12 Nov 2026): Anvil's project-scoped dataset-export API, e.g.
    * https://anvil-qa.adi-labs.ai/api/v1/projects/<project>/dataset-exports/generic (one Anvil project per environment). Blank = not connected (Praxis pre-check).
    * The token is an Anvil-issued export-client secret: server only, never logged, never sent to a browser.

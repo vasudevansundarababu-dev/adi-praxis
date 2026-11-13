@@ -15,6 +15,8 @@ import { grantAppRole } from './grant-app-role';
  * - `policy-seed --client <clientId> --owner <pmUserId>`: fictional SEED policy projects (PRD PR-S01); never production.
  * - `qa-users [--dry-run]`: QA-only synthetic users (30 staffing-ready SMEs, 10 Reviewers) through the public API at
  *   API_URL; never production. Exit 3 when some candidates are not ready yet (re-run to continue).
+ * - `qa-project-cleanup [--apply]`: QA-only. Deletes every project without protected history; cancels the rest. Dry run
+ *   by default; --apply also needs QA_PROJECT_CLEANUP_CONFIRM=delete-all-projects. Never production.
  * Exits non-zero on failure so Cloud Run retries and alerts.
  */
 const job = process.argv[2];
@@ -71,6 +73,17 @@ try {
     // The job also runs pending or failed assessments with this environment's model (SUITABILITY_MODEL).
     const r = await qaUsers(db, { ...optionsFromEnv(process.env, config.appEnv, dryRun, fetchHttp(process.env.API_URL ?? '')), evaluator: defaultEvaluator(config) }, log);
     if (!dryRun && r.incomplete) process.exitCode = 3;
+  } else if (job === 'qa-project-cleanup') {
+    if (config.appEnv === 'production') throw new Error('qa-project-cleanup refuses to run with APP_ENV=production');
+    const extra = process.argv.slice(3).filter((a) => a !== '--apply');
+    if (extra.length) throw new Error(`Unknown qa-project-cleanup argument "${extra[0]}". Use: --apply (default is a dry run)`);
+    const apply = process.argv.includes('--apply');
+    if (apply && process.env.QA_PROJECT_CLEANUP_CONFIRM !== 'delete-all-projects') throw new Error('qa-project-cleanup --apply needs QA_PROJECT_CLEANUP_CONFIRM=delete-all-projects');
+    const { cleanupProjects } = await import('./qa-project-cleanup');
+    const r = await cleanupProjects(db, { apply, log: (m, extra) => log('info', m, extra) });
+    const tally = r.reduce<Record<string, number>>((a, o) => ({ ...a, [o.outcome]: (a[o.outcome] ?? 0) + 1 }), {});
+    log('info', 'qa project cleanup', { apply, tally });
+    console.log(JSON.stringify({ report: 'qa-project-cleanup', apply, tally, projects: r }));
   } else if (job === 'catalog-import') {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);

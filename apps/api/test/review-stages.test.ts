@@ -390,4 +390,69 @@ describe('Authoring v2.1 Wave 2: SME -> Expert -> PM review route', () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().error).toBe('REVIEW_ROUTE_FROZEN');
   });
+  describe('QA project cleanup job (owner, 13 Nov 2026: delete all projects, keep SMEs)', () => {
+    it('dry run changes nothing; apply deletes a staffed project with no protected history, keeps and cancels one with approved records; SMEs, templates and audit stay', async () => {
+      const { cleanupProjects } = await import('../src/jobs/qa-project-cleanup');
+      // A staffed project: slots, matches, reviewer, assignment, task instance, submission.
+      const staffed = await submitted();
+      // An approved project: append-only approved record and reviews.
+      const approved = await submitted();
+      expect((await pass(approved.expert, approved.id)).statusCode).toBe(200);
+      expect((await approve(approved.pm, approved.id)).statusCode).toBe(200);
+      expect(await db.approvedTaskRecord.count({ where: { taskInstanceId: approved.id } })).toBe(1);
+      const before = { projects: await db.project.count(), users: await db.smeUser.count(), candidates: await db.candidate.count(), templates: await db.template.count(), audits: await db.auditEvent.count() };
+
+      const dry = await cleanupProjects(db, { apply: false });
+      expect(dry.find((o) => o.id === approved.projectId)).toMatchObject({ outcome: 'would_keep_and_cancel' });
+      expect(dry.find((o) => o.id === approved.projectId)!.reasons.join(' ')).toMatch(/approved task records/);
+      expect(await db.project.count()).toBe(before.projects);
+      expect(await db.auditEvent.count()).toBe(before.audits);
+
+      const staffedOutcome = dry.find((o) => o.id === staffed.projectId)!;
+      const r = await cleanupProjects(db, { apply: true });
+      const s = r.find((o) => o.id === staffed.projectId)!;
+      if (staffedOutcome.outcome === 'would_delete') {
+        expect(s.outcome, JSON.stringify(s)).toBe('deleted');
+        expect(await db.project.count({ where: { id: staffed.projectId } })).toBe(0);
+        expect(await db.taskInstance.count({ where: { projectId: staffed.projectId } })).toBe(0);
+        expect(await db.coverageSlot.count({ where: { projectId: staffed.projectId } })).toBe(0);
+        expect(await db.projectAssignment.count({ where: { projectId: staffed.projectId } })).toBe(0);
+        expect(await db.auditEvent.count({ where: { entityId: staffed.projectId, action: 'project.hard_deleted', actorType: 'SYSTEM' } })).toBe(1);
+      } else {
+        // Submission wrote protected history (for example a policy snapshot): kept and cancelled, never forced.
+        expect(s.outcome).toBe('kept_cancelled');
+      }
+      expect(r.find((o) => o.id === approved.projectId)).toMatchObject({ outcome: 'kept_cancelled' });
+      expect((await db.project.findUniqueOrThrow({ where: { id: approved.projectId } })).status).toBe('CANCELLED');
+      expect(await db.approvedTaskRecord.count({ where: { taskInstanceId: approved.id } })).toBe(1);
+      expect(await db.auditEvent.count({ where: { entityId: approved.projectId, action: 'project.cancelled', actorType: 'SYSTEM' } })).toBe(1);
+      // SMEs, candidates and templates untouched; audit only grows.
+      expect(await db.smeUser.count()).toBe(before.users);
+      expect(await db.candidate.count()).toBe(before.candidates);
+      expect(await db.template.count()).toBe(before.templates);
+      expect(await db.auditEvent.count()).toBeGreaterThan(before.audits);
+
+      // Idempotent: a second run deletes nothing more and does not cancel again.
+      const again = await cleanupProjects(db, { apply: true });
+      expect(again.find((o) => o.id === approved.projectId)).toMatchObject({ outcome: 'kept_already_cancelled' });
+      expect(await db.auditEvent.count({ where: { entityId: approved.projectId, action: 'project.cancelled', actorType: 'SYSTEM' } })).toBe(1);
+    });
+
+    it('a draft project with nothing under it is deleted', async () => {
+      const { cleanupProjects } = await import('../src/jobs/qa-project-cleanup');
+      const pmUser = await createUser(clientId, ['PM']);
+      const pm = await login(app, pmUser.email);
+      const domainId = (await post(admin, '/domains', { name: 'Draftland' })).json().id;
+      const tpl = (await post(admin, '/templates', { domainId, workflowName: 'Draft only', primaryWork: 'x', verificationCriteria: 'x', humanGate: 'x', defaultTptMinutes: 30, skills: ['KYC'], taskModes: ['AUTHORING'] })).json();
+      await post(admin, `/templates/${tpl.id}/publish`);
+      const jd = (await post(pm, '/job-descriptions', { title: 'Analyst', responsibilities: 'Author cases.', skills: ['KYC'], wagePerTask: 40, wageCurrency: 'GBP', locationType: 'REMOTE' })).json();
+      const created = await post(pm, '/projects', { authoringExperience: 'CLASSIC', reviewRoute: 'SME_PM', templateId: tpl.id, name: 'Draft P', taskMode: 'AUTHORING', distinctTarget: 1, maxPerExpert: 1, tptMinutes: 30, startDate: '2026-10-05', endDate: '2026-10-06', jobDescriptionId: jd.id });
+      expect(created.statusCode, created.body).toBe(201);
+      const p = created.json();
+      const r = await cleanupProjects(db, { apply: true });
+      expect(r.find((o) => o.id === p.id)).toMatchObject({ outcome: 'deleted' });
+      expect(await db.project.count({ where: { id: p.id } })).toBe(0);
+      expect(await db.template.count({ where: { id: tpl.id } })).toBe(1);
+    });
+  });
 });

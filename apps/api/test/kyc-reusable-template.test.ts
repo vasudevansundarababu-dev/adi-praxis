@@ -136,6 +136,14 @@ describe('corrected KYC template (reusable five-state proposal)', () => {
       expect(r.statusCode).toBe(422);
       expect(JSON.stringify(r.json().data.errors)).toMatch(/federalPolicies/);
     }
+    // An invalid proposal is refused with 422 (not a server error) and creates nothing.
+    const bad = clone();
+    delete bad.execution.federalPolicies;
+    const before = await db.template.count();
+    const refused = await propose(bad);
+    expect(refused.statusCode, refused.body).toBe(422);
+    expect(refused.json().data).toMatchObject({ valid: false, status: 'template_invalid' });
+    expect(await db.template.count()).toBe(before);
     const unknown = clone();
     unknown.execution.schema_version = 'anvil.template-execution.v3';
     expect((await validate(unknown)).statusCode).toBe(422);

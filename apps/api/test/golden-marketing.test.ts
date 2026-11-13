@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { GOLDEN_MARKETING_EXAMPLE, marketingTask2Graph, withRuleVersions, type CandidateRule } from '@praxis/shared';
+import { GOLDEN_MARKETING_EXAMPLE, MARKETING_CAMPAIGN_TASK2_PROFILE, MARKETING_T2_TOOLS, marketingTask2Graph, withRuleVersions, type CandidateRule } from '@praxis/shared';
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MockGoogleVerifier } from '../src/candidate/google';
@@ -19,13 +19,42 @@ import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
 /**
- * Golden Task2, Marketing (owner, 12 Nov 2026): an SME authors, and an Expert and PM accept, a five-agent campaign task
- * like the owner's Task2 handoff, on DM03 template version 2 (form marketing-campaign-task2). The whole cycle runs here:
- * template version (multi-agent by its form), project, policy rules, staffing, authoring with the five-agent workflow,
- * checks, Expert review, PM approval and the Approved Task Dataset. Everything is fictional; no model is called.
+ * Golden Task2, Marketing (owner, 12-13 Nov 2026): the VEYRA Hush One headphone launch as ONE reusable five-agent task.
+ * The whole cycle runs here: Anvil's proposal (form, template block with target 1 and no quotas, execution v3 with the
+ * agreed 0-4 rubric descriptor) creates a new workflow's DRAFT; an Admin publishes it; then project, policy rules,
+ * staffing, authoring with the five-agent workflow, checks, Expert review, PM approval and the Approved Task Dataset.
+ * Everything is fictional; no model is called and Anvil is not contacted.
  */
 const SECRET = 'test-mock-secret';
-const WORKFLOW = 'Launch of Noise Cancelling Phone';
+const WORKFLOW = 'VEYRA Hush One headphone launch';
+const PROFILE_ID = 'veyra-hush-one-launch-v1';
+/** The reviewed Task2 rubric's criterion IDs, each bound to Keystone's Marketing evaluator. */
+const CRITERION_IDS = ((GOLDEN_MARKETING_EXAMPLE.sections as { S7: { criteria: { id: string }[] } }).S7.criteria).map((c) => c.id);
+const RUBRIC = { scale: 'zero_to_four', formula: 'criterion weight * level / 4', groups: { A: 10, B: 20, C: 15, D: 10, E: 15, F: 15, G: 15 }, minimum: { total: 80, adaptation: 12 }, critical_rule_ids: ['CR-01', 'CR-02', 'CR-03', 'CR-04', 'CR-05', 'CR-06'] };
+
+/** Anvil's proposal as Keystone assembles it from Praxis's form and graph (synthetic execution part). */
+function proposal(rubric: object = RUBRIC) {
+  return {
+    schemaVersion: 'praxis.anvil.template-spec.v1',
+    anvil_template_key: 'veyra-hush-one-launch',
+    requirement: { reference: 'Golden-KYC-Marketing-approved-requirement-49172', summary: 'Golden Task2: VEYRA Hush One headphone launch, one reusable five-agent task.' },
+    authoring: {
+      profile: MARKETING_CAMPAIGN_TASK2_PROFILE,
+      template: { domainName: 'Marketing', primaryWork: 'Plan and maintain a product launch campaign within budget authority.', verificationCriteria: 'Evidence, budget and policy agree; approvals bind exact versions.', humanGate: 'Publication and spending stay authorised human decisions.', skills: SKILLS, defaultTptMinutes: 240, defaultDistinctTarget: 1, coverageDimensions: {}, edgeCaseCatalog: [] },
+    },
+    execution: {
+      schema_version: 'anvil.template-execution.v3',
+      catalogue_version: '1.3.0',
+      environment: { id: 'marketing-task2-us-v1', version: '1' },
+      tools: MARKETING_T2_TOOLS.map((t) => ({ id: t, input_schema: { type: 'object' }, output_schema: { type: 'object' }, error_schema: { type: 'object' } })),
+      evaluators: CRITERION_IDS.map((id) => ({ criterion_id: id, capability: { id: 'marketing-task2-evidence-v1', version: '1' }, evidence_source: 'run_evidence' })),
+      output_schema: { type: 'object', properties: { outcome: { type: 'string' } }, required: ['outcome'], additionalProperties: true },
+      rubric,
+      paid_calls: false,
+    },
+    skills: { schema_version: 'anvil.template-skills.v1', authoring: { mandatory: SKILLS, languages: ['en'] }, reviewing: { mandatory: ['Campaign review'], languages: ['en'] } },
+  };
+}
 const SKILLS = ['Paid search', 'Campaign planning', 'Marketing analytics'];
 const allTrue = { realistic: true, correct: true, coversSlot: true, difficultyFair: true, distinct: true, rubricCatches: true };
 
@@ -58,14 +87,15 @@ const rule = (r: (typeof RULES)[number]): CandidateRule => ({
   citations: [{ fieldPath: 'requirement', role: 'supports', quote: r.requirement, page: null, chunkId: null, lineStart: null, lineEnd: null, confidence: null }],
 });
 
-describe('Golden Task2 (Marketing): the full Praxis cycle on DM03 template version 2', () => {
+describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA Hush One template', () => {
   let app: FastifyInstance;
   const email = new MemoryEmailSender();
   const google = new MockGoogleVerifier(SECRET);
   const storage = new MemoryStorage();
-  const config = testConfig();
+  const config = testConfig({ ANVIL_CREDENTIAL_NOT_AFTER: new Date(Date.now() + 60 * 86_400_000).toISOString() });
   let clientId: string;
   let admin: string;
+  let anvilKey: string;
 
   const post = (cookie: string, url: string, payload: object = {}) => app.inject({ method: 'POST', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
   const patch = (cookie: string, url: string, payload: object) => app.inject({ method: 'PATCH', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
@@ -85,33 +115,23 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on DM03 template versi
     const { client } = await seed(db, { SEED_ADMIN_EMAIL: 'admin@test.local', SEED_ADMIN_PASSWORD: 'admin-password-123', TASKFLOW_PATH: '/none' });
     clientId = client.id;
     admin = await login(app, 'admin@test.local', 'admin-password-123');
+    anvilKey = (await post(admin, '/api-clients', { name: 'Anvil QA', kind: 'ANVIL' })).json().key;
   });
   afterAll(async () => {
     await app.close();
     await db.$disconnect();
   });
 
-  /** DM03 version 1 (single-agent form) published, then a version 2 draft. */
-  async function templates() {
-    const domainId = (await post(admin, '/domains', { name: 'Marketing' })).json().id;
-    const v1 = (
-      await post(admin, '/templates', {
-        domainId,
-        workflowName: WORKFLOW,
-        primaryWork: 'Plan and maintain a product launch campaign within budget authority.',
-        verificationCriteria: 'Evidence, budget and policy agree; approvals bind exact versions.',
-        humanGate: 'Publication and spending stay authorised human decisions.',
-        defaultTptMinutes: 240,
-        skills: SKILLS,
-        taskModes: ['AUTHORING'],
-        coverageDimensions: { dimensions: [{ key: 'locale', label: 'Locale', values: ['US_en-US', 'FR_fr-FR'] }], cells: [{ tags: { locale: 'US_en-US' }, quota: 1, required: true }] },
-        edgeCaseCatalog: [],
-      })
-    ).json();
-    expect((await post(admin, `/templates/${v1.id}/publish`)).statusCode).toBe(200);
-    const draft = await post(admin, `/templates/${v1.id}/versions`);
-    expect(draft.statusCode, draft.body).toBe(201);
-    return { v1, v2: draft.json() };
+  const propose = (body: object) => app.inject({ method: 'POST', url: '/api/v1/integrations/anvil/templates/proposals', headers: { authorization: `Bearer ${anvilKey}`, ...idem() }, payload: body });
+
+  /** Anvil proposes the VEYRA template (a new workflow); an Admin publishes the draft. */
+  async function published() {
+    await post(admin, '/domains', { name: 'Marketing' });
+    const res = await propose(proposal());
+    expect(res.statusCode, res.body).toBe(201);
+    const d = res.json().data;
+    expect((await post(admin, `/templates/${d.template_version_id}/publish`)).statusCode).toBe(200);
+    return { id: d.template_version_id as string, d };
   }
 
   async function publishRules(projectId: string, pmUserId: string) {
@@ -174,34 +194,39 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on DM03 template versi
     return post(cookie, `/review/tasks/${id}/stage-decision`, { expectedRevision: r.revision, expectedVersion: r.currentVersion, ...body });
   }
 
-  it('choosing the five-agent form makes version 2 multi-agent (audited); version 1 stays single-agent', async () => {
-    const { v1, v2 } = await templates();
-    const set = await patch(admin, `/templates/${v2.id}`, { profileId: 'marketing-campaign-task2' });
-    expect(set.statusCode, set.body).toBe(200);
-    expect((await post(admin, `/templates/${v2.id}/publish`)).json()).toMatchObject({ version: 2, status: 'PUBLISHED', profileId: 'marketing-campaign-task2' });
-    expect((await db.template.findUniqueOrThrow({ where: { id: v2.id } })).agentMode).toBe('MULTI');
-    expect((await db.template.findUniqueOrThrow({ where: { id: v1.id } })).agentMode).toBe('SINGLE');
-    const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: v2.id, action: 'template.updated' } });
-    expect(audit.before).toMatchObject({ agentMode: 'SINGLE' });
-    expect(audit.after).toMatchObject({ profileId: 'marketing-campaign-task2', agentMode: 'MULTI' });
+  it('Anvil\'s proposal creates a new multi-agent workflow with target 1 and no quotas; the old Phone workflow is untouched; a wrong rubric descriptor is refused', async () => {
+    await post(admin, '/domains', { name: 'Marketing' });
+    for (const bad of [{ ...RUBRIC, groups: { A: 20, B: 20, C: 15, D: 10, E: 15, F: 10, G: 10 } }, { ...RUBRIC, critical_rule_ids: ['CR01', 'CR02', 'CR03', 'CR04', 'CR05', 'CR06'] }, { ...RUBRIC, scale: 'pass_partial_fail' }]) {
+      const r = await propose(proposal(bad));
+      expect(r.statusCode, r.body).toBe(422);
+      expect(JSON.stringify(r.json().data.errors)).toMatch(/rubric/);
+    }
+    const res = await propose(proposal());
+    expect(res.statusCode, res.body).toBe(201);
+    const d = res.json().data;
+    expect(d).toMatchObject({ status: 'draft_created', version: 1, workflow: WORKFLOW, profile_id: PROFILE_ID });
+    const t = await db.template.findUniqueOrThrow({ where: { id: d.template_version_id } });
+    expect(t).toMatchObject({ status: 'DRAFT', agentMode: 'MULTI', defaultDistinctTarget: 1, profileId: PROFILE_ID });
+    expect(t.coverageDimensions).toEqual({ dimensions: [], cells: [] });
+    expect(t.edgeCaseCatalog).toEqual([]);
+    expect((t.anvilSpec as { execution: { rubric: unknown } }).execution.rubric).toEqual(RUBRIC);
+    expect(await db.template.count({ where: { workflowName: 'Launch of Noise Cancelling Phone' } })).toBe(0);
   });
 
   it('SME authors the Task2 case with the five-agent workflow; Expert passes, PM approves; it enters the dataset', async () => {
-    const { v2 } = await templates();
-    await patch(admin, `/templates/${v2.id}`, { profileId: 'marketing-campaign-task2' });
-    expect((await post(admin, `/templates/${v2.id}/publish`)).statusCode).toBe(200);
-    const s = await staffedProject(v2.id);
+    const v = await published();
+    const s = await staffedProject(v.id);
 
     // The SME gets the Task2 form and starts from the five-agent workflow.
     const t = await view(s.sme, s.taskId);
-    expect(t.definition).toBe('profile:marketing-campaign-task2');
-    expect(t.template).toMatchObject({ workflow: WORKFLOW, profileId: 'marketing-campaign-task2' });
+    expect(t.definition).toBe(`profile:${PROFILE_ID}`);
+    expect(t.template).toMatchObject({ workflow: WORKFLOW, profileId: PROFILE_ID });
     expect(t.agentMode).toBe('MULTI');
-    expect(t.startingGraph).toMatchObject({ agentMode: 'MULTI', templateVersion: 2 });
+    expect(t.startingGraph).toMatchObject({ agentMode: 'MULTI', templateVersion: 1 });
     expect(t.startingGraph.roles).toHaveLength(5);
 
     // The worked case plus the workflow, with the project's published rule versions, passes every check.
-    const output = { ...withRuleVersions(GOLDEN_MARKETING_EXAMPLE, s.versions), workflowGraph: marketingTask2Graph(2) };
+    const output = { ...withRuleVersions(GOLDEN_MARKETING_EXAMPLE, s.versions), workflowGraph: marketingTask2Graph(1) };
     const saved = await save(s.sme, s.taskId, output);
     expect(saved.statusCode, saved.body).toBe(200);
     const sub = await submit(s.sme, s.taskId);
@@ -213,26 +238,27 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on DM03 template versi
     expect(checks.results.find((c) => c.id === 'policy.bound-versions')).toMatchObject({ ok: true });
 
     // Expert passes, PM approves: people decide at each stage.
-    expect((await stage(s.expert, s.taskId, { stage: 'EXPERT_REVIEW', decision: 'PASS', checklist: allTrue })).statusCode).toBe(200);
+    const ex = await stage(s.expert, s.taskId, { stage: 'EXPERT_REVIEW', decision: 'PASS', checklist: allTrue });
+    expect(ex.statusCode, ex.body).toBe(200);
     const approved = await stage(s.pm, s.taskId, { stage: 'PM_APPROVAL', decision: 'APPROVE' });
     expect(approved.statusCode, approved.body).toBe(200);
     const record = await db.approvedTaskRecord.findFirstOrThrow({ where: { taskInstanceId: s.taskId } });
-    const rec = record.output as { profile: { id: string }; sections: { S6: { caseOutcome: string }; S2: { sourceRefs: { checksum: string }[] } } };
-    expect(rec.profile.id).toBe('marketing-campaign-task2');
-    expect(rec.sections.S6.caseOutcome).toBe('campaign_closed');
+    const rec = record.output as { profile: { id: string }; sections: { S6: Record<string, unknown>; S2: { sourceRefs: { checksum: string }[] }; S7: { criticalFailures: string[] } } };
+    expect(rec.profile.id).toBe(PROFILE_ID);
+    // One reusable task: no per-case outcome; wire critical-rule IDs.
+    expect(Object.keys(rec.sections.S6)).toEqual(['outputContract']);
+    expect(rec.sections.S7.criticalFailures).toEqual(['CR-01', 'CR-02', 'CR-03', 'CR-04', 'CR-05', 'CR-06']);
     // Source data travels by reference only.
     expect(rec.sections.S2.sourceRefs.every((r) => /^[0-9a-f]{64}$/.test(r.checksum))).toBe(true);
   });
 
   it('a single-agent workflow on the five-agent version, or a rubric group that does not add up, blocks submission', async () => {
-    const { v2 } = await templates();
-    await patch(admin, `/templates/${v2.id}`, { profileId: 'marketing-campaign-task2' });
-    await post(admin, `/templates/${v2.id}/publish`);
-    const s = await staffedProject(v2.id);
+    const v = await published();
+    const s = await staffedProject(v.id);
     const good = withRuleVersions(GOLDEN_MARKETING_EXAMPLE, s.versions) as unknown as { sections: { S7: { criteria: { id: string; group: string }[] } } };
     const bad = JSON.parse(JSON.stringify(good)) as typeof good;
     bad.sections.S7.criteria.find((c) => c.id === 'B1')!.group = 'C';
-    const single = { ...marketingTask2Graph(2), agentMode: 'SINGLE' as const, roles: [marketingTask2Graph(2).roles[0]!] };
+    const single = { ...marketingTask2Graph(1), agentMode: 'SINGLE' as const, roles: [marketingTask2Graph(1).roles[0]!] };
     expect((await save(s.sme, s.taskId, { ...bad, workflowGraph: single })).statusCode).toBe(200);
     const refused = await submit(s.sme, s.taskId);
     expect(refused.statusCode).toBe(422);

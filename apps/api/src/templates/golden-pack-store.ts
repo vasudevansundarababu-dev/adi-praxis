@@ -50,7 +50,7 @@ export async function storePack(
     if (domain.status !== 'ACTIVE') throw new AppError(409, 'DOMAIN_RETIRED', `The domain ${domain.name} is retired.`);
     const t = await tx.template.create({
       data: {
-        clientId: input.clientId, domainId: domain.id, workflowName: r.profile.catalogWorkflowName, lineageId: randomUUID(), version: 1, status: 'DRAFT', profileId: r.profile.profileId,
+        clientId: input.clientId, domainId: domain.id, workflowName: r.profile.catalogWorkflowName, lineageId: randomUUID(), version: 1, status: 'DRAFT', profileId: r.profile.profileId, agentMode: r.profile.agentMode,
         primaryWork: tpl.primaryWork, verificationCriteria: tpl.verificationCriteria, humanGate: tpl.humanGate, skills: [...new Set(tpl.skills)], defaultTptMinutes: tpl.defaultTptMinutes, taskModes: [...new Set(tpl.taskModes)],
         ...(tpl.coverageDimensions ? { coverageDimensions: tpl.coverageDimensions as object } : {}),
         ...(tpl.edgeCaseCatalog ? { edgeCaseCatalog: tpl.edgeCaseCatalog as object[] } : {}),
@@ -76,6 +76,8 @@ export async function storePack(
         version: latest.version + 1,
         status: 'DRAFT',
         profileId: r.profile.profileId,
+        // The version's agent mode follows its form (a multi-agent form makes it multi-agent).
+        agentMode: r.profile.agentMode,
         anvilSpec: input.anvilSpec ?? (copy.anvilSpec as Prisma.InputJsonValue),
         // A proposal's template block that states the cardinality replaces the copied one: a corrected template must
         // not inherit the previous version's target or quotas (KYC five-state contract: target 5, no additive quotas).

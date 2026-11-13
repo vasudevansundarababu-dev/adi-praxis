@@ -1,4 +1,6 @@
-# Marketing Task2: five-agent campaign task in Praxis
+# Marketing Task2: VEYRA Hush One headphone launch, one reusable five-agent task
+
+> **13 Nov 2026 update:** this is now ONE reusable task on a new workflow, "VEYRA Hush One headphone launch" (form `veyra-hush-one-launch-v1`), proposed by Anvil and published by an Admin. Per-case expectations, outcomes, release schedules and recorded responses were removed (they are Anvil dataset material). Critical failures use the wire IDs CR-01 to CR-06. See `docs/DECISIONS.md`. The table below records the original 12 Nov build.
 
 Owner decisions of 12 Nov 2026, on the review of the Golden Task2 Marketing authoring handoff v1.1
 (`golden-marketing-design/outputs/Praxis-Golden-Task2-Marketing-Authoring-Handoff-v1.1`). The owner accepted all four

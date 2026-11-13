@@ -37,8 +37,27 @@ export interface StoredJointParts {
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
-/** Execution part schemas Praxis stores (unchanged) for a joint proposal. v2: KYC five-state contract, K5. */
-export const EXECUTION_SCHEMAS: readonly string[] = ['anvil.template-execution.v1', 'anvil.template-execution.v2'];
+/**
+ * Execution part schemas Praxis stores (unchanged) for a joint proposal. v2: KYC five-state contract, K5. v3: Marketing
+ * Task2 (Keystone's four wire decisions, 13 Nov 2026), with the public 0-4 rubric descriptor.
+ */
+export const EXECUTION_SCHEMAS: readonly string[] = ['anvil.template-execution.v1', 'anvil.template-execution.v2', 'anvil.template-execution.v3'];
+
+/** Keystone decision 3: the exact public rubric descriptor of a 0-4 Marketing template. */
+const RUBRIC_GROUPS = { A: 10, B: 20, C: 15, D: 10, E: 15, F: 15, G: 15 } as const;
+const CRITICAL_RULE_IDS = ['CR-01', 'CR-02', 'CR-03', 'CR-04', 'CR-05', 'CR-06'];
+export function rubricDescriptorProblems(r: unknown): string[] {
+  if (!isObj(r)) return ['execution.rubric is required for anvil.template-execution.v3'];
+  const out: string[] = [];
+  if (r.scale !== 'zero_to_four') out.push('rubric.scale must be "zero_to_four"');
+  if (r.formula !== 'criterion weight * level / 4') out.push('rubric.formula must be "criterion weight * level / 4"');
+  const g = r.groups;
+  if (!isObj(g) || JSON.stringify(Object.keys(g).sort()) !== JSON.stringify(Object.keys(RUBRIC_GROUPS)) || Object.entries(RUBRIC_GROUPS).some(([k, w]) => g[k] !== w)) out.push('rubric.groups must be {A:10,B:20,C:15,D:10,E:15,F:15,G:15}');
+  const m = r.minimum;
+  if (!isObj(m) || m.total !== 80 || m.adaptation !== 12) out.push('rubric.minimum must be {total:80, adaptation:12}');
+  if (!Array.isArray(r.critical_rule_ids) || JSON.stringify(r.critical_rule_ids) !== JSON.stringify(CRITICAL_RULE_IDS)) out.push('rubric.critical_rule_ids must be CR-01 to CR-06');
+  return out;
+}
 
 export const isJointProposal = (body: unknown) => isObj(body) && body.schemaVersion === JOINT_TEMPLATE_SPEC;
 export const jointParts = (t: Pick<Template, 'anvilSpec'>): StoredJointParts | null => (isObj(t.anvilSpec) && t.anvilSpec.schemaVersion === JOINT_TEMPLATE_SPEC ? (t.anvilSpec as unknown as StoredJointParts) : null);
@@ -77,6 +96,8 @@ export function checkJointProposal(body: Record<string, unknown>): { issues: Joi
   const ex = body.execution;
   if (!isObj(ex) || !EXECUTION_SCHEMAS.includes(ex.schema_version as string)) issues.push(issue('TP_SPEC_SHAPE', '/execution/schema_version', `execution must be an ${EXECUTION_SCHEMAS.join(' or ')} object.`, 'Send the execution part in Anvil’s published schema.'));
   else {
+    if (ex.schema_version === 'anvil.template-execution.v3')
+      for (const m of rubricDescriptorProblems(ex.rubric)) issues.push(issue('TP_SPEC_SHAPE', '/execution/rubric', m, 'Send the agreed public rubric descriptor (Keystone decision 3); never 5/2/0 for a 0-4 template.'));
     // K5 (12 Nov 2026): v2 carries template-level federal policies as immutable references; bank rules stay in `rules`.
     if (ex.schema_version === 'anvil.template-execution.v2') {
       const fp = ex.federalPolicies;

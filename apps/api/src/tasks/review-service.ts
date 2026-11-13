@@ -1,3 +1,4 @@
+import { hasQuotas } from './definitions';
 import { Prisma } from '@prisma/client';
 import { praxisContractChecks, EXECUTABLE_WORKFLOW, coverageStatus, CoverageDimensions, CoverageQuotas, effectiveCoverage, mayApprove, type CoverageTags } from '@praxis/shared';
 import { z } from 'zod';
@@ -97,7 +98,7 @@ export async function decideTask(tx: Tx, actor: InternalActor, taskId: string, b
   const version = t.submissions.at(-1)?.version ?? 1;
   const now = new Date();
   const isOpen = t.slot?.isOpen ?? false;
-  if (body.decision === 'ACCEPT' && isOpen && !body.confirmedCoverage) throw new AppError(400, 'CONFIRM_TAGS', 'Open slot: confirm (or correct) the author’s coverage tags and edge case before accepting.');
+  if (body.decision === 'ACCEPT' && isOpen && hasQuotas(t.project.template) && !body.confirmedCoverage) throw new AppError(400, 'CONFIRM_TAGS', 'Open slot: confirm (or correct) the author’s coverage tags and edge case before accepting.');
   const coverage = body.decision === 'ACCEPT' && isOpen && body.confirmedCoverage ? { tags: body.confirmedCoverage.tags, edgeCase: body.confirmedCoverage.edgeCase } : null;
 
   await tx.taskReview.create({

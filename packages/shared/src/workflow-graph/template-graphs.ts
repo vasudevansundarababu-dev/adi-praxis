@@ -246,7 +246,7 @@ export const WAVE3_GRAPH_TEMPLATES = STARTING_GRAPH_TEMPLATES.slice(8);
 
 /** Starting workflows owned by an alternate form (a template version that chooses that form gets this graph). */
 const PROFILE_GRAPHS: Record<string, (templateVersion: number) => WorkflowGraphInput> = {
-  'marketing-campaign-task2': marketingTask2Graph,
+  'veyra-hush-one-launch-v1': marketingTask2Graph,
 };
 
 /** The template's starting workflow, or null when the template has none yet. A form with its own graph wins. */

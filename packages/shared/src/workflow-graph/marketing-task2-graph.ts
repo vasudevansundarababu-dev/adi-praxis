@@ -25,10 +25,10 @@ export const MARKETING_T2_TOOLS: string[] = [...new Set([...MARKETING_T2_COMMON_
 
 const tools = (role: keyof typeof MARKETING_T2_ROLE_TOOLS) => [...MARKETING_T2_COMMON_READS, ...MARKETING_T2_ROLE_TOOLS[role]];
 
-export function marketingTask2Graph(templateVersion = 2): WorkflowGraphInput {
+export function marketingTask2Graph(templateVersion = 1): WorkflowGraphInput {
   return {
     schemaVersion: WORKFLOW_GRAPH_SCHEMA,
-    templateId: 'noise-cancelling-headphones-launch',
+    templateId: 'veyra-hush-one-launch',
     templateVersion,
     agentMode: 'MULTI',
     roles: [

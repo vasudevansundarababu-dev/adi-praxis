@@ -1,3 +1,4 @@
+import { hasQuotas } from './definitions';
 import { Prisma } from '@prisma/client';
 import { EXECUTABLE_WORKFLOW, jsonDiff, materialPaths, praxisContractChecks, STAGE_LABELS, type ExpertEditRequest, type PendingStage, type StageDecisionRequest } from '@praxis/shared';
 import type { InternalActor } from '../auth/actor';
@@ -175,7 +176,7 @@ export async function decideStage(tx: Tx, actor: InternalActor, taskId: string, 
   if (body.decision === 'PASS') {
     contractIssues();
     const isOpen = t.slot?.isOpen ?? false;
-    if (isOpen && !body.confirmedCoverage) throw new AppError(400, 'CONFIRM_TAGS', 'Open slot: confirm (or correct) the author’s coverage tags and edge case before passing to PM approval.');
+    if (isOpen && hasQuotas(t.project.template) && !body.confirmedCoverage) throw new AppError(400, 'CONFIRM_TAGS', 'Open slot: confirm (or correct) the author’s coverage tags and edge case before passing to PM approval.');
     await record('PASS', { duplicateDecision: flaggedDuplicate ? 'ACCEPT_AS_DISTINCT' : null });
     await tx.taskInstance.update({
       where: { id: t.id },

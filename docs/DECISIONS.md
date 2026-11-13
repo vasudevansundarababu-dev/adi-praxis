@@ -977,3 +977,24 @@ Review of the Golden Task2 Marketing handoff v1.1; details in `docs/authoring/MA
 - **(chosen by Claude)** A form may own its starting workflow (`templateStartingGraph(workflow, version, profileId)`).
 - **(chosen by Claude)** The two "several incoming routes" graph warnings on the Task2 workflow stay: both steps are
   reached by exclusive routes. Refining the checker is later work.
+
+## Marketing Task2 as ONE reusable VEYRA Hush One task (13 Nov 2026)
+
+- **Owner and requirement:** "Marketing: the VEYRA Hush One headphone launch template has the five-agent graph and 0–4 rubric, not the old single-agent Phone template." Requirement 49172 section 6; Keystone's four wire decisions.
+- **New workflow, "VEYRA Hush One headphone launch"**, with form `veyra-hush-one-launch-v1`.
+  - The old "Launch of Noise Cancelling Phone" lineage is left as it is.
+  - The form is **not built in.** It reaches Praxis as data in Anvil's template proposal (section 7.2), so an Anvil proposal creates the DRAFT and an Admin publishes it.
+- **One reusable task, target 1:**
+  - **Removed per-case fields:** case outcome, role and weekly expectations, expected budget handling, findings, rationale, known gaps, evidence release schedule and recorded tool responses. Campaign cases are Anvil dataset inputs.
+  - **Outputs:** `contract.outputsFrom: "template_execution"`, plus a required output contract.
+  - **Markets:** the five locales are listed as in scope; only qualified ones run (US first).
+  - **Budget:** the USD 200,000 is one shared simulated authority, never multiplied per locale.
+- **Wire IDs:**
+  - The critical failures are `CR-01`…`CR-06`, labelled CR01…CR06 for people.
+  - The graph keeps `praxis.workflow_graph.v1-proposed` and the role IDs `orchestrator`, `intent`, `performance`, `brief` and `policy`; Anvil's adapter maps them to its own names.
+- **Execution part `anvil.template-execution.v3`** is accepted only with the exact public rubric descriptor:
+  - `{scale: zero_to_four, formula: "criterion weight * level / 4", groups A10 B20 C15 D10 E15 F15 G15, minimum {total 80, adaptation 12}, critical_rule_ids CR-01…CR-06}`;
+  - a 0–4 template is never checked against the 5/2/0 anchors.
+- **Agent mode:** a proposed version's agent mode follows its form.
+- **Open-slot tags:** an open slot is asked for coverage tags or an edge case, and a reviewer to confirm them, only when the template has coverage dimensions or edge cases.
+- **Invalid proposals:** answered 422 before the command runs. Before this fix they returned 500, because the audit guard treated the 422 as an unaudited change.

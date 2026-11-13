@@ -21,11 +21,13 @@ import {
 } from '../src';
 
 /**
- * Golden Task2 (Marketing), owner decisions of 12 Nov 2026: DM03 template version 2 with a five-agent form, the 0-4
- * rubric in groups A-G, an evidence release schedule, source data by reference, and its own starting workflow.
+ * Golden Task2 (Marketing): the VEYRA Hush One headphone launch as ONE reusable five-agent task (owner decisions of
+ * 12-13 Nov 2026; Keystone's four wire decisions): the 0-4 rubric in groups A-G, CR-01 to CR-06, source data by
+ * reference, no per-case answers, and its own starting workflow. The form reaches Praxis in Anvil's proposal.
  */
 const P = MARKETING_CAMPAIGN_TASK2_PROFILE;
-const WORKFLOW = 'Launch of Noise Cancelling Phone';
+const WORKFLOW = 'VEYRA Hush One headphone launch';
+const OLD_WORKFLOW = 'Launch of Noise Cancelling Phone';
 const ruleIds = ['POL-01', 'POL-04', 'POL-13', 'POL-14', 'POL-16', 'POL-17', 'POL-18', 'POL-23'];
 const versions = Object.fromEntries(ruleIds.map((id, i) => [id, `00000000-0000-4000-8000-0000000000${10 + i}`]));
 const golden = withRuleVersions(GOLDEN_MARKETING_EXAMPLE, versions) as unknown as { sections: Record<string, Record<string, unknown>> };
@@ -33,11 +35,20 @@ const clone = () => JSON.parse(JSON.stringify(golden)) as typeof golden;
 const f = (s: string, k: string) => P.sections.find((x) => x.key === s)!.fields.find((x) => x.key === k)!;
 
 describe('Marketing Task2 form (DM03 template version 2)', () => {
-  it('registers as an alternate form: DM03 version 1 keeps its single-agent form', () => {
+  it('is a valid form for a new workflow, not built in (it arrives in Anvil\'s proposal); the old Phone workflow keeps its single-agent form', () => {
     expect(checkProfile(P)).toEqual([]);
-    expect(profileForWorkflow(WORKFLOW)).toMatchObject({ status: 'ok', profile: { profileId: NOISE_CANCELLING_PROFILE.profileId } });
-    expect(profileForTemplate({ workflowName: WORKFLOW, profileId: 'marketing-campaign-task2' })).toMatchObject({ status: 'ok', profile: { profileId: 'marketing-campaign-task2' } });
-    expect(profilesForWorkflow(WORKFLOW).map((p) => p.profileId)).toEqual(['noise-cancelling-phone-launch', 'marketing-campaign-task2']);
+    expect(P).toMatchObject({ profileId: 'veyra-hush-one-launch-v1', catalogWorkflowName: WORKFLOW });
+    expect(profileForTemplate({ workflowName: WORKFLOW, profileId: 'veyra-hush-one-launch-v1' }).status).not.toBe('ok');
+    expect(profileForWorkflow(OLD_WORKFLOW)).toMatchObject({ status: 'ok', profile: { profileId: NOISE_CANCELLING_PROFILE.profileId } });
+    expect(profilesForWorkflow(OLD_WORKFLOW).map((p) => p.profileId)).toEqual(['noise-cancelling-phone-launch']);
+  });
+
+  it('one reusable task: no per-case answers, release schedule, recorded responses or outcomes; outputs come from the template execution', () => {
+    const keys = P.sections.flatMap((s) => s.fields.map((x) => x.key));
+    for (const k of ['caseOutcome', 'roleExpectations', 'weeklyExpectations', 'budgetExpectations', 'releaseSchedule', 'recordedResponses', 'findings', 'knownGaps', 'rationale', 'decisionFields']) expect(keys).not.toContain(k);
+    expect(P.contract).toMatchObject({ outputsFrom: 'template_execution', decisionFields: null });
+    expect(f('S6', 'outputContract').required).toBe(true);
+    expect(f('S1', 'locales').options!.map((o) => o.value)).toEqual(['US_en-US', 'IN_en-IN', 'IN_hi-IN', 'FR_fr-FR', 'SG_en-SG']);
   });
 
   it('is multi-agent, blocks executable Anvil export until Anvil qualifies Marketing, and fixes the gateway tools', () => {
@@ -47,7 +58,7 @@ describe('Marketing Task2 form (DM03 template version 2)', () => {
     expect(f('S3', 'tools').allowCustom).toBe(false);
     // Agents never hold approval, ledger, activation or clock writes.
     expect(MARKETING_T2_TOOLS.some((t) => /approval_decision|ledger\.write|activate|clock/.test(t))).toBe(false);
-    expect(f('S7', 'criticalFailures').options!).toHaveLength(6);
+    expect(f('S7', 'criticalFailures').options!.map((o) => o.value)).toEqual(['CR-01', 'CR-02', 'CR-03', 'CR-04', 'CR-05', 'CR-06']);
   });
 
   it('rubric: 0-4 levels in groups A-G (weights total 100; B needs 12 of 20 to pass)', () => {
@@ -57,7 +68,7 @@ describe('Marketing Task2 form (DM03 template version 2)', () => {
     expect(c.groups!.find((g) => g.id === 'B')!.minimum).toBe(12);
   });
 
-  it('the worked US case passes every form check', () => {
+  it('the reusable VEYRA task passes every form check', () => {
     expect(profileShapeProblems(P, golden)).toEqual([]);
     expect(profileProblems(P, golden)).toEqual([]);
   });
@@ -75,16 +86,13 @@ describe('Marketing Task2 form (DM03 template version 2)', () => {
     expect(text).toMatch(/Level 0/);
   });
 
-  it('source data and private expectations stay out of the agent view; the release schedule is authored', () => {
+  it('the rubric and procedure stay out of the agent view; source data travels by reference', () => {
     const view = agentProjection(P, golden) as { sections: Record<string, Record<string, unknown> | undefined> };
     const text = JSON.stringify(view);
-    expect(text).toContain('Veyra Hush One');
-    expect(view.sections.S6?.caseOutcome).toBeUndefined();
+    expect(text).toContain('VEYRA Hush One');
     expect(view.sections.S7).toBeUndefined();
     expect(view.sections.S5).toBeUndefined();
-    expect(text).not.toContain('weeklyExpectations');
     expect(f('S2', 'sourceRefs').itemFields!.map((x) => x.key)).toEqual(['id', 'dataset', 'records', 'checksum', 'licence']);
-    expect(f('S2', 'releaseSchedule').itemFields!.find((x) => x.key === 'week')).toMatchObject({ min: 0, max: 12 });
   });
 
   it('checkProfile rejects bad groups: duplicate IDs, totals that are not 100, a minimum above its weight', () => {
@@ -102,9 +110,11 @@ describe('Marketing Task2 form (DM03 template version 2)', () => {
 describe('Marketing Task2 starting workflow', () => {
   const graph = marketingTask2Graph();
 
-  it('a version that chooses the form starts from the five-agent workflow; version 1 keeps its own', () => {
-    expect(templateStartingGraph(WORKFLOW, 2, 'marketing-campaign-task2')).toEqual(marketingTask2Graph(2));
-    expect(templateStartingGraph(WORKFLOW, 1)?.agentMode).toBe('SINGLE');
+  it('the VEYRA form starts from the five-agent workflow (canonical role IDs); the old Phone workflow keeps its own', () => {
+    expect(templateStartingGraph(WORKFLOW, 1, 'veyra-hush-one-launch-v1')).toEqual(marketingTask2Graph(1));
+    expect(graph.schemaVersion).toBe('praxis.workflow_graph.v1-proposed');
+    expect(graph.roles.map((r) => r.id)).toEqual(['orchestrator', 'intent', 'performance', 'brief', 'policy']);
+    expect(templateStartingGraph(OLD_WORKFLOW, 1)?.agentMode).toBe('SINGLE');
   });
 
   it('is valid: five roles, a parallel join, Task3 as an external system, a simulated approver, bounded loops', () => {

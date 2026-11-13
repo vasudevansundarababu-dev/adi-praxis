@@ -237,14 +237,12 @@ export const anvilTemplateRoutes: FastifyPluginAsyncZod<{ db: Db; anvil?: { envi
 
   app.post('/integrations/anvil/templates/proposals', { config: { access: ANVIL }, bodyLimit: MAX_BYTES, schema: { tags: ['anvil'], body: z.record(z.string(), z.unknown()) } }, async (req, reply) => {
     const c = client(req);
-    // An invalid proposal changes nothing: answer 422 before the command (a command must audit every change it makes).
-    const pre = await check(db, c.clientId, req.body);
-    if (!pre.valid || (!pre.spec && !pre.joint)) {
-      return reply.status(422).send(envelope(req.id, { schema_version: 'praxis.template-validation.v1', valid: false, status: 'template_invalid', errors: pre.errors, error_count: pre.errors.length, praxis_requirements: pre.praxisRequirements, review_gates: [], paid_calls: false }));
-    }
     await asContract(() => runStaffOrServiceCommand(db, req, reply, async ({ tx, audit }) => {
       const r = await check(tx, c.clientId, req.body);
       if (!r.valid || (!r.spec && !r.joint)) {
+        // A refused proposal creates nothing, but the refusal is recorded (the command audits every outcome it stores,
+        // and a repeat with the same Idempotency-Key replays this 422).
+        await audit({ entityType: 'TemplateProposal', entityId: req.id, action: 'template_proposal.refused', after: { errorCodes: [...new Set(r.errors.map((e) => e.code))], errorCount: r.errors.length } });
         return { status: 422, body: envelope(req.id, { schema_version: 'praxis.template-validation.v1', valid: false, status: 'template_invalid', errors: r.errors, error_count: r.errors.length, praxis_requirements: r.praxisRequirements, review_gates: [], paid_calls: false }) };
       }
       // Joint proposals: the parts are stored exactly as received, so both sides hash the same object.

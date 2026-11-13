@@ -997,4 +997,4 @@ Review of the Golden Task2 Marketing handoff v1.1; details in `docs/authoring/MA
   - a 0–4 template is never checked against the 5/2/0 anchors.
 - **Agent mode:** a proposed version's agent mode follows its form.
 - **Open-slot tags:** an open slot is asked for coverage tags or an edge case, and a reviewer to confirm them, only when the template has coverage dimensions or edge cases.
-- **Invalid proposals:** answered 422 before the command runs. Before this fix they returned 500, because the audit guard treated the 422 as an unaudited change.
+- **Invalid proposals:** refused with 422 and audited as `template_proposal.refused`; a repeat with the same Idempotency-Key replays the refusal. Before this fix they returned 500, because the audit guard treated the stored 422 as an unaudited change.

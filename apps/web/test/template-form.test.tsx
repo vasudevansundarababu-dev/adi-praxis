@@ -31,9 +31,9 @@ describe('template authoring form', () => {
     expect(text(html(<TemplateActions template={template({ workflowName: 'KYB and beneficial ownership', status: 'DRAFT' })} hasDraft />))).not.toContain('Authoring form');
   });
 
-  it('a DM03 draft offers the five-agent Task2 form beside its default form (owner, 12 Nov 2026)', () => {
+  it('the old Phone (DM03) draft no longer offers a built-in Task2 form: the VEYRA Hush One form arrives in Anvil\'s proposal (13 Nov 2026)', () => {
     const markup = html(<TemplateActions template={template({ status: 'DRAFT' })} hasDraft />);
-    expect(markup).toContain('value="marketing-campaign-task2"');
-    expect(text(markup)).toContain('Golden Task2: campaign planning and weekly intent optimisation (five agents)');
+    expect(markup).not.toContain('value="marketing-campaign-task2"');
+    expect(markup).not.toContain('value="veyra-hush-one-launch-v1"');
   });
 });

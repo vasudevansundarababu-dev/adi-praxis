@@ -925,18 +925,16 @@ Owner: "Finish the remaining tasks. Will make one final build." Defaults taken, 
 - `ANVIL_ENVIRONMENT` (default `qa` in the deploy script) binds revocation events with the project in
   `ANVIL_EXPORT_BASE_URL`; unbound environments refuse revocations.
 
-## Keyless Praxis <-> Anvil, draft delete, seeded SME skills (12 Nov 2026)
+## Keyless Praxis <-> Anvil (12 Nov 2026)
 
-- **No API keys between Anvil and Praxis** (owner: "No need for API keys ... it's a waste of time"; Keystone K6).
+- **No API keys between Anvil and Praxis** (owner: "No need for API keys ... it's a waste of time"; Keystone K6; requirement 49172 section 7.1).
   - **Both directions:** each side sends a raw Google-signed ID token for its own runtime account. The "no auth at all" option was not taken.
-  - **Inbound checks:** RS256; issuer exactly `https://accounts.google.com`; exact audience (this API's URL); pinned numeric subject and service-account e-mail; `iat`/`exp`.
+  - **Inbound checks:** RS256; issuer exactly `https://accounts.google.com`; exact audience (this API's numeric run.app origin); pinned numeric subject and service-account e-mail; `iat`/`exp`.
   - **Grant:** the caller also needs an ANVIL grant row, checked on every request, plus the pilot stop (`ANVIL_CREDENTIAL_NOT_AFTER`).
     - The deploy's setup job creates the grant row. It is audited, and an Admin can revoke it.
-    - A redeploy never re-creates a revoked grant.
+    - A redeploy never re-creates or re-enables a revoked grant.
     - A grant row has no usable key.
-  - **Outbound:** uses the runtime account's identity token for the Anvil origin. `ANVIL_EXPORT_TOKEN` is optional (legacy).
+  - **Scope:** a keyless caller reaches only the five Anvil integration routes; every other route answers 401.
+  - **No legacy fallback:** once keyless is configured, ANVIL API keys are refused and new ones cannot be issued (409 `ANVIL_KEYLESS`). Other key kinds are unchanged.
+  - **Outbound:** the runtime account's identity token for the Anvil origin, from the metadata server only. `ANVIL_EXPORT_TOKEN` is removed.
   - **Configuration:** Anvil's account and subject are repository variables, not secrets, kept out of this public repository.
-- **Draft template versions can be deleted** (issue #61).
-  - Only DRAFT, and only when nothing has used it.
-  - Published and retired versions are retired, never deleted.
-- **QA seed:** each seeded SME's profile skills are the pool template's skills, so staffing lists SMEs with that template's skill set.

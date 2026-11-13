@@ -250,7 +250,7 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
   // ── API clients (Admin): keys are shown once and stored as hashes ──
   app.get('/api-clients', { config: { access: ['ADMIN'] }, schema: { tags: ['admin'] } }, async (req) => {
     const rows = await db.apiClient.findMany({ where: { clientId: req.actor!.clientId }, orderBy: { createdAt: 'desc' } });
-    return { items: rows.map((c) => ({ id: c.id, name: c.name, kind: c.kind, createdAt: c.createdAt.toISOString(), revokedAt: c.revokedAt?.toISOString() ?? null, expiresAt: c.expiresAt?.toISOString() ?? null })) };
+    return { items: rows.map((c) => ({ id: c.id, name: c.name, kind: c.kind, createdAt: c.createdAt.toISOString(), revokedAt: c.revokedAt?.toISOString() ?? null, expiresAt: c.expiresAt?.toISOString() ?? null, serviceAccount: c.serviceAccount })) };
   });
   app.post(
     '/api-clients',
@@ -267,6 +267,10 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
         const key = `pk_${newToken()}`;
         const hours = req.body.expiresInHours ?? (req.body.kind === 'ANVIL' ? 720 : undefined);
         let expiresAt = hours ? new Date(Date.now() + hours * 3_600_000) : null;
+        if (req.body.kind === 'ANVIL' && config.ANVIL_CALLER_SERVICE_ACCOUNT && config.ANVIL_CALLER_SUBJECT && config.ANVIL_INBOUND_AUDIENCE) {
+          // Owner, 12 Nov 2026 (K6): Anvil signs in keylessly here; no ANVIL key may be issued as a fallback.
+          throw new AppError(409, 'ANVIL_KEYLESS', 'Anvil uses its Google service identity in this environment; Anvil keys are not issued. Revoke the keyless grant to stop Anvil.');
+        }
         if (req.body.kind === 'ANVIL') {
           // Owner, 11 Nov 2026 (Anvil Q7): never past the pilot bound.
           const bound = config.ANVIL_CREDENTIAL_NOT_AFTER ? new Date(config.ANVIL_CREDENTIAL_NOT_AFTER) : null;

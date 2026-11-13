@@ -32,11 +32,12 @@ const MAX_UPLOAD = 1_048_576;
 export class AnvilExportClient {
   constructor(
     private readonly baseUrl: string,
-    private readonly token: string,
+    /** A static token, or (keyless, the default) a provider of this service's Google identity token. */
+    private readonly auth: string | (() => Promise<string>),
     private readonly fetchImpl: FetchLike = fetch as unknown as FetchLike,
     private readonly timeoutMs = 30_000,
   ) {
-    if (!baseUrl || !token) throw new Error('Anvil export client needs ANVIL_EXPORT_BASE_URL and ANVIL_EXPORT_TOKEN');
+    if (!baseUrl || !auth) throw new Error('Anvil export client needs ANVIL_EXPORT_BASE_URL and a token or identity provider');
   }
 
   contracts() {
@@ -52,7 +53,13 @@ export class AnvilExportClient {
 
   private async call(method: 'GET' | 'POST', path: string, body?: Uint8Array, extra: Record<string, string> = {}): Promise<AnvilResult> {
     if (body && body.byteLength > MAX_UPLOAD) return { kind: 'transport', httpStatus: null, code: 'PACKAGE_TOO_LARGE', message: `The package is ${body.byteLength} bytes; Anvil accepts at most ${MAX_UPLOAD}. Split the export.`, requestId: null, retryable: false };
-    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}`, Accept: 'application/json', ...extra };
+    let token: string;
+    try {
+      token = typeof this.auth === 'string' ? this.auth : await this.auth();
+    } catch {
+      return { kind: 'transport', httpStatus: null, code: 'IDENTITY_UNAVAILABLE', message: 'Praxis could not get its Google identity token to call Anvil.', requestId: null, retryable: true };
+    }
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}`, Accept: 'application/json', ...extra };
     if (body) headers['Content-Type'] = 'application/zip';
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);

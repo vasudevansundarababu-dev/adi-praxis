@@ -176,6 +176,12 @@ export const ContractMapping = z
     /** criterion field: the rubric. */
     criteria: FieldRef,
     /**
+     * Reusable tasks over a case dataset (KYC five-state contract, 12 Nov 2026): the final answer is the template's
+     * shared `execution.output_schema`, and each case's expected answer is private dataset material. The form then
+     * declares no per-task output field and no expected answer. Without this, a sections form needs an output field.
+     */
+    outputsFrom: z.literal('template_execution').optional(),
+    /**
      * Owner, 12 Nov (Q4 paid search): one output.json field per item of a repeated S5 field, e.g. q01_intent. Graded
      * fields get generated json_equals criteria sharing `weightShare` % of the score; the author's criteria share the
      * rest. Anvil's task v1 has no list type and at most 50 criteria, hence `maxItems`.

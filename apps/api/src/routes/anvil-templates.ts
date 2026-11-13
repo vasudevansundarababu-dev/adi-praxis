@@ -11,7 +11,7 @@ import { runStaffOrServiceCommand } from '../platform/command';
 import { packProfileId, storePack } from '../templates/golden-pack-store';
 import { loadUploadedProfiles, profileIdTaken } from '../templates/uploaded-profiles';
 import { jcsSha256 } from '../anvil/jcs';
-import { checkJointProposal, isJointProposal, JOINT_KEYS, JOINT_TEMPLATE_SPEC, jointHashes, jointTemplateSpec, jointToolIds, type StoredJointParts } from '../anvil/joint-template';
+import { checkJointProposal, EXECUTION_SCHEMAS, isJointProposal, JOINT_KEYS, JOINT_TEMPLATE_SPEC, jointHashes, jointTemplateSpec, jointToolIds, type StoredJointParts } from '../anvil/joint-template';
 
 /**
  * Praxis template API for Anvil (Praxis-Anvil contract, approved 12 Nov 2026, docs/anvil/PRAXIS-ANVIL-CONTRACT-FINAL.md
@@ -204,6 +204,7 @@ export const anvilTemplateRoutes: FastifyPluginAsyncZod<{ db: Db; anvil?: { envi
         part_hash_keys: ['authoring', 'execution', 'skills'],
         identity: 'template_id = Praxis stable template UUID (lineage), version = positive integer, both assigned by Praxis',
       },
+      execution_schema_versions: EXECUTION_SCHEMAS,
       authoring_schema: AUTHORING_SCHEMA,
       pack_schema_version: GOLDEN_PACK_SCHEMA_VERSION,
       profile_schema_version: PROFILE_SCHEMA_VERSION,

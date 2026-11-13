@@ -20,7 +20,9 @@ export { sampleProfileOutput } from './sample';
 export * from './golden-pack';
 export * from './template-spec';
 export { GOLDEN_KYC_EXAMPLE, withRuleVersions } from './golden-kyc-example';
+export { GOLDEN_MARKETING_EXAMPLE } from './golden-marketing-example';
 export { KYC_ACCOUNT_OPENING_PROFILE, KYC_V2_TOOLS, KYC_V2_RECOMMENDATIONS, KYC_V2_PRODUCTS, KYC_V2_STATES, KYC_V2_PARTY_ROLES, KYC_V2_SLOTS, KYC_V2_CRITICAL_FAILURES } from './profiles/kyc-account-opening';
+export { MARKETING_CAMPAIGN_TASK2_PROFILE, MARKETING_T2_LOCALES, MARKETING_T2_ROLES, MARKETING_T2_ROLE_IDS, MARKETING_T2_OUTCOMES, MARKETING_T2_ACTIONS, MARKETING_T2_CRITICAL_FAILURES, MARKETING_T2_CRITICAL_LABELS, MARKETING_T2_GROUPS, MARKETING_T2_PROFILE_ID, MARKETING_T2_WORKFLOW } from './profiles/marketing-campaign-task2';
 export { AML_PROFILE, KYB_PROFILE, KYC_PROFILE, NOISE_CANCELLING_PROFILE, OMNICHANNEL_PROFILE };
 export { ADVERSE_MEDIA_PROFILE, CUSTOMER_RISK_RATING_PROFILE, EDD_PROFILE };
 export { COMPLIANCE_MONITORING_PROFILE, FRAUD_HANDOFF_PROFILE, Q4_PAID_SEARCH_PROFILE };
@@ -43,6 +45,10 @@ for (const p of TEMPLATE_PROFILES) {
 }
 
 /** Alternate forms a template version may choose (`Template.profileId`). */
+/**
+ * Built-in alternate forms. The VEYRA Hush One (Marketing Task2) form is NOT built in: it reaches Praxis as data in
+ * Anvil's template proposal (requirement 49172 section 7.2), so it is exported for that proposal only.
+ */
 export const ALTERNATE_PROFILES = [KYC_ACCOUNT_OPENING_PROFILE] as const;
 for (const p of ALTERNATE_PROFILES) {
   const r = registerProfile(p, { alternate: true });

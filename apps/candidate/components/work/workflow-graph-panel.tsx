@@ -209,6 +209,22 @@ function NodeEditor({ graph, node, editable, onChange, onClose }: { graph: Workf
               Minutes before the timeout route
               <input type="number" min={1} className={input} value={node.timeoutMinutes} onChange={(e) => set({ timeoutMinutes: Math.max(1, Number(e.target.value) || 1) })} />
             </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={!!node.simulated} onChange={(e) => set({ simulated: e.target.checked || undefined })} />
+              Simulated by the environment (never a real human decision)
+            </label>
+          </>
+        )}
+        {node.type === 'external_system' && (
+          <>
+            <label className="block text-sm">
+              System (outside the evaluated team; not an agent)
+              <input className={input} value={node.system} onChange={(e) => set({ system: e.target.value })} />
+            </label>
+            <label className="block text-sm">
+              What the team asks it for
+              <textarea className={input} rows={2} value={node.request} onChange={(e) => set({ request: e.target.value })} />
+            </label>
           </>
         )}
         {node.type === 'output' && (
@@ -278,7 +294,7 @@ function NodeEditor({ graph, node, editable, onChange, onClose }: { graph: Workf
             )}
             {node.type !== 'input' && node.type !== 'output' && (
               <button type="button" className="rounded border border-line p-2 text-sm text-error" onClick={() => { run({ op: 'remove_node', nodeId: node.id }); onClose(); }}>
-                Remove this {node.type === 'human_step' ? 'person step' : node.type === 'decision' ? 'decision' : 'step'}
+                Remove this {node.type === 'human_step' ? 'person step' : node.type === 'external_system' ? 'external system step' : node.type === 'decision' ? 'decision' : 'step'}
               </button>
             )}
           </div>

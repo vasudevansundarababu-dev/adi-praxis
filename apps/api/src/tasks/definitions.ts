@@ -90,11 +90,20 @@ export function coverageChecks(template: TemplateRef, slot: SlotRef | null, outp
     return !d || (d.values.length > 0 && !d.values.some((x) => x.toLowerCase() === v.toLowerCase()));
   });
   checks.push({ id: 'coverage.values', section: 'W01', ok: bad.length === 0, message: bad.length ? `Unknown coverage values: ${bad.map(([k, v]) => `${k}=${v}`).join(', ')}` : 'Coverage tags use the template’s values' });
-  if (slot.isOpen) {
-    checks.push({ id: 'coverage.open-tags', section: 'W01', ok: Object.keys(cov.tags).length > 0, message: 'Open slot: choose at least one coverage tag' });
-    checks.push({ id: 'coverage.open-edge', section: 'W01', ok: !!cov.edgeCase, message: 'Open slot: name the edge case this task tests' });
-  }
+  // Only a template that has coverage dimensions or edge cases asks an open slot to name them; a reusable template with
+  // no quotas (one task per selector value, or a single task) has nothing to tag.
+  if (slot.isOpen && template.coverageDimensions.length) checks.push({ id: 'coverage.open-tags', section: 'W01', ok: Object.keys(cov.tags).length > 0, message: 'Open slot: choose at least one coverage tag' });
+  if (slot.isOpen && template.edgeCases.length) checks.push({ id: 'coverage.open-edge', section: 'W01', ok: !!cov.edgeCase, message: 'Open slot: name the edge case this task tests' });
   return checks;
 }
 
 registerDefinition('Marketing', EXECUTABLE_WORKFLOW, { ...genericDefinition, key: 'praxis-contract-v1', validateTaskInput: (_t, input) => praxisContractIssues((input as Record<string, unknown> | null)?.praxisContract).map((i) => `${i.path}: ${i.message}`), validateSubmission: (_t, output) => praxisContractChecks(output, true) });
+
+/**
+ * Whether a template version asks open slots to name coverage tags or an edge case. A reusable template with no
+ * coverage dimensions and no edge cases (one task per selector value, or a single task) has nothing to confirm.
+ */
+export function hasQuotas(template: { coverageDimensions: unknown; edgeCaseCatalog: unknown }): boolean {
+  const cov = template.coverageDimensions as { dimensions?: unknown[] } | null;
+  return (Array.isArray(cov?.dimensions) && cov!.dimensions!.length > 0) || (Array.isArray(template.edgeCaseCatalog) && template.edgeCaseCatalog.length > 0);
+}

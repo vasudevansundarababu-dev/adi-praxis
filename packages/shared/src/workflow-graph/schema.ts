@@ -8,7 +8,7 @@ import { z } from 'zod';
  */
 export const WORKFLOW_GRAPH_SCHEMA = 'praxis.workflow_graph.v1-proposed' as const;
 
-export const WORKFLOW_NODE_TYPES = ['input', 'agent_step', 'decision', 'join', 'human_step', 'output', 'escalation'] as const;
+export const WORKFLOW_NODE_TYPES = ['input', 'agent_step', 'decision', 'join', 'human_step', 'external_system', 'output', 'escalation'] as const;
 export type WorkflowNodeType = (typeof WORKFLOW_NODE_TYPES)[number];
 
 /** Terminal node kinds: a trial ends here. Escalation is a terminal that is not a successful completion. */
@@ -128,6 +128,24 @@ export const WorkflowNode = z.discriminatedUnion('type', [
       responseSchema: z.array(HumanResponseField).min(1).max(20),
       permittedEvidence: Ids,
       timeoutMinutes: z.number().int().min(1).max(60 * 24 * 30),
+      /** The environment plays this person (a scripted fixture), so the response is never a real human decision. */
+      simulated: z.boolean().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      ...NodeBase,
+      /**
+       * A system outside the evaluated team (e.g. Task3 media production): the team sends a request and receives a
+       * result. Not an agent and not a person; its behaviour is supplied by the environment (Marketing Task2, 12 Nov 2026).
+       */
+      type: z.literal('external_system'),
+      system: Text(200),
+      request: Text(),
+      /** Artifacts sent with the request. */
+      sendsRefs: Ids,
+      /** The artifact the system returns. */
+      returnsArtifact: GraphId,
     })
     .strict(),
   z

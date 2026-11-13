@@ -65,7 +65,7 @@ function fieldLine(f: TemplateProfileField, indent = '  '): string {
 
 /** A plain-language guide to one template: sections and fields, graded outputs, the starting workflow and decisions. */
 export function templateGuide(profile: TemplateProfile): string {
-  const graph = templateStartingGraph(profile.catalogWorkflowName);
+  const graph = templateStartingGraph(profile.catalogWorkflowName, 1, profile.profileId);
   const people = graph?.nodes.filter((n) => n.type === 'human_step').map((n) => `"${n.label}" (${(n as { actorRole?: string }).actorRole ?? 'a person'})`) ?? [];
   const outputs = profile.sections.find((s) => s.key === 'S6')!.fields.filter((f) => f.outputField);
   return [

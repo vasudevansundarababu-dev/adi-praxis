@@ -28,6 +28,12 @@ describe('template authoring form', () => {
   });
 
   it('a workflow with one form shows no choice', () => {
-    expect(text(html(<TemplateActions template={template({ status: 'DRAFT' })} hasDraft />))).not.toContain('Authoring form');
+    expect(text(html(<TemplateActions template={template({ workflowName: 'KYB and beneficial ownership', status: 'DRAFT' })} hasDraft />))).not.toContain('Authoring form');
+  });
+
+  it('the old Phone (DM03) draft no longer offers a built-in Task2 form: the VEYRA Hush One form arrives in Anvil\'s proposal (13 Nov 2026)', () => {
+    const markup = html(<TemplateActions template={template({ status: 'DRAFT' })} hasDraft />);
+    expect(markup).not.toContain('value="marketing-campaign-task2"');
+    expect(markup).not.toContain('value="veyra-hush-one-launch-v1"');
   });
 });

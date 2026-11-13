@@ -36,6 +36,22 @@ export const GoldenPack = z
         /** Coverage matrix and edge cases, as in the template editor; without them every task is an open slot. */
         coverageDimensions: CoverageDimensions.optional(),
         edgeCaseCatalog: EdgeCaseCatalog.optional(),
+        /**
+         * Reusable tasks over a case dataset (KYC five-state contract, K1/K3, 12 Nov 2026): each authored task picks one
+         * value of a pick-list field (`source`, e.g. `S1.governingState`), and Anvil routes cases by `field`. One task per
+         * value: the target is the number of values, and no coverage or edge-case quota may add tasks. The dataset itself
+         * (id, version, hash, counts) is bound at export, never here.
+         */
+        caseSelector: z
+          .object({
+            field: z.string().regex(/^[a-z][a-z0-9_]{0,62}$/),
+            source: z.string().regex(/^S\d+\.[A-Za-z][A-Za-z0-9_]{0,62}$/),
+            values: z.array(z.string().trim().min(1).max(50)).min(1).max(100),
+          })
+          .strict()
+          .optional(),
+        /** Distinct tasks to author per project. With a case selector it must equal the number of selector values. */
+        defaultDistinctTarget: z.number().int().min(1).max(10_000).optional(),
       })
       .strict()
       .optional(),
@@ -65,6 +81,7 @@ export function checkGoldenPack(raw: unknown, isTaken: (profileId: string) => bo
   if (profile.storage !== 'sections') problems.push('profile: uploaded forms must store their values in sections (storage "sections")');
   if (profile.domainPlugin) problems.push('profile: uploaded forms cannot use a specialised editor (domainPlugin must be null)');
   if (isTaken(profile.profileId)) problems.push(`profile: the form ID "${profile.profileId}" is already in use; give a changed form a new ID (e.g. ${profile.profileId}-v2)`);
+  problems.push(...caseSelectorProblems(profile, parsed.data.template));
   const names = new Set<string>();
   const examples = parsed.data.examples.map((e) => {
     const out: string[] = [];
@@ -78,6 +95,37 @@ export function checkGoldenPack(raw: unknown, isTaken: (profileId: string) => bo
   });
   for (const e of examples) if (e.problems.length) problems.push(`example "${e.name}": ${e.problems.slice(0, 5).join('; ')}${e.problems.length > 5 ? ` (+${e.problems.length - 5} more)` : ''}`);
   return { ok: problems.length === 0, problems, profile, examples };
+}
+
+/** Distinct-task target a template block asks for: explicit, or one task per case-selector value. */
+export function packTarget(template: GoldenPack['template']): number | null {
+  if (!template) return null;
+  return template.defaultDistinctTarget ?? template.caseSelector?.values.length ?? null;
+}
+
+/** A case selector must point at a pick list whose options are exactly its values, and must not multiply tasks. */
+function caseSelectorProblems(profile: TemplateProfile, template: GoldenPack['template']): string[] {
+  const sel = template?.caseSelector;
+  if (!sel) return [];
+  const out: string[] = [];
+  const [sectionKey, fieldKey] = sel.source.split('.');
+  const field = profile.sections.find((s) => s.key === sectionKey)?.fields.find((f) => f.key === fieldKey);
+  if (!field) out.push(`template.caseSelector.source: "${sel.source}" is not a field of the form`);
+  else if (field.type !== 'pick_list') out.push(`template.caseSelector.source: "${sel.source}" must be a pick_list field`);
+  else {
+    if (!field.required) out.push(`template.caseSelector.source: "${sel.source}" must be required, so every task names its ${sel.field}`);
+    const opts = (field.options ?? []).map((o) => o.value).sort();
+    const vals = [...sel.values].sort();
+    if (new Set(vals).size !== vals.length) out.push('template.caseSelector.values: values must be unique');
+    if (opts.join('\u0000') !== vals.join('\u0000')) out.push(`template.caseSelector.values: must equal the options of ${sel.source} exactly (${opts.join(', ')})`);
+  }
+  if (profile.contract?.outputsFrom !== 'template_execution') out.push('profile.contract.outputsFrom: a case-selector form must take its outputs from the template execution ("template_execution"); expected answers are private dataset material');
+  if (template.defaultDistinctTarget !== undefined && template.defaultDistinctTarget !== sel.values.length)
+    out.push(`template.defaultDistinctTarget: must be ${sel.values.length}, one task per ${sel.field} value`);
+  if (template.coverageDimensions && (template.coverageDimensions.dimensions.length || template.coverageDimensions.cells.length))
+    out.push('template.coverageDimensions: a case-selector template has no coverage quotas; cases are dataset inputs, not authored tasks');
+  if (template.edgeCaseCatalog?.length) out.push('template.edgeCaseCatalog: a case-selector template has no edge-case quotas; cases are dataset inputs, not authored tasks');
+  return out;
 }
 
 /** True for a policy citation value that is a placeholder to fill per project. */

@@ -133,6 +133,10 @@ export function checkWorkflowGraph(input: unknown, ctx: GraphCheckContext = {}):
       ref(artifacts.has(n.outputArtifact), 'Artifact', n.outputArtifact, `${p}.outputArtifact`, n.id);
     }
     if (n.type === 'human_step') n.permittedEvidence.forEach((a) => ref(artifacts.has(a), 'Artifact', a, `${p}.permittedEvidence`, n.id));
+    if (n.type === 'external_system') {
+      n.sendsRefs.forEach((a) => ref(artifacts.has(a), 'Artifact', a, `${p}.sendsRefs`, n.id));
+      ref(artifacts.has(n.returnsArtifact), 'Artifact', n.returnsArtifact, `${p}.returnsArtifact`, n.id);
+    }
     if (n.type === 'output') ref(artifacts.has(n.deliverable), 'Artifact', n.deliverable, `${p}.deliverable`, n.id);
     if (n.type === 'join') [...n.requiredInputs, ...n.optionalInputs].forEach((x) => ref(nodes.has(x), 'Node', x, `${p}.inputs`, n.id));
   }
@@ -310,6 +314,7 @@ export function checkWorkflowGraph(input: unknown, ctx: GraphCheckContext = {}):
   for (const n of g.nodes) {
     if (n.type === 'input') n.provides.forEach((a) => produce(a, n.id));
     if (n.type === 'agent_step') produce(n.outputArtifact, n.id);
+    if (n.type === 'external_system') produce(n.returnsArtifact, n.id);
   }
   for (const [a, ps] of producers) {
     if (new Set(ps).size > 1) err('ARTIFACT_MULTIPLE_PRODUCERS', `${a} is produced by ${ps.join(' and ')}; give each step its own output`, `artifacts.${a}`);
@@ -335,6 +340,14 @@ export function checkWorkflowGraph(input: unknown, ctx: GraphCheckContext = {}):
       if (isPrivate(n.outputArtifact)) err('PRIVATE_TO_ACTOR', `${n.label} writes ${n.outputArtifact}, but agent output cannot be private reference material`, `${p}.outputArtifact`, n.id);
       const role = roles.get(n.roleId)!;
       for (const a of role.evidenceRefs) if (isPrivate(a)) err('PRIVATE_TO_ACTOR', `Role ${role.name} can see ${a}, which is private`, `roles.${role.id}.evidenceRefs`, n.id);
+    }
+    if (n.type === 'external_system') {
+      for (const a of n.sendsRefs) {
+        consumed.add(a);
+        if (isPrivate(a)) err('PRIVATE_TO_ACTOR', `${n.label} sends ${a}, which is private to the verifier`, `${p}.sendsRefs`, n.id);
+        else if (!availableAt(n.id, a)) err('ARTIFACT_NOT_AVAILABLE', `${n.label} sends ${a}, which no earlier step provides`, `${p}.sendsRefs`, n.id);
+      }
+      if (isPrivate(n.returnsArtifact)) err('PRIVATE_TO_ACTOR', `${n.label} returns ${n.returnsArtifact}, but what the team receives cannot be private reference material`, `${p}.returnsArtifact`, n.id);
     }
     if (n.type === 'human_step') {
       for (const a of n.permittedEvidence) {

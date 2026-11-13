@@ -81,7 +81,13 @@ export function checkProfile(raw: unknown): string[] {
     if (f.options && new Set(f.options.map((o) => o.value)).size !== f.options.length) out.push(`${path}: duplicate option values`);
     if (f.type === 'repeated_array' && !f.itemFields?.length) out.push(`${path}: repeated array has no item fields`);
     if (f.type !== 'repeated_array' && f.itemFields) out.push(`${path}: only repeated arrays declare item fields`);
-    if ((f.weightTotal !== undefined || f.requireCritical) && f.type !== 'criterion') out.push(`${path}: weight rules apply to criterion fields only`);
+    if ((f.weightTotal !== undefined || f.requireCritical || f.scale || f.groups) && f.type !== 'criterion') out.push(`${path}: weight rules apply to criterion fields only`);
+    if (f.groups) {
+      if (new Set(f.groups.map((g) => g.id)).size !== f.groups.length) out.push(`${path}: duplicate group IDs`);
+      const total = f.groups.reduce((n, g) => n + g.weight, 0);
+      if (f.weightTotal !== undefined && Math.abs(total - f.weightTotal) > 0.01) out.push(`${path}: group weights total ${total}, not ${f.weightTotal}`);
+      for (const g of f.groups) if (g.minimum !== undefined && g.minimum > g.weight) out.push(`${path}: group ${g.id} minimum is above its weight`);
+    }
     if (p.storage === 'canonical' && siblings === null && !f.path) out.push(`${path}: canonical profiles need a storage path for every field`);
     if (p.storage === 'sections' && f.path) out.push(`${path}: storage paths are for canonical profiles only`);
     if (f.outputField) {
@@ -123,7 +129,9 @@ export function checkProfile(raw: unknown): string[] {
     want(p.contract.policies, 'policies', ['policy_citation']);
     want(p.contract.decisionFields, 'decisionFields', ['repeated_array']);
     want(p.contract.criteria, 'criteria', ['criterion']);
-    if (!outputFields.size && !p.contract.decisionFields) out.push('contract: the profile declares no output fields');
+    if (p.contract.outputsFrom === 'template_execution') {
+      if (outputFields.size || p.contract.decisionFields) out.push('contract.outputsFrom: a form whose outputs come from the template execution declares no per-task output fields');
+    } else if (!outputFields.size && !p.contract.decisionFields) out.push('contract: the profile declares no output fields (or set contract.outputsFrom "template_execution" for a reusable task)');
   }
   return out;
 }

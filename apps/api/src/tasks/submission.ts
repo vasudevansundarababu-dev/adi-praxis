@@ -225,8 +225,12 @@ function jointSpecChecks(spec: { execution: Record<string, unknown> }, output: R
   const calls = (Array.isArray(sections.S3?.recordedResponses) ? sections.S3!.recordedResponses : []) as { id?: string; tool?: string }[];
   const badTools = calls.filter((c) => !c.tool || !tools.has(c.tool));
   const hasCritical = criteria.some((c) => c.critical === true);
+  // A 0-4 template (execution v3 rubric descriptor, Keystone decision 3) is never scored on KYC's 5/2/0 anchors; its form
+  // already requires the level 4, 2 and 0 statements. Weights are still checked.
+  const zeroToFour = (spec.execution.rubric as { scale?: unknown } | undefined)?.scale === 'zero_to_four';
+  const weightAnchor = weightAndAnchorChecks(criteria).filter((c) => !(zeroToFour && c.id === 'anvil.criteria-anchors'));
   return [
-    ...weightAndAnchorChecks(criteria),
+    ...weightAnchor,
     { id: 'anvil.evaluator-binding', section: 'S7', ok: unmapped.length === 0, message: unmapped.length ? `Criteria ${unmapped.map((c) => c.id ?? '?').join(', ')} have no evaluator in this template; use the template’s criterion IDs (${[...map.keys()].join(', ')})` : 'Every criterion has an evaluator in the template' },
     { id: 'anvil.evaluator-kinds', section: 'S7', ok: wrong.length === 0, message: wrong.length ? `Use the template’s evaluator and version for ${wrong.map((c) => `${c.id} (${map.get(c.id!)!.id} v${map.get(c.id!)!.version})`).join(', ')}` : 'Every criterion uses the evaluator and version its template maps to it' },
     { id: 'anvil.output-reference', section: 'S7', ok: noReference.length === 0, message: noReference.length ? `Criteria ${noReference.map((c) => c.id).join(', ')} check the final answer: name an output field (${outputs.join(', ') || 'none declared'}) and the private expected value` : 'Every output check names an output field and its expected value' },

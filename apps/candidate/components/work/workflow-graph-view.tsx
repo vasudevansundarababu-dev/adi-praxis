@@ -16,6 +16,7 @@ const KIND: Record<WorkflowNode['type'], string> = {
   decision: 'Decision',
   join: 'Join',
   human_step: 'Person in the case',
+  external_system: 'External system',
   output: 'Final output',
   escalation: 'Escalation',
 };
@@ -119,7 +120,7 @@ export function WorkflowGraphView({
                 fill="var(--color-surface, #fff)"
                 stroke={stroke}
                 strokeWidth={isSel ? 2.5 : 1.5}
-                strokeDasharray={n.type === 'human_step' ? '6 3' : undefined}
+                strokeDasharray={n.type === 'human_step' ? '6 3' : n.type === 'external_system' ? '2 3' : undefined}
               />
             );
           return (

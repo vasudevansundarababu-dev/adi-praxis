@@ -20,7 +20,9 @@ export function agentGraphProjection(g: WorkflowGraph) {
       case 'join':
         return { ...base, requiredInputs: n.requiredInputs, optionalInputs: n.optionalInputs };
       case 'human_step':
-        return { ...base, actorRole: n.actorRole, prompt: n.prompt, responseSchema: n.responseSchema, permittedEvidence: keep(n.permittedEvidence), timeoutMinutes: n.timeoutMinutes };
+        return { ...base, actorRole: n.actorRole, prompt: n.prompt, responseSchema: n.responseSchema, permittedEvidence: keep(n.permittedEvidence), timeoutMinutes: n.timeoutMinutes, ...(n.simulated ? { simulated: true } : {}) };
+      case 'external_system':
+        return { ...base, system: n.system, request: n.request, sendsRefs: keep(n.sendsRefs), returnsArtifact: n.returnsArtifact };
       case 'output':
         return { ...base, deliverable: n.deliverable, completionCondition: n.completionCondition };
       case 'escalation':

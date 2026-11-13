@@ -11,7 +11,7 @@ import { runStaffOrServiceCommand } from '../platform/command';
 import { packProfileId, storePack } from '../templates/golden-pack-store';
 import { loadUploadedProfiles, profileIdTaken } from '../templates/uploaded-profiles';
 import { jcsSha256 } from '../anvil/jcs';
-import { checkJointProposal, isJointProposal, JOINT_KEYS, JOINT_TEMPLATE_SPEC, jointHashes, jointTemplateSpec, jointToolIds, type StoredJointParts } from '../anvil/joint-template';
+import { checkJointProposal, EXECUTION_SCHEMAS, isJointProposal, JOINT_KEYS, JOINT_TEMPLATE_SPEC, jointHashes, jointTemplateSpec, jointToolIds, type StoredJointParts } from '../anvil/joint-template';
 
 /**
  * Praxis template API for Anvil (Praxis-Anvil contract, approved 12 Nov 2026, docs/anvil/PRAXIS-ANVIL-CONTRACT-FINAL.md
@@ -204,6 +204,7 @@ export const anvilTemplateRoutes: FastifyPluginAsyncZod<{ db: Db; anvil?: { envi
         part_hash_keys: ['authoring', 'execution', 'skills'],
         identity: 'template_id = Praxis stable template UUID (lineage), version = positive integer, both assigned by Praxis',
       },
+      execution_schema_versions: EXECUTION_SCHEMAS,
       authoring_schema: AUTHORING_SCHEMA,
       pack_schema_version: GOLDEN_PACK_SCHEMA_VERSION,
       profile_schema_version: PROFILE_SCHEMA_VERSION,
@@ -239,6 +240,9 @@ export const anvilTemplateRoutes: FastifyPluginAsyncZod<{ db: Db; anvil?: { envi
     await asContract(() => runStaffOrServiceCommand(db, req, reply, async ({ tx, audit }) => {
       const r = await check(tx, c.clientId, req.body);
       if (!r.valid || (!r.spec && !r.joint)) {
+        // A refused proposal creates nothing, but the refusal is recorded (the command audits every outcome it stores,
+        // and a repeat with the same Idempotency-Key replays this 422).
+        await audit({ entityType: 'TemplateProposal', entityId: req.id, action: 'template_proposal.refused', after: { errorCodes: [...new Set(r.errors.map((e) => e.code))], errorCount: r.errors.length } });
         return { status: 422, body: envelope(req.id, { schema_version: 'praxis.template-validation.v1', valid: false, status: 'template_invalid', errors: r.errors, error_count: r.errors.length, praxis_requirements: r.praxisRequirements, review_gates: [], paid_calls: false }) };
       }
       // Joint proposals: the parts are stored exactly as received, so both sides hash the same object.

@@ -133,7 +133,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       reviewRoute: t.project.reviewRoute,
       agentMode: t.project.template.agentMode,
       phase: taskPhase(t.status, { reviewRoute: t.project.reviewRoute, pendingStage: t.reviewStage }),
-      startingGraph: t.taskType === 'AUTHORING' ? templateStartingGraph(t.project.template.workflowName, t.project.templateVersion) : null,
+      startingGraph: t.taskType === 'AUTHORING' ? templateStartingGraph(t.project.template.workflowName, t.project.templateVersion, t.project.template.profileId) : null,
       authoringWorkspace: (t.drafting as { workspace?: unknown } | null)?.workspace ?? null,
       tptMinutes: t.project.tptMinutes,
       definition: definitionFor(template).key,

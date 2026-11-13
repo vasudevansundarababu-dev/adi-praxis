@@ -998,3 +998,25 @@ Review of the Golden Task2 Marketing handoff v1.1; details in `docs/authoring/MA
 - **Agent mode:** a proposed version's agent mode follows its form.
 - **Open-slot tags:** an open slot is asked for coverage tags or an edge case, and a reviewer to confirm them, only when the template has coverage dimensions or edge cases.
 - **Invalid proposals:** refused with 422 and audited as `template_proposal.refused`; a repeat with the same Idempotency-Key replays the refusal. Before this fix they returned 500, because the audit guard treated the stored 422 as an unaudited change.
+
+## Anvil-defined templates in the Meta-Compiler: "Defined by Anvil", not "n/6 Valid" (13 Nov 2026)
+
+- **Problem (owner, QA):** KYC v5/v6 and VEYRA Hush One showed "1/6 Valid" with red "to fix" pills (Domain 5, Data 5,
+  MCP 1, Guardrails 2, Rubric 1). These are not errors. Those versions have no Harbor blueprint; `blueprintOf()`
+  pre-fills only panel 0, so `sectionProblems()` flags every empty stage 1–5 item.
+- **Decision (task from the owner's session; chosen by Claude where marked):**
+  - A template version with `anvilSpec` set is **defined by Anvil**: its execution, tools, rubric and environment come
+    from Anvil's execution part, not from the Harbor blueprint. Publishing and projects already work without it.
+  - The template page's stage navigator shows **"Defined by Anvil"** with the execution schema version, a one-line
+    rubric summary and the starting graph's role ids, instead of "n/6 Valid" and the per-stage "to fix" pills. The
+    stage problems list and the "n/6 valid: fix every stage" Generate hint are hidden; Generate stays disabled (it is
+    for Meta-Compiler blueprints).
+  - The directory (Admin) shows "Defined by Anvil" on such a row instead of "n/6 valid".
+  - **(chosen by Claude)** Data path: `GET /templates/:id/anvil` gains `definition` (`AnvilDefinitionDto`, read-only
+    summary from `anvilDefinition()` in `@praxis/shared`); `DirectoryRowDto` gains `definedByAnvil`. Rubric summary:
+    a v3 0–4 descriptor reads "0–4 scale, 7 groups, minimum 80; N criteria mapped to evaluators"; otherwise
+    "5/2/0 per criterion; N criteria mapped to evaluators".
+  - The Meta-Compiler validator (`sectionProblems`, `validSections`, S2-07 / S2-17) is **unchanged** for
+    Harbor/Meta-Compiler templates, and the API still returns `problems`/`validSections` for every template.
+  - Anvil-owned parts are only read, never edited.
+

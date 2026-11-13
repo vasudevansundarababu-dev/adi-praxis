@@ -938,3 +938,24 @@ Owner: "Finish the remaining tasks. Will make one final build." Defaults taken, 
   - **No legacy fallback:** once keyless is configured, ANVIL API keys are refused and new ones cannot be issued (409 `ANVIL_KEYLESS`). Other key kinds are unchanged.
   - **Outbound:** the runtime account's identity token for the Anvil origin, from the metadata server only. `ANVIL_EXPORT_TOKEN` is removed.
   - **Configuration:** Anvil's account and subject are repository variables, not secrets, kept out of this public repository.
+
+## Corrected KYC template: reusable five-state proposal (13 Nov 2026)
+
+- **Owner:** "Finish the corrected KYC and Marketing templates." Contract: Keystone K1–K6; requirement 49172, sections 5.1–5.3 and 7.2.
+- **Execution part:** Praxis accepts `anvil.template-execution.v2` as well as v1 and stores it unchanged.
+  - v2 needs `federalPolicies` as `{id, version, content_sha256, publication_ref}`.
+  - Bank rules stay in `rules`.
+  - The contracts endpoint lists `execution_schema_versions`.
+- **Case selector:** the template block may carry `caseSelector {field, source, values}`.
+  - The source must be a required pick list whose options equal the values exactly.
+  - The target is one task per value, so a declared `defaultDistinctTarget` must equal the number of values.
+  - No coverage or edge-case quota is allowed. Cases are dataset inputs; the dataset is bound at export only.
+- **Outputs:** a reusable form sets `contract.outputsFrom: "template_execution"`.
+  - Its answer schema is the template's `execution.output_schema`.
+  - It declares no per-task output field or expected answer, because expected answers are private dataset material.
+  - A case-selector form must set it.
+- **A proposal for an existing workflow** creates the next DRAFT version.
+  - The cardinality its template block states (target, coverage, edge cases) replaces what was copied from the latest version.
+  - The corrected KYC therefore does not inherit v4/v5's target of 200 and their quotas.
+  - Published versions are untouched.
+- **Form IDs are never reused.** v4 and v5 keep `golden-kyc-openenv-v2`; the corrected form needs a new ID.

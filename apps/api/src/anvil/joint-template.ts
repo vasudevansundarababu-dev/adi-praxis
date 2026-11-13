@@ -37,6 +37,9 @@ export interface StoredJointParts {
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
+/** Execution part schemas Praxis stores (unchanged) for a joint proposal. v2: KYC five-state contract, K5. */
+export const EXECUTION_SCHEMAS: readonly string[] = ['anvil.template-execution.v1', 'anvil.template-execution.v2'];
+
 export const isJointProposal = (body: unknown) => isObj(body) && body.schemaVersion === JOINT_TEMPLATE_SPEC;
 export const jointParts = (t: Pick<Template, 'anvilSpec'>): StoredJointParts | null => (isObj(t.anvilSpec) && t.anvilSpec.schemaVersion === JOINT_TEMPLATE_SPEC ? (t.anvilSpec as unknown as StoredJointParts) : null);
 
@@ -72,8 +75,18 @@ export function checkJointProposal(body: Record<string, unknown>): { issues: Joi
     if (a.examples !== undefined && !Array.isArray(a.examples)) issues.push(issue('TP_SPEC_SHAPE', '/authoring/examples', 'authoring.examples must be an array.', 'Send the worked examples as an array or omit it.'));
   }
   const ex = body.execution;
-  if (!isObj(ex) || ex.schema_version !== 'anvil.template-execution.v1') issues.push(issue('TP_SPEC_SHAPE', '/execution/schema_version', 'execution must be an anvil.template-execution.v1 object.', 'Send the execution part in Anvil’s published schema.'));
+  if (!isObj(ex) || !EXECUTION_SCHEMAS.includes(ex.schema_version as string)) issues.push(issue('TP_SPEC_SHAPE', '/execution/schema_version', `execution must be an ${EXECUTION_SCHEMAS.join(' or ')} object.`, 'Send the execution part in Anvil’s published schema.'));
   else {
+    // K5 (12 Nov 2026): v2 carries template-level federal policies as immutable references; bank rules stay in `rules`.
+    if (ex.schema_version === 'anvil.template-execution.v2') {
+      const fp = ex.federalPolicies;
+      if (!Array.isArray(fp) || !fp.length) issues.push(issue('TP_SPEC_SHAPE', '/execution/federalPolicies', 'anvil.template-execution.v2 needs federalPolicies.', 'List each federal policy as {id, version, content_sha256, publication_ref}.'));
+      else
+        fp.forEach((f, i) => {
+          const ok = isObj(f) && typeof f.id === 'string' && !!f.id && typeof f.version === 'string' && !!f.version && typeof f.content_sha256 === 'string' && /^[0-9a-f]{64}$/.test(f.content_sha256) && typeof f.publication_ref === 'string' && !!f.publication_ref;
+          if (!ok) issues.push(issue('TP_SPEC_SHAPE', `/execution/federalPolicies/${i}`, 'A federal policy must be {id, version, content_sha256 (64 lowercase hex), publication_ref}.', 'Send the exact immutable reference; never an invented hash.'));
+        });
+    }
     if (ex.paid_calls !== false) issues.push(issue('TP_SPEC_SHAPE', '/execution/paid_calls', 'paid_calls must be false.', 'Paid calls are off for every Praxis template.'));
     if (!Array.isArray(ex.evaluators) || !ex.evaluators.length) issues.push(issue('TP_EVALUATOR_KIND_UNKNOWN', '/execution/evaluators', 'No evaluator mapping: authored criteria could not be graded.', 'Map each criterion ID to a catalogue capability {id, version} and evidence_source.'));
     if (!isObj(ex.output_schema) || ex.output_schema.type !== 'object') issues.push(issue('TP_OUTPUT_SCHEMA', '/execution/output_schema', 'The final-answer schema must be an object schema.', 'Provide the output schema of the final answer.'));

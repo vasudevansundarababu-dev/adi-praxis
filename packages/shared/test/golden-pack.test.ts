@@ -40,6 +40,20 @@ describe('golden task pack', () => {
 });
 
 /** The example pack in docs/authoring/golden-packs stays valid (regenerate with GEN_GOLDEN_PACK=1). */
+describe('reusable form: outputs from the template execution', () => {
+  const base = (contract: object) => ({ schemaVersion: 'praxis.golden_pack.v1', source: 'test', profile: { ...KYC_ACCOUNT_OPENING_PROFILE, profileId: 'reusable-test', contract: { ...KYC_ACCOUNT_OPENING_PROFILE.contract, ...contract } } });
+  it('a form that also declares per-task output fields cannot claim its outputs come from the template execution', () => {
+    const r = checkGoldenPack(base({ outputsFrom: 'template_execution' }), () => false);
+    expect(r.problems.join(' ')).toMatch(/declares no per-task output fields/);
+  });
+  it('a case selector needs outputsFrom "template_execution"', () => {
+    const pick = KYC_ACCOUNT_OPENING_PROFILE.sections.flatMap((s) => s.fields.map((f) => ({ s: s.key, f }))).find((x) => x.f.type === 'pick_list' && x.f.required)!;
+    const values = (pick.f.options ?? []).map((o) => o.value);
+    const pack = { ...base({}), template: { domainName: 'Banking', primaryWork: 'x', verificationCriteria: 'x', humanGate: 'x', skills: ['KYC'], defaultTptMinutes: 60, caseSelector: { field: 'selector', source: `${pick.s}.${pick.f.key}`, values } } };
+    expect(checkGoldenPack(pack, () => false).problems.join(' ')).toMatch(/must take its outputs from the template execution/);
+  });
+});
+
 describe('example golden pack file', () => {
   it('validates', async () => {
     const { readFileSync, writeFileSync } = await import('node:fs');

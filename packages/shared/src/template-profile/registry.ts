@@ -123,7 +123,9 @@ export function checkProfile(raw: unknown): string[] {
     want(p.contract.policies, 'policies', ['policy_citation']);
     want(p.contract.decisionFields, 'decisionFields', ['repeated_array']);
     want(p.contract.criteria, 'criteria', ['criterion']);
-    if (!outputFields.size && !p.contract.decisionFields) out.push('contract: the profile declares no output fields');
+    if (p.contract.outputsFrom === 'template_execution') {
+      if (outputFields.size || p.contract.decisionFields) out.push('contract.outputsFrom: a form whose outputs come from the template execution declares no per-task output fields');
+    } else if (!outputFields.size && !p.contract.decisionFields) out.push('contract: the profile declares no output fields (or set contract.outputsFrom "template_execution" for a reusable task)');
   }
   return out;
 }

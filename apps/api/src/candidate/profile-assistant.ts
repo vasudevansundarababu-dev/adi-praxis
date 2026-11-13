@@ -1,6 +1,7 @@
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
 import { FIELD_DEFS, ISO_COUNTRIES, RESPONSIBILITIES, CLAIM_TYPES, type QuestionDef } from '@praxis/shared';
 import { z } from 'zod';
+import { GeminiVertexContentDrafter } from '../meta-compiler/drafter';
 
 /**
  * The model's only job in the SME profile (FLOW2 5.2): extract candidate-stated facts from one answer, flag
@@ -142,27 +143,33 @@ const EXTRACTION_SCHEMA = (allowed: string[]) => ({
 
 const escapeTag = (s: string) => s.replace(/<\/?(candidate_answer|question|opportunity|allowed_fields|confirmed_profile)>/gi, '');
 
+/** The user turn: the same for every provider. */
+function userPrompt(input: ExtractionInput, allowed: string[]) {
+  return [
+    `<opportunity>${escapeTag(`${input.opportunity.title} — ${input.opportunity.domain} / ${input.opportunity.specialty}`)}</opportunity>`,
+    `<allowed_fields>\n${allowed.map((k) => `${k}: ${FIELD_DEFS[k]?.label ?? k}`).join('\n')}\nroles: the candidate's role timeline (use the roles array)\n</allowed_fields>`,
+    `<confirmed_profile>\n${input.confirmedSummary.map(escapeTag).join('\n') || '(nothing confirmed yet)'}\n</confirmed_profile>`,
+    `<question>${escapeTag(input.question.text)}</question>`,
+    `<candidate_answer>\n${escapeTag(input.answer)}\n</candidate_answer>`,
+  ].join('\n\n');
+}
+
 export class ClaudeVertexProfileAssistant implements ProfileAssistant {
   static readonly MODEL = 'claude-opus-5';
   /** Used once when the primary model declines (stop_reason "refusal"); Vertex has no server-side fallbacks. */
   static readonly FALLBACK_MODEL = 'claude-opus-4-8';
-  readonly modelVersion = ClaudeVertexProfileAssistant.MODEL;
+  readonly modelVersion: string;
   private readonly client: Pick<AnthropicVertex, 'messages'>;
 
   /** `client` is injectable so tests can check requests without calling Vertex. */
-  constructor(opts: { projectId: string; region: string; client?: Pick<AnthropicVertex, 'messages'> }) {
+  constructor(opts: { projectId: string; region: string; model?: string; client?: Pick<AnthropicVertex, 'messages'> }) {
+    this.modelVersion = opts.model ?? ClaudeVertexProfileAssistant.MODEL;
     this.client = opts.client ?? new AnthropicVertex({ projectId: opts.projectId, region: opts.region });
   }
 
   async extract(input: ExtractionInput): Promise<ExtractionResult> {
     const allowed = [...new Set(input.allowedFields)];
-    const user = [
-      `<opportunity>${escapeTag(`${input.opportunity.title} — ${input.opportunity.domain} / ${input.opportunity.specialty}`)}</opportunity>`,
-      `<allowed_fields>\n${allowed.map((k) => `${k}: ${FIELD_DEFS[k]?.label ?? k}`).join('\n')}\nroles: the candidate's role timeline (use the roles array)\n</allowed_fields>`,
-      `<confirmed_profile>\n${input.confirmedSummary.map(escapeTag).join('\n') || '(nothing confirmed yet)'}\n</confirmed_profile>`,
-      `<question>${escapeTag(input.question.text)}</question>`,
-      `<candidate_answer>\n${escapeTag(input.answer)}\n</candidate_answer>`,
-    ].join('\n\n');
+    const user = userPrompt(input, allowed);
 
     const request = (model: string) =>
       this.client.messages.create({
@@ -176,7 +183,7 @@ export class ClaudeVertexProfileAssistant implements ProfileAssistant {
 
     let response;
     try {
-      response = await request(ClaudeVertexProfileAssistant.MODEL);
+      response = await request(this.modelVersion);
       if (response.stop_reason === 'refusal') response = await request(ClaudeVertexProfileAssistant.FALLBACK_MODEL);
     } catch (err) {
       throw new AssistantUnavailableError(err instanceof Error ? err.message : 'Model call failed');
@@ -190,6 +197,60 @@ export class ClaudeVertexProfileAssistant implements ProfileAssistant {
     if (!parsed.success) throw new AssistantUnavailableError('Structured output failed validation');
     return sanitizeExtraction(parsed.data, allowed);
   }
+}
+
+// ───────────────────────── Gemini on Vertex (owner, 13 Nov 2026: QA has no Claude quota) ─────────────────────────
+
+/**
+ * Gemini on Vertex (PROFILE_MODEL=gemini:<model>). Same system prompt, user turn and validation as Claude; the output
+ * schema travels in the prompt (JSON mode). Any failure is AssistantUnavailableError, so the candidate keeps the
+ * "retry or use the form" path and nothing is decided by the model.
+ */
+export class GeminiVertexProfileAssistant implements ProfileAssistant {
+  readonly modelVersion: string;
+  private readonly drafter: Pick<GeminiVertexContentDrafter, 'complete'>;
+
+  constructor(model: string, opts: ConstructorParameters<typeof GeminiVertexContentDrafter>[1] & { drafter?: Pick<GeminiVertexContentDrafter, 'complete'> }) {
+    this.modelVersion = `gemini:${model}`;
+    this.drafter = opts.drafter ?? new GeminiVertexContentDrafter(model, opts);
+  }
+
+  async extract(input: ExtractionInput): Promise<ExtractionResult> {
+    const allowed = [...new Set(input.allowedFields)];
+    const system = `${SYSTEM}\n\nAnswer with one JSON object only, matching this JSON schema exactly:\n${JSON.stringify(EXTRACTION_SCHEMA(allowed))}`;
+    let text: string;
+    try {
+      // Thinking counts against maxOutputTokens: room for thinking plus the JSON answer.
+      text = (await this.drafter.complete({ purpose: 'propose_field', system, user: userPrompt(input, allowed), maxOutputTokens: 16000 })).text;
+    } catch (err) {
+      throw new AssistantUnavailableError(err instanceof Error ? err.message : 'Model call failed');
+    }
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw new AssistantUnavailableError('No structured output returned');
+    }
+    const parsed = ExtractionResult.safeParse(json);
+    if (!parsed.success) throw new AssistantUnavailableError('Structured output failed validation');
+    return sanitizeExtraction(parsed.data, allowed);
+  }
+}
+
+/**
+ * The SME profile assistant's model: PROFILE_MODEL (`gemini:<model>`, `claude:<model>` or a Claude id). Empty follows
+ * a Gemini AUTHORING_MODEL (QA), otherwise Claude Opus as before.
+ */
+export function profileModel(config: { PROFILE_MODEL: string; AUTHORING_MODEL: string }): string {
+  return config.PROFILE_MODEL || (config.AUTHORING_MODEL.startsWith('gemini:') ? config.AUTHORING_MODEL : ClaudeVertexProfileAssistant.MODEL);
+}
+
+/** `claudeClient` lets tests avoid the real Vertex client, which starts a credential lookup when created. */
+export function vertexProfileAssistant(setting: string, opts: { projectId: string; location: string; claudeClient?: Pick<AnthropicVertex, 'messages'> }): ProfileAssistant {
+  const [prefix, ...rest] = setting.split(':');
+  if (rest.length && prefix === 'gemini') return new GeminiVertexProfileAssistant(rest.join(':'), { projectId: opts.projectId, location: opts.location });
+  const model = rest.length && prefix === 'claude' ? rest.join(':') : setting;
+  return new ClaudeVertexProfileAssistant({ projectId: opts.projectId, region: opts.location, model, client: opts.claudeClient });
 }
 
 // ───────────────────────── Local dev mock (never used in production) ─────────────────────────

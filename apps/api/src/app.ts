@@ -28,7 +28,7 @@ import { healthRoutes } from './routes/health';
 import { jobDescriptionRoutes } from './routes/job-descriptions';
 import { GoogleIdTokenVerifier, MockGoogleVerifier, type GoogleVerifier } from './candidate/google';
 import { MockIdentityProvider, StripeIdentityProvider, type IdentityProvider } from './candidate/identity-provider';
-import { ClaudeVertexProfileAssistant, MockProfileAssistant, type ProfileAssistant } from './candidate/profile-assistant';
+import { MockProfileAssistant, profileModel, vertexProfileAssistant, type ProfileAssistant } from './candidate/profile-assistant';
 import { MockSuitabilityEvaluator, vertexSuitabilityEvaluator, type SuitabilityEvaluator } from './candidate/suitability';
 import { GcsStorage, stubScanner, type MalwareScanner, type ObjectStorage } from './candidate/storage';
 import { defaultAdapters, type Adapters } from './policy/extraction/service';
@@ -109,7 +109,7 @@ export interface AppDeps {
   identity?: IdentityProvider;
   /** The single v1 client candidates sign up under. Defaults to SEED_CLIENT_NAME, else the oldest client. */
   resolveClientId?: () => Promise<string>;
-  /** SME profile assistant: Claude on Vertex when configured, otherwise the local mock. */
+  /** SME profile assistant: PROFILE_MODEL on Vertex (Claude or Gemini) when configured, otherwise the local mock. */
   assistant?: ProfileAssistant;
   /** Evidence storage (GCS; the emulator locally) and malware scanning (stub in v1). */
   storage?: ObjectStorage;
@@ -171,7 +171,7 @@ export function defaultEmbeddings(config: Config): EmbeddingProvider {
 
 export function defaultAssistant(config: Config): ProfileAssistant {
   return config.assistantMode === 'vertex'
-    ? new ClaudeVertexProfileAssistant({ projectId: config.VERTEX_PROJECT_ID, region: config.VERTEX_LOCATION })
+    ? vertexProfileAssistant(profileModel(config), { projectId: config.VERTEX_PROJECT_ID, location: config.VERTEX_LOCATION })
     : new MockProfileAssistant();
 }
 

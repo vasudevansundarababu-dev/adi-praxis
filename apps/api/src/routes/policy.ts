@@ -14,7 +14,8 @@ import { addDocumentVersion, loadVersionText } from '../policy/documents';
 import { startBatch, spentUsd, type Adapters } from '../policy/extraction/service';
 import { ensureProfiles } from '../policy/profiles';
 import { previewRuleSet, publishRuleSet } from '../policy/rule-sets';
-import { createRuleFromCandidate, currentVersions, editRule, markExcluded, markReviewed, reviewProblems, ruleVersionFull, type CitationEdit } from '../policy/rules';
+import { RuleAssistantUnavailableError, type PolicyRuleAssistant, type SuggestRule } from '../policy/rule-assistant';
+import { contentHash, createRuleFromCandidate, currentVersions, definitionProblems, editRule, evidenceProblems, markExcluded, markReviewed, reviewProblems, ruleVersionFull, setApplied, type CitationEdit } from '../policy/rules';
 import { addChange, effectivePolicy, removeChange, sidecar, snapshotTask } from '../policy/task-policy';
 
 const ProjectParams = z.object({ projectId: z.string().uuid() });
@@ -39,13 +40,24 @@ const ExcludeBody = z.object({ expectedContentHash: z.string().length(64), reaso
 const PublishBody = z.object({ expectedLatestVersion: z.number().int().positive().nullable() });
 const ProfileSetting = z.object({ profileId: z.string().max(100) });
 const ProfilePatch = z.object({ enabled: z.boolean() });
+const ApplyBody = z.object({ applied: z.boolean(), expectedContentHash: z.string().length(64), acceptUnverifiedEvidence: z.boolean().optional(), required: z.boolean().optional() });
+const DefineBody = z.object({ expectedContentHash: z.string().length(64) });
+const SuggestBody = z.object({ documentId: z.string().uuid(), prompt: z.string().trim().min(1).max(4000) });
+const AI_ACTIONS = ['policy.rule_suggestions_requested', 'policy.rule_ai_defined'];
 
 function versionDto(v: { id: string; version: number; sha256: string; fileName: string; format: string; mediaType: string; sizeBytes: number; pageCount: number; pageCountMethod: string; locatorGranularity: string; origin: string; createdAt: Date }) {
   return { id: v.id, version: v.version, sha256: v.sha256, fileName: v.fileName, format: v.format, mediaType: v.mediaType, sizeBytes: v.sizeBytes, pageCount: v.pageCount, pageCountMethod: v.pageCountMethod, locatorGranularity: v.locatorGranularity, origin: v.origin, createdAt: v.createdAt };
 }
 
+function scopeText(b: PolicyRuleBody) {
+  const a = b.applicability;
+  if (a.universal) return 'everywhere in the project';
+  return [a.actors.join(', '), a.actions.join(', '), a.entities.join(', '), a.channels.join(', '), a.locales.join(', '), a.jurisdictions.join(', '), a.conditionText ?? ''].filter(Boolean).join('; ');
+}
+
 function ruleDto(r: Awaited<ReturnType<typeof currentVersions>>[number]) {
   const b = PolicyRuleBody.parse(r.version.body);
+  const evidence = r.version.citations.find((c) => c.fieldPath === 'requirement') ?? r.version.citations[0];
   return {
     ruleId: r.rule.id,
     ruleKey: r.rule.ruleKey,
@@ -58,6 +70,12 @@ function ruleDto(r: Awaited<ReturnType<typeof currentVersions>>[number]) {
     title: b.title,
     requirementType: b.requirementType,
     uncertainty: b.uncertainty,
+    requirement: b.requirement,
+    applied: r.version.state === 'REVIEWED',
+    documentIds: [...new Set(r.version.citations.map((c) => c.documentVersion.documentId))],
+    evidence: evidence ? { quote: evidence.quote.slice(0, 600), resolution: evidence.resolution, document: evidence.documentVersion.document.title, documentVersion: evidence.documentVersion.version, locator: evidence.locator } : null,
+    definitionProblems: definitionProblems(r.version.body),
+    evidenceProblems: evidenceProblems(r.version),
     sources: r.version.citations.map((c) => ({ document: c.documentVersion.document.title, documentVersion: c.documentVersion.version, locator: c.locator, resolution: c.resolution })),
   };
 }
@@ -66,7 +84,7 @@ function ruleDto(r: Awaited<ReturnType<typeof currentVersions>>[number]) {
  * Policy Rules (docs/prd/PRD-POLICY-RULES.md, docs/architecture/ARCH-POLICY-RULES.md). Owning PM and Admin only;
  * every change goes through runCommand (idempotency, audit, outbox in one transaction).
  */
-export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; storage: ObjectStorage; scanner: MalwareScanner; adapters: Adapters }> = async (app, { db, config, storage, scanner, adapters }) => {
+export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; storage: ObjectStorage; scanner: MalwareScanner; adapters: Adapters; assistant: PolicyRuleAssistant }> = async (app, { db, config, storage, scanner, adapters, assistant }) => {
   const policy = config.policy;
   const loadText = (v: { textStorageKey: string }) => loadVersionText(storage, v);
 
@@ -153,7 +171,7 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
         parentBatchId: b.parentBatchId,
         createdAt: b.createdAt,
         finishedAt: b.finishedAt,
-        jobs: b.jobs.map((j) => ({ id: j.id, status: j.status, provider: j.provider, documentVersionId: j.documentVersionId, document: j.documentVersion.document.title, documentVersion: j.documentVersion.version, candidateCount: j.candidateCount, error: j.error, finishedAt: j.finishedAt, ...(isAdmin(actor) ? { estimatedUsd: Number(j.estimatedUsd), actualUsd: j.actualUsd === null ? null : Number(j.actualUsd) } : {}) })),
+        jobs: b.jobs.map((j) => ({ id: j.id, status: j.status, provider: j.provider, documentVersionId: j.documentVersionId, document: j.documentVersion.document.title, documentVersion: j.documentVersion.version, candidateCount: j.candidateCount, error: j.error, createdAt: j.createdAt, startedAt: j.startedAt, finishedAt: j.finishedAt, submitted: j.providerOperationId !== null, ...(isAdmin(actor) ? { estimatedUsd: Number(j.estimatedUsd), actualUsd: j.actualUsd === null ? null : Number(j.actualUsd) } : {}) })),
       })),
     };
   });
@@ -201,28 +219,137 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
     return { items: items.map(ruleDto) };
   });
 
-  app.get('/projects/:projectId/policy/rule-versions/:versionId', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ versionId: z.string().uuid() }) } }, async (req) => {
-    const p = await policyProject(db, req.actor!, req.params.projectId);
-    const v = await ruleVersionFull(db, req.actor!.clientId, req.params.versionId);
-    if (v.rule.projectId !== p.id) throw notFound('Rule version not found');
-    const history = await db.policyRuleVersion.findMany({ where: { ruleId: v.ruleId }, orderBy: { version: 'desc' }, select: { id: true, version: true, state: true, reviewedAt: true, createdAt: true } });
+  async function ruleDetail(projectId: string, clientId: string, versionId: string) {
+    const v = await ruleVersionFull(db, clientId, versionId);
+    if (v.rule.projectId !== projectId) throw notFound('Rule version not found');
+    const history = await db.policyRuleVersion.findMany({ where: { ruleId: v.ruleId }, orderBy: { version: 'desc' }, select: { id: true, version: true, state: true, origin: true, reviewedAt: true, createdAt: true } });
     return {
       ruleId: v.ruleId,
       ruleKey: v.rule.ruleKey,
       required: v.rule.required,
       versionId: v.id,
       version: v.version,
+      latest: history[0]?.id === v.id,
       state: v.state,
+      applied: v.state === 'REVIEWED',
       contentHash: v.contentHash,
       body: v.body,
       excludeReason: v.excludeReason,
       reviewedById: v.reviewedById,
       reviewedAt: v.reviewedAt,
       origin: v.origin,
+      createdAt: v.createdAt,
+      updatedAt: v.updatedAt,
       problems: v.state === 'REVIEWED' || v.state === 'EXCLUDED' ? [] : reviewProblems(v),
-      citations: v.citations.map((c) => ({ id: c.id, fieldPath: c.fieldPath, role: c.role, quote: c.quote, locator: c.locator, resolution: c.resolution, documentVersionId: c.documentVersionId, document: c.documentVersion.document.title, documentVersion: c.documentVersion.version, sha256: c.documentVersion.sha256, format: c.documentVersion.format })),
+      definitionProblems: definitionProblems(v.body),
+      evidenceProblems: evidenceProblems(v),
+      citations: v.citations.map((c) => ({ id: c.id, fieldPath: c.fieldPath, role: c.role, quote: c.quote, locator: c.locator, resolution: c.resolution, documentVersionId: c.documentVersionId, documentId: c.documentVersion.documentId, document: c.documentVersion.document.title, documentVersion: c.documentVersion.version, sha256: c.documentVersion.sha256, format: c.documentVersion.format })),
       history,
     };
+  }
+
+  app.get('/projects/:projectId/policy/rule-versions/:versionId', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ versionId: z.string().uuid() }) } }, async (req) => {
+    const p = await policyProject(db, req.actor!, req.params.projectId);
+    return ruleDetail(p.id, req.actor!.clientId, req.params.versionId);
+  });
+
+  /** The rule page (PR-M07): the rule's current version with every field, its evidence and history. */
+  app.get('/projects/:projectId/policy/rules/:ruleId', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ ruleId: z.string().uuid() }) } }, async (req) => {
+    const p = await policyProject(db, req.actor!, req.params.projectId);
+    const v = await db.policyRuleVersion.findFirst({ where: { ruleId: req.params.ruleId, clientId: req.actor!.clientId, rule: { projectId: p.id } }, orderBy: { version: 'desc' }, select: { id: true } });
+    if (!v) throw notFound('Rule not found');
+    return ruleDetail(p.id, req.actor!.clientId, v.id);
+  });
+
+  /** Apply to project (PR-M04): a PM or Admin ticking the box is the review. Never done by AI. */
+  app.put('/projects/:projectId/policy/rules/:ruleId/applied', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ ruleId: z.string().uuid() }), body: ApplyBody } }, async (req, reply) => {
+    await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+      const p = await policyProject(tx, actor, req.params.projectId);
+      const r = await setApplied(tx, { clientId: actor.clientId, projectId: p.id, ruleId: req.params.ruleId, actorId: actor.userId, roles: actor.roles, applied: req.body.applied, expectedContentHash: req.body.expectedContentHash, acceptUnverifiedEvidence: req.body.acceptUnverifiedEvidence, required: req.body.required }, audit);
+      if (!r.changed) await audit({ entityType: 'PolicyRuleVersion', entityId: r.version.id, action: 'policy.rule_apply_unchanged', after: { applied: req.body.applied } });
+      return { status: 200, body: { applied: r.version.state === 'REVIEWED', changed: r.changed, versionId: r.version.id, version: r.version.version, state: r.version.state, contentHash: r.version.contentHash, warnings: r.warnings } };
+    });
+    return reply;
+  });
+
+  async function checkAiCap(clientId: string) {
+    const since = new Date();
+    since.setUTCHours(0, 0, 0, 0);
+    const used = await db.auditEvent.count({ where: { clientId, action: { in: AI_ACTIONS }, createdAt: { gte: since } } });
+    if (used >= config.POLICY_AI_DAILY_CALL_CAP) throw new AppError(429, 'MODEL_DAILY_CAP', 'The policy assistant has reached today’s usage limit. You can still tick rules and edit them by hand.');
+  }
+  const unavailable = (e: unknown): never => {
+    if (e instanceof RuleAssistantUnavailableError) throw new AppError(503, 'ASSISTANT_UNAVAILABLE', `The policy assistant is not available right now (${e.message}). Nothing was changed; try again or edit by hand.`);
+    throw e;
+  };
+
+  /**
+   * Prompt-guided selection (PR-M02): the AI suggests which of the document's rules match the PM's criteria, with a
+   * reason each. Suggestions are returned and audited, never stored as rule state; the PM ticks Apply to project.
+   * The model is called outside the database transaction.
+   */
+  app.post('/projects/:projectId/policy/rule-suggestions', { config: { access: POLICY_ACCESS, rateLimit: perSession(20) }, schema: { tags: ['policy'], params: ProjectParams, body: SuggestBody } }, async (req, reply) => {
+    const actor = req.actor!;
+    const p = await policyProject(db, actor, req.params.projectId);
+    const doc = await db.policyDocument.findFirst({ where: { id: req.body.documentId, projectId: p.id } });
+    if (!doc) throw notFound('Document not found');
+    await checkAiCap(actor.clientId);
+    const rules = (await currentVersions(db, actor.clientId, p.id)).filter((r) => r.version.citations.some((c) => c.documentVersion.documentId === doc.id));
+    const input: SuggestRule[] = rules.map((r) => {
+      const b = PolicyRuleBody.parse(r.version.body);
+      return { ruleKey: r.rule.ruleKey, title: b.title, requirement: b.requirement, required: r.rule.required, scope: scopeText(b) };
+    });
+    const items = input.length ? await assistant.suggest(req.body.prompt, input).catch(unavailable) : [];
+    const byKey = new Map(rules.map((r) => [r.rule.ruleKey, r.rule.id]));
+    await runCommand(db, req, reply, async ({ audit }) => {
+      await audit({ entityType: 'PolicyDocument', entityId: doc.id, action: 'policy.rule_suggestions_requested', after: { model: assistant.modelVersion, prompt: req.body.prompt, rules: items.length, suggested: items.filter((i) => i.match).map((i) => i.ruleKey) } });
+      return { status: 200, body: { model: assistant.modelVersion, documentId: doc.id, items: items.map((i) => ({ ...i, ruleId: byKey.get(i.ruleKey) ?? null })) } };
+    });
+    return reply;
+  });
+
+  /**
+   * Define with AI (PR-M06): the AI drafts the canonical rule fields from the policy text, quoting the source. Saved as
+   * an ordinary draft edit (quotes re-verified by Praxis); never Reviewed or applied by the AI.
+   */
+  app.post('/projects/:projectId/policy/rules/:ruleId/define', { config: { access: POLICY_ACCESS, rateLimit: perSession(120) }, schema: { tags: ['policy'], params: ProjectParams.extend({ ruleId: z.string().uuid() }), body: DefineBody } }, async (req, reply) => {
+    const actor = req.actor!;
+    const p = await policyProject(db, actor, req.params.projectId);
+    const latest = await db.policyRuleVersion.findFirst({ where: { ruleId: req.params.ruleId, clientId: actor.clientId, rule: { projectId: p.id } }, orderBy: { version: 'desc' }, select: { id: true } });
+    if (!latest) throw notFound('Rule not found');
+    const v = await ruleVersionFull(db, actor.clientId, latest.id);
+    if (v.contentHash !== req.body.expectedContentHash) throw new AppError(409, 'CONFLICT', 'This rule changed since you opened it. Reload to see the latest version.');
+    if (v.state === 'REVIEWED') throw new AppError(409, 'APPLIED', 'This rule is applied to the project. Untick Apply to project before redefining it.');
+    const dv = v.citations[0]?.documentVersion ?? (v.extractionJobId ? (await db.extractionJob.findUnique({ where: { id: v.extractionJobId }, include: { documentVersion: { include: { document: true } } } }))?.documentVersion : null);
+    if (!dv) throw new AppError(422, 'NO_SOURCE', 'This rule has no source document to define it from. Add a quote first.');
+    await checkAiCap(actor.clientId);
+    const text = (await loadText(dv)).text;
+    const body = PolicyRuleBody.parse(v.body);
+    const def = await assistant.define({ ruleKey: v.rule.ruleKey, body, quotes: v.citations.map((c) => c.quote), documentText: text }).catch(unavailable);
+    const kept = v.citations.map((c) => ({ documentVersionId: c.documentVersionId, fieldPath: c.fieldPath, role: c.role as CitationEdit['role'], quote: c.quote, section: (c.locator as { section?: string | null })?.section ?? null }));
+    const fieldPath = (f: string) => (f === 'applicability' ? 'applicability.conditionText' : f);
+    const added = def.quotes
+      .map((q) => ({ documentVersionId: dv.id, fieldPath: fieldPath(q.fieldPath), role: (q.fieldPath === 'exceptions' ? 'exception' : 'supports') as CitationEdit['role'], quote: q.quote, section: null }))
+      .filter((q) => !kept.some((k) => k.fieldPath === q.fieldPath && k.quote.trim() === q.quote.trim()));
+    // A verified AI quote replaces an unverified one for the same field; everything else the PM had is kept.
+    const citations = [...kept, ...added].slice(0, 50);
+    const newBody = PolicyRuleBody.parse({ ...def.body, title: def.body.title || body.title });
+    await runCommand(db, req, reply, async ({ tx, actor: a, audit }) => {
+      const out = await editRule(tx, { loadText }, { clientId: a.clientId, projectId: p.id, ruleId: v.ruleId, actorId: a.userId, expectedContentHash: v.contentHash, body: newBody, citations }, audit);
+      const full = await ruleVersionFull(tx, a.clientId, out.id);
+      // Drop AI-added quotes that Praxis could not find in the document, so only verified AI evidence is kept.
+      const badAdded = full.citations.filter((c) => c.resolution !== 'RESOLVED' && added.some((x) => x.fieldPath === c.fieldPath && x.quote.trim() === c.quote.trim()) && !kept.some((k) => k.quote.trim() === c.quote.trim()));
+      let final = out;
+      if (badAdded.length) {
+        await tx.policyCitation.deleteMany({ where: { id: { in: badAdded.map((c) => c.id) } } });
+        const left = full.citations.filter((c) => !badAdded.some((b) => b.id === c.id));
+        final = await tx.policyRuleVersion.update({ where: { id: out.id }, data: { contentHash: contentHash(newBody, left.map((c) => ({ documentVersionId: c.documentVersionId, fieldPath: c.fieldPath, quote: c.quote }))) } });
+      }
+      const after = await ruleVersionFull(tx, a.clientId, final.id);
+      await audit({ entityType: 'PolicyRuleVersion', entityId: final.id, action: 'policy.rule_ai_defined', after: { model: assistant.modelVersion, ruleKey: v.rule.ruleKey, quotesAdded: added.length - badAdded.length, quotesRejected: badAdded.length, definitionProblems: definitionProblems(after.body) } });
+      return { status: 200, body: { versionId: final.id, version: final.version, state: final.state, contentHash: final.contentHash, model: assistant.modelVersion, verifiedQuotes: after.citations.filter((c) => c.resolution === 'RESOLVED').length, rejectedQuotes: badAdded.length, definitionProblems: definitionProblems(after.body), evidenceProblems: evidenceProblems(after) } };
+    });
+    return reply;
   });
 
   app.post('/projects/:projectId/policy/rules', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams, body: ManualRule } }, async (req, reply) => {

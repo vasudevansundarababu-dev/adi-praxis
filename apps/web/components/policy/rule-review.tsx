@@ -43,7 +43,7 @@ const list = (v: string) =>
 const RESOLUTION: Record<Citation['resolution'], string> = { RESOLVED: 'Quote found in this version', QUOTE_MISMATCH: 'Quote NOT found in this version — check it', UNRESOLVED: 'Not linked to a location' };
 
 /** Review Rules (S1 R01–R11): source evidence beside the editable rule. Reviewed content is read-only; editing makes a new draft. */
-export function RuleReview({ projectId, versionId }: { projectId: string; versionId: string }) {
+export function RuleReview({ projectId, versionId, editOnly = false }: { projectId: string; versionId: string; editOnly?: boolean }) {
   const router = useRouter();
   const [d, setD] = useState<Detail | null>(null);
   const [body, setBody] = useState<PolicyRuleBody | null>(null);
@@ -217,7 +217,7 @@ export function RuleReview({ projectId, versionId }: { projectId: string; versio
           <button type="button" disabled={!dirty || pending} onClick={save} className="btn btn-secondary disabled:opacity-50">
             {locked ? 'Save as new draft' : 'Save changes'}
           </button>
-          {!locked && (
+          {!locked && !editOnly && (
             <>
               <label className="inline-flex items-center gap-1">
                 <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} /> Required policy
@@ -228,7 +228,7 @@ export function RuleReview({ projectId, versionId }: { projectId: string; versio
             </>
           )}
         </div>
-        {!locked && d.problems.length > 0 && (
+        {!locked && !editOnly && d.problems.length > 0 && (
           <ul className="mt-2 list-disc pl-5 text-xs text-warning" aria-label="Before this rule can be reviewed">
             {d.problems.map((p) => (
               <li key={p}>{p}</li>

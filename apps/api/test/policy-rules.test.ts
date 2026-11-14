@@ -8,6 +8,7 @@ import { MemoryStorage } from '../src/candidate/storage';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { processExtractionJob, type Adapters } from '../src/policy/extraction/service';
 import { ProviderError, type ExtractionAdapter, type ProviderResult } from '../src/policy/extraction/types';
+import { MockRuleAssistant, RuleAssistantUnavailableError, type Definition, type PolicyRuleAssistant } from '../src/policy/rule-assistant';
 import { createClient, createUser, db, idem, login, resetDb, testConfig } from './helpers';
 import { pdfWithText } from './documents';
 
@@ -74,6 +75,7 @@ let adminCookie: string;
 let otherPmCookie: string;
 let projectId: string;
 let taskId: string;
+let ai: PolicyRuleAssistant & { calls: number };
 
 const adapters = (): Adapters => ({ llamaextract: llama, google });
 const worker = (jobId: string) => processExtractionJob({ db, storage, adapters: adapters(), sleep: async () => undefined }, jobId);
@@ -139,7 +141,7 @@ async function extractedRule() {
 
 beforeAll(async () => {
   storage = new MemoryStorage();
-  app = await buildApp({ config: testConfig({ POLICY_BUDGET_LLAMA_USD: '20', POLICY_BUDGET_GOOGLE_USD: '30' }), db, pingRedis: async () => true, selectionGate: stubSelectionGate, storage, policyAdapters: { get llamaextract() { return llama; }, get google() { return google; } } as Adapters });
+  app = await buildApp({ config: testConfig({ POLICY_BUDGET_LLAMA_USD: '20', POLICY_BUDGET_GOOGLE_USD: '30' }), db, pingRedis: async () => true, selectionGate: stubSelectionGate, storage, policyAdapters: { get llamaextract() { return llama; }, get google() { return google; } } as Adapters, ruleAssistant: { get modelVersion() { return ai.modelVersion; }, suggest: (p, r) => ai.suggest(p, r), define: (i) => ai.define(i) } });
 });
 afterAll(async () => {
   await app.close();
@@ -149,6 +151,7 @@ beforeEach(async () => {
   storage.objects.clear();
   llama = new FakeProvider('llamaextract');
   google = new FakeProvider('google');
+  ai = Object.assign(new MockRuleAssistant(), { calls: 0 });
   await fixture();
 });
 
@@ -454,5 +457,217 @@ describe('task changes and snapshots (AC09–AC12, AC16)', () => {
     expect(exp.json()).toMatchObject({ schema_version: 'praxis.anvil.policy.v1-proposed', task_id: taskId, digest: a.json().digest });
     expect(exp.body).not.toMatch(/api[_-]?key|password|secret/i);
     await expect(db.$executeRawUnsafe(`UPDATE "TaskPolicySnapshot" SET digest = 'x' WHERE id = '${a.json().id}'`)).rejects.toThrow();
+  });
+});
+
+const GAPPY = { title: 'Refund handling', requirement: 'Refunds are out of scope.', requirementType: 'unknown', visibility: 'agent_visible', applicability: { universal: false, actors: [], actions: [], entities: [], channels: [], locales: [], jurisdictions: [], conditionText: null }, prerequisites: [], precedence: [], exceptions: { kind: 'unknown', items: [] }, effective: { from: null, to: null, conditionText: null }, evidenceNeeds: [], verificationHint: null, uncertainty: [] };
+
+async function documentId() {
+  return (await api(pmCookie).get(`/projects/${projectId}/policy/documents`)).json().items[0].id as string;
+}
+
+describe('rules table and Apply to project (PRD 5.6, owner 14 Nov 2026)', () => {
+  it('lists each rule with its requirement, evidence, document and applied flag (PR-M01, PR-M03)', async () => {
+    const { rule } = await extractedRule();
+    expect(rule).toMatchObject({ requirement: 'Obtain written manager approval before scheduling a launch event.', applied: false, documentIds: [await documentId()], evidence: { resolution: 'RESOLVED', quote: expect.stringContaining('manager approval') }, definitionProblems: [], evidenceProblems: [] });
+  });
+
+  it('a PM ticking Apply to project is the review: audited with actor and role, idempotent, stale ticks rejected (PR-M04)', async () => {
+    const { rule } = await extractedRule();
+    const url = `/projects/${projectId}/policy/rules/${rule.ruleId}/applied`;
+    const stale = await api(pmCookie).put(url, { applied: true, expectedContentHash: 'f'.repeat(64) });
+    expect(stale.statusCode).toBe(409);
+    const on = await api(pmCookie).put(url, { applied: true, expectedContentHash: rule.contentHash });
+    expect(on.statusCode).toBe(200);
+    expect(on.json()).toMatchObject({ applied: true, changed: true, state: 'REVIEWED', versionId: rule.versionId });
+    const again = await api(pmCookie).put(url, { applied: true, expectedContentHash: rule.contentHash });
+    expect(again.json()).toMatchObject({ applied: true, changed: false });
+    const v = await db.policyRuleVersion.findUniqueOrThrow({ where: { id: rule.versionId } });
+    expect(v.reviewedById).not.toBeNull();
+    const audits = await db.auditEvent.findMany({ where: { action: 'policy.rule_applied' } });
+    expect(audits).toHaveLength(1);
+    expect(audits[0]!.after).toMatchObject({ roles: ['PM'], unverifiedEvidenceAccepted: false, ruleKey: 'R-APPROVAL' });
+    expect(audits[0]!.actorId).toBe(v.reviewedById);
+  });
+
+  it('unticking never changes the Reviewed version: it makes a new draft; ticking again reviews that draft', async () => {
+    const { rule } = await extractedRule();
+    const url = `/projects/${projectId}/policy/rules/${rule.ruleId}/applied`;
+    await api(pmCookie).put(url, { applied: true, expectedContentHash: rule.contentHash });
+    const off = await api(pmCookie).put(url, { applied: false, expectedContentHash: rule.contentHash });
+    expect(off.json()).toMatchObject({ applied: false, changed: true, state: 'DRAFT', version: 2 });
+    const reviewed = await db.policyRuleVersion.findUniqueOrThrow({ where: { id: rule.versionId } });
+    expect(reviewed.state).toBe('REVIEWED');
+    const draft = await db.policyRuleVersion.findUniqueOrThrow({ where: { id: off.json().versionId }, include: { citations: true } });
+    expect(draft.contentHash).toBe(rule.contentHash);
+    expect(draft.citations).toHaveLength(1);
+    expect(await db.auditEvent.count({ where: { action: 'policy.rule_unapplied' } })).toBe(1);
+    const on = await api(pmCookie).put(url, { applied: true, expectedContentHash: rule.contentHash });
+    expect(on.json()).toMatchObject({ applied: true, version: 2 });
+  });
+
+  it('an unverified quote needs the PM to confirm; the confirmation is audited and kept in the published set (PR-M05)', async () => {
+    await enableDefaultProfile();
+    llama.mode = 'bad-quote';
+    const versionId = await uploadedVersion();
+    const r = await api(pmCookie).post(`/projects/${projectId}/policy/extraction`, { documentVersionIds: [versionId] });
+    await worker(r.json().jobs[0].id);
+    const rule = (await api(pmCookie).get(`/projects/${projectId}/policy/rules`)).json().items[0];
+    expect(rule.evidence.resolution).toBe('QUOTE_MISMATCH');
+    expect(rule.evidenceProblems.length).toBeGreaterThan(0);
+    const url = `/projects/${projectId}/policy/rules/${rule.ruleId}/applied`;
+    const refused = await api(pmCookie).put(url, { applied: true, expectedContentHash: rule.contentHash });
+    expect(refused.statusCode).toBe(422);
+    expect(refused.json().error).toBe('EVIDENCE_UNVERIFIED');
+    const ok = await api(pmCookie).put(url, { applied: true, expectedContentHash: rule.contentHash, acceptUnverifiedEvidence: true });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().warnings.length).toBeGreaterThan(0);
+    const audit = await db.auditEvent.findFirstOrThrow({ where: { action: 'policy.rule_applied' } });
+    expect(audit.after).toMatchObject({ unverifiedEvidenceAccepted: true, evidence: [{ fieldPath: 'requirement', resolution: 'QUOTE_MISMATCH' }] });
+    const pub = await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: null });
+    expect(pub.statusCode).toBe(201);
+    const set = await db.projectRuleSet.findUniqueOrThrow({ where: { id: pub.json().id } });
+    expect((set.content as { rules: Array<{ sources: Array<{ resolution?: string }> }> }).rules[0]!.sources[0]!.resolution).toBe('QUOTE_MISMATCH');
+  });
+
+  it('a rule without requirement text cannot be applied', async () => {
+    const { versionId } = await extractedRule();
+    const m = await api(pmCookie).post(`/projects/${projectId}/policy/rules`, { documentVersionId: versionId, ruleKey: 'EMPTY', body: { ...GAPPY, requirement: '' }, citations: [] });
+    const r = await api(pmCookie).put(`/projects/${projectId}/policy/rules/${m.json().ruleId}/applied`, { applied: true, expectedContentHash: m.json().contentHash, acceptUnverifiedEvidence: true });
+    expect(r.statusCode).toBe(422);
+    expect(r.json().error).toBe('NOT_DEFINED');
+  });
+
+  it('publishes only applied rules; rules not applied do not block and are recorded as Not applied (PR-M08, AC06)', async () => {
+    const { rule, versionId } = await extractedRule();
+    await api(pmCookie).post(`/projects/${projectId}/policy/rules`, { documentVersionId: versionId, ruleKey: 'REFUNDS', body: GAPPY, citations: [{ fieldPath: 'requirement', role: 'supports', quote: 'Refunds are out of scope.' }] });
+    const before = (await api(pmCookie).get(`/projects/${projectId}/policy/rule-set/preview`)).json();
+    expect(before.blocking).toEqual(['No rule is applied to the project yet.']);
+    await api(pmCookie).put(`/projects/${projectId}/policy/rules/${rule.ruleId}/applied`, { applied: true, expectedContentHash: rule.contentHash });
+    const preview = (await api(pmCookie).get(`/projects/${projectId}/policy/rule-set/preview`)).json();
+    expect(preview.blocking).toEqual([]);
+    expect(preview.notApplied).toEqual([{ ruleKey: 'R-REFUNDS', state: 'NEEDS_DEFINITION', required: true }]);
+    expect(preview.excluded).toContainEqual({ ruleKey: 'R-REFUNDS', reason: 'Not applied to this project' });
+    const pub = await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: null });
+    expect(pub.statusCode).toBe(201);
+    const set = await db.projectRuleSet.findUniqueOrThrow({ where: { id: pub.json().id } });
+    expect(set.ruleVersionIds).toEqual([rule.versionId]);
+  });
+
+  it('an applied rule that is still incomplete blocks publication until it is defined', async () => {
+    const { versionId } = await extractedRule();
+    const m = (await api(pmCookie).post(`/projects/${projectId}/policy/rules`, { documentVersionId: versionId, ruleKey: 'REFUNDS', body: GAPPY, citations: [{ fieldPath: 'requirement', role: 'supports', quote: 'Refunds are out of scope.' }] })).json();
+    const ok = await api(pmCookie).put(`/projects/${projectId}/policy/rules/${m.ruleId}/applied`, { applied: true, expectedContentHash: m.contentHash });
+    expect(ok.json().warnings.length).toBeGreaterThan(0);
+    const preview = (await api(pmCookie).get(`/projects/${projectId}/policy/rule-set/preview`)).json();
+    expect(preview.blocking.join(' ')).toContain('R-REFUNDS is applied but incomplete');
+    expect((await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: null })).statusCode).toBe(422);
+  });
+
+  it('a conflict blocks only when it involves an applied rule', async () => {
+    const { versionId } = await extractedRule();
+    const make = (requirement: string) => api(pmCookie).post(`/projects/${projectId}/policy/rules`, { documentVersionId: versionId, ruleKey: 'REFUNDS', body: { ...GAPPY, requirement, requirementType: 'prohibition', applicability: { ...GAPPY.applicability, universal: true }, effective: { from: null, to: null, conditionText: 'always' } }, citations: [{ fieldPath: 'requirement', role: 'supports', quote: 'Refunds are out of scope.' }] });
+    const a = (await make('Do not process refunds.')).json();
+    await make('Refunds may be processed by agents.');
+    const rules = (await api(pmCookie).get(`/projects/${projectId}/policy/rules`)).json().items;
+    const approval = rules.find((r: { ruleKey: string }) => r.ruleKey === 'R-APPROVAL');
+    await api(pmCookie).put(`/projects/${projectId}/policy/rules/${approval.ruleId}/applied`, { applied: true, expectedContentHash: approval.contentHash });
+    const p1 = (await api(pmCookie).get(`/projects/${projectId}/policy/rule-set/preview`)).json();
+    expect(p1.conflicts.map((c: { kind: string }) => c.kind)).toContain('same_rule_id_different_content');
+    expect(p1.blocking).toEqual([]);
+    await api(pmCookie).put(`/projects/${projectId}/policy/rules/${a.ruleId}/applied`, { applied: true, expectedContentHash: a.contentHash });
+    const p2 = (await api(pmCookie).get(`/projects/${projectId}/policy/rule-set/preview`)).json();
+    expect(p2.blocking.join(' ')).toContain('appears in more than one source');
+  });
+
+  it('another PM cannot tick a rule in a project they do not own', async () => {
+    const { rule } = await extractedRule();
+    const r = await api(otherPmCookie).put(`/projects/${projectId}/policy/rules/${rule.ruleId}/applied`, { applied: true, expectedContentHash: rule.contentHash });
+    expect(r.statusCode).toBe(404);
+    expect((await db.policyRuleVersion.findUniqueOrThrow({ where: { id: rule.versionId } })).state).toBe('DRAFT');
+  });
+
+  it('the rule page returns every field, evidence and history for the current version (PR-M07)', async () => {
+    const { rule } = await extractedRule();
+    const d = (await api(pmCookie).get(`/projects/${projectId}/policy/rules/${rule.ruleId}`)).json();
+    expect(d).toMatchObject({ ruleKey: 'R-APPROVAL', latest: true, applied: false, body: { requirementType: 'obligation', applicability: { actors: ['agent'] }, effective: { from: '2026-01-01' } }, citations: [{ resolution: 'RESOLVED', document: 'Launch policy' }], history: [{ version: 1 }] });
+    expect((await api(otherPmCookie).get(`/projects/${projectId}/policy/rules/${rule.ruleId}`)).statusCode).toBe(404);
+  });
+});
+
+describe('AI suggestions and definitions only suggest (PR-M02, PR-M06, PR-M09)', () => {
+  it('suggests matching rules of the chosen document with a reason each, audits the run and changes no rule', async () => {
+    const { versionId } = await extractedRule();
+    await api(pmCookie).post(`/projects/${projectId}/policy/rules`, { documentVersionId: versionId, ruleKey: 'REFUNDS', body: GAPPY, citations: [{ fieldPath: 'requirement', role: 'supports', quote: 'Refunds are out of scope.' }] });
+    const before = await db.policyRuleVersion.findMany({ orderBy: { id: 'asc' }, select: { id: true, state: true, contentHash: true } });
+    const r = await api(pmCookie).post(`/projects/${projectId}/policy/rule-suggestions`, { documentId: await documentId(), prompt: 'Tasks that schedule a launch event need approval.' });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().model).toBe('mock-policy-1');
+    const items = r.json().items as Array<{ ruleKey: string; match: boolean; reason: string; ruleId: string }>;
+    expect(items.find((i) => i.ruleKey === 'R-APPROVAL')).toMatchObject({ match: true, reason: expect.stringContaining('launch') });
+    expect(items.find((i) => i.ruleKey === 'R-REFUNDS')).toMatchObject({ match: false });
+    expect(items.every((i) => i.ruleId)).toBe(true);
+    expect(await db.policyRuleVersion.findMany({ orderBy: { id: 'asc' }, select: { id: true, state: true, contentHash: true } })).toEqual(before);
+    const audit = await db.auditEvent.findFirstOrThrow({ where: { action: 'policy.rule_suggestions_requested' } });
+    expect(audit.after).toMatchObject({ model: 'mock-policy-1', prompt: 'Tasks that schedule a launch event need approval.', suggested: ['R-APPROVAL'] });
+  });
+
+  it('only rules from the chosen document are sent; a document of another project is 404', async () => {
+    await extractedRule();
+    const other = await upload(pmCookie, { name: 'other.txt', type: 'text/plain', data: Buffer.from('A different policy about refunds and returns handling.') }, { title: 'Other policy' });
+    const r = await api(pmCookie).post(`/projects/${projectId}/policy/rule-suggestions`, { documentId: other.json().documentId, prompt: 'launch approval' });
+    expect(r.json().items).toEqual([]);
+    const missing = await api(pmCookie).post(`/projects/${projectId}/policy/rule-suggestions`, { documentId: randomUUID(), prompt: 'launch approval' });
+    expect(missing.statusCode).toBe(404);
+  });
+
+  it('Define with AI fills the definition as a draft, keeps only quotes found in the source, and never applies the rule', async () => {
+    const { versionId } = await extractedRule();
+    const m = (await api(pmCookie).post(`/projects/${projectId}/policy/rules`, { documentVersionId: versionId, ruleKey: 'REFUNDS', body: GAPPY, citations: [{ fieldPath: 'requirement', role: 'supports', quote: 'Refunds are out of scope.' }] })).json();
+    expect(m.state).toBe('NEEDS_DEFINITION');
+    const real = ai;
+    ai = Object.assign(Object.create(real), {
+      calls: 0,
+      define: async (i: Parameters<PolicyRuleAssistant['define']>[0]): Promise<Definition> => {
+        const d = await real.define(i);
+        return { body: { ...d.body, requirementType: 'prohibition' }, quotes: [...d.quotes, { fieldPath: 'exceptions', quote: 'This quote is invented and not in the document.' }] };
+      },
+    });
+    const r = await api(pmCookie).post(`/projects/${projectId}/policy/rules/${m.ruleId}/define`, { expectedContentHash: m.contentHash });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toMatchObject({ state: 'DRAFT', model: 'mock-policy-1', rejectedQuotes: 1, definitionProblems: [], evidenceProblems: [] });
+    const d = (await api(pmCookie).get(`/projects/${projectId}/policy/rules/${m.ruleId}`)).json();
+    expect(d.body).toMatchObject({ requirementType: 'prohibition', effective: { conditionText: 'always' } });
+    expect(d.citations.every((c: { resolution: string }) => c.resolution === 'RESOLVED')).toBe(true);
+    expect(d.contentHash).toBe(r.json().contentHash);
+    expect(d.applied).toBe(false);
+    expect(await db.auditEvent.count({ where: { action: 'policy.rule_ai_defined' } })).toBe(1);
+    expect(await db.auditEvent.count({ where: { action: { in: ['policy.rule_applied', 'policy.rule_reviewed'] } } })).toBe(0);
+    // The PM can now tick it with no further step.
+    const ok = await api(pmCookie).put(`/projects/${projectId}/policy/rules/${m.ruleId}/applied`, { applied: true, expectedContentHash: d.contentHash });
+    expect(ok.json()).toMatchObject({ applied: true, warnings: [] });
+  });
+
+  it('refuses to redefine an applied rule, and a stale definition request', async () => {
+    const { rule } = await extractedRule();
+    const stale = await api(pmCookie).post(`/projects/${projectId}/policy/rules/${rule.ruleId}/define`, { expectedContentHash: 'f'.repeat(64) });
+    expect(stale.statusCode).toBe(409);
+    await api(pmCookie).put(`/projects/${projectId}/policy/rules/${rule.ruleId}/applied`, { applied: true, expectedContentHash: rule.contentHash });
+    const r = await api(pmCookie).post(`/projects/${projectId}/policy/rules/${rule.ruleId}/define`, { expectedContentHash: rule.contentHash });
+    expect(r.statusCode).toBe(409);
+    expect(r.json().error).toBe('APPLIED');
+  });
+
+  it('an unavailable model changes nothing and says so; the daily cap is enforced', async () => {
+    const { rule } = await extractedRule();
+    ai = Object.assign(new MockRuleAssistant(), { calls: 0, define: async () => { throw new RuleAssistantUnavailableError('quota'); }, suggest: async () => { throw new RuleAssistantUnavailableError('quota'); } });
+    const r = await api(pmCookie).post(`/projects/${projectId}/policy/rules/${rule.ruleId}/define`, { expectedContentHash: rule.contentHash });
+    expect(r.statusCode).toBe(503);
+    expect((await db.policyRuleVersion.findUniqueOrThrow({ where: { id: rule.versionId } })).contentHash).toBe(rule.contentHash);
+    const s = await api(pmCookie).post(`/projects/${projectId}/policy/rule-suggestions`, { documentId: await documentId(), prompt: 'launch' });
+    expect(s.statusCode).toBe(503);
+    await db.auditEvent.createMany({ data: Array.from({ length: 1000 }, () => ({ clientId, actorType: 'USER' as const, entityType: 'PolicyDocument', entityId: randomUUID(), action: 'policy.rule_suggestions_requested' })) });
+    const capped = await api(pmCookie).post(`/projects/${projectId}/policy/rule-suggestions`, { documentId: await documentId(), prompt: 'launch' });
+    expect(capped.statusCode).toBe(429);
   });
 });

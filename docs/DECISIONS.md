@@ -1081,3 +1081,23 @@ Review of the Golden Task2 Marketing handoff v1.1; details in `docs/authoring/MA
   is not possible, because PMs are offered only the newest version of each workflow.
 - **Deploy:** `praxis-qa-smoke` Cloud Run job, deployed but never run by `deploy-demo.sh` (same secrets as
   `praxis-qa-users`, no retries, 1 hour timeout). Runbook: `docs/ops/QA-ENV-SETUP.md` section 7.
+
+## Policy rules page: live extraction progress, rules table and "Apply to project" (14 Nov 2026)
+
+Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirements are in `docs/prd/PRD-POLICY-RULES.md` section 5.6.
+
+- **(owner)** "Since the Project is authored by admin or PM its automatically means reviewed. No need for extra approval." and "No further review required. This screen is done by Admin or PM."
+  - Ticking **Apply to project** (PM or Admin) *is* the human review: the rule's current version becomes Reviewed, with the actor recorded and an audit entry (`policy.rule_applied`). There is no separate approval step.
+  - The box is ticked exactly when the current version is Reviewed, so no new column is needed.
+  - Unticking a Reviewed rule never changes the Reviewed version (it is immutable). A new draft version with the same content is made instead (`policy.rule_unapplied`), and the rule drops out at the next publication.
+  - Ticking an Excluded rule makes a new version and applies that one.
+- **(owner)** "Read the policy and define the rules that can accepted by the Anvil." The AI drafts each rule's fields (requirement, type, applicability, conditions, exceptions, effective scope, evidence) from the policy text: **Define with AI**. The draft is saved as an ordinary edit (`policy.rule_ai_defined`, model recorded), and the PM can change it before ticking.
+- **(owner, guardrail)** The AI only suggests. It never ticks, reviews, excludes or publishes. Prompt suggestions are shown as "Suggested" with a one-line reason, and the PM still ticks each rule.
+- **(chosen by Claude)** Rules that are not ticked no longer block publication. The preview lists them as "Not applied", and the published set records them in `excluded` with the reason "Not applied to this project". This is not a silent omission: it follows from the owner's rule that ticking is the review. AC06 still holds, because Draft and Needs-definition versions are never included. Conflicts block only when they involve a ticked rule.
+- **(chosen by Claude; the owner did not answer the question)** Evidence quote not found word-for-word in the source: ticking shows a warning, and the PM confirms "I checked the source" (`acceptUnverifiedEvidence`). The audit entry and the published set's content keep the citation's `resolution`. Without a verified locator, the Anvil project-policy manifest points to the whole document version. Without the confirmation the API returns 422 `EVIDENCE_UNVERIFIED`.
+- **(chosen by Claude)** Definition gaps (type unknown, no scope, no effective scope): the page runs Define with AI before applying a rule that has gaps. A rule with no requirement text cannot be applied. Any gaps left are recorded in the audit entry as warnings.
+- **(chosen by Claude)** Model: `POLICY_AI_MODEL` (`gemini:<model>`, `claude:<model>` or a Claude id). Empty follows a Gemini `AUTHORING_MODEL` (QA, which has no Claude quota), otherwise `claude-sonnet-5-5`. Without `VERTEX_PROJECT_ID` a deterministic mock is used. The cap is `POLICY_AI_DAILY_CALL_CAP` calls per client per day (default 1000), counted from audit entries. Tests use the mock and test doubles, never live calls.
+- **(chosen by Claude)** Prompt suggestions are not stored as rule state. Each run is audited (`policy.rule_suggestions_requested`, with the prompt, the document and the suggested rule keys).
+- **(chosen by Claude)** Extraction progress: the page polls `GET /policy/extraction` every 3 s while any job is not terminal. It stops when all jobs are terminal and then reloads the rules. It gives up after 35 minutes, since the worker's deadline is 30.
+- **(chosen by Claude)** **Apply all suggested** is a button the PM clicks after reading the suggestions. It ticks each suggested rule as that PM, one audited command per rule, and skips any rule whose evidence needs a confirmation. The AI itself still ticks nothing.
+- **(owner, via the DevOps session)** A ticked rule that is still incomplete (type unknown, no scope, no effective scope) is applied with a warning but **blocks publication** until it is defined, because Anvil cannot accept it. Unverified quotes warn and need confirmation but do not block. This replaces PRD AC06's separate review step: the tick is the review.

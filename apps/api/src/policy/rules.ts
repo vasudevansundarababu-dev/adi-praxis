@@ -110,20 +110,32 @@ export async function editRule(
   return version;
 }
 
-/** Reasons a version cannot be marked Reviewed yet (S1 R10, PRD PR-R02/R04). Empty = reviewable. */
-export function reviewProblems(v: { body: unknown; citations: Array<{ fieldPath: string; resolution: string }> }): string[] {
-  const b = PolicyRuleBody.parse(v.body);
+/** Gaps in the rule's definition (the fields an evaluator needs). Empty = fully defined. */
+export function definitionProblems(body: unknown): string[] {
+  const b = PolicyRuleBody.parse(body);
   const p: string[] = [];
   const a = b.applicability;
   if (!b.requirement.trim()) p.push('Add the requirement.');
   if (b.requirementType === 'unknown') p.push('Choose whether this is an obligation, prohibition, permission or definition.');
   if (!a.universal && a.actors.length + a.actions.length + a.channels.length + a.entities.length + a.locales.length + a.jurisdictions.length === 0 && !a.conditionText) p.push('Define where the rule applies, or mark it as applying everywhere.');
   if (!b.effective.from && !b.effective.to && !b.effective.conditionText) p.push('Set the effective scope (a date, or "always" in the condition).');
+  return p;
+}
+
+/** Evidence gaps: claims not linked to a quote found word for word in the source document. Empty = verified. */
+export function evidenceProblems(v: { body: unknown; citations: Array<{ fieldPath: string; resolution: string }> }): string[] {
+  const b = PolicyRuleBody.parse(v.body);
+  const p: string[] = [];
   const ok = (path: string) => v.citations.some((c) => c.resolution === 'RESOLVED' && (c.fieldPath === path || c.fieldPath.startsWith(`${path}.`)));
   if (!ok('requirement')) p.push('Link the requirement to a quote found in the source document.');
-  if (a.conditionText && !ok('applicability')) p.push('Link the applicability condition to a source quote.');
+  if (b.applicability.conditionText && !ok('applicability')) p.push('Link the applicability condition to a source quote.');
   if (b.exceptions.kind === 'listed' && !ok('exceptions')) p.push('Link the listed exceptions to a source quote.');
   return p;
+}
+
+/** Reasons a version cannot be marked Reviewed through Mark Reviewed (S1 R10, PRD PR-R02/R04). Empty = reviewable. */
+export function reviewProblems(v: { body: unknown; citations: Array<{ fieldPath: string; resolution: string }> }): string[] {
+  return [...definitionProblems(v.body), ...evidenceProblems(v)];
 }
 
 /** Marks the current version Reviewed (PM/ADMIN; D-R1: the editor may review). Stale decisions are rejected. */
@@ -155,3 +167,61 @@ export async function markExcluded(tx: Tx, input: { clientId: string; projectId:
   await audit({ entityType: 'PolicyRuleVersion', entityId: v.id, action: 'policy.rule_excluded', after: { reason: input.reason.trim(), ruleKey: v.rule.ruleKey } });
   return out;
 }
+
+type Audit = (a: AuditInput) => Promise<void>;
+
+/** Copies a version (body and citations) into a new version of the same rule, in the given state. */
+async function copyVersion(tx: Tx, v: Awaited<ReturnType<typeof ruleVersionFull>>, state: 'DRAFT' | 'NEEDS_DEFINITION', actorId: string, origin: string) {
+  const next = v.rule.latestVersion + 1;
+  const out = await tx.policyRuleVersion.create({ data: { clientId: v.clientId, ruleId: v.ruleId, version: next, state, body: v.body as Prisma.InputJsonValue, contentHash: v.contentHash, origin, editedById: actorId } });
+  await tx.policyRule.update({ where: { id: v.ruleId }, data: { latestVersion: next } });
+  for (const c of v.citations) {
+    await tx.policyCitation.create({ data: { clientId: c.clientId, ruleVersionId: out.id, documentVersionId: c.documentVersionId, fieldPath: c.fieldPath, role: c.role, quote: c.quote, locator: c.locator as Prisma.InputJsonValue, resolution: c.resolution, confirmedById: c.confirmedById } });
+  }
+  return out;
+}
+
+/**
+ * "Apply to project" (PRD PR-M04, owner 14 Nov 2026): a PM or Admin ticking the box IS the review. Ticked means the
+ * rule's current version is Reviewed. Unticking a Reviewed rule never touches that version (immutable): it makes a new
+ * draft version with the same content. Idempotent: asking for the state the rule is already in changes nothing.
+ * Unverified evidence needs the PM's explicit confirmation (PR-M05); a rule without requirement text cannot be applied.
+ */
+export async function setApplied(
+  tx: Tx,
+  input: { clientId: string; projectId: string; ruleId: string; actorId: string; roles: string[]; applied: boolean; expectedContentHash: string; acceptUnverifiedEvidence?: boolean; required?: boolean },
+  audit: Audit,
+) {
+  const rule = await tx.policyRule.findFirst({ where: { id: input.ruleId, clientId: input.clientId, projectId: input.projectId }, select: { id: true } });
+  if (!rule) throw notFound('Rule not found');
+  await tx.$queryRaw`SELECT id FROM "PolicyRule" WHERE id = ${rule.id}::uuid FOR UPDATE`;
+  const latest = await tx.policyRuleVersion.findFirstOrThrow({ where: { ruleId: rule.id }, orderBy: { version: 'desc' }, select: { id: true } });
+  const v = await ruleVersionFull(tx, input.clientId, latest.id);
+  if (v.contentHash !== input.expectedContentHash) throw conflict('This rule changed since you opened it. Reload to see the latest version.');
+  const isApplied = v.state === 'REVIEWED';
+  if (isApplied === input.applied) return { version: v, changed: false, warnings: [] as string[] };
+
+  if (!input.applied) {
+    const out = await copyVersion(tx, v, 'DRAFT', input.actorId, 'unapplied');
+    await audit({ entityType: 'PolicyRuleVersion', entityId: out.id, action: 'policy.rule_unapplied', before: { versionId: v.id, version: v.version, state: v.state }, after: { version: out.version, state: out.state, ruleKey: v.rule.ruleKey, roles: input.roles } });
+    return { version: out, changed: true, warnings: [] };
+  }
+
+  const definition = definitionProblems(v.body);
+  if (!PolicyRuleBody.parse(v.body).requirement.trim()) throw new AppError(422, 'NOT_DEFINED', 'Add the requirement before applying this rule.');
+  const evidence = evidenceProblems(v);
+  if (evidence.length && !input.acceptUnverifiedEvidence) throw new AppError(422, 'EVIDENCE_UNVERIFIED', `The source evidence is not verified: ${evidence.join(' ')} Check the source, then confirm to apply anyway.`);
+  const target = v.state === 'EXCLUDED' ? await copyVersion(tx, v, 'DRAFT', input.actorId, 'reapplied') : v;
+  const out = await tx.policyRuleVersion.update({ where: { id: target.id }, data: { state: 'REVIEWED', reviewedById: input.actorId, reviewedAt: new Date() } });
+  if (input.required !== undefined) await tx.policyRule.update({ where: { id: v.ruleId }, data: { required: input.required } });
+  const warnings = [...definition, ...evidence];
+  await audit({
+    entityType: 'PolicyRuleVersion',
+    entityId: out.id,
+    action: 'policy.rule_applied',
+    before: { state: v.state },
+    after: { state: 'REVIEWED', version: out.version, contentHash: out.contentHash, ruleKey: v.rule.ruleKey, roles: input.roles, evidence: v.citations.map((c) => ({ fieldPath: c.fieldPath, resolution: c.resolution })), unverifiedEvidenceAccepted: evidence.length > 0, warnings },
+  });
+  return { version: out, changed: true, warnings };
+}
+

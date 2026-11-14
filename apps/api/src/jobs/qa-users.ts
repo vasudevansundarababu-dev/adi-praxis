@@ -30,7 +30,13 @@ export interface HttpResponse {
   cookies: string[];
   retryAfterSeconds: number | null;
 }
-export type Http = (req: { method: string; path: string; body?: unknown; cookie?: string }) => Promise<HttpResponse>;
+/** A multipart form with one file (policy document upload). */
+export interface HttpForm {
+  fields: Record<string, string>;
+  file: { name: string; type: string; content: string };
+}
+/** `root`: the path is not under /api/v1 (e.g. /readyz). `form`: send multipart instead of JSON. */
+export type Http = (req: { method: string; path: string; body?: unknown; cookie?: string; root?: boolean; form?: HttpForm }) => Promise<HttpResponse>;
 
 export interface QaUsersOptions {
   appEnv: string;
@@ -108,11 +114,19 @@ export function optionsFromEnv(env: NodeJS.ProcessEnv, appEnv: string, dryRun: b
 
 /** fetch against API_URL, for the Cloud Run job. */
 export function fetchHttp(apiUrl: string): Http {
-  return async ({ method, path, body, cookie }) => {
-    const r = await fetch(`${apiUrl}/api/v1${path}`, {
+  return async ({ method, path, body, cookie, root, form }) => {
+    let payload: string | FormData | undefined = body === undefined ? undefined : JSON.stringify(body);
+    if (form) {
+      const fd = new FormData();
+      for (const [k, v] of Object.entries(form.fields)) fd.append(k, v);
+      fd.append('file', new Blob([form.file.content], { type: form.file.type }), form.file.name);
+      payload = fd;
+    }
+    const r = await fetch(`${apiUrl}${root ? '' : '/api/v1'}${path}`, {
       method,
-      headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), 'idempotency-key': crypto.randomUUID(), cookie: cookie ?? '' },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      // fetch sets the multipart boundary itself.
+      headers: { ...(body === undefined || form ? {} : { 'content-type': 'application/json' }), 'idempotency-key': crypto.randomUUID(), cookie: cookie ?? '' },
+      body: payload,
     });
     const ra = Number(r.headers.get('retry-after'));
     return {
@@ -468,7 +482,7 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
 }
 
 /** A bland synthetic answer of the right shape for a profile field. */
-function answerFor(field: string, q: { answerType: string; options: string[] }): string | number | string[] {
+export function answerFor(field: string, q: { answerType: string; options: string[] }): string | number | string[] {
   const kind = FIELD_DEFS[field]?.kind ?? 'text';
   const choice = q.answerType === 'choice' && q.options.length ? q.options[0]! : null;
   if (kind === 'number') return field === 'hours_per_week' ? 20 : 10;

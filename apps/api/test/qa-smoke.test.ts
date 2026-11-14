@@ -1,9 +1,12 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AUTHORSHIP_VERSION, GOLDEN_KYC_EXAMPLE } from '@praxis/shared';
-import { buildOutput, defaultPolicyMarkdown, NEEDS, optionsFromEnv, qaSmoke, SMOKE_PREFIX, STEPS, type QaSmokeOptions } from '../src/jobs/qa-smoke';
+import { bindCriteriaFromChecks, buildOutput, defaultPolicyMarkdown, NEEDS, optionsFromEnv, qaSmoke, SMOKE_PREFIX, STEPS, type QaSmokeOptions } from '../src/jobs/qa-smoke';
 import type { Http, HttpResponse } from '../src/jobs/qa-users';
+import { JOINT_TEMPLATE_SPEC } from '../src/anvil/joint-template';
+import { anvilSpecChecks } from '../src/tasks/submission';
 import { TEST_DATABASE_URL, TEST_REDIS_URL } from './env';
 
 /**
@@ -360,5 +363,45 @@ describe('qa-smoke: QA end-to-end smoke job (orchestration, mocked HTTP)', () =>
     // The shared golden case itself is untouched.
     expect(JSON.stringify(GOLDEN_KYC_EXAMPLE)).toContain('{{GB-01}}');
     expect(() => buildOutput({ definition: 'kyc', template: { workflow: 'KYC onboarding and refresh', profileId: null, profile: null }, input: {} }, rule)).toThrow(/No synthetic case builder/);
+  });
+});
+
+describe('qa-smoke on the KYC v6 template shape (per-state reusable form, Anvil-defined rubric, no worked example)', () => {
+  const packet = JSON.parse(readFileSync(new URL('./fixtures/kyc-reusable/proposal.json', import.meta.url), 'utf8'));
+  const profile = packet.authoring.profile;
+  const spec = { schemaVersion: JOINT_TEMPLATE_SPEC, execution: packet.execution };
+  const rule = { ruleId: 'r-1', ruleKey: 'R-NW-3.1', versionId: 'rv-1', quote: 'must' };
+  const task = { definition: 'golden-kyc-reusable-v1', template: { profileId: profile.profileId, profile }, input: { slot: { case: { field: 'governing_state', source: 'S1.governingState', value: 'TX' }, tags: {} } } };
+
+  it('fills every pick list with a value the form allows and names the slot state', () => {
+    const out = buildOutput(task, rule) as { sections: Record<string, Record<string, unknown>> };
+    expect(out.sections.S3!.environment).toBe('golden_kyc_openenv');
+    expect(out.sections.S1!.governingState).toBe('TX');
+    const allowedTools = profile.sections.find((x: { key: string }) => x.key === 'S3').fields.find((f: { key: string }) => f.key === 'tools').options.map((o: { value: string }) => o.value);
+    for (const tool of out.sections.S3!.tools as string[]) expect(allowedTools).toContain(tool);
+  });
+
+  it('binds the rubric to the template criterion IDs and evaluators from the pre-check, until every Anvil check passes', () => {
+    let out = buildOutput(task, rule);
+    const failing = (o: Record<string, unknown>) => anvilSpecChecks(spec, o).filter((c) => !c.ok).map((c) => c.id);
+    expect(failing(out)).toContain('anvil.evaluator-binding');
+    let rounds = 0;
+    for (let next = bindCriteriaFromChecks(out, anvilSpecChecks(spec, out)); next; next = bindCriteriaFromChecks(out, anvilSpecChecks(spec, out))) {
+      out = next;
+      rounds++;
+    }
+    expect(rounds).toBe(2);
+    expect(failing(out)).toEqual([]);
+    const criteria = (out.sections as { S7: { criteria: { id: string; evaluatorKind: string; evaluatorVersion: string; weight: number; critical: boolean; name: string }[] } }).S7.criteria;
+    expect(criteria.map((c) => [c.id, c.evaluatorKind, c.evaluatorVersion])).toEqual(packet.execution.evaluators.map((e: { criterion_id: string; capability: { id: string; version: string } }) => [e.criterion_id, e.capability.id, e.capability.version]));
+    expect(criteria.filter((c) => c.critical)).toHaveLength(1);
+    expect(criteria.every((c) => c.name.startsWith('Synthetic QA smoke'))).toBe(true);
+  });
+
+  it('splits weights to exactly 100 with two decimals for any number of criteria, and reports a pre-check it cannot read', () => {
+    const three = bindCriteriaFromChecks({ sections: {} }, [{ id: 'anvil.evaluator-binding', ok: false, message: 'Criteria C1 have no evaluator in this template; use the template’s criterion IDs (a, b, c)' }]) as { sections: { S7: { criteria: { weight: number }[] } } };
+    expect(three.sections.S7.criteria.map((c) => c.weight)).toEqual([33.34, 33.33, 33.33]);
+    expect(bindCriteriaFromChecks({ sections: {} }, [{ id: 'anvil.evaluator-binding', ok: true, message: '' }])).toBeNull();
+    expect(() => bindCriteriaFromChecks({ sections: {} }, [{ id: 'anvil.evaluator-binding', ok: false, message: 'something else' }])).toThrow(/did not name the template's criterion IDs/);
   });
 });

@@ -180,7 +180,8 @@ only: the job refuses `APP_ENV=production`. Decisions: `docs/DECISIONS.md`, "QA 
   workflow; PMs are offered only the newest version of each workflow), and timeouts in seconds:
   `QA_SMOKE_EXTRACTION_TIMEOUT_SECONDS` (900), `QA_SMOKE_ASSESSMENT_TIMEOUT_SECONDS` (600),
   `QA_SMOKE_TASK_TIMEOUT_SECONDS` (120), `QA_SMOKE_CHAT_TIMEOUT_SECONDS` (180).
-- **Known gap (14 Nov 2026):** the per-state KYC form `golden-kyc-reusable-v1` (KYC v6, from Anvil's proposal) has no
-  worked example, and its Anvil criteria cannot be invented. On that template the `authoring` step fails at submit with
-  the failing checks and says so. It passes once the form has a worked example (for example `authoring.examples` in the
-  Anvil proposal).
+- **Forms without a worked example (fixed 14 Nov 2026):** on the per-state KYC form `golden-kyc-reusable-v1` (KYC v6,
+  from Anvil's proposal) the job builds the case from the template itself: allowed values from the form, the slot's
+  `governing_state`, and the template's own criterion IDs and evaluators, which it reads from the workbench pre-check
+  (`POST /me/tasks/:id/check`) as an author would. The `authoring` step reports `criteriaFrom: "pre-check"`. Each
+  pre-check adds one embedding call to the cost (two on KYC v6).

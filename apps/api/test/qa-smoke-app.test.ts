@@ -180,7 +180,7 @@ describe('qa-smoke against the real API in-process (all providers mocked)', () =
     for (const pw of Object.values(PW)) expect(JSON.stringify(r) + logs.join('')).not.toContain(pw);
   }, 120_000);
 
-  it('on the per-state reusable KYC template (Anvil proposal, case selector): the SME gets a state slot and the case names it', async () => {
+  it('on the per-state reusable KYC template (Anvil proposal, case selector, no worked example): builds a valid case from the template and passes end to end', async () => {
     const templateId = await addReusableKyc();
     const r = await run();
     expect(r.ids.templateId).toBe(templateId);
@@ -192,13 +192,24 @@ describe('qa-smoke against the real API in-process (all providers mocked)', () =
     expect(slotCase.field).toBe('governing_state');
     const [section, field] = slotCase.source.split('.') as [string, string];
     expect((task.output as { sections: Record<string, Record<string, unknown>> }).sections[section]![field]).toBe(slotCase.value);
-    // Staffing, policy and the live-model call work on this template; the case cannot be submitted, because the form
-    // has no worked example and Anvil's criteria cannot be invented. The report names the gap.
-    expect(steps).toMatchObject({ policy: { status: 'PASS' }, staffing: { status: 'PASS' }, authoring: { status: 'FAIL' }, review: { status: 'SKIPPED' } });
-    expect(steps.authoring!.error).toMatch(/^Submit refused \(CHECKS_FAILED\): .*anvil\.evaluator-binding.*has no worked example/);
+    // The case is built from the template itself: allowed enum values, the template's own criterion IDs and
+    // evaluators (learned from the workbench pre-check), and the slot's state. It passes every submit check, the named
+    // Reviewer accepts it, and the dataset chain verifies.
+    const failed = r.steps.filter((s) => s.status !== 'PASS');
+    expect(failed, JSON.stringify(failed, null, 2)).toEqual([]);
+    expect(r.ok).toBe(true);
+    expect(steps.authoring).toMatchObject({ details: { criteriaFrom: 'pre-check', criteria: 20 } });
+    const out = task.output as { sections: { S3: { environment: string; tools: string[] }; S7: { criteria: { id: string; evaluatorKind: string; evaluatorVersion: string; weight: number; critical?: boolean }[] } } };
+    expect(out.sections.S3.environment).toBe('golden_kyc_openenv');
+    const packet = JSON.parse(readFileSync(new URL('./fixtures/kyc-reusable/proposal.json', import.meta.url), 'utf8'));
+    const evaluators = packet.execution.evaluators as { criterion_id: string; capability: { id: string; version: string } }[];
+    expect(out.sections.S7.criteria.map((c) => [c.id, c.evaluatorKind, c.evaluatorVersion])).toEqual(evaluators.map((e) => [e.criterion_id, e.capability.id, e.capability.version]));
+    expect(out.sections.S7.criteria.reduce((n, c) => n + Math.round(c.weight * 100), 0)).toBe(10_000);
+    const record = await db.approvedTaskRecord.findUniqueOrThrow({ where: { id: r.ids.recordId } });
+    expect(record.taskInstanceId).toBe(r.ids.taskId);
+    expect(record.reviewerId).toBe((await db.user.findUniqueOrThrow({ where: { email: 'reviewer01@praxis.test' } })).id);
     expect(await db.taskDraftRun.count({ where: { taskInstanceId: r.ids.taskId, section: 'CHAT', status: 'SUCCEEDED' } })).toBe(1);
-    // A failed run cancels its project.
-    expect(steps.cleanup).toMatchObject({ status: 'PASS', details: { cancelled: true, status: 'CANCELLED' } });
+    expect(steps.cleanup).toMatchObject({ status: 'PASS' });
   }, 120_000);
 
   it('QA_SMOKE_TEMPLATE_ID cannot pin an older version: PMs are offered only the newest; the report says so', async () => {

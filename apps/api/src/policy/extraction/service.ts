@@ -212,10 +212,30 @@ async function persistResult(w: WorkerDeps, jobId: string, input: ExtractionInpu
   if (done) await refreshBatch(w.db, job.batchId);
 }
 
+/**
+ * Ends a job that produced no result. A job the provider never accepted (no operation id: unavailable, or the first
+ * call refused) cannot have been charged, so its budget reservation is released with a negative `RELEASE` row
+ * (owner, 14 Nov 2026: failed QA attempts held $4.80 of a $5 ceiling). A job the provider accepted, or an UNCERTAIN
+ * submit, keeps its reservation: it may have been charged.
+ */
 async function finish(w: WorkerDeps, jobId: string, r: { status: 'FAILED' | 'CANCELLED' | 'UNCERTAIN'; error: string; cleanup?: string }) {
-  const job = await w.db.extractionJob.update({ where: { id: jobId }, data: { status: r.status, error: r.error.slice(0, 1000), finishedAt: new Date(), cleanup: r.cleanup ?? null } });
-  await w.db.auditEvent.create({ data: { clientId: job.clientId, actorType: 'SYSTEM', actorId: 'policy-extraction', entityType: 'ExtractionJob', entityId: job.id, action: 'policy.extraction_failed', after: { status: r.status, error: r.error.slice(0, 300) } } });
+  const job = await w.db.$transaction(async (tx) => {
+    const j = await tx.extractionJob.update({ where: { id: jobId }, data: { status: r.status, error: r.error.slice(0, 1000), finishedAt: new Date(), cleanup: r.cleanup ?? null }, include: { batch: true } });
+    let releasedUsd = 0;
+    if (r.status !== 'UNCERTAIN' && !j.providerOperationId) releasedUsd = await releaseReservation(tx, j.id, j.clientId, (j.batch.profileSnapshot as unknown as ProfileSnapshot).provider);
+    await tx.auditEvent.create({ data: { clientId: j.clientId, actorType: 'SYSTEM', actorId: 'policy-extraction', entityType: 'ExtractionJob', entityId: j.id, action: 'policy.extraction_failed', after: { status: r.status, error: r.error.slice(0, 300), releasedUsd } } });
+    return j;
+  });
   await refreshBatch(w.db, job.batchId);
+}
+
+/** Releases what is still reserved for a job (idempotent: nothing left to release writes nothing). Returns the amount. */
+export async function releaseReservation(tx: Tx, jobId: string, clientId: string, provider: string): Promise<number> {
+  const held = await tx.extractionSpend.aggregate({ where: { jobId }, _sum: { amountUsd: true } });
+  const amount = Number(held._sum.amountUsd ?? 0);
+  if (amount <= 0) return 0;
+  await tx.extractionSpend.create({ data: { clientId, provider, jobId, kind: 'RELEASE', amountUsd: new Prisma.Decimal(-amount) } });
+  return amount;
 }
 
 export async function refreshBatch(db: Db | Tx, batchId: string) {

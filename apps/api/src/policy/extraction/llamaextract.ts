@@ -114,9 +114,27 @@ export class LlamaExtractAdapter implements ExtractionAdapter {
     if (!res.ok) {
       const retryAfter = Number(res.headers.get('retry-after'));
       const retryable = res.status === 429 || res.status >= 500;
-      throw new ProviderError(`LlamaExtract returned HTTP ${res.status}.`, retryable, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : undefined);
+      throw new ProviderError(`LlamaExtract returned HTTP ${res.status}.${await errorDetail(res)}`, retryable, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : undefined);
     }
     return res.json();
+  }
+}
+
+/** LlamaCloud's own error message (e.g. a project/key mismatch), shortened; never the request or its credentials. */
+async function errorDetail(res: Response): Promise<string> {
+  try {
+    const body = (await res.text()).slice(0, 2000);
+    let detail: unknown = body;
+    try {
+      const j = JSON.parse(body) as { detail?: unknown; message?: unknown };
+      detail = j.detail ?? j.message ?? body;
+    } catch {
+      /* not JSON: keep the text */
+    }
+    const text = (typeof detail === 'string' ? detail : JSON.stringify(detail)).replace(/llx-[A-Za-z0-9_-]+/g, 'llx-[redacted]').replace(/\s+/g, ' ').trim().slice(0, 300);
+    return text ? ` ${text}` : '';
+  } catch {
+    return '';
   }
 }
 

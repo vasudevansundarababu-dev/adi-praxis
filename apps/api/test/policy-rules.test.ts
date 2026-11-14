@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { CandidateRule } from '@praxis/shared';
@@ -18,7 +19,7 @@ import { pdfWithText } from './documents';
 class FakeProvider implements ExtractionAdapter {
   calls = { submit: 0, status: 0, result: 0, cleanup: 0 };
   problems: string[] = [];
-  mode: 'ok' | 'fail' | 'ambiguous' | 'bad-quote' = 'ok';
+  mode: 'ok' | 'fail' | 'ambiguous' | 'bad-quote' | 'refused' = 'ok';
   constructor(readonly provider: 'llamaextract' | 'google') {}
   availability() {
     return this.problems;
@@ -26,6 +27,7 @@ class FakeProvider implements ExtractionAdapter {
   async submit() {
     this.calls.submit++;
     if (this.mode === 'ambiguous') throw new ProviderError('LlamaExtract request failed: TimeoutError', true, undefined, true);
+    if (this.mode === 'refused') throw new ProviderError('LlamaExtract returned HTTP 401.', false);
     return { operationId: `op-${this.calls.submit}` };
   }
   async getStatus() {
@@ -284,6 +286,56 @@ describe('extraction (AC04–AC05, AC17, A01–A03, A07, A12)', () => {
     expect(r.statusCode).toBe(409);
     expect(r.json().error).toBe('BUDGET_EXHAUSTED');
     expect(llama.calls.submit).toBe(0);
+  });
+
+  it('a job the provider never accepted releases its reservation; an accepted or uncertain one keeps it', async () => {
+    await enableDefaultProfile();
+    const v = await uploadedVersion();
+    const spent = async () => Number((await db.extractionSpend.aggregate({ where: { provider: 'llamaextract' }, _sum: { amountUsd: true } }))._sum.amountUsd ?? 0);
+    const run = async (mode: FakeProvider['mode'], parentBatchId?: string, problems: string[] = []) => {
+      llama.mode = mode;
+      const r = await api(pmCookie).post(`/projects/${projectId}/policy/extraction`, { documentVersionIds: [v], ...(parentBatchId ? { parentBatchId } : {}) });
+      expect(r.statusCode, r.body).toBe(202);
+      const jobId = r.json().jobs[0].id as string;
+      llama.problems = problems;
+      await worker(jobId);
+      llama.problems = [];
+      return { batchId: r.json().batchId as string, job: await db.extractionJob.findUniqueOrThrow({ where: { id: jobId } }) };
+    };
+
+    const refused = await run('refused');
+    expect(refused.job).toMatchObject({ status: 'FAILED', providerOperationId: null });
+    expect(await spent()).toBe(0);
+    expect(await db.extractionSpend.findMany({ where: { jobId: refused.job.id }, select: { kind: true }, orderBy: { createdAt: 'asc' } })).toEqual([{ kind: 'RESERVE' }, { kind: 'RELEASE' }]);
+    const audit = await db.auditEvent.findFirstOrThrow({ where: { entityId: refused.job.id, action: 'policy.extraction_failed' } });
+    expect((audit.after as { releasedUsd: number }).releasedUsd).toBeGreaterThan(0);
+
+    // Became unavailable between queueing and running: no call made, released too.
+    const off = await run('ok', refused.batchId, ['The LlamaExtract API key is not configured.']);
+    expect(off.job.status).toBe('FAILED');
+    expect(await spent()).toBe(0);
+
+    // Accepted by the provider, then failed: it may have been charged, so the reservation stays.
+    const failed = await run('fail', off.batchId);
+    expect(failed.job.status).toBe('FAILED');
+    expect(failed.job.providerOperationId).not.toBeNull();
+    expect(await spent()).toBeCloseTo(Number(failed.job.estimatedUsd), 4);
+  });
+
+  it('the migration releases reservations still held by jobs the provider never accepted', async () => {
+    await enableDefaultProfile();
+    const v = await uploadedVersion();
+    llama.mode = 'refused';
+    const r = await api(pmCookie).post(`/projects/${projectId}/policy/extraction`, { documentVersionIds: [v] });
+    const jobId = r.json().jobs[0].id as string;
+    // A job that failed before this change: FAILED, no operation id, reservation never released.
+    await db.extractionJob.update({ where: { id: jobId }, data: { status: 'FAILED', finishedAt: new Date() } });
+    expect(Number((await db.extractionSpend.aggregate({ where: { jobId }, _sum: { amountUsd: true } }))._sum.amountUsd)).toBeGreaterThan(0);
+    const sql = readFileSync(new URL('../prisma/migrations/20261128000000_release_failed_extraction_reservations/migration.sql', import.meta.url), 'utf8');
+    await db.$executeRawUnsafe(sql);
+    await db.$executeRawUnsafe(sql);
+    expect(Number((await db.extractionSpend.aggregate({ where: { jobId }, _sum: { amountUsd: true } }))._sum.amountUsd)).toBe(0);
+    expect(await db.extractionSpend.count({ where: { jobId, kind: 'RELEASE' } })).toBe(1);
   });
 
   it('only an Admin may choose the provider; the project setting is used and audited', async () => {

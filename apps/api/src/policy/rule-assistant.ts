@@ -125,31 +125,48 @@ function parseJson<T>(text: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>)
 
 /** Text-in, text-out completion: lets the same prompts run on Gemini or Claude on Vertex. */
 export interface Completer {
-  complete(system: string, user: string, maxOutputTokens: number): Promise<string>;
+  complete(system: string, user: string, maxOutputTokens: number, opts?: CallOptions): Promise<string>;
+}
+export interface CallOptions {
+  /** A short yes/no-per-rule job: ask a thinking model to think briefly. */
+  quick?: boolean;
+  timeoutMs?: number;
 }
 
-const SUGGEST_CHUNK = 60;
+/**
+ * The web proxy gives up after 30 s and Cloud Run after 60 s. One call per 15 rules, run in parallel, each with a 25 s
+ * limit, keeps a whole document's suggestions inside that window; a slow model becomes a clear 503, not a proxy error.
+ */
+export const SUGGEST_CHUNK = 15;
+export const SUGGEST_PARALLEL = 6;
+export const MODEL_CALL_TIMEOUT_MS = 25_000;
 
 export class ModelRuleAssistant implements PolicyRuleAssistant {
   constructor(readonly modelVersion: string, private readonly llm: Completer) {}
 
   async suggest(prompt: string, rules: SuggestRule[]): Promise<Suggestion[]> {
-    const out: Suggestion[] = [];
-    for (let i = 0; i < rules.length; i += SUGGEST_CHUNK) {
-      const chunk = rules.slice(i, i + SUGGEST_CHUNK);
-      const text = await this.call(SUGGEST_SYSTEM, suggestUser(prompt, chunk), 16000);
-      out.push(...sanitizeSuggestions(parseJson(text, SuggestOut).items, chunk));
-    }
-    return out;
+    const chunks: SuggestRule[][] = [];
+    for (let i = 0; i < rules.length; i += SUGGEST_CHUNK) chunks.push(rules.slice(i, i + SUGGEST_CHUNK));
+    const results: Suggestion[][] = new Array(chunks.length);
+    let next = 0;
+    const worker = async () => {
+      while (next < chunks.length) {
+        const i = next++;
+        const text = await this.call(SUGGEST_SYSTEM, suggestUser(prompt, chunks[i]!), 8000, { quick: true, timeoutMs: MODEL_CALL_TIMEOUT_MS });
+        results[i] = sanitizeSuggestions(parseJson(text, SuggestOut).items, chunks[i]!);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(SUGGEST_PARALLEL, chunks.length) }, worker));
+    return results.flat();
   }
 
   async define(input: DefineInput): Promise<Definition> {
-    return parseJson(await this.call(DEFINE_SYSTEM, defineUser(input), 16000), Definition);
+    return parseJson(await this.call(DEFINE_SYSTEM, defineUser(input), 16000, { timeoutMs: MODEL_CALL_TIMEOUT_MS }), Definition);
   }
 
-  private async call(system: string, user: string, max: number) {
+  private async call(system: string, user: string, max: number, opts: CallOptions) {
     try {
-      return await this.llm.complete(system, user, max);
+      return await this.llm.complete(system, user, max, opts);
     } catch (err) {
       throw new RuleAssistantUnavailableError(err instanceof Error ? err.message : 'Model call failed');
     }
@@ -167,14 +184,14 @@ export function vertexRuleAssistant(setting: string, opts: { projectId: string; 
   const [prefix, ...rest] = setting.split(':');
   if (rest.length && prefix === 'gemini') {
     const g = new GeminiVertexContentDrafter(rest.join(':'), { projectId: opts.projectId, location: opts.location });
-    return new ModelRuleAssistant(`gemini:${rest.join(':')}`, { complete: async (system, user, maxOutputTokens) => (await g.complete({ purpose: 'propose_field', system, user, maxOutputTokens })).text });
+    return new ModelRuleAssistant(`gemini:${rest.join(':')}`, { complete: async (system, user, maxOutputTokens, o) => (await g.complete({ purpose: 'propose_field', system, user, maxOutputTokens, timeoutMs: o?.timeoutMs, ...(o?.quick ? { thinkingLevel: 'low' as const } : {}) })).text });
   }
   const model = rest.length && prefix === 'claude' ? rest.join(':') : setting;
   let client: AnthropicVertex | undefined;
   return new ModelRuleAssistant(model, {
-    complete: async (system, user, max_tokens) => {
+    complete: async (system, user, max_tokens, o) => {
       client ??= new AnthropicVertex({ projectId: opts.projectId, region: opts.location });
-      const r = await client.messages.create({ model, max_tokens, system, messages: [{ role: 'user', content: user }] });
+      const r = await client.messages.create({ model, max_tokens, system, messages: [{ role: 'user', content: user }] }, o?.timeoutMs ? { timeout: o.timeoutMs, maxRetries: 0 } : undefined);
       if (r.stop_reason === 'refusal' || r.stop_reason === 'max_tokens') throw new Error(`Model stopped: ${r.stop_reason}`);
       const t = r.content.find((b) => b.type === 'text');
       return t && t.type === 'text' ? t.text : '';

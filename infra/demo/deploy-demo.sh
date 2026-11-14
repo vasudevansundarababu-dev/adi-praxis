@@ -275,6 +275,18 @@ gcloud run jobs deploy praxis-qa-users --image="$REPO/api:$TAG" "${COMMON[@]}" -
   --set-secrets="$SECRETS,DEMO_ADMIN_PASSWORD=demo-admin-password:latest,DEMO_PM_PASSWORD=demo-pm-password:latest,QA_SEED_REVIEWER_PASSWORD=qa-seed-reviewer-password:latest"
 fi
 
+# QA end-to-end smoke test (docs/ops/QA-ENV-SETUP.md section 7). Deployed only, never run here: each run makes paid
+# calls (one LlamaExtract job, about $0.10, and three small model calls). Same conditions as the seed users job, whose
+# Reviewers it uses. Run it after every QA deploy; exit 0 only when every step that ran passed:
+#   gcloud run jobs execute praxis-qa-smoke --region <region> --wait
+if [ -f "$ROOT/apps/api/src/jobs/qa-smoke.ts" ] &&
+  [ -n "$(gcloud secrets versions list qa-seed-reviewer-password --filter=state=ENABLED --limit=1 --format='value(name)' 2>/dev/null)" ]; then
+say "QA smoke job (deployed only)"
+gcloud run jobs deploy praxis-qa-smoke --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 --task-timeout=3600s \
+  --args=src/jobs/run.ts,qa-smoke \
+  --set-secrets="$SECRETS,DEMO_ADMIN_PASSWORD=demo-admin-password:latest,DEMO_PM_PASSWORD=demo-pm-password:latest,QA_SEED_REVIEWER_PASSWORD=qa-seed-reviewer-password:latest"
+fi
+
 if [ "${SKIP_DEMO_SETUP:-0}" != "1" ]; then
 say "Demo data (users and a published KYC project)"
 gcloud run jobs deploy praxis-demo-setup --image="$REPO/api:$TAG" "${COMMON[@]}" --max-retries=0 \

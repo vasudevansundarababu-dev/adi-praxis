@@ -91,6 +91,14 @@ describe('LlamaExtract adapter (S2 §3)', () => {
     expect(await lost.submit(input, profile).catch((x) => x)).toMatchObject({ ambiguous: true });
   });
 
+  it('keeps LlamaCloud\'s error detail on a refused call, without the key', async () => {
+    const f = fakeFetch([{ status: 401, body: { detail: 'Project ID specified in the URL does not match the project ID associated with the API key llx-abc123' } }]);
+    const e = await new LlamaExtractAdapter(policy(), f.fn).submit(input, profile).catch((x) => x);
+    expect(e).toBeInstanceOf(ProviderError);
+    expect(e).toMatchObject({ retryable: false, ambiguous: false });
+    expect(e.message).toBe('LlamaExtract returned HTTP 401. Project ID specified in the URL does not match the project ID associated with the API key llx-[redacted]');
+  });
+
   it('normalises a recorded completed job with per-field citations and credits', () => {
     const r = normaliseLlama({
       status: 'COMPLETED',

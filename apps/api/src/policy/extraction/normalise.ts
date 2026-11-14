@@ -38,7 +38,19 @@ export function needsDefinition(c: CandidateRule): boolean {
   return !c.requirement || c.requirementType === 'unknown' || !hasScope || c.citations.length === 0;
 }
 
-const squash = (s: string) => s.normalize('NFKC').replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, '-').replace(/\s+/g, ' ').trim().toLowerCase();
+// Providers tokenise quotes ("customers only . Never"): spacing around punctuation is not a difference in wording.
+const squash = (s: string) =>
+  s
+    .normalize('NFKC')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\s+/g, ' ')
+    .replace(/ ?([.,;:!?)\]]) ?/g, '$1 ')
+    .replace(/([([]) /g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 
 export interface ResolvedCitation {
   quote: string;
@@ -70,12 +82,27 @@ export function resolveCitation(c: CandidateCitation, doc: { text: string; pages
   };
 }
 
-/** Finds a quote in text, tolerant of whitespace and typographic quote differences; returns [start, end) offsets. */
+/**
+ * Finds a quote in text and returns its exact [start, end) offsets in the original text. Tolerant only of spacing
+ * (runs of whitespace, spaces a provider adds around punctuation), typographic quotes and dashes, letter case, and
+ * Markdown emphasis or code marks (*, _, `) around words. Every word and punctuation mark must still be there, in order:
+ * a quote that is not in the document stays a mismatch (PR-R02).
+ */
 export function findSpan(text: string, quote: string): [number, number] | null {
   const exact = text.indexOf(quote);
   if (exact >= 0) return [exact, exact + quote.length];
-  const words = quote.normalize('NFKC').trim().split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/['\u2018\u2019]/g, "['\u2018\u2019]").replace(/["\u201C\u201D]/g, '["\u201C\u201D]').replace(/[-\u2013\u2014]/g, '[-\u2013\u2014]'));
-  if (!words.length || words.length > 400) return null;
-  const m = new RegExp(words.join('\\s+'), 'i').exec(text.normalize('NFKC'));
+  const parts = quote.normalize('NFKC').trim().match(/\s+|[\p{L}\p{N}]+|[^\s\p{L}\p{N}]/gu) ?? [];
+  const tokens = parts.filter((p) => !/^\s+$/.test(p) && !/^[*_`]$/.test(p)).map((t) => ({ t, word: /[\p{L}\p{N}]/u.test(t) }));
+  if (!tokens.length || tokens.length > 800) return null;
+  const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/['\u2018\u2019]/g, "['\u2018\u2019]").replace(/["\u201C\u201D]/g, '["\u201C\u201D]').replace(/[-\u2013\u2014]/g, '[-\u2013\u2014]');
+  const MARKS = '[*_`]*';
+  let re = esc(tokens[0]!.t);
+  for (let i = 1; i < tokens.length; i++) {
+    const a = tokens[i - 1]!;
+    const b = tokens[i]!;
+    // Two words the quote separates must stay separate words; next to punctuation, spacing is free.
+    re += (a.word && b.word ? `${MARKS}\\s+${MARKS}` : '[\\s*_`]*') + esc(b.t);
+  }
+  const m = new RegExp(re, 'iu').exec(text.normalize('NFKC'));
   return m ? [m.index, m.index + m[0].length] : null;
 }

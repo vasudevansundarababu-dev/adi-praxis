@@ -445,10 +445,29 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
       const f = await call('admin', 'GET', `/template-profiles/${encodeURIComponent(profileId)}`, undefined, { ok: [404] });
       example = f.status === 200 ? (f.body.examples?.[0]?.output ?? null) : null;
     }
-    const output = buildOutput(t, rule!, example);
-    const sampled = profileId && profileId !== 'kyc-account-opening' && !example ? output : null;
-    const saved = await call(sme, 'PUT', `/me/tasks/${taskId}`, { output, activeSecondsDelta: 120, expectedRevision: t.revision }, { ok: [422] });
-    if (saved.status === 422) throw new Error(`Save refused: ${JSON.stringify(saved.body?.details ?? saved.body).slice(0, 600)}`);
+    let output = buildOutput(t, rule!, example);
+    const sampled = profileId && profileId !== 'kyc-account-opening' && !example;
+    const save = async (out: Record<string, unknown>, revision: number) => {
+      const r = await call(sme, 'PUT', `/me/tasks/${taskId}`, { output: out, activeSecondsDelta: 120, expectedRevision: revision }, { ok: [422] });
+      if (r.status === 422) throw new Error(`Save refused: ${JSON.stringify(r.body?.details ?? r.body).slice(0, 600)}`);
+      return r;
+    };
+    let saved = await save(output, t.revision);
+    // A template Anvil defined grades each criterion with its own evaluator. The author learns the template's criterion
+    // IDs and evaluator versions from the workbench's pre-check, exactly as a human author does, and binds the rubric.
+    const bound: { criteriaFrom: 'example' | 'pre-check' | null; criteria: number } = { criteriaFrom: example ? 'example' : null, criteria: 0 };
+    if (!example && t.template?.profileId !== 'kyc-account-opening') {
+      for (let round = 0; round < 2; round++) {
+        const pre = await call(sme, 'POST', `/me/tasks/${taskId}/check`, {});
+        addPaid({ kind: 'similarity-embedding', provider: 'vertex-embeddings', count: 1, usd: PAID_CALL_ESTIMATES_USD.embedding, source: 'estimate' });
+        const next = bindCriteriaFromChecks(output, (pre.body.checks ?? []) as Json[]);
+        if (!next) break;
+        output = next;
+        bound.criteriaFrom = 'pre-check';
+        bound.criteria = ((output.sections as Json).S7?.criteria ?? []).length;
+        saved = await save(output, saved.body.revision);
+      }
+    }
 
     // One live AUTHORING_MODEL call through the chatbot; the author keeps their own text (the proposal is discarded).
     const msg = (await call(sme, 'POST', `/me/tasks/${taskId}/conversation/messages`, {
@@ -479,11 +498,11 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
     }
     if (sub.status === 422) {
       const checks = ((sub.body?.details?.checks ?? []) as Json[]).filter((c) => !c.ok && c.severity !== 'warning').map((c) => `${c.id}: ${c.message}`);
-      const gap = output === sampled ? ` (the form "${profileId}" has no worked example, so the smoke test filled it with the generic synthetic sample; the form needs a worked example, e.g. authoring.examples in the Anvil proposal)` : '';
+      const gap = sampled ? ` (the form "${profileId}" has no worked example, so the smoke test built the case from the form's schema and the template's pre-check; a worked example, e.g. authoring.examples in the Anvil proposal, would make this exact)` : '';
       throw new Error(`Submit refused (${sub.body?.error}): ${checks.join(' | ') || JSON.stringify(sub.body?.details).slice(0, 600)}${gap}`);
     }
     addPaid({ kind: 'similarity-embedding', provider: 'vertex-embeddings', count: 1, usd: PAID_CALL_ESTIMATES_USD.embedding, source: 'estimate' });
-    return { taskId, slot: slot.brief ?? null, case: slot.case ? `${slot.case.field} ${slot.case.value}` : null, form: t.definition, submittedVersion: sub.body.version, assistantModel: run.run.model ?? null };
+    return { taskId, ...bound, slot: slot.brief ?? null, case: slot.case ? `${slot.case.field} ${slot.case.value}` : null, form: t.definition, submittedVersion: sub.body.version, assistantModel: run.run.model ?? null };
   });
 
   // ── 6. Review: the named Reviewer accepts; the dataset record exists and the chain verifies ──
@@ -623,6 +642,18 @@ export function buildOutput(task: Json, rule: { ruleId: string; ruleKey: string 
       policies: [{ ...first, ruleId: rule.ruleKey ?? rule.ruleId, ruleVersion: rule.versionId, locator: rule.ruleKey ?? first.locator ?? 'R1', quote: rule.quote || first.quote, appliesTo: first.appliesTo ?? 'The whole case', rationale: 'Synthetic QA smoke: the case applies the rule this run reviewed and published.' }],
     };
   }
+  // Every pick list holds a value the form allows (the generic sample's S3 environment "none" is not on every form).
+  for (const s of profile?.sections ?? [])
+    for (const f of s.fields ?? []) {
+      const allowed = ((f.options ?? []) as { value: string }[]).map((x) => x.value);
+      const sec = sections[s.key];
+      if (!allowed.length || !sec || f.allowCustom) continue;
+      if (f.type === 'pick_list' && sec[f.key] != null && !allowed.includes(sec[f.key])) sec[f.key] = allowed[0];
+      if (f.type === 'multi_select' && Array.isArray(sec[f.key])) {
+        const kept = (sec[f.key] as unknown[]).filter((v) => allowed.includes(v as string));
+        sec[f.key] = kept.length ? kept : [allowed[0]];
+      }
+    }
   const slotCase = task.input?.slot?.case as { source: string; value: string } | undefined;
   if (slotCase) {
     const [section, field] = slotCase.source.split('.') as [string, string];
@@ -631,4 +662,47 @@ export function buildOutput(task: Json, rule: { ruleId: string; ruleKey: string 
   const tags = task.input?.slot?.tags ?? {};
   base.header = { ...(base.header ?? {}), coverageTags: tags, edgeCase: task.input?.slot?.edgeCase ?? base.header?.edgeCase ?? null };
   return base;
+}
+
+/**
+ * Binds the rubric to a template Anvil defined, from the workbench pre-check (`POST /me/tasks/:id/check`): the
+ * `anvil.evaluator-binding` check names the template's criterion IDs, and `anvil.evaluator-kinds` names each one's
+ * evaluator and version. Returns the corrected output, or null when neither check asks for a change. Weights are split
+ * evenly (two decimals, total exactly 100) and the first criterion is critical. The criterion text stays synthetic.
+ */
+export function bindCriteriaFromChecks(output: Record<string, unknown>, checks: { id: string; ok: boolean; message: string }[]): Record<string, unknown> | null {
+  const failing = (id: string) => checks.find((c) => c.id === id && !c.ok)?.message;
+  const out = structuredClone(output) as Json;
+  const s7 = (out.sections.S7 ??= {});
+  const current = (Array.isArray(s7.criteria) ? s7.criteria : []) as Json[];
+  const binding = failing('anvil.evaluator-binding');
+  if (binding) {
+    const list = /criterion IDs \(([^)]*)\)/.exec(binding)?.[1];
+    const idsFound = (list ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+    if (!idsFound.length) throw new Error(`The pre-check did not name the template's criterion IDs: ${binding}`);
+    const template = current[0] ?? {};
+    const n = idsFound.length;
+    const base = Math.floor(10_000 / n);
+    s7.criteria = idsFound.map((id, i) => ({
+      ...template,
+      id,
+      name: `Synthetic QA smoke check: ${id.replace(/_/g, ' ')}`,
+      passCondition: `The agent's run evidence fully supports ${id.replace(/_/g, ' ')} (synthetic QA smoke).`,
+      partialCredit: `The run evidence partly supports ${id.replace(/_/g, ' ')}.`,
+      failCondition: `The run evidence does not support ${id.replace(/_/g, ' ')}.`,
+      weight: (base + (i < 10_000 - base * n ? 1 : 0)) / 100,
+      critical: i === 0,
+      evaluatorKind: null,
+      evaluatorVersion: null,
+    }));
+    return out;
+  }
+  const kinds = failing('anvil.evaluator-kinds');
+  if (kinds) {
+    const pairs = new Map([...kinds.matchAll(/([A-Za-z0-9_.:-]+) \(([^()\s]+) v([^()\s]+)\)/g)].map((m) => [m[1]!, { kind: m[2]!, version: m[3]! }]));
+    if (!pairs.size) throw new Error(`The pre-check did not name the template's evaluators: ${kinds}`);
+    s7.criteria = current.map((c) => (pairs.has(c.id) ? { ...c, evaluatorKind: pairs.get(c.id)!.kind, evaluatorVersion: pairs.get(c.id)!.version } : c));
+    return out;
+  }
+  return null;
 }

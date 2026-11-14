@@ -1,7 +1,9 @@
-import { TemplateDirectoryResponse } from '@praxis/shared';
+import { HarborBlueprint, TemplateDirectoryResponse } from '@praxis/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DirectoryView } from '@/components/templates/directory/directory-view';
+import { BlueprintSummary } from '@/components/templates/compiler/blueprint-summary';
 import { McHeader } from '@/components/templates/mc-header';
+import { sampleBlueprintInput } from '@/lib/mc/fixtures';
 import { filterDomains, tptText } from '@/lib/mc/format';
 import { handleMock, mockStore, resetMockStore } from '@/lib/mc/mock-backend';
 import { ctx, DOMAIN_BANK, DOMAIN_EMPTY, DOMAIN_MKTG, fixtureSource, html, project, template, text } from './helpers';
@@ -63,6 +65,10 @@ describe('U1 Screen 1 directory', () => {
     expect(t).toContain('Edit Template');
     expect(tptText(null, 'x')).toBe('—');
     expect(tptText(35, '15 Steps')).toBe('35m (15 Steps)');
+    // DEF-1: seeded blueprints store the full text; it is never wrapped twice (directory and Screen 2 summary).
+    expect(tptText(45, '45m (12 Wks)')).toBe('45m (12 Wks)');
+    expect(tptText(30, ' 30m (4 Wks) ')).toBe('30m (4 Wks)');
+    expect(tptText(40, '')).toBe('40m');
   });
 
   it('S1-07, S1-10, S1-11: an Active deployment shows the emerald Active badge, project, SME email and SME UI link (Admin)', async () => {
@@ -104,5 +110,15 @@ describe('U1 Screen 1 directory', () => {
     expect(data.domains.find((d) => d.domainId === DOMAIN_EMPTY)!.rows).toEqual([]);
     expect(data.domains.flatMap((d) => d.rows).every((r) => r.validSections === 6)).toBe(true);
     expect(mockStore().blueprints.size).toBe(2);
+  });
+});
+
+describe('DEF-1 on the PM blueprint summary (S1-08, S1-15)', () => {
+  it('shows a seeded "45m (12 Wks)" label once', () => {
+    const input = sampleBlueprintInput();
+    input.template_meta!.tpt_label = '45m (12 Wks)';
+    const t = text(html(<BlueprintSummary bp={HarborBlueprint.parse(input)} templateId="t-1" />));
+    expect(t).toContain('TPT 45m (12 Wks)');
+    expect(t).not.toContain('45m (45m');
   });
 });

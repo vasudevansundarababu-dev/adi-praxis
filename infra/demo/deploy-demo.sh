@@ -164,6 +164,8 @@ if [ -n "$VERTEX" ]; then
   # FLOW2 SME suitability assessment (worker, qa-users job): Claude Opus by default, which fails without Claude quota,
   # so QA uses Gemini until the quota is granted (then SUITABILITY_MODEL=claude-opus-5). Older builds ignore it.
   printf 'SUITABILITY_MODEL: "%s"\n' "${SUITABILITY_MODEL:-gemini:gemini-3.8-flash}" >> "$ENVFILE"
+  # FLOW2 SME profile chat (owner, 13 Nov): Gemini in QA for the same reason (then PROFILE_MODEL=claude-opus-5).
+  printf 'PROFILE_MODEL: "%s"\n' "${PROFILE_MODEL:-gemini:gemini-3.8-flash}" >> "$ENVFILE"
 fi
 # Live policy extraction (owner decision 10 Nov: live in QA; one-time setup: infra/demo/setup-policy-extraction.sh).
 # Settings are added only when the Layout Parser processor exists in the project. The live switch is added only when

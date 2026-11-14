@@ -999,6 +999,14 @@ Review of the Golden Task2 Marketing handoff v1.1; details in `docs/authoring/MA
 - **Open-slot tags:** an open slot is asked for coverage tags or an edge case, and a reviewer to confirm them, only when the template has coverage dimensions or edge cases.
 - **Invalid proposals:** refused with 422 and audited as `template_proposal.refused`; a repeat with the same Idempotency-Key replays the refusal. Before this fix they returned 500, because the audit guard treated the stored 422 as an unaudited change.
 
+## SME profile chat on Gemini in QA (13 Nov 2026)
+
+- **(owner)** QA has no Claude quota on Vertex, so every SME profile chat answer failed with "I couldn't process that answer just now". The owner chose option 1: let the profile chat run on Gemini, as the suitability assessment already does.
+- **Setting:** `PROFILE_MODEL` takes `gemini:<model>`, `claude:<model>` or a Claude id.
+  - Empty, it follows a Gemini `AUTHORING_MODEL` (as QA has), otherwise Claude Opus 5 as before.
+  - `infra/demo/deploy-demo.sh` sets `gemini:gemini-3.8-flash` explicitly for QA.
+- **Same contract for both providers:** the same rules, escaped answer and output schema; output is validated and narrowed to the fields the controller asked for. Any failure is "assistant unavailable", so the candidate keeps "retry or use the form". The model only proposes facts; the candidate confirms each one.
+
 ## Anvil-defined templates in the Meta-Compiler: "Defined by Anvil", not "n/6 Valid" (13 Nov 2026)
 
 - **Problem (owner, QA):** KYC v5/v6 and VEYRA Hush One showed "1/6 Valid" with red "to fix" pills (Domain 5, Data 5,
@@ -1019,4 +1027,3 @@ Review of the Golden Task2 Marketing handoff v1.1; details in `docs/authoring/MA
   - The Meta-Compiler validator (`sectionProblems`, `validSections`, S2-07 / S2-17) is **unchanged** for
     Harbor/Meta-Compiler templates, and the API still returns `problems`/`validSections` for every template.
   - Anvil-owned parts are only read, never edited.
-

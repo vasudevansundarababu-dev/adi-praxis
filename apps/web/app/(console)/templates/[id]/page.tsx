@@ -94,6 +94,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
           jobDescriptions={jds.map((j) => ({ id: j.id, title: j.title }))}
           factoryId={factoryOf(t, versions, bp.variantOfId)}
           draftId={draft?.id ?? null}
+          anvil={anvil?.definition ?? null}
         />
       </div>
     </div>

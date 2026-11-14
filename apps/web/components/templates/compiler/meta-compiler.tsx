@@ -3,6 +3,7 @@
 import {
   BLUEPRINT_SECTIONS,
   sectionProblems,
+  type AnvilDefinitionDto,
   validSectionCount,
   type BlueprintResponse,
   type BlueprintSection,
@@ -31,6 +32,8 @@ export interface MetaCompilerProps {
   /** Template whose blueprint "Reset to factory" restores (variant source or previous version); null = last saved. */
   factoryId: string | null;
   draftId: string | null;
+  /** Set when Anvil defines this version's execution: no blueprint validity counter or "to fix" badges. */
+  anvil?: AnvilDefinitionDto | null;
 }
 
 type Dialog =
@@ -45,7 +48,7 @@ export function canGenerate(validCount: number, dirty: boolean) {
 }
 
 /** Screen 2: Tier-1 Admin Meta-Compiler (S2-01 to S2-18). */
-export function MetaCompiler({ initial, template, switcher, presets, jobDescriptions, factoryId, draftId }: MetaCompilerProps) {
+export function MetaCompiler({ initial, template, switcher, presets, jobDescriptions, factoryId, draftId, anvil = null }: MetaCompilerProps) {
   const router = useRouter();
   const [saved, setSaved] = useState<BlueprintResponse>(initial);
   const [bp, setBp] = useState<HarborBlueprint>(initial.blueprint);
@@ -158,7 +161,7 @@ export function MetaCompiler({ initial, template, switcher, presets, jobDescript
         <div className="ml-auto flex items-center gap-2">
           {!generateReady && (
             <span id="generate-hint" className="text-xs text-fg-muted">
-              {dirty ? 'Save your changes to generate.' : `${validCount}/6 valid: fix every stage to generate.`}
+              {dirty ? 'Save your changes to generate.' : anvil ? 'Defined by Anvil: Generate is for Meta-Compiler blueprints.' : `${validCount}/6 valid: fix every stage to generate.`}
             </span>
           )}
           {generateReady ? (
@@ -213,11 +216,11 @@ export function MetaCompiler({ initial, template, switcher, presets, jobDescript
 
       <div className="mt-3 grid gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_minmax(20rem,26rem)]">
         <div className="lg:sticky lg:top-36 lg:self-start">
-          <StageNav problems={problems} active={section} onSelect={setSection} />
+          <StageNav problems={problems} active={section} onSelect={setSection} anvil={anvil} />
         </div>
 
         <div id="mc-stage-panel" role="tabpanel" aria-labelledby={`stage-tab-${section}`} className="min-w-0 space-y-4">
-          {problems[section].length > 0 && (
+          {!anvil && problems[section].length > 0 && (
             <ul aria-label="Problems in this stage" className="list-disc rounded-md border border-warning p-3 pl-7 text-sm">
               {problems[section].map((p) => (
                 <li key={p}>{p}</li>

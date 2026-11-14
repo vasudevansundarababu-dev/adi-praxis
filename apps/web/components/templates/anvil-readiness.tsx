@@ -1,3 +1,5 @@
+import type { AnvilDefinitionDto } from '@praxis/shared';
+
 /** Anvil readiness of one template version (Praxis-Anvil contract, 12 Nov 2026): published here and qualified by Anvil. */
 export interface AnvilReadiness {
   versionHash: string;
@@ -8,6 +10,8 @@ export interface AnvilReadiness {
   anvilReady: boolean;
   requirementId: string | null;
   channel: string | null;
+  /** Summary of Anvil's parts; null for a template without `anvilSpec`. */
+  definition?: AnvilDefinitionDto | null;
 }
 
 export function AnvilReadinessBadge({ r }: { r: AnvilReadiness }) {

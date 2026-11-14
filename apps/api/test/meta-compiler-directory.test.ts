@@ -60,11 +60,11 @@ describe('A1 Templates directory (S1-01 to S1-11, S1-15)', () => {
     expect(body.view).toBe('ADMIN');
     expect(body.domains.map((d) => [d.domainName, d.rows.length])).toEqual([['Banking', 1], ['Digital Marketing', 1], ['Empty', 0]]);
     const row = body.domains[1]!.rows[0]!;
-    expect(row).toMatchObject({ templateId: v2.id, version: 2, templateStatus: 'DRAFT', status: 'DRAFT', tptMinutes: 45, tptLabel: '12 Wks', modes: ['HERMETIC_MCP'], validSections: 6, hasBlueprint: true, projectCount: 1 });
+    expect(row).toMatchObject({ templateId: v2.id, version: 2, templateStatus: 'DRAFT', status: 'DRAFT', tptMinutes: 45, tptLabel: '12 Wks', modes: ['HERMETIC_MCP'], validSections: 6, hasBlueprint: true, definedByAnvil: false, projectCount: 1 });
     // The studio runs v1; the row shows v2 (a draft), so the badge is Draft, but the live studio is still listed (S1-10, S3-09).
     expect(row.deployments).toEqual([{ id: expect.any(String), projectId: project.id, projectName: 'PRJ-MKTG-101', status: 'ACTIVE', smeEmail: 'sme.one@example.test', studioUrl: 'https://experts.example.test/studio/mktg-launch-abc123' }]);
     const k = body.domains[0]!.rows[0]!;
-    expect(k).toMatchObject({ templateId: kyb.id, hasBlueprint: false, validSections: 0, tptLabel: '', modes: [], deployments: [] });
+    expect(k).toMatchObject({ templateId: kyb.id, hasBlueprint: false, definedByAnvil: false, validSections: 0, tptLabel: '', modes: [], deployments: [] });
     expect(body.summary).toEqual({ totalTemplates: 2, activeStudios: 1, attachedProjects: 1, attachedSmes: 1, authoredTasks: 0 });
 
     const withRetired = TemplateDirectoryResponse.parse((await http.get(admin, '/templates/directory?includeRetired=true')).json());

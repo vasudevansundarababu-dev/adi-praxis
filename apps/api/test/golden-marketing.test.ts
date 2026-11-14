@@ -210,6 +210,16 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
     expect(t.coverageDimensions).toEqual({ dimensions: [], cells: [] });
     expect(t.edgeCaseCatalog).toEqual([]);
     expect((t.anvilSpec as { execution: { rubric: unknown } }).execution.rubric).toEqual(RUBRIC);
+    // The template page shows "Defined by Anvil" (execution schema, rubric, roles) instead of the n/6 blueprint counter.
+    expect((await get(admin, `/templates/${t.id}/anvil`)).json().definition).toEqual({
+      anvilTemplateKey: 'veyra-hush-one-launch',
+      executionSchemaVersion: 'anvil.template-execution.v3',
+      rubricSummary: `0–4 scale, 7 groups, minimum 80; ${CRITERION_IDS.length} criteria mapped to evaluators`,
+      roleIds: expect.arrayContaining([expect.any(String)]),
+    });
+    expect((await get(admin, `/templates/${t.id}/anvil`)).json().definition.roleIds).toHaveLength(5);
+    const row = (await get(admin, '/templates/directory')).json().domains.flatMap((d: { rows: { templateId: string }[] }) => d.rows).find((r: { templateId: string }) => r.templateId === t.id);
+    expect(row).toMatchObject({ definedByAnvil: true, hasBlueprint: false });
     expect(await db.template.count({ where: { workflowName: 'Launch of Noise Cancelling Phone' } })).toBe(0);
   });
 

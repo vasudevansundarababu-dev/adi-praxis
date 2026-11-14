@@ -62,6 +62,7 @@ export async function templateDirectory(db: Db, args: { clientId: string; view: 
       modes: bp?.template_meta.modes.length ? bp.template_meta.modes : t.executionMode ? [t.executionMode] : [],
       validSections: bp ? validSectionCount(sectionProblems(bp)) : 0,
       hasBlueprint: bp !== null,
+      definedByAnvil: t.anvilSpec !== null,
       variantOfId: t.variantOfId,
       projectCount: projectCount.get(t.lineageId) ?? 0,
       authoredTaskCount: authoredCount.get(t.lineageId) ?? 0,

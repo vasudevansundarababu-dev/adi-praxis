@@ -28,6 +28,7 @@ import { healthRoutes } from './routes/health';
 import { jobDescriptionRoutes } from './routes/job-descriptions';
 import { GoogleIdTokenVerifier, MockGoogleVerifier, type GoogleVerifier } from './candidate/google';
 import { MockIdentityProvider, StripeIdentityProvider, type IdentityProvider } from './candidate/identity-provider';
+import { defaultRuleAssistant, type PolicyRuleAssistant } from './policy/rule-assistant';
 import { MockProfileAssistant, profileModel, vertexProfileAssistant, type ProfileAssistant } from './candidate/profile-assistant';
 import { MockSuitabilityEvaluator, vertexSuitabilityEvaluator, type SuitabilityEvaluator } from './candidate/suitability';
 import { GcsStorage, stubScanner, type MalwareScanner, type ObjectStorage } from './candidate/storage';
@@ -130,6 +131,8 @@ export interface AppDeps {
   metaCompiler?: MetaCompilerOverrides;
   /** Policy extraction providers. Defaults follow config (live calls only when POLICY_EXTRACTION_LIVE is on). */
   policyAdapters?: Adapters;
+  /** Policy rule assistant (suggest + define): POLICY_AI_MODEL on Vertex when configured, otherwise the mock. */
+  ruleAssistant?: PolicyRuleAssistant;
 }
 
 export function defaultSupport(config: Config): SupportAssistant {
@@ -353,7 +356,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(modelProviderRoutes, { db: deps.db, config: deps.config });
       await v1.register(conversationRoutes, { db: deps.db, selectionGate, dailyModelCallCap: deps.config.AUTHORING_DAILY_CALL_CAP });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
-      await v1.register(policyRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, adapters: deps.policyAdapters ?? defaultAdapters(deps.config.policy) });
+      await v1.register(policyRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, adapters: deps.policyAdapters ?? defaultAdapters(deps.config.policy), assistant: deps.ruleAssistant ?? defaultRuleAssistant(deps.config) });
       await v1.register(policyProposalRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       // M10 SME supply: nothing is registered with the flag off (docs/SME-SUPPLY.md section 13).
       if (deps.config.SME_SUPPLY_ENABLED) {

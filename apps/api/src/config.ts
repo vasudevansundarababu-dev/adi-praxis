@@ -76,6 +76,13 @@ const Env = z.object({
    */
   PROFILE_MODEL: z.string().default(''),
   /**
+   * Policy rules page (PRD 5.6): model that suggests rules for a PM's criteria and drafts rule definitions. Same forms as
+   * PROFILE_MODEL. Empty follows a Gemini AUTHORING_MODEL (QA), otherwise claude-sonnet-5-5. Suggests only; never decides.
+   */
+  POLICY_AI_MODEL: z.string().default(''),
+  /** Per-client daily cap on policy AI calls (suggestion runs + definitions). */
+  POLICY_AI_DAILY_CALL_CAP: z.coerce.number().int().min(1).max(100_000).default(1000),
+  /**
    * Praxis-Anvil contract (12 Nov 2026): Anvil's project-scoped dataset-export API, e.g.
    * https://anvil-qa.adi-labs.ai/api/v1/projects/<project>/dataset-exports/generic (one Anvil project per environment). Blank = not connected (Praxis pre-check).
    * The token is an Anvil-issued export-client secret: server only, never logged, never sent to a browser.

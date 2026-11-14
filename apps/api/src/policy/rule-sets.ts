@@ -77,6 +77,8 @@ export function detectConflicts(items: Current[]): Conflict[] {
 export interface Preview {
   included: Array<{ ruleKey: string; ruleVersionId: string; version: number; title: string }>;
   excluded: Array<{ ruleKey: string; reason: string | null }>;
+  /** Rules a PM or Admin has not applied to the project (PR-M08): left out, never blocking. */
+  notApplied: Array<{ ruleKey: string; state: string; required: boolean }>;
   blocking: string[];
   conflicts: Conflict[];
   counts: Record<string, number>;
@@ -94,28 +96,35 @@ function setContent(items: Current[]) {
       version: i.version.version,
       contentHash: i.version.contentHash,
       body: PolicyRuleBody.parse(i.version.body),
-      sources: i.version.citations.map((c) => ({ documentVersionId: c.documentVersionId, sha256: c.documentVersion.sha256, fieldPath: c.fieldPath, role: c.role, quote: c.quote, locator: c.locator })),
+      // An unverified quote applied with the PM's confirmation (PR-M05) says so; verified sources keep their earlier shape.
+      sources: i.version.citations.map((c) => ({ documentVersionId: c.documentVersionId, sha256: c.documentVersion.sha256, fieldPath: c.fieldPath, role: c.role, quote: c.quote, locator: c.locator, ...(c.resolution === 'RESOLVED' ? {} : { resolution: c.resolution }) })),
     }));
   return { inheritanceMode: 'ALL_TASKS', rules };
 }
 
-/** Publication preview (S1 R13). Draft / Needs definition required rules and any conflict block publication. */
+export const NOT_APPLIED = 'Not applied to this project';
+
+/**
+ * Publication preview (S1 R13, PR-M08). The set holds the applied (Reviewed) rules; Draft and Needs definition
+ * versions are never included and, since 14 Nov 2026, do not block: they are listed as Not applied. A conflict blocks
+ * when it involves an applied rule.
+ */
 export async function previewRuleSet(tx: Db | Tx, clientId: string, projectId: string): Promise<Preview> {
   const items = await currentVersions(tx, clientId, projectId);
   const counts = { DRAFT: 0, NEEDS_DEFINITION: 0, REVIEWED: 0, EXCLUDED: 0 } as Record<string, number>;
   for (const i of items) counts[i.version.state] = (counts[i.version.state] ?? 0) + 1;
   const blocking: string[] = [];
-  for (const i of items) {
-    if (i.rule.required && (i.version.state === 'DRAFT' || i.version.state === 'NEEDS_DEFINITION')) blocking.push(`${i.rule.ruleKey} is ${i.version.state === 'DRAFT' ? 'a draft' : 'Needs definition'}; review it or exclude it with a reason.`);
-  }
+  const applied = new Set(items.filter((i) => i.version.state === 'REVIEWED').map((i) => i.rule.ruleKey));
   const conflicts = detectConflicts(items);
-  for (const c of conflicts) blocking.push(c.message);
+  for (const c of conflicts) if (c.ruleKeys.some((k) => applied.has(k))) blocking.push(c.message);
+  const notApplied = items.filter((i) => i.version.state === 'DRAFT' || i.version.state === 'NEEDS_DEFINITION');
   const content = setContent(items);
-  if (content.rules.length === 0) blocking.push('No rule is Reviewed yet.');
+  if (content.rules.length === 0) blocking.push('No rule is applied to the project yet.');
   const latest = await tx.projectRuleSet.findFirst({ where: { clientId, projectId }, orderBy: { version: 'desc' }, select: { id: true, version: true, digest: true } });
   return {
     included: content.rules.map((r) => ({ ruleKey: r.ruleKey, ruleVersionId: r.ruleVersionId, version: r.version, title: r.body.title })),
-    excluded: items.filter((i) => i.version.state === 'EXCLUDED').map((i) => ({ ruleKey: i.rule.ruleKey, reason: i.version.excludeReason })),
+    excluded: [...items.filter((i) => i.version.state === 'EXCLUDED').map((i) => ({ ruleKey: i.rule.ruleKey, reason: i.version.excludeReason })), ...notApplied.map((i) => ({ ruleKey: i.rule.ruleKey, reason: NOT_APPLIED }))],
+    notApplied: notApplied.map((i) => ({ ruleKey: i.rule.ruleKey, state: i.version.state, required: i.rule.required })),
     blocking,
     conflicts,
     counts,

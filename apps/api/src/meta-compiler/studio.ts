@@ -2,7 +2,7 @@ import type { TaskInstance } from '@prisma/client';
 import { STUDIO_STEP_IDS, StudioAnswers, type HarborBlueprint, type TaskCheck } from '@praxis/shared';
 import type { ObjectStorage } from '../candidate/storage';
 import type { Db, Tx } from '../db';
-import { notFound } from '../lib/errors';
+import { AppError, notFound } from '../lib/errors';
 import { genericDefinition, registerDefinition, type TaskDefinition } from '../tasks/definitions';
 import type { MetaCompilerDeps } from './deps';
 import { loadGenerationOutput } from './generation';
@@ -75,15 +75,16 @@ export async function deployedBlueprint(tx: Db | Tx, storage: ObjectStorage, ver
 }
 
 /**
- * The deployment behind a studio key, only for its own SME (S4-02, D14). Anyone else, another client, or a stopped
- * studio gets the same 404, so a key reveals nothing.
+ * The deployment behind a studio key, only for its own SME (S4-02, D14). Anyone else or another client gets the same
+ * 404, so a key reveals nothing. Its own SME gets 410 once it is stopped or failed, so the URL shows "studio closed" (S3-10).
  */
 export async function studioFor(tx: Db | Tx, args: { studioKey: string; clientId: string; smeUserId: string }) {
   const d = await tx.studioDeployment.findFirst({
-    where: { studioKey: args.studioKey, clientId: args.clientId, status: 'ACTIVE', candidate: { smeUserId: args.smeUserId } },
+    where: { studioKey: args.studioKey, clientId: args.clientId, candidate: { smeUserId: args.smeUserId } },
     include: { template: { include: { domain: true } }, project: true },
   });
   if (!d) throw notFound('Studio not found');
+  if (d.status !== 'ACTIVE') throw new AppError(410, 'STUDIO_CLOSED', 'This studio is closed. Work you already committed is kept.');
   return d;
 }
 

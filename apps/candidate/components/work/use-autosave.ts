@@ -83,7 +83,7 @@ export function useAutosave<T extends Record<string, unknown>>(taskId: string, i
             return true;
           }
           dirty.current = true;
-          setState({ kind: res.ok || body?.error === 'STALE_REVISION' ? 'conflict' : 'error', message: res.ok ? 'Save confirmation could not be verified. Reload before continuing.' : body?.message ?? 'Could not save' });
+          setState({ kind: res.ok || body?.error === 'STALE_REVISION' || body?.error === 'STUDIO_CLOSED' ? 'conflict' : 'error', message: res.ok ? 'Save confirmation could not be verified. Reload before continuing.' : body?.message ?? 'Could not save' });
           return false;
         } catch {
           dirty.current = true;

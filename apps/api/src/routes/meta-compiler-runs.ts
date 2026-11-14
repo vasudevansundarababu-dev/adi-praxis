@@ -11,7 +11,7 @@ import type { MetaCompilerDeps } from '../meta-compiler/deps';
 import { DrafterError, estimate, type DrafterFactory } from '../meta-compiler/drafter';
 import { generationDto, progress, promptFor, promptHashOf } from '../meta-compiler/generation';
 import type { HarborRunner } from '../harbor/runner';
-import { deploymentDto, deployStudio } from '../meta-compiler/deployments';
+import { deploymentDto, deployStudio, stopStudio } from '../meta-compiler/deployments';
 import { pendingChecks, verificationDto, verificationLogTail } from '../meta-compiler/verification';
 import { runCommand } from '../platform/command';
 import type { Prisma } from '@prisma/client';
@@ -138,6 +138,15 @@ export const metaCompilerRunRoutes: FastifyPluginAsyncZod<RunRoutesOptions> = as
       await runCommand(db, req, reply, (ctx) =>
         deployStudio(ctx, { templateId: req.params.id, verificationRunId: req.body.verificationRunId, projectId: req.body.projectId, candidateId: req.body.smeCandidateId, candidateAppUrl: config.CANDIDATE_APP_URL }),
       );
+      return reply;
+    },
+  );
+
+  app.post(
+    '/deployments/:id/stop',
+    { config: { access: ADMIN }, schema: { tags: ['meta-compiler'], params: IdParams, response: { 200: StudioDeploymentDto } } },
+    async (req, reply) => {
+      await runCommand(db, req, reply, (ctx) => stopStudio(ctx, { deploymentId: req.params.id, candidateAppUrl: config.CANDIDATE_APP_URL }));
       return reply;
     },
   );

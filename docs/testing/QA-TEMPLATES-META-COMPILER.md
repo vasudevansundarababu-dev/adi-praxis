@@ -174,7 +174,7 @@ repository, without a dedicated test.
 | S3-07 | S | Copy SME URL; "Open Deployed SME Studio" link. | Pass — meta-compiler-deployments.test.ts |
 | S3-08 | S | Live logs panel (compiler, verifier, runtime) and generated-code preview. | Pass — meta-compiler-generation.test.ts, meta-compiler-verification.test.ts, pipeline.test.tsx |
 | S3-09 | M | Re-generation and rollback: a newer generation does not replace a running studio until it passes Step 2 and… | Pass — meta-compiler-deployments.test.ts, meta-compiler-directory.test.ts, meta-compiler-schema.test.ts, pipeline.test.tsx |
-| S3-10 | M | Stop a studio (owner agreed, D12; Phase C). | Not built — Phase C (after 16 Nov) |
+| S3-10 | M | Stop a studio (owner agreed, D12; Phase C). | Built 10 Nov, awaiting independent QA. `S3-10 an Admin stops a studio…` (API: Admin only, 404 across clients, 410 "studio closed" for its SME, other SMEs still 404, authored tasks kept, audited once, idempotent, redeploy reopens the same URL); `S3-10: each active studio has a Stop button…` (web). "Uses no compute" holds for the shared runtime, which has no per-studio compute; the isolated runtime's `stop` is not built |
 | S3-11 | S | Optional per-template code generation (D5 = C): when the server-side switch is on, Step 1 offers "Generate… | Pass — meta-compiler-generation.test.ts |
 | S4-01 | M | Studio header shows status (running), preserved URL, project and SME identity. | Pass — meta-compiler-studio.test.ts, studio.test.tsx |
 | S4-02 | M | Access control: only the assigned SME (and Admins, read-only per D4) can open the studio. | Pass — meta-compiler-studio.test.ts, studio.test.tsx |

@@ -76,7 +76,7 @@ export function Pipeline({ templateId, models, targets, deployments: initialDepl
   const [smeId, setSmeId] = useState('');
   const [deployments, setDeployments] = useState(initialDeployments);
   const [deployed, setDeployed] = useState<StudioDeploymentDto | null>(null);
-  const [busy, setBusy] = useState<'gen' | 'ver' | 'deploy' | null>(null);
+  const [busy, setBusy] = useState<'gen' | 'ver' | 'deploy' | `stop:${string}` | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const keys = useRef<Record<string, string>>({});
@@ -126,6 +126,18 @@ export function Pipeline({ templateId, models, targets, deployments: initialDepl
     setCopied(false);
     const list = await mcBrowser.deployments(templateId);
     if (list.data) setDeployments(list.data.items);
+  }
+
+  async function stop(d: StudioDeploymentDto) {
+    if (!window.confirm(`Stop this studio? Its SME will see "studio closed" at ${d.studioUrl}. Committed tasks are kept, and deploying to the same project and SME reopens it.`)) return;
+    setBusy(`stop:${d.id}`);
+    setError(null);
+    const r = await mcBrowser.stopStudio(d.id, keyFor(`stop:${d.id}`));
+    setBusy(null);
+    delete keys.current[`stop:${d.id}`];
+    if (!r.ok || !r.data) return setError(r.error);
+    if (deployed?.id === d.id) setDeployed(r.data);
+    setDeployments((list) => list.map((x) => (x.id === d.id ? r.data! : x)));
   }
 
   const hint = deployHint(ver, projectId, smeId);
@@ -301,7 +313,7 @@ export function Pipeline({ templateId, models, targets, deployments: initialDepl
         {deployments.length > 0 && (
           <div>
             <h3 className="text-sm font-medium">Studios for this workflow</h3>
-            <p className="text-xs text-fg-muted">A studio stays live until a newer generation passes Step 2 and is deployed to the same project and SME.</p>
+            <p className="text-xs text-fg-muted">A studio stays live until you stop it or deploy a newer verified generation to the same project and SME. Stopping keeps committed tasks; deploying again reopens the same URL.</p>
             <ul className="mt-1 divide-y divide-hairline text-sm">
               {deployments.map((d) => (
                 <li key={d.id} className="flex flex-wrap items-center gap-2 py-1.5">
@@ -312,6 +324,12 @@ export function Pipeline({ templateId, models, targets, deployments: initialDepl
                     {d.studioUrl}
                     <span className="sr-only"> (opens in a new tab)</span>
                   </a>
+                  {d.status === 'ACTIVE' && (
+                    <button type="button" className="btn btn-secondary !px-2 !py-0.5 text-xs" disabled={busy !== null} aria-busy={busy === `stop:${d.id}`} onClick={() => void stop(d)}>
+                      {busy === `stop:${d.id}` ? 'Stopping…' : 'Stop studio'}
+                      <span className="sr-only"> for v{d.templateVersion}, {targets.find((p) => p.id === d.projectId)?.name ?? d.projectId}</span>
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

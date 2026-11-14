@@ -73,6 +73,25 @@ export async function deployStudio(
   return { status: existing ? 200 : 201, body: deploymentDto(d, args.candidateAppUrl) };
 }
 
+/**
+ * S3-10: an Admin stops a studio. Its URL then shows "studio closed" to its SME; authored tasks, bundles and any open
+ * task stay as they are, so a later deploy to the same project and SME reopens the same URL. Idempotent and audited.
+ */
+export async function stopStudio(ctx: CommandContext, args: { deploymentId: string; candidateAppUrl: string }): Promise<{ status: number; body: StudioDeploymentDto }> {
+  const { tx, actor, audit } = ctx;
+  const existing = await tx.studioDeployment.findFirst({ where: { id: args.deploymentId, clientId: actor.clientId } });
+  if (!existing) throw notFound('Studio not found');
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`studio:${existing.templateLineageId}:${existing.projectId}:${existing.candidateId}`}))`;
+  const d = await tx.studioDeployment.findUniqueOrThrow({ where: { id: existing.id } });
+  if (d.status === 'STOPPED') {
+    await audit({ entityType: 'StudioDeployment', entityId: d.id, action: 'studio.stop_unchanged', after: { status: 'STOPPED' } });
+    return { status: 200, body: deploymentDto(d, args.candidateAppUrl) };
+  }
+  const stopped = await tx.studioDeployment.update({ where: { id: d.id }, data: { status: 'STOPPED', stoppedAt: new Date(), stoppedById: actor.userId } });
+  await audit({ entityType: 'StudioDeployment', entityId: d.id, action: 'studio.stopped', before: { status: d.status }, after: { status: 'STOPPED', studioKey: d.studioKey, projectId: d.projectId, candidateId: d.candidateId } });
+  return { status: 200, body: deploymentDto(stopped, args.candidateAppUrl) };
+}
+
 async function newStudioKey(tx: Tx, blueprint: unknown): Promise<string> {
   const id = HarborBlueprint.safeParse(blueprint).data?.studio_id || 'studio';
   for (;;) {

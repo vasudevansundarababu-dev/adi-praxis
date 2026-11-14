@@ -792,6 +792,15 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
           const grants = await db.$queryRaw<{ p: string }[]>`SELECT privilege_type AS p FROM information_schema.table_privileges WHERE table_name = ${t}`;
           expect(grants.map((g) => g.p).filter((p) => p === 'UPDATE' || p === 'DELETE'), t).toEqual([]);
         }
+        // A foreign key into an append-only table locks the referenced row as the table owner, which needs UPDATE on
+        // a column; without the id grant every insert that references it fails on Cloud SQL (QA, 14 Nov 2026:
+        // ExtractionJob -> PolicyDocumentVersion). The local superuser hides this, so check the grant itself.
+        const referenced = await db.$queryRaw<{ t: string }[]>`SELECT DISTINCT c.relname AS t FROM pg_constraint k JOIN pg_class c ON c.oid = k.confrelid WHERE k.contype = 'f' AND c.relname = ANY(${tables})`;
+        expect(referenced.map((r) => r.t).sort()).toEqual(['ApprovedTaskRecord', 'PolicyDocumentVersion', 'SelectionDecision']);
+        for (const { t } of referenced) {
+          const cols = await db.$queryRaw<{ c: string }[]>`SELECT column_name AS c FROM information_schema.column_privileges WHERE table_name = ${t} AND privilege_type = 'UPDATE'`;
+          expect(cols.map((x) => x.c), t).toEqual(['id']);
+        }
       });
 
       it('the verification job recomputes the hash chain and reports any break', async () => {

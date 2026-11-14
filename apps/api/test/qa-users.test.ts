@@ -10,7 +10,9 @@ import { MockGoogleVerifier } from '../src/candidate/google';
 import { MockIdentityProvider } from '../src/candidate/identity-provider';
 import { MemoryStorage } from '../src/candidate/storage';
 import { MockSuitabilityEvaluator } from '../src/candidate/suitability';
-import { defaultEmails, emailList, optionsFromEnv, poolName, qaUsers, spread, type Http, type QaUsersOptions } from '../src/jobs/qa-users';
+import { acceptProposals, defaultEmails, emailList, optionsFromEnv, parseQaUsersArgs, personaPlan, poolName, qaUsers, spread, type Http, type QaUsersOptions } from '../src/jobs/qa-users';
+import { PERSONAS, trackOf } from '../src/jobs/qa-personas';
+import { cleanupSmes } from '../src/jobs/qa-sme-cleanup';
 import { processDomainEvent } from '../src/outbox/dispatcher';
 import { HandlerRegistry } from '../src/outbox/handlers';
 import { assessOnSubmit } from '../src/candidate/selection-service';
@@ -277,6 +279,118 @@ describe('qa-users: QA seed of 30 staffing-ready SMEs and 10 Reviewers', () => {
     expect(waits.filter((w) => w === 31_000)).toHaveLength(2);
   }, 60_000);
 
+  it('matched mode seeds only the KYC personas into the named project; the PM assigns, the SMEs accept; the SME cleanup then deletes or retires everyone', async () => {
+    const kyc = PERSONAS.filter((p) => p.track === 'KYC').map((p) => p.email).sort();
+    const matched = { personas: PERSONAS, candidateEmails: PERSONAS.map((p) => p.email), projectIds: [existingProjectId], reviewerEmails: defaultEmails('reviewer', 2) };
+    const plan = await qaUsers(db, options({ ...matched, dryRun: true }), log);
+    expect(plan.templates.map((t) => t.projectId)).toEqual([existingProjectId]);
+    expect(plan.slots.map((s) => s.candidateEmail).sort()).toEqual(kyc);
+    expect(await db.smeUser.count()).toBe(0);
+
+    const r = await qaUsers(db, options(matched), log);
+    expect(r.incomplete).toBe(0);
+    expect(r.slots.map((s) => s.candidateEmail).sort()).toEqual(kyc);
+    // No pool for the other template, no Marketing persona on a KYC project.
+    expect(await db.project.count()).toBe(1);
+    const users = await db.smeUser.findMany();
+    expect(users).toHaveLength(8);
+    expect(users.map((u) => u.displayName).sort()).toEqual(PERSONAS.filter((p) => p.track === 'KYC').map((p) => p.name).sort());
+    // The persona's own answers went through the profile form.
+    const il = await db.profileVersion.findFirstOrThrow({ where: { smeUser: { displayName: { contains: 'KYC SME 07' } } }, orderBy: { version: 'desc' } });
+    const f = (il.data as { fields: Record<string, { value: unknown }> }).fields;
+    expect(f.jurisdictions!.value).toEqual(['United States']);
+    expect(f.specialties!.value).toEqual(['KYC / onboarding', 'Enhanced due diligence', 'Sanctions review', 'Compliance testing']);
+    expect(f.decision_authority!.value).toBe('Approved outcomes');
+    expect(String(f.work_example!.value)).toMatch(/custodial account for a minor/);
+    expect(String(f['criterion:skill-1']!.value)).toMatch(/Illinois/);
+    expect(JSON.stringify(il)).not.toMatch(/United Kingdom|Synthetic QA test answer/);
+    // Every selection is still a named Reviewer's decision.
+    expect(await db.selectionDecision.count({ where: { outcome: 'SELECTED' } })).toBe(8);
+
+    // The PM assigns two; the synthetic SMEs accept through the candidate endpoint.
+    const pm = await login(app, 'pm@praxis.demo', PM_PW);
+    const post = (url: string, payload: object = {}) => app.inject({ method: 'POST', url: `/api/v1${url}`, headers: { cookie: pm, ...idem() }, payload });
+    expect((await post(`/projects/${existingProjectId}/match`)).statusCode).toBeLessThan(300);
+    expect((await post(`/projects/${existingProjectId}/assignments`, { topN: 2 })).statusCode).toBeLessThan(300);
+    const accepted = await acceptProposals(db, { appEnv: 'demo', http, personas: PERSONAS }, log);
+    expect(accepted.map((a) => a.outcome)).toEqual(['accepted', 'accepted']);
+    expect(await db.smeAssignment.count({ where: { status: 'ACCEPTED' } })).toBe(2);
+    await expect(acceptProposals(db, { appEnv: 'production', http, personas: PERSONAS }, log)).rejects.toThrow(/production/);
+    // Personas that were never seeded (the Marketing ones here) are skipped, not signed up.
+    expect(await db.smeUser.count()).toBe(8);
+
+    // One more SME who only started an application: no protected history, so fully deletable.
+    const token = (await http({ method: 'POST', path: '/auth/dev/google-token', body: { email: 'draft@praxis.test', name: 'SYNTHETIC QA draft' } })).body.credential;
+    const signIn = await http({ method: 'POST', path: '/auth/google', body: { credential: token, adultAttested: true } });
+    const cookie = signIn.cookies.join('; ');
+    const opp = await db.opportunity.findFirstOrThrow({ where: { projectId: existingProjectId, role: 'AUTHOR' } });
+    expect((await http({ method: 'POST', path: '/me/enrollments', body: { opportunityId: opp.id }, cookie })).status).toBeLessThan(300);
+    const draftUser = await db.smeUser.findFirstOrThrow({ where: { displayName: 'SYNTHETIC QA draft' } });
+
+    // Dry run: classifies, writes nothing.
+    const before = { smes: await db.smeUser.count(), ids: await db.providerIdentity.count(), audit: await db.auditEvent.count(), decisions: await db.selectionDecision.count() };
+    const dry = await cleanupSmes(db, { apply: false });
+    expect(dry.filter((o) => o.outcome === 'would_delete').map((o) => o.smeUserId)).toEqual([draftUser.id]);
+    expect(dry.filter((o) => o.outcome === 'would_retire')).toHaveLength(8);
+    expect(dry.find((o) => o.outcome === 'would_retire')!.reasons.join()).toMatch(/selection decisions/);
+    expect({ smes: await db.smeUser.count(), ids: await db.providerIdentity.count(), audit: await db.auditEvent.count(), decisions: await db.selectionDecision.count() }).toEqual(before);
+
+    const done = await cleanupSmes(db, { apply: true });
+    expect(done.filter((o) => o.outcome === 'deleted')).toHaveLength(1);
+    expect(done.filter((o) => o.outcome === 'retired')).toHaveLength(8);
+    expect(await db.smeUser.findUnique({ where: { id: draftUser.id } })).toBeNull();
+    expect(await db.enrollment.count({ where: { smeUserId: draftUser.id } })).toBe(0);
+    // Protected history is untouched; nobody can sign in with the old account; nothing is left open or counted.
+    expect(await db.selectionDecision.count()).toBe(before.decisions);
+    expect(await db.providerIdentity.count()).toBe(0);
+    expect(await db.session.count({ where: { smeUserId: { not: null } } })).toBe(0);
+    for (const u of await db.smeUser.findMany()) expect(u).toMatchObject({ accountStatus: 'CLOSED', displayName: 'Deleted SME', contactEmail: null });
+    expect(await db.candidate.count({ where: { deletedAt: null } })).toBe(0);
+    expect(await db.smeAssignment.count({ where: { status: { in: ['PROPOSED', 'ACCEPTED'] } } })).toBe(0);
+    expect(await db.projectAssignment.count({ where: { releasedAt: null } })).toBe(0);
+    // Matches are gone, and the matcher's own filter skips deleted and closed candidates (the project itself is
+    // STAFFED here, so its match can't be re-run; QA cancels old projects with qa-project-cleanup).
+    expect(await db.projectMatch.count()).toBe(0);
+    expect(await db.candidate.count({ where: { deletedAt: null, smeUser: { accountStatus: 'ACTIVE' } } })).toBe(0);
+    // Audited as SYSTEM, without names or emails.
+    const audits = await db.auditEvent.findMany({ where: { action: { in: ['sme.hard_deleted', 'sme.retired'] } } });
+    expect(audits).toHaveLength(9);
+    expect(audits.every((a) => a.actorType === 'SYSTEM' && a.actorId === 'qa-sme-cleanup')).toBe(true);
+    expect(JSON.stringify(audits)).not.toMatch(/@praxis\.test|SYNTHETIC QA KYC/);
+
+    // Idempotent.
+    const again = await cleanupSmes(db, { apply: true });
+    expect(again.every((o) => o.outcome === 'already_retired')).toBe(true);
+    expect(await db.auditEvent.count({ where: { action: { in: ['sme.hard_deleted', 'sme.retired'] } } })).toBe(9);
+
+    // The same email later starts a brand-new, clean account; the retired one stays closed.
+    const re = (await http({ method: 'POST', path: '/auth/dev/google-token', body: { email: 'kyc01@praxis.test', name: 'again' } })).body.credential;
+    expect((await http({ method: 'POST', path: '/auth/google', body: { credential: re, adultAttested: true } })).status).toBe(200);
+    expect(await db.smeUser.count({ where: { accountStatus: 'ACTIVE' } })).toBe(1);
+  }, 300_000);
+
+  it('matched mode refuses a project without a published opportunity', async () => {
+    const draft = await db.project.create({ data: { clientId, name: 'Unpublished', templateId: templateA, templateVersion: 1, ownerId: (await db.user.findUniqueOrThrow({ where: { email: 'pm@praxis.demo' } })).id } as never }).catch(() => null);
+    if (draft) await expect(qaUsers(db, options({ personas: PERSONAS, candidateEmails: PERSONAS.map((p) => p.email), projectIds: [draft.id], dryRun: true }), log)).rejects.toThrow(/published opportunity/);
+    await expect(qaUsers(db, options({ personas: PERSONAS, candidateEmails: PERSONAS.map((p) => p.email), projectIds: [randomUUID()], dryRun: true }), log)).rejects.toThrow(/not found/);
+  });
+
+  it('qa-sme-cleanup as a run.ts job: refuses production, and --apply needs the confirmation phrase', async () => {
+    const run = (args: string[], extra: Record<string, string>) => {
+      try {
+        return { code: 0, out: execFileSync('npx', ['tsx', 'src/jobs/run.ts', 'qa-sme-cleanup', ...args], { cwd: path.resolve(import.meta.dirname, '..'), env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: TEST_DATABASE_URL, REDIS_URL: TEST_REDIS_URL, ...extra }, encoding: 'utf8' }) };
+      } catch (err) {
+        const e = err as { status: number; stdout: string };
+        return { code: e.status, out: e.stdout };
+      }
+    };
+    expect(run([], { APP_ENV: 'production' })).toMatchObject({ code: 1, out: expect.stringMatching(/refuses to run with APP_ENV=production/) });
+    expect(run(['--apply'], { APP_ENV: 'local', QA_SME_CLEANUP_CONFIRM: '' })).toMatchObject({ code: 1, out: expect.stringMatching(/QA_SME_CLEANUP_CONFIRM=delete-all-smes/) });
+    const dry = run([], { APP_ENV: 'local' });
+    expect(dry.code).toBe(0);
+    expect(dry.out).toMatch(/"report":"qa-sme-cleanup","apply":false/);
+  }, 90_000);
+
   it('needs the passwords for a real run', async () => {
     await expect(qaUsers(db, options({ reviewerPassword: undefined }), log)).rejects.toThrow(/QA_SEED_REVIEWER_PASSWORD/);
     await expect(qaUsers(db, options({ reviewerPassword: 'short' }), log)).rejects.toThrow(/at least 12/);
@@ -300,6 +414,35 @@ describe('qa-users: planning', () => {
       expect(new Set(slots.map((s) => s.candidateEmail)).size).toBe(30);
       expect(new Set(slots.map((s) => s.reviewerEmail)).size).toBe(Math.min(10, slots.length));
     }
+  });
+
+  it('matches personas to templates by track and refuses templates that fit neither', () => {
+    expect(trackOf('KYC onboarding and refresh', 'Banking')).toBe('KYC');
+    expect(trackOf('Golden KYC reusable', 'Banking')).toBe('KYC');
+    expect(trackOf('Campaign brief', 'Marketing')).toBe('MARKETING');
+    expect(trackOf('Sanctions screening', 'Banking')).toBeNull();
+    const t = (workflowName: string, name: string) => ({ workflowName, domain: { name } });
+    const plan = personaPlan([t('KYC onboarding', 'Banking'), t('Launch plan', 'Marketing')], PERSONAS, ['r1', 'r2']);
+    expect(plan.filter((s) => s.template.workflowName === 'KYC onboarding')).toHaveLength(8);
+    expect(plan.filter((s) => s.template.workflowName === 'Launch plan').map((s) => s.candidateEmail)).toEqual(['mkt01@praxis.test', 'mkt02@praxis.test', 'mkt03@praxis.test', 'mkt04@praxis.test']);
+    expect(() => personaPlan([t('Sanctions screening', 'Banking')], PERSONAS, ['r1'])).toThrow(/neither a KYC nor a Marketing/);
+    // 12 synthetic personas, KYC spread over the five governing states.
+    expect(PERSONAS).toHaveLength(12);
+    expect(new Set(PERSONAS.map((p) => p.email)).size).toBe(12);
+    expect(PERSONAS.every((p) => p.name.startsWith('SYNTHETIC QA') && p.email.endsWith('@praxis.test'))).toBe(true);
+    expect(new Set(PERSONAS.filter((p) => p.track === 'KYC').map((p) => (p.fields.jurisdictions as string[])[1]))).toEqual(new Set(['US-CA', 'US-NY', 'US-TX', 'US-FL', 'US-IL']));
+  });
+
+  it('parses the run.ts arguments', () => {
+    const id = randomUUID();
+    expect(parseQaUsersArgs([])).toEqual({ dryRun: false, matched: false, accept: false, projectIds: [] });
+    expect(parseQaUsersArgs(['--matched', '--project', id, '--dry-run'])).toMatchObject({ matched: true, dryRun: true, projectIds: [id] });
+    expect(parseQaUsersArgs(['--accept'])).toMatchObject({ accept: true });
+    expect(() => parseQaUsersArgs(['--matched'])).toThrow(/at least one --project/);
+    expect(() => parseQaUsersArgs(['--project', id])).toThrow(/needs --matched/);
+    expect(() => parseQaUsersArgs(['--project', 'x'])).toThrow(/project id/);
+    expect(() => parseQaUsersArgs(['--accept', '--dry-run'])).toThrow(/on its own/);
+    expect(() => parseQaUsersArgs(['--bogus'])).toThrow(/Unknown/);
   });
 
   it('reads the email lists from the environment, each address its own identity', () => {

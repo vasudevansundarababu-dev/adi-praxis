@@ -1123,3 +1123,29 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
 
 - **(owner)** "One PR for everything." Steps 1 to 9 of the MVP1 build order are built on `feat/mvp1-forge` in one continuous run, committed step by step with tests, and opened as one PR.
 - Push, merge and deploy each still need the owner's yes. QA runs need the owner's yes in the DevOps session.
+## QA fresh start: SME cleanup and matched SME seed (14 Nov 2026)
+
+- **(owner)** "Delete all SME ... First Delete All the users and Purge all the data. Second get 10-15 Profiles which matches the requirement. Then I should be able to directly assign to the Project. and Start authoring the task." Later in the same message: "Also Remove already uploaded documents and Policies. I will start fresh."
+- **(owner)** The candidate UI and journey will be rewritten from a spec the owner will give later. Nothing in the candidate app changes here.
+- **(chosen by Claude)** "All the users" means SMEs. Console users (Admin, PM, the 10 seeded Reviewers), templates and the audit log are kept.
+- **(non-negotiable)** Append-only and immutable rows are never deleted or changed, and triggers are never disabled. An SME with such history is **retired**, not deleted:
+  - history that triggers retirement: selection decisions, approved task records, SME-authored tasks, earnings, standings, policy proposals, payouts, certifications, or tasks issued to them;
+  - retirement deletes their sign-in identities and sessions, so they cannot sign in and the same email later starts a brand-new account;
+  - it deletes their matches, withdraws open applications, cancels proposed or accepted work with no task issued, marks the candidate deleted, and closes and anonymises the account.
+  - Matching already skips deleted and closed candidates. Every other SME is hard-deleted with all their rows. Job: `qa-sme-cleanup`.
+- **(non-negotiable)** Policy documents, their versions, rules, citations and published rule sets are immutable. "Remove documents and policies" is done by cancelling the projects that hold them with the existing `qa-project-cleanup` job; the owner then creates new projects and uploads policies there.
+- **(chosen by Claude)** 12 matched synthetic personas (`apps/api/src/jobs/qa-personas.ts`):
+  - 8 KYC personas spread over CA, NY, TX, FL and IL;
+  - 4 Marketing personas.
+- **(chosen by Claude)** The personas are seeded with `qa-users --matched --project <id>`:
+  - only into the projects named, each persona matched to the project's template by track;
+  - through the real journey, so a named seeded Reviewer still makes every selection;
+  - a template that is neither KYC nor Marketing is refused.
+- **(chosen by Claude)** "Directly assign" keeps the PM's Assign click as the decision. `qa-users --accept` then makes the seeded personas accept their proposals through the candidate endpoint, so the PM can sign in as one and author straight away. It never signs up a persona that was not seeded.
+- **Run order in QA** (each step needs the owner's direct yes in the DevOps session; dry runs first):
+  1. `qa-project-cleanup`, then `--apply`;
+  2. `qa-sme-cleanup`, then `--apply` with `QA_SME_CLEANUP_CONFIRM=delete-all-smes`;
+  3. the owner creates the new KYC and Marketing projects, uploads policies and publishes each opportunity;
+  4. `qa-users --matched --project <kyc> --project <marketing>`;
+  5. the owner assigns on the staffing page;
+  6. `qa-users --accept`.

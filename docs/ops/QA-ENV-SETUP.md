@@ -185,3 +185,18 @@ only: the job refuses `APP_ENV=production`. Decisions: `docs/DECISIONS.md`, "QA 
   `governing_state`, and the template's own criterion IDs and evaluators, which it reads from the workbench pre-check
   (`POST /me/tasks/:id/check`) as an author would. The `authoring` step reports `criteriaFrom: "pre-check"`. Each
   pre-check adds one embedding call to the cost (two on KYC v6).
+
+## 8. Fresh start: SME cleanup and matched SMEs (14 Nov 2026)
+
+The owner asked to remove all SMEs, documents and policies, then seed only SMEs that match the KYC and Marketing work. Decisions are in `docs/DECISIONS.md` ("QA fresh start"). Every step needs the owner's direct yes in the DevOps session. Run each one as a dry run first and show the owner its counts.
+
+| Step | Command (`praxis-migrate` image, `run.ts`) | What it does |
+|---|---|---|
+| 1 | `qa-project-cleanup`, then `qa-project-cleanup --apply` with `QA_PROJECT_CLEANUP_CONFIRM=delete-all-projects` | Deletes projects without protected history and cancels the rest. That includes the old Chicago project and its policy documents, which are immutable. |
+| 2 | `qa-sme-cleanup`, then `qa-sme-cleanup --apply` with `QA_SME_CLEANUP_CONFIRM=delete-all-smes` | Hard-deletes SMEs without protected history. Retires the rest: no sign-in, nothing open, out of matching, account closed and anonymised. |
+| 3 | Owner, in praxis-web | Create the new KYC and Marketing projects, upload the policy files, publish each project's opportunity. |
+| 4 | `qa-users --matched --project <kycProjectId> --project <marketingProjectId>` (try `--dry-run` first) | 8 KYC and 4 Marketing synthetic personas, each through the real journey into the matching project. Needs the same secrets as `praxis-qa-users`. |
+| 5 | Owner, staffing page | Re-run match, then Assign. |
+| 6 | `qa-users --accept` | The seeded personas accept their proposals. The owner can then sign in as one (mock Google, for example `kyc07@praxis.test`) and author. |
+
+Steps 1 and 2 print one JSON report line each (`report: "qa-project-cleanup"` / `"qa-sme-cleanup"`) with a tally. Re-running them changes nothing more.

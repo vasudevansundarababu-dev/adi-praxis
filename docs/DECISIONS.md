@@ -1079,6 +1079,14 @@ Review of the Golden Task2 Marketing handoff v1.1; details in `docs/authoring/MA
   `golden-kyc-reusable-v1` the job reaches submit, but the form has no worked example, so the generic sample fails
   `anvil.evaluator-binding` and `profile.S3.environment`. The report says so. Pinning the older account-opening version
   is not possible, because PMs are offered only the newest version of each workflow.
+- **(DevOps session for the owner, 14 Nov 2026, after QA run `praxis-qa-smoke-86qrn`)** "Fix the authoring step to
+  produce a VALID KYC v6 task … build the synthetic answer from the template itself … don't relax the submit checks."
+  - **(chosen by Claude)** No route shows authors the template's evaluator mapping, so the job reads it from the
+    workbench pre-check (`POST /me/tasks/:id/check`), as a human author does: `anvil.evaluator-binding` names the
+    criterion IDs, then `anvil.evaluator-kinds` names each evaluator and version. No new route and no check relaxed.
+  - **(chosen by Claude)** Every pick list takes a value the form allows (the generic sample's S3 environment `none`
+    is not on the v6 form). Weights are split evenly to exactly 100; the first criterion is critical; criterion text
+    is synthetic.
 - **Deploy:** `praxis-qa-smoke` Cloud Run job, deployed but never run by `deploy-demo.sh` (same secrets as
   `praxis-qa-users`, no retries, 1 hour timeout). Runbook: `docs/ops/QA-ENV-SETUP.md` section 7.
 

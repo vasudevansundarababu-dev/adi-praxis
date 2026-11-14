@@ -1,9 +1,10 @@
 import { Prisma, type TaskInstance } from '@prisma/client';
-import { CAPPED_TASK_STATUSES, effectiveCoverage, CoverageDimensions, CoverageQuotas, generateSlots, OPEN_TASK_STATUSES, pickSlot } from '@praxis/shared';
+import { CAPPED_TASK_STATUSES, caseSelectorSlots, effectiveCoverage, CoverageDimensions, CoverageQuotas, generateSlots, OPEN_TASK_STATUSES, pickSlot, type CaseSelector, type SlotCase, type SlotSpec } from '@praxis/shared';
 import type { Db, Tx } from '../db';
 import { AppError, notFound } from '../lib/errors';
 import type { writeAudit } from '../platform/audit';
 import type { TemplateRef } from './definitions';
+import { profileFor } from './profile-output';
 
 type Audit = (i: Parameters<typeof writeAudit>[2]) => Promise<void>;
 export const WORKABLE_PROJECT = ['STAFFING', 'STAFFED', 'IN_PROGRESS'] as const;
@@ -22,7 +23,22 @@ export async function templateRef(tx: Db | Tx, templateId: string): Promise<Temp
     collectionSchema: t.collectionSchema,
     coverageDimensions: matrix.dimensions,
     edgeCases: edges.map((e) => e.name ?? '').filter(Boolean),
+    caseSelector: caseSelectorOf(t.caseSelector),
   };
+}
+
+/** A template's stored case selector, or null when it has none (or it is malformed). */
+export function caseSelectorOf(v: unknown): CaseSelector | null {
+  const s = v as Partial<CaseSelector> | null;
+  if (!s || typeof s.field !== 'string' || typeof s.source !== 'string' || !Array.isArray(s.values) || !s.values.every((x) => typeof x === 'string') || !s.values.length) return null;
+  return { field: s.field, source: s.source, values: s.values };
+}
+
+/** One slot per case-selector value, labelled from the version's form when it is registered. */
+function selectorSlots(t: { workflowName: string; profileId: string | null }, sel: CaseSelector): SlotSpec[] {
+  const [sectionKey, fieldKey] = sel.source.split('.');
+  const field = profileFor({ workflowName: t.workflowName, profileId: t.profileId })?.sections.find((s) => s.key === sectionKey)?.fields.find((f) => f.key === fieldKey);
+  return caseSelectorSlots(sel, { fieldLabel: field?.label, labelOf: (v) => field?.options?.find((o) => o.value === v)?.label });
 }
 
 /** Coverage slots for an authoring project, generated once (SPEC: on project submit). Idempotent. */
@@ -30,9 +46,11 @@ export async function ensureSlots(tx: Tx, projectId: string) {
   const p = await tx.project.findUniqueOrThrow({ where: { id: projectId }, include: { template: true } });
   if (p.taskMode !== 'AUTHORING' || !p.distinctTarget) return 0;
   if (await tx.coverageSlot.count({ where: { projectId } })) return 0;
+  const sel = caseSelectorOf(p.template.caseSelector);
   const cov = effectiveCoverage(p.template, CoverageQuotas.nullable().safeParse(p.coverageQuotas).data ?? null);
   const matrix = CoverageDimensions.safeParse(p.template.coverageDimensions).data ?? { dimensions: [], cells: [] };
-  const slots = generateSlots({
+  // A case-selector template: exactly one slot per value, whatever the project's target (13 Nov 2026).
+  const slots = sel ? selectorSlots(p.template, sel) : generateSlots({
     dimensions: matrix.dimensions,
     cells: cov.cells,
     edgeCases: cov.edgeCases,
@@ -43,7 +61,7 @@ export async function ensureSlots(tx: Tx, projectId: string) {
     data: slots.map((s, position) => ({
       clientId: p.clientId,
       projectId,
-      coverageTags: { tags: s.tags, edgeCase: s.edgeCase } as Prisma.InputJsonValue,
+      coverageTags: { tags: s.tags, edgeCase: s.edgeCase, ...(s.case ? { case: { ...s.case } } : {}) } as unknown as Prisma.InputJsonValue,
       isOpen: s.isOpen,
       required: s.required,
       position,
@@ -91,14 +109,14 @@ export async function allocateTasks(tx: Tx, args: { projectId: string; candidate
       .filter((t) => t.slot && (CAPPED_TASK_STATUSES as readonly string[]).includes(t.status))
       .map((t) => ({ ...(t.slot!.coverageTags as { tags: Record<string, string>; edgeCase: string | null }), isOpen: t.slot!.isOpen }));
     const rows = await tx.coverageSlot.findMany({ where: { projectId: p.id, status: { in: ['OPEN', 'RELEASED'] } }, orderBy: { position: 'asc' } });
-    const available = rows.map((r) => ({ ...(r.coverageTags as { tags: Record<string, string>; edgeCase: string | null }), id: r.id, isOpen: r.isOpen, required: r.required, row: r }));
+    const available = rows.map((r) => ({ ...(r.coverageTags as unknown as { tags: Record<string, string>; edgeCase: string | null; case?: SlotCase }), id: r.id, isOpen: r.isOpen, required: r.required, row: r }));
     for (let n = 0; n < room; n++) {
       const s = pickSlot(available, held, { jurisdictions: scope.jurisdictions ?? [] });
       if (!s) break;
       available.splice(available.indexOf(s), 1);
       held.push({ tags: s.tags, edgeCase: s.edgeCase, isOpen: s.isOpen });
       await tx.coverageSlot.update({ where: { id: s.id }, data: { status: 'OFFERED', assignedToId: args.candidateId } });
-      const input = { slot: { id: s.id, brief: s.row.brief, tags: s.tags, edgeCase: s.edgeCase, isOpen: s.isOpen } } as Prisma.InputJsonValue;
+      const input = { slot: { id: s.id, brief: s.row.brief, tags: s.tags, edgeCase: s.edgeCase, isOpen: s.isOpen, ...(s.case ? { case: s.case } : {}) } } as unknown as Prisma.InputJsonValue;
       // A reclaimed task on this slot is reused (cleared); otherwise a new one is created.
       const reuse = await tx.taskInstance.findFirst({ where: { slotId: s.id, status: 'CREATED', assignedToId: null } });
       const data = { status: 'ASSIGNED' as const, assignedToId: args.candidateId, projectAssignmentId: pa.id, assignedAt: now, input, output: Prisma.DbNull, checks: Prisma.DbNull, flags: Prisma.DbNull, coverageTags: { tags: s.tags, edgeCase: s.edgeCase } as Prisma.InputJsonValue };

@@ -17,6 +17,8 @@ import { grantAppRole } from './grant-app-role';
  *   API_URL; never production. Exit 3 when some candidates are not ready yet (re-run to continue).
  * - `qa-project-cleanup [--apply]`: QA-only. Deletes every project without protected history; cancels the rest. Dry run
  *   by default; --apply also needs QA_PROJECT_CLEANUP_CONFIRM=delete-all-projects. Never production.
+ * - `case-selector-slots <projectId> [--apply]`: replaces a case-selector project's generic slots with one slot per
+ *   value, only while no task has been issued. Dry run by default.
  * Exits non-zero on failure so Cloud Run retries and alerts.
  */
 const job = process.argv[2];
@@ -84,6 +86,15 @@ try {
     const tally = r.reduce<Record<string, number>>((a, o) => ({ ...a, [o.outcome]: (a[o.outcome] ?? 0) + 1 }), {});
     log('info', 'qa project cleanup', { apply, tally });
     console.log(JSON.stringify({ report: 'qa-project-cleanup', apply, tally, projects: r }));
+  } else if (job === 'case-selector-slots') {
+    const rest = process.argv.slice(3);
+    const apply = rest.includes('--apply');
+    const ids = rest.filter((a) => a !== '--apply');
+    if (ids.length !== 1 || !/^[0-9a-f-]{36}$/i.test(ids[0]!)) throw new Error('Use: case-selector-slots <projectId> [--apply]');
+    const { rebuildCaseSelectorSlots } = await import('./case-selector-slots');
+    const r = await rebuildCaseSelectorSlots(db, { projectId: ids[0]!, apply });
+    console.log(JSON.stringify({ report: 'case-selector-slots', apply, ...r }));
+    if (r.outcome === 'refused') process.exitCode = 3;
   } else if (job === 'catalog-import') {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);

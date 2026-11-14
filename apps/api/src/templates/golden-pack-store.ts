@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { checkGoldenPack, GoldenPack, packTarget, type GoldenPackCheck } from '@praxis/shared';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError } from '../lib/errors';
@@ -55,6 +55,7 @@ export async function storePack(
         ...(tpl.coverageDimensions ? { coverageDimensions: tpl.coverageDimensions as object } : {}),
         ...(tpl.edgeCaseCatalog ? { edgeCaseCatalog: tpl.edgeCaseCatalog as object[] } : {}),
         ...(packTarget(tpl) !== null ? { defaultDistinctTarget: packTarget(tpl)! } : {}),
+        ...(tpl.caseSelector ? { caseSelector: tpl.caseSelector as Prisma.InputJsonValue } : {}),
         ...(input.anvilSpec !== undefined ? { anvilSpec: input.anvilSpec } : {}),
       },
     });
@@ -79,6 +80,7 @@ export async function storePack(
         // The version's agent mode follows its form (a multi-agent form makes it multi-agent).
         agentMode: r.profile.agentMode,
         anvilSpec: input.anvilSpec ?? (copy.anvilSpec as Prisma.InputJsonValue),
+        caseSelector: copy.caseSelector === null ? Prisma.DbNull : (copy.caseSelector as Prisma.InputJsonValue),
         // A proposal's template block that states the cardinality replaces the copied one: a corrected template must
         // not inherit the previous version's target or quotas (KYC five-state contract: target 5, no additive quotas).
         ...cardinalityOf(pack.template),
@@ -98,5 +100,7 @@ function cardinalityOf(tpl: GoldenPack['template']) {
     ...(target !== null ? { defaultDistinctTarget: target } : {}),
     ...(tpl.coverageDimensions ? { coverageDimensions: tpl.coverageDimensions as Prisma.InputJsonValue } : {}),
     ...(tpl.edgeCaseCatalog ? { edgeCaseCatalog: tpl.edgeCaseCatalog as Prisma.InputJsonValue } : {}),
+    // A stated template block decides the case selector too: a version without one must not inherit it.
+    caseSelector: tpl.caseSelector ? (tpl.caseSelector as Prisma.InputJsonValue) : Prisma.DbNull,
   };
 }

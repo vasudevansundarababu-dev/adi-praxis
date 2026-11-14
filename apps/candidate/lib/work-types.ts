@@ -31,6 +31,8 @@ export interface SlotInput {
   tags: Record<string, string>;
   edgeCase: string | null;
   isOpen: boolean;
+  /** The case-selector value this task is for (one task per value), with the form field that carries it. */
+  case?: { field: string; source: string; value: string };
 }
 
 export interface TaskView extends TaskSummary {

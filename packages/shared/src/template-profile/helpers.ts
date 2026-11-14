@@ -468,4 +468,17 @@ export function startProfileOutput(profile: TemplateProfile, output: unknown): R
   return profile.storage === 'sections' ? setFieldValue(profile, withHeader, 'S1', profile.titleField, title) : withHeader;
 }
 
+/**
+ * Pre-fills a task's case-selector field from its slot (one task per value, 13 Nov 2026) when the field is still
+ * empty. The submission check still refuses a value that differs from the slot's.
+ */
+export function withSlotCase(profile: TemplateProfile, output: Record<string, unknown>, c: { source: string; value: string } | null | undefined): Record<string, unknown> {
+  if (!c || profile.storage !== 'sections') return output;
+  const [section, fieldKey] = c.source.split('.') as [SectionKey, string];
+  const field = profile.sections.find((s) => s.key === section)?.fields.find((f) => f.key === fieldKey);
+  if (!field) return output;
+  const cur = getFieldValue(profile, output, section, field);
+  return cur === undefined || cur === null || cur === '' ? setFieldValue(profile, output, section, fieldKey, c.value) : output;
+}
+
 export const opts = (...values: string[]): PickOption[] => values.map((v) => opt(v));

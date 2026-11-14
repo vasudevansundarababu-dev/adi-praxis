@@ -1,4 +1,4 @@
-import { EXECUTABLE_WORKFLOW, praxisContractIssues, praxisContractChecks, kycCanonicalText, kycChecks, kycKeyInputs, type CoverageTags, type KycTask, type TaskCheck } from '@praxis/shared';
+import { EXECUTABLE_WORKFLOW, praxisContractIssues, praxisContractChecks, kycCanonicalText, kycChecks, kycKeyInputs, type CaseSelector, type CoverageTags, type KycTask, type SlotCase, type TaskCheck } from '@praxis/shared';
 
 export interface TemplateRef {
   workflowName: string;
@@ -9,9 +9,13 @@ export interface TemplateRef {
   collectionSchema: unknown;
   coverageDimensions: { key: string; label: string; values: string[] }[];
   edgeCases: string[];
+  /** One task per value of this form field (null = no case selector). */
+  caseSelector?: CaseSelector | null;
 }
 
 export interface SlotRef {
+  /** The case-selector value the slot is for, when the template has a case selector. */
+  case?: SlotCase;
   tags: Record<string, string>;
   edgeCase: string | null;
   isOpen: boolean;
@@ -85,7 +89,10 @@ export function coverageChecks(template: TemplateRef, slot: SlotRef | null, outp
   if (!slot) return [];
   const cov = finalCoverage(slot, output);
   const checks: TaskCheck[] = [];
+  const sel = template.caseSelector ?? null;
   const bad = Object.entries(cov.tags).filter(([k, v]) => {
+    // The case-selector field is not a coverage dimension; its value is checked against the form below.
+    if (sel && k === sel.field) return !sel.values.includes(v);
     const d = template.coverageDimensions.find((x) => x.key === k);
     return !d || (d.values.length > 0 && !d.values.some((x) => x.toLowerCase() === v.toLowerCase()));
   });
@@ -94,7 +101,22 @@ export function coverageChecks(template: TemplateRef, slot: SlotRef | null, outp
   // no quotas (one task per selector value, or a single task) has nothing to tag.
   if (slot.isOpen && template.coverageDimensions.length) checks.push({ id: 'coverage.open-tags', section: 'W01', ok: Object.keys(cov.tags).length > 0, message: 'Open slot: choose at least one coverage tag' });
   if (slot.isOpen && template.edgeCases.length) checks.push({ id: 'coverage.open-edge', section: 'W01', ok: !!cov.edgeCase, message: 'Open slot: name the edge case this task tests' });
+  if (slot.case) checks.push(caseCheck(slot.case, output));
   return checks;
+}
+
+/** The form's case-selector field must carry the slot's value, so each value gets exactly one task. */
+export function caseCheck(c: SlotCase, output: Record<string, unknown>): TaskCheck {
+  const [section, field] = c.source.split('.') as [string, string];
+  const sections = (output.sections ?? {}) as Record<string, Record<string, unknown> | undefined>;
+  const value = sections[section]?.[field];
+  const ok = value === c.value;
+  return {
+    id: 'case.selector',
+    section: section,
+    ok,
+    message: ok ? `This task is for ${c.field} ${c.value}` : `This task's slot is ${c.field} ${c.value}: set ${c.source} to ${c.value}${typeof value === 'string' && value ? ` (it is ${value})` : ''}`,
+  };
 }
 
 registerDefinition('Marketing', EXECUTABLE_WORKFLOW, { ...genericDefinition, key: 'praxis-contract-v1', validateTaskInput: (_t, input) => praxisContractIssues((input as Record<string, unknown> | null)?.praxisContract).map((i) => `${i.path}: ${i.message}`), validateSubmission: (_t, output) => praxisContractChecks(output, true) });

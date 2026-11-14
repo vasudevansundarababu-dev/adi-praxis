@@ -112,22 +112,6 @@ Uses existing Praxis roles only. [S1 §10]
 | PR-R09 | Inspect inherited tasks and impact. | S1 R15 | — |
 | PR-R10 | **Conflict detection** (owner-confirmed examples): same rule ID with different content across sources; same source section with different visibility. Shown as a warning; blocks publication of the affected set until resolved. | Owner Q6 | Seed contains one deliberate conflict. |
 
-### 5.6 Rules table, prompt-guided selection and Apply to project [Owner, 14 Nov 2026 (Issue 2)]
-
-The owner: "Since the Project is authored by admin or PM its automatically means reviewed. No need for extra approval." and "Read the policy and define the rules that can accepted by the Anvil." Decisions: `docs/DECISIONS.md`, 14 Nov 2026.
-
-| ID | Requirement | Acceptance |
-| --- | --- | --- |
-| PR-M01 | **Document dropdown**: the project's policy documents; defaults to the first. The table shows the rules whose evidence comes from the chosen document. | Tested. |
-| PR-M02 | **Prompt box**: the PM writes selection criteria, e.g. "This template is for KYC for single, joint and minor accounts. Select all the rules that are mandatory for these tasks, including edge cases and special cases." With no prompt, every rule of the document is shown. With a prompt, the AI marks the rules that match, each with a one-line reason, shown as **Suggested** (not a decision). Changing the document re-runs the same prompt on that document's rules. | AI output never changes rule state (tested). |
-| PR-M03 | **Table** columns: Rule name (a link to the rule page), Evidence (the requirement quote, with a warning when the quote was not found in the document), Required, **Apply to project** (checkbox). | Tested. |
-| PR-M04 | **Apply to project** (PM/ADMIN) is the human review: ticking marks the current version Reviewed (actor, time, content hash, audit). Unticking a Reviewed rule makes a new draft version with the same content; the Reviewed version stays unchanged. Idempotent; stale ticks (content changed) are rejected. The AI never ticks. | Tested. |
-| PR-M05 | Evidence quote not found in the source: ticking shows a warning and needs the PM's confirmation; the audit and the published set keep the citation's resolution. A rule without requirement text cannot be applied. | Tested. |
-| PR-M06 | **Define with AI**: the AI fills the canonical rule fields (requirement, type, applicability, conditions, exceptions, effective scope, required evidence) from the policy text, quoting the source for each claim. The result is a draft edit the PM can change; it is never Reviewed by the AI. The page runs it before applying a rule with definition gaps. | Tested with the mock model. |
-| PR-M07 | **Rule page**: clicking the rule name opens a formatted page with every field, the source evidence (quotes, locators, verified or not), version history, Apply to project, Define with AI and an editor. | Tested. |
-| PR-M08 | **Publication**: the set contains the ticked (Reviewed) rules; Draft and Needs definition versions are never included (AC06); rules not ticked do not block and are recorded as "Not applied". Conflicts block when they involve a ticked rule. | Tested. |
-| PR-M09 | Model: `POLICY_AI_MODEL` on Vertex (Gemini in QA), mock without Vertex; daily cap `POLICY_AI_DAILY_CALL_CAP`. Policy text and prompts are data, never instructions. Tests never call live models. | Tested. |
-
 ### 5.4 Task inheritance, changes and snapshot [S1 UI 4–6]
 
 | ID | Requirement | Source | Acceptance |
@@ -150,6 +134,22 @@ The owner: "Since the Project is authored by admin or PM its automatically means
 | PR-S03 | KYC-001 and Bodhium marketing data / FineQuestions bindings added when the owner supplies them; until then seed tasks are clearly labelled fictional design fixtures. | S1 §11; Owner Q8 |
 | PR-S04 | Private Bodhium pack (not in git): project "SEED — Bodhium benchmark" from the C5 template, tasks BL-001..BL-003, closed-book policy; imported the same way as C5. | Owner |
 | PR-S05 | Seed tasks are drafts: no fabricated people, approvals, reviews or compliance results. Seed rule "Reviewed" records are attributed to the seed job actor and labelled as fixtures. | Owner Q3 (drafts OK); CLAUDE.md |
+
+### 5.6 Rules table, prompt-guided selection and Apply to project [Owner, 14 Nov 2026 (Issue 2)]
+
+The owner: "Since the Project is authored by admin or PM its automatically means reviewed. No need for extra approval." and "Read the policy and define the rules that can accepted by the Anvil." Decisions: `docs/DECISIONS.md`, 14 Nov 2026.
+
+| ID | Requirement | Acceptance |
+| --- | --- | --- |
+| PR-M01 | **Document dropdown**: the project's policy documents; defaults to the first. The table shows the rules whose evidence comes from the chosen document. | Tested. |
+| PR-M02 | **Prompt box**: the PM writes selection criteria, e.g. "This template is for KYC for single, joint and minor accounts. Select all the rules that are mandatory for these tasks, including edge cases and special cases." With no prompt, every rule of the document is shown. With a prompt, the AI marks the rules that match, each with a one-line reason, shown as **Suggested** (not a decision). Changing the document re-runs the same prompt on that document's rules. | AI output never changes rule state (tested). |
+| PR-M03 | **Table** columns: Rule name (a link to the rule page), Evidence (the requirement quote, with a warning when the quote was not found in the document), Required, **Apply to project** (checkbox). | Tested. |
+| PR-M04 | **Apply to project** (PM/ADMIN) is the human review: ticking marks the current version Reviewed (actor, time, content hash, audit). Unticking a Reviewed rule makes a new draft version with the same content; the Reviewed version stays unchanged. Idempotent; stale ticks (content changed) are rejected. The AI never ticks. | Tested. |
+| PR-M05 | Evidence quote not found in the source: ticking shows a warning and needs the PM's confirmation; the audit and the published set keep the citation's resolution. A rule without requirement text cannot be applied. | Tested. |
+| PR-M06 | **Define with AI**: the AI fills the canonical rule fields (requirement, type, applicability, conditions, exceptions, effective scope, required evidence) from the policy text, quoting the source for each claim. The result is a draft edit the PM can change; it is never Reviewed by the AI. The page runs it before applying a rule with definition gaps. | Tested with the mock model. |
+| PR-M07 | **Rule page**: clicking the rule name opens a formatted page with every field, the source evidence (quotes, locators, verified or not), version history, Apply to project, Define with AI and an editor. | Tested. |
+| PR-M08 | **Publication**: the set contains the ticked (Reviewed) rules; Draft and Needs definition versions are never included (AC06); rules not ticked do not block and are recorded as "Not applied". Conflicts block when they involve a ticked rule. | Tested. |
+| PR-M09 | Model: `POLICY_AI_MODEL` on Vertex (Gemini in QA), mock without Vertex; daily cap `POLICY_AI_DAILY_CALL_CAP`. Policy text and prompts are data, never instructions. Tests never call live models. | Tested. |
 
 ## 6. Data (proposed; names reconciled at architecture)
 

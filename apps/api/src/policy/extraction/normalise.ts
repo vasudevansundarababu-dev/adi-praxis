@@ -38,8 +38,6 @@ export function needsDefinition(c: CandidateRule): boolean {
   return !c.requirement || c.requirementType === 'unknown' || !hasScope || c.citations.length === 0;
 }
 
-const squash = (s: string) => s.normalize('NFKC').replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, '-').replace(/\s+/g, ' ').trim().toLowerCase();
-
 export interface ResolvedCitation {
   quote: string;
   locator: Locator;
@@ -52,30 +50,74 @@ export interface ResolvedCitation {
  */
 export function resolveCitation(c: CandidateCitation, doc: { text: string; pages: string[]; format: string }): ResolvedCitation {
   const base: Locator = { kind: 'text_span', page: null, renditionPage: null, lineStart: null, lineEnd: null, charStart: null, charEnd: null, section: null, chunkId: c.chunkId ?? null, boxes: null };
-  const q = squash(c.quote);
-  if (q.length < 8) return { quote: c.quote, locator: { ...base, kind: 'manual_reference' }, resolution: 'UNRESOLVED' };
+  if (normaliseForMatch(c.quote).text.length < 8) return { quote: c.quote, locator: { ...base, kind: 'manual_reference' }, resolution: 'UNRESOLVED' };
   if (doc.format === 'pdf' && doc.pages.length) {
     const order = c.page ? [c.page - 1, ...doc.pages.map((_, i) => i).filter((i) => i !== c.page! - 1)] : doc.pages.map((_, i) => i);
     for (const i of order) {
-      if (i >= 0 && i < doc.pages.length && squash(doc.pages[i]!).includes(q)) return { quote: c.quote, locator: { ...base, kind: 'page_region', page: i + 1 }, resolution: 'RESOLVED' };
+      if (i < 0 || i >= doc.pages.length) continue;
+      const span = findSpan(doc.pages[i]!, c.quote);
+      if (span) return { quote: doc.pages[i]!.slice(span[0], span[1]), locator: { ...base, kind: 'page_region', page: i + 1 }, resolution: 'RESOLVED' };
     }
     return { quote: c.quote, locator: { ...base, kind: 'page_region', page: null }, resolution: 'QUOTE_MISMATCH' };
   }
   const span = findSpan(doc.text, c.quote);
   if (!span) return { quote: c.quote, locator: base, resolution: 'QUOTE_MISMATCH' };
   return {
-    quote: c.quote,
+    // The stored quote is the exact original document span, not the provider's tokenised copy (PR-R02).
+    quote: doc.text.slice(span[0], span[1]),
     locator: { ...base, charStart: span[0], charEnd: span[1], lineStart: lineOf(doc.text, span[0]), lineEnd: lineOf(doc.text, Math.max(span[0], span[1] - 1)) },
     resolution: 'RESOLVED',
   };
 }
 
-/** Finds a quote in text, tolerant of whitespace and typographic quote differences; returns [start, end) offsets. */
+const OPENERS = new Set(['(', '[']);
+const CLOSERS = new Set(['.', ',', ';', ':', '!', '?', ')', ']']);
+const foldChar = (ch: string) =>
+  ch.replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'").replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"').replace(/[\u2010-\u2015\u2212]/g, '-');
+
+/**
+ * Normalises text for quote matching and keeps, for every output character, the [start, end) offsets of the
+ * original characters it came from. Only harmless differences are removed: Unicode compatibility forms, case,
+ * curly vs straight quotes, dash variants, runs of whitespace (including line breaks), and whitespace before
+ * `. , ; : ! ? ) ]` or after `( [` (providers such as LlamaExtract return "only ." for "only."). Words are never
+ * changed, added or dropped, so a quote whose words are not in the document still fails (PR-R02).
+ */
+export function normaliseForMatch(input: string): { text: string; starts: number[]; ends: number[] } {
+  const chars: { ch: string; start: number; end: number }[] = [];
+  let i = 0;
+  for (const cp of input) {
+    const end = i + cp.length;
+    if (/\s/.test(cp)) {
+      if (chars.length && chars[chars.length - 1]!.ch !== ' ') chars.push({ ch: ' ', start: i, end });
+    } else {
+      for (const ch of foldChar(cp.normalize('NFKC').toLowerCase())) {
+        if (/\s/.test(ch)) {
+          if (chars.length && chars[chars.length - 1]!.ch !== ' ') chars.push({ ch: ' ', start: i, end });
+        } else chars.push({ ch, start: i, end });
+      }
+    }
+    i = end;
+  }
+  const kept = chars.filter((c, k) => {
+    if (c.ch !== ' ') return true;
+    const prev = chars[k - 1];
+    const next = chars[k + 1];
+    return !!prev && !!next && !OPENERS.has(prev.ch) && !CLOSERS.has(next.ch);
+  });
+  return { text: kept.map((c) => c.ch).join(''), starts: kept.map((c) => c.start), ends: kept.map((c) => c.end) };
+}
+
+/**
+ * Finds a quote in text, tolerant only of the differences normaliseForMatch removes; returns [start, end) offsets
+ * into the ORIGINAL text, so the locator and stored quote are the exact source span.
+ */
 export function findSpan(text: string, quote: string): [number, number] | null {
   const exact = text.indexOf(quote);
-  if (exact >= 0) return [exact, exact + quote.length];
-  const words = quote.normalize('NFKC').trim().split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/['\u2018\u2019]/g, "['\u2018\u2019]").replace(/["\u201C\u201D]/g, '["\u201C\u201D]').replace(/[-\u2013\u2014]/g, '[-\u2013\u2014]'));
-  if (!words.length || words.length > 400) return null;
-  const m = new RegExp(words.join('\\s+'), 'i').exec(text.normalize('NFKC'));
-  return m ? [m.index, m.index + m[0].length] : null;
+  if (quote && exact >= 0) return [exact, exact + quote.length];
+  const q = normaliseForMatch(quote).text;
+  if (!q) return null;
+  const t = normaliseForMatch(text);
+  const at = t.text.indexOf(q);
+  if (at < 0) return null;
+  return [t.starts[at]!, t.ends[at + q.length - 1]!];
 }

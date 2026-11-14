@@ -2,6 +2,7 @@ import { CONTRIBUTION_ROLES, FIELD_DEFS, OpportunityBrief, type ContributionRole
 import { runAssessment } from '../candidate/selection-service';
 import type { SuitabilityEvaluator } from '../candidate/suitability';
 import type { Db } from '../db';
+import { trackOf, type Persona } from './qa-personas';
 
 /**
  * `run.ts qa-users [--dry-run]`: QA-only seed of synthetic test users (docs/DECISIONS.md, "QA seed users").
@@ -62,6 +63,14 @@ export interface QaUsersOptions {
    * unavailable. The worker and the job never both run one assessment: runAssessment claims it first.
    */
   evaluator?: SuitabilityEvaluator;
+  /**
+   * Target projects (owner, 14 Nov 2026): seed only into these projects, each SME matched to the project's template by
+   * track (KYC or Marketing, from `personas`). Each project needs a published opportunity. Without it, the job covers
+   * every offerable template's pool as before.
+   */
+  projectIds?: string[];
+  /** Matched personas; when set, `candidateEmails` are theirs and their answers fill the profile form. */
+  personas?: Persona[];
 }
 
 export interface Slot {
@@ -110,6 +119,27 @@ export function optionsFromEnv(env: NodeJS.ProcessEnv, appEnv: string, dryRun: b
     candidateEmails: emailList(env.QA_SEED_CANDIDATE_EMAILS, defaultEmails('sme', 30), 30, 'QA_SEED_CANDIDATE_EMAILS'),
     assessmentTimeoutMs: Number(env.QA_SEED_ASSESSMENT_TIMEOUT_SECONDS ?? 900) * 1000,
   };
+}
+
+/** run.ts arguments: `[--dry-run]`, `--matched --project <id>... [--dry-run]`, or `--accept`. */
+export function parseQaUsersArgs(argv: string[]) {
+  const projectIds: string[] = [];
+  let dryRun = false, matched = false, accept = false;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a === '--dry-run') dryRun = true;
+    else if (a === '--matched') matched = true;
+    else if (a === '--accept') accept = true;
+    else if (a === '--project') {
+      const id = argv[++i];
+      if (!id || !/^[0-9a-f-]{36}$/i.test(id)) throw new Error('--project needs a project id');
+      projectIds.push(id.toLowerCase());
+    } else throw new Error(`Unknown qa-users argument "${a}". Use: --dry-run | --matched --project <id> | --accept`);
+  }
+  if (projectIds.length && !matched) throw new Error('--project needs --matched');
+  if (matched && !projectIds.length) throw new Error('--matched needs at least one --project <id>');
+  if (accept && (matched || dryRun)) throw new Error('--accept runs on its own');
+  return { dryRun, matched, accept, projectIds };
 }
 
 /** fetch against API_URL, for the Cloud Run job. */
@@ -177,6 +207,22 @@ export function spread<T>(templates: T[], candidates: string[], reviewers: strin
   return out;
 }
 
+/**
+ * Matched plan: each persona goes to every covered template of its own track (KYC or Marketing). A template that fits
+ * neither track, or a track with no personas, is an error rather than a pool of mismatched SMEs.
+ */
+export function personaPlan<T extends { workflowName: string; domain: { name: string } }>(templates: T[], personas: Persona[], reviewers: string[]) {
+  const out: { template: T; candidateEmail: string; reviewerEmail: string }[] = [];
+  for (const template of templates) {
+    const track = trackOf(template.workflowName, template.domain.name);
+    if (!track) throw new Error(`Template "${template.workflowName}" is neither a KYC nor a Marketing template; no matched SMEs for it`);
+    const mine = personas.filter((p) => p.track === track);
+    if (!mine.length) throw new Error(`No ${track} personas for "${template.workflowName}"`);
+    for (const p of mine) out.push({ template, candidateEmail: p.email, reviewerEmail: reviewers[out.length % reviewers.length]! });
+  }
+  return out;
+}
+
 const READY = 'READY_FOR_STAFFING';
 
 export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUsersResult> {
@@ -188,6 +234,7 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
     if (!o.reviewerPassword || o.reviewerPassword.length < 12) throw new Error('QA_SEED_REVIEWER_PASSWORD is required (at least 12 characters)');
   }
   const sleep = o.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+  const personaOf = (email: string) => o.personas?.find((p) => p.email === email.toLowerCase());
 
   const admin = await db.user.findUnique({ where: { email: o.adminEmail } });
   if (!admin) throw new Error(`${o.adminEmail} not found: run demo-setup first`);
@@ -217,11 +264,27 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
 
   // ── Plan (also the whole of a dry run) ──
   const pools = new Map<string, { id: string | null; name: string; created: boolean }>();
-  for (const t of templates) {
-    const p = await poolProject(db, clientId, t.id, t.workflowName);
-    pools.set(t.id, { id: p?.id ?? null, name: p?.name ?? poolName(t.workflowName), created: false });
+  if (o.projectIds?.length) {
+    // Targeted: only the named projects' templates, each pooled into that project.
+    const projects = await db.project.findMany({ where: { id: { in: o.projectIds }, clientId }, include: { opportunities: { where: { role: 'AUTHOR' } } } });
+    const missing = o.projectIds.filter((id) => !projects.some((p) => p.id === id));
+    if (missing.length) throw new Error(`Projects not found in this client: ${missing.join(', ')}`);
+    for (const p of projects) {
+      if (LIVE_PROJECT.notIn.includes(p.status as never)) throw new Error(`Project ${p.name} (${p.id}) is ${p.status}`);
+      if (p.opportunities[0]?.status !== 'PUBLISHED') throw new Error(`Project ${p.name} (${p.id}) has no published opportunity: publish it first`);
+      if (pools.has(p.templateId)) throw new Error(`Two target projects use the same template (${p.templateId}); name one project per template`);
+      pools.set(p.templateId, { id: p.id, name: p.name, created: false });
+    }
+    templates.splice(0, templates.length, ...templates.filter((t) => pools.has(t.id)));
+    const stale = projects.filter((p) => !templates.some((t) => t.id === p.templateId));
+    if (stale.length) throw new Error(`Project ${stale[0]!.name} uses a template that is not the newest published version`);
+  } else {
+    for (const t of templates) {
+      const p = await poolProject(db, clientId, t.id, t.workflowName);
+      pools.set(t.id, { id: p?.id ?? null, name: p?.name ?? poolName(t.workflowName), created: false });
+    }
   }
-  const plan = spread(templates, o.candidateEmails, o.reviewerEmails);
+  const plan = o.personas ? personaPlan(templates, o.personas, o.reviewerEmails) : spread(templates, o.candidateEmails, o.reviewerEmails);
 
   if (o.dryRun) {
     for (const email of o.reviewerEmails) {
@@ -411,7 +474,8 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
   async function signInCandidate(email: string) {
     const who = `sme:${email}`;
     const n = o.candidateEmails.indexOf(email) + 1;
-    const { credential } = (await call(who, 'POST', '/auth/dev/google-token', { email, name: `${SYNTHETIC} SME ${pad(n)}` })).body;
+    const name = personaOf(email)?.name ?? `${SYNTHETIC} SME ${pad(n)}`;
+    const { credential } = (await call(who, 'POST', '/auth/dev/google-token', { email, name })).body;
     const me = (await call(who, 'POST', '/auth/google', { credential, adultAttested: true })).body;
     if (!['VERIFIED', 'ALTERNATIVE_VERIFIED'].includes(me.identityStatus)) {
       await call(who, 'POST', '/me/identity/session', {});
@@ -422,6 +486,7 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
 
   /** The accessible profile form (CF-30): confirms or answers every question, then the explicit submit (C05). */
   async function completeAndSubmit(who: string, enrollmentId: string) {
+    const persona = personaOf(who.slice('sme:'.length));
     let s = (await call(who, 'GET', `/me/enrollments/${enrollmentId}/conversation`)).body;
     const fields: { fieldKey: string; action: string; value?: unknown }[] = [];
     const seen = new Set<string>();
@@ -431,13 +496,13 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
         seen.add(f);
         const cur = s.profile.fields[f] as { status: string; value: unknown } | undefined;
         if (cur?.status === 'CONFIRMED') continue;
-        if (cur?.status === 'PROPOSED' && cur.value !== null) fields.push({ fieldKey: f, action: 'CONFIRM' });
-        else fields.push({ fieldKey: f, action: 'EDIT', value: answerFor(f, q) });
+        if (cur?.status === 'PROPOSED' && cur.value !== null && !persona) fields.push({ fieldKey: f, action: 'CONFIRM' });
+        else fields.push({ fieldKey: f, action: 'EDIT', value: answerFor(f, q, persona) });
       }
     }
     const roles = (s.profile.roles as { id: string; status: string }[]).filter((r) => r.status === 'PROPOSED').map((r) => ({ action: 'CONFIRM', id: r.id }));
     const needsRole = s.questions.some((q: { fields: string[] }) => q.fields.includes('roles')) && s.profile.roles.length === 0;
-    if (needsRole) roles.push({ action: 'ADD', role: { title: 'Synthetic QA domain analyst', employerType: 'Synthetic organisation', start: '2015-01', end: null, responsibility: 'PERFORMED', specialtyRelevant: true } } as never);
+    if (needsRole) roles.push({ action: 'ADD', role: { title: persona?.role.title ?? 'Synthetic QA domain analyst', employerType: persona?.role.employerType ?? 'Synthetic organisation', start: persona?.role.start ?? '2015-01', end: null, responsibility: 'PERFORMED', specialtyRelevant: true } } as never);
     const claims = (s.profile.claims as { id: string; status: string }[]).filter((c) => c.status === 'PROPOSED').map((c) => ({ action: 'CONFIRM', id: c.id }));
     if (fields.length || roles.length || claims.length) {
       s = (await call(who, 'POST', '/me/profile/corrections', { enrollmentId, expectedRevision: s.session.revision, fields, roles, claims })).body;
@@ -468,23 +533,64 @@ export async function qaUsers(db: Db, o: QaUsersOptions, log: Log): Promise<QaUs
   /** C07 checklist, item by item, as the candidate. */
   async function onboard(who: string, enrollmentId: string, email: string) {
     const india = o.candidateEmails.indexOf(email) % 2 === 1;
+    const persona = personaOf(email);
     const view = (await call(who, 'GET', `/me/onboarding?enrollmentId=${enrollmentId}`)).body;
     for (const item of view.items as { key: string; kind: string; done: boolean; terms: { sha256: string } | null }[]) {
       if (item.done || item.kind === 'certification' || item.kind === 'payee') continue;
       const data = item.kind === 'conflicts'
         ? { hasConflicts: false, authorizedToContribute: true }
         : item.kind === 'preferences'
-          ? { country: india ? 'IN' : 'GB', languages: [{ language: 'en', level: 'C2' }], timezone: india ? 'Asia/Kolkata' : 'Europe/London', hoursPerWeek: 20, emailNotifications: false }
+          ? { country: persona?.country ?? (india ? 'IN' : 'GB'), languages: [{ language: 'en', level: 'C2' }], timezone: persona?.timezone ?? (india ? 'Asia/Kolkata' : 'Europe/London'), hoursPerWeek: 20, emailNotifications: false }
           : undefined;
       await call(who, 'POST', '/me/onboarding/acknowledgements', { enrollmentId, itemKey: item.key, ...(item.terms ? { termsHash: item.terms.sha256 } : {}), ...(data ? { data } : {}) });
     }
   }
 }
 
+/**
+ * `qa-users --accept`: each seeded persona accepts the proposals a PM has sent them (the PM's Assign click is the
+ * decision; acceptance is the synthetic SME's own step, through the same endpoint and checks a real SME uses).
+ * Accepts only PROPOSED assignments of personas already seeded; anything the API refuses is reported, not forced.
+ */
+export async function acceptProposals(db: Db, o: { appEnv: string; http: Http; personas: Persona[] }, log: Log) {
+  if (o.appEnv === 'production') throw new Error('qa-users refuses to run with APP_ENV=production');
+  const out: { email: string; title: string; outcome: string }[] = [];
+  for (const p of o.personas) {
+    // Only personas that were seeded: signing in would otherwise create an account.
+    const seeded = await db.providerIdentity.findUnique({ where: { provider_subject: { provider: 'GOOGLE', subject: `mock-${p.email}` } }, include: { smeUser: true } });
+    if (!seeded || seeded.smeUser.accountStatus !== 'ACTIVE') continue;
+    let cookie = '';
+    const call = async (method: string, path: string, body?: unknown) => {
+      const r = await o.http({ method, path, body: method === 'GET' ? undefined : (body ?? {}), cookie });
+      if (r.cookies.length) cookie = [...new Map([...cookie.split('; ').filter(Boolean), ...r.cookies].map((c) => [c.split('=')[0], c])).values()].join('; ');
+      return r;
+    };
+    const token = await call('POST', '/auth/dev/google-token', { email: p.email, name: p.name });
+    if (token.status >= 400) throw new Error(`mock sign-in for ${p.email}: ${token.status}`);
+    const me = await call('POST', '/auth/google', { credential: token.body.credential, adultAttested: true });
+    if (me.status >= 400) throw new Error(`sign-in for ${p.email}: ${me.status}`);
+    const list = (await call('GET', '/me/assignments')).body as { items: { id: string; title: string; status: string; revision: number }[] };
+    for (const a of list.items.filter((x) => x.status === 'PROPOSED')) {
+      const r = await call('POST', `/me/assignments/${a.id}/accept`, { expectedRevision: a.revision });
+      const outcome = r.status === 200 ? 'accepted' : `refused: ${r.body?.message ?? r.status}`;
+      out.push({ email: p.email, title: a.title, outcome });
+      log(r.status === 200 ? 'info' : 'warn', 'proposal', { candidate: p.email, opportunity: a.title, outcome });
+    }
+  }
+  return out;
+}
+
 /** A bland synthetic answer of the right shape for a profile field. */
-export function answerFor(field: string, q: { answerType: string; options: string[] }): string | number | string[] {
+export function answerFor(field: string, q: { answerType: string; options: string[] }, persona?: Persona): string | number | string[] {
   const kind = FIELD_DEFS[field]?.kind ?? 'text';
   const choice = q.answerType === 'choice' && q.options.length ? q.options[0]! : null;
+  const mine = persona?.fields[field] ?? (field.startsWith('criterion:') ? persona?.fields.criterion : undefined);
+  if (mine !== undefined) {
+    if (!choice) return kind === 'text' && Array.isArray(mine) ? mine.join('; ') : mine;
+    // A choice question accepts only its own options: keep the persona's that fit, else the first option.
+    const fit = (Array.isArray(mine) ? mine : [String(mine)]).filter((v) => q.options.includes(String(v))).map(String);
+    if (fit.length) return kind === 'list' ? fit : fit[0]!;
+  }
   if (kind === 'number') return field === 'hours_per_week' ? 20 : 10;
   if (kind === 'list') return [choice ?? 'Synthetic QA test entry'];
   return choice ?? 'Synthetic QA test answer: this account and its profile are synthetic test data.';

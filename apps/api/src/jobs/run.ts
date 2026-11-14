@@ -15,6 +15,11 @@ import { grantAppRole } from './grant-app-role';
  * - `policy-seed --client <clientId> --owner <pmUserId>`: fictional SEED policy projects (PRD PR-S01); never production.
  * - `qa-users [--dry-run]`: QA-only synthetic users (30 staffing-ready SMEs, 10 Reviewers) through the public API at
  *   API_URL; never production. Exit 3 when some candidates are not ready yet (re-run to continue).
+ *   `qa-users --matched --project <id> [--project <id>] [--dry-run]`: instead, the 12 matched KYC and Marketing personas
+ *   (qa-personas.ts), only into the named projects, each by its template's track.
+ *   `qa-users --accept`: each matched persona accepts the proposals a PM sent them.
+ * - `qa-sme-cleanup [--apply]`: QA-only. Deletes every SME without protected history; retires (closes, anonymises) the
+ *   rest. Dry run by default; --apply also needs QA_SME_CLEANUP_CONFIRM=delete-all-smes. Never production.
  * - `qa-smoke`: QA-only end-to-end smoke test over the public API at API_URL (real QA infrastructure: live extraction,
  *   live models, the deployed worker). Prints one JSON line `report: "qa-smoke"`; exit 0 only when every step that ran
  *   passed. Never production.
@@ -69,15 +74,22 @@ try {
     if (r.missingTemplates.length) process.exitCode = 3;
   } else if (job === 'qa-users') {
     if (config.appEnv === 'production') throw new Error('qa-users refuses to run with APP_ENV=production');
-    const extra = process.argv.slice(3).filter((a) => a !== '--dry-run');
-    if (extra.length) throw new Error(`Unknown qa-users argument "${extra[0]}". Use: --dry-run`);
-    const dryRun = process.argv.includes('--dry-run');
-    const { fetchHttp, optionsFromEnv, qaUsers } = await import('./qa-users');
-    if (!dryRun && !process.env.API_URL) throw new Error('qa-users needs API_URL');
-    const { defaultEvaluator } = await import('../app');
-    // The job also runs pending or failed assessments with this environment's model (SUITABILITY_MODEL).
-    const r = await qaUsers(db, { ...optionsFromEnv(process.env, config.appEnv, dryRun, fetchHttp(process.env.API_URL ?? '')), evaluator: defaultEvaluator(config) }, log);
-    if (!dryRun && r.incomplete) process.exitCode = 3;
+    const { parseQaUsersArgs, fetchHttp, optionsFromEnv, qaUsers, acceptProposals } = await import('./qa-users');
+    const a = parseQaUsersArgs(process.argv.slice(3));
+    if (!a.dryRun && !process.env.API_URL) throw new Error('qa-users needs API_URL');
+    const { PERSONAS } = await import('./qa-personas');
+    if (a.accept) {
+      const r = await acceptProposals(db, { appEnv: config.appEnv, http: fetchHttp(process.env.API_URL!), personas: PERSONAS }, log);
+      console.log(JSON.stringify({ report: 'qa-users-accept', proposals: r }));
+      if (r.some((x) => x.outcome !== 'accepted')) process.exitCode = 3;
+    } else {
+      const { defaultEvaluator } = await import('../app');
+      const base = optionsFromEnv(process.env, config.appEnv, a.dryRun, fetchHttp(process.env.API_URL ?? ''));
+      const matched = a.matched ? { personas: PERSONAS, candidateEmails: PERSONAS.map((p) => p.email), projectIds: a.projectIds } : {};
+      // The job also runs pending or failed assessments with this environment's model (SUITABILITY_MODEL).
+      const r = await qaUsers(db, { ...base, ...matched, evaluator: defaultEvaluator(config) }, log);
+      if (!a.dryRun && r.incomplete) process.exitCode = 3;
+    }
   } else if (job === 'qa-smoke') {
     if (config.appEnv === 'production') throw new Error('qa-smoke refuses to run with APP_ENV=production');
     if (process.argv.length > 3) throw new Error(`Unknown qa-smoke argument "${process.argv[3]}". qa-smoke takes no arguments.`);
@@ -98,6 +110,17 @@ try {
     const tally = r.reduce<Record<string, number>>((a, o) => ({ ...a, [o.outcome]: (a[o.outcome] ?? 0) + 1 }), {});
     log('info', 'qa project cleanup', { apply, tally });
     console.log(JSON.stringify({ report: 'qa-project-cleanup', apply, tally, projects: r }));
+  } else if (job === 'qa-sme-cleanup') {
+    if (config.appEnv === 'production') throw new Error('qa-sme-cleanup refuses to run with APP_ENV=production');
+    const extra = process.argv.slice(3).filter((a) => a !== '--apply');
+    if (extra.length) throw new Error(`Unknown qa-sme-cleanup argument "${extra[0]}". Use: --apply (default is a dry run)`);
+    const apply = process.argv.includes('--apply');
+    if (apply && process.env.QA_SME_CLEANUP_CONFIRM !== 'delete-all-smes') throw new Error('qa-sme-cleanup --apply needs QA_SME_CLEANUP_CONFIRM=delete-all-smes');
+    const { cleanupSmes } = await import('./qa-sme-cleanup');
+    const r = await cleanupSmes(db, { apply, log: (m, extra) => log('info', m, extra) });
+    const tally = r.reduce<Record<string, number>>((acc, o) => ({ ...acc, [o.outcome]: (acc[o.outcome] ?? 0) + 1 }), {});
+    log('info', 'qa sme cleanup', { apply, tally });
+    console.log(JSON.stringify({ report: 'qa-sme-cleanup', apply, tally, smes: r }));
   } else if (job === 'case-selector-slots') {
     const rest = process.argv.slice(3);
     const apply = rest.includes('--apply');
@@ -111,7 +134,7 @@ try {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-project-cleanup | case-selector-slots`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-project-cleanup | qa-sme-cleanup | case-selector-slots`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

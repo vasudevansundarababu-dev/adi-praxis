@@ -4,8 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { mutate } from '@/lib/client-api';
 import { elapsed, isActive, pollExtraction, stageLabel } from './extraction-progress';
-import { locatorText } from './locator';
-import { RuleReview } from './rule-review';
+import { RulesTable } from './rules-table';
 
 export interface DocVersion {
   id: string;
@@ -57,11 +56,18 @@ export interface RuleRow {
   contentHash: string;
   title: string;
   uncertainty: string[];
+  requirement: string;
+  applied: boolean;
+  documentIds: string[];
+  evidence: { quote: string; resolution: string; document: string; documentVersion: number } | null;
+  definitionProblems: string[];
+  evidenceProblems: string[];
   sources: Array<{ document: string; documentVersion: number; locator: { page?: number | null; lineStart?: number | null; section?: string | null }; resolution: string }>;
 }
 export interface PreviewData {
   included: Array<{ ruleKey: string; version: number; title: string }>;
   excluded: Array<{ ruleKey: string; reason: string | null }>;
+  notApplied?: Array<{ ruleKey: string; state: string; required: boolean }>;
   blocking: string[];
   conflicts: Array<{ kind: string; message: string; ruleKeys: string[] }>;
   counts: Record<string, number>;
@@ -69,8 +75,6 @@ export interface PreviewData {
   affectedTasks: number;
 }
 
-const STATE_LABEL: Record<RuleRow['state'], string> = { DRAFT: 'Draft', NEEDS_DEFINITION: 'Needs definition', REVIEWED: 'Reviewed', EXCLUDED: 'Excluded' };
-const STATE_CLASS: Record<RuleRow['state'], string> = { DRAFT: 'bg-bg', NEEDS_DEFINITION: 'bg-warning/15 text-warning', REVIEWED: 'bg-success/15 text-success', EXCLUDED: 'bg-bg text-fg-muted line-through' };
 
 function Message({ m }: { m: { kind: 'ok' | 'error'; text: string } | null }) {
   if (!m) return null;
@@ -82,7 +86,6 @@ function Message({ m }: { m: { kind: 'ok' | 'error'; text: string } | null }) {
 }
 
 export function PolicyWorkspace(props: { projectId: string; isAdmin: boolean; documents: DocumentsData; extraction: ExtractionData | null; rules: RuleRow[]; preview: PreviewData | null }) {
-  const [selected, setSelected] = useState<string | null>(props.rules.find((r) => r.state !== 'REVIEWED' && r.state !== 'EXCLUDED')?.versionId ?? props.rules[0]?.versionId ?? null);
   return (
     <div className="mt-6 space-y-6">
       <Documents projectId={props.projectId} data={props.documents} />
@@ -91,27 +94,8 @@ export function PolicyWorkspace(props: { projectId: string; isAdmin: boolean; do
         <h2 id="rules-h" className="font-semibold">
           Rules
         </h2>
-        {props.rules.length === 0 ? (
-          <p className="mt-2 text-sm text-fg-muted">No rules yet. Extract candidates from a document, or add a rule by hand from the review panel.</p>
-        ) : (
-          <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(16rem,22rem)_1fr]">
-            <ul aria-label="Rules" className="divide-y divide-line rounded border border-line text-sm">
-              {props.rules.map((r) => (
-                <li key={r.ruleId}>
-                  <button type="button" onClick={() => setSelected(r.versionId)} aria-current={selected === r.versionId} className={`w-full p-2 text-left hover:bg-bg ${selected === r.versionId ? 'bg-bg' : ''}`}>
-                    <span className="font-mono text-xs">{r.ruleKey}</span> <span className="text-xs text-fg-muted">v{r.version}</span>
-                    {r.required && <span className="ml-1 text-xs text-fg-muted">· required</span>}
-                    <span className="block">{r.title}</span>
-                    <span className={`mt-1 inline-block rounded px-1.5 text-xs ${STATE_CLASS[r.state]}`}>{STATE_LABEL[r.state]}</span>
-                    {r.sources[0] && <span className="ml-2 text-xs text-fg-muted">{r.sources[0].document} v{r.sources[0].documentVersion}, {locatorText(r.sources[0].locator)}</span>}
-                    {r.uncertainty.length > 0 && <span className="ml-2 text-xs text-warning">{r.uncertainty.length} uncertain</span>}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {selected ? <RuleReview key={selected} projectId={props.projectId} versionId={selected} /> : <p className="text-sm text-fg-muted">Choose a rule.</p>}
-          </div>
-        )}
+        <p className="text-sm text-fg-muted">Choose a document, describe what the template needs, and tick the rules that apply. Your tick is the review: ticked rules go into the rule set when you publish.</p>
+        <RulesTable projectId={props.projectId} documents={props.documents.items.map((d) => ({ id: d.id, title: d.title }))} rules={props.rules} />
       </section>
       <Publish projectId={props.projectId} preview={props.preview} />
     </div>
@@ -437,7 +421,7 @@ function Publish({ projectId, preview }: { projectId: string; preview: PreviewDa
         Publish the project rule set
       </h2>
       <p className="text-fg-muted">
-        {preview.counts.REVIEWED ?? 0} reviewed · {preview.counts.DRAFT ?? 0} draft · {preview.counts.NEEDS_DEFINITION ?? 0} needs definition · {preview.counts.EXCLUDED ?? 0} excluded.
+        {preview.counts.REVIEWED ?? 0} applied · {(preview.counts.DRAFT ?? 0) + (preview.counts.NEEDS_DEFINITION ?? 0)} not applied · {preview.counts.EXCLUDED ?? 0} excluded.
         {preview.latest ? ` Current published version: ${preview.latest.version}.` : ' Nothing published yet.'}
       </p>
       <label className="mt-2 inline-flex items-center gap-2">
@@ -451,7 +435,17 @@ function Publish({ projectId, preview }: { projectId: string; preview: PreviewDa
           Included: {preview.included.map((r) => `${r.ruleKey} v${r.version}`).join(', ')}
         </p>
       )}
-      {preview.excluded.length > 0 && <p className="text-fg-muted">Excluded: {preview.excluded.map((r) => `${r.ruleKey} (${r.reason ?? 'no reason'})`).join('; ')}</p>}
+      {preview.notApplied && preview.notApplied.length > 0 && (
+        <p className="text-fg-muted">
+          Not applied (left out of the set): {preview.notApplied.length} rule{preview.notApplied.length === 1 ? '' : 's'}
+          {preview.notApplied.some((r) => r.required) && `, of which ${preview.notApplied.filter((r) => r.required).length} marked required`}.
+        </p>
+      )}
+      {preview.excluded.filter((r) => !preview.notApplied?.some((n) => n.ruleKey === r.ruleKey)).length > 0 && (
+        <p className="text-fg-muted">
+          Excluded: {preview.excluded.filter((r) => !preview.notApplied?.some((n) => n.ruleKey === r.ruleKey)).map((r) => `${r.ruleKey} (${r.reason ?? 'no reason'})`).join('; ')}
+        </p>
+      )}
       {preview.blocking.length > 0 && (
         <div role="status" className="mt-2 rounded border border-warning/40 bg-warning/10 p-2">
           <strong>Publication is blocked:</strong>

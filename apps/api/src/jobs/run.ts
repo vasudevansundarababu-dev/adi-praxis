@@ -15,6 +15,9 @@ import { grantAppRole } from './grant-app-role';
  * - `policy-seed --client <clientId> --owner <pmUserId>`: fictional SEED policy projects (PRD PR-S01); never production.
  * - `qa-users [--dry-run]`: QA-only synthetic users (30 staffing-ready SMEs, 10 Reviewers) through the public API at
  *   API_URL; never production. Exit 3 when some candidates are not ready yet (re-run to continue).
+ * - `qa-smoke`: QA-only end-to-end smoke test over the public API at API_URL (real QA infrastructure: live extraction,
+ *   live models, the deployed worker). Prints one JSON line `report: "qa-smoke"`; exit 0 only when every step that ran
+ *   passed. Never production.
  * - `qa-project-cleanup [--apply]`: QA-only. Deletes every project without protected history; cancels the rest. Dry run
  *   by default; --apply also needs QA_PROJECT_CLEANUP_CONFIRM=delete-all-projects. Never production.
  * - `case-selector-slots <projectId> [--apply]`: replaces a case-selector project's generic slots with one slot per
@@ -75,6 +78,15 @@ try {
     // The job also runs pending or failed assessments with this environment's model (SUITABILITY_MODEL).
     const r = await qaUsers(db, { ...optionsFromEnv(process.env, config.appEnv, dryRun, fetchHttp(process.env.API_URL ?? '')), evaluator: defaultEvaluator(config) }, log);
     if (!dryRun && r.incomplete) process.exitCode = 3;
+  } else if (job === 'qa-smoke') {
+    if (config.appEnv === 'production') throw new Error('qa-smoke refuses to run with APP_ENV=production');
+    if (process.argv.length > 3) throw new Error(`Unknown qa-smoke argument "${process.argv[3]}". qa-smoke takes no arguments.`);
+    if (!process.env.API_URL) throw new Error('qa-smoke needs API_URL');
+    const { fetchHttp } = await import('./qa-users');
+    const { optionsFromEnv, qaSmoke } = await import('./qa-smoke');
+    const r = await qaSmoke(optionsFromEnv(process.env, config.appEnv, fetchHttp(process.env.API_URL)), log);
+    console.log(JSON.stringify(r));
+    if (!r.ok) process.exitCode = 1;
   } else if (job === 'qa-project-cleanup') {
     if (config.appEnv === 'production') throw new Error('qa-project-cleanup refuses to run with APP_ENV=production');
     const extra = process.argv.slice(3).filter((a) => a !== '--apply');
@@ -99,7 +111,7 @@ try {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-project-cleanup | case-selector-slots`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

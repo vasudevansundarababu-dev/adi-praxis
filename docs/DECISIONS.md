@@ -1046,6 +1046,42 @@ Review of the Golden Task2 Marketing handoff v1.1; details in `docs/authoring/MA
   - It refuses once the project has any task, or any slot that is offered or assigned, so no expert's work is touched.
   - It is audited as `project.slots_rebuilt` (actor SYSTEM).
 
+## QA smoke job: `qa-smoke` (14 Nov 2026)
+
+- **(owner)** After several QA P0s that unit tests missed (FK grant on an append-only table, LlamaExtract project ID,
+  tokenised quotes, failed jobs holding budget), build an end-to-end smoke test that walks the real journey over the
+  public API against real QA infrastructure, run it now and after every QA deploy, and report PASS or FAIL per step.
+- **(chosen by Claude)** **Public API only, as named actors.** Unlike `qa-users`, the job never reads the database; every
+  id it needs comes from the routes the apps use. The seeded Reviewer `reviewer01@praxis.test` makes every human
+  decision (selection, task acceptance); AI output only informs. No route was added; a step that cannot be done through
+  existing routes fails and names the gap.
+- **(chosen by Claude)** **Steps and dependencies:** `health`, `sign-in`, `project`, `policy`, `staffing`,
+  `authoring`, `review`, `export`, `cleanup`. Policy and staffing both need only the project, so one failing still lets
+  the other run; authoring needs both. Cleanup runs whenever a project was made. Exit code 0 only when no step failed;
+  SKIPPED does not fail the run.
+- **(chosen by Claude)** **A fresh SME per run** (`smoke-<UTC timestamp>@praxis.test`). Accepted assignments on
+  cancelled projects still count against an SME's concurrent-project limit (2), so one fixed SME would be refused from
+  the third run on. Open question for the owner: should cancelling a project close its accepted assignments?
+- **(chosen by Claude)** **Policy review:** the PM reviews every extracted rule that has no open problems and excludes
+  the others with a recorded reason, because publication needs every draft decided. "Most citations resolved" means at
+  least 50% RESOLVED.
+- **(chosen by Claude)** **The case the SME saves:** the Golden KYC worked case on the account-opening form; an uploaded
+  form's first worked example (Admin route `GET /template-profiles/:id`); otherwise the form's deterministic synthetic
+  sample. It cites the rule this run published (key and exact version) and sets the slot's case-selector value.
+- **(chosen by Claude)** **Project settings:** chatbot and classic editor (`BOTH`), route SME → PM with the Reviewer
+  deciding, one distinct task and one per expert, so a full pass ends with the project COMPLETED (a completed project
+  cannot be cancelled; cleanup leaves it). Failed runs cancel their project, pausing it first when in progress.
+- **(chosen by Claude)** **Export:** only Praxis's own pre-check. When the deployed export validator is Anvil-gated,
+  the step is SKIPPED with that reason, because validating would call Anvil.
+- **(chosen by Claude)** **Cost report:** the extraction's cost as the API reports it, and estimates for the calls it
+  does not price: suitability $0.01, authoring assistant $0.005, embedding $0.0001. One run is about $0.11.
+- **Gap found while building it (in-process run against the real routes):** on KYC v6's per-state form
+  `golden-kyc-reusable-v1` the job reaches submit, but the form has no worked example, so the generic sample fails
+  `anvil.evaluator-binding` and `profile.S3.environment`. The report says so. Pinning the older account-opening version
+  is not possible, because PMs are offered only the newest version of each workflow.
+- **Deploy:** `praxis-qa-smoke` Cloud Run job, deployed but never run by `deploy-demo.sh` (same secrets as
+  `praxis-qa-users`, no retries, 1 hour timeout). Runbook: `docs/ops/QA-ENV-SETUP.md` section 7.
+
 ## Policy rules page: live extraction progress, rules table and "Apply to project" (14 Nov 2026)
 
 Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirements are in `docs/prd/PRD-POLICY-RULES.md` section 5.6.

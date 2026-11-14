@@ -143,3 +143,44 @@ gcloud run jobs deploy praxis-qa-users --image="$REPO/api:$TAG" "${COMMON[@]}" -
 Owner: create the secret `qa-seed-reviewer-password` (at least 12 characters) in Secret Manager, then
 plan with `gcloud run jobs execute praxis-qa-users --region <region> --wait` (writes nothing; read the logs) and apply
 with `gcloud run jobs execute praxis-qa-users --region <region> --wait --args=src/jobs/run.ts,qa-users`.
+
+## 7. QA smoke test: `qa-smoke` job (14 Nov 2026)
+
+An end-to-end check of the real journey against the real QA infrastructure, to run after every QA deploy. QA (and local)
+only: the job refuses `APP_ENV=production`. Decisions: `docs/DECISIONS.md`, "QA smoke job".
+
+- **Run:** `gcloud run jobs execute praxis-qa-smoke --region <region> --wait`. The deploy script deploys the job
+  (`infra/demo/deploy-demo.sh`, when `qa-seed-reviewer-password` has a version) but never runs it.
+- **Result:** one log line with `report: "qa-smoke"`: each step's status (PASS, FAIL or SKIPPED), duration, the error
+  for each failure, the ids it created, and the paid calls with their cost. Exit 0 only when every step that ran passed.
+  A step whose prerequisite failed is SKIPPED with `needs <step>`.
+- **Steps:**
+  1. `health` (`/readyz`), `sign-in` (demo Admin and PM, Reviewer `reviewer01@praxis.test`).
+  2. `project`: a new project `SYNTHETIC QA smoke — <UTC date time>` on the newest published KYC template, owned by
+     `pm@praxis.demo`, opportunity published, the Reviewer attached. It never touches other projects.
+  3. `policy`: uploads the 1-page synthetic policy `apps/api/src/jobs/qa-smoke-policy.md`, runs extraction with the
+     project's default profile (live LlamaExtract, about $0.10), waits for the job. Passes when the job SUCCEEDED with
+     at least one rule and at least half the citations are RESOLVED. The PM reviews every rule without open problems,
+     excludes the rest with a reason, and publishes the rule set.
+  4. `staffing`: a fresh SME `smoke-<timestamp>@praxis.test` (mock Google, mock identity), profile form, submit, the
+     worker's suitability assessment (one Gemini call), the Reviewer's SELECTED decision, onboarding, the PM's match
+     and assignment, and the SME's acceptance.
+  5. `authoring`: the SME's first task (a state slot on a per-state template), consent, save, one authoring-assistant
+     message (one AUTHORING_MODEL call; the proposal is discarded), the authorship declaration, submit.
+  6. `review`: the Reviewer accepts; the ApprovedTaskRecord exists and `GET /dataset/verification` reports the hash
+     chain intact.
+  7. `export`: Praxis's pre-check validation of the record. SKIPPED when the export validator would call Anvil.
+  8. `cleanup`: cancels the smoke project (pausing it first when in progress). A full pass completes the project's one
+     task, so it is already COMPLETED and stays so. Append-only records stay by design.
+- **Preconditions:** `demo-setup` and `qa-users` have run; `praxis-worker` is running with the QA models; the
+  LlamaExtract profile is enabled. Each run adds one SME and one project (both labelled synthetic);
+  `qa-project-cleanup` removes old projects.
+- **Optional env:** `QA_SMOKE_REVIEWER_EMAIL`, `QA_SMOKE_SME_EMAIL` (default: a fresh one per run),
+  `QA_SMOKE_WORKFLOW` (default `KYC onboarding and refresh`), `QA_SMOKE_TEMPLATE_ID` (pin a template of another
+  workflow; PMs are offered only the newest version of each workflow), and timeouts in seconds:
+  `QA_SMOKE_EXTRACTION_TIMEOUT_SECONDS` (900), `QA_SMOKE_ASSESSMENT_TIMEOUT_SECONDS` (600),
+  `QA_SMOKE_TASK_TIMEOUT_SECONDS` (120), `QA_SMOKE_CHAT_TIMEOUT_SECONDS` (180).
+- **Known gap (14 Nov 2026):** the per-state KYC form `golden-kyc-reusable-v1` (KYC v6, from Anvil's proposal) has no
+  worked example, and its Anvil criteria cannot be invented. On that template the `authoring` step fails at submit with
+  the failing checks and says so. It passes once the form has a worked example (for example `authoring.examples` in the
+  Anvil proposal).

@@ -39,6 +39,8 @@ export const DirectoryRowDto = z.object({
   modes: z.array(z.enum(EXECUTION_MODES)),
   validSections: z.number().int().min(0).max(BLUEPRINT_SECTIONS.length),
   hasBlueprint: z.boolean(),
+  /** Execution is defined by Anvil (`anvilSpec` set): the "n/6 valid" counter does not apply. */
+  definedByAnvil: z.boolean(),
   variantOfId: uuid.nullable(),
   projectCount: z.number().int(),
   authoredTaskCount: z.number().int(),

@@ -16,7 +16,7 @@ QA pass of the Policy Rules feature against [PRD-POLICY-RULES.md](../prd/PRD-POL
 
 | Item | Result |
 | --- | --- |
-| Acceptance criteria | 26 of 32 rows pass with test, runtime or review evidence; 4 partly (AC02, AC14, A04, A05); 1 deferred to staging (A01 live half); 1 out of scope (A11) |
+| Acceptance criteria | 28 of 32 rows pass with test, runtime or review evidence (A04 and A05 closed 10 Nov); 2 partly (AC02 labels, AC14 by design); 1 deferred to staging (A01 live half); 1 out of scope (A11) |
 | Browser journey | Pass on 3 screens (project policy workspace, task list readiness, task policy). Screenshots kept outside git |
 | Runtime API | Pass: seed idempotent, production refused, SME view read-only and private, PM-only exports |
 | Security | Pass for what was checked. No secrets, cookies or policy text in the API log |
@@ -90,7 +90,7 @@ now covers the four tables.
 | AC11 Frozen handoff | Pass | `publishes an immutable snapshot with a digest…`; `dataset export carries the frozen snapshot…`; `studio task export adds the policy sidecar…`; `the sidecar matches contracts/praxis/policy-snapshot.schema.json` |
 | AC12 Historical integrity | Pass | Append-only triggers + revokes (DEF-1 fixed); export reads the snapshot, not current rules |
 | AC13 Rubric stability | Pass | Template blueprint, criteria and version unchanged after seeding and publishing (test above) |
-| AC14 Verdict semantics | Partly | Praxis computes no verdicts; it shows "Anvil test: Not tested" and never Pass. The verdict states themselves belong to Anvil |
+| AC14 Verdict semantics | Partly | Praxis computes no verdicts; it shows "Anvil test: Not tested" and never Pass (`apps/web/test/task-policy.test.tsx`, 10 Nov). The verdict states themselves belong to Anvil |
 | AC15 Evaluator ownership | Pass (review) | Praxis sends rules and hints only; no engine, credential or execution code added |
 | AC16 Legacy compatibility | Pass | `a legacy task without a rule set is Not configured and unchanged`; legacy export rows have no `policy` key; SME view returns `configured: false` |
 | AC17 Concurrency and retries | Pass | `…stale decisions are rejected…`; `runs one job per version… idempotent`; `a deliberate rerun is a child attempt` |
@@ -100,8 +100,8 @@ now covers the four tables.
 | A01 Both adapters | Pass in CI / staging owed | 12 recorded-response tests. Live smoke is a later owner-gated staging step (≤ $50) |
 | A02 Profile selection | Pass | `only an Admin may choose the provider; the project setting is used and audited` |
 | A03 One canonical output | Pass | Both adapters normalise to one schema; one review screen |
-| A04 Formats on both providers | Partly | PDF and TXT recorded for both; DOCX/Markdown by format detection only. Live check in staging |
-| A05 Citation locators | Partly | Field association and quote matching (whitespace, typographic quotes) tested; malformed and converted-page locators not separately tested |
+| A04 Formats on both providers | Pass in CI / staging owed | `A04 formats on both providers…` (10 Nov): PDF, DOCX, TXT and Markdown each go to both adapters with their real media type; Layout Parser only for PDF/DOCX; no page number except PDF; PNG, XLSX and UTF-16 refused. Live check in the staging smoke |
+| A05 Citation locators | Pass | Field association and quote matching; `A05 Unicode…`, `A05 missing and malformed locators…`, `A04/A05 converted pages…` (10 Nov). These found two defects, both fixed: offsets after a ligature or decomposed accent pointed at the wrong characters, and a fractional page number crashed the resolver |
 | A06 Quote and source checks | Pass | `keeps a quote that is not in the document as Needs definition`; extraction never marks Reviewed |
 | A07 Retries and budget | Pass | `marks an ambiguous submit Uncertain without resubmitting`; `refuses a job that would exceed the provider budget` |
 | A08 Provider switch | Pass | New attempt per switch; reviewed rules and snapshots untouched (append-only) |
@@ -114,7 +114,7 @@ now covers the four tables.
 
 Run in a separate conversation that did not write the code, with local services only and no provider keys.
 
-- **Verdict on the code:** sign-off. No Blocker defects and no AC marked Fail. A05 stays Partly (no malformed or converted-page locator test); the A01 live half stays for the staging smoke.
+- **Verdict on the code:** sign-off. No Blocker defects and no AC marked Fail. A05 was closed on 10 Nov with locator tests and two fixes; the A01 and A04 live halves stay for the staging smoke.
 - **Suites:** typecheck clean; API 689 passed, 1 failed (`infra.test.ts`, needs the Docker socket), 5 skipped; web 55, candidate 23, shared 188 passed. Policy suites 44 passed.
 - **Spend safety:** a throwaway concurrency test with a budget that fits exactly one job gave `[202, 409 BUDGET_EXHAUSTED]`, and a null ceiling gave `409 BUDGET_NOT_SET`. The advisory lock serialises reservations.
 - **Migration:** additive only. Applies on an empty database and on a database at `main`'s schema; existing rows intact; 13 append-only triggers.

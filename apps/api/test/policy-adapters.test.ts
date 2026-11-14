@@ -3,7 +3,7 @@ import { loadConfig } from '../src/config';
 import { readPolicyDocument, sniffPolicyFormat, zipEntry } from '../src/policy/document-reader';
 import { geminiEndpoint, GoogleLayoutGeminiAdapter, normaliseGemini, textChunks } from '../src/policy/extraction/google';
 import { LlamaExtractAdapter, normaliseLlama } from '../src/policy/extraction/llamaextract';
-import { findSpan, resolveCitation } from '../src/policy/extraction/normalise';
+import { findSpan, normaliseForMatch, resolveCitation } from '../src/policy/extraction/normalise';
 import { ProviderError } from '../src/policy/extraction/types';
 import { docxWithText, pdfWithText } from './documents';
 import { TEST_DATABASE_URL, TEST_REDIS_URL } from './env';
@@ -164,6 +164,55 @@ describe('documents and citations (S2 §9, A04–A06, A08)', () => {
     expect(pdf).toMatchObject({ resolution: 'RESOLVED', locator: { page: 2 } });
     const bad = resolveCitation({ fieldPath: 'requirement', role: 'supports', quote: 'Agents may skip approval entirely.', page: 1, chunkId: null, lineStart: null, lineEnd: null, confidence: null }, { text, pages: [], format: 'txt' });
     expect(bad.resolution).toBe('QUOTE_MISMATCH');
+  });
+
+  describe('quote matching tolerates provider tokenisation only (PR-R02)', () => {
+    const cite = (quote: string, page: number | null = null) => ({ fieldPath: 'requirement', role: 'supports' as const, quote, page, chunkId: null, lineStart: null, lineEnd: null, confidence: null });
+    const md = '# Synthetic data\n\nEvery task case must use synthetic customers only. Never use a real person, real company or real ID number.\n\nSee (Annex A) for details.';
+    const original = 'Every task case must use synthetic customers only. Never use a real person, real company or real ID number.';
+
+    it('resolves a LlamaExtract-tokenised quote to the exact original span', () => {
+      const r = resolveCitation(cite('Every task case must use synthetic customers only . Never use a real person , real company or real ID number .'), { text: md, pages: [], format: 'md' });
+      expect(r.resolution).toBe('RESOLVED');
+      expect(r.quote).toBe(original);
+      expect(r.locator).toMatchObject({ charStart: md.indexOf(original), charEnd: md.indexOf(original) + original.length, lineStart: 3, lineEnd: 3 });
+      expect(md.slice(r.locator.charStart!, r.locator.charEnd!)).toBe(original);
+    });
+
+    it('handles spaces inside brackets, curly quotes and dashes', () => {
+      expect(findSpan(md, 'See ( Annex A ) for details .')).toEqual([md.indexOf('See'), md.length]);
+      const text = 'Staff must say “no” — always.';
+      expect(findSpan(text, 'say "no" - always .')).toEqual([text.indexOf('say'), text.length]);
+    });
+
+    it('resolves a quote that spans a line break and stores the original text with the newline', () => {
+      const text = 'Intro.\nAgents must verify the customer\n  before opening an account.\nEnd.';
+      const r = resolveCitation(cite('Agents must verify the customer before opening an account .'), { text, pages: [], format: 'txt' });
+      expect(r).toMatchObject({ resolution: 'RESOLVED', quote: 'Agents must verify the customer\n  before opening an account.', locator: { lineStart: 2, lineEnd: 3 } });
+    });
+
+    it('still rejects a quote with a changed, added or missing word', () => {
+      for (const q of [
+        'Every task case must use synthetic customers only . Never use a real person , real bank or real ID number .',
+        'Every task case may use synthetic customers only .',
+        'Every task case must use synthetic customers only . Never use a real person or real ID number .',
+        'Every task case must use synthetic customersonly .',
+      ]) {
+        const r = resolveCitation(cite(q), { text: md, pages: [], format: 'md' });
+        expect(r).toMatchObject({ resolution: 'QUOTE_MISMATCH', quote: q, locator: { charStart: null, lineStart: null } });
+      }
+    });
+
+    it('applies the same tolerance to PDF pages and stores the page text', () => {
+      const r = resolveCitation(cite('needs manager approval , always .', 1), { text: '', pages: ['nothing', 'Agent needs manager approval, always.'], format: 'pdf' });
+      expect(r).toMatchObject({ resolution: 'RESOLVED', quote: 'needs manager approval, always.', locator: { page: 2 } });
+    });
+
+    it('maps offsets back correctly when compatibility characters change length', () => {
+      const text = 'The ﬁnal check, done.';
+      expect(findSpan(text, 'final check , done .')).toEqual([4, text.length]);
+      expect(normaliseForMatch('a  ( b )\n, c').text).toBe('a (b), c');
+    });
   });
 
   it('treats document content as data: injected instructions stay text and are not obeyed', () => {

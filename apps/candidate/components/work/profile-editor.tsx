@@ -13,6 +13,7 @@ import {
   sectionProgress,
   setFieldValue,
   startProfileOutput,
+  withSlotCase,
   type ItemField,
   type ProfileProblem,
   type SectionKey,
@@ -264,7 +265,10 @@ function ArrayControl({ field, value, path, problems, lookup, onChange }: FieldP
 }
 
 export function ProfileEditor({ task, profile, onSubmitted, initialSection = 0 }: { task: TaskView; profile: TemplateProfile; onSubmitted: () => void; initialSection?: number }) {
-  const initial = useMemo(() => (profileApplies(profile, task.output) ? (task.output as Record<string, unknown>) : startProfileOutput(profile, task.output)), [profile, task.output]);
+  const initial = useMemo(
+    () => withSlotCase(profile, profileApplies(profile, task.output) ? (task.output as Record<string, unknown>) : startProfileOutput(profile, task.output), task.readOnly ? null : task.input.slot?.case),
+    [profile, task.output, task.input.slot?.case, task.readOnly],
+  );
   const { value, update, currentRevision, state, flush } = useAutosave<Record<string, unknown>>(task.id, initial, task.revision, task.readOnly);
   const [active, setActive] = useState(Math.min(Math.max(initialSection, 0), profile.sections.length - 1));
   const problems = useMemo(() => profileProblems(profile, value), [profile, value]);

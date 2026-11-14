@@ -1006,3 +1006,21 @@ Review of the Golden Task2 Marketing handoff v1.1; details in `docs/authoring/MA
   - Empty, it follows a Gemini `AUTHORING_MODEL` (as QA has), otherwise Claude Opus 5 as before.
   - `infra/demo/deploy-demo.sh` sets `gemini:gemini-3.8-flash` explicitly for QA.
 - **Same contract for both providers:** the same rules, escaped answer and output schema; output is validated and narrowed to the fields the controller asked for. Any failure is "assistant unavailable", so the candidate keeps "retry or use the form". The model only proposes facts; the candidate confirms each one.
+
+## One slot and one task per case-selector value (13 Nov 2026)
+
+- **(owner)** "Start the fix for one task per state." The first project on KYC v6 got five generic open slots, so two authors could pick the same state and another state would get none.
+- **Stored on the template:** a version keeps its `caseSelector` (`{field, source, values}`) in its own column.
+  - A proposal or golden pack sets it from its template block; a block without one clears it.
+  - A new version made in the UI keeps it (same form). A variant (a new workflow) does not.
+  - The migration backfills existing versions from the stored Anvil proposal (`anvil_spec.authoring.template.caseSelector`), which changes nothing else.
+- **Slots:** a project on such a version gets exactly one required, non-open slot per value, in the selector's order, whatever the project's target.
+  - Each slot carries its value (`coverageTags.case`), and the issued task's `input.slot.case` carries it to the author.
+  - Its brief names the value with the form's labels when the form is registered, for example "Governing state: California (CA)".
+- **Authoring:** the candidate editor pre-fills the form's selector field (for example `S1.governingState`) from the slot when it is empty.
+  - Submission check `case.selector` (section S1) blocks a task whose field differs from its slot's value, or is empty.
+  - The slot's value is accepted as a coverage value although it is not a coverage dimension.
+- **Projects created before this change:** job `case-selector-slots <projectId> [--apply]` replaces their generic slots with one per value.
+  - It is a dry run by default.
+  - It refuses once the project has any task, or any slot that is offered or assigned, so no expert's work is touched.
+  - It is audited as `project.slots_rebuilt` (actor SYSTEM).

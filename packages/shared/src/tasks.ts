@@ -11,6 +11,42 @@ export interface SlotSpec {
   /** Counts towards the project's minimum coverage. */
   required: boolean;
   brief: string;
+  /** The case-selector value this slot is for (one slot per value), with the form field that must carry it. */
+  case?: SlotCase;
+}
+
+/** A template's case selector (golden pack `template.caseSelector`): one task per value of a required pick list. */
+export interface CaseSelector {
+  field: string;
+  /** `S<n>.<fieldKey>` of the form, e.g. `S1.governingState`. */
+  source: string;
+  values: string[];
+}
+
+export interface SlotCase {
+  field: string;
+  source: string;
+  value: string;
+}
+
+/**
+ * One required slot per case-selector value (KYC five-state contract, 13 Nov 2026): the target is one task per value,
+ * so slots are never open and never repeat a value. `labelOf` gives the value's display label, when known.
+ */
+export function caseSelectorSlots(sel: CaseSelector, opts: { fieldLabel?: string; labelOf?: (value: string) => string | undefined } = {}): SlotSpec[] {
+  const name = opts.fieldLabel ?? sel.field;
+  return sel.values.map((value) => {
+    const label = opts.labelOf?.(value);
+    const shown = label && label !== value ? `${label} (${value})` : value;
+    return {
+      tags: { [sel.field]: value },
+      edgeCase: null,
+      isOpen: false,
+      required: true,
+      brief: `${name}: ${shown}. Write this reusable task for ${label ?? value} only; set ${name} to ${value}.`,
+      case: { field: sel.field, source: sel.source, value },
+    };
+  });
 }
 
 export interface SlotInput {

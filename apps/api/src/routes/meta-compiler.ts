@@ -158,6 +158,7 @@ export const metaCompilerRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config 
             // A variant is a new workflow: a chosen form and Anvil's spec belong to the source workflow, not to it.
             profileId: null,
             anvilSpec: Prisma.DbNull,
+            caseSelector: Prisma.DbNull,
             workflowName: label,
             lineageId,
             version: 1,

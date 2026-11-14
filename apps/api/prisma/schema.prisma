@@ -478,6 +478,9 @@ model Template {
   /// Anvil-owned parts of a template proposed by Anvil: requirement reference, execution part, skills. Never edited
   /// by Praxis (Praxis-Anvil contract, 12 Nov 2026).
   anvilSpec             Json?          @map("anvil_spec")
+  /// One task per value of a required pick list ({ field, source, values }): the project gets one slot per value
+  /// (KYC five-state contract, 13 Nov 2026). Null for templates without a case selector.
+  caseSelector          Json?          @map("case_selector")
   publishedAt           DateTime?      @map("published_at")
   retiredAt             DateTime?      @map("retired_at")
   /// Harbor blueprint (packages/shared/src/blueprint). Null for templates outside the Meta-Compiler catalog.

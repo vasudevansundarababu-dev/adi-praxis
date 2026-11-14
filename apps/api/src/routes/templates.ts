@@ -1,4 +1,4 @@
-import type { Domain, Prisma, Template } from '@prisma/client';
+import { Prisma, type Domain, type Template } from '@prisma/client';
 import {
   CoverageDimensions,
   CreateDomainRequest,
@@ -323,6 +323,8 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
             collectionSchema: copy.collectionSchema as Prisma.InputJsonValue,
             coverageDimensions: copy.coverageDimensions as Prisma.InputJsonValue,
             edgeCaseCatalog: copy.edgeCaseCatalog as Prisma.InputJsonValue,
+            // Same form, same case selector (null stays null).
+            caseSelector: copy.caseSelector === null ? Prisma.DbNull : (copy.caseSelector as Prisma.InputJsonValue),
             version: versions[0]!.version + 1,
             status: 'DRAFT',
           } as Prisma.TemplateUncheckedCreateInput,

@@ -143,3 +143,18 @@ gcloud run jobs deploy praxis-qa-users --image="$REPO/api:$TAG" "${COMMON[@]}" -
 Owner: create the secret `qa-seed-reviewer-password` (at least 12 characters) in Secret Manager, then
 plan with `gcloud run jobs execute praxis-qa-users --region <region> --wait` (writes nothing; read the logs) and apply
 with `gcloud run jobs execute praxis-qa-users --region <region> --wait --args=src/jobs/run.ts,qa-users`.
+
+## 7. Policy extraction (LlamaExtract) in QA (14 Nov 2026)
+
+- **Database grant:** extraction first failed with a 500, "permission denied for table PolicyDocumentVersion". Fixed by
+  PR #67 (migration `20261127000000_policy_version_fk_check`), deployed to QA at main `27db0e6`.
+- **Credentials:** the next error was LlamaExtract HTTP 401. The key was valid on the US server, but
+  `llamaextract-project-id` named a different project. The owner added a new key (`llamaextract-api-key` versions 2
+  and 3, the same key) and the matching project ID (`llamaextract-project-id` version 2). A free check (list files with
+  that project ID) returned 200. The EU server rejects the key, so the default US base URL is correct.
+- **Budget, a direct QA change, not in the deploy config:** failed jobs keep their budget reservation (a bug reported
+  to the code session), so 8 failed attempts held $4.80 of the $5 `POLICY_BUDGET_LLAMA_USD`. The owner approved raising
+  it to 10 on `praxis-api` and `praxis-worker` (revisions 00029, same image `27db0e6`). The next nightly or forced
+  deploy resets it to 5 (`deploy-demo.sh` defaults `POLICY_BUDGET_LLAMA_USD` to 5) unless the reservation bug is
+  fixed or the deploy passes a higher value.
+- Secrets are read when a revision starts. After adding a secret version, roll a new revision of both services.

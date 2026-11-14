@@ -153,7 +153,7 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
         parentBatchId: b.parentBatchId,
         createdAt: b.createdAt,
         finishedAt: b.finishedAt,
-        jobs: b.jobs.map((j) => ({ id: j.id, status: j.status, provider: j.provider, documentVersionId: j.documentVersionId, document: j.documentVersion.document.title, documentVersion: j.documentVersion.version, candidateCount: j.candidateCount, error: j.error, finishedAt: j.finishedAt, ...(isAdmin(actor) ? { estimatedUsd: Number(j.estimatedUsd), actualUsd: j.actualUsd === null ? null : Number(j.actualUsd) } : {}) })),
+        jobs: b.jobs.map((j) => ({ id: j.id, status: j.status, provider: j.provider, documentVersionId: j.documentVersionId, document: j.documentVersion.document.title, documentVersion: j.documentVersion.version, candidateCount: j.candidateCount, error: j.error, createdAt: j.createdAt, startedAt: j.startedAt, finishedAt: j.finishedAt, submitted: j.providerOperationId !== null, ...(isAdmin(actor) ? { estimatedUsd: Number(j.estimatedUsd), actualUsd: j.actualUsd === null ? null : Number(j.actualUsd) } : {}) })),
       })),
     };
   });

@@ -1,8 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { elapsed, isActive, pollExtraction, stageLabel } from './extraction-progress';
 import { locatorText } from './locator';
 import { RuleReview } from './rule-review';
 
@@ -33,6 +34,10 @@ export interface Job {
   error: string | null;
   estimatedUsd?: number;
   actualUsd?: number | null;
+  createdAt?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  submitted?: boolean;
 }
 export interface ExtractionData {
   profile: { id: string; label: string; provider: string; revision: number; source: string } | null;
@@ -66,7 +71,6 @@ export interface PreviewData {
 
 const STATE_LABEL: Record<RuleRow['state'], string> = { DRAFT: 'Draft', NEEDS_DEFINITION: 'Needs definition', REVIEWED: 'Reviewed', EXCLUDED: 'Excluded' };
 const STATE_CLASS: Record<RuleRow['state'], string> = { DRAFT: 'bg-bg', NEEDS_DEFINITION: 'bg-warning/15 text-warning', REVIEWED: 'bg-success/15 text-success', EXCLUDED: 'bg-bg text-fg-muted line-through' };
-const JOB_LABEL: Record<string, string> = { QUEUED: 'Queued', PROCESSING: 'Processing', SUCCEEDED: 'Succeeded', PARTIAL: 'Partial — some output unreadable', FAILED: 'Failed', CANCELLED: 'Cancelled', UNCERTAIN: 'Uncertain — not resubmitted' };
 
 function Message({ m }: { m: { kind: 'ok' | 'error'; text: string } | null }) {
   if (!m) return null;
@@ -248,11 +252,42 @@ function Documents({ projectId, data }: { projectId: string; data: DocumentsData
   );
 }
 
-function Extraction({ projectId, isAdmin, data, documents }: { projectId: string; isAdmin: boolean; data: ExtractionData | null; documents: DocumentsData }) {
+/** Keeps the receipts live while any job is queued or running (PRD PR-E15); refreshes the rules once all are done. */
+function useLiveExtraction(projectId: string, initial: ExtractionData | null) {
+  const router = useRouter();
+  const [data, setData] = useState(initial);
+  const [now, setNow] = useState(() => Date.now());
+  const [kick, setKick] = useState(0);
+  useEffect(() => setData(initial), [initial]);
+  const active = !!data && isActive(data.batches.flatMap((b) => b.jobs));
+  useEffect(() => {
+    if (!active) return;
+    const signal = { aborted: false };
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    void pollExtraction<ExtractionData>({
+      signal,
+      fetchOnce: async () => {
+        const res = await fetch(`/api/v1/projects/${projectId}/policy/extraction`, { cache: 'no-store' });
+        return res.ok ? ((await res.json()) as ExtractionData) : null;
+      },
+      onUpdate: setData,
+      onDone: () => router.refresh(),
+    }).finally(() => clearInterval(tick));
+    return () => {
+      signal.aborted = true;
+      clearInterval(tick);
+    };
+  }, [active, kick, projectId, router]);
+  return { data, active, now, restart: () => setKick((k) => k + 1) };
+}
+
+function Extraction({ projectId, isAdmin, data: initial, documents }: { projectId: string; isAdmin: boolean; data: ExtractionData | null; documents: DocumentsData }) {
   const router = useRouter();
   const [chosen, setChosen] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const live = useLiveExtraction(projectId, initial);
+  const data = live.data;
   if (!data) return null;
   const latest = documents.items.map((d) => ({ doc: d, v: d.versions[0]! }));
 
@@ -261,8 +296,9 @@ function Extraction({ projectId, isAdmin, data, documents }: { projectId: string
     const r = await mutate<{ batchId: string; created: boolean }>('POST', `/projects/${projectId}/policy/extraction`, { documentVersionIds: versionIds, ...(parentBatchId ? { parentBatchId } : {}) });
     setPending(false);
     if (!r.ok) return setMsg({ kind: 'error', text: r.error ?? 'Extraction could not start.' });
-    setMsg({ kind: 'ok', text: r.data!.created ? 'Extraction started. Refresh in a minute to see the result.' : 'This extraction already exists; showing its receipt.' });
+    setMsg({ kind: 'ok', text: r.data!.created ? 'Extraction started. Progress updates below; rules appear when it finishes.' : 'This extraction already exists; showing its receipt.' });
     router.refresh();
+    live.restart();
   }
 
   async function setProfile(profileId: string) {
@@ -310,6 +346,11 @@ function Extraction({ projectId, isAdmin, data, documents }: { projectId: string
         </fieldset>
       )}
       <Message m={msg} />
+      {live.active && (
+        <p role="status" aria-live="polite" className="mt-2 text-fg-muted">
+          Extraction in progress — this page updates by itself.
+        </p>
+      )}
       {data.batches.length > 0 && (
         <table className="mt-4 w-full text-left">
           <caption className="text-left text-xs font-medium text-fg-muted">Receipts</caption>
@@ -318,6 +359,7 @@ function Extraction({ projectId, isAdmin, data, documents }: { projectId: string
               <th className="py-1">Document</th>
               <th>Status</th>
               <th>Candidates</th>
+              <th>Elapsed</th>
               <th>Profile</th>
               {isAdmin && <th>Cost</th>}
               <th />
@@ -332,10 +374,11 @@ function Extraction({ projectId, isAdmin, data, documents }: { projectId: string
                     {b.parentBatchId && <span className="ml-1 text-xs text-fg-muted">(retry)</span>}
                   </td>
                   <td>
-                    {JOB_LABEL[j.status] ?? j.status}
+                    {stageLabel(j)}
                     {j.error && <span className="block text-xs text-error">{j.error}</span>}
                   </td>
                   <td>{j.candidateCount}</td>
+                  <td className="text-xs">{elapsed(j, live.now) ?? '—'}</td>
                   <td className="text-xs">
                     {b.profileId} r{b.profileRevision}
                   </td>

@@ -4,7 +4,7 @@ import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, conflict } from '../lib/errors';
 import type { AuditInput } from '../platform/audit';
-import { currentVersions } from './rules';
+import { currentVersions, definitionProblems } from './rules';
 
 type Current = Awaited<ReturnType<typeof currentVersions>>[number];
 
@@ -118,6 +118,12 @@ export async function previewRuleSet(tx: Db | Tx, clientId: string, projectId: s
   const conflicts = detectConflicts(items);
   for (const c of conflicts) if (c.ruleKeys.some((k) => applied.has(k))) blocking.push(c.message);
   const notApplied = items.filter((i) => i.version.state === 'DRAFT' || i.version.state === 'NEEDS_DEFINITION');
+  // Anvil cannot accept a rule without its required fields: an applied rule that is still incomplete blocks (owner, 14 Nov 2026).
+  for (const i of items) {
+    if (i.version.state !== 'REVIEWED') continue;
+    const gaps = definitionProblems(i.version.body);
+    if (gaps.length) blocking.push(`${i.rule.ruleKey} is applied but incomplete: ${gaps.join(' ')} Define it (with AI or by hand) and tick it again.`);
+  }
   const content = setContent(items);
   if (content.rules.length === 0) blocking.push('No rule is applied to the project yet.');
   const latest = await tx.projectRuleSet.findFirst({ where: { clientId, projectId }, orderBy: { version: 'desc' }, select: { id: true, version: true, digest: true } });

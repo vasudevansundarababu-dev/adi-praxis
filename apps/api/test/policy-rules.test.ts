@@ -554,6 +554,16 @@ describe('rules table and Apply to project (PRD 5.6, owner 14 Nov 2026)', () => 
     expect(set.ruleVersionIds).toEqual([rule.versionId]);
   });
 
+  it('an applied rule that is still incomplete blocks publication until it is defined', async () => {
+    const { versionId } = await extractedRule();
+    const m = (await api(pmCookie).post(`/projects/${projectId}/policy/rules`, { documentVersionId: versionId, ruleKey: 'REFUNDS', body: GAPPY, citations: [{ fieldPath: 'requirement', role: 'supports', quote: 'Refunds are out of scope.' }] })).json();
+    const ok = await api(pmCookie).put(`/projects/${projectId}/policy/rules/${m.ruleId}/applied`, { applied: true, expectedContentHash: m.contentHash });
+    expect(ok.json().warnings.length).toBeGreaterThan(0);
+    const preview = (await api(pmCookie).get(`/projects/${projectId}/policy/rule-set/preview`)).json();
+    expect(preview.blocking.join(' ')).toContain('R-REFUNDS is applied but incomplete');
+    expect((await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: null })).statusCode).toBe(422);
+  });
+
   it('a conflict blocks only when it involves an applied rule', async () => {
     const { versionId } = await extractedRule();
     const make = (requirement: string) => api(pmCookie).post(`/projects/${projectId}/policy/rules`, { documentVersionId: versionId, ruleKey: 'REFUNDS', body: { ...GAPPY, requirement, requirementType: 'prohibition', applicability: { ...GAPPY.applicability, universal: true }, effective: { from: null, to: null, conditionText: 'always' } }, citations: [{ fieldPath: 'requirement', role: 'supports', quote: 'Refunds are out of scope.' }] });

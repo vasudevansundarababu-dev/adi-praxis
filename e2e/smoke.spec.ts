@@ -118,6 +118,7 @@ test.describe('candidate smoke', () => {
   test('a new candidate signs in with the dev mock, is asked to verify identity, and can reach home', async ({ page }) => {
     test.skip(EXTERNAL, 'the mock sign-in exists only in local development');
     await page.goto(`${CANDIDATE}/sign-in?returnTo=/home`);
+    await page.waitForLoadState('networkidle'); // let the form hydrate before submitting it
     await page.locator('#dev-email').fill(`smoke.${Date.now()}@example.test`);
     await page.locator('#dev-name').fill('Smoke Tester');
     await page.getByRole('checkbox').first().check();

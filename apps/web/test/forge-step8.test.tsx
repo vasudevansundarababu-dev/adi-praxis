@@ -408,11 +408,13 @@ describe('Task page decision box', () => {
 
 describe('Menus and Admin → Candidate app sign-in', () => {
   const keys = (g: ReturnType<typeof navGroupsFor>) => g.map((x) => x.key);
-  it('with the new flow on the menu is Home, Projects, Sourcing, Admin, Tutorials; off it is unchanged', () => {
+  it('with the new flow on the menu is Home, Projects, Sourcing, Admin, Tutorials; Certification, Partners and Payments are always hidden', () => {
     expect(keys(navGroupsFor(['ADMIN'], true, true))).toEqual(['home', 'projects', 'sourcing', 'admin', 'tutorials']);
     const projects = navGroupsFor(['ADMIN', 'PM'], true, true).find((g) => g.key === 'projects')!;
     expect(projects.items.map((i) => i.label)).toEqual(['Projects', 'Templates', 'Approved exports']);
-    expect(keys(navGroupsFor(['ADMIN'], true, false))).toEqual(['home', 'projects', 'sourcing', 'reviews', 'certification', 'partners', 'payments', 'admin', 'tutorials']);
+    // Owner, 15 Nov: Certification, Partners and Payments are hidden from the menu with the flow on or off.
+    expect(keys(navGroupsFor(['ADMIN'], true, false))).toEqual(['home', 'projects', 'sourcing', 'reviews', 'admin', 'tutorials']);
+    for (const flow of [true, false]) for (const k of ['certification', 'partners', 'payments']) expect(keys(navGroupsFor(['FINANCE', 'ADMIN', 'PM', 'REVIEWER'], true, flow))).not.toContain(k);
     expect(navGroupsFor(['ADMIN'], false, false).find((g) => g.key === 'admin')!.items.map((i) => i.label)).toEqual(['Users', 'Taxonomy', 'Terms', 'Failure codes', 'API clients', 'Candidate app sign-in']);
     // PMs read the setting only with the new flow on; Reviewers lose the Reviews menu with it.
     expect(keys(navGroupsFor(['PM'], false, false))).not.toContain('admin');

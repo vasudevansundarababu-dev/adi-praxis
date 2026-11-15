@@ -60,3 +60,5 @@ CREATE TRIGGER "RubricTaskSources_append_only" BEFORE UPDATE OR DELETE ON "Rubri
 CREATE TRIGGER "RubricRecommendationRun_no_truncate" BEFORE TRUNCATE ON "RubricRecommendationRun" FOR EACH STATEMENT EXECUTE FUNCTION praxis_no_truncate();
 CREATE TRIGGER "RubricCriterionAnnotation_no_truncate" BEFORE TRUNCATE ON "RubricCriterionAnnotation" FOR EACH STATEMENT EXECUTE FUNCTION praxis_no_truncate();
 CREATE TRIGGER "RubricTaskSources_no_truncate" BEFORE TRUNCATE ON "RubricTaskSources" FOR EACH STATEMENT EXECUTE FUNCTION praxis_no_truncate();
+REVOKE UPDATE, DELETE ON "RubricRecommendationRun", "RubricCriterionAnnotation", "RubricTaskSources" FROM PUBLIC;
+REVOKE UPDATE, DELETE ON "RubricRecommendationRun", "RubricCriterionAnnotation", "RubricTaskSources" FROM CURRENT_USER;

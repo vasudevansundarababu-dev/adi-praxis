@@ -8,7 +8,7 @@ import { AppError, forbidden, notFound } from '../lib/errors';
 import type { writeAudit } from '../platform/audit';
 import type { OutboxInput } from '../outbox/outbox';
 import { compileForSubmission, COMPILED_MARKER, profileSaveProblems } from './profile-output';
-import { acceptTask, rejectTask, reviewableTask } from './review-service';
+import { acceptTask, rejectTask, reviewableTask, type ReviewerIdentity } from './review-service';
 import { blocking, evaluateTask, refreshSimilarity, type StoredChecks } from './submission';
 import type { SimilarMatch } from './similarity';
 
@@ -45,7 +45,7 @@ export function authoredContent(output: unknown) {
   return rest;
 }
 
-const TASK_INCLUDE = {
+export const TASK_INCLUDE = {
   project: { include: { template: true } },
   assignedTo: { include: { smeUser: true } },
   slot: true,
@@ -106,9 +106,12 @@ export function passInForce(t: StageTask) {
   return t.reviews.filter((r) => r.stage === 'EXPERT_REVIEW' && r.decision === 'PASS' && r.submissionVersion === v.version && r.contentHash === hash).at(-1) ?? null;
 }
 
-/** The submitted version and content are exactly what the actor looked at, and the task is where they think it is. */
-function assertCurrent(t: StageTask, body: { expectedVersion: number; expectedRevision: number }) {
-  if (t.status !== 'SUBMITTED' || !t.reviewStage) throw new AppError(409, 'NOT_AWAITING_REVIEW', `This task is ${t.status.toLowerCase()}, not awaiting review.`);
+/**
+ * The submitted version and content are exactly what the actor looked at, and the task is where they think it is.
+ * `staged: false` (MVP1 Tasks tab, SME -> PM route) checks the same without a pending stage.
+ */
+export function assertCurrent(t: StageTask, body: { expectedVersion: number; expectedRevision: number }, opts: { staged?: boolean } = {}) {
+  if (t.status !== 'SUBMITTED' || ((opts.staged ?? true) && !t.reviewStage)) throw new AppError(409, 'NOT_AWAITING_REVIEW', `This task is ${t.status.toLowerCase()}, not awaiting review.`);
   const v = latest(t);
   if (body.expectedVersion !== v.version) {
     const edit = t.reviews.find((r) => r.decision === 'EDIT' && r.submissionVersion === v.version);
@@ -124,7 +127,7 @@ function assertCurrent(t: StageTask, body: { expectedVersion: number; expectedRe
   return v;
 }
 
-async function lock(tx: Tx, taskId: string) {
+export async function lock(tx: Tx, taskId: string) {
   await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${taskId}::uuid FOR UPDATE`;
 }
 
@@ -137,9 +140,21 @@ function assertRole(a: ReviewAccess, stage: PendingStage) {
 export async function decideStage(tx: Tx, actor: InternalActor, taskId: string, body: StageDecisionRequest, audit: Audit, emit: Emit) {
   await lock(tx, taskId);
   const a = await reviewAccess(tx, actor, taskId);
-  const t = a.t;
   if (!a.twoStage) throw new AppError(409, 'NOT_TWO_STAGE', 'This project uses SME → PM approval; record the review decision instead.');
   assertRole(a, body.stage);
+  return decideStageFor(tx, a.t, { id: actor.userId, kind: 'USER' }, body, audit, emit);
+}
+
+export type StageDecision = Omit<StageDecisionRequest, 'checklist' | 'comments'> & {
+  checklist?: Record<string, boolean>;
+  comments: { section?: string; target?: { kind: 'node' | 'field'; id: string }; text: string }[];
+};
+
+/**
+ * The stage decision once the reviewer's access and responsibility are checked (locked task). Shared by the Reviews
+ * screen and (MVP1) the Tasks tab (PM approval) and the external Reviewer in the candidate app (Expert review).
+ */
+export async function decideStageFor(tx: Tx, t: StageTask, reviewer: ReviewerIdentity, body: StageDecision, audit: Audit, emit: Emit, auditExtra: Record<string, unknown> = {}) {
   const v = assertCurrent(t, body);
   if (body.stage !== t.reviewStage) throw new AppError(409, 'WRONG_STAGE', `This task is at ${STAGE_LABELS[t.reviewStage!]}, not ${STAGE_LABELS[body.stage]}.`, { stage: t.reviewStage });
   const hash = contentHash(v.output);
@@ -152,7 +167,7 @@ export async function decideStage(tx: Tx, actor: InternalActor, taskId: string, 
         clientId: t.clientId,
         taskInstanceId: t.id,
         submissionVersion: v.version,
-        reviewerId: actor.userId,
+        reviewerId: reviewer.id,
         decision,
         stage: body.stage,
         contentHash: hash,
@@ -163,6 +178,8 @@ export async function decideStage(tx: Tx, actor: InternalActor, taskId: string, 
       },
     });
   const common = { reviewNotes: body.notes ?? null, revision: { increment: 1 } };
+  // TaskInstance.reviewerId names a console user; an external Reviewer is on reviewerSmeUserId already.
+  const byUser = reviewer.kind === 'USER' ? { reviewerId: reviewer.id } : {};
 
   if (body.stage === 'EXPERT_REVIEW' && flaggedDuplicate) {
     const expectedDup = body.decision === 'PASS' ? 'ACCEPT_AS_DISTINCT' : body.decision === 'REWORK' ? 'REWORK' : body.rejectReason === 'DUPLICATE' ? 'REJECT_DUPLICATE' : null;
@@ -182,7 +199,7 @@ export async function decideStage(tx: Tx, actor: InternalActor, taskId: string, 
       where: { id: t.id },
       data: { ...common, reviewStage: 'PM_APPROVAL', ...(isOpen && body.confirmedCoverage ? { coverageTags: { tags: body.confirmedCoverage.tags, edgeCase: body.confirmedCoverage.edgeCase } as Prisma.InputJsonValue } : {}) },
     });
-    await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.expert_passed', before: { status: 'SUBMITTED', stage: 'EXPERT_REVIEW' }, after: { status: 'SUBMITTED', stage: 'PM_APPROVAL', responsibility, version: v.version, contentHash: hash } });
+    await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.expert_passed', before: { status: 'SUBMITTED', stage: 'EXPERT_REVIEW' }, after: { status: 'SUBMITTED', stage: 'PM_APPROVAL', responsibility, version: v.version, contentHash: hash, ...auditExtra } });
     return { status: 'SUBMITTED', stage: 'PM_APPROVAL', version: v.version };
   }
 
@@ -191,18 +208,18 @@ export async function decideStage(tx: Tx, actor: InternalActor, taskId: string, 
     if (!pass) throw new AppError(409, 'STALE_STAGE_DECISION', `No Expert review is in force for version ${v.version}; it needs Expert review again.`, { currentVersion: v.version });
     contractIssues();
     await record('ACCEPT');
-    const samePerson = pass.reviewerId === actor.userId;
+    const samePerson = pass.reviewerId === reviewer.id;
     const r = await acceptTask(
       tx,
       t,
       {
-        reviewerId: actor.userId,
+        reviewerId: reviewer.id,
         notes: body.notes ?? null,
         coverage: null,
         duplicateDecision: pass.duplicateDecision === 'ACCEPT_AS_DISTINCT' ? 'ACCEPT_AS_DISTINCT' : null,
         now,
-        extraUpdate: { ...common, reviewerId: actor.userId, reviewStage: null },
-        auditAfter: { version: v.version, contentHash: hash, stage: 'PM_APPROVAL', responsibility, expertId: pass.reviewerId, expertPassedAt: pass.createdAt.toISOString(), samePersonAsExpert: samePerson },
+        extraUpdate: { ...common, ...byUser, reviewStage: null },
+        auditAfter: { version: v.version, contentHash: hash, stage: 'PM_APPROVAL', responsibility, expertId: pass.reviewerId, expertPassedAt: pass.createdAt.toISOString(), samePersonAsExpert: samePerson, ...auditExtra },
       },
       audit,
       emit,
@@ -212,14 +229,14 @@ export async function decideStage(tx: Tx, actor: InternalActor, taskId: string, 
 
   if (body.decision === 'REWORK') {
     await record('REWORK', { duplicateDecision: flaggedDuplicate && body.stage === 'EXPERT_REVIEW' ? (body.duplicateDecision ?? null) : null });
-    await tx.taskInstance.update({ where: { id: t.id }, data: { ...common, reviewerId: actor.userId, status: 'REWORK', reviewStage: null, reworkCount: { increment: 1 } } });
-    await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.rework_requested', before: { status: 'SUBMITTED', stage: body.stage }, after: { status: 'REWORK', stage: body.stage, responsibility, comments: body.comments.length, version: v.version } });
+    await tx.taskInstance.update({ where: { id: t.id }, data: { ...common, ...byUser, status: 'REWORK', reviewStage: null, reworkCount: { increment: 1 } } });
+    await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.rework_requested', before: { status: 'SUBMITTED', stage: body.stage }, after: { status: 'REWORK', stage: body.stage, responsibility, comments: body.comments.length, version: v.version, ...auditExtra } });
     return { status: 'REWORK', version: v.version };
   }
 
   // REJECT, by the Expert or (owner decision, 11 Nov 2026) the PM.
   await record('REJECT', { rejectReason: body.rejectReason!, duplicateDecision: flaggedDuplicate ? (body.duplicateDecision ?? null) : null });
-  await rejectTask(tx, t, { reason: body.rejectReason!, now, extraUpdate: { ...common, reviewerId: actor.userId, reviewStage: null }, auditAfter: { version: v.version, stage: body.stage, responsibility } }, audit);
+  await rejectTask(tx, t, { reason: body.rejectReason!, now, extraUpdate: { ...common, ...byUser, reviewStage: null }, auditAfter: { version: v.version, stage: body.stage, responsibility, ...auditExtra } }, audit);
   return { status: 'REJECTED', version: v.version };
 }
 
@@ -296,13 +313,20 @@ export async function expertEdit(tx: Tx, actor: InternalActor, taskId: string, b
   return { status: after.status, stage: after.stage, version, material, materialBecause: forced.length ? 'rubric or reference answer changed' : body.material ? 'declared by the Expert' : null, changed: changes.length };
 }
 
+/** Display names for TaskReview.reviewerId values: a console User, or (MVP1) an external Reviewer's SmeUser. */
+export async function reviewerNames(db: Db | Tx, ids: string[]) {
+  const unique = [...new Set(ids)];
+  const users = await db.user.findMany({ where: { id: { in: unique } }, select: { id: true, name: true } });
+  const smes = await db.smeUser.findMany({ where: { id: { in: unique.filter((id) => !users.some((u) => u.id === id)) } }, select: { id: true, displayName: true } });
+  return (id: string) => users.find((p) => p.id === id)?.name ?? smes.find((p) => p.id === id)?.displayName ?? 'Unknown';
+}
+
 /** What the reviewer screen shows about stages: history with void markers, the diff and the viewer's actions. */
 export async function stageView(db: Db | Tx, a: ReviewAccess) {
   const t = a.t;
   const current = t.submissions.at(-1) ?? null;
   const previous = t.submissions.length > 1 ? t.submissions.at(-2)! : null;
-  const people = await db.user.findMany({ where: { id: { in: [...new Set(t.reviews.map((r) => r.reviewerId))] } }, select: { id: true, name: true } });
-  const nameOf = (id: string) => people.find((p) => p.id === id)?.name ?? 'Unknown';
+  const nameOf = await reviewerNames(db, t.reviews.map((r) => r.reviewerId));
   const inForce = passInForce(t);
   const actions: string[] = [];
   if (a.twoStage && t.status === 'SUBMITTED') {

@@ -1595,3 +1595,38 @@ Forgot password still answers 202 and sends nothing).
   `exportCapabilities {executable: false, blockers: [...]}` is stored with the form and read by nothing: whether RL Gym
   takes the tasks is decided by RL Gym's own validation at export. `S1.exampleGoverningState` is exported as
   `coverage.example_governing_state` only, by its fixed key, as agreed for v7.
+
+## QA seed projects job: `qa-seed-projects` (15 Nov 2026)
+
+- **(owner, via the DevOps session)** The RL Gym team asked for two seeded synthetic projects for Authoring QA in the
+  MVP1 new flow on KYC v6: "SYNTHETIC QA lifecycle — KYC v6" (tasks New, In progress and Submitted) and "SYNTHETIC QA
+  all-approved export — KYC v6" (every task Submitted). Approvals happen only by the owner in the console, never by
+  script. Review route Author → PM/Admin. Synthetic people through Sourcing and Offline sign-in; dry run by default,
+  `--apply` with `QA_SEED_PROJECTS_CONFIRM=create-synthetic-projects`; never production.
+- **(chosen by Claude)** **Reuse the smoke job's new-flow code.** The API session (named actors, rate-limit waits,
+  secret redaction), project creation, the hand-written rule, Offline sign-in with terms, and authoring are now exported
+  helpers in `qa-smoke.ts` (`apiSession`, `createForgeProject`, `publishSyntheticRule`, `forgeCandidateSignIn`,
+  `draftTask`, `submitTask`, `authorAndSubmit`, `cancelForgeProject`); `qa-smoke` uses the same helpers unchanged in
+  behaviour.
+- **(chosen by Claude)** **One synthetic SME per task**, with a fixed email per project and slot
+  (`qa-seed-<project>-sme-<n>@praxis.test`), so each task has its own author and a re-run finds the same people. A
+  project's SME places are target ÷ per-expert cap, and a case-selector template makes one task per value whatever the
+  target, so the job reads the draft project's task rows and sets the target to their number (per-expert cap 1) before
+  it submits. No probe project is made or cancelled.
+- **(chosen by Claude)** **The all-approved project has five tasks, not 2–3.** KYC v6 makes exactly one task per
+  governing state (five), whatever the project's target (13 Nov 2026 rule), so the requested 2–3 is not possible on this
+  template. On a template without a case selector the job would use a target of 2.
+- **(chosen by Claude)** **Lifecycle states by slot order:** tasks 1–2 Submitted, task 3 In progress (draft saved with
+  the synthetic case, no pre-check, no submit), the rest New. The owner approves one of the two Submitted tasks.
+- **(chosen by Claude)** **Tasks cite the rule through the rule set.** The KYC v6 form has no policy-citation field
+  (its contract has no `policies`), so the case body cannot name the rule; each project's published rule set (one
+  reviewed rule `R-NW-2.1` quoting the synthetic policy) is every task's policy (`GET /tasks/:id/policy`). No
+  extraction, so no LlamaExtract cost.
+- **(chosen by Claude)** **Idempotent by name, forward only.** A re-run finds each project by its exact name, reuses its
+  rule (publishing the rule set only if missing) and its sourced people, and moves a task only forward
+  (New → In progress → Submitted), never past Submitted and never back; a task the owner decided (Accepted, Rework,
+  Rejected) or that someone else authors is left as it is and noted. A same-named project that is cancelled, completed,
+  on another template or on another review route is an error, never duplicated.
+- **(chosen by Claude)** **Report without names or emails.** Per task: task ID, slot label, state, SME status, target
+  state, the author's Sourcing person ID, and for Submitted tasks the console approval link
+  `/projects/<projectId>/tasks/<taskId>/review`. Paid calls are embeddings only (about $0.0003 per submitted task).

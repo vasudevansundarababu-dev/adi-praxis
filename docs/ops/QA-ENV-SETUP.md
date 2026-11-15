@@ -220,3 +220,41 @@ The owner asked to remove all SMEs, projects (with their documents and policies)
 | 6 | `qa-users --accept` | The seeded personas accept their proposals. The owner can then sign in as one (mock Google, for example `kyc07@praxis.test`) and author. |
 
 Steps 1 and 2 print one JSON report line each (`report: "qa-project-cleanup"` / `"qa-sme-cleanup"`) with a tally. Re-running them changes nothing more.
+
+## 9. Seeded Authoring QA projects: `qa-seed-projects` job (15 Nov 2026)
+
+Two clearly labelled synthetic projects in the MVP1 new flow that the RL Gym team asked for, for Authoring QA. QA (and
+local) only: the job refuses `APP_ENV=production`. Decisions: `docs/DECISIONS.md`, "QA seed projects job".
+
+- **Run (dry run first, then apply):**
+  `gcloud run jobs execute praxis-qa-users --region <region> --wait --args=src/jobs/run.ts,qa-seed-projects`
+  then, with the owner's yes, `--args=src/jobs/run.ts,qa-seed-projects,--apply` and
+  `--update-env-vars=QA_SEED_PROJECTS_CONFIRM=create-synthetic-projects`. It uses the `praxis-qa-users` job's
+  `API_URL`, `DEMO_ADMIN_PASSWORD` and `DEMO_PM_PASSWORD`.
+- **Projects** (review route Author → PM/Admin, `SME_PM`, so a submitted task goes straight to the owner), both on KYC v6
+  `10f6e179-23cd-4666-85bd-22dff3509990` (`QA_SEED_PROJECTS_TEMPLATE_ID` overrides), one task per governing state:
+  - `SYNTHETIC QA lifecycle — KYC v6`: tasks 1–2 Submitted (waiting for the PM/Admin decision), task 3 In progress
+    (draft saved, not submitted), the rest New (assigned, not started).
+  - `SYNTHETIC QA all-approved export — KYC v6`: every task Submitted. Export to RL Gym opens once the owner has
+    approved them all. KYC v6 makes one task per state whatever the target, so this project has as many tasks as the
+    template has states (five), not 2–3.
+- **People:** one synthetic SME per task (`qa-seed-<project>-sme-<n>@praxis.test`, first name `SYNTHETIC`, agency
+  `SYNTHETIC QA seed`), added in Sourcing, assigned directly, signed in with Offline candidate sign-in; each accepts the
+  currently published Terms through Before you start and is signed out at the end.
+- **Policy:** the synthetic sample policy `apps/api/src/jobs/qa-smoke-policy.md` and one hand-written rule `NW-2.1`
+  citing it, reviewed and published as the project's rule set (no extraction), so every task's policy cites it.
+- **Never:** approves, rejects or sends back a task, creates approved records, exports, changes client settings, or
+  publishes or changes Terms. The owner approves each task in the console.
+- **Re-run:** finds both projects by name and continues them. Tasks only move forward (New → In progress → Submitted)
+  and never past Submitted; a task the owner has already decided is left as it is. A project left as a draft by an
+  interrupted run is sized and submitted. A project with the name that is cancelled, completed, on another template or
+  on another review route is reported as an error, never duplicated.
+- **Result:** one log line with `report: "qa-seed-projects"`: the project IDs; per task the task ID, slot, state, SME
+  status, target state and author person ID (the Sourcing person); `approvalLink` `/projects/<projectId>/tasks/<taskId>/review`
+  (on the console) for each Submitted task, also listed in `approvalLinks`; the paid calls and estimated cost. No names
+  or emails. A dry run adds `planned` per project and task. Exit 0 only when both projects succeeded.
+- **Cost:** embeddings only, no model calls and no extraction: two pre-checks and one submit per submitted task (seven
+  on KYC v6), about $0.002 for the first run; a re-run that has nothing to move costs nothing.
+- **Preconditions:** the new flow on with Offline candidate sign-in (Admin → Candidate app sign-in), the contributor
+  Terms published, and KYC v6 offered to the PM (the newest published KYC version). The job checks the first and the
+  last and stops with the reason; it never switches anything on.

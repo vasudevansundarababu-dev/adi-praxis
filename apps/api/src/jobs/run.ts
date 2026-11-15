@@ -24,6 +24,11 @@ import { grantAppRole } from './grant-app-role';
  *   live models, the deployed worker). Prints one JSON line `report: "qa-smoke"`; exit 0 only when every step that ran
  *   passed. With the client's MVP1 new flow on (QA_SMOKE_NEW_FLOW=auto|on|off), it also walks the new flow (`forge`).
  *   Never production.
+ * - `qa-seed-projects [--apply]`: QA-only. Seeds two SYNTHETIC new-flow projects for Authoring QA on KYC v6
+ *   (QA_SEED_PROJECTS_TEMPLATE_ID): "SYNTHETIC QA lifecycle — KYC v6" (tasks New, In progress and Submitted) and
+ *   "SYNTHETIC QA all-approved export — KYC v6" (every task Submitted), over the public API at API_URL. Never approves,
+ *   rejects or exports: the owner decides every task in the console. Finds the projects by name and continues them.
+ *   Dry run by default; --apply also needs QA_SEED_PROJECTS_CONFIRM=create-synthetic-projects. Never production.
  * - `qa-project-cleanup [--apply]`: QA-only. Deletes every project without protected history; cancels the rest. Dry run
  *   by default; --apply also needs QA_PROJECT_CLEANUP_CONFIRM=delete-all-projects. Never production.
  * - `qa-template-cleanup --keep <id> [--keep <id>] [--apply]`: QA-only. Keeps the named templates (and other versions
@@ -103,6 +108,15 @@ try {
     const r = await qaSmoke(optionsFromEnv(process.env, config.appEnv, fetchHttp(process.env.API_URL)), log);
     console.log(JSON.stringify(r));
     if (!r.ok) process.exitCode = 1;
+  } else if (job === 'qa-seed-projects') {
+    if (config.appEnv === 'production') throw new Error('qa-seed-projects refuses to run with APP_ENV=production');
+    const { parseQaSeedProjectsArgs, optionsFromEnv, qaSeedProjects } = await import('./qa-seed-projects');
+    const { apply } = parseQaSeedProjectsArgs(process.argv.slice(3));
+    if (!process.env.API_URL) throw new Error('qa-seed-projects needs API_URL');
+    const { fetchHttp } = await import('./qa-users');
+    const r = await qaSeedProjects(optionsFromEnv(process.env, config.appEnv, fetchHttp(process.env.API_URL), apply), log);
+    console.log(JSON.stringify(r));
+    if (!r.ok) process.exitCode = 1;
   } else if (job === 'qa-project-cleanup') {
     if (config.appEnv === 'production') throw new Error('qa-project-cleanup refuses to run with APP_ENV=production');
     const extra = process.argv.slice(3).filter((a) => a !== '--apply');
@@ -154,7 +168,7 @@ try {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

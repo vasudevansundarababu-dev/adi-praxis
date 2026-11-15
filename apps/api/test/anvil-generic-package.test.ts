@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AnvilExportClient, type FetchLike } from '../src/anvil/export-client';
-import { actorProjection, buildGenericPackages, MAX_TASKS_PER_PART } from '../src/anvil/generic-package';
+import { actorProjection, buildGenericPackages, CASE_SELECTOR_IN_STATE_PACKAGES, MAX_TASKS_PER_PART } from '../src/anvil/generic-package';
 import { jcs, JcsError, jcsSha256 } from '../src/anvil/jcs';
 import { jointHashes, jointTemplateSpec } from '../src/anvil/joint-template';
 import { AnvilGatedValidator, genericSupport, validationItem } from '../src/anvil/validator';
@@ -266,5 +266,58 @@ describe('author checks on a joint template (four confirmations, point 3)', () =
     expect(byId(r, 'anvil.critical').ok).toBe(false);
     expect(byId(r, 'anvil.tools').ok).toBe(true);
     expect(byId(anvilSpecChecks(partsAndKey, out(good, [{ id: 'R1', tool: 'funds.transfer' }])), 'anvil.tools')).toMatchObject({ ok: false, message: expect.stringContaining('R1 (funds.transfer)') });
+  });
+});
+
+describe('KYC v7 selector block (Anvil written answers, 15 Nov 2026; MVP1 step 4)', () => {
+  const V7 = { field: 'product', source: 'S1.applicationType', values: ['individual', 'adult_joint', 'teen_joint', 'custodial'] };
+  const V6 = { field: 'governing_state', source: 'S1.governingState', values: ['CA', 'NY', 'TX'] };
+  const slotInput = (sel: { field: string; source: string }, value: string) => ({ slot: { id: 's', brief: 'b', tags: { [sel.field]: value }, edgeCase: null, isOpen: false, case: { field: sel.field, source: sel.source, value } } });
+  const authored = (s1: Record<string, string>) => {
+    const out = clone(AUTHORED);
+    Object.assign(out.sections.S1, s1);
+    return out;
+  };
+  const entryOf = (b: ReturnType<typeof buildGenericPackages>) => b.parts[0]!.manifest.tasks as Record<string, unknown>[];
+
+  it('a v7 task carries case_selector with its slot value, and coverage.example_governing_state only when set', () => {
+    const withState = buildGenericPackages([{ record: record(1, authored({ applicationType: 'adult_joint', exampleGoverningState: 'NY' }), { input: slotInput(V7, 'adult_joint') } as never), template: template({ caseSelector: V7 } as never) }], { projectId: 'p1' });
+    expect(withState.problems).toEqual([]);
+    expect(entryOf(withState)[0]).toMatchObject({ case_selector: { field: 'product', value: 'adult_joint' }, coverage: { example_governing_state: 'NY' } });
+    const files = readZip(withState.parts[0]!.zip);
+    expect(JSON.parse(files.get('praxis-export.json')!.toString('utf8')).tasks[0].case_selector).toEqual({ field: 'product', value: 'adult_joint' });
+
+    const noState = buildGenericPackages([{ record: record(1, authored({ applicationType: 'adult_joint', exampleGoverningState: '' }), { input: slotInput(V7, 'adult_joint') } as never), template: template({ caseSelector: V7 } as never) }], { projectId: 'p1' });
+    expect(entryOf(noState)[0]!.case_selector).toEqual({ field: 'product', value: 'adult_joint' });
+    expect(entryOf(noState)[0]).not.toHaveProperty('coverage');
+    // The new fields change the v7 package identity.
+    expect(noState.parts[0]!.packageSha256).not.toBe(withState.parts[0]!.packageSha256);
+  });
+
+  it('uses the authored value when the slot has none; reports a mismatch or a missing value instead of guessing', () => {
+    const fromAuthored = buildGenericPackages([{ record: record(1, authored({ applicationType: 'custodial' })), template: template({ caseSelector: V7 } as never) }], { projectId: 'p1' });
+    expect(entryOf(fromAuthored)[0]!.case_selector).toEqual({ field: 'product', value: 'custodial' });
+    const r = buildGenericPackages(
+      [
+        { record: record(1, authored({ applicationType: 'teen_joint' }), { input: slotInput(V7, 'adult_joint') } as never), template: template({ caseSelector: V7 } as never) },
+        { record: record(2), template: template({ caseSelector: V7 } as never) },
+      ],
+      { projectId: 'p1' },
+    );
+    expect(r.problems.map((p) => p.code)).toEqual(['GENERIC_CASE_SELECTOR_MISMATCH', 'GENERIC_CASE_SELECTOR_MISSING']);
+    expect(r.parts).toEqual([]);
+  });
+
+  it('a v6 (state) package stays byte-identical: no case_selector or coverage, same hashes as before step 4', () => {
+    expect(CASE_SELECTOR_IN_STATE_PACKAGES).toBe(false);
+    const out = authored({ governingState: 'NY', exampleGoverningState: 'TX' });
+    const b = buildGenericPackages([{ record: record(1, out, { input: slotInput(V6, 'NY') } as never), template: template({ caseSelector: V6 } as never) }], { projectId: 'p1' });
+    expect(b.problems).toEqual([]);
+    const entry = entryOf(b)[0]!;
+    expect(entry).not.toHaveProperty('case_selector');
+    expect(entry).not.toHaveProperty('coverage');
+    // Hashes produced by the package builder before this change, for this exact fixture.
+    expect(b.parts[0]!.packageSha256).toBe('7afeb0c1c321924cbfe52ee03a8dc320ab9fce3153a85a711804c6a85e16203d');
+    expect(b.parts[0]!.zipSha256).toBe('5944026cc17fc92e3350008b44c120f3d07d4793f2d4966146a13d1d3b22450e');
   });
 });

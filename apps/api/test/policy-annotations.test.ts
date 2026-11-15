@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PROJECT_POLICY_ANNOTATIONS_SCHEMA_VERSION, PolicyRuleBody, ProjectPolicyAnnotations, ProjectPolicyManifest, RuleAnnotationInput, validateProjectPolicyManifest, type CandidateRule } from '@praxis/shared';
+import { PolicyRuleBody, ProjectPolicyManifest, RuleAnnotationInput, validateProjectPolicyManifest, type CandidateRule } from '@praxis/shared';
 import { buildApp } from '../src/app';
 import { MemoryStorage } from '../src/candidate/storage';
 import { stableStringify } from '../src/lib/crypto';
@@ -182,17 +182,16 @@ describe('AI annotation pass: classification and mandatory marking (AC1–AC5)',
     expect((await byKey('FOREIGN-PASSPORT')).annotation.compound).toBeNull();
   });
 
-  it('AC3: an obligation with an exception keeps both through edit, apply, publish and export', async () => {
+  it('AC3: an obligation with an exception keeps both through edit, apply and publish', async () => {
     await setup();
     await annotate();
     const r = await byKey('ADDRESS');
     expect(r.annotation).toMatchObject({ classification: 'obligation' });
+    expect(r.annotation.exceptions).toEqual({ kind: 'listed', items: [{ statement: 'The customer is a minor under 13.', conditions: null }] });
     await apply('ADDRESS');
     expect((await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: null })).statusCode).toBe(201);
-    const doc = (await api(adminCookie).get(`/projects/${projectId}/anvil/project-policy/annotations`)).json();
-    const e = doc.rules.find((x: { identity: { rule_key: string } }) => x.identity.rule_key === 'R-ADDRESS');
-    expect(e.meaning.classification).toBe('obligation');
-    expect(e.exceptions_timing.exceptions).toEqual({ kind: 'listed', items: [{ statement: 'The customer is a minor under 13.', conditions: null }] });
+    const after = await byKey('ADDRESS');
+    expect(after.annotation).toMatchObject({ classification: 'obligation', exceptions: { kind: 'listed' } });
   });
 
   it('AC4: "must not" stays a prohibition; "may not" is not turned into a permission', async () => {
@@ -215,20 +214,11 @@ describe('AI annotation pass: classification and mandatory marking (AC1–AC5)',
     const w = preview.annotationWarnings.find((x: { ruleKey: string }) => x.ruleKey === 'R-LARGE-DEPOSIT-REPORT');
     expect(w.flags.map((f: { code: string }) => f.code).filter((c: string) => c === 'UNRESOLVED_LINK')).toHaveLength(1);
     expect(preview.blocking).toEqual([]);
-    // Exported with the unresolved dependency, then resolved to the exact version once the definition is applied.
-    await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: null });
-    let doc = (await api(adminCookie).get(`/projects/${projectId}/anvil/project-policy/annotations`)).json();
-    let e = doc.rules.find((x: { identity: { rule_key: string } }) => x.identity.rule_key === 'R-LARGE-DEPOSIT-REPORT');
-    expect(e.uncertainty.unresolved_dependencies).toEqual(['uses_definition R-LARGE-DEPOSIT-DEF: not in the published rule set']);
+    // Once the definition is applied and published, the dependant's warning goes away (internal data only; no export).
     await apply('LARGE-DEPOSIT-DEF');
-    await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: 1 });
-    doc = (await api(adminCookie).get(`/projects/${projectId}/anvil/project-policy/annotations`)).json();
-    e = doc.rules.find((x: { identity: { rule_key: string } }) => x.identity.rule_key === 'R-LARGE-DEPOSIT-REPORT');
-    const def = await byKey('LARGE-DEPOSIT-DEF');
-    const resolved = { relation: 'uses_definition', rule_key: 'R-LARGE-DEPOSIT-DEF', rule_id: 'R-LARGE-DEPOSIT-DEF', rule_version_id: def.versionId, rule_version: def.version, status: 'in_set' };
-    expect(e.relationships.links).toEqual([resolved]);
-    expect(e.relationships.linked_from).toEqual([resolved]);
-    expect(e.uncertainty.unresolved_dependencies).toEqual([]);
+    const after = (await api(pmCookie).get(`/projects/${projectId}/policy/rule-set/preview`)).json();
+    const w2 = after.annotationWarnings.find((x: { ruleKey: string }) => x.ruleKey === 'R-LARGE-DEPOSIT-REPORT');
+    expect((w2?.flags ?? []).some((f: { code: string }) => f.code === 'UNRESOLVED_LINK')).toBe(false);
   });
 
   it('the prompt states every classification rule of the spec and forbids inventing details', () => {
@@ -302,93 +292,6 @@ describe('editable annotations, history and flags (AC6–AC8)', () => {
     expect(codes['R-PASSPORT']).toEqual(expect.arrayContaining(['DUPLICATE', 'UNRESOLVED_LINK']));
     expect(codes['R-UTILITY-BILL']).toContain('NEEDS_CLARIFICATION');
     expect(preview.markingCounts).toEqual({ permitted_option: 1, needs_clarification: 1 });
-  });
-});
-
-describe('export to RL Gym (AC10, AC11)', () => {
-  async function published() {
-    await setup();
-    await annotate();
-    for (const k of ['PASSPORT', 'FOREIGN-PASSPORT', 'FOREIGN-NDC', 'CA-JOINT']) await apply(k);
-    const r = await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: null });
-    expect(r.statusCode, r.body).toBe(201);
-  }
-  const fetchDoc = async (headers: Record<string, string> = { cookie: adminCookie }) => app.inject({ method: 'GET', url: `/api/v1/projects/${projectId}/anvil/project-policy/annotations`, headers });
-
-  it('AC10: exports the exact published rule and annotation versions, sources and relationships, bound to the manifest', async () => {
-    await published();
-    const res = await fetchDoc();
-    expect(res.statusCode, res.body).toBe(200);
-    expect(res.headers['x-praxis-schema-version']).toBe(PROJECT_POLICY_ANNOTATIONS_SCHEMA_VERSION);
-    const doc = ProjectPolicyAnnotations.parse(res.json());
-    const manifestRes = await app.inject({ method: 'GET', url: `/api/v1/projects/${projectId}/anvil/project-policy`, headers: { cookie: adminCookie } });
-    expect(doc.manifest_sha256).toBe(manifestRes.headers['x-praxis-manifest-sha256']);
-    expect(res.headers['x-praxis-manifest-sha256']).toBe(manifestRes.headers['x-praxis-manifest-sha256']);
-    expect(res.headers['x-praxis-annotations-sha256']).toBe(createHash('sha256').update(res.body).digest('hex'));
-    expect(doc.rules).toHaveLength(4);
-    const set = await db.projectRuleSet.findFirstOrThrow({ where: { projectId } });
-    const ndc = doc.rules.find((r) => r.identity.rule_key === 'R-FOREIGN-NDC')!;
-    const live = await byKey('FOREIGN-NDC');
-    expect(ndc.identity).toMatchObject({ rule_version_id: live.versionId, rule_version: live.version, content_hash: live.contentHash, project_rule_set: { id: set.id, version: 1, digest: set.digest } });
-    expect(ndc.source).toMatchObject({ document_id: documentId, document_version_id: documentVersionId, quotation: 'The bank may accept a foreign passport only with a non-documentary check.', quotation_verified: true, locator: { line_start: 3 } });
-    expect(ndc.mandatory.marking).toBe('mandatory_when_applicable');
-    expect(ndc.relationships.compound).toMatchObject({ role: 'companion', members: ['R-FOREIGN-NDC', 'R-FOREIGN-PASSPORT'] });
-    expect(ndc.relationships.links[0]).toMatchObject({ relation: 'companion_of', rule_key: 'R-FOREIGN-PASSPORT', status: 'in_set' });
-    expect(ndc.provenance.ai_suggestion?.annotation.marking).toBe('mandatory_when_applicable');
-    expect(ndc.provenance.current).toMatchObject({ source: 'ai_suggestion_unedited', edited_by: { id: pmId, role: 'PM' } });
-    expect(ndc.provenance.approval).toMatchObject({ status: 'applied', decided_by: { id: pmId, role: 'PM' }, decided_by_human: true });
-    expect(ndc.readable_text).toContain('Mandatory when applicable');
-    const ca = doc.rules.find((r) => r.identity.rule_key === 'R-CA-JOINT')!;
-    expect(ca.applicability.jurisdictions).toEqual({ kind: 'listed', items: ['US-CA'] });
-    // An edit after publication changes nothing exported until it is applied and published again.
-    const pass = await byKey('PASSPORT');
-    await api(pmCookie).put(`/projects/${projectId}/policy/rules/${pass.ruleId}/annotation`, { expectedContentHash: pass.contentHash, annotation: { ...RuleAnnotationInput.parse(pass.annotation), marking: 'mandatory' } });
-    expect((await byKey('PASSPORT')).applied).toBe(false);
-    const again = await fetchDoc();
-    expect(again.body).toBe(res.body);
-    await apply('PASSPORT');
-    await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: 1 });
-    const third = ProjectPolicyAnnotations.parse((await fetchDoc()).json());
-    const p3 = third.rules.find((r) => r.identity.rule_key === 'R-PASSPORT')!;
-    expect(p3.mandatory.marking).toBe('mandatory');
-    expect(p3.provenance.ai_suggestion?.annotation.marking).toBe('permitted_option');
-    expect(p3.provenance.current).toMatchObject({ source: 'author_edit', annotation: { annotation_version: 2 } });
-  });
-
-  it('AC11: the v1 manifest keeps its exact schema (no annotation fields) and access, audit and 409 rules carry over', async () => {
-    await published();
-    const m = await app.inject({ method: 'GET', url: `/api/v1/projects/${projectId}/anvil/project-policy`, headers: { cookie: adminCookie } });
-    expect(m.statusCode).toBe(200);
-    expect(ProjectPolicyManifest.parse(m.json())).toBeTruthy();
-    expect(m.body).not.toMatch(/annotation|marking|classification/);
-    expect(m.json().policies[0].rules.every((r: { severity: string }) => r.severity === 'high')).toBe(true);
-
-    const key = `pk_${randomUUID()}${randomUUID()}`;
-    const rl = await db.apiClient.create({ data: { clientId, name: 'RL Gym', kind: 'RL_GYM', keyHash: createHash('sha256').update(key).digest('hex') } });
-    expect((await fetchDoc({ authorization: `Bearer ${key}` })).statusCode).toBe(200);
-    expect(await db.auditEvent.count({ where: { action: 'anvil.project_policy_annotations_exported', actorType: 'SERVICE', actorId: rl.id } })).toBe(1);
-    expect((await fetchDoc({ cookie: pmCookie })).statusCode).toBe(200);
-    expect((await fetchDoc({})).statusCode).toBe(401);
-    const reviewer = await login(app, (await createUser(clientId, ['REVIEWER'])).email);
-    expect((await fetchDoc({ cookie: reviewer })).statusCode).toBe(403);
-    const otherPm = await login(app, (await createUser(clientId, ['PM'])).email);
-    expect((await fetchDoc({ cookie: otherPm })).statusCode).toBe(404);
-
-    const dv = await db.policyDocumentVersion.findFirstOrThrow({ where: { projectId } });
-    storage.objects.set(dv.storageKey, { data: Buffer.from('tampered'), contentType: 'text/plain' });
-    const blocked = await fetchDoc();
-    expect(blocked.statusCode).toBe(409);
-    expect(blocked.json().error).toBe('PROJECT_POLICY_INVALID');
-    expect(await db.auditEvent.count({ where: { action: 'anvil.project_policy_annotations_blocked' } })).toBe(1);
-  });
-
-  it('AC11: a body without an annotation hashes exactly as before, so published digests are unchanged', () => {
-    const legacy = { title: 'T', requirement: 'R', ...BASE, requirementType: 'obligation' };
-    const parsed = PolicyRuleBody.parse(legacy);
-    expect('annotation' in parsed).toBe(false);
-    expect(stableStringify(parsed)).toBe(stableStringify(PolicyRuleBody.parse(JSON.parse(JSON.stringify(legacy)))));
-    expect(contentHash(parsed, [])).toBe(contentHash(PolicyRuleBody.parse({ ...legacy }), []));
-    expect(validateProjectPolicyManifest).toBeTypeOf('function');
   });
 });
 

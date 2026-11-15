@@ -1,8 +1,6 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  PolicyRuleBody, RuleAnnotation, annotationFlags, annotationText, isOpenClarification, projectPolicyAnnotationsJsonSchema, ruleApplicability, validateProjectPolicyAnnotations,
+  PolicyRuleBody, RuleAnnotation, annotationFlags, annotationText, isOpenClarification, ruleApplicability,
 } from '../src';
 
 /** Policy rule annotations: shared schema, applicability per application (AC9), flags (AC8), contract file. */
@@ -55,19 +53,5 @@ describe('flags and text (AC8)', () => {
   it('a body without an annotation parses without one (old hashes and digests stay the same)', () => {
     const b = PolicyRuleBody.parse({ title: 'T', requirement: 'R' });
     expect(Object.keys(b)).not.toContain('annotation');
-  });
-});
-
-describe('praxis.anvil.project_policy_annotations.v1 (proposed) contract', () => {
-  it('the published JSON Schema is generated from the shared model', async () => {
-    const file = JSON.parse(readFileSync(path.resolve(import.meta.dirname, '../../../contracts/praxis/project-policy-annotations-v1/schema.json'), 'utf8'));
-    expect(file).toEqual(await projectPolicyAnnotationsJsonSchema());
-  });
-
-  it('binds to the manifest: one entry per manifest rule and the manifest digest', () => {
-    const manifest = { source_project: { id: 'p1', version: 'v1' }, policies: [{ policy_id: 'doc1', version: 'rs1.d1', rules: [{ rule_id: 'R-A' }] }] };
-    const doc = { schema_version: 'praxis.anvil.project_policy_annotations.v1', contract_status: 'proposed', source_project: { id: 'p1', version: 'v1' }, template: null, manifest_sha256: 'a'.repeat(64), interpretation: { outcomes: [], notice: 'n' }, rules: [] };
-    expect(validateProjectPolicyAnnotations(doc, manifest, 'b'.repeat(64)).map((p) => p.code)).toEqual(['MANIFEST_MISMATCH', 'MISSING_RULE']);
-    expect(validateProjectPolicyAnnotations({ ...doc, extra: 1 }, manifest, 'a'.repeat(64))[0]!.code).toBe('SCHEMA');
   });
 });

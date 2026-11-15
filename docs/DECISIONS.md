@@ -1271,3 +1271,24 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
 - **(chosen by Claude)** The Reviewer's Approve on a task flagged as a likely duplicate needs a tick that it is
   distinct (sent as `ACCEPT_AS_DISTINCT`; send-back sends `REWORK`), and on an open coverage slot a tick confirming
   the task's own coverage tags and edge case, because step 2's API requires them.
+## MVP1 step 4: export (15 Nov 2026)
+
+- **(chosen by Claude)** With `newFlow` on for the project's client, a project's tasks are its coverage slots. A slot
+  counts as approved when it has a current (not superseded) ApprovedTaskRecord or an ACCEPTED task; a REJECTED task
+  does not count. Export opens only when every slot is approved and there is at least one slot; "marked complete", the
+  end date and the distinct target no longer open it. Validate still needs one approved task, at any time. Reason text:
+  "Export opens when all 5 tasks are approved (1 of 5 now)." ("the task is" for one). With `newFlow` off nothing
+  changes. The rule is the pure `exportEligibility` with an optional `allTasks: {totalTasks, approvedTasks}` input.
+- **(chosen by Claude)** KYC v7 export: a task whose template has a case selector other than `governing_state` gets
+  `case_selector: {field, value}` in its manifest entry. The value is the slot's case value (`input.slot.case.value`),
+  or the authored value at `caseSelector.source` when the slot has none. A differing authored value is a package
+  problem (`GENERIC_CASE_SELECTOR_MISMATCH`), and no value at all is `GENERIC_CASE_SELECTOR_MISSING`; the task is not
+  sent. `coverage: {example_governing_state}` is added when `S1.exampleGoverningState` is a non-empty string, and left
+  out otherwise. The new keys change v7 package hashes only.
+- **(chosen by Claude)** v6 (state-selector) packages stay byte-identical, behind
+  `CASE_SELECTOR_IN_STATE_PACKAGES = false` in `apps/api/src/anvil/generic-package.ts`, until Anvil confirms whether
+  v6 should carry `{field: 'governing_state'}` too. A test pins a v6 fixture's package and ZIP hashes to the values the
+  code produced before this change. The schema, file names, API paths and identifiers are unchanged.
+- **(chosen by Claude)** Export panel: the button is "Export to RL Gym" and validation is "Validate"; the panel shows
+  the API's reason while export is closed. The contract §6 text on the Praxis side ("marked complete, or end date")
+  describes the old flow only; it was not edited in this step.

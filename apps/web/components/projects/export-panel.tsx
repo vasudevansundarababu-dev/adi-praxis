@@ -16,7 +16,8 @@ export interface ExportState {
 
 /**
  * Project export (owner, 12 Nov 2026). Validate one approved task at any time; export every approved task once the project
- * is complete. The validator's verdict lists the tasks that need fixing; it changes nothing by itself.
+ * is complete (in the MVP1 new flow, 15 Nov 2026: once every task is approved; the API's reason says how many are).
+ * The validator's verdict lists the tasks that need fixing; it changes nothing by itself.
  */
 export function ExportPanel({ projectId, initial }: { projectId: string; initial: ExportState }) {
   const [state, setState] = useState(initial);
@@ -63,7 +64,7 @@ export function ExportPanel({ projectId, initial }: { projectId: string; initial
           </>
         )}
         <button type="button" className="btn btn-primary disabled:opacity-60" disabled={pending || !state.canExport} onClick={() => void run(`/projects/${projectId}/exports`, {})}>
-          Export
+          Export to RL Gym
         </button>
       </div>
       {pending && <p className="mt-2 text-sm text-fg-muted">Working…</p>}

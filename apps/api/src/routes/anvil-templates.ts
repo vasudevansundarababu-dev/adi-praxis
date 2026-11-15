@@ -53,11 +53,21 @@ async function staffingAdvice(db: Db | Tx, clientId: string, spec: { skills: { a
 
 type Checked = TemplateSpecCheck & { spec: TemplateSpec | null; joint: StoredJointParts | null; pack: TemplateSpecCheck['pack']; packBody: unknown };
 
+/**
+ * Arrival check for case selectors (15 Nov 2026): a proposal whose selector Praxis cannot run as one task per value
+ * (unknown shape or keys, a source that is not a required pick list of the form, empty, duplicate or unmatched values,
+ * labels for unknown values, or quotas or a target that would add tasks) is refused whole with this code, never
+ * half-supported. A supported selector needs no code change.
+ */
+const CASE_SELECTOR_PROBLEM = /^template\.caseSelector\b|case-selector|one task per \S+ value/;
+const CASE_SELECTOR_FIX = 'Use caseSelector {field, source, values[, labels]}: source names a required pick list of the form, values equal its options exactly, and no coverage or edge-case quota or other target is set.';
+
 /** Golden-pack problems as template-proposal errors (same mapping for both proposal formats). */
 function packIssues(problems: string[], pointer: string) {
   return problems.map((p) => {
-    const code = /unsupported field type/.test(p) ? 'TP_FIELD_TYPE_UNSUPPORTED' : /^example/.test(p) ? 'TP_EXAMPLE_INVALID' : /weight/i.test(p) ? 'TP_CRITERIA_WEIGHTS' : /already in use/.test(p) ? 'TP_FORM_ID_TAKEN' : 'TP_FORM_INVALID';
-    return { code, owner: 'anvil' as const, file: 'template-spec.json', pointer, message: p, fix: code === 'TP_FORM_ID_TAKEN' ? 'Give a changed form a new ID; IDs are never reused.' : 'Repair the authoring part as described.' };
+    const code = /unsupported field type/.test(p) ? 'TP_FIELD_TYPE_UNSUPPORTED' : /^example/.test(p) ? 'TP_EXAMPLE_INVALID' : /weight/i.test(p) ? 'TP_CRITERIA_WEIGHTS' : /already in use/.test(p) ? 'TP_FORM_ID_TAKEN' : CASE_SELECTOR_PROBLEM.test(p) ? 'TP_CASE_SELECTOR_UNSUPPORTED' : 'TP_FORM_INVALID';
+    const fix = code === 'TP_FORM_ID_TAKEN' ? 'Give a changed form a new ID; IDs are never reused.' : code === 'TP_CASE_SELECTOR_UNSUPPORTED' ? CASE_SELECTOR_FIX : 'Repair the authoring part as described.';
+    return { code, owner: 'anvil' as const, file: 'template-spec.json', pointer, message: p, fix };
   });
 }
 
@@ -211,7 +221,7 @@ export const anvilTemplateRoutes: FastifyPluginAsyncZod<{ db: Db; anvil?: { envi
       field_types: FIELD_TYPES,
       limits: { maximum_upload_bytes: MAX_BYTES, maximum_examples: 20 },
       revocation: { schema_version: 'anvil.template-revocation.v1', endpoint: 'POST /api/v1/integrations/anvil/templates/qualifications', acknowledgement: ['event_id', 'event_sha256', 'status', 'sequence'] },
-      error_codes: ['TP_SCHEMA_VERSION', 'TP_SPEC_SHAPE', 'TP_FORM_INVALID', 'TP_FORM_ID_TAKEN', 'TP_FIELD_TYPE_UNSUPPORTED', 'TP_CRITERIA_WEIGHTS', 'TP_EXAMPLE_INVALID', 'TP_SKILLS_MISSING', 'TP_EVALUATOR_KIND_UNKNOWN', 'TP_TOOL_SCHEMA_MISSING', 'TP_OUTPUT_SCHEMA', 'TP_TEMPLATE_MISSING'],
+      error_codes: ['TP_SCHEMA_VERSION', 'TP_SPEC_SHAPE', 'TP_FORM_INVALID', 'TP_FORM_ID_TAKEN', 'TP_FIELD_TYPE_UNSUPPORTED', 'TP_CRITERIA_WEIGHTS', 'TP_EXAMPLE_INVALID', 'TP_SKILLS_MISSING', 'TP_EVALUATOR_KIND_UNKNOWN', 'TP_TOOL_SCHEMA_MISSING', 'TP_OUTPUT_SCHEMA', 'TP_TEMPLATE_MISSING', 'TP_CASE_SELECTOR_UNSUPPORTED'],
       praxis_requirement_codes: ['PR_RECRUITMENT_NEEDED', 'PR_SUPPLY_INSUFFICIENT', 'PR_CERTIFICATION_NEEDED', 'PR_SUPPLY_OK'],
       paid_calls: false,
     }),

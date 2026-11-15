@@ -81,3 +81,23 @@ API_URL=http://localhost:4000 DEMO_ADMIN_PASSWORD=... DEMO_PM_PASSWORD=... QA_SE
   SYNTHETIC), reads export eligibility but never exports, signs its candidates out and cancels the project unless it
   completed. The result is the `forge` part of the `report: "qa-smoke"` JSON line.
 - Tests (mocks only): `apps/api/test/qa-smoke-forge.test.ts`.
+
+## 6. Adding a new template or version
+
+No code is needed unless the arrival check refuses it; then run the QA smoke against it.
+
+- RL Gym proposes it (`POST /api/v1/integrations/anvil/templates/proposals`). It becomes a DRAFT version; an Admin
+  reviews and publishes it. Nothing goes live from the API.
+- A template that makes one task per value of a form field declares
+  `authoring.template.caseSelector = {field, source, values[, labels]}` (KYC v6: `governing_state` from
+  `S1.governingState`; KYC v7: `product` from `S1.applicationType`). Any field works: a project gets one task per
+  value, the author form shows that field pre-set and read-only, the Tasks list and Dashboard show the field's label
+  and each value's label (the template's `labels`, else the form's option labels), and the export carries
+  `case_selector {field, value}` for every selector except v6's state.
+- The arrival check refuses a proposal it cannot run whole, with `TP_CASE_SELECTOR_UNSUPPORTED` (selector shape,
+  `source` not a required pick list of the form, empty, duplicate or unmatched values, labels for unknown values, or a
+  target, coverage or edge-case quota that would add tasks), `TP_FIELD_TYPE_UNSUPPORTED` (a field type the forms do
+  not have) or `TP_FORM_ID_TAKEN` (a reused form ID). A refused proposal creates nothing. A refusal is the only case
+  that needs a code change, and then only after the owner agrees the new feature.
+- After publishing, run the QA smoke (section 5) against the new version: `QA_SMOKE_TEMPLATE_ID=<template version id>`.
+  It makes a project sized to the template's task count and takes every task to approval.

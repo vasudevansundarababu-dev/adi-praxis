@@ -32,7 +32,7 @@ export interface SlotInput {
   edgeCase: string | null;
   isOpen: boolean;
   /** The case-selector value this task is for (one task per value), with the form field that carries it. */
-  case?: { field: string; source: string; value: string };
+  case?: { field: string; source: string; value: string; label?: string };
 }
 
 export interface TaskView extends TaskSummary {

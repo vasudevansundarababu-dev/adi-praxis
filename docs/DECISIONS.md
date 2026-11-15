@@ -1546,3 +1546,52 @@ Forgot password still answers 202 and sends nothing).
   as the other two partner sign-ins and `staffLogin` already did; it was submitted before hydration and stayed on the
   sign-in page. The candidate mock sign-in in `smoke.spec.ts` gets the same hydration wait (it failed once on PR #76's
   run with the same symptom). No assertion was removed or relaxed.
+
+  sign-in page. No assertion was removed or relaxed.
+
+
+## KYC v7 and generic case selector (15 Nov 2026)
+
+- **(owner)** A new template or version is data, not code. KYC v7 (application type) arrived as an RL Gym template
+  proposal: `caseSelector {field: product, source: S1.applicationType, values: individual, adult_joint, teen_joint,
+  custodial}`, no coverage, target 4, form `golden-kyc-application-type-v1` v3. It is supported with no
+  template-specific code; a made-up `risk_tier` template (three values) is tested the same way.
+- **(chosen by Claude)** Intake. `caseSelector` gains optional `labels` (value → display label); every key must be a
+  selector value. Selector problems (shape or unknown keys, a source that is not a required pick list of the form,
+  empty, duplicate or unmatched values, labels for unknown values, a target that is not one per value, coverage or
+  edge-case quotas, outputs not from template execution) now carry the code `TP_CASE_SELECTOR_UNSUPPORTED` (was
+  `TP_FORM_INVALID`) with a fix text; the code is listed in the contracts. The proposal is refused whole and creates
+  nothing. Field types and form IDs keep `TP_FIELD_TYPE_UNSUPPORTED` and `TP_FORM_ID_TAKEN`. The earlier
+  `praxis.template_spec.v1-proposed` format is unchanged.
+- **(chosen by Claude)** Slots. The existing one-slot-per-value path is the generic path (v6 already used it). Each
+  slot's `case` now also stores `label`: the template's label, else the form option's, else the value. The field name
+  shown is the form field's label, else the field humanised (`risk_tier` → "Risk tier"). A value is shown with its code
+  in brackets only when the value is a short upper-case code ("California (CA)"); otherwise the label alone ("Joint",
+  never "Joint (adult_joint)"). So v6 briefs and Tasks-list labels are unchanged, and v7 shows Single, Joint, Minor
+  (joint with adult), Custodian. The v7 brief reads "Application type: Joint. Write this reusable task for Joint only;
+  set Application type to Joint." Task count and required workers follow the values count as for v6 (the template's
+  `defaultDistinctTarget` is the values count).
+- **(chosen by Claude)** Authoring. The author form shows the selector field read-only with the slot's label and "Set by
+  this task. It cannot be changed."; the editor always writes the slot's value. The API refuses a save (`PUT
+  /me/tasks/:id`) or an expert edit that puts another value there (`422 CASE_SELECTOR_LOCKED`, "This task is for
+  Custodian. That choice is set by the task and cannot be changed."); an empty field may be saved. An accepted
+  assistant proposal never changes it (the slot value is written back). The submission check `case.selector` is
+  unchanged. This applies to v6 too: a v6 author can no longer pick another state in a draft (the submission check
+  already refused it).
+- **(chosen by Claude)** Console. `ForgeTaskRow.selector.label` uses the stored slot label, else the template's
+  labels, else the form's option label. The Dashboard reads "Coverage by application type" for v7; no web code
+  changed.
+- **(chosen by Claude)** Export. As built in MVP1 step 4, plus: a value that is not one of the template's values is
+  `GENERIC_CASE_SELECTOR_UNKNOWN`, and a slot made for another selector field is `GENERIC_CASE_SELECTOR_MISMATCH`. When
+  any task of a selector template has a selector problem, none of that template version's tasks is sent (the others
+  get `GENERIC_CASE_SELECTOR_BATCH_BLOCKED` with the reason), so an export never silently lacks a value. v6 packages
+  stay byte-identical (`CASE_SELECTOR_IN_STATE_PACKAGES = false`; the golden hash test is unchanged). The v6 exception
+  is keyed on the field name `governing_state`, so a future template that selects by `governing_state` also gets no
+  `case_selector` until RL Gym confirms v6 should carry it.
+- **(chosen by Claude)** Public names: export problem messages said "Anvil" and "Praxis"; they now say RL Gym and ADI
+  Forge, and `generic-package.ts` and `tasks/definitions.ts` are on the public-names guard list.
+- **What v7 declares that Authoring does not act on:** `contractStatus: requires_confirmation` is shown on the author
+  form as "field contract awaiting domain-owner confirmation" (as for v6) and does not block projects.
+  `exportCapabilities {executable: false, blockers: [...]}` is stored with the form and read by nothing: whether RL Gym
+  takes the tasks is decided by RL Gym's own validation at export. `S1.exampleGoverningState` is exported as
+  `coverage.example_governing_state` only, by its fixed key, as agreed for v7.

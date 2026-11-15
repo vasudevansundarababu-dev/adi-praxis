@@ -76,7 +76,8 @@ describe('case selector: one slot and one task per value', () => {
     const slots = await db.coverageSlot.findMany({ where: { projectId: p.id }, orderBy: { position: 'asc' } });
     expect(slots.map((s) => (s.coverageTags as { tags: Record<string, string> }).tags.governing_state)).toEqual(STATES);
     expect(slots.every((s) => !s.isOpen && s.required)).toBe(true);
-    expect(slots.map((s) => (s.coverageTags as { case: unknown }).case)).toEqual(STATES.map((value) => ({ field: 'governing_state', source: 'S1.governingState', value })));
+    // Each slot also carries its display label (15 Nov 2026), from the form's options.
+    expect(slots.map((s) => (s.coverageTags as { case: unknown }).case)).toEqual(STATES.map((value, i) => ({ field: 'governing_state', source: 'S1.governingState', value, label: ['California', 'New York', 'Texas', 'Florida', 'Illinois'][i] })));
     slots.forEach((s, i) => expect(s.brief).toContain(STATES[i]));
     // Idempotent: never a second set.
     expect(await db.$transaction((tx) => ensureSlots(tx, p.id))).toBe(0);

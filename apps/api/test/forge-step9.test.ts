@@ -94,8 +94,10 @@ describe('MVP1 step 9: task selectors and sign-out on mode change', () => {
         optionLabel: (_source: string, value: string) => ({ CA: 'California' })[value],
       };
       expect(forgeSlotSelector({ tags: { governing_state: 'CA' }, case: { field: 'governing_state', source: 'S1.governingState', value: 'CA' } }, labels)).toEqual({ field: 'Governing state', value: 'CA', label: 'California (CA)' });
-      // No form label known: the selector's own field name and the bare value.
-      expect(forgeSlotSelector({ tags: {}, case: { field: 'application_type', source: 'S1.applicationType', value: 'JOINT' } })).toEqual({ field: 'application_type', value: 'JOINT', label: 'JOINT' });
+      // No form label known: the selector's field name, humanised (15 Nov 2026), and the bare value.
+      expect(forgeSlotSelector({ tags: {}, case: { field: 'application_type', source: 'S1.applicationType', value: 'JOINT' } })).toEqual({ field: 'Application type', value: 'JOINT', label: 'JOINT' });
+      // A label stored on the slot wins; an internal value is not shown beside it.
+      expect(forgeSlotSelector({ tags: {}, case: { field: 'product', source: 'S1.applicationType', value: 'teen_joint', label: 'Minor (joint with adult)' } }, labels)).toEqual({ field: 'Product', value: 'teen_joint', label: 'Minor (joint with adult)' });
       // Dimension order, not key order.
       expect(forgeSlotSelector({ tags: { b: '2', a: '1' } }, { dimensions: [{ key: 'b', label: 'B' }, { key: 'a', label: 'A' }] })).toEqual({ field: 'B', value: '2', label: '2' });
       expect(forgeSlotSelector({ tags: {}, edgeCase: 'expired ID' })).toEqual({ field: 'Edge case', value: 'expired ID', label: 'expired ID' });

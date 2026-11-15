@@ -7,6 +7,7 @@ import { sha256, stableStringify } from '../../lib/crypto';
 import { authoringPolicyView, effectivePolicy } from '../../policy/task-policy';
 import type { ConversationAssistant } from './assistant';
 import { proposalProblems } from './guards';
+import { withCaseLocked } from '../definitions';
 
 export const CONVERSATION_VERSION = 'authoring-facilitator/2';
 export const editable = (t: TaskInstance & {project?:{status:string}}) => {
@@ -93,7 +94,8 @@ export async function decideProposal(tx: Tx, task: TaskInstance, runId: string, 
     if (pending.problems.length) throw new AppError(422, 'PROPOSAL_BLOCKED', 'Resolve the proposal checks before applying changes.', { problems: pending.problems });
     let output: Record<string, unknown>;
     try {
-      output = applyConversationChanges((task.output ?? {}) as Record<string, unknown>, pending.proposal);
+      // A proposal never changes the task's case-selector value (15 Nov 2026).
+      output = withCaseLocked(task.input, applyConversationChanges((task.output ?? {}) as Record<string, unknown>, pending.proposal));
     } catch (e) {
       throw new AppError(422, 'PROPOSAL_BLOCKED', 'This proposal no longer applies to the task. Request a fresh one.', { problems: [e instanceof Error ? e.message : 'invalid change'] });
     }

@@ -82,6 +82,18 @@ describe('coverage selector from the API', () => {
     expect(t).toContain('Custodian (CUSTODIAN) TSK-004');
     expect(a11yProblems(m)).toEqual([]);
   });
+
+  it('KYC v7 as the API sends it (15 Nov 2026): "Coverage by application type" with the agreed display labels only', () => {
+    const v7 = [['individual', 'Single'], ['adult_joint', 'Joint'], ['teen_joint', 'Minor (joint with adult)'], ['custodial', 'Custodian']].map(([value, label], i) => row(i + 1, { selector: { field: 'Application type', value: value!, label: label! } }));
+    const m = renderToStaticMarkup(<ForgeDashboardTab project={P} reviewRoute="SME_PM" requiredWorkers={1} tasks={v7} people={[]} dashboard={null} ruleSet={null} exportState={null} attributes={[]} jobDescriptions={[]} />);
+    const t = text(m);
+    expect(t).toContain('Coverage by application type');
+    expect(t).toContain('Single TSK-001');
+    expect(t).toContain('Joint TSK-002');
+    expect(t).toContain('Minor (joint with adult) TSK-003');
+    expect(t).toContain('Custodian TSK-004');
+    expect(t).not.toMatch(/adult_joint|teen_joint|custodial|individual/);
+  });
 });
 
 describe('export fix links and the recruiter back link', () => {

@@ -1925,3 +1925,31 @@ D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos ar
   `docs/design/mascot/`.
 - **(chosen by Claude, D13)** Tutorial stays at the top of the page: it opens an inline video card, which would cover
   the form if it floated.
+## D2 tutorial videos: plan (15 Nov 2026)
+
+Plan: `docs/plan/PLAN-D2-TUTORIAL-VIDEO.md`. **Awaiting the owner's approval; no feature code yet.**
+
+- **(owner)** AI video with Vertex Veo; a missing video never blocks publish; on publish in staging and production,
+  only an Admin "Generate tutorial" button in QA; a per-video and a daily cost cap; an Admin approves before SMEs or
+  Reviewers see it; generated once per template version.
+- **(chosen by Claude)** **Model and clips:** `veo-3.1-fast-generate-001` (GA), 720p, 16:9, 8 s clips, video only,
+  2 clips per chapter, one retry per clip. Veo's own audio is not used.
+- **(chosen by Claude)** **Narration** is Cloud Text-to-Speech (one Chirp 3 HD English voice), from a script Gemini
+  drafts on Vertex (the existing QA model route). Captions (WebVTT) come from the same script.
+- **(chosen by Claude)** **On-screen text is drawn by ffmpeg** from the validated script, never by Veo. Veo prompts ask
+  for text-free, logo-free scenes with no real likenesses. Every spoken or shown word goes through `publicText()`
+  and a hard check for "Praxis", "Anvil" and "ADI-Labs"; a hit fails the run.
+- **(chosen by Claude)** **Synthetic example:** the template's own golden example where it has one, else a
+  Gemini-drafted one with invented names. Never task, SME or project data.
+- **(chosen by Claude)** **Storage:** a new private `TUTORIAL_BUCKET` (`<project>-tutorials`), objects under
+  `tutorials/<lineageId>/<runId>/`. `tutorial_video_url` stores `storage:<key>`; the API serves a 12 h V4 signed URL.
+  Veo returns bytes (no `storageUri`), so the Vertex service agent needs no bucket access.
+- **(chosen by Claude)** **Caps:** `TUTORIAL_VIDEO_COST_CAP_USD` and `TUTORIAL_VIDEO_DAILY_CAP_USD`, blank = live
+  generation refused. Worst-case reservation at request time, daily total per environment (UTC) under an advisory
+  lock, a per-call check during the run, and an append-only `TutorialSpend` ledger. Suggested values $40 and $100.
+- **(chosen by Claude)** **Cost estimate:** $0.08 per Veo second → about $1.33 per chapter; Marketing ≈ $11, KYC
+  v6/v7 ≈ $15–17 each; all three ≈ $40–45 once.
+- **(chosen by Claude)** **Approval** writes the video to the run's template version and later versions of the
+  workflow; older versions keep theirs. Regenerating keeps the approved video until the new one is approved. One
+  open run per workflow.
+- **(chosen by Claude)** Runs in `praxis-worker` as an outbox handler, with `ffmpeg` added to the API/worker image.

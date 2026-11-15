@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { ForgeSettings, type ForgeSettings as ForgeSettingsT } from '@praxis/shared';
 import type { Config } from '../config';
 import type { Db, Tx } from '../db';
+import type { AuditInput } from '../platform/audit';
 
 /** MVP1 per-client settings (docs/design/PROJECT-SCREEN-DESIGN.md): the earlier journey stays until newFlow is on. */
 export const FORGE_DEFAULTS: ForgeSettingsT = { newFlow: false, candidateSignIn: 'OFFLINE' };
@@ -31,4 +32,15 @@ export function offlineSignInAllowed(config: Pick<Config, 'NODE_ENV' | 'appEnv'>
 export function withForge(settings: unknown, forge: ForgeSettingsT): Prisma.InputJsonValue {
   const base = settings && typeof settings === 'object' && !Array.isArray(settings) ? (settings as Record<string, unknown>) : {};
   return { ...base, forge } as Prisma.InputJsonValue;
+}
+
+/**
+ * Ends every open candidate-app session of the client (SMEs and Reviewers alike), as a change of sign-in mode needs.
+ * Audited with the count only (no ids or emails). Returns how many sessions were ended.
+ */
+export async function endCandidateSessions(tx: Tx, clientId: string, audit: (i: AuditInput) => Promise<void>): Promise<number> {
+  const now = new Date();
+  const { count } = await tx.session.updateMany({ where: { clientId, audience: 'CANDIDATE', revokedAt: null, expiresAt: { gt: now } }, data: { revokedAt: now } });
+  await audit({ entityType: 'Client', entityId: clientId, action: 'candidate.sessions_ended', after: { reason: 'sign_in_mode_changed', count } });
+  return count;
 }

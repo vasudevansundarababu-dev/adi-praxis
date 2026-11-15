@@ -1,4 +1,4 @@
-import { normEmail, smeTaskStatus, type ForgeDecisionRequest, type ForgePerson, type ForgeTaskRow, type ReviewerDecisionRequest, type ReviewerTaskStatus } from '@praxis/shared';
+import { CoverageDimensions, forgeSlotSelector, normEmail, smeTaskStatus, type ForgeDecisionRequest, type ForgeTaskSelector, type SelectorSlot, type ForgePerson, type ForgeTaskRow, type ReviewerDecisionRequest, type ReviewerTaskStatus } from '@praxis/shared';
 import type { Actor, CandidateActor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { AppError, forbidden, notFound } from '../lib/errors';
@@ -63,6 +63,21 @@ async function consoleTask(tx: Db | Tx, actor: Actor, projectId: string, taskId:
   return t;
 }
 
+/**
+ * Reads each task's coverage selector from its slot (MVP1 step 9), labelled from the project's template: the form
+ * field and option labels for a case selector, the dimension labels otherwise (the same labels the slot brief uses).
+ */
+async function slotSelectors(tx: Db | Tx, projectId: string): Promise<(slot: SelectorSlot | null | undefined) => ForgeTaskSelector | null> {
+  const p = await tx.project.findUniqueOrThrow({ where: { id: projectId }, select: { template: { select: { workflowName: true, profileId: true, coverageDimensions: true } } } });
+  const profile = profileFor({ workflowName: p.template.workflowName, profileId: p.template.profileId });
+  const fieldOf = (source: string) => {
+    const [sectionKey, fieldKey] = source.split('.');
+    return profile?.sections.find((s) => s.key === sectionKey)?.fields.find((f) => f.key === fieldKey);
+  };
+  const dimensions = CoverageDimensions.safeParse(p.template.coverageDimensions).data?.dimensions ?? [];
+  return (slot) => forgeSlotSelector(slot, { fieldLabel: (source) => fieldOf(source)?.label, optionLabel: (source, value) => fieldOf(source)?.options?.find((o) => o.value === value)?.label, dimensions });
+}
+
 /** The Tasks tab: one row per task, in slot order. */
 export async function forgeTaskRows(tx: Db | Tx, actor: Actor, projectId: string): Promise<ForgeTaskRow[]> {
   const tasks = await tx.taskInstance.findMany({
@@ -73,12 +88,14 @@ export async function forgeTaskRows(tx: Db | Tx, actor: Actor, projectId: string
   const reviewers = await tx.smeUser.findMany({ where: { id: { in: tasks.map((t) => t.reviewerSmeUserId).filter((x): x is string => !!x) } } });
   const me = await tx.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { email: true } });
   const conflicted = new Set((await tx.conflictDeclaration.findMany({ where: { reviewerId: actor.userId, resolvedAt: null } })).map((c) => c.smeUserId));
+  const selectorOf = await slotSelectors(tx, projectId);
   return tasks.map((t) => {
     const author = t.assignedTo?.smeUser ?? null;
     const blocked = !!author && (conflicted.has(author.id) || (!!author.contactEmail && normEmail(author.contactEmail) === normEmail(me.email)));
     return {
       taskId: t.id,
       label: taskLabel(t),
+      selector: selectorOf((t.input as { slot?: SelectorSlot } | null)?.slot),
       slotLabel: slotLabel(t),
       status: t.status,
       smeStatus: smeTaskStatus(t.status),

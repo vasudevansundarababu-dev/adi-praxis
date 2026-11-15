@@ -157,10 +157,54 @@ export interface ForgePerson {
   email: string | null;
 }
 
+/**
+ * What a task covers, for the Dashboard's "Coverage by <field>" (MVP1 step 9): read from the task's slot, not its brief.
+ * `field` is the selector's display name ("Governing state", "Application type", a dimension label, "Edge case"; empty
+ * for an open slot), `value` the stored value ("CA") and `label` what the table shows ("California (CA)", "Open slot").
+ */
+export interface ForgeTaskSelector {
+  field: string;
+  value: string;
+  label: string;
+}
+
+/** The slot data a selector is read from (a task's `input.slot`). */
+export interface SelectorSlot {
+  tags?: Record<string, string> | null;
+  edgeCase?: string | null;
+  isOpen?: boolean | null;
+  case?: { field: string; source: string; value: string } | null;
+}
+
+/**
+ * A task's selector from its slot. A case-selector slot gives the form field's label and the option's label (as the
+ * slot brief shows them); a dimension slot its first tag in dimension order; an edge-case slot its edge case; an open
+ * slot "Open slot". No slot: null.
+ */
+export function forgeSlotSelector(
+  slot: SelectorSlot | null | undefined,
+  labels: { fieldLabel?: (source: string) => string | undefined; optionLabel?: (source: string, value: string) => string | undefined; dimensions?: { key: string; label: string }[] } = {},
+): ForgeTaskSelector | null {
+  if (!slot) return null;
+  if (slot.isOpen) return { field: '', value: '', label: 'Open slot' };
+  if (slot.case) {
+    const option = labels.optionLabel?.(slot.case.source, slot.case.value);
+    return { field: labels.fieldLabel?.(slot.case.source) ?? slot.case.field, value: slot.case.value, label: option && option !== slot.case.value ? `${option} (${slot.case.value})` : slot.case.value };
+  }
+  const dims = labels.dimensions ?? [];
+  const order = (k: string) => dims.findIndex((d) => d.key === k) + 1 || 999;
+  const first = Object.entries(slot.tags ?? {}).sort(([a], [b]) => order(a) - order(b))[0];
+  if (first) return { field: dims.find((d) => d.key === first[0])?.label ?? first[0], value: first[1], label: first[1] };
+  if (slot.edgeCase) return { field: 'Edge case', value: slot.edgeCase, label: slot.edgeCase };
+  return null;
+}
+
 /** One row of the project's Tasks tab. */
 export interface ForgeTaskRow {
   taskId: string;
   label: string;
+  /** What the task covers, from its slot (MVP1 step 9). Absent in older responses: the console then reads the brief. */
+  selector?: ForgeTaskSelector | null;
   slotLabel: string;
   status: string;
   smeStatus: SmeTaskStatus;

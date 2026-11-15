@@ -4,7 +4,7 @@ import type { Config } from '../config';
 import type { Db } from '../db';
 import { AppError } from '../lib/errors';
 import { runCommand } from '../platform/command';
-import { forgeFrom, forgeSettings, offlineSignInAllowed, withForge } from '../forge/settings';
+import { endCandidateSessions, forgeFrom, forgeSettings, offlineSignInAllowed, withForge } from '../forge/settings';
 
 /** MVP1 Admin settings: the new flow switch and the candidate app sign-in mode (one per client). */
 export const forgeSettingsRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config }> = async (app, { db, config }) => {
@@ -26,7 +26,9 @@ export const forgeSettingsRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
       const after = { ...before, ...req.body };
       await tx.client.update({ where: { id: client.id }, data: { settings: withForge(client.settings, after) } });
       await audit({ entityType: 'Client', entityId: client.id, action: 'forge.settings_updated', before, after });
-      return { status: 200, body: { ...after, offlineAllowed } };
+      // Changing the sign-in mode signs everyone out of the candidate app (design: Admin, candidate app sign-in).
+      const candidateSessionsEnded = after.candidateSignIn !== before.candidateSignIn ? await endCandidateSessions(tx, client.id, audit) : 0;
+      return { status: 200, body: { ...after, offlineAllowed, candidateSessionsEnded } };
     });
     return reply;
   });

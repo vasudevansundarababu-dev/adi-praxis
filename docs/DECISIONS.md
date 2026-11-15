@@ -1682,3 +1682,37 @@ owner's approval; no code yet.**
   compare the output; Output field is then a picker from the output schema. Help text says "RL Gym".
 - **(chosen by Claude)** D9 keeps values already saved: an unknown link or a value on a hidden field is flagged, never
   stripped, so stored and exported bytes don't change. It sits behind the same flag.
+
+## Simplified rubric editor combined with rubric recommendations, D8 and D9 (15 Nov 2026)
+
+Owner spec: `docs/prd/PRD-SIMPLIFIED-RUBRIC-EDITOR.md`. It's combined into `docs/plan/PLAN-RUBRIC-RECOMMENDATIONS.md`
+(sections 2, 14 and 15). Mockup for approval: `docs/design/mockups/rubric-editor.html`. **Awaiting the owner's approval of
+the mockup and the plan; no feature code yet.** Where the specs conflict, the simplified-editor spec wins on what the
+author sees, and the recommendations spec wins on derivation and storage.
+
+- **(chosen by Claude) Field list:** the editor shows the owner's 9 fields in order. Step/role and skill appear in the
+  "Derived from" chain, exceptions in the Change dialog, "why suggested" under the links, and unresolved items in
+  the to-finish list. No extra top-level fields.
+- **(chosen by Claude) Whole-task failure:** only what the template supports is offered. For KYC v6/v7 that's "a Fail
+  (0) on this criterion fails the whole task" (S7 scoring rule). "Partial triggers it" isn't offered. A behaviour the
+  Fail doesn't cover is kept as a note and flagged "Evaluation setup needed". Only the existing `critical` flag is
+  exported.
+- **(chosen by Claude) Criterion name:** the ID is read-only. The name is editable (as today) with "Reset to template"
+  and an "Edited from template" marker. This replaces D8's read-only name, following the later spec.
+- **(chosen by Claude) Applicability:** the editor's four kinds (required throughout, required when, permitted option,
+  human officer or other role), plus UNKNOWN for derived requirements. The template's own Not applicable, Unknown and
+  missing-evidence treatment is unchanged in the export.
+- **(chosen by Claude) One link control:** "Derived from" replaces D9's separate "Evidence or rule links" picker.
+  Confirmed links of exportable kinds (rule keys, step IDs, evidence IDs) fill the existing `evidenceRefs`; unconfirmed
+  suggestions don't. `evidenceRefs` is shown read-only under Technical settings. Saved values are kept.
+- **(chosen by Claude) Technical settings:** collapsed and read-only in "Technical grading settings · From template",
+  with "Not used" rather than hidden (D9 said hidden). Filled only from the exact template mapping. With no mapping:
+  "Evaluation setup needed". "How it will be checked" never says "Ready".
+- **(chosen by Claude) Weights:** shown read-only from structured template data only (D8 `criterionDefaults`, groups,
+  `weightTotal`). The mockup assumes a v7 version with D8 defaults (weight 5). Plan option B stays the owner's choice
+  for today's v7.
+- **(chosen by Claude) Suggested additions:** shown separately and labelled AI suggestion / Internal only / Evaluation
+  setup needed. They never enter `S7.criteria` on a fixed evaluator map.
+- **(chosen by Claude) Mockup data:** the Custodian task on KYC v7, with real criterion IDs, scale, tools and S5 steps.
+  Anchor text is from the QA cheat sheet and is shown as D8 template defaults. Policy rule numbers and passages are
+  illustrative and labelled as such.

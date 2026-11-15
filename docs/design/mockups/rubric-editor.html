@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rubric editor · ADI Forge (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
+<style>
+/* Dark theme values from packages/shared/theme/theme.css (the candidate app is dark), as in candidate-screens.html. Mockup only. */
+:root{--bg:#212227;--surface:#2a2c33;--text:#e6eaee;--muted:#8a9ca8;--border:#3a3d46;--link:#5aa3e6;--focus:#5aa3e6;--accent:#3fac95;--error:#f87171;--warning:#fbbf24;--success:#4ade80;--hairline:#363944;--elevated:#2c2e36;--shadow:0 1px 2px rgb(0 0 0 / .3),0 12px 32px -14px rgb(0 0 0 / .6)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-size:14px;line-height:1.55}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+button{font-family:inherit}
+.demo{background:#fbbf24;color:#1b1c20;text-align:center;font-size:12px;font-weight:500;padding:4px 16px}
+header{border-bottom:1px solid var(--hairline)}
+.hwrap{max-width:56rem;margin:0 auto;padding:14px 16px;display:flex;align-items:center;gap:18px}
+.brand{font-family:'Geist',sans-serif;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+.inf{width:26px;height:14px;border-radius:7px;border:3px solid #3fac95;border-right-color:#2a80d0;border-bottom-color:#2a80d0}
+nav.top{margin-left:auto;display:flex;gap:18px;font-size:13px}
+.rail{height:3px;background:linear-gradient(90deg,#0a2170 0%,#2a80d0 50%,#3fac95 100%)}
+main{max-width:56rem;margin:0 auto;padding:22px 16px 150px}
+h1{font-family:'Geist',sans-serif;font-size:22px;font-weight:600;margin:0}
+h2{font-family:'Geist',sans-serif;font-size:17px;font-weight:600;margin:0}
+.muted{color:var(--muted)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.card{background:var(--elevated);border:1px solid var(--hairline);border-radius:16px;box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:9px 16px;font-weight:600;font-size:14px;cursor:pointer;border:0}
+.btn-primary{color:#fff;background:linear-gradient(90deg,#1f64b8 0%,#2a80d0 45%,#2f9c8a 100%);box-shadow:0 8px 20px -10px rgb(42 128 208 / .8)}
+.btn-secondary{border:1px solid var(--hairline);background:var(--elevated);color:var(--text)}
+.btn-sm{padding:5px 11px;font-size:12.5px;border-radius:9px}
+.btn-link{background:none;border:0;color:var(--link);cursor:pointer;padding:0;font-size:13px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:600;line-height:20px;white-space:nowrap;background:color-mix(in srgb,var(--pill,var(--muted)) 18%,transparent)}
+.pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--pill,var(--muted))}
+.pill-info{--pill:var(--link)}.pill-success{--pill:var(--success)}.pill-warning{--pill:var(--warning)}.pill-error{--pill:var(--error)}.pill-brand{--pill:var(--accent)}
+.pill-ai{--pill:#c084fc}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin:16px 0 18px}
+.tabs span{font-size:12.5px;padding:5px 10px;border-radius:999px;border:1px solid var(--hairline);color:var(--muted)}
+.tabs span.on{background:#0a2170;color:#fff;border-color:#0a2170;font-weight:600}
+.summary{padding:14px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.crit{margin-bottom:14px;overflow:hidden}
+.crit>.hd{display:flex;gap:10px;align-items:center;padding:14px 18px;cursor:pointer;flex-wrap:wrap}
+.crit>.hd:hover{background:#30323a}
+.crit>.bd{padding:4px 18px 18px;border-top:1px solid var(--hairline);display:none}
+.crit.open>.bd{display:block}
+.chev{margin-left:auto;color:var(--muted);font-size:12px}
+.f{padding:14px 0;border-bottom:1px solid var(--hairline)}
+.f:last-child{border-bottom:0}
+.f>.lb{font-weight:600;font-size:13.5px;margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.f>.lb small{font-weight:400;color:var(--muted);font-size:12px}
+input[type=text],textarea,select{font-family:inherit;font-size:14px;color:var(--text);background:#24262c;border:1px solid var(--border);border-radius:10px;padding:8px 10px;width:100%}
+textarea{min-height:58px;resize:vertical}
+input:focus,textarea:focus{outline:2px solid var(--focus);outline-offset:1px}
+.score{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.score label{font-size:12.5px;color:var(--muted);display:block}
+.score .pts{font-family:'Geist',sans-serif;color:var(--text);font-weight:600}
+.links{display:flex;flex-wrap:wrap;gap:6px}
+.lk{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--hairline);border-radius:10px;padding:3px 4px 3px 10px;font-size:12.5px;background:#26282f}
+.lk a{font-weight:500}
+.lk.sug{border-style:dashed;border-color:#5aa3e6}
+.lk.chg{border-color:var(--warning);background:color-mix(in srgb,var(--warning) 10%,#26282f)}
+.lk.need{border-color:var(--warning);border-style:dashed;color:var(--warning);padding:3px 10px}
+.lk button{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 5px;border-radius:6px}
+.lk button:hover{background:#3a3d46;color:var(--text)}
+.chain{font-size:12.5px;color:var(--muted);margin-top:8px}
+.chain b{color:var(--text);font-weight:500}
+.why{font-size:12.5px;color:var(--muted);margin-top:4px}
+.banner{border-radius:12px;padding:10px 12px;font-size:13px;margin:12px 0 0;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.banner.warn{background:color-mix(in srgb,var(--warning) 12%,transparent);border:1px solid color-mix(in srgb,var(--warning) 45%,transparent)}
+.banner.info{background:color-mix(in srgb,var(--link) 10%,transparent);border:1px solid color-mix(in srgb,var(--link) 35%,transparent)}
+.banner .grow{flex:1;min-width:14rem}
+.diff{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;width:100%}
+.diff div{border-radius:8px;padding:8px 10px;font-size:12.5px}
+.diff .old{background:rgb(248 113 113 / .08);border:1px solid rgb(248 113 113 / .3)}
+.diff .new{background:rgb(74 222 128 / .08);border:1px solid rgb(74 222 128 / .3)}
+.appl{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.appl p{margin:0;flex:1;min-width:14rem}
+.chk{display:flex;gap:8px;align-items:center;font-size:13.5px;cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:#2a80d0}
+.radio{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:6px 0;cursor:pointer}
+.radio input{margin-top:3px;accent-color:#2a80d0}
+.explain{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+.checked{font-size:13.5px;margin:0}
+details.tech{margin-top:2px;border:1px solid var(--hairline);border-radius:12px;background:#26282f}
+details.tech>summary{cursor:pointer;padding:10px 12px;font-weight:600;font-size:13.5px;list-style:none;display:flex;gap:8px;align-items:center}
+details.tech>summary::-webkit-details-marker{display:none}
+details.tech>summary::before{content:'▸';color:var(--muted)}
+details.tech[open]>summary::before{content:'▾'}
+.kv{display:grid;grid-template-columns:minmax(9rem,14rem) 1fr;gap:6px 14px;padding:4px 14px 14px;font-size:13px}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+.lock{font-size:12px;color:var(--muted);padding:0 14px 12px}
+.reset{font-size:12px}
+.overlay{position:fixed;inset:0;background:rgb(0 0 0 / .55);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+.overlay.on{display:flex}
+.dialog{width:min(560px,100%);max-height:88vh;overflow:auto;background:#1b1c20;border:1px solid var(--hairline);border-radius:16px;box-shadow:var(--shadow);padding:18px 20px}
+.dialog h2{margin-bottom:6px}
+.dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:#1b1c20;border-left:1px solid var(--hairline);box-shadow:-20px 0 40px -20px rgb(0 0 0 / .7);display:none;flex-direction:column;z-index:15}
+.drawer.on{display:flex}
+.drawer .hd{padding:14px 16px;border-bottom:1px solid var(--hairline);display:flex;align-items:center;gap:8px}
+.drawer .bd{padding:16px;overflow:auto;font-size:13.5px}
+.passage{border-left:3px solid #2a80d0;padding:6px 12px;margin:10px 0;background:#24262c;border-radius:0 8px 8px 0}
+mark{background:rgb(251 191 36 / .25);color:inherit;border-radius:3px;padding:0 2px}
+.savebar{position:fixed;left:0;right:0;bottom:52px;z-index:6}
+.savebar .in{max-width:56rem;margin:0 auto;padding:0 16px}
+.savebar .card{display:flex;gap:10px;align-items:center;padding:10px 14px;flex-wrap:wrap}
+.toast{max-width:56rem;margin:0 auto 10px;padding:0 16px;display:none}
+.toast.on{display:block}
+.gaps{margin:8px 0 0;padding-left:18px;font-size:13px}
+.gaps li{margin:3px 0}
+.picker{position:fixed;left:16px;right:16px;bottom:10px;max-width:56rem;margin:0 auto;background:#0a2170;color:#fff;border-radius:14px;padding:7px 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;z-index:7}
+.picker button{font-size:12px;border:1px solid rgb(255 255 255 / .25);background:transparent;color:#fff;border-radius:999px;padding:3px 10px;cursor:pointer}
+.picker button:hover{background:rgb(255 255 255 / .12)}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px #fbbf24}100%{box-shadow:var(--shadow)}}
+.addlist{margin-top:8px;border:1px solid var(--hairline);border-radius:10px;background:#24262c;display:none}
+.addlist.on{display:block}
+.addlist button{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);padding:7px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--hairline)}
+.addlist button:last-child{border-bottom:0}
+.addlist button:hover{background:#30323a}
+.addlist small{color:var(--muted)}
+@media (max-width:640px){.score{grid-template-columns:1fr}.diff{grid-template-columns:1fr}.kv{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="demo">Mockup for approval · KYC v7 criterion IDs, scoring scale, tools and procedure are real; policy passages and rule numbers are illustrative · nothing is saved</div>
+<header><div class="hwrap"><div class="brand"><span class="inf"></span>ADI Forge</div><nav class="top"><a href="#">My tasks</a><a href="#">Help</a><a href="#">Morgan (SME)</a></nav></div><div class="rail"></div></header>
+
+<main>
+  <p class="muted" style="margin:0 0 4px;font-size:13px"><a href="#">My tasks</a> › Custodial account (UTMA/UGMA-style) KYC</p>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <h1>Custodial account (UTMA/UGMA-style) KYC</h1>
+    <span class="pill pill-info">In progress</span>
+  </div>
+  <p class="muted" style="margin:4px 0 0;font-size:12.5px">KYC onboarding and refresh · template v7 · application type Custodian · task revision <span id="revNo">14</span> · <span id="saved">Saved 14:31</span></p>
+  <div class="tabs"><span>S1 Assignment</span><span>S2 Inputs</span><span>S3 Tools</span><span>S4 Policies</span><span>S5 Procedure</span><span>S6 Output</span><span class="on">S7 Rubric</span><span>S8 Provenance</span></div>
+
+  <div class="card summary">
+    <div style="flex:1;min-width:16rem">
+      <h2>Rubric</h2>
+      <p class="muted" style="margin:2px 0 0;font-size:13px">20 criteria from the template, scored Pass 5 · Partial 2 · Fail 0, 100 points in total. This mockup shows 3 of them.</p>
+    </div>
+    <span class="pill pill-success">Coverage: 14 of 16 required items</span>
+    <span class="pill pill-warning" id="gapPill">5 to finish</span>
+    <button class="btn btn-secondary btn-sm" id="regen">Refresh suggestions</button>
+  </div>
+
+  <div id="crits"></div>
+
+  <div class="card crit" id="c-add" style="border-style:dashed">
+    <div class="hd" data-toggle="c-add"><span class="mono muted">new</span><strong>Agent does not grant human approval</strong><span class="pill pill-ai">AI suggestion</span><span class="pill">Internal only · not sent to RL Gym</span><span class="pill pill-warning">Evaluation setup needed</span><span class="chev">▾</span></div>
+    <div class="bd">
+      <div class="banner info"><div class="grow"><strong>Suggested addition.</strong> No template criterion covers S5 step 5's "refer to a specialist": a bank officer approves an unproven authority, not the agent. This template's 20 criteria are fixed, so an addition stays in ADI Forge and RL Gym doesn't score it.</div><button class="btn btn-secondary btn-sm" id="dismissAdd">Dismiss</button><button class="btn btn-secondary btn-sm" id="keepAdd">Keep as internal note</button></div>
+      <div class="f"><div class="lb">What should the agent do?</div><textarea>Refer an unproven custodian authority to a specialist and wait. Never mark the authority as approved itself.</textarea></div>
+      <div class="f"><div class="lb">Derived from</div><div class="links"><span class="lk sug"><a href="#" data-src="s5step5">Workflow · Verify custodian's authority</a><button title="Confirm">✓</button><button title="Remove">✕</button></span><span class="lk sug"><a href="#" data-src="s3tools">S3 · Permitted tools · specialist.refer</a><button>✓</button><button>✕</button></span></div></div>
+      <div class="f"><div class="lb">When does this apply?</div><div class="appl"><p class="muted"><em>Not set yet.</em></p><span class="pill pill-warning">Undefined</span></div></div>
+      <div class="f"><div class="lb">How should we score it? <small>Template scale</small></div><div class="score"><label><span class="pts">Pass · 5</span><textarea>Every unproven authority is referred with specialist.refer, and no approval is recorded by the agent.</textarea></label><label><span class="pts">Partial · 2</span><textarea placeholder="Not written yet"></textarea></label><label><span class="pts">Fail · 0</span><textarea>The agent treats the authority as approved.</textarea></label></div></div>
+      <div class="f"><div class="lb">How it will be checked</div><p class="checked"><strong style="color:var(--warning)">Evaluation setup needed.</strong> The template has no evaluator for this criterion, so RL Gym won't score it. Adding one is a template change for the template admin, agreed with RL Gym.</p></div>
+      <div class="f"><details class="tech"><summary>Technical grading settings · From template <span class="pill pill-warning" style="margin-left:auto">No mapping</span></summary><dl class="kv"><dt>Evaluator</dt><dd>— none in the template</dd><dt>Version</dt><dd>—</dd><dt>Output field</dt><dd>—</dd></dl><p class="lock">Nothing is guessed. Without a mapping this criterion stays internal.</p></details></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"><div class="card" style="padding:12px 16px">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="pill pill-success">Draft saved</span><span id="toastMeta" class="muted" style="font-size:13px"></span><button class="btn-link" style="margin-left:auto" id="toastClose">Close</button></div>
+    <p style="margin:8px 0 0;font-size:13.5px"><strong>Still to finish before you submit:</strong></p>
+    <ul class="gaps" id="gapList"></ul>
+    <p class="muted" style="margin:8px 0 0;font-size:12.5px">These items don't stop you saving. Submit still runs the same checks as today.</p>
+  </div></div>
+</main>
+
+<div class="savebar"><div class="in"><div class="card">
+  <span class="muted" style="font-size:13px">Changes save automatically. Save keeps a version you can restore later.</span>
+  <button class="btn btn-secondary btn-sm" style="margin-left:auto" id="saveBtn">Save</button>
+  <button class="btn btn-primary btn-sm" id="submitBtn" title="Mockup">Submit for review</button>
+</div></div></div>
+
+<div class="drawer" id="drawer"><div class="hd"><strong id="dTitle">Source</strong><button class="btn-link" style="margin-left:auto" id="dClose">Close</button></div><div class="bd" id="dBody"></div></div>
+
+<div class="overlay" id="applDlg"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="applH">
+  <h2 id="applH">When does this apply?</h2>
+  <p class="muted" style="margin:0 0 10px;font-size:13px" id="applFor"></p>
+  <label class="radio"><input type="radio" name="ak" value="always"><span><strong>Required throughout this workflow</strong><br><span class="muted">Assessed on every application this task covers.</span></span></label>
+  <label class="radio"><input type="radio" name="ak" value="when"><span><strong>Required only when a condition applies</strong><br><span class="muted">If the condition doesn't apply, the result is Not applicable, never full marks. If the run doesn't show whether it applies, it's Unknown.</span></span></label>
+  <label class="radio"><input type="radio" name="ak" value="option"><span><strong>A permitted option</strong><br><span class="muted">The agent may choose this route. Its conditions are assessed only when it's chosen; it's never compulsory.</span></span></label>
+  <label class="radio"><input type="radio" name="ak" value="other"><span><strong>Belongs to a human officer or another role</strong><br><span class="muted">Assessed as "the agent routes it correctly", never as the agent exercising that authority.</span></span></label>
+  <div style="margin-top:10px"><label style="font-size:13px" for="applCond">Condition</label><textarea id="applCond" placeholder="e.g. Someone acts for another party: a custodian, guardian or power of attorney."></textarea></div>
+  <div style="margin-top:8px"><label style="font-size:13px" for="applExc">Exceptions (optional)</label><textarea id="applExc"></textarea></div>
+  <p class="explain">Suggested from S1 · Application type, Workflow · Verify custodian's authority and the selected policy rules. Product and state come from each application RL Gym runs, never from the example state.</p>
+  <div class="act"><button class="btn btn-secondary btn-sm" id="applCancel">Cancel</button><button class="btn btn-primary btn-sm" id="applSave">Use this</button></div>
+</div></div>
+
+<div class="picker"><strong style="margin-right:4px">Show state:</strong>
+  <button data-show="links">Suggested links</button>
+  <button data-show="need">Source link needed</button>
+  <button data-show="changed">Source changed</button>
+  <button data-show="appl">Change applicability</button>
+  <button data-show="fail">Whole-task failure</button>
+  <button data-show="tech">Technical settings</button>
+  <button data-show="setup">Evaluation setup needed</button>
+  <button data-show="save">Save incomplete draft</button>
+</div>
+
+<script>
+const SRC={
+ s2inputs:{t:'S2 · Inputs',sec:'S2 Shared runtime inputs › Application input contract',ver:'Task revision 14 (current)',p:'Each episode receives one isolated application snapshot from the versioned shared dataset that RL Gym assigns. The agent reads it only through the permitted tools: application.read for the application and parties, documents.list, <mark>document.read and document.compare for evidence</mark>, and policy.read for the policies that apply.'},
+ s2changed:{t:'S2 · Inputs',sec:'S2 Shared runtime inputs › Application input contract',ver:'Linked at task revision 12 · changed in revision 14',p:'<span class="muted">Revision 12 (used for this criterion):</span><div class="passage">… documents.list and document.read for evidence …</div><span class="muted">Revision 14 (now):</span><div class="passage">… documents.list, document.read <mark>and document.compare for evidence; a document can arrive in more than one version</mark> …</div>'},
+ s3tools:{t:'S3 · Permitted tools',sec:'S3 Shared environment and tools › Permitted tools',ver:'Task revision 14 · catalogue from template v7',p:'21 tools selected, including <mark>identity.check, document.check, document.compare, authority.check and specialist.refer</mark>.'},
+ s5step2:{t:'Workflow · Verify identity',sec:'S5 Reusable procedure › step 2',ver:'Task revision 14',p:'<strong>Action:</strong> Verify the custodian\'s identity documents · <strong>Tool:</strong> identity.check, document.check · <strong>Failure handling:</strong> If the document is expired or unreadable, request a replacement (information.request).'},
+ s5step5:{t:'Workflow · Verify custodian\'s authority',sec:'S5 Reusable procedure › step 5',ver:'Task revision 14',p:'<strong>Action:</strong> Verify the custodian\'s authority and the custodial agreement · <strong>Tool:</strong> authority.check, document.read · <strong>Failure handling:</strong> If the agreement is missing, request it; if authority is unproven, refer it (specialist.refer).'},
+ s5step6:{t:'Workflow · Identify the beneficiary',sec:'S5 Reusable procedure › step 6',ver:'Task revision 14',p:'<strong>Action:</strong> Identify the beneficiary minor; never treat the beneficiary as an owner · <strong>Tool:</strong> application.read.'},
+ s1type:{t:'S1 · Application type',sec:'S1 Reusable assignment › Application type',ver:'Task revision 14',p:'<mark>Custodian</mark> (case selector: product = custodial). Each application RL Gym runs supplies its own product and governing state.'},
+ s4gb02:{t:'S4 · Policy rules · GB-02',sec:'Project policy › rule GB-02 · version golden-kyc-1.0.0',ver:'Rule version golden-kyc-1.0.0 · document "Golden Bank approved operating choices", section 2 (illustrative)',p:'<em>Illustrative passage:</em> <mark>Verify the identity of each owner and each person acting for an owner</mark> by documentary or non-documentary methods before the account is approved. A minor beneficiary of a custodial account is identified, not verified as an owner.'},
+ s6out:{t:'S6 · Required output',sec:'S6 Output contract',ver:'Task revision 14 · output schema from template v7',p:'One recommendation per application from the allowed values (<span class="mono">recommendation</span>), supported by the cited evidence for the custodian and the minor beneficiary, <mark>with any unresolved gaps and the human handoff stated</mark>.'},
+ s4gb05:{t:'S4 · Policy rules · GB-05',sec:'Project policy › rule GB-05 · version golden-kyc-1.0.0',ver:'Rule version golden-kyc-1.0.0 (illustrative)',p:'<em>Illustrative passage:</em> Use the most recent version of each supporting document; record any change between versions.'}
+};
+const ADDABLE=['s1type','s2inputs','s3tools','s5step2','s5step5','s5step6','s6out','s4gb02','s4gb05'];
+const C=[
+ {id:'identification_verification',name:'Identity verified',nameDefault:'Identity verified',open:true,
+  todo:'Verify the identity of the custodian, and of anyone else acting for the account, with documentary or non-documentary checks, and record each result.',
+  links:[{k:'s5step2',st:'ok'},{k:'s3tools',st:'ok'},{k:'s2inputs',st:'ok'},{k:'s4gb02',st:'sug'},{k:'s6out',st:'sug'}],
+  chain:['S5 · Procedure step 2','Investigating agent','Verifying identity documents'],
+  why:'Step 2 and rule GB-02 require identity verification; S6 requires the evidence to be cited.',
+  ak:'always',cond:'Every person the application names as an owner, custodian or authorised signer. The minor beneficiary is identified (step 6), not verified as an owner, unless the policy requires it.',exc:'',
+  pass:'Each party\'s identity is verified with documentary or non-documentary checks, and the results are recorded',
+  partial:'Verification done for some parties, or the results are incomplete',
+  fail:'No verification, or verification is assumed',edited:{},
+  wt:true,wtCond:'The agent recommends ready_for_approval while identity verification for the custodian is incomplete or has failed.',wtKind:'fail',
+  evidence:'identity.check or document.check results for each party in the run, cited in the findings; a finding.write entry for any check that is pending or refused.'},
+ {id:'revision_integrity',name:'Revisions handled',nameDefault:'Revisions handled',open:false,changed:true,
+  todo:'When a document has more than one version, compare the versions, use the latest, and carry any material change into the findings and the recommendation.',
+  links:[{k:'s2changed',st:'chg'},{k:'s3tools',st:'ok'},{k:'s4gb05',st:'ok'}],
+  chain:['S2 · Inputs','Investigating agent','Extracting and reconciling material changes'],
+  why:'S2 says documents can arrive in more than one version; rule GB-05 requires the latest version.',
+  ak:'when',cond:'A document in the application has more than one version.',exc:'',
+  pass:'Changed or newer documents are reconciled with document.compare and the latest version is used',
+  partial:'Revision noticed but not fully reconciled',
+  fail:'A stale or conflicting version is used without noting it',edited:{},
+  wt:false,wtCond:'',wtKind:'fail',
+  evidence:'The findings name the changed document and what changed, and the recommendation reflects it. Calling document.compare alone is evidence of an action, not proof the change was applied.'},
+ {id:'account_authority',name:'Authority',nameDefault:'Authority',open:false,
+  todo:'Verify that the custodian has authority to act for the minor beneficiary with authority.check, and refer an unproven authority to a specialist.',
+  links:[{k:'s5step5',st:'ok'},{k:'s1type',st:'ok'},{k:'s3tools',st:'ok'},{need:'Policy rule',st:'need',why:'No selected policy rule covers custodian authority documents. Pick one in S4, or note it as unresolved.'}],
+  chain:['S5 · Procedure step 5','Investigating agent','Verifying authority to act'],
+  why:'Step 5 and the Custodian application type require authority to be verified.',
+  ak:'when',cond:'Someone acts for another party: a custodian, guardian or power of attorney.',exc:'Approving an unproven authority is a bank officer\'s decision; the agent verifies and refers.',
+  pass:'Authority to act (custodian, guardian or power of attorney) is verified with authority.check',
+  partial:'Authority noted but not verified, and the gap is referred to a specialist',
+  partialDefault:'Authority noted but not verified',
+  fail:'Authority assumed',edited:{partial:true},
+  wt:false,wtCond:'',wtKind:'fail',
+  evidence:'authority.check result and the custodial agreement (document.read) cited in the findings; a specialist.refer entry when authority is unproven.'}
+];
+const AK={always:['Required throughout','pill-brand'],when:['Required when a condition applies','pill-info'],option:['Permitted option','pill-info'],other:['Human officer or other role','pill-info'],unset:['Undefined','pill-warning']};
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+
+function linkHtml(c,l,i){
+ if(l.st==='need')return `<span class="lk need" title="${esc(l.why)}">Source link needed · ${l.need} <button data-addto="${c.id}" style="color:var(--warning)">Pick a source</button></span>`;
+ const s=SRC[l.k];const cls=l.st==='sug'?'lk sug':l.st==='chg'?'lk chg':'lk';
+ const tag=l.st==='sug'?'<span class="muted" style="font-size:11px">suggested</span>':l.st==='chg'?'<span style="color:var(--warning);font-size:11px">changed</span>':'';
+ const btns=l.st==='sug'?`<button data-ok="${c.id}:${i}" title="Confirm this link">✓</button><button data-rm="${c.id}:${i}" title="Remove">✕</button>`:`<button data-rm="${c.id}:${i}" title="Remove">✕</button>`;
+ return `<span class="${cls}"><a href="#" data-src="${l.k}">${s.t}</a>${tag}${btns}</span>`;
+}
+function render(){
+ document.getElementById('crits').innerHTML=C.map(c=>{
+  const [akT,akC]=AK[c.ak];const sug=c.links.filter(l=>l.st==='sug').length;
+  const chips=[c.wt?'<span class="pill pill-error">Whole-task failure</span>':'',c.changed?'<span class="pill pill-warning">Source changed — check rubric</span>':'',c.links.some(l=>l.st==='need')?'<span class="pill pill-warning">Source link needed</span>':'',Object.keys(c.edited).length?'<span class="pill pill-info">Edited</span>':'<span class="pill">Template default</span>'].join('');
+  const sc=(k,label,pts)=>`<label><span class="pts">${label} · ${pts}</span><textarea data-sc="${c.id}:${k}">${esc(c[k])}</textarea>${c.edited[k]?`<span class="reset muted">Edited · <button class="btn-link reset" data-reset="${c.id}:${k}">Reset to template</button></span>`:'<span class="reset muted">Template default</span>'}</label>`;
+  return `<div class="card crit${c.open?' open':''}" id="c-${c.id}">
+  <div class="hd" data-toggle="c-${c.id}"><span class="mono muted">${c.id}</span><strong>${esc(c.name)}</strong><span class="pill ${akC}">${akT}</span>${chips}<span class="chev">5 points ▾</span></div>
+  <div class="bd">
+   ${c.changed?`<div class="banner warn" id="chg-${c.id}"><div class="grow"><strong>Source changed — check rubric.</strong> S2 · Inputs changed in revision 14 after this criterion was linked to it (revision 12). Nothing here was changed for you.<div class="diff"><div class="old"><span class="muted">Linked text (rev 12)</span><br>… documents.list and document.read for evidence …</div><div class="new"><span class="muted">Now (rev 14)</span><br>… document.read and document.compare for evidence; a document can arrive in more than one version …</div></div></div><button class="btn btn-secondary btn-sm" data-keep="${c.id}">Reviewed, keep as is</button></div>`:''}
+   <div class="f"><div class="lb">Criterion name ${c.name!==c.nameDefault?`<small>Edited · <button class="btn-link reset" data-resetname="${c.id}">Reset</button></small>`:'<small>From template</small>'}</div><input type="text" value="${esc(c.name)}" data-name="${c.id}"></div>
+   <div class="f"><div class="lb">What should the agent do?</div><textarea>${esc(c.todo)}</textarea></div>
+   <div class="f" id="links-${c.id}"><div class="lb">Derived from ${sug?`<small>${sug} suggested · confirm or remove</small>`:''}</div>
+     <div class="links">${c.links.map((l,i)=>linkHtml(c,l,i)).join('')}<button class="btn-link" data-addto="${c.id}" style="font-size:12.5px;margin-left:4px">+ Add source</button></div>
+     <div class="addlist" id="add-${c.id}">${ADDABLE.filter(k=>!c.links.some(l=>l.k===k)).map(k=>`<button data-pick="${c.id}:${k}">${SRC[k].t}<br><small>${SRC[k].ver}</small></button>`).join('')}</div>
+     <div class="chain">${c.chain.map(x=>`<b>${x}</b>`).join(' → ')} → <b>this criterion</b></div>
+     <div class="why">Why suggested: ${c.why}</div></div>
+   <div class="f" id="appl-${c.id}"><div class="lb">When does this apply?</div><div class="appl"><p>${esc(c.cond)}${c.exc?`<br><span class="muted" style="font-size:12.5px">Exception: ${esc(c.exc)}</span>`:''}</p><span class="pill ${akC}">${akT}</span><button class="btn btn-secondary btn-sm" data-appl="${c.id}">Change</button></div>
+     ${c.ak==='when'?'<p class="explain">When the condition doesn\'t apply: Not applicable, not full marks. When the run doesn\'t show whether it applies: Unknown. Missing evidence is not the same as wrong behaviour.</p>':''}</div>
+   <div class="f"><div class="lb">How should we score it? <small>Template scale: Pass 5 · Partial 2 · Fail 0</small></div><div class="score">${sc('pass','Pass',5)}${sc('partial','Partial',2)}${sc('fail','Fail',0)}</div></div>
+   <div class="f" id="fail-${c.id}"><div class="lb">Whole-task failure</div>
+     <label class="chk"><input type="checkbox" data-wt="${c.id}" ${c.wt?'checked':''}> Make this a whole-task failure when…</label>
+     ${c.wt?`<textarea data-wtc="${c.id}" style="margin-top:8px" placeholder="Describe exactly what fails the whole task">${esc(c.wtCond)}</textarea>
+     ${c.wtCond.trim()?'':'<p class="explain" style="color:var(--warning)">Write the condition. A ticked box alone isn\'t enough.</p>'}
+     <label class="radio"><input type="radio" name="wk-${c.id}" data-wk="${c.id}:fail" ${c.wtKind==='fail'?'checked':''}><span>It's what a <strong>Fail (0)</strong> on this criterion means <span class="pill pill-success" style="margin-left:4px">Supported</span></span></label>
+     <label class="radio"><input type="radio" name="wk-${c.id}" data-wk="${c.id}:other" ${c.wtKind==='other'?'checked':''}><span>It's a specific behaviour that a Fail on this criterion doesn't cover</span></label>
+     ${c.wtKind==='other'?'<div class="banner warn"><div class="grow"><strong>Evaluation setup needed.</strong> This template can only fail the whole task when this criterion scores Fail (0). Your condition is saved as a note in ADI Forge; RL Gym will not apply it until the template is changed.</div></div>':''}
+     <p class="explain">How this template works: when this criterion scores <strong>Fail (0)</strong>, RL Gym fails the whole task, whatever the other scores. A <strong>Partial (2)</strong> doesn't fail the task.</p>`:'<p class="explain">Off: a Fail here costs this criterion\'s 5 points only.</p>'}
+   </div>
+   <div class="f"><div class="lb">What evidence should support the score?</div><textarea>${esc(c.evidence)}</textarea></div>
+   <div class="f"><div class="lb">How it will be checked</div><p class="checked">RL Gym scores this from the recorded run (the tool calls, documents read, findings and recommendation) with the template's KYC rubric evaluator, version 1. No reference answer is stored in the task.</p><p class="explain">This mapping comes from the template. Whether the evaluator is installed and calibrated is confirmed in RL Gym, not here.</p></div>
+   <div class="f" id="tech-${c.id}"><details class="tech"><summary>Technical grading settings · From template</summary>
+     <dl class="kv"><dt>Evaluator</dt><dd class="mono">golden-kyc-rubric-v1</dd><dt>Evaluator version</dt><dd class="mono">1</dd><dt>Evidence source</dt><dd>Recorded run <span class="mono muted">(run_evidence)</span></dd><dt>Output field</dt><dd class="muted">Not used: scored from the run, not from an output field</dd><dt>Comparison</dt><dd class="muted">Not used</dd><dt>Expected value</dt><dd class="muted">Not used</dd><dt>Weight</dt><dd>5 of 100</dd><dt>Scale</dt><dd>Pass 5 · Partial 2 · Fail 0</dd><dt>Whole-task failure flag</dt><dd>${c.wt?'On':'Off'}</dd><dt>Evidence or rule IDs sent</dt><dd class="mono">${c.links.filter(l=>l.st==='ok'&&l.k&&/s5|s4/.test(l.k)).map(l=>l.k==='s5step2'?'S5-2':l.k==='s5step5'?'S5-5':l.k==='s4gb02'?'GB-02':'GB-05').join(', ')||'—'}</dd></dl>
+     <p class="lock">🔒 Read-only. These come from template v7 and can't be typed here. Template admins change them in the template.</p></details></div>
+  </div></div>`}).join('');
+ bind();gapsCount();
+}
+function gaps(){
+ const g=[];
+ for(const c of C){
+  if(c.links.some(l=>l.st==='need'))g.push(`<a href="#" data-jump="links-${c.id}">${c.id}</a>: source link needed (policy rule)`);
+  const s=c.links.filter(l=>l.st==='sug').length;if(s)g.push(`<a href="#" data-jump="links-${c.id}">${c.id}</a>: ${s} suggested source link${s>1?'s':''} not confirmed`);
+  if(c.changed)g.push(`<a href="#" data-jump="c-${c.id}">${c.id}</a>: source changed — check rubric`);
+  if(c.wt&&!c.wtCond.trim())g.push(`<a href="#" data-jump="fail-${c.id}">${c.id}</a>: whole-task failure condition is empty`);
+  if(c.wt&&c.wtKind==='other')g.push(`<a href="#" data-jump="fail-${c.id}">${c.id}</a>: whole-task failure needs evaluation setup`);
+  for(const k of ['pass','partial','fail'])if(!c[k].trim())g.push(`<a href="#" data-jump="c-${c.id}">${c.id}</a>: ${k} description missing`);
+ }
+ if(!addDismissed){g.push('<a href="#" data-jump="c-add">Suggested addition</a>: applicability undefined');g.push('<a href="#" data-jump="c-add">Suggested addition</a>: Partial description missing');g.push('<a href="#" data-jump="c-add">Suggested addition</a>: no technical mapping (evaluation setup needed)');}
+ return g;
+}
+let addDismissed=false;
+function gapsCount(){document.getElementById('gapPill').textContent=gaps().length+' to finish';}
+function find(id){return C.find(c=>c.id===id)}
+function bind(){
+ document.querySelectorAll('[data-toggle]').forEach(h=>h.onclick=e=>{if(e.target.closest('button,a,input'))return;const el=document.getElementById(h.dataset.toggle);el.classList.toggle('open');const c=find(h.dataset.toggle.slice(2));if(c)c.open=el.classList.contains('open')});
+ document.querySelectorAll('[data-src]').forEach(a=>a.onclick=e=>{e.preventDefault();openSrc(a.dataset.src)});
+ document.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>{const[id,i]=b.dataset.ok.split(':');find(id).links[i].st='ok';render()});
+ document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const[id,i]=b.dataset.rm.split(':');find(id).links.splice(+i,1);render()});
+ document.querySelectorAll('[data-addto]').forEach(b=>b.onclick=()=>document.getElementById('add-'+b.dataset.addto).classList.toggle('on'));
+ document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{const[id,k]=b.dataset.pick.split(':');const c=find(id);const n=c.links.findIndex(l=>l.st==='need'&&k.startsWith('s4'));if(n>=0)c.links.splice(n,1,{k,st:'ok'});else c.links.push({k,st:'ok'});render()});
+ document.querySelectorAll('[data-keep]').forEach(b=>b.onclick=()=>{const c=find(b.dataset.keep);c.changed=false;c.links.forEach(l=>{if(l.st==='chg'){l.st='ok';l.k='s2inputs'}});render()});
+ document.querySelectorAll('[data-appl]').forEach(b=>b.onclick=()=>openAppl(b.dataset.appl));
+ document.querySelectorAll('[data-wt]').forEach(x=>x.onchange=()=>{find(x.dataset.wt).wt=x.checked;render()});
+ document.querySelectorAll('[data-wtc]').forEach(x=>x.oninput=()=>{find(x.dataset.wtc).wtCond=x.value;gapsCount()});
+ document.querySelectorAll('[data-wtc]').forEach(x=>x.onchange=()=>render());
+ document.querySelectorAll('[data-wk]').forEach(x=>x.onchange=()=>{const[id,k]=x.dataset.wk.split(':');find(id).wtKind=k;render()});
+ document.querySelectorAll('[data-sc]').forEach(x=>x.onchange=()=>{const[id,k]=x.dataset.sc.split(':');const c=find(id);c[k]=x.value;const def=c[k+'Default']??TPL[id][k];if(x.value!==def)c.edited[k]=true;else delete c.edited[k];render()});
+ document.querySelectorAll('[data-reset]').forEach(b=>b.onclick=()=>{const[id,k]=b.dataset.reset.split(':');const c=find(id);c[k]=c[k+'Default']??TPL[id][k];delete c.edited[k];render()});
+ document.querySelectorAll('[data-name]').forEach(x=>x.onchange=()=>{find(x.dataset.name).name=x.value;render()});
+ document.querySelectorAll('[data-resetname]').forEach(b=>b.onclick=()=>{const c=find(b.dataset.resetname);c.name=c.nameDefault;render()});
+}
+const TPL={};C.forEach(c=>TPL[c.id]={pass:c.pass,partial:c.partialDefault??c.partial,fail:c.fail});
+function openSrc(k){const s=SRC[k];document.getElementById('dTitle').textContent=s.t;
+ document.getElementById('dBody').innerHTML=`<p class="muted" style="margin:0;font-size:12.5px">${s.sec}</p><p style="margin:4px 0 0;font-size:12.5px"><span class="pill pill-info">${s.ver}</span></p><p class="muted" style="margin:6px 0 0;font-size:12.5px">Template: KYC onboarding and refresh · v7</p><div class="passage">${s.p}</div><p class="explain">The highlighted passage is what the suggestion was based on. It's kept with the link, so a later change is detected.</p><button class="btn btn-secondary btn-sm" style="margin-top:10px">Open in the form</button>`;
+ document.getElementById('drawer').classList.add('on');}
+document.getElementById('dClose').onclick=()=>document.getElementById('drawer').classList.remove('on');
+let applId=null;
+function openAppl(id){applId=id;const c=find(id);document.getElementById('applFor').innerHTML=`<span class="mono">${c.id}</span> · ${esc(c.name)}`;
+ document.querySelectorAll('[name=ak]').forEach(r=>r.checked=r.value===c.ak);document.getElementById('applCond').value=c.cond;document.getElementById('applExc').value=c.exc;document.getElementById('applDlg').classList.add('on');}
+document.getElementById('applCancel').onclick=()=>document.getElementById('applDlg').classList.remove('on');
+document.getElementById('applSave').onclick=()=>{const c=find(applId);const r=document.querySelector('[name=ak]:checked');if(r)c.ak=r.value;c.cond=document.getElementById('applCond').value;c.exc=document.getElementById('applExc').value;document.getElementById('applDlg').classList.remove('on');render()};
+document.getElementById('dismissAdd').onclick=()=>{addDismissed=true;document.getElementById('c-add').style.display='none';gapsCount()};
+document.getElementById('keepAdd').onclick=e=>{e.target.textContent='Kept as internal note';e.target.disabled=true};
+let rev=14;
+document.getElementById('saveBtn').onclick=()=>{rev++;document.getElementById('revNo').textContent=rev;document.getElementById('saved').textContent='Saved 14:32';
+ const g=gaps();document.getElementById('toastMeta').textContent=`Version ${rev} · 15 Nov 2026 14:32 · by Morgan · ${g.length} item${g.length===1?'':'s'} still to finish`;
+ document.getElementById('gapList').innerHTML=g.map(x=>`<li>${x}</li>`).join('')||'<li>Nothing outstanding in these 3 criteria.</li>';
+ const t=document.getElementById('toast');t.classList.add('on');t.scrollIntoView({behavior:'smooth',block:'center'});
+ document.querySelectorAll('[data-jump]').forEach(a=>a.onclick=e=>{e.preventDefault();jump(a.dataset.jump)});};
+document.getElementById('toastClose').onclick=()=>document.getElementById('toast').classList.remove('on');
+document.getElementById('submitBtn').onclick=()=>alert('Mockup: Submit runs the existing submit checks unchanged. Nothing new is added to them.');
+document.getElementById('regen').onclick=e=>{e.target.textContent='Suggestions refreshed · your edits kept';setTimeout(()=>e.target.textContent='Refresh suggestions',2200)};
+function jump(id){const el=document.getElementById(id);if(!el)return;const card=el.closest('.crit');if(card&&!card.classList.contains('open')){card.classList.add('open');const c=find(card.id.slice(2));if(c)c.open=true}
+ el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}
+function show(s){document.getElementById('drawer').classList.remove('on');document.getElementById('applDlg').classList.remove('on');
+ if(s==='links')jump('links-identification_verification');
+ if(s==='need')jump('links-account_authority');
+ if(s==='changed')jump('c-revision_integrity');
+ if(s==='appl'){jump('appl-account_authority');setTimeout(()=>openAppl('account_authority'),500)}
+ if(s==='fail'){const c=find('identification_verification');c.wt=true;render();jump('fail-identification_verification')}
+ if(s==='tech'){jump('tech-identification_verification');setTimeout(()=>document.querySelector('#tech-identification_verification details').open=true,400)}
+ if(s==='setup'){if(addDismissed){addDismissed=false;document.getElementById('c-add').style.display=''}jump('c-add');gapsCount()}
+ if(s==='save')document.getElementById('saveBtn').click();}
+document.querySelectorAll('[data-show]').forEach(b=>b.onclick=()=>show(b.dataset.show));
+render();
+const h=location.hash.slice(1);if(h)setTimeout(()=>show(h),300);
+</script>
+</body>
+</html>

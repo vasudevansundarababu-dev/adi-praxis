@@ -1,14 +1,15 @@
-# Plan: rubric recommendations in Authoring (with D8 template defaults and D9 sourced criterion fields)
+# Plan: simplified rubric editor with recommendations (combined: rubric recommendations, simplified editor, D8, D9)
 
 | Item | Value |
 | --- | --- |
 | Status | **Plan only, awaiting the owner's approval.** No code yet. |
-| Requirement | `docs/prd/PRD-RUBRIC-RECOMMENDATIONS.md` (owner spec, 15 Nov 2026, verbatim) |
+| Requirements | `docs/prd/PRD-RUBRIC-RECOMMENDATIONS.md` and `docs/prd/PRD-SIMPLIFIED-RUBRIC-EDITOR.md` (owner specs, 15 Nov 2026, verbatim). Section 14 reconciles them. |
+| Mockup | `docs/design/mockups/rubric-editor.html` (**owner approval needed before any build**) |
 | Related | QA defects D8 (S7 typed by hand), D9 (technical criterion fields typed with no source) and D6 (S4 picked from the policy library); policy rule annotations plan (PR #81) |
 | Code baseline | `main` at `4b424b00` |
 | Release boundary | Everything ships behind flags that are **off** by default. With the flags off, nothing changes for users, exports or the RL Gym QA deployment. |
 
-Section 10 lists the decisions I took so we don't need a round of questions. Section 11 has the only two points where the owner might want to choose differently.
+Section 10 lists the decisions I took so we don't need a round of questions. Section 11 has the only two points where the owner might want to choose differently. Section 14 lists where the two specs, D8 and D9 conflict and what I decided. Section 15 maps the simplified-editor acceptance criteria to tests.
 
 ---
 
@@ -46,39 +47,53 @@ Section 10 lists the decisions I took so we don't need a round of questions. Sec
 7. **An existing "AI suggests, human decides" pattern** to copy: `apps/api/src/policy/rule-assistant.ts` (interface +
    Vertex implementation + mock, model from config, suggestions stored, a person decides).
 
-## 2. Where the UI lives
+## 2. Where the UI lives: the simplified rubric editor
 
-No new screen and no new approval stage. All of it sits inside the existing S7 step and the existing read-only views.
+**Mockup for approval:** `docs/design/mockups/rubric-editor.html`. It's a clickable mockup on the KYC v7 Custodian
+task, showing `identification_verification`, `revision_integrity` and `account_authority` plus one suggested
+addition. The picker bar at the bottom jumps to each requested state.
 
-**Candidate app, task form, S7 (the editing surface).** This is where the SME edits the rubric today, so it's where
-recommendations go.
+No new screen and no new approval stage. The editor *is* S7 ("Rubric") in the candidate task form, where the SME
+edits the rubric today. The console and Reviewer views show the same layout read-only.
 
-- **Criterion list (D8):** S7 opens with the template's criteria already listed. Each row shows a status chip:
-  *Template*, *Template default (unchanged)*, *Edited*, *Accepted suggestion*, *Custom*, *Internal only — not sent to
-  RL Gym*, *Source changed — check rubric*.
-- **Criterion editor:** the existing item fields (ID, name, Pass/Partial/Fail or levels, weight where the template has
-  weights, Critical, evidence links) plus an **"Assessment details"** block for the new internal fields from spec §4:
-  what is assessed, workflow step and agent role, skill, mandatory/conditional, condition and exceptions,
-  critical-failure trigger, evidence required, source links, why it's recommended, and unresolved questions. The
-  block is clearly marked **"Kept in ADI Forge — RL Gym doesn't receive this yet."**
-- **"Recommendations" side panel:** a Generate/Refresh button, then cards. Each card shows the derivation chain
-  (Source section → step/role → skill → rubric, plus policy rule and required output where they apply), its links,
-  and an *AI suggestion* label when a model wrote it. Actions: **Accept**, **Accept with edits**, **Dismiss**. Proposed
-  changes to an existing criterion show as a field-by-field diff; they never overwrite anything.
-- **Coverage bar:** "N mandatory requirements, M covered", with each gap, unresolved item and possible duplicate
-  weighting listed and linked to its source. S7's progress never reads "complete" while there are gaps; it reads
-  "Filled — 2 coverage gaps".
-- **Source links open the source in Authoring.** A task field link switches the form to that section and scrolls to
-  and highlights the field or item. A policy rule or document link opens the task's policy view at that rule, with the
-  document page or section. A template link opens a read-only template-field popover with the template ID and version.
+**Each criterion is a collapsible card.** The header shows the read-only ID, the name, an applicability pill and
+status chips: *Template default*, *Edited*, *Whole-task failure*, *Source changed — check rubric*, *Source link
+needed*, *AI suggestion*, *Internal only — not sent to RL Gym*, *Evaluation setup needed*. The body has the
+simplified-editor fields in the owner's order:
 
-**Console (PM/Admin) task page and Reviewer page (read-only).** The S7 render in `AuthoredForm` and `review-page`
-gains the same status chips, an "Assessment details" disclosure, the coverage summary, and "changed from template
-default" markers (from D8). Policy links in the console open `/projects/[id]/policy/rules/[ruleId]`. The decision
-buttons and their meaning don't change.
+| # | Field | Behaviour | Stored in |
+| --- | --- | --- | --- |
+| 1 | Criterion name | From the template (D8 default); editable, with "Reset". The ID is read-only. | S7 item `name` (exported, as today) |
+| 2 | What should the agent do? | Plain-English behaviour, editable. | annotation `assesses` (internal) |
+| 3 | Derived from | Suggested source links as readable chips (**S2 · Inputs**, **S3 · Permitted tools**, **S4 · Policy rules · GB-02**, **Workflow · Verify identity**, **S6 · Required output**). Each is ✓ confirm or ✕ remove; "+ Add source" picks from readable names, never typed IDs. **Source link needed** when none is reliable. Below it: the chain *source → step/role → skill → this criterion* and "Why suggested". | annotation `sources` (internal). Confirmed rule, step and evidence IDs also fill `evidenceRefs` (D9). |
+| 4 | When does this apply? | A readable statement, an applicability pill and **Change**. The dialog offers the four kinds (required throughout; required when a condition applies; permitted option; human officer or other role), the condition and exceptions. The Not applicable, Unknown and missing-evidence wording is shown. | annotation (internal) |
+| 5 | How should we score it? | Pass, Partial and Fail text, labelled with the template's points (5/2/0 for KYC, levels 0–4 for Marketing). Each shows *Template default* or *Edited · Reset to template*. | S7 item `passCondition` / `partialCredit` / `failCondition` (or `level*`), exported as today |
+| 6 | Whole-task failure | "Make this a whole-task failure when…" with a required condition. A radio says whether it's what a **Fail (0)** on this criterion means (*Supported*) or a behaviour the Fail doesn't cover (**Evaluation setup needed**, kept as a note). The line below explains this template's rule. | S7 item `critical` (exported, unchanged meaning); the condition is in the annotation |
+| 7 | What evidence should support the score? | Editable. | annotation `evidenceRequired` (internal) |
+| 8 | How it will be checked | Read-only sentence built from the template mapping (e.g. "RL Gym scores this from the recorded run … KYC rubric evaluator, version 1"). It never says "Ready". With no mapping: **Evaluation setup needed**. | computed |
+| 9 | Technical grading settings · From template | Collapsed by default and read-only: evaluator, version, evidence source, output field, comparison, expected value, weight, scale, whole-task flag, and the evidence or rule IDs sent. Each is "Not used" when it doesn't apply (`run_evidence`). There's a lock note. | S7 item `evaluatorKind`, `evaluatorVersion`, binding fields, `weight` (exported, filled from the template) |
 
-**Template builder (`components/templates/compiler/*`):** no change in this phase. (Admin editing of template
-defaults is the open point in section 11.)
+**Above the cards:** a summary ("20 criteria … Pass 5 · Partial 2 · Fail 0, 100 points"), a coverage pill, an "N to
+finish" pill and **Refresh suggestions**. **Below them:** suggested additions. On a fixed evaluator map these are
+internal only and *Evaluation setup needed*. **Save** is the existing save: an incomplete draft saves, and a panel
+lists what's still to finish, each item linked:
+- missing or unconfirmed source links;
+- undefined applicability;
+- missing score text;
+- an empty or unsupported whole-task condition;
+- missing technical mapping.
+
+Submit runs the existing checks unchanged.
+
+**Source links open the source in Authoring.** A side panel shows the passage with its section, task revision or
+rule/document version, and the template version, with the derivation-time passage highlighted. "Open in the form"
+goes to that section and field. In the console, a policy link opens `/projects/[id]/policy/rules/[ruleId]`.
+
+**Console (PM/Admin) task page and Reviewer page:** the same cards read-only (`AuthoredForm`, `review-page`), with
+"Edited from template default" markers (D8) and the to-finish list. The decision buttons and their meaning don't change.
+
+**Template builder (`components/templates/compiler/*`):** no change. Template admins keep their current permissions
+over the template's technical configuration.
 
 ## 3. Data model (internal only, new tables, additive migration)
 
@@ -119,12 +134,14 @@ model RubricCriterionAnnotation {
 ```
 
 `AnnotationDetails` (Zod in `packages/shared/src/rubric/`): `assesses`, `stepId?`, `roleId?`, `skill`,
-`applicability: MANDATORY | CONDITIONAL`, `condition?`, `exceptions?`, `critical?: { trigger: ZERO | PARTIAL_OR_ZERO |
-PROHIBITED_BEHAVIOUR, behaviour?: string }`, `evidenceRequired`, `explanation`, `unresolved: string[]`,
+`applicability: REQUIRED | REQUIRED_WHEN | PERMITTED_OPTION | OTHER_ROLE | UNSET` (UNKNOWN for a derived requirement
+whose applicability can't be decided), `condition?`, `exceptions?`, `wholeTaskFailure?: { condition: string, kind:
+FAIL_OF_CRITERION | OTHER_BEHAVIOUR }` (OTHER_BEHAVIOUR = evaluation setup needed; never exported), `evidenceRequired`, `explanation`, `unresolved: string[]`,
 `coversRequirements: string[]` (requirement keys), and `stateRules` (fixed wording of the §7 scoring states:
 Not applicable, Unknown, Missing evidence ≠ incorrect behaviour).
 
-`SourceLink`: `kind` (TEMPLATE_FIELD | TEMPLATE_EXECUTION | TASK_FIELD | WORKFLOW_NODE | WORKFLOW_ROLE | POLICY_RULE |
+`SourceLink` also has `state: SUGGESTED | CONFIRMED | NEEDED` (NEEDED = a "Source link needed" placeholder naming the
+missing kind) and a readable `label` (e.g. "S4 · Policy rules · GB-02"). `kind` (TEMPLATE_FIELD | TEMPLATE_EXECUTION | TASK_FIELD | WORKFLOW_NODE | WORKFLOW_ROLE | POLICY_RULE |
 POLICY_DOCUMENT | OUTPUT_FIELD), `templateId`, `templateVersion`, `taskId?`, `taskRevision?`, `section?`, `field?`,
 `itemPath?` (e.g. `S5.steps[2].action`), `stepId?`, `roleId?`, `ruleKey?`, `ruleVersionId?`,
 `documentVersionId?`, `locator?` (page, section, from `PolicyCitation.locator`), `excerpt` (at most 280 characters),
@@ -380,7 +397,7 @@ template-default provenance.
 2. API: migration (two tables), config flags, service and routes (authorisation, idempotency, audit), source-change
    detection, restore, the `RubricAssistant` interface with a mock and a Vertex implementation, and D8 seeding and
    submit ID checks behind the flag.
-3. Candidate app: D9 pickers (evidence or rule links, output field) and hiding of fields that don't apply, S7 status chips, Assessment details, Recommendations panel, coverage bar, source-link navigation,
+3. Candidate app: the simplified editor cards as in the approved mockup (the 9 fields, the Change dialog, whole-task failure, collapsed technical settings, the source panel, the to-finish list on save), then D9 sourcing, suggested additions, coverage and source-link navigation,
    reset to default, restore.
 4. Console and Reviewer: read-only chips, details, coverage and "changed from default".
 5. Export-compatibility tests (section 9), the docs (`docs/integrations/` note of what RL Gym doesn't receive, and a
@@ -405,3 +422,38 @@ Every API test uses a per-run docker `pgvector/pgvector:pg16` on a free port wit
 | 10 | Section 9 tests 1–4. |
 | 11 | Submit and decision routes unchanged (existing review tests pass). No new statuses or stages; the enum and route diff is asserted in a test. |
 | 12 | Flags-off tests (section 9.5). The migration is additive only (a test checks no existing column changes). The full suites stay green. No deploy. |
+
+## 14. Reconciling the two specs, D8 and D9
+
+The decisions are also in `docs/DECISIONS.md`. Where the specs differ, the simplified-editor spec (the later one) wins
+on what the author sees. The recommendations spec wins on how suggestions are derived and stored.
+
+| # | Conflict | Decision |
+| --- | --- | --- |
+| 1 | **Field list.** Recommendations §4 lists 14 fields (incl. step/role, skill, exceptions, why, unresolved). The editor §1 lists 9 in a fixed order. | The editor shows only the 9, in order. Step/role and skill appear in the "Derived from" chain; exceptions in the Change dialog; "why" under the links; unresolved items in the to-finish list. Nothing is lost and no extra top-level fields are added. |
+| 2 | **Critical trigger.** Recommendations §4 asks whether zero, partial or a specific behaviour triggers it. Editor §5 says don't assume partial triggers it, and reflect only what the contract supports. | The editor offers only what the template supports. For KYC v6/v7 that's "a Fail (0) on this criterion fails the whole task", per the S7 scoring rule. "Partial triggers it" isn't offered. A behaviour the Fail doesn't cover is saved as a note and flagged **Evaluation setup needed**. Only the existing `critical` flag is exported. |
+| 3 | **Criterion name.** D8 said ID and name read-only. Editor §1 says the name is editable under existing permissions. | The ID stays read-only. The name is editable, as it is today, with "Reset to template" and an "Edited from template" marker for the Reviewer and PM. This is D8's "template default, SME edits" applied to the name. |
+| 4 | **Applicability kinds.** Recommendations uses mandatory/conditional plus §7 rules. The editor names four kinds. | Four kinds (required throughout, required when, permitted option, human officer or other role), plus UNKNOWN for derived requirements and UNSET for a new suggestion. The Not applicable, Unknown and missing-evidence treatment stays as the template's scoring rule defines it, and nothing in the export changes. |
+| 5 | **"Evidence or rule links" (D9 picker) vs "Derived from" (editor §2).** These are two link controls for one idea. | One control: "Derived from". Confirmed links of exportable kinds (policy rule keys, step IDs, evidence IDs) fill the existing `evidenceRefs` list. Suggested-but-unconfirmed links don't. `evidenceRefs` is then shown read-only under Technical settings ("Evidence or rule IDs sent"). Existing saved values are kept. The field's meaning ("IDs this criterion checks") is unchanged, so nothing is repurposed. |
+| 6 | **Technical fields.** D9 auto-fills and hides them. The editor puts them in a collapsed read-only "From template" section. | Collapsed and read-only in "Technical grading settings · From template", shown with "Not used" rather than hidden. It's filled only from the exact template mapping, never guessed; with no mapping it reads **Evaluation setup needed**. This is D9's sourcing with the editor's presentation. |
+| 7 | **Weights.** Editor §4 says load the template's weights. Plan option B left v7's weight (help prose only) unfilled. | Weight is shown read-only from structured template data: D8 `criterionDefaults`, `groups` or `weightTotal`. The mockup assumes a template version carrying D8 defaults (weight 5). On today's v7 without defaults, weight stays author-entered with the prose shown as a note, unless the owner picks option B. |
+| 8 | **New criteria.** Recommendations proposes additions; editor §4 says keep unsupported changes out of the executable export. | Additions are shown separately under the cards, labelled *AI suggestion* / *Internal only — not sent to RL Gym* / *Evaluation setup needed*. They never enter `S7.criteria` on a fixed evaluator map. |
+| 9 | **History.** Editor §7 asks to record author, timestamp and version, and keep the AI original. | Annotation versions record author and time. The S7 values keep the task revision and `TaskSubmission` history. Run items are frozen, so the original AI suggestion stays separate from edits. No new history system. |
+| 10 | **Validation.** Recommendations treats coverage gaps as warnings; editor §7 asks for draft saving with gaps listed. | These agree. Save always works (existing autosave), and the to-finish list is computed. Submit, approval and export validation are unchanged and are never bypassed. |
+
+## 15. Test plan: simplified-editor acceptance criteria
+
+| AC | Tests |
+| --- | --- |
+| 1 | The candidate S7 render of a v7 task has no editable input for evaluator, version, output field, comparison or expected value. It's a component test, plus an API check that the annotation and S7 endpoints refuse writes to them from an author. |
+| 2 | Auto-filled `evaluatorKind`/`evaluatorVersion` survive save/reload, pass the existing submit check, and appear in the export package byte-for-byte as when typed correctly. Legacy values on hidden fields are kept. |
+| 3 | Derivation suggests links for the v7 fixture (S2, S3, S4 rules, workflow steps, S6). Confirm, remove and add (picker only, no free-text path in the API schema) all work. A link's GET resolves to the versioned passage. Clicking it opens the source panel and "Open in the form" focuses the field. |
+| 4 | Edit a linked S2 field: the criterion is flagged "Source changed"; its S7 values and annotation are unchanged; "Reviewed, keep" re-snapshots and is audited. |
+| 5 | Score labels and defaults follow the field's scale: 5/2/0 on KYC, 0–4 levels and groups on Marketing. Reset to template restores the default. KYC defaults on a 0–4 field are refused. |
+| 6 | Whole-task failure: ticking it without a condition is listed as incomplete. FAIL_OF_CRITERION sets the existing `critical` flag. OTHER_BEHAVIOUR is flagged "Evaluation setup needed" and doesn't change the exported payload. The explanation text matches the template's scoring rule. |
+| 7 | A criterion ID without a mapping shows "Evaluation setup needed" and empty technical settings, with no default invented. "How it will be checked" never contains "Ready". |
+| 8 | Saving with every to-finish category present succeeds (autosave 200), lists each gap, and submit still fails on the existing checks (e.g. empty Fail text on a joint template). |
+| 9 | The export golden tests (section 9) pass with the new data present. RL Gym's offline validation fixture (`synthetic-offline-validation.json`) accepts the package unchanged. |
+| 10 | No new task statuses, review stages or decision routes (enum and route snapshot test). |
+| 11 | No change under RL Gym contract fixtures (contract files byte-identical; template hashes unchanged). |
+| 12 | Flags-off tests: S7 renders as today and the endpoints return 404. The migration is additive only. No deploy. |

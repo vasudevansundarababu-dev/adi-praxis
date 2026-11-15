@@ -481,6 +481,10 @@ model Template {
   /// One task per value of a required pick list ({ field, source, values }): the project gets one slot per value
   /// (KYC five-state contract, 13 Nov 2026). Null for templates without a case selector.
   caseSelector          Json?          @map("case_selector")
+  /// MVP1 step 7: the tutorial video shown on every task of this template (display metadata; not versioned).
+  tutorialVideoUrl      String?        @map("tutorial_video_url")
+  /// [{ title, at }] chapters of the tutorial video, `at` in seconds.
+  tutorialChapters      Json?          @map("tutorial_chapters")
   publishedAt           DateTime?      @map("published_at")
   retiredAt             DateTime?      @map("retired_at")
   /// Harbor blueprint (packages/shared/src/blueprint). Null for templates outside the Meta-Compiler catalog.

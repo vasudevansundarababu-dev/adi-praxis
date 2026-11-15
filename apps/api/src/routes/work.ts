@@ -22,6 +22,7 @@ import { AUTHORSHIP_VERSION } from '../tasks/conversation/authorship';
 import { chatOf, draftingWith } from '../tasks/conversation/service';
 import { authoringPolicyView, effectivePolicy, sidecar } from '../policy/task-policy';
 import { profileSaveProblems } from '../tasks/profile-output';
+import { tutorialOf } from '../forge/tutorial';
 
 const IdParams = z.object({ id: z.string().uuid() });
 
@@ -157,6 +158,8 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       startingGraph: t.taskType === 'AUTHORING' ? templateStartingGraph(t.project.template.workflowName, t.project.templateVersion, t.project.template.profileId) : null,
       authoringWorkspace: (t.drafting as { workspace?: unknown } | null)?.workspace ?? null,
       tptMinutes: t.project.tptMinutes,
+      // MVP1 step 7: the template's tutorial video, or null.
+      tutorial: tutorialOf(t.project.template),
       definition: definitionFor(template).key,
       template: {
         workflow: template.workflowName,

@@ -8,6 +8,7 @@ import {
   profileForTemplate,
   profileForWorkflow,
   publishProblems,
+  SetTutorialRequest,
   TemplateDto,
   UpdateTemplateRequest,
 } from '@praxis/shared';
@@ -19,6 +20,7 @@ import type { Db, Tx } from '../db';
 import { AppError, conflict, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { loadUploadedProfiles } from '../templates/uploaded-profiles';
+import { tutorialOf } from '../forge/tutorial';
 
 type TemplateWithDomain = Template & { domain: Domain };
 
@@ -62,6 +64,7 @@ export function toTemplateDto(t: TemplateWithDomain): TemplateDto {
     openSlotShare: Number(t.openSlotShare),
     similarityThreshold: Number(t.similarityThreshold),
     profileId: t.profileId,
+    tutorial: tutorialOf(t),
     publishedAt: t.publishedAt?.toISOString() ?? null,
     retiredAt: t.retiredAt?.toISOString() ?? null,
     createdAt: t.createdAt.toISOString(),
@@ -325,6 +328,7 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
             edgeCaseCatalog: copy.edgeCaseCatalog as Prisma.InputJsonValue,
             // Same form, same case selector (null stays null).
             caseSelector: copy.caseSelector === null ? Prisma.DbNull : (copy.caseSelector as Prisma.InputJsonValue),
+            tutorialChapters: copy.tutorialChapters === null ? Prisma.DbNull : (copy.tutorialChapters as Prisma.InputJsonValue),
             version: versions[0]!.version + 1,
             status: 'DRAFT',
           } as Prisma.TemplateUncheckedCreateInput,
@@ -339,6 +343,36 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
           after: body,
         });
         return { status: 201, body };
+      });
+      return reply;
+    },
+  );
+
+  // MVP1 step 7: the tutorial video every task of this template shows. Display metadata, not part of the authored
+  // contract: it is set on every version of the workflow (projects keep the version they use), with no new version.
+  app.put(
+    '/templates/:id/tutorial',
+    { config: { access: ADMIN }, schema: { tags: ['templates'], params: IdParams, body: SetTutorialRequest, response: { 200: TemplateDto } } },
+    async (req, reply) => {
+      await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+        const t = await findTemplate(tx, req.params.id, actor.clientId);
+        if (!t) throw notFound('Template not found');
+        await lockLineage(tx, t.lineageId);
+        const videoUrl = req.body.videoUrl;
+        const chapters = videoUrl ? [...(req.body.chapters ?? [])].sort((a, b) => a.at - b.at) : [];
+        const { count } = await tx.template.updateMany({
+          where: { lineageId: t.lineageId, clientId: actor.clientId },
+          data: { tutorialVideoUrl: videoUrl, tutorialChapters: videoUrl ? (chapters as Prisma.InputJsonValue) : Prisma.DbNull },
+        });
+        const after = (await findTemplate(tx, t.id, actor.clientId))!;
+        await audit({
+          entityType: 'Template',
+          entityId: t.id,
+          action: 'template.tutorial_set',
+          before: { tutorial: tutorialOf(t) },
+          after: { tutorial: tutorialOf(after), lineageId: t.lineageId, versions: count },
+        });
+        return { status: 200, body: toTemplateDto(after) };
       });
       return reply;
     },

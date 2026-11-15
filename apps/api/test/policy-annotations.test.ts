@@ -403,6 +403,8 @@ describe('no new approval stage; Apply and the retired required flag (AC12, A1, 
     expect(preview.blocking).toEqual([]);
     expect(preview.markingCounts).toMatchObject({ not_annotated: 1, needs_clarification: 1, permitted_option: 1 });
     expect((await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: null })).statusCode).toBe(201);
+    const sets = (await api(pmCookie).get(`/projects/${projectId}/policy/rule-sets`)).json().items;
+    expect(sets[0]).toMatchObject({ version: 1, ruleCount: 3, markingCounts: { not_annotated: 1, needs_clarification: 1, permitted_option: 1 } });
     const actions = (await db.auditEvent.findMany({ where: { clientId }, select: { action: true } })).map((a) => a.action);
     expect(actions.filter((a) => /approv/i.test(a))).toEqual([]);
   });

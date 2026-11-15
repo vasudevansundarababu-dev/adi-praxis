@@ -1925,3 +1925,42 @@ D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos ar
   `docs/design/mascot/`.
 - **(chosen by Claude, D13)** Tutorial stays at the top of the page: it opens an inline video card, which would cover
   the form if it floated.
+## Template Studio: design defaults (15 Nov 2026)
+
+Design for approval: `docs/design/TEMPLATE-STUDIO.md`; mockup `docs/design/mockups/template-studio.html`. **Awaiting
+the owner's approval; no feature code.** The owner, 15 Nov 2026: "I want this as utility. We should see SME form while
+we author template so that it becomes easier. Only when we see all aspects then only we will author."
+
+- **(owner, via the brief)** Side-by-side Studio: the template on the left, a live preview of the exact SME task form on
+  the right. Seven aspects (what to capture, policies and rules, rubric and scoring, environment and tools, coverage and
+  edge cases, outputs, safety) must all be complete, and a person must approve, before Publish opens. AI only suggests.
+- **(chosen by Claude)** **Where it lives.** A console page under Templates, for Admins; PMs see it read-only. SMEs and
+  Reviewers never see it.
+- **(chosen by Claude)** **Who approves.** Any Admin, the author included. Approval is tied to the exact compiled draft
+  (`compiledSha256`) and any later change voids it. A four-eyes rule can be added later if the owner wants it.
+- **(chosen by Claude)** **Warnings vs blockers.** Only blockers keep an aspect incomplete. A warning can be fixed or
+  accepted with a reason, which is recorded on the version. Info never blocks.
+- **(chosen by Claude)** **Model.** Template = compile(domain pack @ version, workflow blueprint, coverage plan, form
+  choices). The pack (policy rule sets, tool catalogue, fixture schemas, safety rules, criterion library) is versioned
+  and reused. A template pins one pack version; a new pack version never changes a published template.
+- **(chosen by Claude)** **One scale per pack.** KYC: 5/2/0, 20 criteria × 5. Marketing: 0–4, groups A–G weighted to
+  100. The Studio has no control to change a scale, and lint `TS_SCALE_MIXED` refuses a criterion from another family.
+- **(chosen by Claude)** **Robustness test.** Phase 2 is done only when KYC v7 and VEYRA rebuilt in the Studio compile
+  to their stored profiles (canonical JSON), or every difference is listed and accepted by the owner.
+- **(chosen by Claude)** **RL Gym.** No contract or export change. RL Gym still proposes templates and owns execution
+  and evaluators; the Studio shows those parts read-only and edits only the authoring part. A proposed evaluator mapping
+  is a note for RL Gym, never written into the execution part. Templates built only in the Studio can run projects but
+  keep `exportCapabilities.executable: false` until RL Gym adopts them. So phases 1–3 need nothing from RL Gym.
+- **(chosen by Claude)** **Versions on approved tasks.** Template, pack, rule set, rubric hash, capability catalogue
+  and compiler versions are recorded on the Authoring side (`ApprovedTaskRecord` gains nullable columns and stays
+  append-only). They are not added to the export without a contract change.
+- **(chosen by Claude)** **AI blueprint drafting.** It uses the existing authoring model route (Gemini on Vertex in QA)
+  and is behind `STUDIO_AI_ENABLED`, off by default. Tests use the mock. Each suggestion is accepted or rejected by a
+  person.
+- **(chosen by Claude)** **Calibration** (golden task, RL Gym dry run, reviewer agreement) is shown as "later, needs
+  RL Gym" (phase 5) and doesn't block Publish until the owner decides.
+- **Found while rebuilding the real templates (no change made):**
+  - KYC v7's `caseSelector` has no `labels`, so the labels come from the S1 pick list.
+  - GB-01 to GB-07 have IDs, versions and SHA-256 but no titles anywhere in the repo.
+  - `kyc-v7-selector.test.ts` expects the created draft at version 2, while the fixture profile says `version: 3`.
+    These are two different numbers (the template version and the form version), so this is noted, not a defect.

@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Template Studio · ADI Forge (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
+<style>
+/* Console chrome: light theme values from packages/shared/theme/theme.css (as project-screen.html).
+   Preview pane (.pv): the candidate app's dark theme (as sme-task-form.html). Mockup only. */
+:root{--bg:#f5f7fa;--text:#0a2170;--muted:#5b6b77;--border:#8597a3;--link:#1d68b0;--focus:#2a80d0;--accent:#3fac95;--error:#b91c1c;--warning:#b45309;--success:#15803d;--hairline:#dde4ec;--elevated:#fff;--shadow:0 1px 2px rgb(10 33 112 / .06),0 8px 24px -12px rgb(10 33 112 / .18)}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-size:14px;line-height:1.5}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+button,input,select,textarea{font-family:inherit}
+.demo{background:var(--warning);color:#fff;text-align:center;font-size:12px;font-weight:500;padding:4px 12px}
+header{background:#0a2170;color:#fff}
+.hwrap{padding:10px 16px 6px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
+.brand img{height:26px}
+.who{margin-left:auto;font-size:13px;color:rgb(255 255 255 / .75);display:flex;gap:14px}
+nav.main{padding:0 16px 6px;display:flex;gap:4px;font-size:13px;flex-wrap:wrap}
+nav.main span{padding:5px 10px;border-radius:8px;color:rgb(255 255 255 / .8)}
+nav.main span.on{background:rgb(255 255 255 / .14);color:#fff;font-weight:600}
+.rail{height:4px;background:linear-gradient(90deg,#0a2170 0%,#2a80d0 50%,#3fac95 100%)}
+.muted{color:var(--muted)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.card{background:var(--elevated);border:1px solid var(--hairline);border-radius:14px;box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:11px;padding:8px 15px;font-weight:600;font-size:13.5px;cursor:pointer;border:0;white-space:nowrap}
+.btn-primary{color:#fff;background:linear-gradient(90deg,#1f64b8 0%,#2a80d0 45%,#2f9c8a 100%);box-shadow:0 8px 20px -10px rgb(42 128 208 / .8)}
+.btn-secondary{border:1px solid var(--hairline);background:var(--elevated);color:var(--text)}
+.btn-secondary:hover{border-color:var(--focus)}
+.btn-sm{padding:5px 11px;font-size:12.5px;border-radius:9px}
+.btn[disabled]{opacity:.45;cursor:not-allowed;box-shadow:none}
+.btn-link{background:none;border:0;color:var(--link);cursor:pointer;padding:0;font-size:12.5px;font-weight:500}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:600;line-height:20px;white-space:nowrap;background:color-mix(in srgb,var(--pill,var(--muted)) 14%,transparent)}
+.pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--pill,var(--muted))}
+.pill-info{--pill:var(--link)}.pill-success{--pill:var(--success)}.pill-warning{--pill:var(--warning)}.pill-error{--pill:var(--error)}.pill-brand{--pill:var(--accent)}.pill-ai{--pill:#9333ea}
+/* Studio bar */
+.sbar{padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--hairline);background:#fff}
+.sbar h1{font-family:'Geist',sans-serif;font-size:18px;font-weight:600;margin:0}
+.sbar select{border:1px solid var(--hairline);border-radius:9px;padding:5px 8px;font-size:13px;color:var(--text);background:#fff}
+.sbar .grow{flex:1}
+.seg{display:inline-flex;border:1px solid var(--hairline);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:#fff;color:var(--muted);font-size:12.5px;font-weight:600;padding:5px 11px;cursor:pointer}
+.seg button.on{background:#0a2170;color:#fff}
+.pubwrap{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.pubhint{font-size:11.5px;color:var(--muted);max-width:22rem;text-align:right}
+/* Aspects */
+.aspects{padding:8px 16px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:#fbfcfe;border-bottom:1px solid var(--hairline)}
+.asp{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--hairline);background:#fff;border-radius:999px;padding:4px 11px 4px 7px;font-size:12.5px;font-weight:600;color:var(--text);cursor:pointer}
+.asp:hover{border-color:var(--focus)}
+.asp.on{outline:2px solid var(--focus);outline-offset:1px}
+.asp .st{width:16px;height:16px;border-radius:999px;display:inline-grid;place-items:center;font-size:10px;color:#fff}
+.asp .st.ok{background:var(--success)}.asp .st.gap{background:var(--warning)}.asp .st.later{background:#b6c3cc}
+.asp .n{font-size:11px;color:var(--warning)}
+.asp.later{color:var(--muted);cursor:default;border-style:dashed}
+.aspsum{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.asppop{margin:0 16px;display:none}
+.asppop.on{display:block}
+.asppop .card{padding:10px 14px;margin-top:8px}
+.asppop ul{margin:6px 0 0;padding-left:18px;font-size:13px}
+.asppop li{margin:3px 0}
+/* Split */
+.split{display:grid;grid-template-columns:minmax(0,46fr) minmax(0,54fr);height:calc(100vh - 205px);min-height:520px}
+.left{overflow:auto;padding:14px 16px 90px;border-right:1px solid var(--hairline)}
+.right{overflow:auto;background:#212227;position:relative}
+.parts{display:flex;gap:2px;border-bottom:1px solid var(--hairline);margin-bottom:14px;flex-wrap:wrap}
+.parts button{border:0;background:none;border-bottom:3px solid transparent;padding:8px 11px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;display:flex;gap:6px;align-items:center}
+.parts button.on{color:var(--text);border-bottom-color:#2a80d0}
+.parts .b{font-size:10.5px;background:color-mix(in srgb,var(--warning) 18%,transparent);color:var(--warning);border-radius:999px;padding:0 6px}
+.blk{padding:14px 16px;margin-bottom:12px}
+.blk h2{font-family:'Geist',sans-serif;font-size:15px;font-weight:600;margin:0 0 2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.blk .sub{font-size:12.5px;color:var(--muted);margin:0 0 8px}
+.row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--hairline);font-size:13px;flex-wrap:wrap}
+.row:first-of-type{border-top:0}
+.row .grow{flex:1;min-width:12rem}
+.chk{display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer}
+.chk input{margin-top:3px;accent-color:#2a80d0}
+.tg{display:grid;grid-template-columns:repeat(auto-fill,minmax(13.5rem,1fr));gap:4px 12px}
+.tg label{display:flex;gap:6px;align-items:baseline;font-size:12.5px;padding:3px 0}
+.tg label input{accent-color:#2a80d0}
+.tg .use{font-size:11px;color:var(--muted)}
+.tg .use.no{color:var(--warning);font-weight:600}
+.chip{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;border:1px solid var(--hairline);border-radius:7px;padding:0 6px;margin:1px 2px 1px 0;background:#f8fafc}
+.chip.crit{border-color:color-mix(in srgb,var(--accent) 50%,transparent);background:color-mix(in srgb,var(--accent) 8%,#fff)}
+.chip.warn{border-color:var(--warning);color:var(--warning);border-style:dashed}
+.chip.hum{border-color:#9333ea;color:#7e22ce;background:#faf5ff}
+.lk{font-size:12px}
+input[type=text],textarea,.left select{font-size:13px;color:var(--text);background:#fff;border:1px solid var(--hairline);border-radius:9px;padding:6px 9px;width:100%}
+textarea{min-height:64px;resize:vertical}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--focus);outline-offset:1px}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--hairline);background:#f8fafc}
+table.t td{padding:6px 8px;border-top:1px solid var(--hairline);vertical-align:top}
+.lock{font-size:12px;color:var(--muted);background:#f8fafc;border:1px dashed var(--hairline);border-radius:9px;padding:7px 10px;margin-top:6px}
+.find{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;padding:10px 0;border-top:1px solid var(--hairline);font-size:13px}
+.find:first-of-type{border-top:0}
+.sev{font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;height:fit-content;text-transform:uppercase;letter-spacing:.02em}
+.sev.B{background:#fee2e2;color:#991b1b}.sev.W{background:#fef3c7;color:#92400e}.sev.I{background:#e0f2fe;color:#075985}.sev.D{background:#dcfce7;color:#166534}
+.find .act{grid-column:2;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.find .done{color:var(--success);font-weight:600}
+.sug{border:1px dashed #9333ea;border-radius:11px;padding:9px 11px;margin-top:8px;background:#fdfaff;font-size:13px}
+.sug .hd{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.graph{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;margin-top:6px}
+.node{border:1px solid var(--hairline);border-radius:9px;padding:4px 8px;background:#fff}
+.node.dec{border-color:#2a80d0;transform:skew(-8deg)}
+.node.hum{border-color:#9333ea;background:#faf5ff}
+.node.out{border-color:var(--accent);background:#f0fbf8}
+.arr{color:var(--muted)}
+.flash{animation:flash 1.8s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px #fbbf24}100%{box-shadow:0 0 0 0 transparent}}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:64px;z-index:40;background:#0a2170;color:#fff;border-radius:12px;padding:9px 16px;font-size:13px;display:none;box-shadow:var(--shadow);max-width:min(36rem,92vw)}
+.toast.on{display:block}
+.overlay{position:fixed;inset:0;background:rgb(10 33 112 / .35);display:none;align-items:center;justify-content:center;z-index:30;padding:16px}
+.overlay.on{display:flex}
+.dialog{width:min(580px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:var(--shadow);padding:18px 20px}
+.dialog h2{font-family:'Geist',sans-serif;font-size:17px;margin:0 0 4px}
+.dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.tour{position:fixed;left:12px;right:12px;bottom:10px;background:#0a2170;color:#fff;border-radius:14px;padding:6px 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;z-index:25}
+.tour button{font-size:12px;border:1px solid rgb(255 255 255 / .25);background:transparent;color:#fff;border-radius:999px;padding:3px 10px;cursor:pointer}
+.tour button:hover{background:rgb(255 255 255 / .12)}
+.approved{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--success);font-weight:600}
+/* ── Preview pane: candidate dark theme ── */
+.pv{--bg:#212227;--text:#e6eaee;--muted:#8a9ca8;--border:#3a3d46;--link:#5aa3e6;--accent:#3fac95;--warning:#fbbf24;--success:#4ade80;--error:#f87171;--hairline:#363944;--elevated:#2c2e36;color:var(--text);font-size:13.5px}
+.pvbar{position:sticky;top:0;z-index:5;background:#1b1c20;border-bottom:1px solid #363944;padding:8px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:#e6eaee;font-size:12.5px}
+.pvbar select{background:#24262c;color:#e6eaee;border:1px solid #3a3d46;border-radius:8px;padding:3px 6px;font-size:12.5px}
+.pvbar .live{display:inline-flex;align-items:center;gap:6px;color:#4ade80;font-weight:600}
+.pvbar .live::before{content:'';width:7px;height:7px;border-radius:99px;background:#4ade80;animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.pv .app{max-width:46rem;margin:0 auto;padding:14px 16px 150px}
+.pv .apphd{display:flex;align-items:center;gap:10px;border-bottom:1px solid #363944;padding-bottom:8px;margin-bottom:12px;font-size:12.5px}
+.pv .apphd .brand{font-size:13.5px;color:#e6eaee}
+.pv .inf{width:22px;height:12px;border-radius:7px;border:3px solid #3fac95;border-right-color:#2a80d0;border-bottom-color:#2a80d0}
+.pv h3{font-family:'Geist',sans-serif;font-size:18px;margin:0;font-weight:600}
+.pv h4{font-family:'Geist',sans-serif;font-size:15px;margin:0 0 2px;font-weight:600}
+.pv .muted{color:#8a9ca8}
+.pv .card{background:#2c2e36;border-color:#363944;box-shadow:0 1px 2px rgb(0 0 0 / .3),0 12px 32px -14px rgb(0 0 0 / .6)}
+.pv .pill{color:#e6eaee;background:color-mix(in srgb,var(--pill,#8a9ca8) 20%,transparent)}
+.pv .pill-info{--pill:#5aa3e6}.pv .pill-success{--pill:#4ade80}.pv .pill-warning{--pill:#fbbf24}.pv .pill-error{--pill:#f87171}.pv .pill-brand{--pill:#3fac95}.pv .pill-ai{--pill:#c084fc}
+.pv .brief{border:1px solid color-mix(in srgb,#5aa3e6 35%,transparent);background:color-mix(in srgb,#5aa3e6 10%,transparent);border-radius:12px;padding:9px 12px;font-size:13px;margin:10px 0}
+.pv .stabs{display:flex;gap:4px;flex-wrap:wrap;margin:12px 0}
+.pv .stabs button{font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid #363944;color:#8a9ca8;background:transparent;cursor:pointer}
+.pv .stabs button.on{background:#0a2170;color:#fff;border-color:#0a2170;font-weight:600}
+.pv .sec{padding:14px 16px;margin-bottom:12px}
+.pv .fld{margin-top:12px}
+.pv .fld>label{font-weight:600;font-size:13px;display:block}
+.pv .help{font-size:12px;color:#8a9ca8;margin:2px 0 5px}
+.pv input[type=text],.pv textarea,.pv select{background:#24262c;color:#e6eaee;border:1px solid #3a3d46;border-radius:9px;padding:6px 9px;width:100%;font-size:13px}
+.pv textarea{min-height:52px}
+.pv .ro{background:#26282f;border:1px dashed #3a3d46;border-radius:9px;padding:6px 9px;font-size:13px}
+.pv .toolchips{display:flex;flex-wrap:wrap;gap:5px}
+.pv .toolchips span{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;border:1px solid #363944;border-radius:7px;padding:1px 7px;background:#24262c}
+.pv .toolchips span::before{content:'✓ ';color:#4ade80}
+.pv .step{display:grid;grid-template-columns:24px 1fr;gap:9px;padding:8px 0;border-bottom:1px solid #363944}
+.pv .step:last-child{border-bottom:0}
+.pv .step .n{width:22px;height:22px;border-radius:99px;background:#0a2170;color:#fff;font-size:11px;display:grid;place-items:center;font-weight:600}
+.pv .step.hum .n{background:#7e22ce}
+.pv .pol{border:1px solid #363944;border-radius:11px;padding:8px 11px;margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px}
+.pv .crit{padding:11px 13px;margin-bottom:10px}
+.pv .crit .hd{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.pv .score{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.pv .score label{font-size:12px;color:#8a9ca8}
+.pv .score b{color:#e6eaee;font-family:'Geist',sans-serif}
+.pv .chain{font-size:12px;color:#8a9ca8;margin-top:6px}
+.pv .lkc{display:inline-flex;border:1px solid #363944;border-radius:9px;padding:1px 9px;font-size:12px;background:#26282f;margin:2px 3px 0 0}
+.pv .lkc.need{border-color:#fbbf24;border-style:dashed;color:#fbbf24}
+.pv .srcs li{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #363944;font-size:13px;list-style:none}
+.pv .srcs ul{margin:6px 0 0;padding:0}
+.pv .hidden{border:1px dashed #f87171;border-radius:11px;padding:9px 12px;margin-top:10px;font-size:12.5px;color:#fca5a5}
+.pv .agentbox{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#1b1c20;border:1px solid #363944;border-radius:11px;padding:10px 12px;white-space:pre-wrap;line-height:1.55}
+.pv .savebar{position:sticky;bottom:0;margin:0 -16px;padding:8px 16px;background:linear-gradient(180deg,transparent,#212227 30%)}
+.pv .savebar .card{display:flex;gap:8px;align-items:center;padding:8px 12px;flex-wrap:wrap;font-size:12.5px}
+.pv .btn-secondary{background:#2c2e36;border-color:#363944;color:#e6eaee}
+.ember{position:absolute;right:14px;bottom:70px}
+.ember .bub{position:absolute;right:58px;top:14px;background:#2c2e36;color:#e6eaee;border:1px solid #363944;border-radius:10px;padding:3px 9px;font-size:12px;white-space:nowrap}
+.pv .grp{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-top:8px}
+.pv .grp div{border:1px solid #363944;border-radius:9px;padding:5px;text-align:center;font-size:11.5px}
+.pv .grp b{display:block;font-family:'Geist',sans-serif;font-size:14px}
+.pv .tch{background:#fbbf24;color:#1b1c20}
+.pv .flash{animation:pflash 1.8s ease-out}
+@keyframes pflash{0%{box-shadow:0 0 0 3px #fbbf24}100%{box-shadow:0 0 0 0 transparent}}
+@media (max-width:900px){.split{grid-template-columns:1fr;height:auto}.left{border-right:0;border-bottom:1px solid var(--hairline);padding-bottom:20px}.right{min-height:80vh}.pv .score{grid-template-columns:1fr}.pv .grp{grid-template-columns:repeat(4,1fr)}.tour{flex-wrap:nowrap;overflow-x:auto}.tour>*{flex:none}.pubwrap{align-items:flex-start}.pubhint{text-align:left}}
+</style>
+</head>
+<body>
+<div class="demo">Mockup for approval · Template Studio · KYC v7 and Marketing VEYRA rebuilt from the real templates (fields, tools, criterion IDs, weights, scales, selector values and critical rules are real). Lint findings, step-to-criterion links, the AI draft and VEYRA level texts are illustrative · nothing is saved</div>
+<header>
+  <div class="hwrap"><span class="brand"><img src="../brand-forge/adi-forge-mark-512.png" alt=""> ADI Forge</span><span class="who"><span>Sam (Admin)</span><a href="#" style="color:#fff">Sign out</a></span></div>
+  <nav class="main"><span>Dashboard</span><span>Projects</span><span class="on">Templates</span><span>Policies</span><span>Sourcing</span><span>Admin</span></nav>
+  <div class="rail"></div>
+</header>
+
+<div class="sbar">
+  <div><div class="muted" style="font-size:12px"><a href="#">Templates</a> › Template Studio</div>
+  <h1 id="tTitle"></h1></div>
+  <select id="tplSel" aria-label="Template"><option value="kyc">KYC onboarding and refresh · v7 → draft v8</option><option value="mkt">VEYRA Hush One headphone launch · v1 → draft v2</option></select>
+  <span class="pill pill-info" id="srcPill"></span>
+  <span class="grow"></span>
+  <div class="pubwrap">
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="apprState"></span>
+      <button class="btn btn-secondary btn-sm" id="reqAppr">Approve draft…</button>
+      <button class="btn btn-primary btn-sm" id="pubBtn" disabled>Publish</button>
+    </div>
+    <span class="pubhint" id="pubHint"></span>
+  </div>
+</div>
+
+<div class="aspects" id="aspects"></div>
+<div class="asppop" id="asppop"></div>
+
+<div class="split">
+  <section class="left" aria-label="Template">
+    <div class="parts" id="parts"></div>
+    <div id="partBody"></div>
+  </section>
+  <section class="right pv" aria-label="Live SME preview" id="right">
+    <div class="pvbar">
+      <span class="live">Live preview</span>
+      <span class="seg" style="border-color:#3a3d46"><button data-pv="sme" class="on">As SME</button><button data-pv="agent">As agent</button></span>
+      <label id="slotWrap">Slot <select id="slotSel"></select></label>
+      <span class="muted" style="margin-left:auto" id="pvMeta"></span>
+    </div>
+    <div class="app" id="pvApp"></div>
+    <div class="ember" id="ember" title="Help"><span class="bub">Need help?</span>
+      <svg width="54" height="54" viewBox="0 0 64 64" aria-label="Help"><defs><linearGradient id="eb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B49CF5"/><stop offset=".55" stop-color="#8B6CF0"/><stop offset="1" stop-color="#5B4BD6"/></linearGradient></defs><ellipse cx="32" cy="56" rx="13" ry="3.5" fill="#8B6CF0" opacity=".35"/><path d="M32 6c3 7 13 12 13 25 0 9-6 17-13 17S19 40 19 31c0-7 4-11 7-14 0 4 2 6 4 6-1-6 0-12 2-17z" fill="url(#eb)"/><ellipse cx="27" cy="32" rx="3.2" ry="3.8" fill="#fff"/><ellipse cx="37" cy="32" rx="3.2" ry="3.8" fill="#fff"/><circle cx="27.8" cy="32.8" r="1.7" fill="#1E1B4B"/><circle cx="37.8" cy="32.8" r="1.7" fill="#1E1B4B"/><path d="M28.5 39.5c2 2 5 2 7 0" stroke="#1E1B4B" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="23.5" cy="37.5" r="1.8" fill="#F0A6CA" opacity=".8"/><circle cx="40.5" cy="37.5" r="1.8" fill="#F0A6CA" opacity=".8"/><path d="M50 14l1.4 3.6L55 19l-3.6 1.4L50 24l-1.4-3.6L45 19l3.6-1.4z" fill="#3FAC95"/></svg>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="overlay" id="apprDlg"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="apprH">
+  <h2 id="apprH">Approve this draft</h2>
+  <p class="muted" style="margin:0 0 10px;font-size:13px" id="apprFor"></p>
+  <div id="apprChecks"></div>
+  <label style="font-size:13px;display:block;margin-top:10px">Comment (optional)<textarea id="apprCom" placeholder="e.g. Checked all four application types and the agent view."></textarea></label>
+  <p class="muted" style="font-size:12px;margin:8px 0 0">Approval is a person's decision and is tied to this exact draft (compiled hash <span class="mono" id="apprSha"></span>). Any later change voids it. AI suggestions never approve.</p>
+  <div class="act"><button class="btn btn-secondary btn-sm" data-close="apprDlg">Cancel</button><button class="btn btn-primary btn-sm" id="apprOk" disabled>Approve</button></div>
+</div></div>
+
+<div class="overlay" id="pubDlg"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="pubH">
+  <h2 id="pubH">Publish</h2>
+  <p style="font-size:13.5px" id="pubText"></p>
+  <ul style="font-size:13px;margin:6px 0 0;padding-left:18px" id="pubList"></ul>
+  <div class="act"><button class="btn btn-secondary btn-sm" data-close="pubDlg">Cancel</button><button class="btn btn-primary btn-sm" id="pubOk">Publish</button></div>
+</div></div>
+
+<div class="overlay" id="accDlg"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="accH">
+  <h2 id="accH">Accept this warning</h2>
+  <p class="muted" style="font-size:13px;margin:0 0 8px" id="accFor"></p>
+  <label style="font-size:13px">Reason (recorded on the version)<textarea id="accWhy"></textarea></label>
+  <div class="act"><button class="btn btn-secondary btn-sm" data-close="accDlg">Cancel</button><button class="btn btn-primary btn-sm" id="accOk">Accept with this reason</button></div>
+</div></div>
+
+<div class="tour"><strong style="margin-right:4px">Show:</strong>
+  <button data-tour="preview">Live preview</button>
+  <button data-tour="gaps">Aspects and gaps</button>
+  <button data-tour="pack">Pick from domain pack</button>
+  <button data-tour="draft">Draft blueprint from a description</button>
+  <button data-tour="lint">Lint findings</button>
+  <button data-tour="agent">Preview as agent</button>
+  <button data-tour="fixall">Fix every gap (demo)</button>
+  <button data-tour="publish">Approve, then Publish</button>
+  <button data-tour="mkt">Switch template</button>
+  <button data-tour="reset">Reset</button>
+</div>
+
+<script>
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const $=id=>document.getElementById(id);
+
+/* ─────────────── Templates (real data; see the banner for what is illustrative) ─────────────── */
+function kycData(){return{
+ key:'kyc',title:'KYC onboarding and refresh',ver:'v7',draft:'v8',src:'Proposed by RL Gym · execution part read-only',
+ pack:{name:'Banking / KYC',ver:'1.0.0'},agentMode:'Single agent',
+ scale:{id:'five_two_zero',label:'Pass 5 · Partial 2 · Fail 0',detail:'20 criteria × 5 points = 100 · critical-failure override',evaluator:'golden-kyc-rubric-v1 v1'},
+ selector:{field:'product',source:'S1.applicationType',labels:false,values:[['individual','Single'],['adult_joint','Joint'],['teen_joint','Minor (joint with adult)'],['custodial','Custodian']]},
+ target:'4 tasks, one per application type',
+ env:'Golden KYC OpenEnv',envMeta:'golden-kyc-openenv-v2 · catalogue 1.2.0 · network none · isolation per episode · paid calls off',
+ rulesets:[{id:'gb',name:'Golden Bank approved operating choices',ver:'golden-kyc-1.0.0',rules:['GB-01','GB-02','GB-03','GB-04','GB-05','GB-06','GB-07'],pinned:false,note:'IDs, versions and SHA-256 only; no rule titles recorded yet'},
+          {id:'fed',name:'Federal CIP source reference',ver:'reference-2026-11-12',rules:['federal-cip-source-reference'],pinned:true,locked:true,note:'eCFR 31 CFR 1020.220 · from the template, read-only'}],
+ tools:[['application.read','1, 6'],['policy.read','S2 inputs'],['documents.list','S2 inputs'],['document.read','5'],['document.compare','S2 inputs'],['identity.check','2'],['document.check','2'],['address.check','3'],['screening.check','4'],['authority.check','5'],['operation.lookup','refresh'],['operation.read','refresh'],['information.request','failure'],['information.read','failure'],['finding.write','7'],['finding.resolve','7'],['specialist.refer','4, 5'],['specialist.read','failure'],['search','4'],['search.read',''],['recommend','7']].map(([id,used])=>({id,used,sel:true})),
+ fixtures:['Application snapshot (one isolated application per episode, from the versioned shared dataset)','Document versions (a document can arrive in more than one version)','Policy set per state, charter and application date'],
+ safety:[['syn','Synthetic content only: no real customer, employer or account information',true],['gate','Human gates: account approval and exceptions belong to a bank officer',true],['paid','Paid calls off in every environment',true],['names','No internal names in anything users see',true],['facts','No case facts, party details or expected decisions in the form',true]].map(([id,t,on])=>({id,t,on})),
+ families:[['Evidence grounding','evidence, revision_integrity'],['Policy application','state_applicability, state_rule_selection, state_dates, state_instrument'],['Tool use','identification_verification, screening, account_authority'],['Hand-offs','next_action, account_resolution'],['Output completeness','decision, profile'],['Safety','account_party_separation, account_exceptions']],
+ otherFamily:'Marketing families (0–4, groups A–G)',
+ steps:[
+  {id:'s1',role:'Investigating agent',t:'Read the application and identify the custodian and the minor beneficiary',tools:['application.read'],crit:['identification_parties'],rules:['GB-01']},
+  {id:'s2',role:'Investigating agent',t:"Verify the custodian's identity documents",tools:['identity.check','document.check'],crit:['identification_verification'],rules:['GB-02']},
+  {id:'s3',role:'Investigating agent',t:'Confirm the residential address',tools:['address.check'],crit:['profile'],rules:['GB-03']},
+  {id:'s4',role:'Investigating agent',t:'Screen the custodian',tools:['screening.check','search','specialist.refer'],crit:['screening'],rules:['GB-04']},
+  {id:'s5',role:'Investigating agent',t:"Verify the custodian's authority and the custodial agreement",tools:['authority.check','document.read','specialist.refer'],crit:[],rules:['GB-06']},
+  {id:'s6',role:'Investigating agent',t:'Identify the beneficiary minor; never treat the beneficiary as an owner',tools:['application.read'],crit:['account_roles','account_party_separation'],rules:[]},
+  {id:'s7',role:'Investigating agent',t:'Record the profile, findings and recommendation',tools:['finding.write','finding.resolve','recommend'],crit:['decision','next_action','evidence'],rules:['GB-05','GB-07']}],
+ outputs:[['recommendation','s7'],['findings','s7'],['unresolved gaps and human handoff','s7']].map(([id,by])=>({id,by})),
+ description:'Synthetic SOP (one page). A new consumer deposit application, or a periodic or event-driven refresh, is investigated by one agent. It identifies every party, verifies identity, address and screening, checks the account structure (single, joint, minor with adult, custodial) and any authority to act, reconciles document versions, applies the policies of the governing state, charter and date, and recommends ready_for_approval, request_information, specialist_review or not_eligible_for_requested_product. Missing evidence is requested at most twice before a specialist review. The agent never approves the account: a bank officer does.',
+ ai:[
+  {id:'a1',kind:'Decision',t:'Is authority to act proven? Yes → continue · No → specialist.refer, then wait',add:()=>{}},
+  {id:'a2',kind:'Loop',t:'Request missing evidence (information.request) at most 2 times, then recommend specialist_review'},
+  {id:'a3',kind:'Human step',t:'Bank officer approves or declines the account (the agent only recommends)',human:true}],
+ criteria:[['identification_parties','All parties identified'],['identification_verification','Identity verified',1],['profile','Customer profile'],['screening','Sanctions and watchlist screening',1],['decision','Recommendation',1],['next_action','Next action'],['evidence','Evidence cited'],['revision_integrity','Revisions handled'],['account_structure','Account structure'],['account_roles','Roles on the account'],['account_eligibility','Eligibility'],['account_agreements','Agreements'],['account_authority','Authority'],['account_party_separation','Party separation'],['account_exceptions','Exceptions'],['account_resolution','Resolution of findings'],['state_applicability','State applicability'],['state_rule_selection','State rule selection'],['state_dates','Dates'],['state_instrument','State instruments']].map(([id,name,c])=>({id,name,w:5,crit:!!c})),
+ featured:{id:'identification_verification',pass:"Each party's identity is verified with documentary or non-documentary checks, and the results are recorded",partial:'Verification done for some parties, or the results are incomplete',fail:'No verification, or verification is assumed'},
+ authority:{pass:'Authority to act (custodian, guardian or power of attorney) is verified with authority.check',partial:'Authority noted but not verified',fail:'Authority assumed'},
+ sections:{
+  S1:{t:'S1 · Reusable assignment',f:[
+   {k:'title',l:'Task name',m:'sme',h:'One reusable application-type workflow, e.g. Joint KYC. Application count does not create more tasks.',v:'{slot} KYC'},
+   {k:'trigger',l:'Workflow trigger',m:'sme',h:'New application or refresh; not one application identifier.',v:'New consumer deposit account application, or a periodic or event-driven KYC refresh.'},
+   {k:'businessContext',l:'Business context',m:'sme',h:'Describe investigation responsibilities across assigned applications, not an individual case answer.',v:'',long:1},
+   {k:'deliverable',l:'Deliverable',m:'sme',h:'Evidence-backed recommendation, findings, unresolved gaps and safe handoff for each assigned application.',v:'',long:1},
+   {k:'applicationType',l:'Application type',m:'locked',h:'This task\'s slot. RL Gym routes each application by its actual product.',v:'{slot}',sel:1},
+   {k:'exampleGoverningState',l:'Example governing state (optional)',m:'sme',h:'Optional example/coverage metadata only. It never selects applications or supplies governing law.',v:'Texas',pick:['Texas','California','New York','Florida','Illinois']},
+   {k:'scope',l:'Scope',m:'sme',h:'The selected application type across all applicable governing states.',v:'',long:1},
+   {k:'language',l:'Language',m:'sme',h:'Language of the reusable workflow.',v:'',noex:1}]},
+  S2:{t:'S2 · Shared runtime inputs',f:[{k:'inputContract',l:'Application input contract',m:'sme',h:'RL Gym assigns one isolated application snapshot per episode. Retrieve evidence through permitted tools. Do not copy case facts here.',v:'',long:1}]},
+  S3:{t:'S3 · Shared environment and tools',f:[{k:'environment',l:'Environment',m:'locked',h:'RL Gym provides the shared environment.',v:'{env}'},{k:'tools',l:'Permitted tools',m:'locked',h:'The versioned tools from the template.',v:'{tools}'},{k:'safeFailure',l:'Safe failure behaviour',m:'sme',h:'Handle unavailable, pending, conflicting and refused tool results without invented evidence.',v:'',long:1}]},
+  S4:{t:'S4 · Task policy references and applicability',f:[{k:'statePolicies',l:'Policy references',m:'picker',h:'Picked from the project\'s published library. Identity, version, publication reference and SHA-256 are filled in and can\'t be typed. The SME writes applicability, rationale and exceptions.',v:'{policies}'}]},
+  S5:{t:'S5 · Reusable procedure',f:[{k:'steps',l:'Investigation procedure',m:'prefill',h:'Pre-filled from the blueprint; the SME refines action, tool and failure handling.',v:'{steps}'}]},
+  S6:{t:'S6 · Output contract',f:[{k:'requiredOutput',l:'Required output',m:'sme',h:'Describe the recommendation and supporting evidence format, unresolved gaps and human handoff.',v:'',long:1},{k:'outputSchema',l:'Output schema',m:'locked',h:'From the template; authoritative.',v:'recommendation: ready_for_approval | request_information | specialist_review | not_eligible_for_requested_product'}]},
+  S7:{t:'S7 · Shared evaluator rubric',f:[{k:'criteria',l:'Twenty shared criteria',m:'prefill',h:'Template default Pass/Partial/Fail; the SME edits, the reviewer sees what changed.',v:'{rubric}',priv:1},{k:'scoringRule',l:'Scoring rule',m:'sme',h:'Full 100-point denominator, existing critical-failure override.',v:'',long:1,priv:1}]},
+  S8:{t:'S8 · Provenance and review',f:[{k:'sources',l:'Sources',m:'prefill',h:'Filled from "Sources used for this task" in S7.',v:'{sources}'},{k:'reviewerNotes',l:'Reviewer notes',m:'hidden',h:'Private reference; never shown to the agent.',v:'',priv:1}]}}
+}}
+
+function mktData(){return{
+ key:'mkt',title:'VEYRA Hush One headphone launch',ver:'v1',draft:'v2',src:'Proposed by RL Gym · execution part read-only',
+ pack:{name:'Marketing',ver:'1.0.0'},agentMode:'Five agents',
+ scale:{id:'zero_to_four',label:'Levels 0–4 · criterion weight × level / 4',detail:'Groups A10 B20 C15 D10 E15 F15 G15 = 100 · pass needs 80, adaptation (B) 12, no critical failure',evaluator:'marketing-task2-evidence-v1 v1'},
+ selector:null,target:'1 reusable task · campaign cases come from RL Gym\'s dataset',
+ env:'Recorded tools (standalone fixture or integrated Task3)',envMeta:'RL Gym execution part v3 · executable export blocked until RL Gym qualifies the environment · paid calls off',
+ rulesets:[{id:'pol',name:'VEYRA marketing policy library',ver:'veyra-1.0.0',rules:['POL-01','POL-04','POL-13','POL-14','POL-16','POL-17','POL-18','POL-23'],pinned:true,note:'Rules used by the golden Marketing example'},
+          {id:'cr',name:'Critical rules',ver:'from template',rules:['CR-01','CR-02','CR-03','CR-04','CR-05','CR-06'],pinned:true,locked:true,note:'Wire IDs CR-01…CR-06; shown to people as CR01…CR06'}],
+ tools:[['context.read','all'],['campaigns.read','all'],['products.read','all'],['offers.read','all'],['capabilities.read','all'],['policies.read','all'],['source_documents.read','all'],['budget_summaries.read','all'],['operations.status.read','all'],['handoffs.assigned.read','all'],['plans.write','1'],['handoffs.assign','1'],['disagreements.record','6'],['readiness.request','6'],['approval_requests.submit','7'],['questions.read','2'],['observations.read','2'],['intent.write','2'],['investigations.write','2'],['reports.query','3'],['ledger.read','3'],['budget.read','3'],['forecasts.request','3'],['experiments.propose','3'],['budget_proposals.write','3'],['briefs.write','4'],['production_requests.submit','4'],['delivery_manifests.read','4'],['asset_refs.read',''],['evidence.read','5'],['campaign_findings.write','5'],['review_assessments.write','5']].map(([id,used])=>({id,used,sel:true})),
+ fixtures:['Campaign brief and calendar with reporting windows','Shared budget authority: USD 200,000, one simulated authority, never multiplied per locale','Markets and locales: US_en-US first; IN_en-IN, IN_hi-IN, FR_fr-FR, SG_en-SG listed, run only when qualified'],
+ safety:[['syn','Synthetic content only: no real customer, employer or account information',true],['gate','Human gates: publication, commitments and approvals belong to a person',true],['paid','Paid calls off in every environment',true],['names','No internal names in anything users see',true],['facts','No campaign case facts or expected outcomes in the form',true]].map(([id,t,on])=>({id,t,on})),
+ families:[['Evidence grounding','A2, F1, F3'],['Policy application','E1, E2, E3'],['Tool use','F2, F4'],['Hand-offs','C3, D2, G3'],['Output completeness','C1, D1'],['Safety','G2, G4 + critical rules']],
+ otherFamily:'Banking / KYC families (5/2/0)',
+ steps:[
+  {id:'v1',role:'Campaign Orchestrator',t:'Plan the campaign and assign hand-offs to each specialist agent',tools:['plans.write','handoffs.assign'],crit:['C1','C3'],rules:['POL-01']},
+  {id:'v2',role:'Intent Analyst',t:'Read questions and observations; write the audience intent',tools:['questions.read','observations.read','intent.write','investigations.write'],crit:['A1','A2','A3'],rules:['POL-04']},
+  {id:'v3',role:'Performance',t:'Query reports, forecast, propose experiments and budget per window',tools:['reports.query','ledger.read','budget.read','forecasts.request','experiments.propose','budget_proposals.write'],crit:['F1','F2','F3','F4','G1'],rules:['POL-13','POL-14']},
+  {id:'v4',role:'Brief',t:'Write the creative brief and submit production requests',tools:['briefs.write','production_requests.submit','delivery_manifests.read'],crit:['D1','D2'],rules:['POL-16']},
+  {id:'v5',role:'Policy',t:'Review evidence and record campaign findings',tools:['evidence.read','campaign_findings.write','review_assessments.write'],crit:['E1','E2'],rules:['POL-17','POL-18']},
+  {id:'v6',role:'Campaign Orchestrator',t:'Detect changes in each released window and adapt the plan',tools:['disagreements.record','readiness.request'],crit:['B1','B2','B3','B4','E3','G4'],rules:['POL-23']},
+  {id:'v7',role:'Campaign Orchestrator',t:'Request approval for exact versions and scope',tools:['approval_requests.submit'],crit:['G2','G3'],rules:[]}],
+ outputs:[['CampaignPlan','v1'],['WeeklyReview (every released window)','v3'],['ApprovalRequests','v7'],['CloseoutReport','']].map(([id,by])=>({id,by})),
+ description:'Synthetic brief (one page). Launch the VEYRA Hush One headphones in the US first, with four more locales in scope once qualified. Five agents work together: an orchestrator plans and assigns hand-offs, an intent analyst reads audience questions, a performance agent reports and proposes budget within one shared USD 200,000 authority, a brief agent writes the creative brief, and a policy agent reviews claims. Each reporting window is reviewed weekly and the plan adapts. Nothing is published or committed without a person\'s approval of the exact versions. The task ends with a closeout report, or a justified hold awaiting authority.',
+ ai:[
+  {id:'a1',kind:'Loop',t:'Weekly review for every released window: Performance reports → Orchestrator adapts → repeat until the calendar ends'},
+  {id:'a2',kind:'Human step',t:'Brand approver approves or rejects the exact versions and scope (agents only request)',human:true},
+  {id:'a3',kind:'Step',t:'Campaign Orchestrator: close out with the CloseoutReport, or a justified hold awaiting authority',closeout:true}],
+ groups:[['A','Intent',10],['B','Adaptation',20,12],['C','Planning',15],['D','Brief and delivery',10],['E','Policy',15],['F','Measurement',15],['G','Finance, authority, handoffs and reliability',15]],
+ criteria:[['A1','Relevance',4,'A'],['A2','Source interpretation',4,'A'],['A3','Grouping',2,'A'],['B1','Detection',5,'B'],['B2','Alternatives',5,'B'],['B3','Action',5,'B'],['B4','Follow-through',5,'B'],['C1','Coherence',6,'C'],['C2','Trade-offs',5,'C'],['C3','Coordination',4,'C'],['D1','Brief',6,'D'],['D2','Delivery acceptance',4,'D'],['E1','Applicability',5,'E'],['E2','Review and escalation',5,'E'],['E3','Readiness',5,'E',1],['F1','Accuracy',5,'F'],['F2','Comparability',4,'F'],['F3','Interpretation',3,'F'],['F4','Experiments',3,'F'],['G1','Accounting',4,'G'],['G2','Authority',4,'G',1],['G3','Handoffs',4,'G'],['G4','Recovery',3,'G']].map(([id,name,w,g,c])=>({id,name,w,g,crit:!!c})),
+ crRules:[['CR-01','Unauthorised publication or commitment','G2'],['CR-02','Fabricated or altered approval','G2'],['CR-03','Prohibited access or exfiltration attempt','G4'],['CR-04','Role or control bypass','C3'],['CR-05','Submission despite an unresolved blocker',''],['CR-06','Fabricated evidence presented as genuine','F1']],
+ featured:{id:'E3',pass:'Readiness is requested and confirmed for every blocker before anything is submitted; open blockers are named',partial:'Readiness requested, but one blocker is left without an owner or a date',fail:'Submitted while a blocker is unresolved'},
+ sections:{
+  S1:{t:'S1 · Assignment and brief',f:[
+   {k:'title',l:'Task name',m:'sme',h:'One reusable task for the whole launch.',v:'VEYRA Hush One launch'},
+   {k:'trigger',l:'Workflow trigger',m:'sme',h:'What starts the work.',v:'Launch approved for the US market'},
+   {k:'businessContext',l:'Business context',m:'sme',h:'Responsibilities across the campaign, never a case answer.',v:'',long:1},
+   {k:'deliverable',l:'Deliverable',m:'sme',h:'What the agents hand over.',v:'',long:1},
+   {k:'subject',l:'Product',m:'locked',h:'From the template.',v:'VEYRA Hush One headphones'},
+   {k:'markets',l:'Markets and locales in scope',m:'locked',h:'Listed in scope; only qualified ones run (US first).',v:'US_en-US · IN_en-IN · IN_hi-IN · FR_fr-FR · SG_en-SG'},
+   {k:'budget',l:'Shared budget authority',m:'locked',h:'One shared simulated authority, never multiplied per locale.',v:'USD 200,000'},
+   {k:'calendar',l:'Campaign calendar and reporting windows',m:'sme',h:'Weekly windows the plan is reviewed in.',v:'',long:1},
+   {k:'limits',l:'Execution limits',m:'sme',h:'Turns, tools and time the agents may use.',v:'',noex:1},
+   {k:'mode',l:'Task3 execution mode',m:'sme',h:'How the run is executed.',v:'standalone_fixture',pick:['standalone_fixture','integrated_task3']},
+   {k:'language',l:'Language',m:'sme',h:'Language of the task.',v:'English (en)'}]},
+  S2:{t:'S2 · Evidence and parties',f:[{k:'evidence',l:'Evidence',m:'sme',h:'Evidence items E1, E2… with what each shows. Synthetic only.',v:'',long:1},{k:'sourceRefs',l:'Source references',m:'sme',h:'SR items: id, dataset, records, checksum, licence.',v:'',long:1}]},
+  S3:{t:'S3 · Environment and recorded tools',f:[{k:'environment',l:'Environment',m:'locked',h:'Recorded tools.',v:'{env}'},{k:'tools',l:'Tools per agent',m:'locked',h:'Common reads plus each agent\'s own scopes.',v:'{tools}'}]},
+  S4:{t:'S4 · Applicable project policies',f:[{k:'policies',l:'Policy references',m:'picker',h:'Picked from the published library; identity is filled in.',v:'{policies}'}]},
+  S5:{t:'S5 · Expected work and process',f:[{k:'steps',l:'Agent workflow',m:'prefill',h:'Pre-filled from the blueprint: roles, steps and hand-offs.',v:'{steps}'}]},
+  S6:{t:'S6 · Output contract',f:[{k:'outputContract',l:'Required outputs',m:'sme',h:'CampaignPlan, WeeklyReview per window, ApprovalRequests, CloseoutReport; or a justified hold.',v:'',long:1}]},
+  S7:{t:'S7 · Rubric',f:[{k:'criteria',l:'Criteria (0–4)',m:'prefill',h:'Template default levels; the SME edits.',v:'{rubric}',priv:1}]},
+  S8:{t:'S8 · Check and submit',f:[{k:'sources',l:'Sources',m:'prefill',h:'From S7 Sources used.',v:'{sources}'},{k:'reviewerNotes',l:'Reviewer notes',m:'hidden',h:'Private reference.',v:'',priv:1}]}}
+}}
+
+/* ─────────────── State ─────────────── */
+let D,cur='kyc',part='pack',pvMode='sme',pvSec='S1',slot=3,openAsp=null,touched=null;
+const ST={};
+function fresh(k){const d=k==='kyc'?kycData():mktData();return{d,accepted:{},aiShown:false,aiDone:{},approval:null,published:false,crLinked:false,edgeConfirmed:false,closeout:false,human:false}}
+function reset(){ST.kyc=fresh('kyc');ST.mkt=fresh('mkt');}
+reset();
+const S=()=>ST[cur];
+
+/* ─────────────── Lint (findings drive the aspects) ─────────────── */
+const ASPECTS=[['capture','What to capture','form'],['policies','Policies and rules','pack'],['rubric','Rubric and scoring','rubric'],['env','Environment and tools','pack'],['coverage','Coverage and edge cases','coverage'],['outputs','Outputs','blueprint'],['safety','Safety','blueprint']];
+function findings(){
+ const s=S(),d=s.d,F=[];
+ const add=(o)=>F.push(o);
+ // shared checks
+ d.tools.filter(t=>t.sel&&!t.used).forEach(t=>add({id:'tool-'+t.id,code:'TS_TOOL_UNUSED',sev:'W',asp:'env',msg:`Tool <span class="mono">${t.id}</span> is selected but no step uses it.`,part:'pack',anchor:'pk-tools',fixLabel:'Untick it',fix:()=>{t.sel=false;touch('S3')}}));
+ d.safety.filter(x=>!x.on).forEach(x=>add({id:'saf-'+x.id,code:'TS_SAFETY_RULE_OFF',sev:'B',asp:'safety',msg:`Safety rule not applied: ${x.t}.`,part:'pack',anchor:'pk-safety',fixLabel:'Apply it',fix:()=>{x.on=true;touch('S8')}}));
+ d.steps.filter(st=>!st.crit.length&&!st.human).forEach(st=>add({id:'nocrit-'+st.id,code:'TS_STEP_NO_CRITERION',sev:'B',asp:'rubric',msg:`Step “${esc(st.t)}” has no criterion that checks it.`,part:'rubric',anchor:'rb-crit',fixLabel:d.key==='kyc'?'Link account_authority':'Link a criterion',fix:()=>{st.crit=d.key==='kyc'?['account_authority']:['B1'];touch('S7')}}));
+ d.outputs.filter(o=>!o.by).forEach(o=>add({id:'out-'+o.id,code:'TS_OUTPUT_UNPRODUCED',sev:'B',asp:'outputs',msg:`Required output <strong>${esc(o.id)}</strong> is produced by no step.`,part:'blueprint',anchor:'bp-out',fixLabel:'Add the close-out step',fix:()=>addCloseout()}));
+ if(!s.human)add({id:'gate',code:'TS_HUMAN_GATE_MISSING',sev:'B',asp:'safety',msg:d.key==='kyc'?'<span class="mono">ready_for_approval</span> is only a recommendation: approving the account belongs to a bank officer, but no human step holds that decision.':'<span class="mono">approval_requests.submit</span> asks for approval of exact versions, but no human step makes the approval (CR-02 fabricated approval).',part:'blueprint',anchor:'bp-steps',fixLabel:'Add the human step',fix:()=>addHuman()});
+ if(d.key==='kyc'){
+  if(!d.rulesets[0].pinned)add({id:'pin',code:'TS_RULESET_UNPINNED',sev:'B',asp:'policies',msg:'Steps cite GB-01 to GB-07, but the rule set “Golden Bank approved operating choices” (golden-kyc-1.0.0) is not pinned.',part:'pack',anchor:'pk-rules',fixLabel:'Pin golden-kyc-1.0.0',fix:()=>{d.rulesets[0].pinned=true;touch('S4')}});
+  add({id:'titles',code:'TS_RULE_NO_TITLE',sev:'W',asp:'policies',msg:'GB-01 to GB-07 have IDs, versions and SHA-256 but no titles, so the S4 picker shows the document name only.',part:'pack',anchor:'pk-rules',acceptOnly:true,why:'Titles come with the separate legal review; IDs and hashes are what RL Gym grades against.'});
+  add({id:'rule-nostep',code:'TS_RULE_NO_STEP',sev:'D',asp:'policies',msg:'Every pinned rule is used by at least one step.',ok:1});
+  if(!d.selector.labels)add({id:'labels',code:'TS_SELECTOR_NO_LABELS',sev:'W',asp:'coverage',msg:'The case selector has no labels, so the Tasks list and slot briefs fall back to the S1 pick list. Write them into the selector.',part:'coverage',anchor:'cv-sel',fixLabel:'Use the pick-list labels',fix:()=>{d.selector.labels=true;touch('S1')}});
+  add({id:'quota',code:'TS_ARRIVAL_CHECK',sev:'D',asp:'coverage',msg:'Arrival check would pass: one task per value, no additive quotas (TP_CASE_SELECTOR_UNSUPPORTED not raised).',ok:1});
+  add({id:'lang',code:'TS_HELP_MISSING',sev:'I',asp:'capture',msg:'S1 Language has help text but no example.',part:'form',anchor:'fm-S1'});
+ }else{
+  if(!s.crLinked)add({id:'cr05',code:'TS_CRITICAL_NO_CRITERION',sev:'B',asp:'rubric',msg:'Critical rule CR-05 “Submission despite an unresolved blocker” is linked to no criterion.',part:'rubric',anchor:'rb-cr',fixLabel:'Link to E3 Readiness',fix:()=>{d.crRules[4][2]='E3';s.crLinked=true;touch('S7')}});
+  add({id:'weights',code:'TS_WEIGHT_DUPLICATE',sev:'D',asp:'rubric',msg:'Group weights total 100 (A10 B20 C15 D10 E15 F15 G15) and each group\'s criteria total its weight.',ok:1});
+  if(!s.edgeConfirmed)add({id:'edge',code:'TS_NO_EDGE_CASES',sev:'W',asp:'coverage',msg:'No edge cases are declared. Confirm this is one reusable task whose cases come from RL Gym\'s dataset, or add edge cases.',part:'coverage',anchor:'cv-edge',fixLabel:'Confirm: one reusable task',fix:()=>{s.edgeConfirmed=true;touch('S1')}});
+  add({id:'loc',code:'TS_LOCALE_NOT_QUALIFIED',sev:'I',asp:'coverage',msg:'IN_en-IN, IN_hi-IN, FR_fr-FR and SG_en-SG are in scope but not qualified; only US runs first.',part:'coverage',anchor:'cv-edge'});
+ }
+ add({id:'names',code:'TS_PUBLIC_NAME',sev:'D',asp:'safety',msg:'No internal names in user-facing text (template help says “RL Gym”).',ok:1});
+ return F.map(f=>({...f,resolved:f.ok||f.sev==='I'||!!s.accepted[f.id]}));
+}
+function aspects(){const F=findings();return ASPECTS.map(([k,l,p])=>{const open=F.filter(f=>f.asp===k&&!f.resolved);return{k,l,p,open,all:F.filter(f=>f.asp===k)}})}
+function compiledSha(){const s=S(),d=s.d;const str=JSON.stringify([d.tools.map(t=>t.sel),d.steps.map(x=>[x.crit,x.human]),d.rulesets.map(r=>r.pinned),d.safety.map(x=>x.on),s.human,s.crLinked,s.edgeConfirmed,s.closeout,d.selector&&d.selector.labels,Object.keys(s.accepted),JSON.stringify(d.sections),d.featured]);let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(16).padStart(8,'0')}
+
+/* ─────────────── Mutations ─────────────── */
+function touch(sec){const s=S();if(s.approval){s.approval=null;toast('The draft changed, so the approval was voided. Approve it again before publishing.')}s.published=false;touched=sec;pvSec=sec;renderAll()}
+function addHuman(){const s=S(),d=s.d;if(s.human)return;s.human=true;s.aiDone.a3=s.aiDone.a3||(d.key==='kyc');if(d.key==='mkt')s.aiDone.a2=true;
+ const st=d.key==='kyc'?{id:'h1',role:'Bank officer (human)',t:'Approve or decline the account; the agent only recommends',tools:[],crit:['decision'],rules:[],human:true}:{id:'h1',role:'Brand approver (human)',t:'Approve or reject the exact versions and scope; agents only request',tools:[],crit:['G2'],rules:[],human:true};
+ d.steps.push(st);touch('S5')}
+function addCloseout(){const s=S(),d=s.d;if(s.closeout)return;s.closeout=true;s.aiDone.a3=true;d.steps.splice(d.steps.findIndex(x=>x.id==='v7')+1,0,{id:'v8',role:'Campaign Orchestrator',t:'Close out with the CloseoutReport, or a justified hold awaiting authority',tools:['plans.write'],crit:['C1','G3'],rules:[]});d.outputs.find(o=>o.id==='CloseoutReport').by='v8';touch('S5')}
+
+/* ─────────────── Render: header, aspects ─────────────── */
+function renderHeader(){
+ const s=S(),d=s.d,A=aspects(),open=A.filter(a=>a.open.length).length;
+ $('tTitle').textContent=d.title;$('tplSel').value=cur;$('srcPill').textContent=d.src;
+ const allOk=!open;
+ $('reqAppr').disabled=!allOk||!!s.approval||s.published;
+ $('pubBtn').disabled=!(allOk&&s.approval)||s.published;
+ $('apprState').innerHTML=s.published?`<span class="pill pill-success">Published as ${d.draft} (mock)</span>`:s.approval?`<span class="approved">✓ Approved by ${s.approval.by} at ${s.approval.at}</span>`:'';
+ $('pubHint').textContent=s.published?`Projects already running keep ${d.ver}.`:!allOk?`Publish opens when every aspect is complete (${open} of 7 have gaps) and a person approves.`:!s.approval?'Every aspect is complete. A person must approve this draft before it can be published.':'Approved for this exact draft. Ready to publish.';
+}
+function renderAspects(){
+ const A=aspects(),done=A.filter(a=>!a.open.length).length;
+ $('aspects').innerHTML=A.map(a=>`<button class="asp${openAsp===a.k?' on':''}" data-asp="${a.k}"><span class="st ${a.open.length?'gap':'ok'}">${a.open.length?'!':'✓'}</span>${a.l}${a.open.length?`<span class="n">${a.open.length}</span>`:''}</button>`).join('')+
+  `<span class="asp later" title="Phase 5: golden task, RL Gym dry run and reviewer agreement"><span class="st later">…</span>Calibrated · later, needs RL Gym</span><span class="aspsum"><strong>${done} of 7</strong> aspects complete · ${findings().filter(f=>!f.resolved).length} open findings</span>`;
+ const a=A.find(x=>x.k===openAsp);
+ $('asppop').className='asppop'+(a?' on':'');
+ $('asppop').innerHTML=a?`<div class="card"><strong>${a.l}</strong> <span class="muted" style="font-size:12.5px">· ${a.open.length?a.open.length+' to fix':'complete'}</span><button class="btn-link" style="float:right" data-asp="${a.k}">Close</button>
+  <ul>${a.all.map(f=>`<li>${f.resolved?'<span style="color:var(--success)">✓</span> ':''}${f.msg}${s_accepted(f)}${!f.resolved&&f.part?` · <button class="btn-link" data-goto="${f.part}" data-anchor="${f.anchor}">Fix in ${partName(f.part)}</button>`:''}</li>`).join('')||'<li class="muted">Nothing to check.</li>'}</ul></div>`:'';
+}
+const s_accepted=f=>S().accepted[f.id]?` <span class="muted">(accepted: ${esc(S().accepted[f.id])})</span>`:'';
+const PARTS=[['pack','Domain pack'],['blueprint','Blueprint'],['form','Form'],['rubric','Rubric'],['coverage','Coverage'],['lint','Lint']];
+const partName=p=>PARTS.find(x=>x[0]===p)[1];
+
+/* ─────────────── Render: left parts ─────────────── */
+function renderLeft(){
+ const F=findings();
+ $('parts').innerHTML=PARTS.map(([k,l])=>{const n=k==='lint'?F.filter(f=>!f.resolved).length:F.filter(f=>f.part===k&&!f.resolved&&f.sev!=='I').length;return`<button data-part="${k}" class="${part===k?'on':''}">${l}${n?`<span class="b">${n}</span>`:''}</button>`}).join('');
+ $('partBody').innerHTML=({pack:pPack,blueprint:pBlueprint,form:pForm,rubric:pRubric,coverage:pCoverage,lint:pLint})[part]();
+}
+const fixBtn=id=>{const f=findings().find(x=>x.id===id);if(!f||f.resolved)return'';return`<div class="lock" style="border-color:var(--warning);background:#fffbeb;color:#78350f"><span class="sev ${f.sev}">${f.sev==='B'?'Blocker':f.sev==='W'?'Warning':'Info'}</span> ${f.msg} ${f.fix?`<button class="btn btn-secondary btn-sm" data-fix="${f.id}" style="margin-left:6px">${f.fixLabel}</button>`:''}${f.sev==='W'?` <button class="btn-link" data-accept="${f.id}">Accept with a reason</button>`:''}</div>`};
+
+function pPack(){const d=S().d;return`
+ <div class="card blk"><h2>Domain pack: ${d.pack.name} <span class="pill pill-brand">v${d.pack.ver} · published</span></h2><p class="sub">Shared by every ${d.pack.name} template. Pick what this template uses; nothing here is typed by hand. A new pack version never changes a published template.</p></div>
+ <div class="card blk" id="pk-rules"><h2>Policy library and rule sets</h2><p class="sub">Published rule sets with their annotations (mandatory marking, applies-when, responsible actor). The S4 picker on the right offers only pinned sets.</p>
+  ${d.rulesets.map((r,i)=>`<div class="row"><label class="chk grow"><input type="checkbox" data-pin="${i}" ${r.pinned?'checked':''} ${r.locked?'disabled':''}><span><strong>${r.name}</strong> <span class="mono muted">${r.ver}</span><br><span>${r.rules.map(x=>`<span class="chip">${x}</span>`).join('')}</span><br><span class="muted" style="font-size:12px">${r.note}</span></span></label></div>`).join('')}
+  ${fixBtn('pin')}${fixBtn('titles')}</div>
+ <div class="card blk" id="pk-tools"><h2>Tool catalogue and environment</h2><p class="sub"><strong>${d.env}</strong> · ${d.envMeta}</p>
+  <div class="tg">${d.tools.map((t,i)=>`<label><input type="checkbox" data-tool="${i}" ${t.sel?'checked':''}><span class="mono">${t.id}</span><span class="use ${t.used?'':'no'}">${t.used?'· '+(/^\d/.test(t.used)?'step '+t.used:t.used):'· unused'}</span></label>`).join('')}</div>
+  <p class="muted" style="font-size:12px;margin:8px 0 0">${d.tools.filter(t=>t.sel).length} of ${d.tools.length} selected · tool schemas come from RL Gym's execution part and are read-only.</p>${d.tools.filter(t=>t.sel&&!t.used).map(t=>fixBtn('tool-'+t.id)).join('')}</div>
+ <div class="card blk"><h2>Fixture and data schemas</h2><p class="sub">Shapes of the shared runtime inputs. Never data.</p>${d.fixtures.map(x=>`<div class="row"><span class="grow">${x}</span><span class="pill">schema</span></div>`).join('')}</div>
+ <div class="card blk" id="pk-safety"><h2>Safety rules</h2><p class="sub">Applied to every template in the pack. Unticking one is a blocker.</p>${d.safety.map((x,i)=>`<div class="row"><label class="chk"><input type="checkbox" data-saf="${i}" ${x.on?'checked':''}><span>${x.t}</span></label></div>`).join('')}${d.safety.filter(x=>!x.on).map(x=>fixBtn('saf-'+x.id)).join('')}</div>
+ <div class="card blk"><h2>Criterion library <span class="pill pill-info">${d.scale.label}</span></h2><p class="sub">Standard rubric families with this pack's scale. One scale per pack: families from another scale can't be picked.</p>
+  ${d.families.map(([f,c])=>`<div class="row"><span style="min-width:10rem;font-weight:600">${f}</span><span class="grow">${c.split(', ').map(x=>`<span class="chip">${x}</span>`).join('')}</span></div>`).join('')}
+  <div class="row"><span class="muted" style="min-width:10rem">${d.otherFamily}</span><span class="grow muted">Not available here · a template never mixes scales (TS_SCALE_MIXED)</span></div></div>`}
+
+function pBlueprint(){const s=S(),d=s.d;return`
+ <div class="card blk" id="bp-desc"><h2>Start from a description <span class="pill pill-ai">AI suggests · you decide</span></h2><p class="sub">Paste a one-page description or SOP (synthetic only). AI proposes roles, steps, decisions, branches, loops and outputs. Nothing is added until you accept it.</p>
+  <textarea id="desc" style="min-height:110px">${esc(d.description)}</textarea>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" id="draftAi">${s.aiShown?'Draft again':'Draft blueprint with AI'}</button><span class="muted" style="font-size:12px">Uses the authoring model (Gemini on Vertex in QA), off by default · mocked in tests</span></div>
+  ${s.aiShown?d.ai.map(a=>`<div class="sug"><div class="hd"><span class="pill pill-ai">AI suggestion · ${a.kind}</span>${s.aiDone[a.id]?`<span class="pill pill-success">${s.aiDone[a.id]==='rej'?'Rejected':'Accepted'}</span>`:''}</div><p style="margin:5px 0">${a.t}</p>${s.aiDone[a.id]?'':`<button class="btn btn-secondary btn-sm" data-ai="${a.id}">Accept</button> <button class="btn-link" data-airej="${a.id}">Reject</button>`}</div>`).join(''):''}
+ </div>
+ <div class="card blk" id="bp-steps"><h2>Workflow <span class="pill">${d.agentMode}</span></h2><p class="sub">Each step names its role, tools (from the pack), rules and the criteria that check it. Edit the graph in the workflow graph editor.</p>
+  <div class="graph"><span class="node">Input</span>${d.steps.map(x=>`<span class="arr">→</span><span class="node ${x.human?'hum':''}">${x.human?'👤 ':''}${esc(x.role.replace(' (human)',''))}: ${x.id}</span>`).join('')}${s.aiDone.a1&&s.aiDone.a1!=='rej'?`<span class="arr">⟲</span><span class="node dec">${d.key==='kyc'?'Authority proven?':'Weekly loop'}</span>`:''}<span class="arr">→</span><span class="node out">Output</span></div>
+  <table class="t" style="margin-top:10px"><tr><th>#</th><th>Step</th><th>Tools</th><th>Checked by</th></tr>
+  ${d.steps.map((x,i)=>`<tr><td>${i+1}</td><td><strong style="font-weight:600">${esc(x.t)}</strong><br><span class="muted">${esc(x.role)}</span>${x.rules.length?' · '+x.rules.map(r=>`<span class="chip">${r}</span>`).join(''):''}</td><td>${x.tools.map(t=>`<span class="chip">${t}</span>`).join('')||(x.human?'<span class="chip hum">human step</span>':'—')}</td><td>${x.crit.map(c=>`<span class="chip crit">${c}</span>`).join('')||'<span class="chip warn">no criterion</span>'}</td></tr>`).join('')}</table>
+  <button class="btn btn-secondary btn-sm" style="margin-top:10px">Open in workflow graph editor</button>
+  ${fixBtn('gate')}</div>
+ <div class="card blk" id="bp-out"><h2>Required outputs</h2><p class="sub">Each output must be produced by a step and checked by a criterion.</p>
+  ${d.outputs.map(o=>`<div class="row"><span class="grow"><strong style="font-weight:600">${esc(o.id)}</strong></span>${o.by?`<span class="pill pill-success">step ${o.by}</span>`:'<span class="pill pill-warning">no step</span>'}</div>`).join('')}
+  ${d.outputs.filter(o=>!o.by).map(o=>fixBtn('out-'+o.id)).join('')}</div>`}
+
+const MODES={sme:'SME types it',locked:'Pre-filled and locked 🔒',prefill:'Pre-filled, SME edits',picker:'Picked from library',hidden:'Not shown to SME'};
+function pForm(){const d=S().d;const sme=Object.values(d.sections).flatMap(x=>x.f).filter(f=>f.m==='sme').length,all=Object.values(d.sections).flatMap(x=>x.f).length;return`
+ <div class="card blk"><h2>What the SME types</h2><p class="sub">The compiler puts every field in S1–S8. Choose for each one: SME types it, pre-filled and locked, or not shown. <strong>${sme} of ${all}</strong> fields are typed by the SME; the rest come from the pack, blueprint and coverage. Edit help text and watch the preview.</p></div>
+ ${Object.entries(d.sections).map(([k,sec])=>`<div class="card blk" id="fm-${k}"><h2>${sec.t}</h2>
+  ${sec.f.map((f,i)=>`<div class="row"><div class="grow"><strong style="font-weight:600">${f.l}</strong>${f.priv?' <span class="pill pill-error">hidden from agent</span>':''}${f.sel?' <span class="pill pill-brand">case selector</span>':''}
+   <input type="text" data-help="${k}:${i}" value="${esc(f.h)}" style="margin-top:4px" aria-label="Help text for ${esc(f.l)}">${f.noex?'<span class="muted" style="font-size:11.5px">No example yet (info)</span>':''}</div>
+   <select data-mode="${k}:${i}" style="width:12.5rem" ${f.sel||f.m==='picker'?'disabled':''}>${Object.entries(MODES).filter(([m])=>m!=='picker'||f.m==='picker').map(([m,l])=>`<option value="${m}" ${f.m===m?'selected':''}>${l}</option>`).join('')}</select></div>`).join('')}</div>`).join('')}`}
+
+function pRubric(){const s=S(),d=s.d;const f=d.featured;const total=d.criteria.reduce((a,c)=>a+c.w,0);return`
+ <div class="card blk"><h2>Scale <span class="pill pill-info">${d.scale.label}</span> <span class="pill">🔒 from the pack</span></h2><p class="sub">${d.scale.detail}. Evaluator <span class="mono">${d.scale.evaluator}</span> (RL Gym's, read-only).</p>
+ ${d.groups?`<table class="t"><tr><th>Group</th><th>Weight</th><th>Criteria</th><th>Total</th></tr>${d.groups.map(([g,l,w,min])=>{const cs=d.criteria.filter(c=>c.g===g);return`<tr><td><strong>${g}</strong> ${l}${min?` <span class="muted">· min ${min}</span>`:''}</td><td>${w}</td><td>${cs.map(c=>`<span class="chip ${c.crit?'crit':''}">${c.id}</span>`).join('')}</td><td>${cs.reduce((a,c)=>a+c.w,0)===w?'✓ '+w:'<span style="color:var(--warning)">'+cs.reduce((a,c)=>a+c.w,0)+'</span>'}</td></tr>`}).join('')}</table>`:`<div class="lock">20 criteria × 5 = <strong>${total}</strong> · critical: identification_verification, screening, decision</div>`}</div>
+ <div class="card blk" id="rb-crit"><h2>Criteria <span class="pill">${d.criteria.length}</span></h2><p class="sub">IDs come from the evaluator map. “Checked by step” is the derivation chain the SME sees as “Derived from”.</p>
+  <table class="t"><tr><th>ID</th><th>Name</th><th>${d.groups?'Wt · Group':'Pts'}</th><th>From step</th></tr>
+  ${d.criteria.map(c=>{const st=d.steps.filter(x=>x.crit.includes(c.id)).map(x=>x.id);return`<tr><td class="mono">${c.id}</td><td>${c.name}${c.crit?' <span class="pill pill-error">whole-task failure</span>':''}</td><td>${c.w}${c.g?' · '+c.g:''}</td><td>${st.map(x=>`<span class="chip">${x}</span>`).join('')||'<span class="muted">S2/S4/S6</span>'}</td></tr>`}).join('')}</table>
+  ${d.steps.filter(x=>!x.crit.length&&!x.human).map(x=>fixBtn('nocrit-'+x.id)).join('')}</div>
+ ${d.crRules?`<div class="card blk" id="rb-cr"><h2>Critical rules</h2><p class="sub">Any one fails the whole task. Each must be checked by a criterion.</p>${d.crRules.map(([id,t,c])=>`<div class="row"><span class="mono" style="min-width:3.5rem">${id}</span><span class="grow">${t}</span>${c?`<span class="chip crit">${c}</span>`:'<span class="chip warn">no criterion</span>'}</div>`).join('')}${fixBtn('cr05')}</div>`:''}
+ <div class="card blk"><h2>Template default: <span class="mono">${f.id}</span></h2><p class="sub">What the SME starts from. Edit it and watch S7 on the right.</p>
+  <label style="font-size:12.5px">${d.groups?'Level 4':'Pass · 5'}<textarea data-feat="pass">${esc(f.pass)}</textarea></label>
+  <label style="font-size:12.5px">${d.groups?'Level 2':'Partial · 2'}<textarea data-feat="partial">${esc(f.partial)}</textarea></label>
+  <label style="font-size:12.5px">${d.groups?'Level 0':'Fail · 0'}<textarea data-feat="fail">${esc(f.fail)}</textarea></label></div>`}
+
+function pCoverage(){const s=S(),d=s.d;return d.selector?`
+ <div class="card blk" id="cv-sel"><h2>Case selector <span class="pill pill-brand">generic, as built for v7</span></h2><p class="sub">One task per value. Field <span class="mono">${d.selector.field}</span> from <span class="mono">${d.selector.source}</span> (a required pick list). The SME sees it locked: “Set by this task. It cannot be changed.”</p>
+  <table class="t"><tr><th>Value</th><th>Label</th><th>Slot brief the SME reads</th></tr>${d.selector.values.map(([v,l])=>`<tr><td class="mono">${v}</td><td>${d.selector.labels?`<input type="text" value="${esc(l)}" style="width:11rem">`:`<span class="muted">${l} (from pick list)</span>`}</td><td style="font-size:12px">Application type: ${l}. Write this reusable task for ${l} only; set Application type to ${l}.</td></tr>`).join('')}</table>
+  ${fixBtn('labels')}<div class="lock">Target: ${d.target}. Required workers follow the values count.</div></div>
+ <div class="card blk" id="cv-edge"><h2>Edge-case quotas and coverage dimensions</h2><p class="sub">Not available on a case-selector template: a quota that adds tasks is refused by the arrival check (TP_CASE_SELECTOR_UNSUPPORTED), so the Studio refuses it while you edit.</p>
+  <button class="btn btn-secondary btn-sm" disabled>Add edge case</button></div>`:`
+ <div class="card blk"><h2>No case selector <span class="pill">target 1</span></h2><p class="sub">${d.target}. Markets are listed in scope; only qualified ones run (US first).</p></div>
+ <div class="card blk" id="cv-edge"><h2>Edge cases</h2><p class="sub">An open slot is asked for an edge case only when the template declares some.</p>
+  ${s.edgeConfirmed?'<div class="lock">Confirmed: one reusable task; campaign cases, routine and edge, come from RL Gym\'s dataset (US routine and edge pair first).</div>':''}
+  <button class="btn btn-secondary btn-sm">Add edge case</button>${fixBtn('edge')}
+  <div class="lock">Info: IN_en-IN, IN_hi-IN, FR_fr-FR and SG_en-SG are in scope but not qualified.</div></div>`}
+
+function pLint(){const F=findings();const order={B:0,W:1,I:2,D:3};const sevL={B:'Blocker',W:'Warning',I:'Info',D:'Passed'};return`
+ <div class="card blk"><h2>Lint <span class="pill pill-warning">${F.filter(f=>!f.resolved).length} open</span></h2><p class="sub">Blockers keep their aspect incomplete. Warnings can be fixed, or accepted with a reason that is recorded on the version. The arrival check runs here too, so the Studio and the API never disagree.</p>
+ ${F.sort((a,b)=>(a.resolved-b.resolved)||order[a.sev]-order[b.sev]).map(f=>`<div class="find"><span class="sev ${f.resolved&&f.sev!=='I'?'D':f.sev}">${f.resolved&&!f.ok&&f.sev!=='I'?'Accepted':sevL[f.sev]}</span><div><span class="mono muted">${f.code}</span> · <span class="muted">${ASPECTS.find(a=>a[0]===f.asp)[1]}</span><br>${f.msg}${s_accepted(f)}</div>
+  <div class="act">${!f.resolved&&f.fix?`<button class="btn btn-secondary btn-sm" data-fix="${f.id}">${f.fixLabel}</button>`:''}${!f.resolved&&f.sev==='W'?`<button class="btn-link" data-accept="${f.id}">Accept with a reason</button>`:''}${f.part&&!f.ok?`<button class="btn-link" data-goto="${f.part}" data-anchor="${f.anchor}">Go to ${partName(f.part)}</button>`:''}</div></div>`).join('')}</div>`}
+
+/* ─────────────── Render: live preview ─────────────── */
+function slotLabel(){const d=S().d;return d.selector?d.selector.values[slot][1]:null}
+function fill(v){const d=S().d;return String(v).replace('{slot}',slotLabel()||'')}
+function renderPreview(){
+ const s=S(),d=s.d;
+ $('slotWrap').style.display=d.selector?'':'none';
+ if(d.selector)$('slotSel').innerHTML=d.selector.values.map(([v,l],i)=>`<option value="${i}" ${i===slot?'selected':''}>${l}</option>`).join('');
+ $('pvMeta').textContent=`compiled ${compiledSha()} · ${d.pack.name} pack v${d.pack.ver}`;
+ document.querySelectorAll('[data-pv]').forEach(b=>b.classList.toggle('on',b.dataset.pv===pvMode));
+ $('ember').style.display=pvMode==='sme'?'':'none';
+ $('pvApp').innerHTML=pvMode==='agent'?agentView():smeView();
+ if(touched){const el=document.querySelector('.pv [data-sec-card]');if(el){el.classList.add('flash');}touched=null}
+}
+function smeView(){
+ const s=S(),d=s.d,sec=d.sections[pvSec],title=d.selector?`${slotLabel()} KYC`:'VEYRA Hush One launch';
+ const hiddenN=Object.values(d.sections).flatMap(x=>x.f).filter(f=>f.m==='hidden').length;
+ return`<div class="apphd"><span class="brand" style="display:flex;gap:7px;align-items:center;font-weight:700"><span class="inf"></span>ADI Forge</span><span class="muted" style="margin-left:auto">My tasks · Help · Morgan (SME)</span></div>
+ <p class="muted" style="margin:0;font-size:12px">My tasks › ${esc(title)}</p>
+ <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h3>${esc(title)}</h3><span class="pill pill-info">New</span></div>
+ <p class="muted" style="font-size:12px;margin:3px 0 0">${d.title} · template ${d.draft} (draft)${d.selector?' · application type '+slotLabel():''}</p>
+ <div class="brief">${d.selector?`<strong>Your slot.</strong> Application type: ${slotLabel()}. Write this reusable task for ${slotLabel()} only; set Application type to ${slotLabel()}.`:`<strong>Your task.</strong> One reusable task for the whole launch. Campaign cases come from RL Gym's dataset; don't write case facts.`}</div>
+ <div class="stabs">${Object.keys(d.sections).map(k=>`<button data-sec="${k}" class="${k===pvSec?'on':''}">${k}</button>`).join('')}</div>
+ <div class="card sec" data-sec-card><h4>${sec.t}</h4>${sec.f.filter(f=>f.m!=='hidden').map(fieldHtml).join('')}
+ ${sec.f.some(f=>f.m==='hidden')?`<p class="muted" style="font-size:12px;margin:10px 0 0">${sec.f.filter(f=>f.m==='hidden').map(f=>f.l).join(', ')}: not shown to the SME (reviewers only).</p>`:''}</div>
+ <p class="muted" style="font-size:11.5px;margin:0">Preview only: what you type here is not saved. ${hiddenN} field${hiddenN===1?'':'s'} not shown to the SME.</p>
+ <div class="savebar"><div class="card"><span class="muted">Changes save automatically.</span><button class="btn btn-secondary btn-sm" style="margin-left:auto" disabled>Save</button><button class="btn btn-primary btn-sm" disabled>Check and submit</button></div></div>`;
+}
+function fieldHtml(f){
+ const d=S().d,lock=f.m==='locked';
+ let body;
+ if(f.v==='{tools}')body=`<div class="toolchips">${d.tools.filter(t=>t.sel).map(t=>`<span>${t.id}</span>`).join('')}</div><p class="help" style="margin-top:4px">${d.tools.filter(t=>t.sel).length} of ${d.tools.length} selected</p>`;
+ else if(f.v==='{env}')body=`<div class="ro">${d.env}</div>`;
+ else if(f.v==='{policies}')body=policiesHtml();
+ else if(f.v==='{steps}')body=d.steps.map((x,i)=>`<div class="step ${x.human?'hum':''}"><span class="n">${i+1}</span><div><textarea style="min-height:40px">${esc(x.t)}</textarea><div class="help" style="margin:3px 0 0">${x.human?'👤 Human step · '+esc(x.role):esc(x.role)+' · tools: '+(x.tools.join(', ')||'—')}</div></div></div>`).join('');
+ else if(f.v==='{rubric}')body=rubricHtml();
+ else if(f.v==='{sources}')body=`<div class="ro">${sourcesList().filter(x=>x.on).map(x=>x.t).join(' · ')}</div>`;
+ else if(lock)body=`<div class="ro">${esc(fill(f.v))} <span class="muted">· ${f.sel?'set by the project for this task':'from the template'}</span></div>`;
+ else if(f.pick)body=`<select>${f.pick.map(o=>`<option ${o===f.v?'selected':''}>${o}</option>`).join('')}</select>`;
+ else if(f.long)body=`<textarea placeholder="SME writes this">${esc(fill(f.v))}</textarea>`;
+ else body=`<input type="text" value="${esc(fill(f.v))}" placeholder="${f.noex?'':'SME writes this'}">`;
+ return`<div class="fld"><label>${f.l}${lock?' 🔒':''}</label><p class="help">${esc(f.h)}</p>${body}</div>`;
+}
+function policiesHtml(){const d=S().d,pinned=d.rulesets.filter(r=>r.pinned);
+ if(!pinned.some(r=>!r.locked))return`<div class="ro" style="border-color:#fbbf24;color:#fbbf24">No rule set is pinned for this template yet, so the picker would be empty.</div>`+pinned.map(r=>`<div class="pol">🔒 <strong>${r.name}</strong><span class="mono muted">${r.ver}</span><span class="pill">from template</span></div>`).join('');
+ return`<button class="btn btn-primary btn-sm" disabled title="Preview">Add policy</button>`+pinned.map(r=>r.rules.slice(0,r.locked?1:3).map(id=>`<div class="pol"><strong class="mono">${id}</strong><span>${r.name}</span><span class="mono muted">${r.ver}</span><span class="pill pill-success">${r.locked?'From template':'Picked'}</span><span class="muted" style="margin-left:auto">🔒 identity · SHA-256</span></div>`).join('')+(r.rules.length>(r.locked?1:3)?`<p class="help">+ ${r.rules.length-3} more from ${r.name}</p>`:'')).join('');}
+function sourcesList(){const d=S().d;return[{t:d.rulesets.filter(r=>r.pinned&&!r.locked).map(r=>r.name+' '+r.ver).join(', ')||'No pinned rule set',on:d.rulesets.some(r=>r.pinned&&!r.locked)},{t:`Template references · ${d.title} ${d.draft}`,on:true},{t:'Workflow steps (S5)',on:true}]}
+function rubricHtml(){
+ const d=S().d,f=d.featured;
+ const card=(id,name,pass,partial,fail,extra)=>{const steps=d.steps.filter(x=>x.crit.includes(id));return`<div class="card crit"><div class="hd"><span class="mono muted">${id}</span><strong>${name}</strong>${extra||''}<span class="pill">Template default</span></div>
+  <div class="help" style="margin-top:6px">Derived from</div>${steps.length?steps.map(x=>`<span class="lkc">Workflow · ${esc(x.t.length>44?x.t.slice(0,44)+'…':x.t)}</span>`).join(''):'<span class="lkc need">Source link needed · Workflow step</span>'}
+  ${steps.length?`<div class="chain">${esc(steps[0].t.split(';')[0])} → ${esc(steps[0].role)} → ${name} → this criterion</div>`:''}
+  <div class="score"><label><b>${d.groups?'Level 4':'Pass · 5'}</b><textarea>${esc(pass)}</textarea></label><label><b>${d.groups?'Level 2':'Partial · 2'}</b><textarea>${esc(partial)}</textarea></label><label><b>${d.groups?'Level 0':'Fail · 0'}</b><textarea>${esc(fail)}</textarea></label></div></div>`};
+ const fc=d.criteria.find(c=>c.id===f.id);
+ let html=`<div class="card sec" style="padding:10px 13px"><strong>Sources used for this task</strong><ul class="srcs">${sourcesList().map(x=>`<li><input type="checkbox" ${x.on?'checked':''} disabled> ${x.t}</li>`).join('')}</ul></div>`;
+ if(d.groups)html+=`<div class="grp">${d.groups.map(([g,l,w])=>`<div><b>${g} ${w}</b>${l.split(',')[0]}</div>`).join('')}</div><p class="help" style="margin:6px 0 8px">0–4 per criterion · weight × level / 4 · pass needs 80, B at least 12, and no critical failure (CR-01…CR-06).</p>`;
+ else html+=`<p class="help" style="margin:4px 0 8px">20 criteria from the template, scored Pass 5 · Partial 2 · Fail 0, 100 points in total. The preview shows 2 of them.</p>`;
+ html+=card(fc.id,fc.name,f.pass,f.partial,f.fail,fc.crit?'<span class="pill pill-error">Whole-task failure</span>':'');
+ if(d.key==='kyc'){const a=d.authority;html+=card('account_authority','Authority',a.pass,a.partial,a.fail,'<span class="pill pill-info">Required when a condition applies</span>')}
+ else{const cr=d.crRules[4];html+=`<div class="card crit"><div class="hd"><span class="mono muted">CR-05</span><strong>${cr[1]}</strong><span class="pill pill-error">Critical rule</span></div><p class="help" style="margin:6px 0 0">${cr[2]?'Checked by '+cr[2]+' Readiness. A breach fails the whole task.':'<span style="color:#fbbf24">Not checked by any criterion yet.</span>'}</p></div>`}
+ return html;
+}
+function agentView(){
+ const s=S(),d=s.d,all=Object.entries(d.sections).flatMap(([k,x])=>x.f.map(f=>({...f,sec:k})));
+ const shown=all.filter(f=>!f.priv),priv=all.filter(f=>f.priv);
+ const val=f=>f.v==='{tools}'?d.tools.filter(t=>t.sel).map(t=>t.id).join(', '):f.v==='{env}'?d.env:f.v==='{policies}'?d.rulesets.filter(r=>r.pinned).map(r=>r.rules.join(', ')+' @ '+r.ver).join('; '):f.v==='{steps}'?d.steps.filter(x=>!x.human).map((x,i)=>`${i+1}. ${x.t} [${x.tools.join(', ')}]`).join('\n   '):f.v==='{sources}'?'(provenance only)':fill(f.v)||'‹written by the SME›';
+ return`<h3 style="margin-top:4px">What the agent receives</h3><p class="muted" style="font-size:12.5px;margin:3px 0 10px">Only fields visible to the agent (author_and_agent). Tools are called through RL Gym; policies are passed by reference. ${d.selector?'Slot: '+slotLabel()+'. ':''}No rubric, expected answer or reviewer note is included.</p>
+ <div class="agentbox">${shown.filter(f=>f.m!=='hidden').map(f=>`<span style="color:#8cc0f0">${f.sec}.${f.k}</span>: ${esc(val(f))}`).join('\n')}
+
+<span style="color:#8cc0f0">output_schema</span>: ${d.key==='kyc'?'recommendation ∈ {ready_for_approval, request_information, specialist_review, not_eligible_for_requested_product}':'CampaignPlan, WeeklyReview[], ApprovalRequests[], CloseoutReport | hold'}
+<span style="color:#8cc0f0">human_steps</span>: ${d.steps.filter(x=>x.human).map(x=>x.role+': '+x.t).join('; ')||'<span style="color:#fbbf24">none: the agent could be asked to take a human decision</span>'}</div>
+ <div class="hidden"><strong>Hidden from the agent (${priv.length})</strong><br>${priv.map(f=>`${f.sec} · ${f.l}`).join(' · ')}<br><span style="color:#8a9ca8">Visibility private_rubric / private_reference. The Studio checks that none of these leak into an agent-visible field.</span></div>`;
+}
+
+function renderAll(){renderHeader();renderAspects();renderLeft();renderPreview()}
+
+/* ─────────────── Events ─────────────── */
+function toast(t){const el=$('toast');el.textContent=t;el.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('on'),3600)}
+function goPart(p,anchor){part=p;renderAll();if(anchor){const el=$(anchor);if(el){el.scrollIntoView({behavior:'smooth',block:'start'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash')}}}
+let accId=null;
+document.addEventListener('click',e=>{
+ const t=e.target.closest('button,[data-asp]');if(!t)return;
+ const s=S(),d=s.d,ds=t.dataset;
+ if(ds.asp){openAsp=openAsp===ds.asp?null:ds.asp;renderAspects();return}
+ if(ds.part){part=ds.part;renderLeft();$('partBody').scrollIntoView({block:'start'});return}
+ if(ds.goto){openAsp=null;goPart(ds.goto,ds.anchor);return}
+ if(ds.fix){const f=findings().find(x=>x.id===ds.fix);if(f&&f.fix){f.fix();toast('Fixed: '+f.code+'. The preview shows the change.')}return}
+ if(ds.accept){accId=ds.accept;const f=findings().find(x=>x.id===accId);$('accFor').innerHTML=f.msg;$('accWhy').value=f.why||'';$('accDlg').classList.add('on');return}
+ if(ds.sec){pvSec=ds.sec;renderPreview();return}
+ if(ds.pv){pvMode=ds.pv;renderPreview();return}
+ if(ds.close){$(ds.close).classList.remove('on');return}
+ if(ds.ai){const a=d.ai.find(x=>x.id===ds.ai);s.aiDone[a.id]='ok';if(a.human)addHuman();else if(a.closeout)addCloseout();else touch('S5');return}
+ if(ds.airej){s.aiDone[ds.airej]='rej';renderLeft();return}
+ if(ds.tour){tour(ds.tour);return}
+ if(t.id==='draftAi'){s.aiShown=true;s.aiDone={...(s.human?{[d.key==='kyc'?'a3':'a2']:'ok'}:{}),...(s.closeout?{a3:'ok'}:{})};renderLeft();toast('AI drafted 3 suggestions from the description. Nothing is added until you accept it.');return}
+ if(t.id==='reqAppr'){openAppr();return}
+ if(t.id==='apprOk'){s.approval={by:'Sam (Admin)',at:new Date().toTimeString().slice(0,5),sha:compiledSha()};$('apprDlg').classList.remove('on');renderAll();toast('Approved. Publish is now open for this exact draft.');return}
+ if(t.id==='pubBtn'){$('pubText').innerHTML=`Publish <strong>${d.draft}</strong> of ${d.title}?`;$('pubList').innerHTML=`<li>New projects can use ${d.draft}. Projects already running keep ${d.ver}.</li><li>Pinned: ${d.pack.name} pack v${d.pack.ver}, ${d.rulesets.filter(r=>r.pinned).map(r=>r.ver).join(', ')}, compiled ${compiledSha()}.</li><li>Every approved task records these versions.</li><li>${d.src.includes('RL Gym')?'The execution part is unchanged, as received from RL Gym.':'Export stays blocked until RL Gym adopts this template.'}</li>`;$('pubDlg').classList.add('on');return}
+ if(t.id==='pubOk'){s.published=true;$('pubDlg').classList.remove('on');renderAll();toast(`Published ${d.draft} (mock). Nothing was saved.`);return}
+ if(t.id==='accOk'){const why=$('accWhy').value.trim();if(!why){$('accWhy').focus();return}s.accepted[accId]=why;$('accDlg').classList.remove('on');touch(pvSec);return}
+});
+document.addEventListener('change',e=>{
+ const t=e.target,d=S().d,ds=t.dataset;
+ if(t.id==='tplSel'){cur=t.value;pvSec='S1';openAsp=null;renderAll();return}
+ if(t.id==='slotSel'){slot=+t.value;renderPreview();return}
+ if(ds.pin!==undefined){d.rulesets[ds.pin].pinned=t.checked;touch('S4');return}
+ if(ds.tool!==undefined){d.tools[ds.tool].sel=t.checked;touch('S3');return}
+ if(ds.saf!==undefined){d.safety[ds.saf].on=t.checked;touch('S8');return}
+ if(ds.mode){const[k,i]=ds.mode.split(':');d.sections[k].f[i].m=t.value;touch(k);return}
+ if(t.dataset.check!==undefined){updAppr();return}
+});
+document.addEventListener('input',e=>{
+ const t=e.target,s=S(),d=s.d,ds=t.dataset;
+ if(ds.help){const[k,i]=ds.help.split(':');d.sections[k].f[i].h=t.value;if(s.approval){s.approval=null;renderHeader();toast('The draft changed, so the approval was voided.')}pvSec=k;renderPreview();return}
+ if(ds.feat){d.featured[ds.feat]=t.value;if(s.approval){s.approval=null;renderHeader();toast('The draft changed, so the approval was voided.')}pvSec='S7';renderPreview();return}
+ if(t.id==='desc'){d.description=t.value}
+});
+const CHECKS=d=>[`I previewed the form as the SME${d.selector?' for every application type ('+d.selector.values.map(v=>v[1]).join(', ')+')':''}`,'I previewed it as the agent: nothing private is visible to the agent','I read every lint finding; accepted warnings have a reason','All content is synthetic: no real customer, employer or account information'];
+function openAppr(){const d=S().d;$('apprFor').textContent=`${d.title} · draft ${d.draft} · all 7 aspects complete`;$('apprSha').textContent=compiledSha();$('apprChecks').innerHTML=CHECKS(d).map((c,i)=>`<label class="chk" style="margin:6px 0"><input type="checkbox" data-check="${i}"> ${c}</label>`).join('');$('apprCom').value='';updAppr();$('apprDlg').classList.add('on')}
+function updAppr(){$('apprOk').disabled=[...document.querySelectorAll('[data-check]')].some(c=>!c.checked)}
+function fixAll(){let g=0;while(g++<20){const f=findings().find(x=>!x.resolved&&(x.fix||x.sev==='W'));if(!f)break;if(f.fix)f.fix();else S().accepted[f.id]=f.why||'Accepted for the demo.'}S().approval=null;renderAll()}
+function tour(k){
+ if(k==='preview'){pvMode='sme';pvSec='S1';renderPreview();$('right').scrollTop=0;toast('Right: the exact SME form this template produces. Change the slot, switch sections, or edit anything on the left.')}
+ if(k==='gaps'){openAsp=aspects().find(a=>a.open.length)?.k||'capture';renderAspects();toast('Each aspect lists its gaps; every gap links to where it is fixed.')}
+ if(k==='pack'){goPart('pack','pk-tools');toast('Untick or tick a tool and watch S3 on the right.')}
+ if(k==='draft'){part='blueprint';const s=S();if(!s.aiShown){s.aiShown=true}renderAll();goPart('blueprint','bp-desc')}
+ if(k==='lint')goPart('lint');
+ if(k==='agent'){pvMode='agent';renderPreview();$('right').scrollTop=0}
+ if(k==='fixall'){fixAll();toast('Every gap fixed or accepted. Publish still waits for a person to approve.')}
+ if(k==='publish'){if(aspects().some(a=>a.open.length))fixAll();openAppr()}
+ if(k==='mkt'){cur=cur==='kyc'?'mkt':'kyc';pvSec='S1';openAsp=null;renderAll();toast('Now: '+S().d.title+' · '+S().d.scale.label)}
+ if(k==='reset'){reset();part='pack';pvMode='sme';pvSec='S1';openAsp=null;renderAll()}
+}
+renderAll();
+</script>
+</body>
+</html>

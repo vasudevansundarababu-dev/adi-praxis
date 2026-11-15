@@ -1365,3 +1365,53 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
   browser (tab, or a search across both roles); the API's `q` search is unchanged. New uploads the profile, then the
   profile PDF and the assessment, and returns to the right tab. "Export to Recruiter" is a button on the project
   summary, shown for every project that is not a draft, cancelled or completed, until the four-tab project page lands.
+
+## MVP1 step 8: console screens (15 Nov 2026)
+
+- **(chosen by Claude)** The switch. Console pages read `newFlow` on the server from `GET /admin/forge-settings`; any
+  failure or 403 (Reviewers, Finance) counts as off, and the layout reads it only for Admins and PMs. With it off every
+  existing page renders as before (one extra settings read on the project page). No API change in this step.
+- **(chosen by Claude)** Project page. With the new flow on, a non-draft project opens on the header and four tabs,
+  chosen by `?tab=dashboard|people|tasks|policies` (plain links, default Dashboard). Drafts keep the wizard. The old
+  summary's Overview rows are now `projectDetailRows` (same output) and are reused on the Dashboard, with Review route,
+  Reviewers and Export to RL Gym inserted before Submitted. Tab counts: SMEs assigned / Required workers, tasks, rules
+  in the latest published rule set.
+- **(chosen by Claude)** Task labels. Task ID is `TSK-001`... by slot order (the API's list order), computed on screen,
+  not stored. Task name is the first sentence of the slot brief (for example "Governing state: California (CA)"),
+  since tasks have no other name before the author writes one. "Coverage by <selector>" reads the selector field and
+  value from the same brief (case-selector slots: "Application type: Joint (JOINT). ..."; dimension slots: the first
+  "label: value"), so v6 shows state and v7 application type without an API change.
+- **(chosen by Claude)** Dashboard. Cards: Experts (assigned SMEs / Required workers), Tasks approved / total with the
+  number waiting, Rule set (latest published version and its rule count, from `GET /policy/rule-sets`), Rework rate and
+  active time (from `GET /dashboard`). Next step, first that applies: a task waiting for your decision (opens it), a task
+  waiting for its Reviewer, experts still needed (opens Assign), tasks with no author, all approved (export), tasks in
+  rework, else "Authors are working". Reviewers are the people assigned as Reviewer on the project, with an Assign link.
+- **(chosen by Claude)** Tasks tab. "Assign SME…" is offered only on Open tasks with no author and lists the SMEs already
+  assigned on the project (new people come in through the Assign screen); it calls `POST assignments/direct`. A status
+  filter is added, as in the mockup. Changing an author (the API exists) has no control yet. The export area is the
+  existing Export panel; its links for tasks that need fixing still open the earlier Task review page (route kept).
+- **(chosen by Claude)** Assign screen at `/projects/[id]/assign`: one row per assignable person, a required Task select
+  ("To author (SME)"; on the Reviewer route a Reviewer sees "To review (Reviewer)" with only the tasks they may review),
+  Assign as SME (replaced by "SME places full" when full) and Assign as Reviewer (Reviewer route only). Matching skills
+  shows the skills found in the recruiter's assessment, or "Not assessed yet".
+- **(chosen by Claude)** Task page at `/projects/[id]/tasks/[taskId]/review` (the policy page keeps `.../policy`). The
+  form is rendered from the template profile, section by section, with arrays of records as tables and unknown shapes
+  as JSON; an Open task shows the sections with dashes. Comments are per section (S1 to S8 one by one; add more), and a
+  note also counts as the author comment, as the API rules. The checklist shows when the API says it is required; the
+  "distinct" confirmation only on Author → PM/Admin for a flagged task (the PM step of the Reviewer route does not need
+  it); the coverage confirmation with an editable edge case when the API asks for it. On the Reviewer route the trail's
+  Reviewer step offers "Assign reviewer…" (the project's Reviewers, never the author) while the task has an author, no
+  Reviewer and is not decided, because the Assign screen hides people already assigned. Validate finds the task's
+  approved record in `GET /export` and shows the latest result for it from the last runs.
+- **(chosen by Claude)** Admin → Candidate app sign-in at `/admin/candidate-sign-in`: the New flow switch (On/Off) and the
+  Offline/Online mode on one page. Admins save; PMs see it read-only. Offline is disabled with an explanation when the
+  API says `offlineAllowed: false`. Save sends only what changed, so a stored Offline mode never blocks switching the
+  flow where Offline is refused. **Not implemented:** the design says changing the mode signs everyone out of the
+  candidate app; the API (`forge/settings.ts`, `PUT /admin/forge-settings`) only audits the change, so the page does not
+  claim it. Open for a later step.
+- **(chosen by Claude)** Menus. With the new flow on: Home, Projects (Projects, Templates, Approved exports), Sourcing,
+  Admin (all existing pages plus Candidate app sign-in) and Tutorials; Reviews, Certification, Partners, Payments and
+  Requisitions are hidden from the menu only and their routes still open. Candidate app sign-in shows in Admin for
+  Admins with the flow on or off (it is where the flow is switched on), and for PMs only with it on.
+- **(chosen by Claude)** With the new flow off, the new Assign and task pages show a short note and a link back instead
+  of calling the new-flow APIs (which answer `409 NEW_FLOW_OFF`).

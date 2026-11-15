@@ -145,6 +145,8 @@ export async function previewRuleSet(tx: Db | Tx, clientId: string, projectId: s
   for (const i of items.filter((x) => x.version.state !== 'REVIEWED' && x.version.state !== 'EXCLUDED')) {
     for (const l of PolicyRuleBody.parse(i.version.body).annotation?.links ?? []) {
       if (!applied.has(l.ruleKey) || REVERSE_RELATION[l.relation] !== 'uses_definition') continue;
+      const dependant = items.find((x) => x.rule.ruleKey === l.ruleKey);
+      if (dependant && PolicyRuleBody.parse(dependant.version.body).annotation?.links.some((b) => b.ruleKey === i.rule.ruleKey)) continue; // already flagged from its own link
       const w = annotationWarnings.find((x) => x.ruleKey === l.ruleKey) ?? annotationWarnings[annotationWarnings.push({ ruleKey: l.ruleKey, flags: [] }) - 1]!;
       w.flags.push({ code: 'UNRESOLVED_LINK', message: `Uses the definition in ${i.rule.ruleKey}, which is not applied to the project.` });
     }

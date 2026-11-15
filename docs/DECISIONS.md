@@ -1415,3 +1415,39 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
   Admins with the flow on or off (it is where the flow is switched on), and for PMs only with it on.
 - **(chosen by Claude)** With the new flow off, the new Assign and task pages show a short note and a link back instead
   of calling the new-flow APIs (which answer `409 NEW_FLOW_OFF`).
+
+## MVP1 step 6: candidate sign-in modes (15 Nov 2026)
+
+Owner's design: docs/design/PROJECT-SCREEN-DESIGN.md, "Admin: candidate app sign-in mode". Everything below applies
+only with `newFlow` on; with it off every sign-in behaves as before (the password routes answer 409 SIGN_IN_MODE, and
+Forgot password still answers 202 and sends nothing).
+
+- **(chosen by Claude)** Mode enforcement: Offline keeps `POST /auth/google` (the mock sign-in with email and name);
+  `POST /auth/password` and `/auth/password/set` answer 409 SIGN_IN_MODE. Online makes `/auth/google` answer 409
+  SIGN_IN_MODE ("Sign in with your email and password."). Production already refuses Offline in the settings; the dev
+  token route stays registered only with the mock verifier.
+- **(chosen by Claude)** Password sign-in finds the account through a SourcedPerson in this client with that email that
+  was assigned at least once and is linked to an account (a released person can still sign in). With several accounts
+  for one email, only the single one with a password counts. Every failure (unknown email, no password yet, wrong
+  password) is 401 INVALID_CREDENTIALS with one message, verifying against a dummy hash when there is no password.
+  An inactive account (403) and a missing 18+ confirmation on the first sign-in (400) are reported only after the
+  password matched. Audit `candidate.signed_in_password` holds ids and `firstSignIn` only.
+- **(chosen by Claude)** The set link is sent on every direct assignment path (assign as SME or Reviewer, and Change
+  author) when the mode is Online, the account has no password and no unused unexpired set link. The email goes to
+  the uploaded address inside the same command after the database work, as invites do, so a failed send undoes the
+  assignment. Subject "Your ADI Forge account"; the link is `${CANDIDATE_APP_URL}/set-password/<token>`, 72 hours.
+- **(chosen by Claude)** `POST /projects/:id/people/:sourcedPersonId/password-link` (Admin, or the PM who owns the
+  project): Online only (409 SIGN_IN_MODE otherwise), for a currently assigned person (409 NOT_ASSIGNED); it deletes
+  the person's unused set links (no schema change) and emails a new one, also when they already have a password.
+  Audit `candidate.password_link_sent` with ids, `replaced` and `expiresAt`.
+- **(chosen by Claude)** `POST /auth/password/set` checks the link before the password, so a weak password does not use
+  up the link. Rule: at least 12 characters and no email local part (of 3 characters or more) from any address the
+  account is known by (shared `candidatePasswordProblem`). Using a link marks every other unused link of that person
+  used and signs out all their candidate sessions; it does not sign in.
+- **(chosen by Claude)** Forgot password always answers 202 `{ok:true}`. A reset link (1 hour) is created and emailed
+  only in Online mode for an email that signs in to an account (same lookup as sign-in, so a sourced but never
+  assigned person gets nothing). A failed send is logged without the email and still answers 202. Audit
+  `candidate.password_reset_requested` (actor SYSTEM, ids only) only when a link was created.
+- **(chosen by Claude)** Candidate app: `/sign-in` picks the form with `signInVariant` (password, offline, classic). The
+  Offline form is the existing simulated one, labelled "Offline sign-in (test environment): no password". New pages
+  `/set-password/[token]` (no referrer sent) and `/forgot-password`.

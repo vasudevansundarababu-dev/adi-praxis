@@ -1292,3 +1292,38 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
 - **(chosen by Claude)** Export panel: the button is "Export to RL Gym" and validation is "Validate"; the panel shows
   the API's reason while export is closed. The contract §6 text on the Praxis side ("marked complete, or end date")
   describes the old flow only; it was not edited in this step.
+## MVP1 step 7: Tutorial and Help (15 Nov 2026)
+
+- **(chosen by Claude)** Tutorial. New nullable `Template.tutorialVideoUrl` and `tutorialChapters` (`[{title, at}]`,
+  seconds), migration `20261130000000_template_tutorial` (additive). `PUT /templates/:id/tutorial` (Admin) takes an
+  https address of at most 500 characters, or `null` to clear, and up to 20 chapters (title 1-100 characters, `at` 0 or
+  more), stored sorted by time; clearing also clears the chapters. It is display metadata, so it creates no template
+  version and is set on every version of the workflow (projects keep the version they use, and each sees the same
+  video); a new version copies it, a variant (a new workflow) starts without one. Audited `template.tutorial_set` once,
+  on the version named, with before/after and the number of versions changed. Template DTOs carry `tutorial`;
+  `GET /me/tasks/:id` and `GET /me/reviews/:taskId` carry `tutorial: {videoUrl, chapters} | null`.
+- **(chosen by Claude)** Console: the template page has a "Tutorial video" card (address, chapter rows with title and
+  mm:ss, Save) for Admins and the current value read-only for PMs. Candidate app: "Tutorial" opens a card with an
+  HTML5 video when the address ends in .mp4, .webm or .mov (query and fragment ignored), chapters seek it; any other
+  address is a link "Open the tutorial video" (new tab, noopener). The reviewer page also has the Tutorial button, as
+  this step's brief asks (the design calls Tutorial "for authors").
+- **(chosen by Claude)** Help. `POST /me/tasks/:id/help` (the author's own task, the same access as `GET
+  /me/tasks/:id`) and `POST /me/reviews/:taskId/help` (the assigned Reviewer, the same access as `GET
+  /me/reviews/:taskId`: new flow on, terms accepted, not their own task) take `{question 1-1000, history ≤ 10}` and
+  answer `{answer, scoped: true}`. Help works for any task the caller may open: the author's route with the new flow on
+  or off, the Reviewer's only with it on (as the review page). Same Support Bot model and mock as `/me/support/ask`, the
+  same per-session limit (20 a minute); the Support Bot has no daily cap, so none is added. Questions are not stored.
+- **(chosen by Claude)** The scoped prompt is the SME Support Bot prompt plus task rules: answer only about this task,
+  its template's sections and the project's published rules (and how to submit, or for the Reviewer how to send back or
+  approve); explain and give a generic example, never write the author's content; for the Reviewer, explain what to
+  check and never decide; anything else gets exactly "I can only help with this task and its form. Ask me about a
+  section, the rules for this case, or how to submit." Context, as data in the `<record source="this task">` and
+  `<template>` tags: the template name and its generated guide, the slot brief, status and coverage tags, each
+  section's title and whether it is filled (never the author's answers), the published agent-visible rules in force
+  (ids and titles only; the task's snapshot first), and the review comments the person already sees (the author: the
+  latest author-facing decision; the Reviewer: their own decisions). No off-topic pre-filter. The local mock answers
+  from the help pack, the template guide and the context, and gives the refusal sentence when nothing matches.
+- **(chosen by Claude)** On the task page and the review page, Tutorial and Help buttons sit above the page; Help opens
+  a right-hand drawer with the scope note, four suggested questions (author or reviewer set), the conversation and an
+  Ask box. The general floating Support Bot is removed from the task page (the review page never had it) and stays on
+  Home.

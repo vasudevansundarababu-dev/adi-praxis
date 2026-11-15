@@ -20,6 +20,8 @@ export interface RulesTableRule extends TableRule, AnnotatedRow {
 type AnnotationRun = { status: 'none' | 'running' | 'done' | 'failed' | 'skipped'; annotated?: number; offered?: number; error?: string | null; model?: string | null };
 
 const EXAMPLE = 'This template is for KYC for single, joint and minor accounts. Select all the rules that are mandatory for these tasks, including edge cases and special cases.';
+/** D4 (owner, 15 Nov 2026): a short placeholder, so the example never looks like real input. */
+const PLACEHOLDER = 'Describe the tasks this template covers…';
 
 /**
  * Rules table with prompt-guided selection (PRD 5.6). The AI only marks rules as Suggested, with a reason; the PM's
@@ -42,9 +44,16 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
   const [appType, setAppType] = useState('');
   const [govState, setGovState] = useState('');
   const [annotationRun, setAnnotationRun] = useState<AnnotationRun | null>(null);
+  const [appliedOnly, setAppliedOnly] = useState(false);
+  /** Suggestions the PM rejected in this session: hidden from the suggested list; the rule itself is unchanged. */
+  const [rejected, setRejected] = useState<Set<string>>(new Set());
 
   const docRules = useMemo(() => rulesForDocument(rules, docId), [rules, docId]);
-  const rows = useMemo(() => forApplication(byMarking(visibleRules(docRules, suggestions, showAll), markingFilter), { applicationType: appType, governingState: govState.trim() }), [docRules, suggestions, showAll, markingFilter, appType, govState]);
+  const rows = useMemo(() => {
+    const kept = suggestions && !showAll ? docRules.filter((r) => !rejected.has(r.ruleKey) || r.applied) : docRules;
+    const visible = visibleRules(kept, suggestions, showAll).filter((r) => !appliedOnly || r.applied);
+    return forApplication(byMarking(visible, markingFilter), { applicationType: appType, governingState: govState.trim() });
+  }, [docRules, suggestions, showAll, markingFilter, appType, govState, appliedOnly, rejected]);
   const appTypes = useMemo(() => applicationTypeOptions(rules), [rules]);
   const filtering = !!appType || !!govState.trim();
 
@@ -144,7 +153,7 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
   }
 
   async function applyAllSuggested() {
-    const todo = rows.filter((r) => suggestions?.get(r.ruleKey)?.match && !r.applied);
+    const todo = rows.filter((r) => suggestions?.get(r.ruleKey)?.match && !r.applied && !rejected.has(r.ruleKey));
     let done = 0;
     const skipped: string[] = [];
     for (const r of todo) {
@@ -184,14 +193,22 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
           <label htmlFor="rule-prompt" className="font-medium">
             Which rules does this template need?
           </label>
-          <textarea id="rule-prompt" className="min-h-16 rounded-md border border-line bg-surface px-2 py-1 text-fg" value={prompt} placeholder={EXAMPLE} onChange={(e) => setPrompt(e.target.value)} aria-describedby="rule-prompt-hint" />
+          <textarea id="rule-prompt" className="min-h-16 rounded-md border border-line bg-surface px-2 py-1 text-fg" value={prompt} placeholder={PLACEHOLDER} onChange={(e) => setPrompt(e.target.value)} aria-describedby="rule-prompt-hint" />
+          <span className="text-xs">
+            Example:{' '}
+            <button type="button" className="text-link underline" onClick={() => setPrompt(EXAMPLE)}>
+              Use this example
+            </button>{' '}
+            <span className="text-fg-muted">— “{EXAMPLE}”</span>
+          </span>
           <span id="rule-prompt-hint" className="text-xs text-fg-muted">
-            Leave empty to see every rule. The assistant only suggests; you decide by ticking Apply to project.
+            Leave empty to see every rule. The assistant only suggests; you decide by accepting (ticking Apply to project).
           </span>
           <div className="flex flex-wrap gap-2">
             <button type="submit" className="btn btn-primary disabled:opacity-50" disabled={!!busy || !prompt.trim()}>
               Suggest rules
             </button>
+            {!prompt.trim() && <span className="self-center text-xs text-warning">Type what the template needs</span>}
             {ranPrompt && (
               <button type="button" className="btn btn-secondary" onClick={clearPrompt}>
                 Clear and show all
@@ -223,7 +240,7 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
             </label>
             {suggestedCount > 0 && (
               <button type="button" className="btn btn-secondary disabled:opacity-50" disabled={!!busy} onClick={applyAllSuggested}>
-                Apply all suggested
+                Accept all suggested
               </button>
             )}
           </>
@@ -255,6 +272,9 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
         <label className="flex flex-col gap-1">
           <span className="font-medium">Governing state</span>
           <input className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-fg" value={govState} placeholder="e.g. CA" maxLength={8} onChange={(e) => setGovState(e.target.value)} />
+        </label>
+        <label className="inline-flex items-center gap-1 self-end pb-1">
+          <input type="checkbox" checked={appliedOnly} onChange={(e) => setAppliedOnly(e.target.checked)} /> Applied only
         </label>
         <div className="flex flex-col gap-1">
           <button type="button" className="btn btn-secondary disabled:opacity-50" disabled={!docId || annotationRun?.status === 'running'} onClick={suggestAnnotations}>
@@ -394,6 +414,24 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
                     <td className="max-w-xs pr-3 text-xs">{r.annotation ? (r.annotation.appliesWhen ?? <span className="text-warning">Unknown</span>) : <span className="text-fg-muted">—</span>}</td>
                     <td className="max-w-xs pr-3 text-xs">{r.annotation ? (r.annotation.why ?? <span className="text-warning">Not given</span>) : <span className="text-fg-muted">—</span>}</td>
                     <td>
+                      {s?.match && !r.applied && !rejected.has(r.ruleKey) && (
+                        <div className="mb-1 flex flex-col gap-1">
+                          <button type="button" className="btn btn-primary px-2 py-1 text-xs disabled:opacity-50" disabled={!!stage || !!busy} onClick={() => void toggle(r, true)}>
+                            {steps.define ? 'Define with AI, then accept' : 'Accept'}
+                          </button>
+                          <button type="button" className="btn btn-secondary px-2 py-1 text-xs" onClick={() => setRejected((x) => new Set(x).add(r.ruleKey))} aria-label={`Reject the suggestion ${r.title}`}>
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                      {s?.match && rejected.has(r.ruleKey) && !r.applied && (
+                        <span className="mb-1 block text-xs text-fg-muted">
+                          Rejected · not applied{' '}
+                          <button type="button" className="text-link underline" onClick={() => setRejected((x) => new Set([...x].filter((k) => k !== r.ruleKey)))}>
+                            Undo
+                          </button>
+                        </span>
+                      )}
                       <label className="inline-flex items-center gap-1">
                         <input type="checkbox" checked={r.applied} disabled={!!stage || !!busy} onChange={(e) => void toggle(r, e.target.checked)} aria-label={`Apply ${r.title} to the project`} />
                         <span className="sr-only">{r.applied ? 'Applied' : 'Not applied'}</span>

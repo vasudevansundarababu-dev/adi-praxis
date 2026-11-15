@@ -3,7 +3,7 @@ import '@fastify/multipart';
 import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { CandidateRule, LOCATOR_GRANULARITY, PolicyRuleBody, REVERSE_RELATION, RuleAnnotationInput, TaskChangeInput, annotationFlags } from '@praxis/shared';
+import { CandidateRule, LOCATOR_GRANULARITY, PolicyRuleBody, ProjectRuleSetContent, REVERSE_RELATION, RuleAnnotationInput, TaskChangeInput, annotationFlags } from '@praxis/shared';
 import type { MalwareScanner, ObjectStorage } from '../candidate/storage';
 import type { Config } from '../config';
 import type { Db } from '../db';
@@ -527,8 +527,17 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
 
   app.get('/projects/:projectId/policy/rule-sets', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams } }, async (req) => {
     const p = await policyProject(db, req.actor!, req.params.projectId);
-    const sets = await db.projectRuleSet.findMany({ where: { projectId: p.id }, orderBy: { version: 'desc' }, select: { id: true, version: true, digest: true, ruleVersionIds: true, publishedById: true, createdAt: true } });
-    return { items: sets.map((s) => ({ ...s, ruleCount: s.ruleVersionIds.length })) };
+    const sets = await db.projectRuleSet.findMany({ where: { projectId: p.id }, orderBy: { version: 'desc' }, select: { id: true, version: true, digest: true, ruleVersionIds: true, publishedById: true, createdAt: true, content: true } });
+    // Rules per mandatory marking in each published version (`not_annotated` for rules published without one).
+    const markingCounts = (content: unknown) => {
+      const out: Record<string, number> = {};
+      for (const r of ProjectRuleSetContent.parse(content).rules) {
+        const m = r.body.annotation?.marking ?? 'not_annotated';
+        out[m] = (out[m] ?? 0) + 1;
+      }
+      return out;
+    };
+    return { items: sets.map(({ content, ...s }) => ({ ...s, ruleCount: s.ruleVersionIds.length, markingCounts: markingCounts(content) })) };
   });
 
   // ───────── Task policy (slice 6) ─────────

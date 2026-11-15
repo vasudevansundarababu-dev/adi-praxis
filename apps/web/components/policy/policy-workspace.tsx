@@ -313,12 +313,8 @@ function Extraction({ projectId, isAdmin, data: initial, documents }: { projectI
           <strong>Not available.</strong> {data.problems.join(' ')} You can still add rules by hand from pasted text.
         </div>
       )}
-      {isAdmin && data.budget && data.budget.ceilingUsd !== undefined && (
-        <p className="mt-1 text-fg-muted">
-          Budget ({data.budget.provider}): ${data.budget.spentUsd?.toFixed(2)} of {data.budget.ceilingUsd === null ? 'no limit set (live calls refused)' : `$${data.budget.ceilingUsd.toFixed(2)}`} used; estimate ${data.budget.usdPerPage?.toFixed(2)} per page.
-        </p>
-      )}
-      {!isAdmin && data.budget?.exhausted && <p className="mt-1 text-warning">The extraction budget is used up. Use Paste text, or ask an Admin.</p>}
+      {/* D7 (owner, 15 Nov 2026): no cost or budget figures on project screens; spending moves to an Admin usage page. */}
+      {data.budget?.exhausted && <p className="mt-1 text-warning">The extraction budget is used up. Use Paste text, or ask an Admin.</p>}
       {latest.length > 0 && (
         <fieldset className="mt-3" disabled={!data.available}>
           <legend className="font-medium">Documents to extract (latest versions)</legend>
@@ -349,7 +345,6 @@ function Extraction({ projectId, isAdmin, data: initial, documents }: { projectI
               <th>Candidates</th>
               <th>Elapsed</th>
               <th>Profile</th>
-              {isAdmin && <th>Cost</th>}
               <th />
             </tr>
           </thead>
@@ -370,7 +365,6 @@ function Extraction({ projectId, isAdmin, data: initial, documents }: { projectI
                   <td className="text-xs">
                     {b.profileId} r{b.profileRevision}
                   </td>
-                  {isAdmin && <td className="text-xs">{j.actualUsd != null ? `$${j.actualUsd.toFixed(2)}` : j.estimatedUsd != null ? `≤ $${j.estimatedUsd.toFixed(2)} reserved` : '—'}</td>}
                   <td>
                     {['FAILED', 'UNCERTAIN', 'PARTIAL', 'CANCELLED'].includes(b.status) && (
                       <button type="button" className="text-link hover:underline disabled:opacity-50" disabled={pending || !data.available} onClick={() => run(b.id, b.jobs.map((x) => x.documentVersionId))}>
@@ -407,10 +401,74 @@ function Extraction({ projectId, isAdmin, data: initial, documents }: { projectI
   );
 }
 
+interface PublishedSet {
+  id: string;
+  version: number;
+  digest: string;
+  ruleCount: number;
+  createdAt: string;
+  markingCounts?: Record<string, number>;
+}
+
+const markingText = (c: Record<string, number> | undefined) =>
+  c && Object.keys(c).length
+    ? Object.entries(c)
+        .map(([m, n]) => `${m === 'not_annotated' ? 'Not annotated' : (MARKING_LABEL[m as MandatoryMarking] ?? m)} ${n}`)
+        .join(' · ')
+    : '—';
+
+/** Published rule-set versions with their rules per marking (mockup step 6, approved 15 Nov 2026). */
+export function PublishedVersions({ items }: { items: PublishedSet[] }) {
+  if (!items.length) return <p className="mt-3 text-fg-muted">No rule set published yet.</p>;
+  return (
+    <div className="mt-4">
+      <h3 className="font-semibold">Published versions</h3>
+      <table className="mt-1 w-full text-left">
+        <thead className="text-xs text-fg-muted">
+          <tr>
+            <th className="py-1">Version</th>
+            <th>Rules</th>
+            <th>By marking</th>
+            <th>Digest</th>
+            <th>Published</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((s, i) => (
+            <tr key={s.id} className="border-t border-line align-top">
+              <td className="py-1 font-mono">
+                v{s.version}
+                {i > 0 && <span className="ml-1 text-xs text-fg-muted">(superseded)</span>}
+              </td>
+              <td>{s.ruleCount}</td>
+              <td className="text-xs">{markingText(s.markingCounts)}</td>
+              <td className="font-mono text-xs">{s.digest.slice(0, 8)}…</td>
+              <td className="text-xs">{new Date(s.createdAt).toISOString().slice(0, 16).replace('T', ' ')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-1 text-xs text-fg-muted">RL Gym reads the published set through the unchanged policy manifest. The annotations document (marking, applies when, why, links, provenance) is ready but proposed: it is not sent until RL Gym agrees to the versioned change.</p>
+    </div>
+  );
+}
+
 function Publish({ projectId, preview }: { projectId: string; preview: PreviewData | null }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [sets, setSets] = useState<PublishedSet[]>([]);
+  const latestVersion = preview?.latest?.version ?? null;
+  useEffect(() => {
+    let stop = false;
+    void fetch(`/api/v1/projects/${projectId}/policy/rule-sets`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d: { items: PublishedSet[] }) => !stop && setSets(d.items))
+      .catch(() => undefined);
+    return () => {
+      stop = true;
+    };
+  }, [projectId, latestVersion]);
   if (!preview) return null;
   async function publish() {
     setPending(true);
@@ -486,6 +544,7 @@ function Publish({ projectId, preview }: { projectId: string; preview: PreviewDa
         Publish rule set
       </button>
       <Message m={msg} />
+      <PublishedVersions items={sets} />
     </section>
   );
 }

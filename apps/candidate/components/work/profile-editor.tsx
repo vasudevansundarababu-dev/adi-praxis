@@ -30,6 +30,7 @@ import type { TaskView } from '@/lib/work-types';
 import { SubmitPanel } from './submit-panel';
 import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
+import { SaveBar } from './save-bar';
 import { PolicyPicker, type LibraryView } from './policy-picker';
 import { RubricEditor, SourcePanel, useRubricView } from './rubric-editor';
 
@@ -516,6 +517,14 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
             {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(s) => goTo(sectionIndex(s))} submitLabel={rework ? 'Resubmit for review' : undefined} declaration={DECLARATION_V2} />}
           </div>
         )}
+
+        <SaveBar state={state} flush={flush} readOnly={task.readOnly}>
+          {active !== profile.sections.length - 1 && (
+            <button type="button" className="btn btn-primary" onClick={() => goTo(profile.sections.length - 1)}>
+              Check and submit
+            </button>
+          )}
+        </SaveBar>
 
         <div className="flex flex-wrap justify-between gap-2">
           <button type="button" className={button} disabled={active === 0} onClick={() => goTo(active - 1)}>

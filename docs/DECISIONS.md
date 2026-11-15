@@ -1911,3 +1911,12 @@ D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos ar
     inline. "Use or write my own" needs a chosen JD with a wage.
   - Save itself never asks for a field the PM couldn't see.
 - **(owner, D11)** The open-slot edge-case field reads "Edge case this task tests" everywhere, with the owner's help text (`EDGE_CASE_LABEL` and `EDGE_CASE_HELP` in `packages/shared/src/forge.ts`).
+- **(owner, D12)** **Save is always visible.** The authoring forms (sections form, generic task page, KYC workbench)
+  have a sticky action bar at the bottom with Save. Save is the autosave's flush: it never submits and never runs
+  Submit's checks. The bar shows "Saving…", "Saved at HH:MM" or "Couldn't save, try again", and the button becomes
+  Try again. Beside Save is "Check and submit", which goes to the last section. Autosave is unchanged. The bar is
+  hidden on read-only tasks and in print.
+- **(chosen by Claude, D13)** **Help floats; Tutorial stays at the top.** Help is a fixed button at the bottom right,
+  placed above the sticky Save bar so it never covers Save, Submit or a field. It has a focus ring, is hidden in print
+  and while the drawer is open, and opens the existing Help drawer. Tutorial stays at the top of the page because it
+  opens an inline video card, which would overlap the form if it floated.

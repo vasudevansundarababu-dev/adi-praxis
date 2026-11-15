@@ -202,5 +202,8 @@ describe('D11: the open-slot edge-case field has its label and help', () => {
     expect(t2).toContain('In one line, name the unusual situation this task covers, the twist that makes it harder than a routine case.');
     expect(t2).toContain("Example: 'Weekly report arrives late; the agent must hold, not guess.'");
     expect(html).toContain('aria-describedby="edge-case-help"');
+    // D12: the sections form has the always-visible Save bar, with a way to Check and submit.
+    expect(html).toContain('data-save-bar');
+    expect(text(html)).toContain('Check and submit');
   });
 });

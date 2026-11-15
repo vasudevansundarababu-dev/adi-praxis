@@ -31,6 +31,7 @@ import { SectionDraftBanner, StartPanel, useDrafting } from './drafting';
 import { SubmitPanel } from './submit-panel';
 import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
+import { SaveBar } from './save-bar';
 
 const input = 'mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5 disabled:opacity-70';
 const PHONE_QUERY = '(max-width: 767px)';
@@ -560,6 +561,13 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
           )}
         </fieldset>
         {section === 'W00' && <StartPanel taskId={task.id} drafting={drafting} onBlank={() => void changeSection('W01')} beforeDraft={flush} readOnly={ro} />}
+        <SaveBar state={state} flush={flush} readOnly={ro}>
+          {section !== 'W06' && (
+            <button type="button" className="btn btn-primary" onClick={() => void changeSection('W06')}>
+              Check and submit
+            </button>
+          )}
+        </SaveBar>
         {/* W06 sits in the same column as the other sections (outside the fieldset so its own controls stay usable). */}
         {section === 'W06' && !ro && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(next) => void changeSection(next)} />}
         {section === 'W06' && ro && <p>This task is read-only.</p>}

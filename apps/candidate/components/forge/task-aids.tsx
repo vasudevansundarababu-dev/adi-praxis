@@ -167,7 +167,7 @@ export function HelpDrawer({ endpoint, kind, onClose }: { endpoint: string; kind
   );
 }
 
-/** The Tutorial and Help buttons for a task page (author) or review page (reviewer), with their card and drawer. */
+/** The Tutorial button (top of the page) and the floating Help button (D13) for a task or review page, with their card and drawer. */
 export function TaskAids({ taskId, kind, tutorial, initial = null }: { taskId: string; kind: AidsFor; tutorial: Tutorial | null | undefined; initial?: 'tutorial' | 'help' | null }) {
   const [showTutorial, setShowTutorial] = useState(initial === 'tutorial');
   const [showHelp, setShowHelp] = useState(initial === 'help');
@@ -178,10 +178,21 @@ export function TaskAids({ taskId, kind, tutorial, initial = null }: { taskId: s
         <button type="button" className="btn btn-secondary" aria-expanded={showTutorial} onClick={() => setShowTutorial((v) => !v)}>
           ▶ Tutorial
         </button>
-        <button type="button" className="btn btn-secondary" aria-expanded={showHelp} onClick={() => setShowHelp((v) => !v)}>
+      </div>
+      {/* D13 (owner, 15 Nov 2026): Help floats, so it never scrolls away. Bottom-right, above the sticky Save bar (it never
+          covers Save, Submit or a field), keyboard reachable with a focus ring, hidden in print and while the drawer is open. */}
+      {!showHelp && (
+        <button
+          type="button"
+          data-help-fab
+          aria-expanded={false}
+          aria-label="Help for this task"
+          onClick={() => setShowHelp(true)}
+          className="btn btn-primary fixed bottom-20 right-4 z-40 rounded-full px-4 py-2 shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link sm:bottom-24 sm:right-6 print:hidden"
+        >
           ? Help
         </button>
-      </div>
+      )}
       {showTutorial && (
         <div className="mt-3">
           <TutorialCard tutorial={tutorial} onClose={() => setShowTutorial(false)} />

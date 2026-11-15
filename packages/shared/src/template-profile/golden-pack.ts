@@ -47,6 +47,8 @@ export const GoldenPack = z
             field: z.string().regex(/^[a-z][a-z0-9_]{0,62}$/),
             source: z.string().regex(/^S\d+\.[A-Za-z][A-Za-z0-9_]{0,62}$/),
             values: z.array(z.string().trim().min(1).max(50)).min(1).max(100),
+            /** Optional display label per value (e.g. `{individual: "Single"}`); otherwise the form's option labels. */
+            labels: z.record(z.string(), z.string().trim().min(1).max(100)).optional(),
           })
           .strict()
           .optional(),
@@ -117,6 +119,7 @@ function caseSelectorProblems(profile: TemplateProfile, template: GoldenPack['te
     const opts = (field.options ?? []).map((o) => o.value).sort();
     const vals = [...sel.values].sort();
     if (new Set(vals).size !== vals.length) out.push('template.caseSelector.values: values must be unique');
+    for (const k of Object.keys(sel.labels ?? {})) if (!sel.values.includes(k)) out.push(`template.caseSelector.labels: "${k}" is not one of the selector's values`);
     if (opts.join('\u0000') !== vals.join('\u0000')) out.push(`template.caseSelector.values: must equal the options of ${sel.source} exactly (${opts.join(', ')})`);
   }
   if (profile.contract?.outputsFrom !== 'template_execution') out.push('profile.contract.outputsFrom: a case-selector form must take its outputs from the template execution ("template_execution"); expected answers are private dataset material');

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TERMS_KEYS, type TermsKey } from './selection';
+import { humaniseField, selectorValueDisplay } from './tasks';
 
 /**
  * MVP1 (ADI Forge), approved by the owner on 15 Nov 2026 (docs/design/PROJECT-SCREEN-DESIGN.md).
@@ -173,7 +174,7 @@ export interface SelectorSlot {
   tags?: Record<string, string> | null;
   edgeCase?: string | null;
   isOpen?: boolean | null;
-  case?: { field: string; source: string; value: string } | null;
+  case?: { field: string; source: string; value: string; label?: string } | null;
 }
 
 /**
@@ -188,8 +189,9 @@ export function forgeSlotSelector(
   if (!slot) return null;
   if (slot.isOpen) return { field: '', value: '', label: 'Open slot' };
   if (slot.case) {
-    const option = labels.optionLabel?.(slot.case.source, slot.case.value);
-    return { field: labels.fieldLabel?.(slot.case.source) ?? slot.case.field, value: slot.case.value, label: option && option !== slot.case.value ? `${option} (${slot.case.value})` : slot.case.value };
+    // The label stored on the slot (15 Nov 2026) wins; older slots read it from the template's form.
+    const option = slot.case.label ?? labels.optionLabel?.(slot.case.source, slot.case.value);
+    return { field: labels.fieldLabel?.(slot.case.source) ?? humaniseField(slot.case.field), value: slot.case.value, label: selectorValueDisplay(slot.case.value, option) };
   }
   const dims = labels.dimensions ?? [];
   const order = (k: string) => dims.findIndex((d) => d.key === k) + 1 || 999;

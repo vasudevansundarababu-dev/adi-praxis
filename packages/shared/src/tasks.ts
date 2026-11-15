@@ -21,30 +21,58 @@ export interface CaseSelector {
   /** `S<n>.<fieldKey>` of the form, e.g. `S1.governingState`. */
   source: string;
   values: string[];
+  /** Optional display labels per value, from the template; otherwise the form's option labels are used. */
+  labels?: Record<string, string>;
 }
 
 export interface SlotCase {
   field: string;
   source: string;
   value: string;
+  /** The value's display label when the slot was made (e.g. "Single"); absent on slots made before 15 Nov 2026. */
+  label?: string;
+}
+
+/** "risk_tier" -> "Risk tier": the fallback display name of a selector field without a form label. */
+export const humaniseField = (field: string) => {
+  const words = field.replace(/[_-]+/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim().toLowerCase();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : field;
+};
+
+/**
+ * How a selector value is shown: its label, followed by the value in brackets only when the value is a short code
+ * people also use (a state such as "CA": "California (CA)"). An internal value such as "adult_joint" is never shown
+ * beside its label ("Joint").
+ */
+export function selectorValueDisplay(value: string, label?: string | null): string {
+  if (!label || label === value) return value;
+  return /^[A-Z0-9]{1,5}$/.test(value) ? `${label} (${value})` : label;
+}
+
+/** The display label of one selector value: the template's own label, then the form option's, then the value. */
+export function selectorValueLabel(sel: Pick<CaseSelector, 'labels'>, value: string, optionLabel?: string): string {
+  return sel.labels?.[value] ?? optionLabel ?? value;
 }
 
 /**
- * One required slot per case-selector value (KYC five-state contract, 13 Nov 2026): the target is one task per value,
- * so slots are never open and never repeat a value. `labelOf` gives the value's display label, when known.
+ * One required slot per case-selector value (KYC five-state contract, 13 Nov 2026; generic since 15 Nov 2026): the
+ * target is one task per value, so slots are never open and never repeat a value. `labelOf` gives the form option's
+ * label, when known; the template's own `labels` win over it.
  */
 export function caseSelectorSlots(sel: CaseSelector, opts: { fieldLabel?: string; labelOf?: (value: string) => string | undefined } = {}): SlotSpec[] {
-  const name = opts.fieldLabel ?? sel.field;
+  const name = opts.fieldLabel ?? humaniseField(sel.field);
   return sel.values.map((value) => {
-    const label = opts.labelOf?.(value);
-    const shown = label && label !== value ? `${label} (${value})` : value;
+    const label = selectorValueLabel(sel, value, opts.labelOf?.(value));
+    const shown = selectorValueDisplay(value, label);
+    // A code ("CA") is what the author sets; otherwise the label is what the form's pick list shows.
+    const setTo = shown === label ? label : value;
     return {
       tags: { [sel.field]: value },
       edgeCase: null,
       isOpen: false,
       required: true,
-      brief: `${name}: ${shown}. Write this reusable task for ${label ?? value} only; set ${name} to ${value}.`,
-      case: { field: sel.field, source: sel.source, value },
+      brief: `${name}: ${shown}. Write this reusable task for ${label} only; set ${name} to ${setTo}.`,
+      case: { field: sel.field, source: sel.source, value, label },
     };
   });
 }

@@ -1161,3 +1161,10 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
 - **(chosen by Claude)** The two templates are named by id (`--keep`). Other versions of the same lineage are left untouched, so published history (KYC v4, v5) stays immutable.
 - **Job:** `qa-template-cleanup`.
 - **Run order:** projects, then SMEs, then templates. A dry run comes first each time, and each run needs the owner's yes in the DevOps session.
+- **(owner, 15 Nov 2026) Standing approvals for the MVP1 build:**
+  - push `feat/mvp1-forge` and open the single MVP1 PR;
+  - merge it into main once every CI check passes;
+  - fold in `feat/qa-sme-reset` (QA reset jobs) and `fix/policy-suggest-timeout`;
+  - message the DevOps session to prepare the QA deploy;
+  - "gcp deployment".
+  - The DevOps session's own rule still asks for the owner's yes in that session for each deploy and QA data run.

@@ -43,13 +43,15 @@ export const candidateStudioRoutes: FastifyPluginAsyncZod<StudioRouteOptions> = 
     if (!ctx.ok) outstanding(ctx);
     const bp = await deployedBlueprint(tx, storage, d.verificationRunId);
     registerStudio(d.template.domain.name, d.template.workflowName, d.templateId, bp, deps);
-    return { d, bp, candidateId: ctx.candidateId };
+    return { d, bp, candidateId: ctx.candidateId, direct: ctx.direct };
   }
 
   app.get('/candidate/studio/:studioKey', { config: { access: 'candidate' }, schema: { tags: ['studio'], params: KeyParams, response: { 200: StudioConfigResponse } } }, async (req) => {
     const actor = req.candidate!;
-    const { d, bp, candidateId } = await enter(db, req.params.studioKey, actor.smeUserId, actor.clientId);
+    const { d, bp, candidateId, direct } = await enter(db, req.params.studioKey, actor.smeUserId, actor.clientId);
     let task = await openStudioTask(db, d.projectId, candidateId);
+    // New flow: the PM or Admin assigns each task, so the first open never allocates one.
+    if (!task && direct) throw new AppError(409, 'NO_TASK', 'No task is assigned to you in this studio yet. Your project manager assigns your tasks.');
     if (!task) {
       // First open: one task through the existing allocation (caps, coverage slots and review keep working).
       task = await db.$transaction(async (tx) => {

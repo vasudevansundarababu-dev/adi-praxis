@@ -1199,3 +1199,36 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
   returns `409 PM_ASSIGNS_TASKS`, `canPull` is false and the studio's first open never allocates. An SME from the
   earlier journey keeps the earlier rules (and can still pull) while the setting is on, so the old journey keeps
   working until the owner retires it.
+
+## MVP1 step 2: task review (15 Nov 2026)
+
+- **Routes.** `GET /projects/:id/forge-tasks` and `GET /projects/:id/forge-tasks/:taskId` (Tasks tab and task page) and
+  `POST /projects/:id/tasks/:taskId/decision` (decision box), for Admins and the owning PM. `GET /me/reviews`,
+  `GET /me/reviews/:taskId` and `POST /me/reviews/:taskId/decision` for the external Reviewer (candidate app). All need
+  the new flow (`409 NEW_FLOW_OFF`); the earlier `/review/...` routes are unchanged.
+- **(chosen by Claude)** One engine: the Reviews screen, the Tasks tab and the external Reviewer share the same
+  decision code (`decideOneStep` for Author → PM/Admin, `decideStageFor` for Author → Reviewer → PM/Admin), with the
+  decider given as a console user or an external Reviewer. Audits keep their action names and add `via: tasks_tab`
+  (Tasks tab) or `reviewer: external, smeUserId` (Reviewer).
+- **(chosen by Claude)** Checklist: the review checklist keys are generic (realistic, correct, covers the slot, fair
+  difficulty, distinct, rubric catches failures), so approving on the Author → PM/Admin route needs all of them true
+  (`400 CHECKLIST_INCOMPLETE`), as the Reviews screen does. PM approval on the Reviewer route needs no checklist (as
+  today's stage decision), and the external Reviewer's checklist is optional and stored as sent (the design shows only
+  per-section comments).
+- **(chosen by Claude)** The person who wrote a task (email match) or declared a conflict with its author never decides
+  on it from the Tasks tab, Admins included (as the Reviewer route already does). Their row shows "Waiting for PM".
+- **(chosen by Claude)** The Tasks-tab decision is bound to the submitted version and its content hash on both routes
+  (`expectedVersion`, `expectedRevision`; stale → `409 STALE_STAGE_DECISION` / `STALE_REVISION`); SME → PM decisions made
+  here also store the content hash.
+- **(chosen by Claude)** The external Reviewer's request also takes `duplicateDecision` and `confirmedCoverage`
+  (optional): needed only for a task flagged as a likely duplicate or on an open coverage slot, as the Expert stage
+  requires today. Without them such a task could not be passed.
+- **(chosen by Claude)** TaskReview has no reviewer kind column: an external Reviewer's decisions carry their SmeUser id
+  in `reviewerId`; names are looked up in users, then candidate accounts. The task's console `reviewerId` is set only by
+  console users.
+- **(chosen by Claude)** Reviewer Home statuses come from the Reviewer's own latest decision: To review (submitted and
+  waiting for them), Sent back (they returned it), Approved (they passed it, whatever happened next). Tasks not yet
+  submitted and never decided by them are not listed. The Review page shows the latest submitted version, its checks
+  and flags (as a Validator sees them), never other authors' content (no similar-task texts).
+- **(chosen by Claude)** Task page output: none while Open, the draft read-only while Assigned or In progress, else the
+  latest submitted version. "Date" is the latest of created, assigned, started, submitted and decision times.

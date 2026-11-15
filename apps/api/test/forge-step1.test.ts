@@ -12,6 +12,7 @@ import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { allocateTasks, ensureSlotTasks } from '../src/tasks/task-service';
 import { writeAudit } from '../src/platform/audit';
+import { call, forgeKit } from './forge-helpers';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
 const SECRET = 'test-mock-secret';
@@ -39,8 +40,7 @@ describe('MVP1 step 1: settings, Sourcing, task rows, direct assignment, candida
     email: new MemoryEmailSender(),
     embeddings: new HashingEmbeddingProvider(),
   });
-  const call = (a: FastifyInstance, method: 'GET' | 'POST' | 'PUT', cookie: string, url: string, payload?: object) =>
-    a.inject({ method, url: `/api/v1${url}`, headers: { cookie, ...(method === 'GET' ? {} : idem()) }, ...(payload ? { payload } : {}) });
+  const { setFlow, source, signIn, assign: assignAs } = forgeKit(() => ({ app, pm, admin }), google);
   const post = (cookie: string, url: string, payload: object = {}) => call(app, 'POST', cookie, url, payload);
   const put = (cookie: string, url: string, payload: object) => call(app, 'PUT', cookie, url, payload);
   const get = (cookie: string, url: string) => call(app, 'GET', cookie, url);
@@ -110,25 +110,11 @@ describe('MVP1 step 1: settings, Sourcing, task rows, direct assignment, candida
     return p.id as string;
   }
 
-  const setFlow = async (newFlow: boolean) => expect((await put(admin, '/admin/forge-settings', { newFlow })).statusCode).toBe(200);
-
-  async function source(projectId: string, role: 'SME' | 'REVIEWER', o: { first?: string; last?: string; email?: string; assessment?: Record<string, string> } = {}) {
-    const res = await post(pm, '/sourcing/people', { projectId, role, firstName: o.first ?? 'Grace', lastName: o.last ?? 'Hopper', email: o.email ?? `${randomUUID().slice(0, 8)}@gmail.test`, ...(o.assessment ? { assessment: o.assessment } : {}) });
-    expect(res.statusCode, res.body).toBe(201);
-    return res.json() as { id: string; email: string };
-  }
 
   const tasksOf = (projectId: string) => db.taskInstance.findMany({ where: { projectId }, include: { slot: true }, orderBy: { slot: { position: 'asc' } } });
   const openTask = async (projectId: string) => (await tasksOf(projectId)).find((t) => t.status === 'CREATED' && !t.assignedToId)!;
-  const assign = (projectId: string, sourcedPersonId: string, taskId: string) => post(pm, `/projects/${projectId}/assignments/direct`, { sourcedPersonId, taskId });
+  const assign = assignAs;
   const audits = (action: string) => db.auditEvent.findMany({ where: { action } });
-
-  /** A candidate signed in through the mock Google sign-in (subject `mock-<email>`), with no identity check. */
-  async function signIn(mail: string, subject = `mock-${mail}`) {
-    const res = await app.inject({ method: 'POST', url: '/api/v1/auth/google', payload: { credential: google.mint({ subject, email: mail, name: 'Grace Hopper' }), adultAttested: true } });
-    expect(res.statusCode, res.body).toBe(200);
-    return { smeUserId: res.json().id as string, cookie: `praxis_candidate=${res.cookies.find((x) => x.name === 'praxis_candidate')!.value}` };
-  }
 
   // ── 1. Settings ──
 

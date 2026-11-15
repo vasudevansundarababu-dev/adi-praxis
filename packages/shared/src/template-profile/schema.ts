@@ -108,6 +108,29 @@ export interface TemplateProfileField {
   scale?: CriterionScale;
   /** criterion: weighted groups; each criterion names one, and the criteria of a group total its weight. */
   groups?: CriterionGroup[];
+  /**
+   * criterion (D8, owner 15 Nov 2026 "template default, SME edits"): the template's default criteria. Each names a stable
+   * criterion ID and may give its name, weight, scoring text (by the field's scale) and whole-task failure. The form
+   * starts from these; the author edits; the reviewer sees what changed. Optional: older template versions have none.
+   */
+  criterionDefaults?: CriterionDefault[];
+}
+
+/** One template-default criterion (D8). Scoring keys follow the field's scale: 5/2/0 or levels 0-4. */
+export interface CriterionDefault {
+  id: string;
+  name?: string;
+  weight?: number;
+  passCondition?: string;
+  partialCredit?: string;
+  level3?: string;
+  level2?: string;
+  level1?: string;
+  failCondition?: string;
+  critical?: boolean;
+  /** The exact whole-task failure condition the template approves for this criterion. */
+  criticalCondition?: string;
+  group?: string;
 }
 
 export const CRITERION_SCALES = ['five_two_zero', 'zero_to_four'] as const;
@@ -121,6 +144,24 @@ export interface CriterionGroup {
 }
 const CriterionGroupSchema = z
   .object({ id: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,31}$/), label: z.string().min(1), weight: z.number().positive(), minimum: z.number().nonnegative().optional() })
+  .strict();
+
+const anchor = z.string().min(1).max(4000);
+export const CriterionDefaultSchema: z.ZodType<CriterionDefault> = z
+  .object({
+    id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$/),
+    name: z.string().min(1).max(200).optional(),
+    weight: z.number().positive().max(100).optional(),
+    passCondition: anchor.optional(),
+    partialCredit: anchor.optional(),
+    level3: anchor.optional(),
+    level2: anchor.optional(),
+    level1: anchor.optional(),
+    failCondition: anchor.optional(),
+    critical: z.boolean().optional(),
+    criticalCondition: anchor.optional(),
+    group: z.string().optional(),
+  })
   .strict();
 
 export const TemplateProfileFieldSchema: z.ZodType<TemplateProfileField> = z.lazy(() =>
@@ -148,6 +189,7 @@ export const TemplateProfileFieldSchema: z.ZodType<TemplateProfileField> = z.laz
       requireCritical: z.boolean().optional(),
       scale: z.enum(CRITERION_SCALES).optional(),
       groups: z.array(CriterionGroupSchema).min(1).max(20).optional(),
+      criterionDefaults: z.array(CriterionDefaultSchema).max(200).optional(),
     })
     .strict(),
 );

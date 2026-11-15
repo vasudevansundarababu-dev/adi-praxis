@@ -1,0 +1,162 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { describe, expect, it } from 'vitest';
+import {
+  coverage,
+  derive,
+  emptyOutput,
+  MARKETING_CAMPAIGN_TASK2_PROFILE,
+  registerProfile,
+  seedCriteria,
+  setFieldValue,
+  templateRubric,
+  TemplateProfileSchema,
+  technicalSettings,
+  type DeriveInput,
+  type TemplateProfile,
+} from '@praxis/shared';
+import { jointHashes, jointTemplateSpec } from '../src/anvil/joint-template';
+
+/**
+ * Pure rubric derivation and template reading (no database). Acceptance criteria: recommendations follow each
+ * template's own definitions (AC 1), the applicability safeguards (AC 7), duplicate weighting (AC 8), KYC and
+ * Marketing keep their own scales (AC 9), and the export stays unchanged (AC 10).
+ */
+const V7 = JSON.parse(readFileSync(new URL('./fixtures/kyc-v7/proposal.json', import.meta.url), 'utf8')) as Record<string, any>;
+const V6 = JSON.parse(readFileSync(new URL('./fixtures/kyc-reusable/proposal.json', import.meta.url), 'utf8')) as Record<string, any>;
+const form = (p: unknown) => TemplateProfileSchema.parse(p) as TemplateProfile;
+const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v ?? null)).digest('hex');
+
+function input(profile: TemplateProfile, output: Record<string, unknown>, o: Partial<DeriveInput> = {}): DeriveInput {
+  return { profile, output, rubric: templateRubric(profile, V7.execution)!, template: { id: 't1', version: 2, caseSelector: V7.authoring.template.caseSelector }, task: { id: 'task1', revision: 3 }, policies: [], sources: [], hash, ...o };
+}
+
+function v7Output(profile: TemplateProfile, steps = [{ action: "Verify the custodian's authority and the custodial agreement", tool: 'authority.check', failureBehaviour: '' }]) {
+  let out = emptyOutput(profile);
+  out = setFieldValue(profile, out, 'S1', 'applicationType', 'custodial');
+  out = setFieldValue(profile, out, 'S5', 'steps', steps);
+  return out;
+}
+
+describe('template rubric (D8, D9)', () => {
+  it('KYC v7: 20 fixed criteria from the evaluator map, 5/2/0, no weights invented, run-evidence settings', () => {
+    const tr = templateRubric(form(V7.authoring.profile), V7.execution)!;
+    expect(tr.criteria).toHaveLength(20);
+    expect(tr).toMatchObject({ section: 'S7', fieldKey: 'criteria', scale: 'five_two_zero', fixedSet: true, weightsFromTemplate: false, criterionFailureSupported: true });
+    const seeded = seedCriteria(tr, []);
+    expect(seeded.every((c) => c.weight === null && c.evaluatorKind === 'golden-kyc-rubric-v1' && c.evaluatorVersion === '1')).toBe(true);
+    expect(technicalSettings(tr, seeded[0]!).find((r) => r.label === 'Output field')).toEqual({ label: 'Output field', value: '—', note: 'Not used' });
+  });
+
+  it('template defaults (D8) fill name, weight and scoring; a criterion the template does not map has no evaluator (never guessed)', () => {
+    const p = structuredClone(V7.authoring.profile);
+    p.sections[6].fields[0].criterionDefaults = [{ id: 'identification_verification', name: 'Identity verified', weight: 5, passCondition: 'Each party verified', partialCredit: 'Some parties verified', failCondition: 'No verification', critical: true, criticalCondition: 'Recommends clearance while verification is incomplete' }, { id: 'extra_check', name: 'Extra' }];
+    const tr = templateRubric(form(p), V7.execution)!;
+    expect(tr.weightsFromTemplate).toBe(true);
+    const seeded = seedCriteria(tr, []);
+    expect(seeded.find((c) => c.id === 'identification_verification')).toMatchObject({ name: 'Identity verified', weight: 5, passCondition: 'Each party verified', partialCredit: 'Some parties verified', failCondition: 'No verification', critical: true });
+    const extra = seeded.find((c) => c.id === 'extra_check')!;
+    expect(extra).toMatchObject({ evaluatorKind: '', evaluatorVersion: '' });
+    expect(technicalSettings(tr, extra).find((r) => r.label === 'Evaluator')).toEqual({ label: 'Evaluator', value: '—', note: 'No mapping' });
+    // Existing items are kept exactly, in place; only missing criteria are added.
+    const mine = { ...seeded[0]!, passCondition: 'My own words' };
+    expect(seedCriteria(tr, [mine])[0]).toEqual(mine);
+  });
+
+  it('Marketing keeps its 0-4 levels and groups; KYC scoring defaults are refused on a 0-4 field (AC 9)', () => {
+    const tr = templateRubric(MARKETING_CAMPAIGN_TASK2_PROFILE as TemplateProfile, null)!;
+    expect(tr.scale).toBe('zero_to_four');
+    expect(tr.scoreKeys.map((k) => k.points)).toEqual([4, 3, 2, 1, 0]);
+    expect(tr.fixedSet).toBe(false);
+    expect(tr.criterionFailureSupported).toBe(false);
+    expect(tr.weightsFromTemplate).toBe(true);
+    const bad = structuredClone(MARKETING_CAMPAIGN_TASK2_PROFILE) as any;
+    bad.profileId = 'synthetic-marketing-defaults-v1';
+    const s7 = bad.sections.find((s: { key: string }) => s.key === 'S7');
+    s7.fields.find((f: { type: string }) => f.type === 'criterion').criterionDefaults = [{ id: 'B1', partialCredit: 'KYC-style partial' }];
+    const r = registerProfile(bad, { alternate: true });
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.problems.join(' ')).toMatch(/partial credit.*0-4 field/);
+  });
+});
+
+describe('derivation (AC 1, 7, 8)', () => {
+  it('reads roles from the template’s definitions, not section numbers: the same steps field gives the same links in another section', () => {
+    const p = form(V7.authoring.profile);
+    const a = derive(input(p, v7Output(p)));
+    // Move the procedure field from S5 to S2 (a different template layout); its role is still read from its definition.
+    const moved = structuredClone(V7.authoring.profile);
+    const steps = moved.sections[4].fields.splice(0, 1)[0];
+    moved.sections[1].fields.push(steps);
+    moved.sections[4].fields.push({ key: 'note', type: 'long_text', label: 'Note', help: 'Optional.' });
+    const p2 = form(moved);
+    const b = derive(input(p2, setFieldValue(p2, setFieldValue(p2, emptyOutput(p2), 'S1', 'applicationType', 'custodial'), 'S2', 'steps', [{ action: "Verify the custodian's authority and the custodial agreement", tool: 'authority.check', failureBehaviour: '' }])));
+    const roleOf = (d: typeof a, key: string) => d.roles.find((r) => r.field === key)!.role;
+    expect(roleOf(a, 'steps')).toBe('steps');
+    expect(roleOf(b, 'steps')).toBe('steps');
+    const labels = (d: typeof a) => d.criteria.find((c) => c.id === 'account_authority')!.links.map((l) => l.label.replace(/^S\d/, 'S?'));
+    expect(labels(b)).toEqual(labels(a));
+    expect(b.unused.map((u) => u.field)).toContain('note');
+  });
+
+  it('applicability safeguards: permitted option stays optional, human duty is routing only, unknown stays unset, product follows the application', () => {
+    const p = form(V7.authoring.profile);
+    const rule = (marking: string | null, actor: string | null = null, appliesWhen: string | null = null) => ({ ruleKey: 'R-AU-1', ruleVersionId: 'rv1', title: 'Custodian authority', requirement: "Verify the custodian's authority to act for the minor", documentVersionId: 'dv1', documentTitle: 'Policy', marking, appliesWhen, actor, required: true });
+    const src = [{ kind: 'POLICY_DOCUMENT' as const, ref: 'dv1', label: 'Policy', detail: '', ticked: true, origin: 'DEFAULT' as const }];
+    const auth = (policies: DeriveInput['policies'], out = v7Output(p)) => derive(input(p, out, { policies, sources: src })).criteria.find((c) => c.id === 'account_authority')!.details.applicability;
+    expect(auth([rule('Permitted option', null, 'When the custodian route is chosen')])).toMatchObject({ kind: 'PERMITTED_OPTION', condition: 'When the custodian route is chosen' });
+    expect(auth([rule('Mandatory when applicable', null, 'Someone acts for another party')])).toMatchObject({ kind: 'REQUIRED_WHEN', condition: 'Someone acts for another party' });
+    expect(auth([rule('Mandatory', 'bank officer (human)')])).toMatchObject({ kind: 'OTHER_ROLE' });
+    expect(auth([rule('Mandatory', 'bank officer (human)')]).condition).toMatch(/never exercises that authority itself/);
+    expect(auth([])).toMatchObject({ kind: 'REQUIRED' });
+    expect(auth([]).condition).toMatch(/actual product.*never the example value/);
+    // No step and no rule: when it applies cannot be read; it stays UNSET (never silently "not applicable").
+    expect(auth([], v7Output(p, []))).toMatchObject({ kind: 'UNSET' });
+  });
+
+  it('a requirement stated in several places is one requirement; two weighted criteria on it are flagged as duplicate weight', () => {
+    const reqs = [{ key: 'rule:rv1', label: 'S4 · Policy rules · R-ID-1', kind: 'POLICY_RULE' as const, mandatory: true, applicability: 'REQUIRED' as const }, { key: 'task:S5.steps[0]', label: 'Workflow · Verify', kind: 'WORKFLOW_STEP' as const, mandatory: true, applicability: 'REQUIRED' as const }];
+    const c = coverage(reqs, [{ id: 'a', covers: ['rule:rv1'], weighted: true }, { id: 'b', covers: ['rule:rv1', 'task:S5.steps[0]'], weighted: true }]);
+    expect(c).toMatchObject({ total: 2, covered: 2, gaps: [] });
+    expect(c.duplicates).toEqual([{ requirement: 'S4 · Policy rules · R-ID-1', criteria: ['a', 'b'] }]);
+    const gap = coverage(reqs, [{ id: 'b', covers: ['task:S5.steps[0]'], weighted: true }]);
+    expect(gap.gaps.map((g) => g.key)).toEqual(['rule:rv1']);
+  });
+
+  it('links carry template and task versions and a snapshot; a rule from an unticked document is never linked', () => {
+    const p = form(V7.authoring.profile);
+    const pol = [{ ruleKey: 'R-AU-1', ruleVersionId: 'rv1', title: 'Custodian authority', requirement: "Verify the custodian's authority", documentVersionId: 'dv1', documentTitle: 'Policy', required: true }];
+    const ticked = derive(input(p, v7Output(p), { policies: pol, sources: [{ kind: 'POLICY_DOCUMENT', ref: 'dv1', label: 'P', detail: '', ticked: true, origin: 'DEFAULT' }] }));
+    const link = ticked.criteria.find((c) => c.id === 'account_authority')!.links.find((l) => l.kind === 'POLICY_RULE')!;
+    expect(link).toMatchObject({ templateId: 't1', templateVersion: 2, taskId: 'task1', taskRevision: 3, ruleKey: 'R-AU-1', ruleVersionId: 'rv1', documentVersionId: 'dv1' });
+    expect(link.snapshot).toMatch(/^[0-9a-f]{64}$/);
+    const unticked = derive(input(p, v7Output(p), { policies: pol, sources: [{ kind: 'POLICY_DOCUMENT', ref: 'dv1', label: 'P', detail: '', ticked: false, origin: 'DEFAULT' }] }));
+    expect(unticked.criteria.flatMap((c) => c.links).some((l) => l.kind === 'POLICY_RULE')).toBe(false);
+  });
+});
+
+describe('export unchanged (AC 10)', () => {
+  it('no export or dataset module reads the rubric tables or the rubric module', () => {
+    const roots = ['../src/anvil', '../src/dataset', '../src/policy/anvil-project-policy.ts', '../src/routes/project-export.ts', '../src/routes/anvil.ts', '../src/routes/dataset.ts'];
+    const files: string[] = [];
+    for (const r of roots) {
+      const path = new URL(r, import.meta.url).pathname;
+      if (path.endsWith('.ts')) files.push(path);
+      else for (const f of readdirSync(path)) if (f.endsWith('.ts')) files.push(join(path, f));
+    }
+    expect(files.length).toBeGreaterThan(5);
+    for (const f of files) expect(readFileSync(f, 'utf8'), f).not.toMatch(/rubricCriterionAnnotation|rubricRecommendationRun|rubricTaskSources|tasks\/rubric|RUBRIC_INTERNAL_ONLY|criterionDefaults/);
+  });
+
+  it('the v6 and v7 template hashes are unchanged by the optional criterionDefaults key', () => {
+    for (const [spec, parts] of [[V6, null], [V7, null]] as const) {
+      void parts;
+      const { schemaVersion, anvil_template_key, requirement, authoring, execution, skills } = spec;
+      const j = jointTemplateSpec({ lineageId: '22222222-2222-4222-8222-222222222222', version: 2, anvilSpec: { schemaVersion, anvil_template_key, requirement, authoring, execution, skills } } as never)!;
+      // The joint object carries the authoring part exactly as received: no criterionDefaults are added to it.
+      expect(JSON.stringify(j.authoring)).not.toMatch(/criterionDefaults/);
+      expect(jointHashes(j).part_hashes.authoring).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
+});

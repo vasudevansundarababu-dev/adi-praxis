@@ -82,6 +82,19 @@ export function checkProfile(raw: unknown): string[] {
     if (f.type === 'repeated_array' && !f.itemFields?.length) out.push(`${path}: repeated array has no item fields`);
     if (f.type !== 'repeated_array' && f.itemFields) out.push(`${path}: only repeated arrays declare item fields`);
     if ((f.weightTotal !== undefined || f.requireCritical || f.scale || f.groups) && f.type !== 'criterion') out.push(`${path}: weight rules apply to criterion fields only`);
+    if (f.criterionDefaults) {
+      if (f.type !== 'criterion') out.push(`${path}: criterion defaults apply to criterion fields only`);
+      const ids = f.criterionDefaults.map((d) => d.id);
+      if (new Set(ids).size !== ids.length) out.push(`${path}: duplicate criterion default IDs`);
+      const zeroToFour = f.scale === 'zero_to_four';
+      for (const d of f.criterionDefaults) {
+        // A default never carries another template's scoring scale (owner: KYC's 5/2/0 is never applied to a 0-4 form).
+        if (zeroToFour && d.partialCredit !== undefined) out.push(`${path}: default ${d.id} gives "partial credit" (5/2/0) on a 0-4 field`);
+        if (!zeroToFour && (d.level3 !== undefined || d.level2 !== undefined || d.level1 !== undefined)) out.push(`${path}: default ${d.id} gives levels 1-3 (0-4) on a 5/2/0 field`);
+        if (d.group !== undefined && !f.groups?.some((g) => g.id === d.group)) out.push(`${path}: default ${d.id} names unknown group "${d.group}"`);
+        if (d.criticalCondition !== undefined && d.critical !== true) out.push(`${path}: default ${d.id} has a whole-task failure condition but is not critical`);
+      }
+    }
     if (f.groups) {
       if (new Set(f.groups.map((g) => g.id)).size !== f.groups.length) out.push(`${path}: duplicate group IDs`);
       const total = f.groups.reduce((n, g) => n + g.weight, 0);

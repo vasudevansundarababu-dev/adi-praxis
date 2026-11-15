@@ -35,3 +35,4 @@ export * from './cluster-f1';
 export * from './project-export';
 export * from './anvil-definition';
 export * from './forge';
+export * from "./rubric";

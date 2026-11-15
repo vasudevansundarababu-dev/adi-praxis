@@ -63,6 +63,8 @@ import { MockSelfieCheck, StripeSelfieCheck, type SelfieCheck } from './cert/sel
 import { ClaudeVertexTaskDrafter, MockTaskDrafter, type TaskDrafter } from './tasks/drafting/drafter';
 import { rlRoutes } from './routes/rl';
 import { workRoutes } from './routes/work';
+import { rubricRoutes } from './routes/rubric';
+import { defaultRubricAssistant, type RubricAssistant } from './tasks/rubric/assistant';
 import { MemoryEmailSender, SmtpEmailSender, type EmailSender } from './lib/email';
 import { HashingEmbeddingProvider, VertexEmbeddingProvider, type EmbeddingProvider } from './tasks/embeddings';
 import { profileRoutes } from './routes/profile';
@@ -139,6 +141,8 @@ export interface AppDeps {
   policyAdapters?: Adapters;
   /** Policy rule assistant (suggest + define): POLICY_AI_MODEL on Vertex when configured, otherwise the mock. */
   ruleAssistant?: PolicyRuleAssistant;
+  /** Rubric wording assistant; null = off. Defaults from RUBRIC_AI_ENABLED (off by default; mock without Vertex). */
+  rubricAssistant?: RubricAssistant | null;
 }
 
 export function defaultSupport(config: Config): SupportAssistant {
@@ -356,7 +360,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       });
       await v1.register(reviewRoutes, { db: deps.db, evaluator: deps.evaluator ?? defaultEvaluator(deps.config), storage });
       await v1.register(journeyRoutes, { db: deps.db, config: deps.config, selectionGate });
-      await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
+      await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), rubricEnabled: deps.config.RUBRIC_RECOMMENDATIONS_ENABLED });
+      if (deps.config.RUBRIC_RECOMMENDATIONS_ENABLED) await v1.register(rubricRoutes, { db: deps.db, selectionGate, assistant: deps.rubricAssistant !== undefined ? deps.rubricAssistant : defaultRubricAssistant(deps.config) });
       await v1.register(candidateStudioRoutes, { db: deps.db, config: deps.config, storage, deps: resolveDeps(deps.metaCompiler?.deps), selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), faults: deps.metaCompiler?.studioFaults });
       await v1.register(taskReviewRoutes, { db: deps.db, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
       await v1.register(modelProviderRoutes, { db: deps.db, config: deps.config });

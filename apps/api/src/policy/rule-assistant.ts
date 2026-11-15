@@ -180,15 +180,17 @@ export function policyAiModel(config: { POLICY_AI_MODEL: string; AUTHORING_MODEL
   return config.POLICY_AI_MODEL || (config.AUTHORING_MODEL.startsWith('gemini:') ? config.AUTHORING_MODEL : DEFAULT_POLICY_AI_MODEL);
 }
 
-export function vertexRuleAssistant(setting: string, opts: { projectId: string; location: string }): PolicyRuleAssistant {
+/** A text completer on Vertex for a model setting (`gemini:<model>`, `claude:<model>` or a bare Claude id). */
+export function vertexCompleter(setting: string, opts: { projectId: string; location: string }): Completer & { model: string } {
   const [prefix, ...rest] = setting.split(':');
   if (rest.length && prefix === 'gemini') {
     const g = new GeminiVertexContentDrafter(rest.join(':'), { projectId: opts.projectId, location: opts.location });
-    return new ModelRuleAssistant(`gemini:${rest.join(':')}`, { complete: async (system, user, maxOutputTokens, o) => (await g.complete({ purpose: 'propose_field', system, user, maxOutputTokens, timeoutMs: o?.timeoutMs, ...(o?.quick ? { thinkingLevel: 'low' as const } : {}) })).text });
+    return { model: `gemini:${rest.join(':')}`, complete: async (system, user, maxOutputTokens, o) => (await g.complete({ purpose: 'propose_field', system, user, maxOutputTokens, timeoutMs: o?.timeoutMs, ...(o?.quick ? { thinkingLevel: 'low' as const } : {}) })).text };
   }
   const model = rest.length && prefix === 'claude' ? rest.join(':') : setting;
   let client: AnthropicVertex | undefined;
-  return new ModelRuleAssistant(model, {
+  return {
+    model,
     complete: async (system, user, max_tokens, o) => {
       client ??= new AnthropicVertex({ projectId: opts.projectId, region: opts.location });
       const r = await client.messages.create({ model, max_tokens, system, messages: [{ role: 'user', content: user }] }, o?.timeoutMs ? { timeout: o.timeoutMs, maxRetries: 0 } : undefined);
@@ -196,7 +198,12 @@ export function vertexRuleAssistant(setting: string, opts: { projectId: string; 
       const t = r.content.find((b) => b.type === 'text');
       return t && t.type === 'text' ? t.text : '';
     },
-  });
+  };
+}
+
+export function vertexRuleAssistant(setting: string, opts: { projectId: string; location: string }): PolicyRuleAssistant {
+  const c = vertexCompleter(setting, opts);
+  return new ModelRuleAssistant(c.model, c);
 }
 
 // ───────────────────────── Deterministic mock (local dev, tests, CI) ─────────────────────────

@@ -84,17 +84,17 @@ export function itemFieldsOf(field: ItemField): ItemField[] {
           : ([
               { key: 'partialCredit', type: 'long_text', label: 'Partial credit', help: 'What incomplete but useful work earns (scores 2 of 5).' },
               // Owner, 11 Nov 2026 (Anvil Q4): required on templates Anvil proposed, so each criterion states 5, 2 and 0.
-              { key: 'failCondition', type: 'long_text', label: 'Fail', help: 'What scores 0. Required when the template was proposed by Anvil.' },
+              { key: 'failCondition', type: 'long_text', label: 'Fail', help: 'What scores 0. Required when the template came from RL Gym.' },
             ] as ItemField[])),
         ...(field.groups?.length
           ? ([{ key: 'group', type: 'pick_list', label: 'Group', help: 'The rubric group this criterion counts towards.', required: true, options: field.groups.map((g) => ({ value: g.id, label: `${g.id} · ${g.label} (${g.weight})` })) }] as ItemField[])
           : []),
-        { key: 'critical', type: 'flag', label: 'Critical', help: 'Failing this criterion is a critical failure (separate from a zero-weight criterion).' },
+        { key: 'critical', type: 'flag', label: 'Whole-task failure', help: 'Make this a whole-task failure when this criterion scores Fail: the whole task fails, whatever the other scores.' },
         { key: 'evidenceRefs', type: 'multi_select', label: 'Evidence or rule links', help: 'Evidence, rule or step IDs this criterion checks.', allowCustom: true },
         // Praxis-Anvil contract (12 Nov 2026): on a template Anvil proposed, the kind must be one the template allows.
-        { key: 'evaluatorKind', type: 'text', label: 'Evaluator kind', help: 'How Anvil grades this criterion (one of the kinds the template allows, e.g. run_evidence). Leave empty if the template has no Anvil spec.' },
+        { key: 'evaluatorKind', type: 'text', label: 'Evaluator kind', help: 'The evaluator that grades this criterion in RL Gym. Filled in from the template’s evaluator map for this criterion ID; leave empty when the template has none.' },
         // Anvil's four confirmations (11 Nov 2026), point 3: the evaluator is an exact (id, version) pair from Anvil's catalogue.
-        { key: 'evaluatorVersion', type: 'text', label: 'Evaluator version', help: 'The version of that evaluator in the template’s execution part (e.g. 1). Leave empty if the template has no Anvil spec.' },
+        { key: 'evaluatorVersion', type: 'text', label: 'Evaluator version', help: 'The version of that evaluator, from the template’s evaluator map. Leave empty when the template has none.' },
         ...BINDING_FIELDS('The output.json field this criterion checks. Needed for executable export.'),
       ];
     default:

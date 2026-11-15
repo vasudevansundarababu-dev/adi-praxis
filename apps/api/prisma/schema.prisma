@@ -3448,3 +3448,68 @@ model CandidatePasswordToken {
 
   @@index([smeUserId])
 }
+
+// ───────────────────────── Rubric editor and recommendations (docs/plan/PLAN-RUBRIC-RECOMMENDATIONS.md) ─────────────
+// INTERNAL to Authoring. Never part of a task's output, the approved record or any export: RL Gym does not receive it.
+
+/// One derivation of rubric recommendations for a task (deterministic, optionally with AI wording). Append-only.
+model RubricRecommendationRun {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String   @map("client_id") @db.Uuid
+  taskInstanceId  String   @map("task_instance_id") @db.Uuid
+  /// DERIVED (rules, no model) | AI (rules + model wording)
+  mode            String
+  model           String?
+  promptVersion   String   @map("prompt_version")
+  templateId      String   @map("template_id") @db.Uuid
+  templateVersion Int      @map("template_version")
+  taskRevision    Int      @map("task_revision")
+  /// sha256 of everything read; the same digest and mode reuse the run (no new model call).
+  inputDigest     String   @map("input_digest")
+  status          String
+  /// The frozen derivation: criteria, additions, requirements, unused fields. The original AI suggestion stays here.
+  result          Json
+  error           String?
+  requestedById   String   @map("requested_by_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([taskInstanceId, createdAt])
+  @@index([taskInstanceId, inputDigest, mode])
+}
+
+/// The internal annotation of one criterion (or suggested addition) of a task. Append-only versions; latest is current.
+model RubricCriterionAnnotation {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String   @map("client_id") @db.Uuid
+  taskInstanceId String   @map("task_instance_id") @db.Uuid
+  criterionId    String   @map("criterion_id")
+  version        Int
+  /// TEMPLATE | TEMPLATE_DEFAULT | RECOMMENDED | AI_RECOMMENDED | CUSTOM
+  origin         String
+  /// ACTIVE | SUGGESTED (addition not decided) | KEPT (addition kept as an internal note) | DISMISSED | REMOVED
+  status         String
+  exportable     Boolean
+  fromRunId      String?  @map("from_run_id") @db.Uuid
+  details        Json
+  editedFields   String[] @map("edited_fields")
+  aiFields       String[] @default([]) @map("ai_fields")
+  sources        Json
+  createdById    String   @map("created_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([taskInstanceId, criterionId, version])
+  @@index([taskInstanceId])
+}
+
+/// "Sources used for this task": the task-level checkbox list. Append-only versions; latest is current.
+model RubricTaskSources {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String   @map("client_id") @db.Uuid
+  taskInstanceId String   @map("task_instance_id") @db.Uuid
+  version        Int
+  items          Json
+  createdById    String   @map("created_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([taskInstanceId, version])
+}

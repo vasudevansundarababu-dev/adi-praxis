@@ -1927,7 +1927,7 @@ D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos ar
   the form if it floated.
 ## D2 tutorial videos: plan (15 Nov 2026)
 
-Plan: `docs/plan/PLAN-D2-TUTORIAL-VIDEO.md`. **Awaiting the owner's approval; no feature code yet.**
+Plan: `docs/plan/PLAN-D2-TUTORIAL-VIDEO.md`. **Built 15 Nov 2026 on the owner's "build all the stuff and start on the video"; no live run and no deploy without the owner's direct yes.**
 
 - **(owner)** AI video with Vertex Veo; a missing video never blocks publish; on publish in staging and production,
   only an Admin "Generate tutorial" button in QA; a per-video and a daily cost cap; an Admin approves before SMEs or
@@ -1947,9 +1947,20 @@ Plan: `docs/plan/PLAN-D2-TUTORIAL-VIDEO.md`. **Awaiting the owner's approval; no
 - **(chosen by Claude)** **Caps:** `TUTORIAL_VIDEO_COST_CAP_USD` and `TUTORIAL_VIDEO_DAILY_CAP_USD`, blank = live
   generation refused. Worst-case reservation at request time, daily total per environment (UTC) under an advisory
   lock, a per-call check during the run, and an append-only `TutorialSpend` ledger. Suggested values $40 and $100.
-- **(chosen by Claude)** **Cost estimate:** $0.08 per Veo second → about $1.33 per chapter; Marketing ≈ $11, KYC
-  v6/v7 ≈ $15–17 each; all three ≈ $40–45 once.
+- **(chosen by Claude)** **Cost estimate:** $0.08 per Veo second → about $1.33 per chapter. Every form has 8
+  sections, so 9 chapters: ≈ $12 per template (worst case reserved $23.49); all three ≈ $36 once. **(owner)** The
+  cost is fine: one video per template version.
 - **(chosen by Claude)** **Approval** writes the video to the run's template version and later versions of the
   workflow; older versions keep theirs. Regenerating keeps the approved video until the new one is approved. One
   open run per workflow.
 - **(chosen by Claude)** Runs in `praxis-worker` as an outbox handler, with `ffmpeg` added to the API/worker image.
+- **(chosen by Claude)** The mock pipeline runs only locally; deployed environments without `TUTORIAL_VIDEO_LIVE`
+  say generation is off. `TUTORIAL_VIDEO_LIVE` is refused in tests and local development.
+- **(chosen by Claude)** A publish while another version of the workflow has an open run doesn't start a second run
+  (refusal audited); the Admin generates when the open one is decided. A run with no progress for 2 hours is closed
+  as FAILED on the next request.
+- **(chosen by Claude)** A clip refused by Veo's safety filter is retried once with a fixed, safe scene; a second
+  failure fails the run. Billed calls are recorded before they are made (conservative).
+- **(chosen by Claude)** Reject keeps the files (for the audit trail); only Approve changes the template.
+- **(chosen by Claude)** The tutorials bucket has CORS for the console and candidate origins, so the captions track
+  loads from the signed address.

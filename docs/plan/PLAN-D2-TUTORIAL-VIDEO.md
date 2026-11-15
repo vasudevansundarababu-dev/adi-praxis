@@ -1,6 +1,6 @@
 # Plan: D2, AI-generated tutorial videos per template (15 Nov 2026)
 
-Status: **plan only, awaiting the owner's approval.** No feature code is written until the owner says yes.
+Status: **built (15 Nov 2026), not deployed, no live run yet.** The owner said "build all the stuff and start on the video"; a live Veo run still needs the owner's direct yes. Section 12 lists what the build settled.
 Decisions and assumptions are logged in `docs/DECISIONS.md` ("D2 tutorial videos: plan").
 
 Source: row D2 in the MVP1 QA defect log. Owner decisions (15 Nov 2026): AI video with Vertex Veo; a missing video
@@ -77,13 +77,15 @@ well under a cent; the allowance is deliberately high).
 Per chapter: 2 clips × 8 s × $0.08 = $1.28, plus $0.05 = **$1.33**. With one retry allowed per clip, the reserved
 worst case is $2.61 a chapter.
 
-| Template | Chapters (overview + sections) | Expected | Worst case reserved |
-|---|---|---|---|
-| Marketing (VEYRA), 7 sections | 8 | ≈ $10.60 | ≈ $20.90 |
-| KYC v6 / v7, about 10–12 sections | 11–13 | ≈ $14.60–$17.30 | ≈ $28.70–$33.90 |
+Every authoring form has exactly 8 sections, so every video has **9 chapters** (overview + 8).
 
-All three templates once: about **$40–45**. Suggested values for the owner to set (not in `.env.example`):
-`TUTORIAL_VIDEO_COST_CAP_USD=40`, `TUTORIAL_VIDEO_DAILY_CAP_USD=100`.
+| Template | Chapters | Expected | Worst case reserved |
+|---|---|---|---|
+| KYC v6, KYC v7, Marketing (VEYRA): each | 9 | ≈ $11.97 | ≈ $23.49 |
+
+All three templates once: about **$36**. Suggested values for the owner to set (not in `.env.example`):
+`TUTORIAL_VIDEO_COST_CAP_USD=40`, `TUTORIAL_VIDEO_DAILY_CAP_USD=100`. A $40 per-video cap covers the worst case
+($23.49) with room; $100 a day allows four worst-case runs.
 
 ## 6. How the caps are enforced
 
@@ -147,3 +149,30 @@ installed, skipped in CI). Acceptance tests:
 
 Languages other than English; editing the script or chapters in the console (reject and regenerate instead);
 per-task or per-project videos.
+
+## 12. What the build settled (15 Nov 2026)
+
+- **Code:** `apps/api/src/forge/tutorial-video/` (plan, script, veo, tts, stitch, cost, service), routes in
+  `apps/api/src/routes/tutorial-videos.ts`, the publish hook in `routes/templates.ts`, the outbox handler in the
+  worker, migration `20261202000000_template_tutorial_runs`, the console panel
+  `apps/web/components/templates/tutorial-video-panel.tsx`, captions on the candidate Tutorial card.
+- **API:** `GET /templates/:id/tutorial/runs`, `POST /templates/:id/tutorial/generate` (202 started, 200 already
+  running, 409 refused with the reason), `POST /tutorial-runs/:id/approve`, `POST /tutorial-runs/:id/reject`. Admin only.
+- **Mock pipeline** (no live flag) runs only locally. In QA, staging and production with `TUTORIAL_VIDEO_LIVE=false`
+  the button explains that generation is off. The mock makes placeholder bytes, not a playable video.
+- **Publish never waits:** the request runs inside a savepoint, so even an unexpected error leaves the publish intact.
+  A publish while another version of the workflow has an open run is refused for the video (audited); the Admin can
+  generate later.
+- **A run that stops responding** (no progress for 2 hours, e.g. a worker restart) is closed as FAILED, and its
+  reservation released, the next time someone asks for one.
+- **A clip refused by Veo's safety filter** is retried once with a fixed, safe, text-free scene.
+- **On-screen cards** are capped at about 8 lines (label, what it needs up to 240 characters, good answer up to 160).
+- **Manual address** (the existing field) still works. Saving one replaces an approved generated video.
+- **Verified locally:** the real ffmpeg stitch ran in a `node:22-slim` container with the image's packages (Debian
+  ffmpeg + DejaVu font). It produced a correct MP4 with chapter metadata, and a frame was checked by eye. macOS
+  Homebrew ffmpeg has no `drawtext`, so that test skips there and in CI.
+- **DevOps, with the owner's yes, before a live run:** build the new API/worker image (ffmpeg + font), apply the
+  Terraform (tutorials bucket with CORS for the console and candidate origins, Text-to-Speech API, `TUTORIAL_BUCKET`
+  env). In QA (deployed by script, not Terraform), the same bucket, API and env have to be set by hand:
+  `TUTORIAL_VIDEO_LIVE=true`, both caps, `TUTORIAL_BUCKET`. The worker's service account needs object write on the
+  bucket and Token Creator on itself (already granted for signing).

@@ -102,6 +102,9 @@ async function deleteSme(tx: Q, s: string, t: Tree) {
   await run(tx, 'Candidate', `DELETE FROM "Candidate" WHERE sme_user_id = $1::uuid`, s);
   await run(tx, 'CredentialClaimEvidence', `DELETE FROM "_CredentialClaimToEvidenceArtifact" WHERE "B" IN (SELECT id FROM "EvidenceArtifact" WHERE sme_user_id = $1::uuid)`, s);
   for (const table of ['CredentialClaim', 'ExperienceEpisode']) await run(tx, table, `DELETE FROM "${table}" WHERE profile_version_id = ANY($1::uuid[])`, t.pvs);
+  // MVP1 (ADI Forge): password sign-in rows and links to sourced people.
+  for (const table of ['CandidatePasswordToken', 'CandidateCredential']) await run(tx, table, `DELETE FROM "${table}" WHERE sme_user_id = $1::uuid`, s);
+  await run(tx, 'SourcedPerson (unlinked)', `UPDATE "SourcedPerson" SET sme_user_id = NULL, updated_at = now() WHERE sme_user_id = $1::uuid`, s);
   for (const table of ['ProfileVersion', 'EvidenceArtifact', 'IdentityAttempt', 'AlternativeIdentityCheck', 'ConflictDeclaration', 'Consent', 'Session', 'ProviderIdentity'])
     await run(tx, table, `DELETE FROM "${table}" WHERE sme_user_id = $1::uuid`, s);
   await run(tx, 'SmeUser', `DELETE FROM "SmeUser" WHERE id = $1::uuid`, s);
@@ -111,7 +114,7 @@ async function deleteSme(tx: Q, s: string, t: Tree) {
 /** Retirement of an SME whose history must stay: no sign-in, nothing open, invisible to matching, anonymised. */
 async function retireSme(tx: Q, s: string, t: Tree) {
   const { rows, run } = counter();
-  for (const table of ['Session', 'ProviderIdentity']) await run(tx, table, `DELETE FROM "${table}" WHERE sme_user_id = $1::uuid`, s);
+  for (const table of ['Session', 'ProviderIdentity', 'CandidatePasswordToken', 'CandidateCredential']) await run(tx, table, `DELETE FROM "${table}" WHERE sme_user_id = $1::uuid`, s);
   for (const table of ['ProjectMatch', 'ProjectMatchRejection']) await run(tx, table, `DELETE FROM "${table}" WHERE candidate_id = ANY($1::uuid[])`, t.who);
   await run(tx, 'Enrollment (withdrawn)', `UPDATE "Enrollment" SET status = 'WITHDRAWN', updated_at = now() WHERE sme_user_id = $1::uuid AND status IN ('DRAFT','SUBMITTED','NEEDS_INFORMATION','REVIEW_PENDING','REVIEW_REQUESTED')`, s);
   // Proposed or accepted work with no task issued yet is cancelled, so a retired SME never counts towards staffing.

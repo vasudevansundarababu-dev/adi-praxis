@@ -1916,7 +1916,12 @@ D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos ar
   Submit's checks. The bar shows "Saving…", "Saved at HH:MM" or "Couldn't save, try again", and the button becomes
   Try again. Beside Save is "Check and submit", which goes to the last section. Autosave is unchanged. The bar is
   hidden on read-only tasks and in print.
-- **(chosen by Claude, D13)** **Help floats; Tutorial stays at the top.** Help is a fixed button at the bottom right,
-  placed above the sticky Save bar so it never covers Save, Submit or a field. It has a focus ring, is hidden in print
-  and while the drawer is open, and opens the existing Help drawer. Tutorial stays at the top of the page because it
-  opens an inline video card, which would overlap the form if it floated.
+- **(owner, D13)** **Help is a floating mascot: "Ember", our own ADI Forge character.** It is a friendly forge spark
+  standing on a tiny anvil, in the ADI Forge purples with a teal spark. It is original, with no terminal face or
+  cloud-robot silhouette. It is an inline SVG (64 px) fixed at the bottom right, above the sticky Save bar, so it never
+  covers Save, Submit or a field. It has a gentle idle bob (none under `prefers-reduced-motion`) and a "Need help?"
+  bubble on hover or focus. `aria-label="Help"` with a focus ring; it is hidden in print and while the drawer is open.
+  Clicking it or pressing Enter opens the existing Help drawer. It is on the task and review pages. Screenshots are in
+  `docs/design/mascot/`.
+- **(chosen by Claude, D13)** Tutorial stays at the top of the page: it opens an inline video card, which would cover
+  the form if it floated.

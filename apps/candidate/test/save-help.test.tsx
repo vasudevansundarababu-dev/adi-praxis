@@ -36,14 +36,18 @@ describe('D12: Save is always on screen', () => {
   });
 });
 
-describe('D13: Help floats', () => {
-  it('Help is a fixed, labelled, focusable button that stays clear of the Save bar and is hidden in print; Tutorial stays at the top', () => {
+describe('D13: Help is the floating Ember mascot', () => {
+  it('a fixed, labelled, focusable mascot (inline SVG) with a "Need help?" bubble, no motion when reduced, hidden in print; Tutorial stays at the top', () => {
     const html = renderToStaticMarkup(<TaskAids taskId="00000000-0000-4000-8000-000000000001" kind="author" tutorial={null} />);
     const fab = /<button[^>]*data-help-fab[^>]*>/.exec(html)![0];
-    expect(fab).toContain('aria-label="Help for this task"');
-    expect(fab).toMatch(/fixed bottom-20 right-4/);
+    expect(fab).toContain('aria-label="Help"');
+    expect(fab).toMatch(/fixed bottom-20 right-3/);
     expect(fab).toContain('focus-visible:outline');
     expect(fab).toContain('print:hidden');
+    expect(html).toMatch(/<svg[^>]*viewBox="0 0 64 64"[^>]*aria-hidden="true"/);
+    expect(html).not.toMatch(/<img|\.png|\.gif/);
+    expect(text(html)).toContain('Need help?');
+    expect(html).toContain('@media (prefers-reduced-motion: reduce) { .ember-bob { animation: none } }');
     expect(text(html)).toContain('▶ Tutorial');
     expect(a11yProblems(html)).toEqual([]);
   });

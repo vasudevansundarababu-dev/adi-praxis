@@ -3,6 +3,7 @@
 import { chapterTime, TASK_HELP_SUGGESTIONS, tutorialKind, type Tutorial } from '@praxis/shared';
 import { useEffect, useRef, useState } from 'react';
 import { call } from '@/lib/client';
+import { HelpMascot } from './help-mascot';
 
 /**
  * MVP1 step 7 (docs/design/PROJECT-SCREEN-DESIGN.md, "Candidate app for MVP1"): the task page's Tutorial (the video
@@ -179,20 +180,8 @@ export function TaskAids({ taskId, kind, tutorial, initial = null }: { taskId: s
           ▶ Tutorial
         </button>
       </div>
-      {/* D13 (owner, 15 Nov 2026): Help floats, so it never scrolls away. Bottom-right, above the sticky Save bar (it never
-          covers Save, Submit or a field), keyboard reachable with a focus ring, hidden in print and while the drawer is open. */}
-      {!showHelp && (
-        <button
-          type="button"
-          data-help-fab
-          aria-expanded={false}
-          aria-label="Help for this task"
-          onClick={() => setShowHelp(true)}
-          className="btn btn-primary fixed bottom-20 right-4 z-40 rounded-full px-4 py-2 shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link sm:bottom-24 sm:right-6 print:hidden"
-        >
-          ? Help
-        </button>
-      )}
+      {/* D13 (owner, 15 Nov 2026): Help is the floating Ember mascot; it hides while the drawer is open. */}
+      {!showHelp && <HelpMascot onOpen={() => setShowHelp(true)} />}
       {showTutorial && (
         <div className="mt-3">
           <TutorialCard tutorial={tutorial} onClose={() => setShowTutorial(false)} />

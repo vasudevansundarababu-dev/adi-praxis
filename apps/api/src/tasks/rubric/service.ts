@@ -1,4 +1,8 @@
 import {
+  ACTOR_LABEL,
+  MARKING_LABEL,
+  type MandatoryMarking,
+  type ResponsibleActor,
   coverage,
   derive,
   howChecked,
@@ -96,8 +100,8 @@ export interface LibraryDocument {
 }
 
 /**
- * Policy rule annotations from PR #81 (mandatory marking, applies-when, responsible actor). That work is a separate
- * change; until it is merged this source returns nothing and rules fall back to their `required` flag.
+ * Extra policy rule annotations by rule version. The published rule body already carries its annotation (marking,
+ * applies-when, responsible actor), which is used first; this source is only a fallback for rules without one.
  */
 export interface RuleAnnotationSource {
   annotations(tx: Db | Tx, ruleVersionIds: string[]): Promise<Map<string, { marking: string | null; appliesWhen: string | null; actor: string | null }>>;
@@ -108,7 +112,7 @@ export const noRuleAnnotations: RuleAnnotationSource = { annotations: async () =
 export async function policyLibrary(tx: Db | Tx, clientId: string, projectId: string, notes: RuleAnnotationSource = noRuleAnnotations): Promise<{ setVersion: number | null; documents: LibraryDocument[] }> {
   const set = await latestRuleSet(tx, clientId, projectId);
   if (!set) return { setVersion: null, documents: [] };
-  const content = set.content as { rules?: { ruleKey: string; ruleVersionId: string; body: { title: string; requirement: string }; required?: boolean; sources?: { documentVersionId: string; quote?: string; locator?: Record<string, unknown> }[] }[] };
+  const content = set.content as { rules?: { ruleKey: string; ruleVersionId: string; body: { title: string; requirement: string; annotation?: { marking?: string; appliesWhen?: string | null; responsibleActor?: string } }; required?: boolean; sources?: { documentVersionId: string; quote?: string; locator?: Record<string, unknown> }[] }[] };
   const rules = content.rules ?? [];
   const dvIds = [...new Set(rules.flatMap((r) => (r.sources ?? []).map((s) => s.documentVersionId)))];
   const dvs = await tx.policyDocumentVersion.findMany({ where: { clientId, projectId, id: { in: dvIds } }, include: { document: true }, orderBy: { createdAt: 'asc' } });
@@ -129,8 +133,11 @@ export async function policyLibrary(tx: Db | Tx, clientId: string, projectId: st
         .filter((r) => (r.sources ?? []).some((s) => s.documentVersionId === dv.id))
         .map((r) => {
           const src = r.sources!.find((s) => s.documentVersionId === dv.id)!;
-          const a = ann.get(r.ruleVersionId);
-          return { ruleKey: r.ruleKey, ruleVersionId: r.ruleVersionId, title: r.body.title, requirement: r.body.requirement, required: r.required !== false, quote: src.quote ?? null, locator: src.locator ?? null, marking: a?.marking ?? null, appliesWhen: a?.appliesWhen ?? null, actor: a?.actor ?? null };
+          // Policy rule annotations (marking, applies-when, responsible actor) travel with the published rule body.
+          const own = r.body.annotation;
+          const a = own?.marking ? { marking: MARKING_LABEL[own.marking as MandatoryMarking] ?? null, appliesWhen: own.appliesWhen ?? null, actor: own.responsibleActor && own.responsibleActor !== 'unknown' ? (ACTOR_LABEL[own.responsibleActor as ResponsibleActor] ?? null) : null } : ann.get(r.ruleVersionId);
+          const required = own?.marking ? own.marking === 'mandatory' : r.required !== false;
+          return { ruleKey: r.ruleKey, ruleVersionId: r.ruleVersionId, title: r.body.title, requirement: r.body.requirement, required, quote: src.quote ?? null, locator: src.locator ?? null, marking: a?.marking ?? null, appliesWhen: a?.appliesWhen ?? null, actor: a?.actor ?? null };
         }),
     }));
   return { setVersion: set.version, documents };

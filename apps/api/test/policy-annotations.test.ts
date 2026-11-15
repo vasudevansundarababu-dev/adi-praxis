@@ -187,11 +187,13 @@ describe('AI annotation pass: classification and mandatory marking (AC1–AC5)',
     await annotate();
     const r = await byKey('ADDRESS');
     expect(r.annotation).toMatchObject({ classification: 'obligation' });
-    expect(r.annotation.exceptions).toEqual({ kind: 'listed', items: [{ statement: 'The customer is a minor under 13.', conditions: null }] });
+    const bodyOf = async (ruleId: string) => (await db.policyRuleVersion.findFirstOrThrow({ where: { ruleId }, orderBy: { version: 'desc' } })).body as { exceptions: unknown };
+    expect((await bodyOf(r.ruleId)).exceptions).toEqual({ kind: 'listed', items: [{ statement: 'The customer is a minor under 13.', conditions: null }] });
     await apply('ADDRESS');
     expect((await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: null })).statusCode).toBe(201);
     const after = await byKey('ADDRESS');
-    expect(after.annotation).toMatchObject({ classification: 'obligation', exceptions: { kind: 'listed' } });
+    expect(after.annotation).toMatchObject({ classification: 'obligation' });
+    expect((await bodyOf(r.ruleId)).exceptions).toMatchObject({ kind: 'listed' });
   });
 
   it('AC4: "must not" stays a prohibition; "may not" is not turned into a permission', async () => {

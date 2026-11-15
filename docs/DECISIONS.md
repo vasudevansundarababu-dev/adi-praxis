@@ -1544,4 +1544,5 @@ Forgot password still answers 202 and sends nothing).
   design intends (Home first, Projects through the menu). (2) Journey: the Reviewer's click on a queued task now waits
   for the review page's URL before looking for the title. (3) The m10 partner sign-in now waits for the form to hydrate,
   as the other two partner sign-ins and `staffLogin` already did; it was submitted before hydration and stayed on the
-  sign-in page. No assertion was removed or relaxed.
+  sign-in page. The candidate mock sign-in in `smoke.spec.ts` gets the same hydration wait (it failed once on PR #76's
+  run with the same symptom). No assertion was removed or relaxed.

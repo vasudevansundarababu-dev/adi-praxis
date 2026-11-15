@@ -245,6 +245,8 @@ export interface ForgeHomeDto {
   name: string | null;
   authorTasks: ForgeAuthorTask[];
   reviewTasks: ForgeReviewTask[];
+}
+
 // ── MVP1 step 5: Sourcing screens and Export to Recruiter ──
 
 /** A project on the Sourcing → New dropdown: new or active, with the skills from its job description. */

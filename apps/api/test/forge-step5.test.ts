@@ -132,7 +132,7 @@ describe('MVP1 step 5: Sourcing screens and Export to Recruiter', () => {
     for (let i = 0; i < arr.size(); i += 2) {
       const name = arr.lookup(i) as PDFString | PDFHexString;
       const spec = arr.lookup(i + 1, PDFDict);
-      const stream = spec.lookup(PDFName.of('EF'), PDFDict).lookup(PDFName.of('F'), PDFRawStream);
+      const stream = spec.lookup(PDFName.of('EF'), PDFDict).lookup(PDFName.of('F')) as PDFRawStream;
       out.set(name.decodeText(), decodePDFRawStream(stream).decode());
     }
     return out;

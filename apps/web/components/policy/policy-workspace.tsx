@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { mutate } from '@/lib/client-api';
 import { elapsed, isActive, pollExtraction, stageLabel } from './extraction-progress';
 import { RulesTable } from './rules-table';
+import type { AnnotatedRow } from './annotation-logic';
+import { MARKING_LABEL, type AnnotationFlag, type MandatoryMarking } from '@praxis/shared';
 
 export interface DocVersion {
   id: string;
@@ -46,7 +48,7 @@ export interface ExtractionData {
   profiles?: Array<{ id: string; label: string; provider: string; enabled: boolean; isDefault: boolean; revision: number; problems: string[] }>;
   batches: Array<{ id: string; status: string; profileId: string; profileRevision: number; selectionSource: string; parentBatchId: string | null; createdAt: string; jobs: Job[] }>;
 }
-export interface RuleRow {
+export interface RuleRow extends AnnotatedRow {
   ruleId: string;
   ruleKey: string;
   required: boolean;
@@ -67,7 +69,9 @@ export interface RuleRow {
 export interface PreviewData {
   included: Array<{ ruleKey: string; version: number; title: string }>;
   excluded: Array<{ ruleKey: string; reason: string | null }>;
-  notApplied?: Array<{ ruleKey: string; state: string; required: boolean }>;
+  notApplied?: Array<{ ruleKey: string; state: string; required: boolean; marking?: string | null }>;
+  markingCounts?: Record<string, number>;
+  annotationWarnings?: Array<{ ruleKey: string; flags: AnnotationFlag[] }>;
   blocking: string[];
   conflicts: Array<{ kind: string; message: string; ruleKeys: string[] }>;
   counts: Record<string, number>;
@@ -438,8 +442,30 @@ function Publish({ projectId, preview }: { projectId: string; preview: PreviewDa
       {preview.notApplied && preview.notApplied.length > 0 && (
         <p className="text-fg-muted">
           Not applied (left out of the set): {preview.notApplied.length} rule{preview.notApplied.length === 1 ? '' : 's'}
-          {preview.notApplied.some((r) => r.required) && `, of which ${preview.notApplied.filter((r) => r.required).length} marked required`}.
+          {preview.notApplied.some((r) => r.marking === 'mandatory' || r.marking === 'mandatory_when_applicable') && `, of which ${preview.notApplied.filter((r) => r.marking === 'mandatory' || r.marking === 'mandatory_when_applicable').length} marked Mandatory or Mandatory when applicable`}.
         </p>
+      )}
+      {preview.markingCounts && Object.keys(preview.markingCounts).length > 0 && (
+        <p className="text-fg-muted">
+          Applied by marking:{' '}
+          {Object.entries(preview.markingCounts)
+            .map(([m, n]) => `${m === 'not_annotated' ? 'Not annotated' : (MARKING_LABEL[m as MandatoryMarking] ?? m)} ${n}`)
+            .join(' · ')}
+        </p>
+      )}
+      {preview.annotationWarnings && preview.annotationWarnings.length > 0 && (
+        <details className="mt-2 rounded border border-warning/40 bg-warning/5 p-2">
+          <summary className="cursor-pointer">
+            {preview.annotationWarnings.length} applied rule{preview.annotationWarnings.length === 1 ? ' has' : 's have'} annotation warnings (they do not block publishing and are exported as open issues)
+          </summary>
+          <ul className="mt-1 list-disc pl-5 text-xs">
+            {preview.annotationWarnings.map((w) => (
+              <li key={w.ruleKey}>
+                {w.ruleKey}: {w.flags.map((f) => f.message).join(' ')}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
       {preview.excluded.filter((r) => !preview.notApplied?.some((n) => n.ruleKey === r.ruleKey)).length > 0 && (
         <p className="text-fg-muted">

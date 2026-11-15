@@ -1,12 +1,26 @@
 'use client';
 
-import type { PolicyRuleBody } from '@praxis/shared';
+import { ACTOR_LABEL, CLASSIFICATION_LABEL, MARKING_LABEL, annotationText, type AnnotationFlag, type PolicyRuleBody, type RuleAnnotation, type ScopeList } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
 import { setRuleApplied, type ApplyTarget } from './apply-rule';
 import { locatorText } from './locator';
 import { RuleReview } from './rule-review';
+import { AnnotationEditor } from './annotation-editor';
+import { sourceLabel, type AnnotationSource, type PendingSuggestion } from './annotation-logic';
+
+export interface AnnotationRevision {
+  id: string;
+  annotationVersion: number;
+  source: 'AI_SUGGESTION' | 'AUTHOR_EDIT';
+  adopted: boolean;
+  model: string | null;
+  editedRole: string | null;
+  createdAt: string;
+  ruleVersionId: string;
+  annotation: RuleAnnotation;
+}
 
 export interface RuleDetailData {
   ruleId: string;
@@ -27,6 +41,57 @@ export interface RuleDetailData {
   evidenceProblems: string[];
   citations: Array<{ id: string; fieldPath: string; role: string; quote: string; locator: { page?: number | null; lineStart?: number | null; lineEnd?: number | null; section?: string | null }; resolution: string; documentVersionId: string; document: string; documentVersion: number; sha256: string }>;
   history: Array<{ id: string; version: number; state: string; origin?: string; reviewedAt: string | null; createdAt: string }>;
+  annotation?: RuleAnnotation | null;
+  annotationSource?: AnnotationSource | null;
+  pendingAiSuggestion?: PendingSuggestion | null;
+  flags?: AnnotationFlag[];
+  linkedFrom?: Array<{ ruleKey: string; relation: string }>;
+  annotationHistory?: AnnotationRevision[];
+  applicationTypeOptions?: string[];
+  projectRuleKeys?: string[];
+}
+
+const scope = (s: ScopeList) => (s.kind === 'all' ? 'All' : s.kind === 'listed' ? s.items.join(', ') || 'None listed' : 'Unknown');
+const unknown = <span className="text-warning">Unknown</span>;
+
+/** The current annotation, read-only (Mandatory marking, Applies when, Why first: spec §4). */
+function AnnotationView({ a }: { a: RuleAnnotation }) {
+  return (
+    <dl className="mt-2">
+      <Field label="Mandatory marking">
+        <strong>{MARKING_LABEL[a.marking]}</strong>
+      </Field>
+      <Field label="Applies when">{a.appliesWhen ?? unknown}</Field>
+      <Field label="Why">{a.why ?? unknown}</Field>
+      <Field label="Classification">{CLASSIFICATION_LABEL[a.classification]}</Field>
+      <Field label="Responsible actor">
+        {a.responsibleActor === 'unknown' ? unknown : ACTOR_LABEL[a.responsibleActor]}
+        {a.actorNote && ` — ${a.actorNote}`}
+      </Field>
+      <Field label="Application types">{scope(a.applicationTypes)}</Field>
+      <Field label="Jurisdictions">{scope(a.jurisdictions)}</Field>
+      <Field label="Workflow stage">{a.workflowStage ?? unknown}</Field>
+      <Field label="Deadline">{a.deadline.kind === 'stated' ? `${a.deadline.text ?? 'Stated'}${a.deadline.measuredFrom ? `, measured from ${a.deadline.measuredFrom}` : ''}` : a.deadline.kind === 'none' ? 'None' : unknown}</Field>
+      <Field label="Evidence">
+        {a.evidence.status === 'stated' ? 'Stated by the policy' : a.evidence.status === 'partly_stated' ? 'Partly stated' : unknown}
+        {a.evidence.missing.length > 0 && ` — missing: ${a.evidence.missing.join('; ')}`}
+      </Field>
+      <Field label="Linked rules" empty={a.links.length === 0}>
+        <List items={a.links.map((l) => `${l.relation.replace(/_/g, ' ')} ${l.ruleKey}`)} />
+      </Field>
+      {a.compound && (
+        <Field label="Compound statement">
+          <span className="text-fg-muted">
+            {a.compound.role} in group {a.compound.groupKey}:
+          </span>
+          <blockquote className="mt-1 border-l-2 border-line pl-2">{a.compound.originalStatement}</blockquote>
+        </Field>
+      )}
+      <Field label="Open questions" empty={a.openQuestions.length === 0}>
+        <List items={a.openQuestions} />
+      </Field>
+    </dl>
+  );
 }
 
 const TYPE: Record<PolicyRuleBody['requirementType'], string> = { obligation: 'Obligation (must)', prohibition: 'Prohibition (must not)', permission: 'Permission (may)', definition: 'Definition', unknown: 'Not determined' };
@@ -93,7 +158,7 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
         <div className="flex flex-wrap items-center gap-4">
           <span className={`rounded px-2 py-0.5 ${d.applied ? 'bg-success/15 text-success' : d.state === 'EXCLUDED' ? 'bg-bg text-fg-muted' : 'bg-warning/15 text-warning'}`}>{STATE[d.state]}</span>
           <span>
-            Required: <strong>{d.required ? 'Yes' : 'No'}</strong>
+            Mandatory marking: <strong>{d.annotation ? MARKING_LABEL[d.annotation.marking] : 'Not annotated'}</strong> <span className="text-xs text-fg-muted">({sourceLabel({ ruleKey: d.ruleKey, annotation: d.annotation, annotationSource: d.annotationSource })})</span>
           </span>
           <span className="text-fg-muted">
             Version {d.version} · {ORIGIN[d.origin] ?? d.origin}
@@ -148,6 +213,50 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
               <li key={p}>{p}</li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="ann-h" className="card p-4">
+        <h2 id="ann-h" className="font-semibold">
+          Annotation
+        </h2>
+        <p className="text-xs text-fg-muted">
+          {d.annotation ? `${sourceLabel({ ruleKey: d.ruleKey, annotation: d.annotation, annotationSource: d.annotationSource })}. ` : ''}AI annotations are suggestions; your edit and your Apply tick are the decision. Extraction is not approval or legal validation.
+        </p>
+        {(d.flags ?? []).length > 0 && (
+          <ul className="mt-2 space-y-0.5 text-xs text-warning" aria-label="Flags">
+            {(d.flags ?? []).map((f, i) => (
+              <li key={i}>⚠ {f.message}</li>
+            ))}
+          </ul>
+        )}
+        {d.annotation ? <AnnotationView a={d.annotation} /> : <p className="mt-2 text-fg-muted">Not annotated yet. Use “Suggest annotations with AI” on the Rules page, or annotate it below.</p>}
+        {(d.linkedFrom ?? []).length > 0 && (
+          <p className="mt-2 text-xs text-fg-muted">
+            Linked from: {(d.linkedFrom ?? []).map((l) => `${l.ruleKey} (${l.relation.replace(/_/g, ' ')})`).join(', ')}
+          </p>
+        )}
+        {d.pendingAiSuggestion && (
+          <div className="mt-3 rounded border border-link/30 bg-link/5 p-3">
+            <p className="font-medium">
+              AI suggestion v{d.pendingAiSuggestion.annotationVersion} ({d.pendingAiSuggestion.model ?? 'assistant'}), not used yet
+            </p>
+            <p className="text-xs">{annotationText(d.pendingAiSuggestion.annotation)}</p>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-link">Review and use it</summary>
+              <div className="mt-2">
+                <AnnotationEditor key={`ai-${d.pendingAiSuggestion.id}`} projectId={projectId} ruleId={d.ruleId} contentHash={d.contentHash} applied={d.applied} annotation={d.pendingAiSuggestion.annotation} applicationTypeOptions={d.applicationTypeOptions ?? []} ruleKeys={(d.projectRuleKeys ?? []).filter((k) => k !== d.ruleKey)} basedOnRevisionId={d.pendingAiSuggestion.id} />
+              </div>
+            </details>
+          </div>
+        )}
+        {d.state !== 'EXCLUDED' && (
+          <details className="mt-3">
+            <summary className="cursor-pointer font-medium">Edit annotation</summary>
+            <div className="mt-2">
+              <AnnotationEditor key={`${d.versionId}-${d.annotation?.version ?? 0}`} projectId={projectId} ruleId={d.ruleId} contentHash={d.contentHash} applied={d.applied} annotation={d.annotation ?? null} applicationTypeOptions={d.applicationTypeOptions ?? []} ruleKeys={(d.projectRuleKeys ?? []).filter((k) => k !== d.ruleKey)} />
+            </div>
+          </details>
         )}
       </section>
 
@@ -295,6 +404,39 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
           </tbody>
         </table>
       </section>
+
+      {(d.annotationHistory ?? []).length > 0 && (
+        <section aria-labelledby="ann-hist-h" className="card p-4">
+          <h2 id="ann-hist-h" className="font-semibold">
+            Annotation history
+          </h2>
+          <p className="text-xs text-fg-muted">Every saved annotation is kept: the original AI suggestion and each edit. The source quotation is never changed by an annotation edit.</p>
+          <table className="mt-2 w-full text-left">
+            <thead className="text-xs text-fg-muted">
+              <tr>
+                <th scope="col" className="py-1">
+                  Annotation
+                </th>
+                <th scope="col">By</th>
+                <th scope="col">Marking</th>
+                <th scope="col">Used</th>
+                <th scope="col">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(d.annotationHistory ?? []).map((h) => (
+                <tr key={h.id} className="border-t border-line align-top">
+                  <td className="py-1">v{h.annotationVersion}</td>
+                  <td>{h.source === 'AI_SUGGESTION' ? `AI suggestion (${h.model ?? 'assistant'})` : `Edit by ${h.editedRole === 'ADMIN' ? 'Admin' : (h.editedRole ?? 'author')}`}</td>
+                  <td>{MARKING_LABEL[h.annotation.marking]}</td>
+                  <td>{h.adopted ? (d.annotation?.version === h.annotationVersion ? 'Current' : 'Yes') : 'Offered only'}</td>
+                  <td>{new Date(h.createdAt).toISOString().slice(0, 16).replace('T', ' ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       <details className="card p-4">
         <summary className="cursor-pointer font-semibold">Edit fields and quotes</summary>

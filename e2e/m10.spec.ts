@@ -194,6 +194,14 @@ test('a pay run is built, confirmed by a PM, approved by Finance and submitted',
   // The week before last (the fixture's earnings), so the Monday worker job drafting last week's run never collides.
   const twoWeeksAgo = new Date(Date.now() - 14 * 86_400_000);
   const monday = new Date(Date.UTC(twoWeeksAgo.getUTCFullYear(), twoWeeksAgo.getUTCMonth(), twoWeeksAgo.getUTCDate() - ((twoWeeksAgo.getUTCDay() + 6) % 7)));
+  // A retry finds the run an earlier attempt left part-way (already confirmed or approved): cancel it, as Finance
+  // would, so this attempt starts again from a draft and checks every step.
+  const financeApi = await staff('finance@e2e.local', 'e2e-finance-password');
+  const { items: runs } = await ok(financeApi.get('pay-runs'));
+  for (const r of runs as { id: string; periodStart: string; status: string }[]) {
+    if (r.periodStart.slice(0, 10) === monday.toISOString().slice(0, 10) && ['DRAFT', 'CONFIRMED', 'APPROVED'].includes(r.status))
+      await ok(financeApi.post(`pay-runs/${r.id}/cancel`, { data: { reason: 'e2e retry starts the week again' }, headers: idem() }));
+  }
   await f.getByLabel(/Week starting/).fill(monday.toISOString().slice(0, 10));
   await f.getByRole('button', { name: 'Build pay run' }).click();
   const exists = f.getByText('A pay run for this week already exists.');

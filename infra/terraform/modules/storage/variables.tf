@@ -5,3 +5,8 @@ variable "evidence_retention_days" {
   default     = 30
   description = "Minimum time evidence files are kept before deletion is allowed."
 }
+variable "tutorial_cors_origins" {
+  type        = list(string)
+  default     = []
+  description = "Origins (console, candidate app) allowed to read tutorial videos and captions from signed URLs."
+}

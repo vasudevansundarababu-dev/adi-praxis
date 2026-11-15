@@ -33,3 +33,21 @@ resource "google_storage_bucket" "brand" {
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
 }
+
+# D2 tutorial videos: private, read through short-lived signed URLs only. CORS lets the console and candidate apps load
+# the captions track (and the video with crossorigin) from the signed address.
+resource "google_storage_bucket" "tutorials" {
+  project                     = var.project_id
+  name                        = "${var.project_id}-tutorials"
+  location                    = var.location
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+  force_destroy               = false
+
+  cors {
+    origin          = var.tutorial_cors_origins
+    method          = ["GET", "HEAD"]
+    response_header = ["Content-Type", "Content-Range", "Accept-Ranges"]
+    max_age_seconds = 3600
+  }
+}

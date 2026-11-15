@@ -19,6 +19,7 @@ locals {
     CANDIDATE_APP_URL   = "https://${var.domains.candidate}"
     CORS_ORIGINS        = "https://${var.domains.console},https://${var.domains.candidate}"
     EVIDENCE_BUCKET     = var.buckets.evidence
+    TUTORIAL_BUCKET     = var.buckets.tutorials
     GCS_PROJECT_ID      = var.project_id
     VERTEX_PROJECT_ID   = var.project_id
     VERTEX_LOCATION     = var.vertex_location

@@ -55,3 +55,49 @@ review, and Anvil's export side switched on. It comes after this development, no
 - The discriminator's name and values, and where it sits in the package (top level or per task).
 - Whether the example state also stays in the export for coverage reporting.
 - Whether v7 keeps every other v6 section unchanged.
+
+## Anvil's answers (received 15 Nov 2026, through the owner)
+
+1. **Application types.** `S1.applicationType` is required:
+
+   | Value | Label |
+   |---|---|
+   | `individual` | Single |
+   | `adult_joint` | Joint |
+   | `teen_joint` | Minor (joint with adult) |
+   | `custodial` | Custodian |
+
+   The export selector is generated from it. Routing uses the application's `product`, not the requested product or
+   the example state.
+2. **Discriminator.** Per task, `tasks[].case_selector = {field, value}`:
+   - `field: "product"` for v7 (for example `{"field":"product","value":"adult_joint"}`);
+   - `field: "governing_state"` for existing state-based contracts.
+
+   The selector must match the exact published template version and qualification receipt. v6 behaviour, the API
+   paths, the payload identifiers, `praxis-export.json` and `praxis.authored-task-export.v1` are preserved. RL Gym
+   implements the v7 decoding branch, and RL Gym binds the input dataset (no dataset counts from authors).
+3. **Example state.** Optional per task as `coverage.example_governing_state`, from `S1.exampleGoverningState`, and
+   omitted when absent. It is coverage metadata only.
+4. **Other sections.**
+   - S2, S3 and S5–S8 are preserved.
+   - **S4:** the "one authored state" restriction is removed. Policy references keep their identities, versions,
+     hashes and publication references. Common and applicable state policies are resolved per application; a
+     missing or ambiguous policy blocks or escalates that application.
+   - Published v6 and its history stay untouched. Changed applicability does not inherit broader approval.
+5. **Contract §6** is updated: export requires every task to be approved, with final PM/Admin approval and an
+   optional Reviewer step first. Single-task validation remains.
+6. **Testing.** Integration testing, template submissions and export runs stay paused until our ready note. Export
+   enablement uses the existing keyless identity and scoped grant, with no extra API key. Staging and Production stay
+   on hold.
+
+## Praxis impact (Claude, 15 Nov 2026)
+
+- **No Praxis rule ties S4 policies to one state.** The restriction lives in the template, so Anvil removes it in v7.
+- **Task selection:** v7's case selector (`source: S1.applicationType`, `field: product`) works with today's slot code.
+  It gives one task per application type.
+- **Export (built in MVP1 step 4):**
+  - add `tasks[].case_selector = {field: template.caseSelector.field, value: <the task's selected value>}`;
+  - add `coverage.example_governing_state` when `S1.exampleGoverningState` is filled;
+  - **v6 packages stay byte-identical** (no new fields) unless Anvil asks for `governing_state` on v6 too. This is
+    asked in our confirmation.
+- **Dashboard coverage** follows the template's selector: application type for v7, state for v6.

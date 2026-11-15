@@ -1630,3 +1630,18 @@ Forgot password still answers 202 and sends nothing).
 - **(chosen by Claude)** **Report without names or emails.** Per task: task ID, slot label, state, SME status, target
   state, the author's Sourcing person ID, and for Submitted tasks the console approval link
   `/projects/<projectId>/tasks/<taskId>/review`. Paid calls are embeddings only (about $0.0003 per submitted task).
+
+## Approved terms as seed data; menu clean-up (15 Nov 2026)
+
+- **(owner)** The three terms the owner published in QA on 15 Nov 2026 (`contributor`, `confidentiality_ip`,
+  `data_use`, v1) are seed data in `apps/api/prisma/seed-data/terms/<key>.json`, byte-exact from the QA export
+  (sha256 e0fd5432…, 1b3ad22a…, 8bc7857a…). The `seed` job publishes them on a fresh database instead of placeholders.
+- **(chosen by Claude)** Create-only, like an Admin publishing: a key with no document gets version 1; a placeholder
+  gets the approved text as the next version; an approved version (including any later Admin edit) is never
+  overwritten. A key without a file falls back to the placeholder. `SEED_TERMS_DIR=none` seeds placeholders only, which
+  the tests that exercise placeholder behaviour use.
+- **(chosen by Claude)** The text is kept exactly as published, including two unfilled brackets ("[contact email]" in
+  Contributor terms, "[retention period]" in Data use). Fixing them is the owner's call: publish a new version in
+  Admin → Terms and update the seed files.
+- **(owner)** Certification, Partners and Payments are hidden from the console menu whatever the new-flow setting;
+  the routes stay.

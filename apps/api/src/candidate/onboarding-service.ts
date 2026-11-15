@@ -36,12 +36,35 @@ const PLACEHOLDER_TITLES: Record<(typeof TERMS_KEYS)[number], string> = {
   data_use: 'How your data is used',
 };
 
+export type ApprovedTermsText = { title: string; body: string };
+
+/**
+ * The owner's approved terms (published in QA on 15 Nov 2026), kept in the repo so every fresh database starts with
+ * them. Create-only, the same as an Admin publishing: a key with no document gets version 1; a key whose current
+ * version is a placeholder gets the approved text as the next version; a key with approved text is left alone, so an
+ * Admin's later edits are never overwritten. Keys without approved text fall back to the placeholder.
+ */
+export async function seedTerms(db: Db, clientId: string, publishedById: string, approved: Partial<Record<(typeof TERMS_KEYS)[number], ApprovedTermsText>>) {
+  for (const key of TERMS_KEYS) {
+    const text = approved[key];
+    if (!text) {
+      await seedPlaceholderTerms(db, clientId, publishedById, [key]);
+      continue;
+    }
+    const current = await db.termsDocument.findFirst({ where: { clientId, key }, orderBy: { version: 'desc' } });
+    if (current && !current.placeholder) continue;
+    await db.termsDocument.create({
+      data: { clientId, key, version: (current?.version ?? 0) + 1, title: text.title, body: text.body, sha256: sha256(text.body), placeholder: false, publishedById },
+    });
+  }
+}
+
 /**
  * Version 1 of each terms document, marked as a placeholder. Legal text is outside this platform's spec, so an Admin
  * publishes the approved wording; until then production blocks onboarding (FLOW2 section 11). Create-only.
  */
-export async function seedPlaceholderTerms(db: Db, clientId: string, publishedById: string) {
-  for (const key of TERMS_KEYS) {
+export async function seedPlaceholderTerms(db: Db, clientId: string, publishedById: string, keys: readonly (typeof TERMS_KEYS)[number][] = TERMS_KEYS) {
+  for (const key of keys) {
     const body = `PLACEHOLDER — not approved legal text. An Admin must publish the approved ${PLACEHOLDER_TITLES[key].toLowerCase()} before production use.`;
     const exists = await db.termsDocument.findFirst({ where: { clientId, key } });
     if (!exists) {

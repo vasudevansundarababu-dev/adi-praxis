@@ -2,7 +2,7 @@
 
 | Item | Value |
 | --- | --- |
-| Status | **Draft, waiting for the owner.** Nothing is built until the owner confirms (CLAUDE.md, "How to work" 2). |
+| Status | **Approved by the owner on 15 Nov 2026, as proposed** (section 10: additive annotations document; automatic annotation after extraction plus the backfill button; A1 and A5 confirmed; all other assumptions stand). The RL Gym change note is drafted in `docs/anvil/` for the owner to send; the document stays "proposed" until RL Gym agrees. |
 | Implements | [PRD-POLICY-RULE-ANNOTATIONS.md](../prd/PRD-POLICY-RULE-ANNOTATIONS.md) (owner spec, 15 Nov 2026, copied unchanged) |
 | Builds on | [PRD-POLICY-RULES.md](../prd/PRD-POLICY-RULES.md), [PLAN-POLICY-RULES.md](PLAN-POLICY-RULES.md), [ANVIL-PROJECT-POLICY-V1.md](../integrations/ANVIL-PROJECT-POLICY-V1.md) |
 | Branch | `claude/policy-rule-annotations-3ca355` (draft PR). No merge or deploy from this branch. |

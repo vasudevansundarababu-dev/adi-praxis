@@ -1,6 +1,7 @@
 'use client';
 
-import { getFieldValue, isArrayType, itemFieldsOf, PROFILE_SECTIONS, type ForgeComment, type ItemField, type ProjectPersonDto, type SectionKey, type TemplateProfile, type ValidationRunDto } from '@praxis/shared';
+import { getFieldValue, isArrayType, itemFieldsOf, PROFILE_SECTIONS, type ForgeComment, type ItemField, type ProjectPersonDto, type RubricView, type SectionKey, type TemplateProfile, type ValidationRunDto } from '@praxis/shared';
+import { RubricReadOnly } from './rubric-readonly';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -119,7 +120,7 @@ export function FieldValue({ field, value }: { field: ItemField; value: unknown 
 }
 
 /** The authored form, read-only, section by section in the template's order. Empty fields show a dash. */
-export function AuthoredForm({ profile, output }: { profile: TemplateProfile | null; output: Record<string, unknown> | null }) {
+export function AuthoredForm({ profile, output, rubric = null }: { profile: TemplateProfile | null; output: Record<string, unknown> | null; rubric?: RubricView | null }) {
   if (!profile) {
     return output ? (
       <section className="card mb-4 p-5">
@@ -146,6 +147,7 @@ export function AuthoredForm({ profile, output }: { profile: TemplateProfile | n
                   <dt className="font-medium text-fg-muted">{f.label}</dt>
                   <dd>
                     <FieldValue field={f} value={output ? getFieldValue(profile, output, s.key as SectionKey, f) : undefined} />
+                    {rubric && f.type === 'criterion' && <RubricReadOnly view={rubric} items={((output ? getFieldValue(profile, output, s.key as SectionKey, f) : undefined) as Record<string, unknown>[] | undefined) ?? []} />}
                   </dd>
                 </div>
               ))}
@@ -494,7 +496,7 @@ function ValidateCard({ projectId, recordId, initial }: { projectId: string; rec
 }
 
 /** MVP1 task page: the authored form read-only, the review trail, and the decision box when it is the viewer's turn. */
-export function ForgeTaskPage({ code, view, people, exportState }: { code: string; view: ForgeTaskView; people: ProjectPersonDto[]; exportState: ExportState | null }) {
+export function ForgeTaskPage({ code, view, people, exportState, rubric = null }: { code: string; view: ForgeTaskView; people: ProjectPersonDto[]; exportState: ExportState | null; rubric?: RubricView | null }) {
   const projectId = view.project.id;
   const last = view.reviews.at(-1) ?? null;
   const decided = ['ACCEPTED', 'REWORK', 'REJECTED'].includes(view.status);
@@ -525,7 +527,7 @@ export function ForgeTaskPage({ code, view, people, exportState }: { code: strin
 
       <ChangeAuthor projectId={projectId} view={view} people={people} />
 
-      <AuthoredForm profile={view.template.profile} output={view.status === 'CREATED' ? null : view.output} />
+      <AuthoredForm profile={view.template.profile} output={view.status === 'CREATED' ? null : view.output} rubric={rubric} />
 
       {view.status === 'ACCEPTED' && recordId && <ValidateCard projectId={projectId} recordId={recordId} initial={exportState?.runs ?? []} />}
 

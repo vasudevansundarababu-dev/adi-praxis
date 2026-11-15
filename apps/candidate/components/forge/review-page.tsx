@@ -1,6 +1,7 @@
 'use client';
 
-import { getFieldValue, isArrayType, itemFieldsOf, type ForgeComment, type ItemField, type ReviewerTaskStatus, type SectionKey, type TemplateProfile } from '@praxis/shared';
+import { getFieldValue, isArrayType, itemFieldsOf, type ForgeComment, type ItemField, type ReviewerTaskStatus, type RubricView, type SectionKey, type TemplateProfile } from '@praxis/shared';
+import { RubricReadOnly } from './rubric-readonly';
 import Link from 'next/link';
 import { useState } from 'react';
 import { call } from '@/lib/client';
@@ -79,7 +80,7 @@ function CommentBox({ group, value, onChange, disabled }: { group: ReviewGroup; 
 const when = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
 /** MVP1 Review page: the authored form read-only, a comment box under each section, Send back for rework or Approve. */
-export function ReviewPage({ initial }: { initial: ReviewView }) {
+export function ReviewPage({ initial, rubric = null }: { initial: ReviewView; rubric?: RubricView | null }) {
   const [view, setView] = useState(initial);
   const [boxes, setBoxes] = useState<Record<string, string>>({});
   const [duplicateOk, setDuplicateOk] = useState(false);
@@ -162,6 +163,7 @@ export function ReviewPage({ initial }: { initial: ReviewView }) {
                             <dt className="text-xs font-medium text-fg-muted">{f.label}</dt>
                             <dd>
                               <Value field={f} value={getFieldValue(profile, view.output, s.key as SectionKey, f)} />
+                              {rubric && f.type === 'criterion' && <RubricReadOnly view={rubric} items={(getFieldValue(profile, view.output, s.key as SectionKey, f) as Record<string, unknown>[] | undefined) ?? []} />}
                             </dd>
                           </div>
                         ))}

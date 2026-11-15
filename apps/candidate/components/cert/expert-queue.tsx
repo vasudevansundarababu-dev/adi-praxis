@@ -148,7 +148,7 @@ function FamilyCard({ family: f, onDone }: { family: ExpertReviewItem; onDone: (
           </ol>
         </div>
       )}
-      <p className="text-xs text-fg-muted">Approve only if the questions are accurate, fair and supported by the cited guidelines section. If something is wrong, leave it unapproved and tell your Praxis contact.</p>
+      <p className="text-xs text-fg-muted">Approve only if the questions are accurate, fair and supported by the cited guidelines section. If something is wrong, leave it unapproved and tell your ADI Forge contact.</p>
       <button type="button" disabled={pending} onClick={approve} className="btn btn-primary">
         {pending ? 'Saving…' : 'Approve this family'}
       </button>

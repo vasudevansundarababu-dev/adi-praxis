@@ -96,7 +96,7 @@ export function TaskPolicy({ projectId, taskId, data }: { projectId: string; tas
         <ul className="mt-2 grid gap-1 sm:grid-cols-3">
           <li>Snapshot: {d.snapshot ? (d.snapshot.current ? `v${d.snapshot.version} published, up to date` : `v${d.snapshot.version} published, out of date`) : 'not published'}</li>
           <li>Sources: {d.readiness.sourcesComplete ? 'complete' : 'incomplete'}</li>
-          <li>Anvil test: {d.readiness.anvil}</li>
+          <li>RL Gym test: {d.readiness.anvil}</li>
         </ul>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" disabled={pending || !!d.snapshot?.current} onClick={snapshot} className="btn btn-primary disabled:opacity-50">

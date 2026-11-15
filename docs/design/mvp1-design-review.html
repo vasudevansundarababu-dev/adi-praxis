@@ -1,0 +1,255 @@
+<title>Praxis MVP1 Design</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700;800&family=Geist+Mono:wght@400;500;600&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap">
+<style>
+/* Layout: one reading column; journeys as numbered step lists (the order is real), each step linking to its mockup screen. Praxis brand tokens. */
+:root{
+  --bg:#f5f7fa; --surface:#ffffff; --ink:#0a2170; --muted:#5b6b77; --line:#dde4ec;
+  --blue:#1d68b0; --teal:#2f9c8a; --warn:#b45309; --bad:#b91c1c; --ok:#15803d; --chip:#eef3f9;
+  --display:'Geist','Inter',ui-sans-serif,system-ui,sans-serif; --body:'Inter',ui-sans-serif,system-ui,sans-serif; --mono:'Geist Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1b1c21;--surface:#24262c;--ink:#e6eaee;--muted:#9aabb6;--line:#363944;--blue:#5aa3e6;--teal:#4fc1aa;--warn:#fbbf24;--bad:#f87171;--ok:#4ade80;--chip:#2c2f37;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1b1c21;--surface:#24262c;--ink:#e6eaee;--muted:#9aabb6;--line:#363944;--blue:#5aa3e6;--teal:#4fc1aa;--warn:#fbbf24;--bad:#f87171;--ok:#4ade80;--chip:#2c2f37;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-optical-sizing:auto;font-size:15px;line-height:1.6;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+a{color:var(--blue)}
+.wrap{max-width:60rem;margin:0 auto}
+.band{height:5px;background:linear-gradient(90deg,#0a2170 0%,#2a80d0 50%,#3fac95 100%);margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)))}
+header.top{padding-block:36px 8px}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-family:var(--display);letter-spacing:-0.02em;font-size:clamp(28px,4vw,40px);line-height:1.15;margin:8px 0 10px;font-weight:800;text-wrap:balance}
+h2{font-family:var(--display);letter-spacing:-0.02em;font-size:22px;font-weight:600;margin:44px 0 6px;text-wrap:balance}
+h3{font-family:var(--display);letter-spacing:-0.02em;font-size:16px;font-weight:600;margin:22px 0 8px}
+p{max-width:68ch;margin:8px 0}
+.lead{font-size:17px;color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--chip);color:var(--ink)}
+.tag::before{content:'';width:7px;height:7px;border-radius:9px;background:var(--c,var(--muted))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+.mock{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+.mock a{display:block;text-decoration:none;color:inherit}
+.mock a:hover .card{border-color:var(--blue)}
+.mock .k{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.mock .t{font-size:18px;font-weight:700;margin:4px 0}
+.diagram{overflow-x:auto;margin-top:12px}
+.diagram pre{margin:0;background:transparent}
+ol.steps{list-style:none;padding:0;margin:14px 0 0;counter-reset:s;display:grid;gap:10px}
+ol.steps>li{counter-increment:s;display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;align-items:start}
+ol.steps>li::before{content:counter(s);width:32px;height:32px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:14px;background:var(--chip);color:var(--ink)}
+.step{min-width:0}
+.step .h{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.step .h strong{font-size:15.5px}
+.step .who{font-size:12px;color:var(--muted);font-weight:600}
+.step ul{margin:6px 0 0;padding-left:18px}
+.step li{margin:2px 0}
+.open{font-size:13px;font-weight:600;white-space:nowrap}
+.off{font-size:12px;font-weight:700;color:var(--warn)}
+.table{overflow-x:auto;margin-top:10px}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+th{text-align:left;font-size:12px;color:var(--muted);font-weight:700;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-top:1px solid var(--line);vertical-align:top}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}
+.two .card ul{margin:6px 0 0;padding-left:18px}
+.mono{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.tag{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500}
+ol.steps>li::before{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.mock .t{font-family:var(--display);letter-spacing:-0.02em}
+.approve{border:2px solid var(--blue)}
+.approve ul{padding-left:18px}
+@media (max-width:640px){.mock,.two{grid-template-columns:1fr}}
+</style>
+
+<div class="band"></div>
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">ADI Forge (formerly ADI Praxis) · MVP1 · for owner approval</div>
+  <h1>Projects, sourcing and task authoring, end to end</h1>
+  <p class="lead">One project page for the PM or Admin, profiles from recruitment agencies, tasks assigned directly to people, and a candidate app that is just "your tasks". This page is the design to approve before development starts.</p>
+  <div class="meta"><span class="tag" style="--c:var(--warn)">Awaiting approval</span><span class="tag" style="--c:var(--blue)">15 Nov 2026</span><span class="tag" style="--c:var(--teal)">Mockups: synthetic data</span></div>
+</header>
+
+<section class="mock" aria-label="Mockups">
+  <a href="mockups/project-screen.html#list" target="_blank" rel="noopener"><div class="card"><div class="k">Console mockup · PM and Admin</div><div class="t">Projects, Sourcing, Admin</div><p style="margin:0;color:var(--muted)">New project wizard, the four project tabs, assigning people to tasks, task review, export, sign-in mode.</p></div></a>
+  <a href="mockups/candidate-screens.html#signin" target="_blank" rel="noopener"><div class="card"><div class="k">Candidate app mockup · SME and Reviewer</div><div class="t">Sign in, your tasks, authoring, review</div><p style="margin:0;color:var(--muted)">Terms on first sign-in, the task list, the authoring form with Tutorial and Help, rework, and the Reviewer's view.</p></div></a>
+</section>
+<p style="font-size:13px;color:var(--muted)">Every step below has an "Open screen" link to the exact screen. The bar at the bottom of each mockup is for the mockup only (it switches route, role or person); it is not part of the design.</p>
+
+<h2>End-to-end flow</h2>
+<p>Who does what, from a new project to tasks exported to Anvil. Recruiting happens outside Praxis; everything else is in it.</p>
+<div class="card diagram"><pre class="mermaid">
+flowchart LR
+  subgraph PM["PM or Admin · console"]
+    A1[Create project<br/>from template] --> A2[Upload policies<br/>publish rule set]
+    A2 --> A3[Export JD + SME<br/>cheat sheet PDF]
+    A5[Upload profiles<br/>in Sourcing] --> A6[Assign person<br/>to a task]
+    A6 --> A7[Track progress]
+    A9[Approve, Rework<br/>or Reject] --> A10[Validate with Anvil<br/>per task]
+    A10 --> A11[Export when all<br/>tasks are approved]
+  end
+  subgraph REC["Recruitment agency · offline"]
+    R1[Interview candidates<br/>against JD and tasks] --> R2[Send profiles<br/>and answers]
+  end
+  subgraph SME["SME · candidate app"]
+    S1[Sign in, accept terms] --> S2[Author the task<br/>Tutorial and Help]
+    S2 --> S3[Submit]
+    S4[Fix and resubmit]
+  end
+  subgraph RV["Reviewer · candidate app<br/>only on the Reviewer route"]
+    V1[Review with comments<br/>per section]
+  end
+  ANV[(Anvil)]
+  A3 --> R1
+  R2 --> A5
+  A6 --> S1
+  S3 -->|Reviewer route| V1
+  S3 -->|Author → PM/Admin| A9
+  V1 -->|Approve| A9
+  V1 -->|Send back| S4
+  A9 -->|Rework| S4
+  S4 --> S3
+  A11 --> ANV
+</pre></div>
+
+<h3>Task status</h3>
+<p>One status per task. The SME sees the same states in simpler words: New, In review, Rework, Accepted, Rejected.</p>
+<div class="card diagram"><pre class="mermaid">
+stateDiagram-v2
+  direction LR
+  [*] --> Open: project submitted
+  Open --> Assigned: PM or Admin assigns an SME
+  Assigned --> InProgress: SME starts
+  InProgress --> Submitted: SME submits
+  Submitted --> ReviewerPassed: Reviewer approves (Reviewer route)
+  Submitted --> Rework: Reviewer or PM sends back
+  ReviewerPassed --> Approved: PM or Admin approves
+  ReviewerPassed --> Rework: PM or Admin sends back
+  Submitted --> Approved: PM or Admin approves (Author → PM/Admin)
+  Rework --> Submitted: SME resubmits
+  Submitted --> Rejected: PM or Admin rejects
+  ReviewerPassed --> Rejected: PM or Admin rejects
+  Approved --> [*]: exported with all others
+  Rejected --> [*]: slot freed
+</pre></div>
+
+<h2>PM and Admin journey</h2>
+<p>All in the console. Menu for MVP1: <strong>Home, Projects, Sourcing, Admin, Tutorials</strong>.</p>
+<ol class="steps">
+  <li><div class="step"><div class="h"><strong>Create a project from a template</strong><span class="who">Projects › New project</span><a class="open" href="mockups/project-screen.html#new-project" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>The existing six-step wizard, unchanged: Template, Basics, Volume and TPT, Demographics, Job description, Review and submit.</li>
+    <li>Choose the <strong>review route</strong> here: Author → PM/Admin, or Author → Reviewer → PM/Admin. It is read-only afterwards.</li>
+    <li>Submitting creates exactly the number of tasks the template defines (for KYC v6: one per state, CA, NY, TX, FL, IL).</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Upload policies and publish the rules</strong><span class="who">Project › Policies</span><a class="open" href="mockups/project-screen.html#proc" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>Add the federal and state policy documents; extraction (LlamaExtract or Google) proposes rules with citations.</li>
+    <li>Suggest rules, tick Apply to project (that is the human review), then publish the rule set. Every task inherits it.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Create the opportunity: Export to Recruiter</strong><span class="who">Project › Resource assignments</span><a class="open" href="mockups/project-screen.html#recruiter" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>One button, one PDF, built from the project: <strong>1</strong> the role, <strong>2</strong> requirements with the evidence to check, <strong>3</strong> the SME cheat sheet (the task they would author, in plain words), <strong>4</strong> what to send back for each candidate.</li>
+    <li>Attached inside the PDF: a <strong>candidate assessment sheet (Excel)</strong>, one row per candidate: first and last name, Gmail address, an assessment per requirement, answers to the questions, why they fit. "Download Excel only" gives the same sheet for viewers that hide attachments.</li>
+    <li>No Publish and no public apply link. The pack goes to recruitment agencies.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Agencies recruit offline</strong><span class="off">Outside Praxis</span></div>
+    <ul><li>The agency interviews candidates against the JD and the tasks, and sends back the profiles that match, with the candidates' answers.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Upload the profiles</strong><span class="who">Sourcing › New</span><a class="open" href="mockups/project-screen.html#src-new" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>Upload the recruiter's filled assessment sheet (one profile per row), or add one person: project (only New or active ones), first name, last name, email; optional LinkedIn URL, CV and assessment. Accepted in good faith.</li>
+    <li>SMEs and Reviewers are uploaded the same way. The Sourcing list has search by name, email, role or skill.</li></ul>
+    <a class="open" href="mockups/project-screen.html#src" target="_blank" rel="noopener">Open the Sourcing list ↗</a></div></li>
+  <li><div class="step"><div class="h"><strong>Assign people to tasks</strong><span class="who">Project › Resource assignments › Assign</span><a class="open" href="mockups/project-screen.html#assign" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>Lists Sourcing profiles whose skills match the template. Choose the task, then <strong>Assign as SME</strong> (an open task to author) or <strong>Assign as Reviewer</strong> (only on the Reviewer route; never their own task).</li>
+    <li>Assigning is the selection; there is no separate screening. SMEs are capped at Required workers.</li>
+    <li>In Online sign-in mode, a new person gets an email with a one-time link to set their password.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Track progress</strong><span class="who">Project › Dashboard, Resource assignments, Tasks</span><a class="open" href="mockups/project-screen.html#dash" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>Dashboard: experts, tasks approved, rule set, rework rate; a Next step banner; coverage by state.</li>
+    <li>Resource assignments: each person's role, task ID and task status. Tasks: one row per task with author, status and date.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Review and decide</strong><span class="who">Project › Tasks › task page</span><a class="open" href="mockups/project-screen.html#task-1" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>Any task name opens the authored form. On a submitted task: <strong>Approve</strong>, <strong>Rework</strong> or <strong>Reject</strong> (Rework and Reject need a comment).</li>
+    <li>On the Reviewer route the Reviewer goes first; the PM or Admin makes the final call. Approve adds the task to the approved dataset.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Validate and export to Anvil</strong><span class="who">Project › Tasks</span><a class="open" href="mockups/project-screen.html#tasks" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li><strong>Validate</strong> on any approved task, at any time (checks it with Anvil; the screen says "RL Gym"). "Valid" is not approval or Anvil readiness.</li>
+    <li><strong>Export to RL Gym</strong> opens only when every task in the project is approved, and sends them to Anvil as one batch.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Admin settings</strong><span class="who">Admin</span><a class="open" href="mockups/project-screen.html#adm" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>New: <strong>Candidate app sign-in</strong>, Offline (email and name, test environments only) or Online (email and password).</li>
+    <li>Unchanged: Users (add user, reset password), Taxonomy, Terms, Failure codes, API clients.</li></ul></div></li>
+</ol>
+
+<h2>Candidate and Reviewer journey</h2>
+<p>The candidate app shows only <strong>Home</strong> and <strong>Sign out</strong>. A person's role on each project comes from how they were assigned: as SME, as Reviewer, or both across different projects.</p>
+<ol class="steps">
+  <li><div class="step"><div class="h"><strong>Get access</strong><span class="who">Email (Online mode)</span></div>
+    <ul><li>Online: a welcome email with a one-time, expiring link to set a password. The username is the Gmail address the agency gave.</li>
+    <li>Offline (QA and demos): no email; the person signs in with their email and name.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Sign in</strong><span class="who">Sign in</span><a class="open" href="mockups/candidate-screens.html#signin" target="_blank" rel="noopener">Offline ↗</a><a class="open" href="mockups/candidate-screens.html#online" target="_blank" rel="noopener">Online ↗</a></div>
+    <ul><li>18+ confirmation the first time. An email that was never uploaded sees "No tasks for this account".</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Accept the terms, once</strong><span class="who">Before you start</span><a class="open" href="mockups/candidate-screens.html#setup" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>Contributor terms (confidentiality, IP, data use) and "synthetic data only". Recorded with the terms version. No identity check in MVP1.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>See their tasks</strong><span class="who">Home</span><a class="open" href="mockups/candidate-screens.html#home" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>A Next step card (rework first), then every assigned task: New, Rework, In review, Accepted or Rejected.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Author the task</strong><span class="who">Task page</span><a class="open" href="mockups/candidate-screens.html#task-TSK-006" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>The template's form, section by section, with an example line for each. Saves as they type; <strong>Submit for review</strong>.</li>
+    <li><strong>Tutorial</strong>: the video for this task's template. <strong>Help</strong>: an AI chat about this task only. It explains and gives examples, never writes the task, and refuses anything outside it.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Fix a rework</strong><span class="who">Task page</span><a class="open" href="mockups/candidate-screens.html#task-TSK-003" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>Each reviewer comment shows under its own section, which is highlighted. <strong>Resubmit for review</strong>.</li></ul></div></li>
+  <li><div class="step"><div class="h"><strong>Review a task (when assigned as Reviewer)</strong><span class="who">Home › Tasks to review</span><a class="open" href="mockups/candidate-screens.html#review-TSK-002" target="_blank" rel="noopener">Open screen ↗</a></div>
+    <ul><li>The authored form, read-only, with a comment box under each section.</li>
+    <li><strong>Send back for rework</strong> (needs a comment) returns it to the SME. <strong>Approve</strong> sends it to the PM or Admin to accept and export.</li></ul>
+    <a class="open" href="mockups/candidate-screens.html#home-reviewer" target="_blank" rel="noopener">Open a Reviewer's Home ↗</a></div></li>
+  <li><div class="step"><div class="h"><strong>Follow the outcome</strong><span class="who">Home</span></div>
+    <ul><li>In review while it is checked, then Accepted or Rejected (with the reason). Accepted tasks are read-only.</li></ul></div></li>
+</ol>
+
+<h2>What MVP1 includes, and what waits</h2>
+<div class="two">
+  <div class="card"><strong>In MVP1</strong><ul>
+    <li>Project page with four tabs: Dashboard, Resource assignments, Tasks, Policies.</li>
+    <li>JD export (PDF), Sourcing upload and search, assigning people to tasks.</li>
+    <li>Task review by the PM or Admin, with the Reviewer route where the project uses it.</li>
+    <li>Per-task Anvil validation; export when all tasks are approved.</li>
+    <li>Candidate app: sign-in (Offline or Online), terms, task list, authoring, Tutorial, Help, rework, Reviewer view.</li>
+  </ul></div>
+  <div class="card"><strong>Hidden until after MVP1</strong><ul>
+    <li>Opportunities, public apply links and the applicant journey.</li>
+    <li>Reviews menu (candidate review moves into Sourcing later).</li>
+    <li>Certification and SME training, Partners, Payments.</li>
+    <li>Identity check (Stripe).</li>
+    <li>Recruiter-answer validation; Partner upload screen.</li>
+  </ul></div>
+</div>
+
+<h2>Decisions behind this design</h2>
+<div class="table"><table>
+<thead><tr><th>Decision</th><th>Detail</th></tr></thead>
+<tbody>
+<tr><td>Recruiting</td><td>Agencies only, offline. PM or Admin uploads profiles; required fields are project, first and last name, email.</td></tr>
+<tr><td>Who assigns</td><td>Always the PM or Admin: people to the project and to each task, SME or Reviewer.</td></tr>
+<tr><td>Review route</td><td>Set at project creation, read-only. Reviewers exist only on Author → Reviewer → PM/Admin.</td></tr>
+<tr><td>Task table</td><td>Exactly the number of tasks the project defines; no Add task, no Invites, no task inputs.</td></tr>
+<tr><td>Coverage</td><td>Follows the template's selector. KYC v6: by state; the scenario is the author's choice inside the task. <strong>Pending with Anvil:</strong> a KYC v7 where application type (Single, Joint, Minor, Custodian) selects the task and state is an optional example; coverage would then be by application type. Not agreed yet.</td></tr>
+<tr><td>Export</td><td>Only when every task is approved. Per-task validation any time. Today's code also allows "marked complete" or "end date"; both go, and the Anvil contract text is updated with Keystone.</td></tr>
+<tr><td>Reviewers</td><td>External experts who sign in like SMEs, in the candidate app.</td></tr>
+<tr><td>Sign-in</td><td>Admin switch: Offline (no password, refused in production) or Online (password set by an emailed one-time link, never a password in email).</td></tr>
+<tr><td>Terms and identity</td><td>Terms accepted once at first sign-in. No identity check in MVP1.</td></tr>
+<tr><td>Help and Tutorial</td><td>Both linked to the task. Help answers about the task only and never writes it.</td></tr>
+<tr><td>Public names (legal)</td><td>No "ADI-Labs", "Praxis" or "Anvil" on any screen, PDF or email. The product is <strong>ADI Forge</strong>; Anvil appears as "RL Gym"; the ADI-Labs tagline is removed. Code, APIs, schema names and internal documents keep their names, and the Anvil integration is unchanged.</td></tr>
+<tr><td>Admin pages</td><td>Taxonomy (wizard step 4 and JD requirements), Terms (accepted at first sign-in), Failure codes (RL reviews, not used in MVP1) and API clients (Anvil and RL Gym keys) stay unchanged. A current Terms version must be published before any SME signs in.</td></tr>
+</tbody></table></div>
+
+<h2>How it gets built</h2>
+<p><strong>No breakages.</strong> New screens are added next to the old ones behind a setting; nothing is deleted until its replacement is live and tested. Menus are hidden, data and pages stay. Every step ships with tests (mocks only), the full test suite passing, and the QA smoke test passing before and after deploy.</p>
+<div class="table"><table>
+<thead><tr><th>Order</th><th>Step</th><th>Why first</th></tr></thead>
+<tbody>
+<tr><td class="mono">1</td><td>PM or Admin assigns a person to a specific task; that assignment counts as the selection</td><td>Unlocks authoring without the applicant journey</td></tr>
+<tr><td class="mono">2</td><td>Tasks tab review page (Approve, Rework, Reject, comments per section)</td><td>Must exist before the Reviews menu is hidden</td></tr>
+<tr><td class="mono">3</td><td>Candidate Home: the task list with New and Rework</td><td>The SME's way in</td></tr>
+<tr><td class="mono">4</td><td>Export rule "all tasks approved"</td><td>Completes the loop; needs Anvil switched on</td></tr>
+<tr><td class="mono">5</td><td>Sourcing; Online sign-in with set-password links; Reviewer view in the candidate app; task Tutorial and Help; menu clean-up</td><td>Follow once the loop works</td></tr>
+</tbody></table></div>
+<p style="font-size:14px;color:var(--muted)">Outside Praxis: Anvil has to switch on its side of the export (its contract, plus the export key) before validation and export can finish in QA. Today the smoke test skips export for this reason.</p>
+
+<h2>Approval</h2>
+<div class="card approve">
+  <p style="margin-top:0">Approving this page means development can start with step 1 of the build order, on a new branch, under the no-breakages rule. Nothing is merged or deployed without your yes, as today.</p>
+  <ul>
+    <li>Approve all, or approve with changes: reply in the session with "approved", or with the screen and the change.</li>
+    <li>Design notes in the repository: <span class="mono">docs/design/PROJECT-SCREEN-DESIGN.md</span>.</li>
+  </ul>
+</div>
+</div>

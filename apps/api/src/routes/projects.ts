@@ -20,7 +20,8 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Actor } from '../auth/actor';
 import type { Db, Tx } from '../db';
-import { ensureSlots } from '../tasks/task-service';
+import { ensureSlots, ensureSlotTasks } from '../tasks/task-service';
+import { forgeSettings } from '../forge/settings';
 import { AppError, badRequest, conflict, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { toJdDto } from './job-descriptions';
@@ -351,12 +352,14 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
 
         // SPEC: coverage slots are generated on submit (authoring projects).
         const slots = await ensureSlots(tx, p.id);
+        // MVP1 new flow: one task row per slot up front, so the PM or Admin assigns each task (none in the earlier flow).
+        const tasks = (await forgeSettings(tx, p.clientId)).newFlow ? await ensureSlotTasks(tx, p.id) : null;
         await audit({
           entityType: 'Project',
           entityId: p.id,
           action: 'project.submitted',
           before: { status: 'DRAFT' },
-          after: { status: 'READY_FOR_STAFFING', templateId: p.templateId, templateVersion: p.templateVersion, jdSnapshotId: jdSnapshot.id, requiredWorkers: figures.requiredWorkers, slots },
+          after: { status: 'READY_FOR_STAFFING', templateId: p.templateId, templateVersion: p.templateVersion, jdSnapshotId: jdSnapshot.id, requiredWorkers: figures.requiredWorkers, slots, ...(tasks === null ? {} : { tasks }) },
         });
         await emit({
           name: 'project.ready_for_staffing',

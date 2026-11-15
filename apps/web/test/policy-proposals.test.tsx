@@ -45,12 +45,12 @@ describe('Wave 3: policy proposal review in the console', () => {
 
   it('presents intake flags as advice and explains why a sensitive or unreadable file cannot be accepted', () => {
     const sensitive = renderToStaticMarkup(<ProposalReview p={row({ flags: [{ code: 'SENSITIVE_DATA_SUSPECTED', message: 'Possible real personal or account data was found.' }] })} />);
-    expect(sensitive).toContain('Praxis’s advice, not a decision');
+    expect(sensitive).toContain('ADI Forge’s advice, not a decision');
     expect(sensitive).toContain('Possible real personal or account data was found.');
-    expect(sensitive).toContain('Show Praxis’s reading (redacted)');
+    expect(sensitive).toContain('Show ADI Forge’s reading (redacted)');
     expect(sensitive).toContain('return it so the SME can upload a synthetic copy');
     const unreadable = renderToStaticMarkup(<ProposalReview p={row({ readable: false, flags: [{ code: 'UNREADABLE', message: 'Praxis could not read text.' }] })} />);
-    expect(unreadable).not.toContain('Show Praxis’s reading');
+    expect(unreadable).not.toContain('Show ADI Forge’s reading');
     expect(unreadable).toContain('upload a readable copy');
     expect(a11yProblems(unreadable)).toEqual([]);
   });
@@ -91,7 +91,7 @@ describe('Wave 3: policy sources on the review page', () => {
 describe('Q4 clustering F1 on the RL review screen (owner, 12 Nov 2026)', () => {
   it('shows the score against the 0.99 bar as advice, or why it is not available', () => {
     const below = renderToStaticMarkup(<ClusteringScore c={{ available: true, queries: 4, precision: 0.5, recall: 1, f1: 0.6667, threshold: 0.99, passed: false }} />);
-    expect(below).toContain('Clustering F1 (Praxis): 0.6667 below the 0.99 bar');
+    expect(below).toContain('Clustering F1 (ADI Forge): 0.6667 below the 0.99 bar');
     expect(below).toContain('Advice for your verdict, not a verdict.');
     expect(renderToStaticMarkup(<ClusteringScore c={{ available: false, reason: 'RL Gym did not send the run’s output.json.' }} />)).toContain('not available');
     expect(a11yProblems(below)).toEqual([]);

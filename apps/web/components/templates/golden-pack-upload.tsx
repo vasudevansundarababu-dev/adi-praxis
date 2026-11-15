@@ -63,7 +63,7 @@ export function GoldenPackUpload() {
       </h2>
       <p className="mt-1 text-sm text-fg-muted">
         A JSON file with <code>schemaVersion: &quot;praxis.golden_pack.v1&quot;</code>, a <code>source</code>, the authoring form (<code>profile</code>), optional worked
-        cases (<code>examples</code>) and, for a new workflow, its <code>template</code>. Praxis checks everything before storing it.
+        cases (<code>examples</code>) and, for a new workflow, its <code>template</code>. ADI Forge checks everything before storing it.
       </p>
       <label className="mt-3 block text-sm font-medium" htmlFor="pack-file">
         Pack file

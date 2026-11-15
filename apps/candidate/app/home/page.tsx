@@ -1,4 +1,4 @@
-import { identityEligible } from '@praxis/shared';
+import { identityEligible, type ForgeHomeDto } from '@praxis/shared';
 import type { Metadata } from 'next';
 import { pageTitle } from '@praxis/shared/theme';
 import Link from 'next/link';
@@ -6,7 +6,8 @@ import { redirect } from 'next/navigation';
 import { Assignments } from '@/components/journey/assignments';
 import { SupportBot } from '@/components/support/support-bot';
 import { Journey, NextStep, StatusPill } from '@/components/ui';
-import { api, getMe } from '@/lib/api';
+import { ForgeHome } from '@/components/forge/forge-home';
+import { api, getForgeSettings, getMe } from '@/lib/api';
 import type { AssignmentCard } from '@/lib/journey-types';
 
 export const metadata: Metadata = { title: { absolute: pageTitle('Home') } };
@@ -17,6 +18,14 @@ type Project = { projectId: string; name: string; status: string; counts: Record
 export default async function HomePage() {
   const me = await getMe();
   if (!me) redirect('/sign-in');
+  // MVP1 flow: Home is the task list (docs/design/PROJECT-SCREEN-DESIGN.md, "Candidate app for MVP1").
+  if ((await getForgeSettings()).newFlow) {
+    const { data: forge } = await api<ForgeHomeDto>('/me/forge/home');
+    if (forge?.newFlow) {
+      if (!forge.termsAccepted) redirect('/welcome');
+      return <ForgeHome home={forge} email={me.contactEmail} />;
+    }
+  }
   const eligible = identityEligible(me.identityStatus);
   const { data: assignments } = await api<{ items: AssignmentCard[] }>('/me/assignments');
   const { data: projects } = await api<{ items: Project[] }>('/me/projects');

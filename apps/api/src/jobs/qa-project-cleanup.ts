@@ -84,6 +84,7 @@ async function deleteTree(tx: Q, p: string, t: Awaited<ReturnType<typeof tree>>)
     await del(table, `DELETE FROM "${table}" WHERE task_instance_id = ANY($1::uuid[])`, t.tasks);
   await del('TaskInstance', `DELETE FROM "TaskInstance" WHERE project_id = $1::uuid`, p);
   await del('ProjectAssignment', `DELETE FROM "ProjectAssignment" WHERE project_id = $1::uuid`, p);
+  await del('SourcedPerson', `DELETE FROM "SourcedPerson" WHERE project_id = $1::uuid`, p);
   await del('Application', `DELETE FROM "Application" WHERE campaign_id = ANY($1::uuid[])`, t.campaigns);
   await del('Campaign', `DELETE FROM "Campaign" WHERE project_id = $1::uuid`, p);
   await del('ConversationTurn', `DELETE FROM "ConversationTurn" WHERE session_id IN (SELECT id FROM "ConversationSession" WHERE enrollment_id = ANY($1::uuid[]))`, t.enr);

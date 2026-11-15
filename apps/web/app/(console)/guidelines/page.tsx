@@ -22,7 +22,7 @@ export default async function GuidelinesPage() {
     <div>
       <h1 className="text-2xl font-semibold">Guidelines</h1>
       <p className="mt-1 max-w-3xl text-sm text-fg-muted">
-        Upload the guidelines for a domain and task family. Praxis drafts a knowledge map, a course and a certification for each tier from them. Nothing reaches candidates until an Admin approves every part and publishes the tier.
+        Upload the guidelines for a domain and task family. ADI Forge drafts a knowledge map, a course and a certification for each tier from them. Nothing reaches candidates until an Admin approves every part and publishes the tier.
       </p>
       {items.length === 0 ? (
         <Empty>No guidelines packages yet.{isAdmin ? ' Create one below, then upload its first version.' : ''}</Empty>

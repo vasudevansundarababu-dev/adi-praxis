@@ -4,6 +4,7 @@ import type { ValidationRunDto } from '@praxis/shared';
 import Link from 'next/link';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { exportFixHref } from '@/lib/forge-console';
 
 export interface ExportState {
   canValidate: boolean;
@@ -16,9 +17,10 @@ export interface ExportState {
 
 /**
  * Project export (owner, 12 Nov 2026). Validate one approved task at any time; export every approved task once the project
- * is complete. The validator's verdict lists the tasks that need fixing; it changes nothing by itself.
+ * is complete (in the MVP1 new flow, 15 Nov 2026: once every task is approved; the API's reason says how many are).
+ * The validator's verdict lists the tasks that need fixing; it changes nothing by itself.
  */
-export function ExportPanel({ projectId, initial }: { projectId: string; initial: ExportState }) {
+export function ExportPanel({ projectId, initial, newFlow = false }: { projectId: string; initial: ExportState; newFlow?: boolean }) {
   const [state, setState] = useState(initial);
   const [recordId, setRecordId] = useState(initial.tasks[0]?.recordId ?? '');
   const [pending, setPending] = useState(false);
@@ -34,7 +36,7 @@ export function ExportPanel({ projectId, initial }: { projectId: string; initial
     setState((s) => ({ ...s, runs: [res.data!, ...s.runs] }));
   }
 
-  const validatorNote = state.validator.isAnvil ? 'Validated by Anvil.' : 'Anvil validation is not connected yet: Praxis checks each task with its own export checks.';
+  const validatorNote = state.validator.isAnvil ? 'Validated by RL Gym.' : 'RL Gym validation is not connected yet: ADI Forge checks each task with its own export checks.';
   return (
     <section aria-labelledby="export-heading" className="mt-6 rounded-md border border-line p-4">
       <h2 id="export-heading" className="text-lg font-semibold">
@@ -63,7 +65,7 @@ export function ExportPanel({ projectId, initial }: { projectId: string; initial
           </>
         )}
         <button type="button" className="btn btn-primary disabled:opacity-60" disabled={pending || !state.canExport} onClick={() => void run(`/projects/${projectId}/exports`, {})}>
-          Export
+          Export to RL Gym
         </button>
       </div>
       {pending && <p className="mt-2 text-sm text-fg-muted">Working…</p>}
@@ -90,7 +92,7 @@ export function ExportPanel({ projectId, initial }: { projectId: string; initial
                 .filter((r) => r.status !== 'valid')
                 .map((r) => (
                   <li key={r.recordId}>
-                    <Link href={`/review/tasks/${r.taskId}`}>{r.title}</Link> — {r.status === 'needs_fix' ? 'needs fixing' : 'not validated'}:{' '}
+                    <Link href={exportFixHref(projectId, r.taskId, newFlow)}>{r.title}</Link> — {r.status === 'needs_fix' ? 'needs fixing' : 'not validated'}:{' '}
                     {r.issues
                       .slice(0, 3)
                       .map((i) => i.message)

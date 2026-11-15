@@ -33,7 +33,7 @@ export function SaveIndicator({ state, readOnly }: { state: SaveState; readOnly:
 }
 
 /** Opens the right editor for the task: the KYC workbench, the generic authoring editor, or the annotation form. */
-export function TaskPage({ task }: { task: TaskView }) {
+export function TaskPage({ task, newFlow = false }: { task: TaskView; newFlow?: boolean }) {
   const phone=useSyncExternalStore(notify=>{const m=window.matchMedia('(max-width:767px)');m.addEventListener('change',notify);return()=>m.removeEventListener('change',notify);},()=>window.matchMedia('(max-width:767px)').matches,()=>false);
   const [current,setCurrent]=useState(task),[editor,setEditor]=useState<'CLASSIC'|'CHATBOT'>(task.authoringWorkspace?.view ?? (task.effectiveAuthoringExperience==='CLASSIC'?'CLASSIC':'CHATBOT'));
   const [draftAnswer,setDraftAnswer]=useState(task.authoringWorkspace?.answer??''),[switching,setSwitching]=useState(false),[switchError,setSwitchError]=useState(''),[consented,setConsented]=useState(!task.authoringExperience);
@@ -57,11 +57,12 @@ export function TaskPage({ task }: { task: TaskView }) {
   const steps=(current.output as {solution?:{steps?:import('@praxis/shared').KycStep[]}}|null)?.solution?.steps??[];
   const [agentPreview,setAgentPreview]=useState<unknown>(null),[selectedStep,setSelectedStep]=useState<string|null>(null);
   const router = useRouter();
-  const done = () => router.push(`/projects/${task.projectId}?submitted=${task.id}`);
+  // MVP1 flow: Home is the task list, so the page returns there.
+  const done = () => router.push(newFlow ? '/home' : `/projects/${task.projectId}?submitted=${task.id}`);
   return (
     <div>
-      <Link href={`/projects/${task.projectId}`} data-save-before-leaving className="text-sm text-link hover:underline">
-        ← {task.projectName}
+      <Link href={newFlow ? '/home' : `/projects/${task.projectId}`} data-save-before-leaving className="text-sm text-link hover:underline">
+        ← {newFlow ? 'Your tasks' : task.projectName}
       </Link>
       <p className="mt-1 text-xs text-fg-muted">
         {current.phase?.label ?? TASK_STATUS[task.status]}{task.agentMode ? ` · ${task.agentMode === 'SINGLE' ? 'Single agent' : 'Multi agent'}` : ''} · time target {task.tptMinutes ?? '—'} min · active so far {minutes(task.activeSeconds)} min. The time target is for planning and pay; your task never expires.

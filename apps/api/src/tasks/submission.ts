@@ -187,7 +187,7 @@ export function anvilSpecChecks(anvilSpec: unknown, output: Record<string, unkno
     },
     { id: 'anvil.criteria-anchors', section: 'S7', ok: badAnchors.length === 0, message: badAnchors.length ? `State the pass condition (5), partial credit (2) and fail (0) for criteria ${badAnchors.map((c) => c.id ?? '?').join(', ')}` : 'Every criterion states full, partial and fail' },
     { id: 'anvil.evaluator-kinds', section: 'S7', ok: badKinds.length === 0, message: badKinds.length ? `Choose an evaluator kind the template allows (${[...kinds].join(', ')}) for criteria ${badKinds.map((c) => c.id ?? '?').join(', ')}` : 'Every criterion uses an evaluator kind the template allows' },
-    { id: 'anvil.tools', section: 'S3', ok: badTools.length === 0, message: badTools.length ? `Recorded calls must use tools Anvil described for this template: ${badTools.map((c) => `${c.id ?? '?'} (${c.tool ?? 'no tool'})`).join(', ')}` : 'Every recorded call uses a tool Anvil described' },
+    { id: 'anvil.tools', section: 'S3', ok: badTools.length === 0, message: badTools.length ? `Recorded calls must use tools RL Gym described for this template: ${badTools.map((c) => `${c.id ?? '?'} (${c.tool ?? 'no tool'})`).join(', ')}` : 'Every recorded call uses a tool RL Gym described' },
   ];
 }
 
@@ -235,6 +235,6 @@ function jointSpecChecks(spec: { execution: Record<string, unknown> }, output: R
     { id: 'anvil.evaluator-kinds', section: 'S7', ok: wrong.length === 0, message: wrong.length ? `Use the template’s evaluator and version for ${wrong.map((c) => `${c.id} (${map.get(c.id!)!.id} v${map.get(c.id!)!.version})`).join(', ')}` : 'Every criterion uses the evaluator and version its template maps to it' },
     { id: 'anvil.output-reference', section: 'S7', ok: noReference.length === 0, message: noReference.length ? `Criteria ${noReference.map((c) => c.id).join(', ')} check the final answer: name an output field (${outputs.join(', ') || 'none declared'}) and the private expected value` : 'Every output check names an output field and its expected value' },
     { id: 'anvil.critical', section: 'S7', ok: hasCritical, message: hasCritical ? 'At least one criterion is critical' : 'Mark at least one criterion critical' },
-    { id: 'anvil.tools', section: 'S3', ok: badTools.length === 0, message: badTools.length ? `Recorded calls must use tools Anvil described for this template: ${badTools.map((c) => `${c.id ?? '?'} (${c.tool ?? 'no tool'})`).join(', ')}` : 'Every recorded call uses a tool Anvil described' },
+    { id: 'anvil.tools', section: 'S3', ok: badTools.length === 0, message: badTools.length ? `Recorded calls must use tools RL Gym described for this template: ${badTools.map((c) => `${c.id ?? '?'} (${c.tool ?? 'no tool'})`).join(', ')}` : 'Every recorded call uses a tool RL Gym described' },
   ];
 }

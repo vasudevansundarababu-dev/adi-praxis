@@ -39,7 +39,7 @@ export default async function PartnerHomePage() {
         <p className="muted text-sm">{me.partner.name}</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">Welcome, {me.user.name.split(' ')[0]}</h1>
         <p className="muted mt-2 max-w-2xl">
-          Put forward experts for open requisitions and follow their progress. ADI Praxis invites each candidate, checks their identity and certifies them; every selection is made by a
+          Put forward experts for open requisitions and follow their progress. ADI Forge invites each candidate, checks their identity and certifies them; every selection is made by a
           person.
         </p>
         <Link href="/partner/requisitions" className="btn mt-5 bg-white text-brand-navy shadow-lg hover:bg-white/90">
@@ -59,7 +59,7 @@ export default async function PartnerHomePage() {
         ))}
       </ul>
       <p className="text-sm text-fg-muted">
-        Candidates you submit in this portal are live: ADI Praxis emails them an invite. To test an integration without real candidates, create a sandbox API client under{' '}
+        Candidates you submit in this portal are live: ADI Forge emails them an invite. To test an integration without real candidates, create a sandbox API client under{' '}
         <Link href="/partner/integrations" className="text-link">
           API &amp; webhooks
         </Link>

@@ -6,7 +6,7 @@ const base: AnvilReadiness = { versionHash: 'a'.repeat(64), proposedByAnvil: tru
 
 describe('Anvil readiness badge (Praxis-Anvil contract)', () => {
   it('says not yet qualified, and where the proposal came from', () => {
-    expect(text(html(<AnvilReadinessBadge r={base} />))).toBe('Not yet qualified by Anvil for benchmarks · proposed by Anvil for requirement REQ-2026-041 (enterprise-banking)');
+    expect(text(html(<AnvilReadinessBadge r={base} />))).toBe('Not yet qualified by RL Gym for benchmarks · proposed by RL Gym for requirement REQ-2026-041 (enterprise-banking)');
   });
   it('qualified and published: Anvil-ready with the receipt', () => {
     expect(text(html(<AnvilReadinessBadge r={{ ...base, qualification: 'qualified', anvilReady: true, receiptId: 'RCPT-1' }} />))).toContain('Anvil-ready for benchmarks (receipt RCPT-1)');

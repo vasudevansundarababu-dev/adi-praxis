@@ -21,7 +21,7 @@ export default async function PartnerIntegrationsPage({ searchParams }: { search
       <div>
         <h1 className="text-2xl font-semibold">API &amp; webhooks</h1>
         <p className="mt-1 max-w-3xl text-sm text-fg-muted">
-          Connect your applicant tracking system to Partner API v1 on the ADI Praxis API host, under <code className="font-mono">/partner/v1</code>. Get an access
+          Connect your applicant tracking system to Partner API v1 on the ADI Forge API host, under <code className="font-mono">/partner/v1</code>. Get an access
           token from <code className="font-mono">/partner/v1/oauth/token</code> with a client ID and secret below (OAuth2 client credentials), and send an{' '}
           <code className="font-mono">Idempotency-Key</code> header on every write.
         </p>

@@ -45,14 +45,33 @@ export interface ExportEligibilityInput {
   distinctTarget: number | null;
   endDate: string | null;
   today: string;
+  /**
+   * MVP1 new flow (owner, 15 Nov 2026; contract §6): export opens only when every task of the project is approved.
+   * `totalTasks` is the project's task count (one per coverage slot); `approvedTasks` counts the slots with a current
+   * approved task. Marked complete and the end date no longer open export. Omitted: the earlier rule applies.
+   */
+  allTasks?: { totalTasks: number; approvedTasks: number };
+}
+
+/** The reason export is closed in the new flow, e.g. "Export opens when all 5 tasks are approved (1 of 5 now)." */
+export function allTasksReason(totalTasks: number, approvedTasks: number): string {
+  if (totalTasks < 1) return 'Export opens when the project has tasks and all of them are approved.';
+  return `Export opens when ${totalTasks === 1 ? 'the task is' : `all ${totalTasks} tasks are`} approved (${approvedTasks} of ${totalTasks} now).`;
 }
 
 /**
- * Validate needs at least one approved task. Export also needs the project to be complete: the required number of
+ * Validate needs at least one approved task. In the new flow (`allTasks`), export needs every task approved. Otherwise
+ * export needs the project to be complete: the required number of
  * distinct approved tasks is reached, the project is marked complete, or its end date has come.
  */
 export function exportEligibility(i: ExportEligibilityInput): { canValidate: boolean; canExport: boolean; reason: string | null } {
   if (i.status === 'DRAFT' || i.status === 'CANCELLED') return { canValidate: false, canExport: false, reason: i.status === 'DRAFT' ? 'The project is still a draft.' : 'The project is cancelled.' };
+  if (i.allTasks) {
+    const { totalTasks, approvedTasks } = i.allTasks;
+    const canValidate = i.approvedTasks >= 1;
+    if (totalTasks >= 1 && approvedTasks >= totalTasks && canValidate) return { canValidate, canExport: true, reason: null };
+    return { canValidate, canExport: false, reason: allTasksReason(totalTasks, approvedTasks) };
+  }
   if (i.approvedTasks < 1) return { canValidate: false, canExport: false, reason: 'Export needs at least one approved task.' };
   const targetMet = !!i.distinctTarget && i.approvedTasks >= i.distinctTarget;
   const ended = !!i.endDate && i.today >= i.endDate;

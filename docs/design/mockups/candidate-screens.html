@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Candidate app · ADI Forge (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Geist+Mono:wght@400;500;600&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
+<style>
+/* Dark theme values from packages/shared/theme/theme.css (the candidate app is dark). Layout follows the live QA app. Mockup only. */
+:root{--bg:#212227;--surface:#2a2c33;--text:#e6eaee;--muted:#8a9ca8;--border:#3a3d46;--link:#5aa3e6;--focus:#5aa3e6;--accent:#3fac95;--error:#f87171;--warning:#fbbf24;--success:#4ade80;--hairline:#363944;--elevated:#2c2e36;--shadow:0 1px 2px rgb(0 0 0 / .3),0 12px 32px -14px rgb(0 0 0 / .6)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-size:14px;line-height:1.55}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+.demo{background:#fbbf24;color:#1b1c20;text-align:center;font-size:12px;font-weight:500;padding:4px}
+header{border-bottom:1px solid var(--hairline)}
+.hwrap{max-width:52rem;margin:0 auto;padding:14px 16px;display:flex;align-items:center;gap:18px}
+.brand{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+.inf{width:26px;height:14px;border-radius:7px;border:3px solid #3fac95;border-right-color:#2a80d0;border-bottom-color:#2a80d0}
+nav.top{margin-left:auto;display:flex;gap:18px;font-size:13px}
+nav.top a{color:var(--link)}
+.rail{height:3px;background:linear-gradient(90deg,#0a2170 0%,#2a80d0 50%,#3fac95 100%)}
+main{max-width:52rem;margin:0 auto;padding:28px 16px 120px}
+h1{font-size:24px;font-weight:600;margin:0}
+.muted{color:var(--muted)}
+.card{background:var(--elevated);border:1px solid var(--hairline);border-radius:16px;box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:10px 18px;font-weight:600;font-size:14px;font-family:inherit;cursor:pointer;border:0;text-decoration:none!important}
+.btn-primary{color:#fff;background:linear-gradient(90deg,#1f64b8 0%,#2a80d0 45%,#2f9c8a 100%);box-shadow:0 8px 20px -10px rgb(42 128 208 / .8)}
+.btn-secondary{border:1px solid var(--hairline);background:var(--elevated);color:var(--text)}
+.btn-white{background:#fff;color:#0a2170}
+.btn-sm{padding:7px 12px;font-size:13px;border-radius:10px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;line-height:20px;white-space:nowrap;background:color-mix(in srgb,var(--pill,var(--muted)) 18%,transparent)}
+.pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--pill,var(--muted))}
+.pill-info{--pill:var(--link)}.pill-success{--pill:var(--success)}.pill-warning{--pill:var(--warning)}.pill-error{--pill:var(--error)}.pill-brand{--pill:var(--accent)}
+.hero{position:relative;overflow:hidden;color:#fff;border-radius:20px;padding:24px 26px;background:radial-gradient(120% 140% at 100% 0%,rgb(63 172 149 / .55) 0%,transparent 55%),linear-gradient(125deg,#0a2170 0%,#164a9a 55%,#2a80d0 100%)}
+.hero::after{content:'';position:absolute;inset:auto -60px -80px auto;width:240px;height:240px;border-radius:999px;border:36px solid rgb(255 255 255 / .06)}
+.row{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:14px;background:var(--elevated);border:1px solid var(--hairline);margin-bottom:10px;cursor:pointer}
+.row:hover{border-color:var(--focus)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+input,textarea,select{font-family:inherit;font-size:14px;color:var(--text);background:#24262c;border:1px solid var(--border);border-radius:10px;padding:9px 11px;width:100%}
+label{font-size:13px;display:block}
+label>input,label>textarea,label>select{margin-top:4px}
+.sec{padding:18px 20px;margin-bottom:14px}
+.sec h3{font-size:15px;font-weight:600;margin:0 0 10px;display:flex;gap:10px;align-items:center}
+.eg{font-size:13px;color:var(--muted);border-left:3px solid #2a80d0;padding:2px 0 2px 10px;margin:0 0 10px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.flag{border-color:color-mix(in srgb,var(--warning) 60%,transparent)!important}
+.note{font-size:13px;color:var(--muted);margin:10px 0 0}
+.screen{display:none}.screen.on{display:block}
+.err{color:var(--error);font-size:13px;margin:6px 0 0;display:none}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(400px,100%);background:#1b1c20;border-left:1px solid var(--hairline);box-shadow:-20px 0 40px -20px rgb(0 0 0 / .7);display:none;flex-direction:column;z-index:10}
+.drawer.on{display:flex}
+.drawer .hd{padding:14px 16px;border-bottom:1px solid var(--hairline);display:flex;align-items:center;gap:8px}
+.msgs{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:88%;padding:10px 12px;border-radius:14px;font-size:13.5px}
+.msg.me{align-self:flex-end;background:#1f64b8;color:#fff;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:var(--elevated);border:1px solid var(--hairline);border-bottom-left-radius:4px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 8px}
+.chip{border:1px solid var(--hairline);background:transparent;color:var(--text);border-radius:999px;padding:4px 10px;font-size:12px;font-family:inherit;cursor:pointer}
+.helpfab{position:fixed;right:20px;bottom:76px;z-index:6}
+.picker{position:fixed;left:16px;right:16px;bottom:14px;max-width:52rem;margin:0 auto;background:#0a2170;color:#fff;border-radius:14px;padding:8px 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;z-index:5}
+.picker button{font-family:inherit;font-size:12px;border:1px solid rgb(255 255 255 / .25);background:transparent;color:#fff;border-radius:999px;padding:4px 10px;cursor:pointer}
+.picker button.on{background:#fff;color:#0a2170;font-weight:600}
+.video{aspect-ratio:16/9;background:#000;border-radius:12px;display:grid;place-items:center;color:#fff}
+
+/* Typography (owner, 15 Nov 2026): Geist for headings, titles and primary buttons; Inter for body, labels and tables; Geist Mono for numbers, badges, IDs and code. */
+body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-optical-sizing:auto}
+h1,h2,h3,.brand,.btn-primary,.tabs button,.hero div[style*="font-size:26px"],.step .val,.metric dd,.mock .t{font-family:'Geist','Inter',ui-sans-serif,system-ui,sans-serif;letter-spacing:-0.02em}
+h1{font-weight:700}h2,h3{font-weight:600}.btn-primary{font-weight:600}
+.mono,code,.pill,.tabs .n,.cnt,.metric dd,.step .val,td.mono,.tag{font-family:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.pill,.tabs .n{font-weight:500;letter-spacing:0}
+</style>
+</head>
+<body>
+<p class="demo">Test environment: synthetic data, simulated sign-in. Do not enter real personal information.</p>
+<header><div class="hwrap"><span class="brand"><img src="../brand-forge/adi-forge-mark-512.png" alt="" style="height:28px;width:28px">ADI Forge</span>
+  <nav class="top" id="navIn" style="display:none"><a href="#" data-go="home">Home</a><a href="#" data-go="signin">Sign out</a></nav>
+  <nav class="top" id="navOut"><a href="#" class="btn btn-primary btn-sm" data-go="signin">Sign in</a></nav>
+</div><div class="rail"></div></header>
+
+<main>
+
+<!-- Sign in -->
+<section class="screen on" id="signin">
+  <div style="max-width:26rem;margin:2vh auto 0">
+    <div style="text-align:center;padding:10px 0 4px">
+      <img src="../brand-forge/adi-forge-logo.png" alt="ADI Forge Authoring" style="width:240px;max-width:100%;height:auto">
+    </div>
+    <h1 style="font-size:20px;margin-top:28px">Sign in to ADI Forge</h1>
+    <p class="muted" style="margin:6px 0 18px" id="signText">Sign in with the email you gave your recruitment agency. You'll see the tasks assigned to you.</p>
+    <label style="display:flex;gap:10px;align-items:flex-start;margin-bottom:16px"><input type="checkbox" id="adult" style="width:auto;margin-top:3px"> <span>I confirm I am 18 or over. <span style="color:var(--error)">*</span><br><span class="muted" style="font-size:12px">Needed the first time you sign in.</span></span></label>
+    <div id="offBox" class="card" style="padding:14px 16px;margin-bottom:14px;border-color:#b45309">
+      <div style="color:#fbbf24;font-size:13px;margin-bottom:8px">Offline sign-in (test environment): no password</div>
+      <label>Email<input id="gEmail" value="morgan.hale.qa@gmail.com"></label>
+      <label style="margin-top:10px">Name<input value="Morgan Hale"></label>
+    </div>
+    <div id="onBox" style="display:none;margin-bottom:14px">
+      <label>Email (your Gmail address)<input id="pEmail" value="morgan.hale.qa@gmail.com"></label>
+      <label style="margin-top:10px">Password<input type="password" id="pPass" value="••••••••••"></label>
+      <div style="text-align:right;margin-top:6px;font-size:13px"><a href="#">Forgot password?</a></div>
+    </div>
+    <button class="btn btn-primary" id="gBtn" style="width:100%">Sign in</button>
+    <p class="err" id="sErr"></p>
+    <p class="note" style="font-size:12px" id="onNote" style="display:none"></p>
+    <p class="note" style="font-size:12px"><a href="#">Contributor terms</a> · <a href="#">Privacy notice</a></p>
+  </div>
+</section>
+
+<!-- Not on a project -->
+<section class="screen" id="none">
+  <div style="max-width:30rem;margin:8vh auto 0;text-align:center">
+    <h1 style="font-size:20px">No tasks for this account</h1>
+    <p class="muted" style="margin:10px 0 20px">We couldn't find tasks for <strong id="noneEmail" style="color:var(--text)"></strong>. Check that you signed in with the email you gave your recruitment agency.</p>
+    <a class="btn btn-secondary" href="#" data-go="signin">Use another account</a>
+  </div>
+</section>
+
+<!-- First sign-in: terms (identity check is not in MVP1) -->
+<section class="screen" id="setup">
+  <div style="max-width:36rem;margin:2vh auto 0">
+  <h1>Before you start</h1>
+  <p class="muted" style="margin:6px 0 18px">Once only, the first time you sign in.</p>
+  <div class="card" style="padding:8px 20px 18px">
+    <label style="display:flex;gap:10px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--hairline)"><input type="checkbox" class="req" style="width:auto;margin-top:3px"> <span><strong>Contributor terms</strong><br><span class="muted">Confidentiality, intellectual property and data use. <a href="#">Read the terms</a> (version 3).</span></span></label>
+    <label style="display:flex;gap:10px;align-items:flex-start;padding:14px 0"><input type="checkbox" class="req" style="width:auto;margin-top:3px"> <span><strong>Synthetic data only</strong><br><span class="muted">Everything I write is made up. I won't use real customer, employer or account information.</span></span></label>
+    <p class="err" id="setupErr">Accept both to continue.</p>
+    <button class="btn btn-primary" id="setupBtn" style="margin-top:6px">Accept and continue</button>
+    <p class="note">Your acceptance and the terms version are recorded.</p>
+  </div>
+  </div>
+</section>
+
+<!-- Home: task list -->
+<section class="screen" id="home">
+  <div class="hero">
+    <div style="font-size:13px;opacity:.85" id="heroRoles"></div>
+    <div style="font-size:26px;font-weight:700;margin-top:4px" id="heroName"></div>
+    <div style="margin-top:12px;font-size:12px;letter-spacing:.08em;opacity:.8">NEXT STEP</div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:2px"><div><div style="font-size:17px;font-weight:600" id="nextT"></div><div style="opacity:.85;font-size:13px" id="nextS"></div></div><a href="#" class="btn btn-white btn-sm" id="nextBtn" style="margin-left:auto">Open task →</a></div>
+  </div>
+  <div id="revWrap"><h2 style="font-size:17px;font-weight:600;margin:26px 0 12px">Tasks to review <span class="muted" style="font-size:13px;font-weight:500">· you're the Reviewer on these projects</span></h2><div id="rrows"></div></div>
+  <div id="authWrap"><div style="display:flex;align-items:center;margin:26px 0 12px"><h2 style="font-size:17px;font-weight:600;margin:0">Your tasks <span class="muted" style="font-size:13px;font-weight:500">· you're the author</span></h2><select id="filt" style="width:auto;margin-left:auto;font-size:13px;padding:6px 10px"><option value="">All</option><option>New</option><option>Rework</option><option>In review</option><option>Accepted</option><option>Rejected</option></select></div>
+  <div id="rows"></div></div>
+</section>
+
+<!-- Task page -->
+<section class="screen" id="task">
+  <a href="#" data-go="home">← Your tasks</a>
+  <div style="display:flex;align-items:center;gap:12px;margin:8px 0 4px;flex-wrap:wrap"><h1 style="font-size:22px" id="tTitle"></h1><span id="tStat"></span>
+    <span style="margin-left:auto;display:flex;gap:8px"><button class="btn btn-secondary btn-sm" id="tutBtn">▶ Tutorial</button><button class="btn btn-secondary btn-sm" data-help>? Help</button></span></div>
+  <p class="muted" style="margin:0 0 14px" id="tMeta"></p>
+
+  <div id="tutCard" class="card" style="display:none;padding:16px 18px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;margin-bottom:10px"><strong>Tutorial: how to author a KYC onboarding task</strong><span class="muted" style="margin-left:8px;font-size:12px">template KYC v6 · 7 min · captions</span><a href="#" id="tutClose" style="margin-left:auto">Close</a></div>
+    <div class="video"><span>▶ Video for this task's template</span></div>
+    <p class="note">Chapters: 1 What a reusable assignment is · 2 Inputs · 3 Rules and tools · 4 Steps · 5 Outcome and criteria · 6 Submitting</p>
+  </div>
+
+  <div class="card" id="rwBanner" style="display:none;padding:14px 18px;margin-bottom:16px;border-color:color-mix(in srgb,var(--warning) 60%,transparent)">
+    <span class="pill pill-warning">Rework requested</span> <strong style="margin-left:6px" id="rwWho"></strong>
+    <p class="muted" style="margin:6px 0 0;font-size:13px" id="rwSum"></p>
+  </div>
+  <div class="card" id="roBanner" style="display:none;padding:12px 18px;margin-bottom:16px"></div>
+
+  <fieldset id="form" style="border:0;padding:0;margin:0">
+  <div class="card sec" data-sec="S1"><h3>S1 · Reusable assignment</h3><div class="rcShow" data-for="S1"></div>
+    <p class="eg">Example: "Open a joint checking account for two adults, one with an expired driver's licence." Write your own case; don't copy the example.</p>
+    <div class="grid2">
+      <label style="grid-column:span 2">Title<input class="v" data-v="Open a minor's savings account with a guardian"></label>
+      <label>Trigger<input class="v" data-v="A guardian applies for a savings account for a 15-year-old"></label>
+      <label>Scope<select><option>Retail · minor account · new customer</option></select></label>
+    </div></div>
+  <div class="card sec" data-sec="S2"><h3>S2 · Input contract</h3><div class="rcShow" data-for="S2"></div>
+    <label>Synthetic case inputs<textarea rows="3" class="v" data-v="Guardian: synthetic adult, TX driver's licence (valid). Minor: 15, birth certificate only. Opening deposit $500 cash."></textarea></label></div>
+  <div class="card sec" data-sec="S3"><h3>S3–S4 · Environment and state policies</h3><div class="rcShow" data-for="S3"></div><div class="grid2">
+    <label>Environment<select><option>golden_kyc_openenv · 21 tools</option></select></label>
+    <label>Rules that apply<select><option>FED-CIP-01, FED-CIP-02, TX-ID-01</option></select></label></div></div>
+  <div class="card sec" id="s5" data-sec="S5"><h3>S5 · Steps</h3><div class="rcShow" data-for="S5"></div>
+    <div style="display:grid;gap:8px">
+      <label>1 · Action<input class="v" data-v="Verify the minor's identity from the birth certificate"></label>
+      <label>2 · Action<input class="v" data-v="Open the account and record the guardian"></label>
+      <label>3 · Action<input class="v" data-v="Screen guardian and minor against OFAC"></label>
+    </div></div>
+  <div class="card sec" data-sec="S6"><h3>S6–S8 · Output, criteria, sources</h3><div class="rcShow" data-for="S6"></div><div class="grid2">
+    <label>Expected outcome<select><option>request_information</option><option>ready_for_approval</option></select></label>
+    <label>Criteria<input class="v" data-v="20 criteria · 5 points each"></label>
+    <label style="grid-column:span 2">Note to reviewer<textarea rows="2"></textarea></label></div></div>
+  </fieldset>
+
+  <div id="actions" style="display:flex;gap:10px;align-items:center;margin-top:6px"><button class="btn btn-primary" id="submitBtn">Submit for review</button><span class="muted" style="font-size:13px;margin-left:auto">Your work saves as you type.</span></div>
+</section>
+
+<!-- Review page (candidate assigned as Reviewer on this project) -->
+<section class="screen" id="review">
+  <a href="#" data-go="home">← Your tasks</a>
+  <div style="display:flex;align-items:center;gap:12px;margin:8px 0 4px;flex-wrap:wrap"><h1 style="font-size:22px" id="rTitle"></h1><span id="rStat"></span>
+    <span style="margin-left:auto;display:flex;gap:8px"><button class="btn btn-secondary btn-sm" data-help>? Help</button></span></div>
+  <p class="muted" style="margin:0 0 14px" id="rMeta"></p>
+  <div class="card" id="rDone" style="display:none;padding:12px 18px;margin-bottom:16px"></div>
+  <div id="rSecs"></div>
+  <div id="rActions" class="card" style="padding:16px 18px;border-color:#2a80d0">
+    <strong>Your review</strong>
+    <p class="muted" style="margin:4px 0 12px;font-size:13px">Add a comment under any section that needs work. Send it back for rework, or approve it for the project manager's final acceptance.</p>
+    <p class="err" id="rErr">Add a comment on at least one section before sending it back.</p>
+    <div style="display:flex;gap:10px"><button class="btn btn-secondary" id="rRework">Send back for rework</button><button class="btn btn-primary" id="rApprove">Approve</button></div>
+    <p class="note">Rework goes back to the author with your comments. Approve sends it to the PM or Admin to accept and export.</p>
+  </div>
+</section>
+
+</main>
+
+<button class="btn btn-primary helpfab" data-help id="fab" style="display:none">? Help</button>
+<aside class="drawer" id="help" aria-label="Task help">
+  <div class="hd"><strong>Help for this task</strong><span class="pill pill-brand" style="margin-left:6px">AI</span><a href="#" id="helpClose" style="margin-left:auto">Close</a></div>
+  <p class="muted" style="font-size:12px;margin:10px 16px 0">Answers questions about this task and its form only. It explains and gives examples; you write the task.</p>
+  <div class="msgs" id="msgs"></div>
+  <div class="chips"><button class="chip" data-q="What should I write in S1 reusable assignment?">What goes in S1?</button><button class="chip" data-q="Which rules apply to a minor's account in Texas?">Rules for this case?</button><button class="chip" data-q="Can you write step 2 for me?">Write step 2 for me</button><button class="chip" data-q="What's the weather in Chicago?">Off-topic question</button></div>
+  <div style="display:flex;gap:8px;padding:10px 16px 16px;border-top:1px solid var(--hairline)"><input id="q" placeholder="Ask about this task"><button class="btn btn-primary btn-sm" id="ask">Ask</button></div>
+</aside>
+
+<div class="picker"><strong style="margin-right:4px">Sign-in mode:</strong><button id="mOff" class="on">Offline</button><button id="mOn">Online</button><strong style="margin:0 4px 0 10px">Signed in as:</strong><button id="pM" class="on">Morgan (SME)</button><button id="pJ">Jamie (Reviewer + SME)</button><strong style="margin:0 4px 0 10px">Screens:</strong>
+  <button data-go="signin" class="on">Sign in</button><button data-go="none">No tasks</button><button data-go="setup">First sign-in: terms</button><button data-go="home">Home</button><button data-go="task" data-task="TSK-006">New task</button><button data-go="task" data-task="TSK-003">Rework task</button><button data-go="task" data-task="TSK-002">In review</button><button data-go="review" data-task="TSK-002" data-as="J">Review a task</button>
+</div>
+
+<script>
+const ST={New:'pill-info',Rework:'pill-warning','In review':'pill-brand',Accepted:'pill-success',Rejected:'pill-error','To review':'pill-info','Sent back':'pill-warning','Approved':'pill-success'};
+const T=[
+ {id:'TSK-003',n:'Texas minor account with a guardian',st:'TX',s:'Rework',d:'Sent back 15 Nov',by:'Jamie Okafor (Reviewer)',cm:{S5:'Step 2 needs the guardian\'s CIP check before the minor\'s account opens.'}},
+ {id:'TSK-006',n:'Illinois joint account with biometric consent',st:'IL',s:'New',d:'Assigned 15 Nov'},
+ {id:'TSK-002',n:'New York joint checking account',st:'NY',s:'In review',d:'Submitted 15 Nov'},
+ {id:'TSK-001',n:'California single account, elder-abuse signal',st:'CA',s:'Accepted',d:'Accepted 14 Nov'},
+ {id:'TSK-007',n:'Florida custodian account funded by an LLC',st:'FL',s:'Rejected',d:'Rejected 13 Nov'}];
+const PEOPLE={M:{name:'Morgan',full:'Morgan Hale',email:'morgan.hale.qa@gmail.com',roles:'KYC-Of US bank Chicago · Task author',auth:()=>T,rev:[]},
+ J:{name:'Jamie',full:'Jamie Okafor',email:'jamie.okafor.qa@gmail.com',roles:'KYC-Of US bank Chicago · Reviewer  ·  Marketing launch — VEYRA · Task author',
+  auth:()=>[{id:'MKT-001',n:'Spring email campaign for a subscription product',st:'—',s:'New',d:'Assigned 15 Nov',proj:'Marketing launch — VEYRA'}],
+  rev:[{id:'TSK-002',n:'New York joint checking account',by:'Morgan Hale',st:'NY',s:'To review',d:'Submitted 15 Nov'},{id:'TSK-001',n:'California single account, elder-abuse signal',by:'Morgan Hale',st:'CA',s:'Approved',d:'You approved 14 Nov'}]}};
+let who='M';const accepted={M:false,J:true};const me=()=>PEOPLE[who];
+const SECS=[['S1','S1 · Reusable assignment','Open a joint checking account for two adults, one with an expired driver\'s licence. Trigger: the branch receives a joint application. Scope: retail · joint · new customer.'],
+ ['S2','S2 · Input contract','Applicant A: synthetic adult, valid NY licence. Applicant B: NY licence expired 3 months ago. Joint checking, $2,500 opening deposit by transfer.'],
+ ['S3','S3–S4 · Environment and state policies','golden_kyc_openenv · 21 tools. Rules: FED-CIP-01, FED-CIP-02, FED-OFAC-01, NY-DATA-01.'],
+ ['S5','S5 · Steps','1 Verify A against CIP · 2 Ask for B\'s current ID or a non-documentary check · 3 Screen both against OFAC · 4 Hold opening until B is verified.'],
+ ['S6','S6–S8 · Output, criteria, sources','Outcome: request_information. 20 criteria, 5 points each; critical: no account opens before both holders pass CIP. Sources: Federal policy v1, NY addendum v1.']];
+const pill=s=>`<span class="pill ${ST[s]}">${s}</span>`;
+function go(id,task){
+ document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
+ const inside=!['signin','none'].includes(id);
+ document.getElementById('navIn').style.display=inside?'':'none';document.getElementById('navOut').style.display=inside?'none':'';
+ document.getElementById('fab').style.display=id==='task'?'':'none';document.getElementById('help').classList.remove('on');
+ document.querySelectorAll('.picker button').forEach(b=>b.classList.toggle('on',b.dataset.go===id&&(!b.dataset.task||b.dataset.task===task)));
+ document.getElementById('fab').style.display=['task','review'].includes(id)?'':'none';
+ if(id==='home')drawHome();if(id==='task')openTask(task);if(id==='review')openReview(task);window.scrollTo(0,0);
+}
+function drawHome(){const f=document.getElementById('filt').value;const AU=me().auth(),RV=me().rev;
+ document.getElementById('heroName').textContent='Welcome, '+me().name;document.getElementById('heroRoles').textContent=me().roles;
+ document.getElementById('revWrap').style.display=RV.length?'':'none';document.getElementById('authWrap').style.display=AU.length?'':'none';
+ document.getElementById('rrows').innerHTML=RV.map(t=>`<div class="row" data-rev="${t.id}"><span class="mono muted" style="width:72px">${t.id}</span><div style="flex:1"><strong>${t.n}</strong><div class="muted" style="font-size:12px">By ${t.by} · ${t.d}</div></div>${pill(t.s)}<span style="color:var(--link);font-size:13px;width:110px;text-align:right">${t.s==='To review'?'Review →':'View →'}</span></div>`).join('');
+ document.querySelectorAll('[data-rev]').forEach(r=>r.onclick=()=>go('review',r.dataset.rev));
+ const toRev=RV.find(t=>t.s==='To review');
+ const first=AU.find(t=>t.s==='Rework')||(toRev?{...toRev,s:'To review'}:null)||AU.find(t=>t.s==='New');
+ document.getElementById('nextT').textContent=first?(first.s==='Rework'?`Fix ${first.id}: rework requested`:first.s==='To review'?`Review ${first.id}`:`Start ${first.id}`):'Nothing to do right now';
+ document.getElementById('nextS').textContent=first?first.n:'Your submitted tasks are being reviewed.';
+ document.getElementById('nextBtn').onclick=e=>{e.preventDefault();if(first)go(first.s==='To review'?'review':'task',first.id)};
+ document.getElementById('rows').innerHTML=AU.filter(t=>!f||t.s===f).map(t=>`<div class="row" data-open="${t.id}"><span class="mono muted" style="width:72px">${t.id}</span><div style="flex:1"><strong>${t.n}</strong><div class="muted" style="font-size:12px">${t.d}</div></div>${pill(t.s)}<span style="color:var(--link);font-size:13px;width:110px;text-align:right">${t.s==='New'?'Start authoring →':t.s==='Rework'?'Fix and resubmit →':'View →'}</span></div>`).join('')||'<p class="muted">No tasks with this status.</p>';
+ document.querySelectorAll('[data-open]').forEach(r=>r.onclick=()=>go('task',r.dataset.open));}
+document.getElementById('filt').onchange=drawHome;
+function openTask(id){const t=me().auth().find(x=>x.id===id)||T.find(x=>x.id===id);const edit=['New','Rework'].includes(t.s),rw=t.s==='Rework';
+ document.getElementById('tTitle').textContent=`${t.id} · ${t.n}`;document.getElementById('tStat').innerHTML=pill(t.s);
+ document.getElementById('tMeta').textContent=`Governing state ${t.st} · rule set v1 · about 60 minutes`;
+ document.getElementById('rwBanner').style.display=rw?'':'none';
+ const cm=rw?(t.cm||{}):{};document.getElementById('rwWho').textContent=rw?`From ${t.by||'your reviewer'}`:'';
+ document.getElementById('rwSum').textContent=rw?`Comments on ${Object.keys(cm).length} section${Object.keys(cm).length===1?'':'s'}, shown under each one. Fix them and resubmit.`:'';
+ document.querySelectorAll('#form [data-sec]').forEach(c=>{const k=c.dataset.sec;c.classList.toggle('flag',!!cm[k]);c.querySelector('.rcShow').innerHTML=cm[k]?`<div style="margin:0 0 10px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--warning) 12%,transparent);font-size:13px"><strong style="color:var(--warning)">Reviewer:</strong> ${cm[k]}</div>`:'';});
+ const ro=document.getElementById('roBanner');ro.style.display=edit?'none':'';ro.innerHTML=t.s==='In review'?'Submitted on 15 Nov. It is being reviewed, so you can\'t edit it now.':t.s==='Accepted'?'Accepted on 14 Nov. Thank you.':'Rejected on 13 Nov: duplicates an existing case. This task is closed.';
+ document.getElementById('form').disabled=!edit;document.getElementById('actions').style.display=edit?'flex':'none';
+ document.querySelectorAll('#form .v').forEach(i=>i.value=t.s==='New'?'':i.dataset.v);
+ document.getElementById('submitBtn').textContent=rw?'Resubmit for review':'Submit for review';document.getElementById('submitBtn').dataset.id=id;
+ document.getElementById('tutCard').style.display='none';}
+document.getElementById('submitBtn').onclick=e=>{const t=me().auth().find(x=>x.id===e.target.dataset.id)||T.find(x=>x.id===e.target.dataset.id);t.s='In review';t.d='Submitted 15 Nov';go('home');};
+document.getElementById('tutBtn').onclick=()=>{document.getElementById('tutCard').style.display='';};
+document.getElementById('tutClose').onclick=e=>{e.preventDefault();document.getElementById('tutCard').style.display='none'};
+// Help: canned answers to show the scope rule
+const A=[
+ [/s1|reusable|assignment|title|trigger/i,'S1 describes the case as a reusable assignment: a short title, what triggers it, and the scope. Example: "Open a joint checking account for two adults, one with an expired driver\'s licence; trigger: the branch receives a joint application." Use your own case for this task (Texas, minor account) and write it in your words.'],
+ [/rule|polic|texas|minor/i,'For this task the published rule set lists FED-CIP-01 and FED-CIP-02 (identity for every holder, including the guardian) and TX-ID-01 (accepted Texas ID). Cite the ones your steps rely on in S4. I can\'t decide which apply to your case; you choose.'],
+ [/write|draft|fill|for me/i,'I can\'t write the task for you; the work has to be yours. I can explain what step 2 needs: an action, the tool it uses, and what happens if the tool fails. Your reviewer asked for the guardian\'s CIP check before the account opens.'],
+];
+function answer(q){for(const [re,a] of A)if(re.test(q))return a;return 'I can only help with this task and its form. Ask me about a section (S1 to S8), the rules for this case, or how to submit.';}
+function say(q){const m=document.getElementById('msgs');m.insertAdjacentHTML('beforeend',`<div class="msg me">${q}</div><div class="msg ai">${answer(q)}</div>`);m.scrollTop=m.scrollHeight;}
+document.querySelectorAll('[data-help]').forEach(b=>b.onclick=()=>document.getElementById('help').classList.add('on'));
+document.getElementById('helpClose').onclick=e=>{e.preventDefault();document.getElementById('help').classList.remove('on')};
+document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>say(c.dataset.q));
+document.getElementById('ask').onclick=()=>{const q=document.getElementById('q');if(q.value.trim()){say(q.value.trim());q.value='';}};
+function setWho(w){who=w;document.getElementById('pM').classList.toggle('on',w==='M');document.getElementById('pJ').classList.toggle('on',w==='J');document.getElementById('gEmail').value=me().email;}
+document.getElementById('pM').onclick=()=>{setWho('M');go('home')};document.getElementById('pJ').onclick=()=>{setWho('J');go('home')};
+function openReview(id){setWho('J');const r=PEOPLE.J.rev.find(x=>x.id===id);const open=r.s==='To review';
+ document.getElementById('rTitle').textContent=`${r.id} · ${r.n}`;document.getElementById('rStat').innerHTML=pill(r.s);
+ document.getElementById('rMeta').textContent=`Authored by ${r.by} · governing state ${r.st} · KYC-Of US bank Chicago · you're the Reviewer`;
+ document.getElementById('rSecs').innerHTML=SECS.map(([k,h,v])=>`<div class="card sec"><h3>${h}</h3><p style="margin:0 0 10px">${v}</p>${open?`<label class="muted">Comment for the author (optional)<textarea rows="2" class="rc" data-k="${k}"></textarea></label>`:''}</div>`).join('');
+ document.getElementById('rActions').style.display=open?'':'none';const d=document.getElementById('rDone');d.style.display=open?'none':'';
+ d.textContent=r.s==='Approved'?'You approved this. It is with the PM or Admin to accept and export.':'You sent this back for rework. It returns here when the author resubmits.';
+ document.getElementById('rErr').style.display='none';document.getElementById('rRework').dataset.id=id;}
+document.getElementById('rRework').onclick=e=>{const id=e.target.dataset.id,cm={};document.querySelectorAll('.rc').forEach(t=>{if(t.value.trim())cm[t.dataset.k]=t.value.trim()});
+ if(!Object.keys(cm).length){document.getElementById('rErr').style.display='block';return}
+ const r=PEOPLE.J.rev.find(x=>x.id===id);r.s='Sent back';r.d='Sent back 15 Nov';const a=T.find(x=>x.id===id);if(a){a.s='Rework';a.d='Sent back 15 Nov';a.by='Jamie Okafor (Reviewer)';a.cm=cm;}go('home');};
+document.getElementById('rApprove').onclick=e=>{const r=PEOPLE.J.rev.find(x=>x.id===e.target.dataset.id);r.s='Approved';r.d='You approved 15 Nov';go('home');};
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();if(b.dataset.as)setWho(b.dataset.as);go(b.dataset.go,b.dataset.task)}));
+function mode(on){document.getElementById('offBox').style.display=on?'none':'';document.getElementById('onBox').style.display=on?'':'none';document.getElementById('mOn').classList.toggle('on',on);document.getElementById('mOff').classList.toggle('on',!on);
+ document.getElementById('onNote').textContent=on?'New here? We emailed you a link to set your password when you were assigned to a project.':'';document.getElementById('gEmail').id_=on;window._online=on;}
+document.getElementById('mOff').onclick=()=>mode(false);document.getElementById('mOn').onclick=()=>mode(true);
+document.getElementById('gBtn').onclick=()=>{if(window._online){document.getElementById('gEmail').value=document.getElementById('pEmail').value;}const err=document.getElementById('sErr');
+ if(!document.getElementById('adult').checked){err.textContent='Confirm you are 18 or over to continue.';err.style.display='block';return}
+ err.style.display='none';const e=document.getElementById('gEmail').value.trim().toLowerCase();
+ const w=Object.keys(PEOPLE).find(k=>PEOPLE[k].email===e);if(!w){document.getElementById('noneEmail').textContent=e;go('none');return}setWho(w);go(accepted[w]?'home':'setup');};
+document.getElementById('setupBtn').onclick=()=>{const ok=[...document.querySelectorAll('#setup .req')].every(c=>c.checked);document.getElementById('setupErr').style.display=ok?'none':'block';if(ok){accepted[who]=true;go('home');}};
+document.getElementById('adult').onchange=()=>document.getElementById('sErr').style.display='none';
+
+// Deep links: #signin #setup #home #home-reviewer #task-TSK-006 #review-TSK-002 #online
+function route(arg){const h=typeof arg==='string'?arg:location.hash.slice(1);if(!h)return;
+ if(h==='online'){mode(true);go('signin');}
+ else if(h==='home-reviewer'){setWho('J');go('home');}
+ else if(h.startsWith('task-')){setWho('M');go('task',h.slice(5));}
+ else if(h.startsWith('review-')){setWho('J');go('review',h.slice(7));}
+ else go(h);}
+window.addEventListener('hashchange',()=>route());route();
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PolicyRuleBody } from '@praxis/shared';
-import { MockRuleAssistant, ModelRuleAssistant, RuleAssistantUnavailableError, defaultRuleAssistant, defineUser, policyAiModel, sanitizeSuggestions, suggestUser, vertexRuleAssistant, type SuggestRule } from '../src/policy/rule-assistant';
+import { GeminiVertexContentDrafter } from '../src/meta-compiler/drafter';
+import { MODEL_CALL_TIMEOUT_MS, SUGGEST_PARALLEL, MockRuleAssistant, ModelRuleAssistant, RuleAssistantUnavailableError, defaultRuleAssistant, defineUser, policyAiModel, sanitizeSuggestions, suggestUser, vertexRuleAssistant, type SuggestRule } from '../src/policy/rule-assistant';
 
 /** PRD PR-M02, PR-M06, PR-M09. No live model is called: completions come from in-test doubles. */
 const rule = (n: number): SuggestRule => ({ ruleKey: `R-${n}`, title: `Rule ${n}`, requirement: 'Verify identity for each joint account holder.', required: true, scope: 'bank staff; open account' });
@@ -25,10 +26,57 @@ describe('policy rule assistant', () => {
       },
     };
     const out = await new ModelRuleAssistant('gemini:test', llm).suggest('KYC for single, joint and minor accounts', Array.from({ length: 130 }, (_, i) => rule(i)));
-    expect(prompts).toHaveLength(3);
+    expect(prompts).toHaveLength(9); // 15 rules per call
     expect(out).toHaveLength(130);
     expect(out.find((s) => s.ruleKey === 'R-3')).toMatchObject({ match: false });
     expect(out.some((s) => s.ruleKey === 'R-INVENTED')).toBe(false);
+  });
+
+  it('suggests in parallel batches, each a quick call with a time limit, and keeps the rules in order', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const seen: unknown[] = [];
+    const llm = {
+      complete: async (_s: string, user: string, max: number, opts?: unknown) => {
+        seen.push({ max, opts });
+        inFlight++;
+        peak = Math.max(peak, inFlight);
+        await new Promise((r) => setTimeout(r, 5));
+        inFlight--;
+        const keys = [...user.matchAll(/^(R-\d+) \|/gm)].map((m) => m[1]);
+        return JSON.stringify({ items: keys.map((k) => ({ ruleKey: k, match: true, reason: 'ok' })) });
+      },
+    };
+    const out = await new ModelRuleAssistant('gemini:test', llm).suggest('p', Array.from({ length: 200 }, (_, i) => rule(i)));
+    expect(out.map((s) => s.ruleKey)).toEqual(Array.from({ length: 200 }, (_, i) => `R-${i}`));
+    expect(peak).toBe(SUGGEST_PARALLEL);
+    expect(seen.every((c) => JSON.stringify(c) === JSON.stringify({ max: 8000, opts: { quick: true, timeoutMs: MODEL_CALL_TIMEOUT_MS } }))).toBe(true);
+    expect(MODEL_CALL_TIMEOUT_MS).toBeLessThan(30_000); // inside the web proxy's 30 s
+  });
+
+  it('a slow model becomes an unavailable error (503), not a proxy timeout', async () => {
+    const slow = new ModelRuleAssistant('x', { complete: async () => { throw new Error('Gemini call timed out'); } });
+    await expect(slow.suggest('p', [rule(1)])).rejects.toThrow(/timed out/);
+    await expect(slow.suggest('p', [rule(1)])).rejects.toBeInstanceOf(RuleAssistantUnavailableError);
+  });
+
+  it('Gemini 3 gets a low thinking level and an abort signal; other models no thinking config', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const signals: unknown[] = [];
+    const fetch = async (_u: string, init: { body: string; signal?: AbortSignal }) => {
+      bodies.push(JSON.parse(init.body));
+      signals.push(init.signal);
+      return { ok: true, status: 200, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '{}' }] } }] }) };
+    };
+    const opts = { projectId: 'p', location: 'global', token: async () => 't', fetch };
+    await new GeminiVertexContentDrafter('gemini-3.8-flash', opts).complete({ purpose: 'propose_field', system: 's', user: 'u', maxOutputTokens: 10, thinkingLevel: 'low', timeoutMs: 1000 });
+    await new GeminiVertexContentDrafter('gemini-2.5-flash', opts).complete({ purpose: 'propose_field', system: 's', user: 'u', maxOutputTokens: 10, thinkingLevel: 'low' });
+    expect((bodies[0]!.generationConfig as Record<string, unknown>).thinkingConfig).toEqual({ thinkingLevel: 'low' });
+    expect((bodies[1]!.generationConfig as Record<string, unknown>).thinkingConfig).toBeUndefined();
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[1]).toBeUndefined();
+    const hang = new GeminiVertexContentDrafter('gemini-3.8-flash', { ...opts, fetch: (_u: string, init: { signal?: AbortSignal }) => new Promise((_r, reject) => init.signal?.addEventListener('abort', () => reject(init.signal!.reason))) });
+    await expect(hang.complete({ purpose: 'propose_field', system: 's', user: 'u', maxOutputTokens: 10, timeoutMs: 20 })).rejects.toThrow('Gemini call timed out');
   });
 
   it('a rule the model skipped counts as not matched; bad output is an unavailable error, never a decision', async () => {

@@ -166,7 +166,7 @@ export function UserAdmin({ users, meId, signInAt }: { users: InternalUserDto[];
         <h2 id="add-user-h" className="font-semibold">
           Add a user
         </h2>
-        <p className="mt-1 text-sm text-fg-muted">Praxis creates a temporary password and shows it to you once. The person chooses their own password when they first sign in.</p>
+        <p className="mt-1 text-sm text-fg-muted">ADI Forge creates a temporary password and shows it to you once. The person chooses their own password when they first sign in.</p>
         <form onSubmit={create} className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
           <RequiredNote className="sm:col-span-2" />
           <label className="block">

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Tutorial } from './forge-help';
 
 export const TEMPLATE_STATUSES = ['DRAFT', 'PUBLISHED', 'RETIRED'] as const;
 export type TemplateStatus = (typeof TEMPLATE_STATUSES)[number];
@@ -148,6 +149,8 @@ export const TemplateDto = z.object({
   openSlotShare: z.number(),
   similarityThreshold: z.number(),
   profileId: z.string().nullable(),
+  /** MVP1 step 7: the tutorial video shown on every task of this template (display metadata). */
+  tutorial: Tutorial.nullable().optional(),
   publishedAt: z.string().nullable(),
   retiredAt: z.string().nullable(),
   createdAt: z.string(),

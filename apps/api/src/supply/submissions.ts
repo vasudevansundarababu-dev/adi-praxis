@@ -32,7 +32,7 @@ const DAY = 86_400_000;
  * ends (withdrawn, expired, confirmed not met) a 90-day cool-off applies to every channel. Duplicate reasons never name
  * the owning partner.
  */
-export const DUPLICATE_OWNED = 'This candidate is already registered with ADI Praxis through another submission.';
+export const DUPLICATE_OWNED = 'This candidate is already registered with ADI Forge through another submission.';
 export const duplicateCoolOff = (until: Date) => `This candidate was put forward recently. They can be submitted again from ${until.toISOString().slice(0, 10)}.`;
 
 export interface Channel {
@@ -81,8 +81,8 @@ export async function sendInvite(tx: Tx, email: EmailSender | null, sub: Partner
   if (!sub.sandbox && email) {
     await email.send({
       to: sub.candidate.emailNorm,
-      subject: `You have been put forward for "${r.title}" on ADI Praxis`,
-      text: `Hello ${sub.candidate.name},\n\nYou have been put forward for "${r.title}" on ADI Praxis, a platform where subject-matter experts create training tasks for AI agents.\n\nTo continue, sign in and complete your profile within ${INVITE_VALID_DAYS} days:\n${appUrl}/partner-invite/${token}\n\nIf you did not expect this email, you can ignore it.\n\nADI Praxis`,
+      subject: `You have been put forward for "${r.title}" on ADI Forge`,
+      text: `Hello ${sub.candidate.name},\n\nYou have been put forward for "${r.title}" on ADI Forge, a platform where subject-matter experts create training tasks for AI agents.\n\nTo continue, sign in and complete your profile within ${INVITE_VALID_DAYS} days:\n${appUrl}/partner-invite/${token}\n\nIf you did not expect this email, you can ignore it.\n\nADI Forge`,
     });
   }
   return token;
@@ -300,7 +300,7 @@ export async function remindAndExpireInvites(db: Db, email: EmailSender | null, 
       expired++;
     } else if (!s.reminderSentAt && s.invitedAt && s.invitedAt.getTime() + INVITE_REMINDER_DAYS * DAY <= now.getTime()) {
       await db.partnerSubmission.update({ where: { id: s.id }, data: { reminderSentAt: now } });
-      await email?.send({ to: s.candidate.emailNorm, subject: `Reminder: continue your application for "${s.requisition.title}"`, text: `Hello ${s.candidate.name},\n\nYour invitation to ADI Praxis for "${s.requisition.title}" expires on ${s.inviteExpiresAt?.toISOString().slice(0, 10)}. Use the link in the first email to sign in and continue.\n\nADI Praxis` });
+      await email?.send({ to: s.candidate.emailNorm, subject: `Reminder: continue your application for "${s.requisition.title}"`, text: `Hello ${s.candidate.name},\n\nYour invitation to ADI Forge for "${s.requisition.title}" expires on ${s.inviteExpiresAt?.toISOString().slice(0, 10)}. Use the link in the first email to sign in and continue.\n\nADI Forge` });
       reminded++;
     }
   }

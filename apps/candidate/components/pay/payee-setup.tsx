@@ -7,7 +7,7 @@ import type { PayeeView } from '@/lib/supply-types';
 
 const STATUS: Record<PayeeView['status'], [string, string, string]> = {
   NOT_REQUIRED: ['Not needed', '', 'The partner who put you forward pays you for this work, so there is nothing to set up here.'],
-  NOT_STARTED: ['Not started', '', 'Set up your payment account with our payout provider. You add your tax form and payout method on their secure page; ADI Praxis never sees your bank or tax details.'],
+  NOT_STARTED: ['Not started', '', 'Set up your payment account with our payout provider. You add your tax form and payout method on their secure page; ADI Forge never sees your bank or tax details.'],
   PENDING: ['Being checked', 'pill-info', 'The payout provider is checking your details. If you haven’t finished their form, open it again. This usually clears once the form is complete.'],
   READY: ['Ready', 'pill-success', 'Your payment account is ready. Payments for accepted work go out weekly.'],
   BLOCKED: ['Blocked', 'pill-error', 'Your payment account is blocked, so payouts are on hold. Contact support and we’ll help you sort it out.'],

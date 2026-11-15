@@ -13,6 +13,12 @@ import { answerFor, type Http, type HttpForm, type HttpResponse } from './qa-use
  * fresh synthetic SME signed in with the mock Google provider. It creates its own project `SYNTHETIC QA smoke — <time>`
  * and never touches anyone else's. When a step cannot be done through an existing route, it fails and says so; there
  * are no back doors. It never reads the database and never runs with APP_ENV=production.
+ *
+ * MVP1 (ADI Forge) new flow, a second pass (`forge`, QA_SMOKE_NEW_FLOW=auto|on|off, default auto: only when the
+ * client's new flow is on): its own project `SYNTHETIC QA smoke (new flow) — <time>` from the same template, one task
+ * row per slot, Sourcing of a synthetic SME (and Reviewer on the Reviewer route), direct assignment, Offline candidate
+ * sign-in, Before you start, Home, authoring and submit, the Reviewer's pass, the PM's Approve, and the export rule
+ * "all tasks approved". It reads export eligibility only and never exports. It never changes the client's settings.
  */
 
 type Log = (level: string, message: string, extra?: object) => void;
@@ -32,9 +38,30 @@ export const NEEDS: Record<StepName, StepName[]> = {
   cleanup: [],
 };
 
+/** The new-flow pass (MVP1, ADI Forge), run after the steps above. */
+export const FORGE_STEPS = ['forge-settings', 'forge-project', 'forge-policy', 'forge-tasks', 'forge-sourcing', 'forge-assign', 'forge-sign-in', 'forge-authoring', 'forge-review', 'forge-export', 'forge-cleanup'] as const;
+export type ForgeStepName = (typeof FORGE_STEPS)[number];
+export const FORGE_NEEDS: Record<ForgeStepName, ForgeStepName[]> = {
+  'forge-settings': [],
+  'forge-project': ['forge-settings'],
+  'forge-policy': ['forge-project'],
+  'forge-tasks': ['forge-project'],
+  'forge-sourcing': ['forge-tasks'],
+  'forge-assign': ['forge-sourcing'],
+  'forge-sign-in': ['forge-assign'],
+  'forge-authoring': ['forge-policy', 'forge-sign-in'],
+  'forge-review': ['forge-authoring'],
+  'forge-export': ['forge-review'],
+  'forge-cleanup': [],
+};
+/** auto: run the new-flow pass when the client's new flow is on; on: it must be on (FAIL otherwise); off: never. */
+export const NEW_FLOW_MODES = ['auto', 'on', 'off'] as const;
+export type NewFlowMode = (typeof NEW_FLOW_MODES)[number];
+export type ForgeRoute = 'SME_PM' | 'SME_EXPERT_PM';
+
 export type StepStatus = 'PASS' | 'FAIL' | 'SKIPPED';
-export interface StepResult {
-  name: StepName;
+export interface StepResult<N extends string = StepName> {
+  name: N;
   status: StepStatus;
   durationMs: number;
   /** Why it failed (FAIL) or why it did not run (SKIPPED). */
@@ -63,6 +90,8 @@ export interface QaSmokeReport {
   paidCalls: PaidCall[];
   totalPaidCalls: number;
   estimatedCostUsd: number;
+  /** The new-flow pass: `ran` is false when it was off or skipped (each step then says why). */
+  forge: { mode: NewFlowMode; ran: boolean; route: ForgeRoute; steps: StepResult<ForgeStepName>[]; ids: Record<string, string> };
 }
 
 /** Rough per-call cost of the calls the API does not price itself (Gemini Flash in QA; small prompts). */
@@ -90,12 +119,20 @@ export interface QaSmokeOptions {
   /** Share of extracted citations that must be RESOLVED (not QUOTE_MISMATCH or UNRESOLVED). */
   minResolvedShare: number;
   timeouts: { extractionMs: number; assessmentMs: number; taskMs: number; chatMs: number };
+  /** The new-flow pass (default auto). */
+  newFlow?: NewFlowMode;
+  /** Its project's review route (default Author → Reviewer → PM/Admin, so the Reviewer is exercised too). */
+  forgeRoute?: ForgeRoute;
+  /** The synthetic people it sources (default: fresh ones per run). */
+  forgeSmeEmail?: string;
+  forgeReviewerEmail?: string;
   pollMs?: number;
   now?: () => Date;
   sleep?: (ms: number) => Promise<void>;
 }
 
 export const SMOKE_PREFIX = 'SYNTHETIC QA smoke — ';
+export const FORGE_SMOKE_PREFIX = 'SYNTHETIC QA smoke (new flow) — ';
 const POLICY_FILE = 'qa-smoke-policy.md';
 
 /** UTC yyyy-mm-dd hh:mm, for the project name. */
@@ -126,6 +163,10 @@ export function optionsFromEnv(env: NodeJS.ProcessEnv, appEnv: string, http: Htt
     smeEmail: (env.QA_SMOKE_SME_EMAIL ?? `smoke-${compact}@praxis.test`).toLowerCase(),
     workflowName: env.QA_SMOKE_WORKFLOW ?? 'KYC onboarding and refresh',
     templateId: env.QA_SMOKE_TEMPLATE_ID?.trim() || undefined,
+    newFlow: oneOf('QA_SMOKE_NEW_FLOW', env.QA_SMOKE_NEW_FLOW, NEW_FLOW_MODES, 'auto'),
+    forgeRoute: oneOf('QA_SMOKE_FORGE_ROUTE', env.QA_SMOKE_FORGE_ROUTE, ['SME_EXPERT_PM', 'SME_PM'] as const, 'SME_EXPERT_PM'),
+    forgeSmeEmail: (env.QA_SMOKE_FORGE_SME_EMAIL ?? `smoke-forge-sme-${compact}@praxis.test`).toLowerCase(),
+    forgeReviewerEmail: (env.QA_SMOKE_FORGE_REVIEWER_EMAIL ?? `smoke-forge-rev-${compact}@praxis.test`).toLowerCase(),
     policyMarkdown: defaultPolicyMarkdown(),
     minResolvedShare: 0.5,
     timeouts: {
@@ -136,6 +177,13 @@ export function optionsFromEnv(env: NodeJS.ProcessEnv, appEnv: string, http: Htt
     },
     now: () => new Date(),
   };
+}
+
+function oneOf<T extends string>(name: string, raw: string | undefined, allowed: readonly T[], fallback: T): T {
+  const v = raw?.trim();
+  if (!v) return fallback;
+  if (!(allowed as readonly string[]).includes(v)) throw new Error(`${name} must be one of ${allowed.join(', ')}`);
+  return v as T;
 }
 
 class StepSkipped extends Error {}
@@ -203,8 +251,9 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
     }
   }
 
-  async function step(name: StepName, fn: () => Promise<Record<string, unknown> | void>) {
-    const missing = NEEDS[name].filter((n) => results.get(n)?.status !== 'PASS');
+  const step = (name: StepName, fn: () => Promise<Record<string, unknown> | void>) => runStep(results, NEEDS, name, fn);
+  async function runStep<N extends string>(results: Map<N, StepResult<N>>, needs: Record<N, N[]>, name: N, fn: () => Promise<Record<string, unknown> | void>) {
+    const missing = needs[name].filter((n) => results.get(n)?.status !== 'PASS');
     const s0 = Date.now();
     if (missing.length) {
       results.set(name, { name, status: 'SKIPPED', durationMs: 0, reason: `needs ${missing.join(', ')}` });
@@ -233,6 +282,11 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
   let taskId = '';
   let recordId = '';
   const smeName = `SYNTHETIC QA smoke SME ${stamp(started)}`;
+  // The new-flow pass's own state.
+  const forgeMode: NewFlowMode = o.newFlow ?? 'auto';
+  const forgeRoute: ForgeRoute = o.forgeRoute ?? 'SME_EXPERT_PM';
+  const forgeResults = new Map<ForgeStepName, StepResult<ForgeStepName>>();
+  const fids: Record<string, string> = {};
 
   // ── 1. Health and sign-in ──
   await step('health', async () => {
@@ -253,11 +307,17 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
   });
 
   // ── 2. Project ──
-  await step('project', async () => {
+  /** The newest published authoring version of the workflow (or the pinned template), as offered to the PM. */
+  async function pickTemplate(): Promise<Json> {
     const all = (await call('pm', 'GET', '/templates')).body.items as Json[];
     const candidates = all.filter((t) => t.status === 'PUBLISHED' && (t.taskModes ?? []).includes('AUTHORING') && (o.templateId ? t.id === o.templateId : t.workflowName === o.workflowName));
-    template = candidates.sort((a, b) => b.version - a.version)[0] ?? null;
-    if (!template) throw new Error(o.templateId ? `Template ${o.templateId} is not offered to the PM (PMs see only the newest published version of each workflow)` : `No published authoring template for "${o.workflowName}"`);
+    const found = candidates.sort((a, b) => b.version - a.version)[0] ?? null;
+    if (!found) throw new Error(o.templateId ? `Template ${o.templateId} is not offered to the PM (PMs see only the newest published version of each workflow)` : `No published authoring template for "${o.workflowName}"`);
+    return found;
+  }
+
+  await step('project', async () => {
+    template = await pickTemplate();
     ids.templateId = template.id;
     const day = (n: number) => new Date(started.getTime() + n * 86_400_000).toISOString().slice(0, 10);
     const jd = (await call('pm', 'POST', '/job-descriptions', {
@@ -555,10 +615,13 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
     return { from: p.status, status: c.status, cancelled: true };
   });
 
+  await forgePass();
+
   const steps = STEPS.map((n) => results.get(n)!);
+  const forgeSteps = FORGE_STEPS.map((n) => forgeResults.get(n)!);
   const report: QaSmokeReport = {
     report: 'qa-smoke',
-    ok: steps.every((s) => s.status !== 'FAIL'),
+    ok: steps.every((s) => s.status !== 'FAIL') && forgeSteps.every((s) => s.status !== 'FAIL'),
     appEnv: o.appEnv,
     startedAt: started.toISOString(),
     durationMs: Date.now() - t0,
@@ -567,6 +630,7 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
     paidCalls: paid,
     totalPaidCalls: paid.reduce((n, p) => n + p.count, 0),
     estimatedCostUsd: round(paid.reduce((n, p) => n + p.usd, 0)),
+    forge: { mode: forgeMode, ran: forgeResults.get('forge-settings')?.status === 'PASS', route: forgeRoute, steps: forgeSteps, ids: fids },
   };
   return JSON.parse(redact(JSON.stringify(report))) as QaSmokeReport;
 
@@ -610,6 +674,333 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
           : undefined;
       await call(who, 'POST', '/me/onboarding/acknowledgements', { enrollmentId, itemKey: item.key, ...(item.terms ? { termsHash: item.terms.sha256 } : {}), ...(data ? { data } : {}) });
     }
+  }
+
+  // ───────────────────────── MVP1 new flow (ADI Forge) ─────────────────────────
+
+  /**
+   * The new-flow pass, after the earlier journey's steps. Everything again through the routes the apps use, as named
+   * actors: the demo PM (project, Sourcing, assignment, the final Approve), the demo Admin (reads the settings only), a
+   * synthetic SME and, on the Reviewer route, a synthetic Reviewer, both uploaded in Sourcing and signed in to the
+   * candidate app with Offline sign-in. Every decision is a person's (the Reviewer's pass, the PM's Approve).
+   */
+  async function forgePass() {
+    const fstep = (name: ForgeStepName, fn: () => Promise<Record<string, unknown> | void>) => runStep(forgeResults, FORGE_NEEDS, name, fn);
+    const compact = started.toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    const smeEmail = o.forgeSmeEmail ?? `smoke-forge-sme-${compact}@praxis.test`;
+    const reviewerEmail = o.forgeReviewerEmail ?? `smoke-forge-rev-${compact}@praxis.test`;
+    const withReviewer = forgeRoute === 'SME_EXPERT_PM';
+    const projects: string[] = [];
+    let ftemplate: Json = null;
+    let frule: { ruleId: string; ruleKey: string | null; versionId: string; quote: string } | null = null;
+    let tasks: Json[] = [];
+    const people: { sme?: { id: string; email: string }; reviewer?: { id: string; email: string } } = {};
+    const signedIn = new Set<string>();
+
+    await fstep('forge-settings', async () => {
+      if (forgeMode === 'off') throw new StepSkipped('QA_SMOKE_NEW_FLOW=off');
+      if (results.get('sign-in')?.status !== 'PASS') throw new StepSkipped('needs sign-in');
+      const r = await call('admin', 'GET', '/admin/forge-settings', undefined, { ok: [403, 404] });
+      const off = (why: string) => (forgeMode === 'on' ? new Error(`${why}; QA_SMOKE_NEW_FLOW=on needs it on (Admin → Candidate app sign-in)`) : new StepSkipped(why));
+      if (r.status !== 200) throw off(`GET /admin/forge-settings answered ${r.status}: this API has no new-flow settings`);
+      if (!r.body.newFlow) throw off('The new flow is off for this client');
+      if (r.body.candidateSignIn !== 'OFFLINE') throw new Error('Candidate sign-in is Online: the smoke test signs its synthetic SME and Reviewer in with Offline sign-in, so QA must use Offline (Admin → Candidate app sign-in)');
+      return { newFlow: true, candidateSignIn: r.body.candidateSignIn, route: forgeRoute };
+    });
+
+    /** A submitted new-flow project whose one SME may author all `perExpert` tasks. Returns its id and task rows. */
+    async function createProject(perExpert: number, suffix = '') {
+      const day = (n: number) => new Date(started.getTime() + n * 86_400_000).toISOString().slice(0, 10);
+      const jd = (await call('pm', 'POST', '/job-descriptions', {
+        title: `${FORGE_SMOKE_PREFIX}${ftemplate.workflowName} task author`.slice(0, 200),
+        responsibilities: 'Synthetic QA smoke test project (new flow). Every case, person and document is invented.',
+        skills: (ftemplate.skills?.length ? ftemplate.skills : ['KYC']).slice(0, 20),
+        wagePerTask: 1,
+        wageCurrency: 'USD',
+        locationType: 'REMOTE',
+      })).body;
+      const p = (await call('pm', 'POST', '/projects', {
+        // Names are unique per client: to the second, so a re-run never collides; a replacement names its task count.
+        name: `${FORGE_SMOKE_PREFIX}${started.toISOString().slice(0, 19).replace('T', ' ')}${suffix}`,
+        templateId: ftemplate.id,
+        jobDescriptionId: jd.id,
+        authoringExperience: 'BOTH',
+        reviewRoute: forgeRoute,
+        distinctTarget: perExpert,
+        maxPerExpert: perExpert,
+        tptMinutes: ftemplate.defaultTptMinutes ?? 60,
+        startDate: day(0),
+        endDate: day(30),
+        demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB', 'IN', 'US'], required: false }],
+      })).body;
+      projects.push(p.id);
+      await call('pm', 'POST', `/projects/${p.id}/submit`);
+      const rows = (await call('pm', 'GET', `/projects/${p.id}/forge-tasks`)).body.items as Json[];
+      return { id: p.id as string, rows };
+    }
+
+    // ── Project: from the same template; one SME may hold every task (a probe finds how many the template makes) ──
+    await fstep('forge-project', async () => {
+      ftemplate = template ?? (await pickTemplate());
+      fids.templateId = ftemplate.id;
+      let p = await createProject(1);
+      let probe: string | null = null;
+      if (p.rows.length > 1) {
+        // A case-selector template makes one task per value whatever the target; the per-expert cap cannot exceed the
+        // target, so a project sized to the task count replaces the probe (cancelled at once).
+        probe = p.id;
+        await cancelProject(p.id);
+        p = await createProject(p.rows.length, ` (${p.rows.length} tasks)`);
+      }
+      fids.projectId = p.id;
+      if (probe) fids.probeProjectId = probe;
+      tasks = p.rows;
+      return { projectId: p.id, template: `${ftemplate.workflowName} v${ftemplate.version}`, route: forgeRoute, tasks: tasks.length, ...(probe ? { probeCancelled: probe } : {}) };
+    });
+
+    // ── Policy: the same synthetic policy, one rule a person writes from it (no extraction), reviewed and published ──
+    await fstep('forge-policy', async () => {
+      const pid = fids.projectId!;
+      const up = (await call('pm', 'POST', `/projects/${pid}/policy/documents`, undefined, {
+        form: { fields: { title: 'SYNTHETIC Northwind KYC standard (QA smoke, new flow)', category: 'Bank policy', jurisdiction: 'US' }, file: { name: POLICY_FILE, type: 'text/markdown', content: o.policyMarkdown } },
+      })).body;
+      const quote = 'The analyst must verify the identity of every account owner before the account is opened.';
+      if (!o.policyMarkdown.includes(quote)) throw new Error('The synthetic policy no longer contains the sentence the new-flow rule cites');
+      const made = (await call('pm', 'POST', `/projects/${pid}/policy/rules`, {
+        documentVersionId: up.version.id,
+        ruleKey: 'NW-2.1',
+        body: {
+          title: 'Verify every owner',
+          requirement: quote,
+          requirementType: 'obligation',
+          visibility: 'agent_visible',
+          applicability: { universal: true, actors: [], actions: [], entities: [], channels: [], locales: [], jurisdictions: [], conditionText: null },
+          prerequisites: [],
+          precedence: [],
+          exceptions: { kind: 'none', items: [] },
+          effective: { from: null, to: null, conditionText: 'always' },
+          evidenceNeeds: [],
+          verificationHint: null,
+          uncertainty: [],
+        },
+        citations: [{ fieldPath: 'requirement', role: 'supports', quote }],
+      })).body;
+      await call('pm', 'POST', `/projects/${pid}/policy/rule-versions/${made.versionId}/review`, { expectedContentHash: made.contentHash, required: true });
+      const set = (await call('pm', 'POST', `/projects/${pid}/policy/rule-set`, { expectedLatestVersion: null })).body;
+      frule = { ruleId: made.ruleId, ruleKey: made.ruleKey ?? 'NW-2.1', versionId: made.versionId, quote };
+      fids.ruleVersionId = made.versionId;
+      fids.ruleSetId = set.id;
+      return { rule: frule.ruleKey, ruleSetVersion: set.version };
+    });
+
+    // ── Tasks: one row per slot, made once; nothing can be exported yet ──
+    await fstep('forge-tasks', async () => {
+      const pid = fids.projectId!;
+      const again = (await call('pm', 'GET', `/projects/${pid}/forge-tasks`)).body.items as Json[];
+      const same = (a: Json[], b: Json[]) => a.length === b.length && a.every((x, i) => x.taskId === b[i]?.taskId);
+      if (!tasks.length) throw new Error('The project has no task rows (one per slot is expected)');
+      if (!same(tasks, again)) throw new Error(`Reading the Tasks list again changed it (${tasks.length} rows, then ${again.length}): rows must be made once per slot`);
+      const slots = new Set(tasks.map((t) => t.slotLabel));
+      if (slots.size !== tasks.length) throw new Error(`${tasks.length} task rows for ${slots.size} slots: one row per slot is expected`);
+      const notOpen = tasks.filter((t) => t.status !== 'CREATED' || t.author);
+      if (notOpen.length) throw new Error(`${notOpen.length} new task rows are not Open and unassigned`);
+      const ex = (await call('pm', 'GET', `/projects/${pid}/export`)).body;
+      if (ex.canExport) throw new Error('Export is open before any task is approved');
+      return { tasks: tasks.length, selectors: tasks.map((t) => t.selector?.label ?? null), export: ex.reason };
+    });
+
+    // ── Sourcing: the synthetic SME (and Reviewer), uploaded by the PM for this project ──
+    await fstep('forge-sourcing', async () => {
+      const pid = fids.projectId!;
+      const add = async (role: 'SME' | 'REVIEWER', email: string) =>
+        (await call('pm', 'POST', '/sourcing/people', { projectId: pid, role, firstName: 'SYNTHETIC', lastName: `QA smoke ${role === 'SME' ? 'SME' : 'Reviewer'} ${compact}`, email, agency: 'SYNTHETIC QA smoke' })).body as { id: string; email: string };
+      people.sme = await add('SME', smeEmail);
+      fids.smeSourcedPersonId = people.sme.id;
+      if (withReviewer) {
+        people.reviewer = await add('REVIEWER', reviewerEmail);
+        fids.reviewerSourcedPersonId = people.reviewer.id;
+      }
+      const offered = (await call('pm', 'GET', `/projects/${pid}/assignable`)).body.people as Json[];
+      const missing = [people.sme, people.reviewer].filter((x): x is { id: string; email: string } => !!x && !offered.some((a) => a.sourcedPersonId === x.id));
+      if (missing.length) throw new Error(`The Assign screen does not offer ${missing.map((m) => m.email).join(', ')}`);
+      return { sme: smeEmail, ...(withReviewer ? { reviewer: reviewerEmail } : {}) };
+    });
+
+    // ── Assign: the SME authors every task; the Reviewer reviews every task ──
+    await fstep('forge-assign', async () => {
+      const pid = fids.projectId!;
+      for (const t of tasks) await call('pm', 'POST', `/projects/${pid}/assignments/direct`, { sourcedPersonId: people.sme!.id, taskId: t.taskId });
+      if (people.reviewer) for (const t of tasks) await call('pm', 'POST', `/projects/${pid}/assignments/direct`, { sourcedPersonId: people.reviewer.id, taskId: t.taskId });
+      const listed = (await call('pm', 'GET', `/projects/${pid}/people`)).body.items as Json[];
+      for (const person of [people.sme, people.reviewer].filter(Boolean) as { id: string; email: string }[]) {
+        const row = listed.find((x) => x.sourcedPersonId === person.id);
+        const held = new Set(((row?.tasks ?? []) as Json[]).map((x) => x.taskId));
+        if (!tasks.every((t) => held.has(t.taskId))) throw new Error(`Resource assignments shows ${held.size} of ${tasks.length} tasks for ${person.email}`);
+      }
+      const rows = (await call('pm', 'GET', `/projects/${pid}/forge-tasks`)).body.items as Json[];
+      const assigned = rows.filter((r) => r.status === 'ASSIGNED' && r.author).length;
+      if (assigned !== tasks.length) throw new Error(`${assigned} of ${tasks.length} tasks are Assigned with an author`);
+      return { assigned, ...(people.reviewer ? { reviewers: rows.filter((r) => r.reviewer).length } : {}) };
+    });
+
+    /** Offline sign-in (the mock Google sign-in QA uses), then Before you start. Returns Home. */
+    async function candidateSignIn(who: string, email: string, name: string) {
+      const { credential } = (await call(who, 'POST', '/auth/dev/google-token', { email, name })).body;
+      const r = await call(who, 'POST', '/auth/google', { credential, adultAttested: true }, { ok: [409] });
+      if (r.status === 409) throw new Error(`Offline sign-in was refused for ${email}: ${r.body?.error ?? ''} ${r.body?.message ?? ''}`.trim());
+      signedIn.add(who);
+      const view = (await call(who, 'GET', '/me/forge/terms')).body;
+      const docs = (view.terms ?? []) as (Json | null)[];
+      if (!docs.length || docs.some((d) => !d)) throw new Error('A current version of every contributor terms document must be published before anyone signs in (Admin → Terms)');
+      if (!view.accepted) await call(who, 'POST', '/me/forge/terms', { hashes: Object.fromEntries(docs.map((d) => [d.key, d.sha256])), syntheticOnly: true });
+      const home = (await call(who, 'GET', '/me/forge/home')).body;
+      if (!home.newFlow || !home.termsAccepted) throw new Error(`Home for ${email}: newFlow ${home.newFlow}, terms accepted ${home.termsAccepted}`);
+      return home;
+    }
+
+    // ── Candidate app: sign in, accept the terms, Home lists the tasks ──
+    await fstep('forge-sign-in', async () => {
+      const home = await candidateSignIn('fsme', smeEmail, `SYNTHETIC QA smoke SME ${compact}`);
+      const mine = new Map((home.authorTasks as Json[]).map((t) => [t.taskId, t.status]));
+      const missing = tasks.filter((t) => mine.get(t.taskId) !== 'New');
+      if (missing.length) throw new Error(`Home shows ${tasks.length - missing.length} of ${tasks.length} tasks as New for the SME (${JSON.stringify([...mine.values()])})`);
+      if (withReviewer) await candidateSignIn('freviewer', reviewerEmail, `SYNTHETIC QA smoke Reviewer ${compact}`);
+      return { sme: { home: tasks.length, status: 'New' }, ...(withReviewer ? { reviewer: 'terms accepted' } : {}) };
+    });
+
+    // ── Authoring: the SME saves a valid synthetic case on every task, declares authorship and submits ──
+    await fstep('forge-authoring', async () => {
+      const versions: number[] = [];
+      for (const row of tasks) versions.push(await authorAndSubmit('fsme', row.taskId, frule!));
+      const home = (await call('fsme', 'GET', '/me/forge/home')).body;
+      const inReview = (home.authorTasks as Json[]).filter((t) => tasks.some((x) => x.taskId === t.taskId) && t.status === 'In review').length;
+      if (inReview !== tasks.length) throw new Error(`Home shows ${inReview} of ${tasks.length} tasks In review after submit`);
+      return { submitted: tasks.length, versions };
+    });
+
+    // ── Review: the Reviewer passes each task; the PM approves each; export opens only with the last approval ──
+    await fstep('forge-review', async () => {
+      const pid = fids.projectId!;
+      if (withReviewer) {
+        const listed = new Map(((await call('freviewer', 'GET', '/me/forge/home')).body.reviewTasks as Json[]).map((t) => [t.taskId, t.status]));
+        const waiting = tasks.filter((t) => listed.get(t.taskId) === 'To review').length;
+        if (waiting !== tasks.length) throw new Error(`The Reviewer's Home shows ${waiting} of ${tasks.length} tasks To review`);
+        for (const row of tasks) {
+          const v = (await call('freviewer', 'GET', `/me/reviews/${row.taskId}`)).body;
+          await call('freviewer', 'POST', `/me/reviews/${row.taskId}/decision`, {
+            decision: 'PASS',
+            expectedVersion: v.expectedVersion,
+            expectedRevision: v.expectedRevision,
+            checklist: CHECKLIST_ALL_TRUE,
+            notes: `${FORGE_SMOKE_PREFIX}passed by the synthetic Reviewer.`,
+            ...(v.flaggedDuplicate ? { duplicateDecision: 'ACCEPT_AS_DISTINCT' } : {}),
+            ...(v.confirmCoverage ? { confirmedCoverage: { tags: v.coverageTags?.tags ?? {}, edgeCase: v.coverageTags?.edgeCase ?? 'none' } } : {}),
+          });
+        }
+      }
+      for (const [i, row] of tasks.entries()) {
+        const before = (await call('pm', 'GET', `/projects/${pid}/export`)).body;
+        if (before.canExport) throw new Error(`Export is open with ${i} of ${tasks.length} tasks approved`);
+        if (!String(before.reason ?? '').includes(`(${i} of ${tasks.length} now)`)) throw new Error(`Export reason with ${i} of ${tasks.length} approved: "${before.reason}"`);
+        const v = (await call('pm', 'GET', `/projects/${pid}/forge-tasks/${row.taskId}`)).body;
+        if (!v.canDecide) throw new Error(`The PM cannot decide on ${row.taskId} (status ${v.status}, waiting for ${v.waitingFor ?? 'nobody'})`);
+        await call('pm', 'POST', `/projects/${pid}/tasks/${row.taskId}/decision`, {
+          decision: 'APPROVE',
+          expectedVersion: v.expectedVersion,
+          expectedRevision: v.expectedRevision,
+          notes: `${FORGE_SMOKE_PREFIX}approved by the PM.`,
+          ...(v.checklistRequired ? { checklist: Object.fromEntries((v.checklist as { key: string }[]).map((c) => [c.key, true])) } : {}),
+          ...(v.flaggedDuplicate && forgeRoute === 'SME_PM' ? { duplicateDecision: 'ACCEPT_AS_DISTINCT' } : {}),
+          ...(v.confirmCoverage ? { confirmedCoverage: { tags: v.coverageTags?.tags ?? {}, edgeCase: v.coverageTags?.edgeCase ?? 'none' } } : {}),
+        });
+      }
+      const records = ((await call('admin', 'GET', `/dataset/records?projectId=${pid}`)).body.items as Json[]).filter((r) => tasks.some((t) => t.taskId === r.taskInstanceId));
+      if (records.length !== tasks.length) throw new Error(`${records.length} approved records for ${tasks.length} approved tasks`);
+      const chain = (await call('admin', 'GET', '/dataset/verification')).body;
+      if (!chain.ok) throw new Error(`The approved-record hash chain does not verify: ${JSON.stringify(chain.breaks).slice(0, 600)}`);
+      const home = (await call('fsme', 'GET', '/me/forge/home')).body;
+      const accepted = (home.authorTasks as Json[]).filter((t) => tasks.some((x) => x.taskId === t.taskId) && t.status === 'Accepted').length;
+      if (accepted !== tasks.length) throw new Error(`The SME's Home shows ${accepted} of ${tasks.length} tasks Accepted`);
+      fids.recordIds = records.map((r) => r.id).join(',');
+      return { approved: tasks.length, reviewerPassed: withReviewer ? tasks.length : 0, records: records.length, chain: { ok: true, checked: chain.checked } };
+    });
+
+    // ── Export: eligibility only; the smoke test never exports (that would call RL Gym) ──
+    await fstep('forge-export', async () => {
+      const ex = (await call('pm', 'GET', `/projects/${fids.projectId}/export`)).body;
+      if (!ex.canExport) throw new Error(`Every task is approved but export is closed: ${ex.reason}`);
+      if ((ex.tasks ?? []).length !== tasks.length) throw new Error(`Export lists ${(ex.tasks ?? []).length} approved tasks, expected ${tasks.length}`);
+      return { canExport: true, tasks: ex.tasks.length, validator: ex.validator?.name ?? null, exported: false };
+    });
+
+    // ── Cleanup: sign the synthetic candidates out; cancel the project unless it completed (records stay by design) ──
+    await fstep('forge-cleanup', async () => {
+      for (const who of signedIn) await call(who, 'POST', '/me/logout', undefined, { ok: [401] });
+      if (!fids.projectId) {
+        if (!projects.length) throw new StepSkipped('no new-flow project was created');
+        for (const id of projects) await cancelProject(id);
+        return { cancelled: projects.length };
+      }
+      return { signedOut: signedIn.size, ...(await cancelProject(fids.projectId)) };
+    });
+  }
+
+  /** Cancels a smoke project unless it is already terminal (an in-progress one is paused first). */
+  async function cancelProject(id: string) {
+    const p = await until(o.timeouts.taskMs, 'The project stayed STAFFED (the worker starts it); no route cancels a STAFFED project', async () => {
+      const x = (await call('pm', 'GET', `/projects/${id}`)).body;
+      return x.status === 'STAFFED' ? undefined : x;
+    });
+    if (p.status === 'CANCELLED' || p.status === 'COMPLETED') return { status: p.status, cancelled: false };
+    if (p.status === 'IN_PROGRESS') await call('pm', 'POST', `/projects/${id}/pause`);
+    const c = (await call('pm', 'POST', `/projects/${id}/cancel`)).body;
+    return { from: p.status, status: c.status, cancelled: true };
+  }
+
+  /** One task as its author: consent, a valid synthetic case (bound to the template's checks), declaration, submit. */
+  async function authorAndSubmit(who: string, id: string, citedRule: { ruleId: string; ruleKey: string | null; versionId: string; quote: string }): Promise<number> {
+    let t = (await call(who, 'GET', `/me/tasks/${id}`)).body;
+    await call(who, 'POST', `/me/tasks/${id}/conversation/consent`, { version: AUTHORSHIP_VERSION, accepted: true });
+    let example: Record<string, unknown> | null = null;
+    const profileId = t.template?.profileId as string | null;
+    if (profileId && profileId !== 'kyc-account-opening') {
+      const f = await call('admin', 'GET', `/template-profiles/${encodeURIComponent(profileId)}`, undefined, { ok: [404] });
+      example = f.status === 200 ? (f.body.examples?.[0]?.output ?? null) : null;
+    }
+    let output = buildOutput(t, citedRule, example);
+    const save = async (out: Record<string, unknown>, revision: number) => {
+      const r = await call(who, 'PUT', `/me/tasks/${id}`, { output: out, activeSecondsDelta: 120, expectedRevision: revision }, { ok: [422] });
+      if (r.status === 422) throw new Error(`Save refused: ${JSON.stringify(r.body?.details ?? r.body).slice(0, 600)}`);
+      return r;
+    };
+    let saved = await save(output, t.revision);
+    if (!example && profileId !== 'kyc-account-opening') {
+      for (let round = 0; round < 2; round++) {
+        const pre = await call(who, 'POST', `/me/tasks/${id}/check`, {});
+        addPaid({ kind: 'similarity-embedding', provider: 'vertex-embeddings', count: 1, usd: PAID_CALL_ESTIMATES_USD.embedding, source: 'estimate' });
+        const next = bindCriteriaFromChecks(output, (pre.body.checks ?? []) as Json[]);
+        if (!next) break;
+        output = next;
+        saved = await save(output, saved.body.revision);
+      }
+    }
+    const conv = (await call(who, 'GET', `/me/tasks/${id}/conversation`)).body;
+    const resolutions = ((conv.state?.unresolved ?? []) as string[]).map((question) => ({ question, answer: 'Synthetic QA smoke: the author confirms this in their own words; every fact in the case is invented.' }));
+    await call(who, 'POST', `/me/tasks/${id}/conversation/review`, { expectedRevision: conv.revision, ownWork: true, noExternalLlm: true, authorisedSources: true, ...(resolutions.length ? { resolutions } : {}) });
+    t = (await call(who, 'GET', `/me/tasks/${id}`)).body;
+    let sub = await call(who, 'POST', `/me/tasks/${id}/submit`, { expectedRevision: t.revision, syntheticDeclaration: true, flagExplanations: {} }, { ok: [422] });
+    const unexplained = (sub.body?.details?.unexplained ?? []) as string[];
+    const failing = ((sub.body?.details?.checks ?? []) as Json[]).filter((c) => !c.ok && c.severity !== 'warning');
+    if (sub.status === 422 && unexplained.length && !failing.length) {
+      const flagExplanations = Object.fromEntries(unexplained.map((x) => [x, 'Synthetic QA smoke data: every name, number and document is invented.']));
+      sub = await call(who, 'POST', `/me/tasks/${id}/submit`, { expectedRevision: t.revision, syntheticDeclaration: true, flagExplanations }, { ok: [422] });
+    }
+    if (sub.status === 422) {
+      const checks = ((sub.body?.details?.checks ?? []) as Json[]).filter((c) => !c.ok && c.severity !== 'warning').map((c) => `${c.id}: ${c.message}`);
+      throw new Error(`Submit of ${id} refused (${sub.body?.error}): ${checks.join(' | ') || JSON.stringify(sub.body?.details).slice(0, 600)}`);
+    }
+    addPaid({ kind: 'similarity-embedding', provider: 'vertex-embeddings', count: 1, usd: PAID_CALL_ESTIMATES_USD.embedding, source: 'estimate' });
+    return sub.body.version as number;
   }
 }
 

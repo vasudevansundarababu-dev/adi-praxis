@@ -163,8 +163,9 @@ Generic path, beside the Golden path. Anvil's current shape is kept: `GET /contr
 **On the Praxis side:**
 - **Project Export.** The owning PM or an Admin can:
   - validate one approved task at any time;
-  - export every approved task once the project is complete (target reached, marked complete, or end date
-    reached).
+  - export the project once **every task in it is approved** (final PM/Admin approval, with an optional Reviewer
+    step first). Updated by both sides on 15 Nov 2026; "marked complete" and "end date reached" no longer open
+    export (the earlier rule still applies to projects outside the MVP1 flow).
 - **Separate labels:** package validity, Anvil readiness, review gates and Run authority are shown separately.
 - **Flagged tasks:** listed with Praxis's fixes; nothing changes automatically.
 

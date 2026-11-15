@@ -1,6 +1,7 @@
 import { agentGraphProjection, agentProjection, type TemplateProfile, WorkflowGraph } from '@praxis/shared';
 import type { ApprovedTaskRecord, Template } from '@prisma/client';
 import { jcs, jcsBytes, JcsError, jcsSha256, sha256Hex } from './jcs';
+import { caseSelectorOf } from '../tasks/task-service';
 import { jointHashes, jointTemplateSpec, type JointTemplateSpec } from './joint-template';
 import { writeZip } from './zip';
 
@@ -20,6 +21,15 @@ export const MAX_TASKS_PER_PART = 200;
 /** Anvil's compressed bound is 1,048,576 bytes; parts stay under it with room for the manifest's final batch numbers. */
 export const MAX_PART_BYTES = 1_040_000;
 const PRIVATE_VISIBILITIES = new Set(['private_reference', 'private_rubric', 'evaluation_private']);
+/**
+ * KYC v7 selector block (Anvil's written answers, 15 Nov 2026). A template whose case selector is not the state
+ * (v7: `field: 'product'`, `source: 'S1.applicationType'`) gives each task entry
+ * `case_selector: {field, value}` and, when `S1.exampleGoverningState` is filled, `coverage: {example_governing_state}`.
+ * Anvil asked to confirm whether v6 packages should also carry `{field: 'governing_state'}`; this default (false) keeps
+ * v6 packages byte-identical. Set to true only once that is agreed.
+ */
+export const CASE_SELECTOR_IN_STATE_PACKAGES = false;
+const STATE_SELECTOR_FIELD = 'governing_state';
 
 export interface PackageInput {
   record: ApprovedTaskRecord;
@@ -115,6 +125,29 @@ interface TaskFiles {
 /** Opaque provenance of the human acceptance: the dataset record and its content hash. Never a person. */
 const receiptRef = (r: ApprovedTaskRecord) => `praxis-approved-record:${r.id}:${r.contentHash.slice(0, 16)}`;
 
+/**
+ * The task entry's selector fields (see CASE_SELECTOR_IN_STATE_PACKAGES): the slot's case value is the selected value;
+ * an authored value at the selector's source that differs is a problem, never guessed. No fields for a template
+ * without a selector, or for a state selector while v6 stays unchanged.
+ */
+function selectorBlock(input: PackageInput, authored: Record<string, unknown>): { fields: Record<string, unknown> } | { problem: { code: string; message: string } } {
+  const sel = caseSelectorOf(input.template.caseSelector);
+  if (!sel || (sel.field === STATE_SELECTOR_FIELD && !CASE_SELECTOR_IN_STATE_PACKAGES)) return { fields: {} };
+  const sections = isObj(authored.sections) ? authored.sections : {};
+  const [sectionKey, fieldKey] = sel.source.split('.');
+  const s = sectionKey ? sections[sectionKey] : undefined;
+  const authoredValue = isObj(s) && fieldKey ? s[fieldKey] : undefined;
+  const slot = isObj(input.record.input) && isObj(input.record.input.slot) ? input.record.input.slot : {};
+  const slotCase = isObj(slot.case) && slot.case.field === sel.field && typeof slot.case.value === 'string' ? slot.case.value : undefined;
+  const authoredText = typeof authoredValue === 'string' && authoredValue !== '' ? authoredValue : undefined;
+  const value = slotCase ?? authoredText;
+  if (!value) return { problem: { code: 'GENERIC_CASE_SELECTOR_MISSING', message: `The task has no ${sel.field} value (from its task slot or ${sel.source}).` } };
+  if (slotCase && authoredText && authoredText !== slotCase) return { problem: { code: 'GENERIC_CASE_SELECTOR_MISMATCH', message: `The task's slot is ${sel.field} "${slotCase}" but ${sel.source} says "${authoredText}". Fix the task so they agree.` } };
+  const s1 = isObj(sections.S1) ? sections.S1 : {};
+  const example = typeof s1.exampleGoverningState === 'string' && s1.exampleGoverningState.trim() !== '' ? s1.exampleGoverningState : undefined;
+  return { fields: { case_selector: { field: sel.field, value }, ...(example ? { coverage: { example_governing_state: example } } : {}) } };
+}
+
 function taskFiles(input: PackageInput): TaskFiles | PackageProblem {
   const { record, template } = input;
   const base = { recordId: record.id, taskId: record.taskInstanceId };
@@ -138,6 +171,8 @@ function taskFiles(input: PackageInput): TaskFiles | PackageProblem {
     const formPath = `forms/${String(form.profileId)}.json`;
     const taskId = record.taskInstanceId;
     const { template_sha256 } = jointHashes(spec);
+    const selector = selectorBlock(input, a.authored);
+    if ('problem' in selector) return { ...base, ...selector.problem };
     const entry = {
       task_id: taskId,
       revision_id: record.id,
@@ -147,6 +182,7 @@ function taskFiles(input: PackageInput): TaskFiles | PackageProblem {
       private_assets: [{ path: `private/${taskId}/reference.json`, sha256: jcsSha256(privateRef), purpose: 'grader_only_reference_and_rubric', access: 'private_rubric' }],
       agent_mode: template.agentMode,
       review: { status: 'approved', revision_id: record.id, receipt_ref: receiptRef(record) },
+      ...selector.fields,
     };
     return { input, spec, templateSha256: template_sha256, formPath, form, actor, privateRef, entry };
   } catch (e) {

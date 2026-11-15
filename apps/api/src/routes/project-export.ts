@@ -7,6 +7,7 @@ import type { Db, Tx } from '../db';
 import { sha256 } from '../lib/crypto';
 import { AppError, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
+import { forgeSettings } from '../forge/settings';
 import { validationItem, type AnvilRunRecord, type AnvilTaskValidator, type ValidationItem } from '../anvil/validator';
 import { toRecordDto } from './dataset';
 import { loadProject } from './projects';
@@ -23,9 +24,21 @@ async function currentRecords(tx: Db | Tx, clientId: string, projectId: string) 
   return rows.filter((r) => !superseded.has(r.id));
 }
 
+/**
+ * MVP1 new flow (owner, 15 Nov 2026): the project's tasks are its coverage slots; a slot is approved when it has a
+ * current approved record or an ACCEPTED task. A rejected task does not count: its slot still needs an approved task.
+ */
+async function allTasks(tx: Db | Tx, clientId: string, projectId: string, records: ApprovedTaskRecord[]) {
+  const slots = await tx.coverageSlot.findMany({ where: { clientId, projectId }, select: { id: true } });
+  const accepted = await tx.taskInstance.findMany({ where: { clientId, projectId, status: 'ACCEPTED', slotId: { not: null } }, select: { slotId: true } });
+  const approved = new Set([...records.map((r) => r.slotId), ...accepted.map((t) => t.slotId)]);
+  return { totalTasks: slots.length, approvedTasks: slots.filter((s) => approved.has(s.id)).length };
+}
+
 async function eligibility(tx: Db | Tx, clientId: string, p: { id: string; status: string; distinctTarget: number | null; endDate: Date | null }) {
   const records = await currentRecords(tx, clientId, p.id);
-  return { records, ...exportEligibility({ status: p.status, approvedTasks: records.length, distinctTarget: p.distinctTarget, endDate: p.endDate?.toISOString().slice(0, 10) ?? null, today: today() }) };
+  const newFlow = (await forgeSettings(tx, clientId)).newFlow;
+  return { records, ...exportEligibility({ status: p.status, approvedTasks: records.length, distinctTarget: p.distinctTarget, endDate: p.endDate?.toISOString().slice(0, 10) ?? null, today: today(), ...(newFlow ? { allTasks: await allTasks(tx, clientId, p.id, records) } : {}) }) };
 }
 
 const counts = (results: TaskValidationResult[]) => ({ valid: results.filter((r) => r.status === 'valid').length, needsFix: results.filter((r) => r.status === 'needs_fix').length, notValidated: results.filter((r) => r.status === 'not_validated').length });
@@ -53,7 +66,7 @@ async function validate(tx: Db | Tx, validator: AnvilTaskValidator, records: App
 /**
  * Project export with Anvil validation (owner, 12 Nov 2026). The owning PM or an Admin validates one approved task at
  * any time, and exports every approved task once the project is complete (required tasks approved, marked complete or
- * its end date reached). Each run is kept append-only with the validator's verdict per task.
+ * its end date reached). With the MVP1 new flow on, export opens only when every task of the project is approved. Each run is kept append-only with the validator's verdict per task.
  */
 export const projectExportRoutes: FastifyPluginAsyncZod<{ db: Db; storage: ObjectStorage; validator: AnvilTaskValidator }> = async (app, { db, storage, validator }) => {
   app.get('/projects/:id/export', { config: { access: ACCESS }, schema: { tags: ['projects'], params: Params } }, async (req) => {

@@ -84,7 +84,7 @@ async function defaultDraft(tx: Db | Tx, projectId: string, role: JdRole = 'AUTH
 
 const byRole = (projectId: string, role: JdRole) => ({ projectId_role: { projectId, role } });
 
-async function currentDraft(tx: Db | Tx, projectId: string, role: JdRole = 'AUTHOR') {
+export async function currentDraft(tx: Db | Tx, projectId: string, role: JdRole = 'AUTHOR') {
   const o = await tx.opportunity.findUnique({ where: byRole(projectId, role) });
   if (o?.draftBrief && o.draftCriteria) return { brief: OpportunityBrief.parse(o.draftBrief), criteria: OpportunityCriteria.parse(o.draftCriteria) };
   return defaultDraft(tx, projectId, role);

@@ -13,33 +13,53 @@ import { redeemInvite } from '../tasks/invites';
 import { findSimilar } from '../tasks/similarity';
 import { evaluateTask, submitTask, type StoredChecks } from '../tasks/submission';
 import { activeAssignment, allocateTasks, templateRef } from '../tasks/task-service';
+import { forgeSettings } from '../forge/settings';
+import { directlyAssignedSme } from '../forge/sourcing';
+import { forgeTermsAccepted } from '../forge/candidate';
 import { conversationInputProblems } from '../tasks/conversation/guards';
 import { allowEditor, experienceOf } from '../tasks/authoring-experience';
 import { AUTHORSHIP_VERSION } from '../tasks/conversation/authorship';
 import { chatOf, draftingWith } from '../tasks/conversation/service';
 import { authoringPolicyView, effectivePolicy, sidecar } from '../policy/task-policy';
 import { profileSaveProblems } from '../tasks/profile-output';
+import { tutorialOf } from '../forge/tutorial';
 
 const IdParams = z.object({ id: z.string().uuid() });
 
 /** What still stands between this candidate and the project's tasks (SPEC FLOW 3, candidate login step 4). */
-type Step = { step: 'identity' | 'account' | 'accept' | 'onboarding' | 'eligibility' | 'not_assigned'; message: string; href: string | null };
+type Step = { step: 'identity' | 'account' | 'accept' | 'onboarding' | 'eligibility' | 'not_assigned' | 'terms'; message: string; href: string | null };
 
-export async function workContext(tx: Db | Tx, gate: SelectionGate, smeUserId: string, projectId: string): Promise<{ ok: true; candidateId: string; paId: string } | ({ ok: false } & Step)> {
+/**
+ * Whether the SME works on this project through the MVP1 new flow: the setting is on and a PM or Admin assigned them
+ * (as SME) in Resource assignments. Then being assigned is the selection: no identity check, no selection or
+ * onboarding gate, and tasks come only from the PM (no pulling).
+ */
+export async function directWork(tx: Db | Tx, u: { id: string; clientId: string }, projectId: string) {
+  if (!(await forgeSettings(tx, u.clientId)).newFlow) return false;
+  return directlyAssignedSme(tx, u.id, projectId);
+}
+
+export async function workContext(tx: Db | Tx, gate: SelectionGate, smeUserId: string, projectId: string): Promise<{ ok: true; candidateId: string; paId: string; direct: boolean } | ({ ok: false } & Step)> {
   const u = await tx.smeUser.findUniqueOrThrow({ where: { id: smeUserId } });
   if (u.accountStatus !== 'ACTIVE') return { ok: false, step: 'account', message: 'Your account is not active. Contact support.', href: null };
-  if (!identityEligible(u.identityStatus)) return { ok: false, step: 'identity', message: 'Verify your identity to open tasks.', href: '/verify' };
+  const direct = await directWork(tx, u, projectId);
+  if (!direct && !identityEligible(u.identityStatus)) return { ok: false, step: 'identity', message: 'Verify your identity to open tasks.', href: '/verify' };
   const candidate = await tx.candidate.findUnique({ where: { smeUserId } });
-  const sa = await tx.smeAssignment.findFirst({ where: { smeUserId, projectId }, orderBy: { createdAt: 'desc' } });
+  const sa = direct ? null : await tx.smeAssignment.findFirst({ where: { smeUserId, projectId }, orderBy: { createdAt: 'desc' } });
   if (sa?.status === 'PROPOSED') return { ok: false, step: 'accept', message: 'Accept the assignment on your home page first.', href: '/home' };
   const pa = candidate ? await activeAssignment(tx, projectId, candidate.id) : null;
   if (!candidate || !pa) return { ok: false, step: 'not_assigned', message: 'You are not assigned to this project.', href: '/home' };
+  if (direct) {
+    // MVP1: the one-time Before you start screen (contributor terms, synthetic data only) comes before any work.
+    if (!(await forgeTermsAccepted(tx, u.id, u.clientId))) return { ok: false, step: 'terms', message: 'Accept the contributor terms first.', href: '/welcome' };
+    return { ok: true, candidateId: candidate.id, paId: pa.id, direct: true };
+  }
   const g = await gate.check(tx, { candidateId: candidate.id, projectId });
   if (!g.ok) {
     const onboarding = /onboarding|terms|checklist/.test(g.reason);
     return { ok: false, step: onboarding ? 'onboarding' : 'eligibility', message: `Before you can work on this project: ${g.reason}.`, href: onboarding && sa ? `/enrollments/${sa.enrollmentId}/onboarding` : '/home' };
   }
-  return { ok: true, candidateId: candidate.id, paId: pa.id };
+  return { ok: true, candidateId: candidate.id, paId: pa.id, direct: false };
 }
 
 export function outstanding(s: Step): never {
@@ -104,7 +124,8 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       project: { id: p.id, name: p.name, status: p.status, taskMode: p.taskMode, tptMinutes: p.tptMinutes, workflow: p.template.workflowName, humanGate: p.template.humanGate },
       tasks: tasks.map(taskSummary),
       limits: { openCap: p.openTaskCapPerCandidate, open, perExpertCap: cap, used: capped },
-      canPull: p.status !== 'PAUSED' && open < p.openTaskCapPerCandidate && (cap === null || capped < cap),
+      // New flow: the PM or Admin chooses each task, so nothing is pulled.
+      canPull: !ctx.direct && p.status !== 'PAUSED' && open < p.openTaskCapPerCandidate && (cap === null || capped < cap),
     };
   });
 
@@ -112,6 +133,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => {
       const ctx = await workContext(tx, selectionGate, actor.smeUserId, req.params.id);
       if (!ctx.ok) outstanding(ctx);
+      if (ctx.direct) throw new AppError(409, 'PM_ASSIGNS_TASKS', 'Your project manager assigns your tasks. They are listed on your home page.');
       const [t] = await allocateTasks(tx, { projectId: req.params.id, candidateId: ctx.candidateId, want: 1 }, audit);
       if (!t) throw new AppError(409, 'NO_TASK', 'No task is available for you right now: you may be at your limit, or every suitable slot is taken.');
       return { status: 200, body: taskSummary(t) };
@@ -136,6 +158,8 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       startingGraph: t.taskType === 'AUTHORING' ? templateStartingGraph(t.project.template.workflowName, t.project.templateVersion, t.project.template.profileId) : null,
       authoringWorkspace: (t.drafting as { workspace?: unknown } | null)?.workspace ?? null,
       tptMinutes: t.project.tptMinutes,
+      // MVP1 step 7: the template's tutorial video, or null.
+      tutorial: tutorialOf(t.project.template),
       definition: definitionFor(template).key,
       template: {
         workflow: template.workflowName,

@@ -223,7 +223,7 @@ export function GeneratedJdPanel(props: {
   return (
     <div className="mt-4 space-y-4">
       <p className="text-sm text-fg-muted">
-        Praxis writes the job description from the template: its skills are mandatory, and the demographic and education profile comes from the Demographics step.
+        ADI Forge writes the job description from the template: its skills are mandatory, and the demographic and education profile comes from the Demographics step.
         {preview.reviewer && ' The Expert review route also needs a reviewer job description: the same skills, with more years of experience.'} Both go to recruitment
         when you submit.
       </p>

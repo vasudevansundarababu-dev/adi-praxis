@@ -23,24 +23,8 @@ export function ProjectSummary({
   attributes: DemographicAttributeDto[];
   jobDescriptions: JobDescriptionDto[];
 }) {
-  const snapshot = (p.demographicsSnapshot ?? { attributes: [] }) as { attributes: { key: string; label: string }[] };
-  const label = (key: string) => snapshot.attributes.find((a) => a.key === key)?.label ?? attributes.find((a) => a.key === key)?.label ?? key;
-  // Show the JD as frozen at submit, not its current (possibly edited) version.
-  const jd = (p.jdSnapshot as JobDescriptionDto | null) ?? jobDescriptions.find((j) => j.id === p.jobDescriptionId);
+  const rows = projectDetailRows(p, attributes, jobDescriptions);
   const reviewerJd = (p.reviewerJdSnapshot as JobDescriptionDto | null | undefined) ?? null;
-  const rows: [string, React.ReactNode][] = [
-    ['Workflow', `${p.domainName} — ${p.workflowName} (template v${p.templateVersion})`],
-    ['Owner', p.ownerName],
-    ['Authoring experience', p.taskMode === 'AUTHORING' ? p.authoringExperience ?? 'Both (legacy)' : 'Not applicable'],
-    ['Dates', p.startDate && p.endDate ? `${p.startDate} to ${p.endDate}` : '—'],
-    ['Mode', p.taskMode === 'AUTHORING' ? `Authoring: ${p.distinctTarget} distinct tasks, max ${p.maxPerExpert} per expert` : `Annotation: ${p.taskCount} tasks`],
-    ['TPT', p.tptMinutes ? `${p.tptMinutes} minutes (${p.hoursPerWorkerDay} h per worker per day)` : '—'],
-    ['Required workers', p.requiredWorkers ?? '—'],
-    ['Demographics', p.demographicFilters.map((f) => `${label(f.attributeKey)} (${f.required ? 'required' : 'preferred'})`).join(', ') || '—'],
-    ['Job description', jd ? jdLine(jd) : '—'],
-    ...(reviewerJd ? ([['Reviewer job description', jdLine(reviewerJd)]] as [string, React.ReactNode][]) : []),
-    ['Submitted', p.submittedAt ? new Date(p.submittedAt).toLocaleString() : '—'],
-  ];
   return (
     <div className="max-w-3xl">
       <Link href="/projects" className="text-sm text-link hover:underline">
@@ -71,6 +55,11 @@ export function ProjectSummary({
       {!['DRAFT', 'CANCELLED', 'COMPLETED'].includes(p.status) && (
         <Link href={`/projects/${p.id}/opportunity`} className="ml-3 mt-6 inline-block btn btn-secondary">
           Opportunity page
+        </Link>
+      )}
+      {!['DRAFT', 'CANCELLED', 'COMPLETED'].includes(p.status) && (
+        <Link href={`/projects/${p.id}/recruiter`} className="ml-3 mt-6 inline-block btn btn-secondary">
+          Export to Recruiter
         </Link>
       )}
       {!['DRAFT', 'CANCELLED', 'COMPLETED'].includes(p.status) && reviewerJd && (
@@ -106,8 +95,30 @@ export function ProjectSummary({
   );
 }
 
+/** The project's Overview rows (frozen snapshots), shared with the MVP1 Dashboard tab. */
+export function projectDetailRows(p: ProjectDto, attributes: DemographicAttributeDto[], jobDescriptions: JobDescriptionDto[]): [string, React.ReactNode][] {
+  const snapshot = (p.demographicsSnapshot ?? { attributes: [] }) as { attributes: { key: string; label: string }[] };
+  const label = (key: string) => snapshot.attributes.find((a) => a.key === key)?.label ?? attributes.find((a) => a.key === key)?.label ?? key;
+  // Show the JD as frozen at submit, not its current (possibly edited) version.
+  const jd = (p.jdSnapshot as JobDescriptionDto | null) ?? jobDescriptions.find((j) => j.id === p.jobDescriptionId);
+  const reviewerJd = (p.reviewerJdSnapshot as JobDescriptionDto | null | undefined) ?? null;
+  return [
+    ['Workflow', `${p.domainName} — ${p.workflowName} (template v${p.templateVersion})`],
+    ['Owner', p.ownerName],
+    ['Authoring experience', p.taskMode === 'AUTHORING' ? p.authoringExperience ?? 'Both (legacy)' : 'Not applicable'],
+    ['Dates', p.startDate && p.endDate ? `${p.startDate} to ${p.endDate}` : '—'],
+    ['Mode', p.taskMode === 'AUTHORING' ? `Authoring: ${p.distinctTarget} distinct tasks, max ${p.maxPerExpert} per expert` : `Annotation: ${p.taskCount} tasks`],
+    ['TPT', p.tptMinutes ? `${p.tptMinutes} minutes (${p.hoursPerWorkerDay} h per worker per day)` : '—'],
+    ['Required workers', p.requiredWorkers ?? '—'],
+    ['Demographics', p.demographicFilters.map((f) => `${label(f.attributeKey)} (${f.required ? 'required' : 'preferred'})`).join(', ') || '—'],
+    ['Job description', jd ? jdLine(jd) : '—'],
+    ...(reviewerJd ? ([['Reviewer job description', jdLine(reviewerJd)]] as [string, React.ReactNode][]) : []),
+    ['Submitted', p.submittedAt ? new Date(p.submittedAt).toLocaleString() : '—'],
+  ];
+}
+
 /** Title, pay and location, plus the generated requirements (mandatory skills, experience, education). */
-function jdLine(jd: JobDescriptionDto): string {
+export function jdLine(jd: JobDescriptionDto): string {
   const req = [
     jd.mandatorySkills?.length ? `mandatory skills ${jd.mandatorySkills.join(', ')}` : '',
     jd.minExperienceYears ? `${jd.minExperienceYears}+ years` : '',

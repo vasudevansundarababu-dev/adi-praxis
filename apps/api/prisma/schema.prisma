@@ -409,21 +409,21 @@ model Session {
 
 /// Service-to-service callers: client API push (task inputs) and RL Gym.
 model ApiClient {
-  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId  String        @map("client_id") @db.Uuid
-  name      String
-  kind      ApiClientKind
-  keyHash   String        @unique @map("key_hash")
-  revokedAt DateTime?     @map("revoked_at")
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String        @map("client_id") @db.Uuid
+  name           String
+  kind           ApiClientKind
+  keyHash        String        @unique @map("key_hash")
+  revokedAt      DateTime?     @map("revoked_at")
   /// Keys stop working after this time (required for ANVIL keys; optional for the others).
-  expiresAt DateTime?     @map("expires_at")
+  expiresAt      DateTime?     @map("expires_at")
   /// Admin who issued the key. An ANVIL key stops working once this user is no longer an active Admin (owner, 11 Nov 2026).
-  issuedById String?      @map("issued_by_id") @db.Uuid
+  issuedById     String?       @map("issued_by_id") @db.Uuid
   /// Keyless grant (owner, 12 Nov 2026): the Google service account allowed to call as this client with a signed
   /// identity token. Such a row has no usable key (its key hash is of a discarded random value).
-  serviceAccount String?  @unique @map("service_account")
-  createdAt DateTime      @default(now()) @map("created_at")
-  updatedAt DateTime      @updatedAt @map("updated_at")
+  serviceAccount String?       @unique @map("service_account")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
   @@index([clientId])
 }
@@ -481,6 +481,10 @@ model Template {
   /// One task per value of a required pick list ({ field, source, values }): the project gets one slot per value
   /// (KYC five-state contract, 13 Nov 2026). Null for templates without a case selector.
   caseSelector          Json?          @map("case_selector")
+  /// MVP1 step 7: the tutorial video shown on every task of this template (display metadata; not versioned).
+  tutorialVideoUrl      String?        @map("tutorial_video_url")
+  /// [{ title, at }] chapters of the tutorial video, `at` in seconds.
+  tutorialChapters      Json?          @map("tutorial_chapters")
   publishedAt           DateTime?      @map("published_at")
   retiredAt             DateTime?      @map("retired_at")
   /// Harbor blueprint (packages/shared/src/blueprint). Null for templates outside the Meta-Compiler catalog.
@@ -659,6 +663,7 @@ model Project {
   matchRejections        ProjectMatchRejection[]
   /// When the last FLOW 2 match run finished.
   matchedAt              DateTime?                  @map("matched_at")
+  sourcedPeople          SourcedPerson[]
 
   @@unique([clientId, name])
   @@index([ownerId])
@@ -961,6 +966,8 @@ model TaskInstance {
   drafting            Json?
   /// SME -> Expert -> PM route only: which responsibility the SUBMITTED task waits for. Null on the SME -> PM route.
   reviewStage         ReviewStage?                @map("review_stage")
+  /// MVP1: the external Reviewer (candidate-app SmeUser) the PM or Admin chose for this task (Reviewer route only).
+  reviewerSmeUserId   String?                     @map("reviewer_sme_user_id") @db.Uuid
   createdAt           DateTime                    @default(now()) @map("created_at")
   updatedAt           DateTime                    @updatedAt @map("updated_at")
 
@@ -1272,6 +1279,9 @@ model SmeUser {
 
   providerIdentities ProviderIdentity[]
   sessions           Session[]
+  sourcedAs          SourcedPerson[]
+  credential         CandidateCredential?
+  passwordTokens     CandidatePasswordToken[]
   identityAttempts   IdentityAttempt[]
   alternativeChecks  AlternativeIdentityCheck[]
   candidate          Candidate?
@@ -3367,4 +3377,74 @@ model AnvilRevocationEvent {
 
   @@unique([environment, anvilProjectId, sequence])
   @@index([receiptId])
+}
+
+// ───────────────────────── MVP1 (ADI Forge): people sourced by recruiters ─────────────────────────
+
+enum SourcedRole {
+  SME
+  REVIEWER
+}
+
+/// A person a recruitment agency put forward, uploaded by a PM or Admin in Sourcing (MVP1, owner 15 Nov 2026).
+/// One row per project, role and email. Assigning the person to a task in that project is the selection; there is
+/// no separate screening decision. The email is the person's sign-in. `smeUserId` links the candidate-app account
+/// (created on assignment, or claimed at first sign-in with this email).
+model SourcedPerson {
+  id                   String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId             String      @map("client_id") @db.Uuid
+  projectId            String      @map("project_id") @db.Uuid
+  role                 SourcedRole
+  firstName            String      @map("first_name")
+  lastName             String      @map("last_name")
+  emailNorm            String      @map("email_norm")
+  linkedinUrl          String?     @map("linkedin_url")
+  cvStorageKey         String?     @map("cv_storage_key")
+  assessmentStorageKey String?     @map("assessment_storage_key")
+  /// The recruiter's assessment row as received (requirement verdicts, answers, why they fit). Accepted in good faith.
+  assessment           Json        @default("{}")
+  agency               String?
+  submittedById        String      @map("submitted_by_id") @db.Uuid
+  smeUserId            String?     @map("sme_user_id") @db.Uuid
+  assignedAt           DateTime?   @map("assigned_at")
+  assignedById         String?     @map("assigned_by_id") @db.Uuid
+  releasedAt           DateTime?   @map("released_at")
+  createdAt            DateTime    @default(now()) @map("created_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+
+  project Project  @relation(fields: [projectId], references: [id])
+  smeUser SmeUser? @relation(fields: [smeUserId], references: [id])
+
+  @@unique([projectId, role, emailNorm])
+  @@index([clientId, emailNorm])
+  @@index([smeUserId])
+}
+
+/// MVP1 Online sign-in (owner, 15 Nov 2026): a candidate-app password, set through an emailed one-time link.
+/// Only the argon2id hash is stored. Offline mode (email and name, test environments only) never uses it.
+model CandidateCredential {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  smeUserId    String   @unique @map("sme_user_id") @db.Uuid
+  passwordHash String   @map("password_hash")
+  setAt        DateTime @default(now()) @map("set_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  smeUser SmeUser @relation(fields: [smeUserId], references: [id])
+}
+
+/// One-time link to set or reset a candidate password. Only the sha256 of the token is stored; single use; expires.
+model CandidatePasswordToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String    @map("client_id") @db.Uuid
+  smeUserId String    @map("sme_user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  purpose   String
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  smeUser SmeUser @relation(fields: [smeUserId], references: [id])
+
+  @@index([smeUserId])
 }

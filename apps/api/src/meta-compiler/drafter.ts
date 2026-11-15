@@ -15,6 +15,10 @@ export interface DraftPrompt {
   system: string;
   user: string;
   maxOutputTokens: number;
+  /** Gemini 3.x only: how much the model thinks before answering. Omitted uses the model's default. */
+  thinkingLevel?: 'low' | 'high';
+  /** Aborts the call after this many milliseconds (a DrafterError), so a slow model never outlives the request. */
+  timeoutMs?: number;
 }
 
 export interface DraftOutput {
@@ -106,7 +110,7 @@ export class ClaudeVertexContentDrafter implements ContentDrafter {
   }
 }
 
-type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
+type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
 
 export class GeminiVertexContentDrafter implements ContentDrafter {
   readonly provider = 'gemini' as const;
@@ -130,10 +134,17 @@ export class GeminiVertexContentDrafter implements ContentDrafter {
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: p.system }] },
           contents: [{ role: 'user', parts: [{ text: p.user }] }],
-          generationConfig: { maxOutputTokens: p.maxOutputTokens, responseMimeType: 'application/json', temperature: 0.2 },
+          generationConfig: {
+            maxOutputTokens: p.maxOutputTokens,
+            responseMimeType: 'application/json',
+            temperature: 0.2,
+            ...(p.thinkingLevel && this.model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: p.thinkingLevel } } : {}),
+          },
         }),
+        ...(p.timeoutMs ? { signal: AbortSignal.timeout(p.timeoutMs) } : {}),
       });
     } catch (err) {
+      if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) throw new DrafterError('Gemini call timed out');
       throw new DrafterError(`Gemini call failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     }
     if (!res.ok) throw new DrafterError(`Gemini call failed (${res.status})`);

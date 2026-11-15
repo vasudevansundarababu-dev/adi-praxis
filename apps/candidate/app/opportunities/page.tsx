@@ -13,7 +13,7 @@ export default async function OpportunitiesPage() {
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-8">
       <section className="hero p-6 sm:p-8">
-        <p className="muted text-sm">ADI Praxis for subject-matter experts</p>
+        <p className="muted text-sm">ADI Forge for subject-matter experts</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">Opportunities</h1>
         <p className="muted mt-2 max-w-xl">Write realistic, fully synthetic tasks from real-world workflows. Pick an area you know well.</p>
       </section>

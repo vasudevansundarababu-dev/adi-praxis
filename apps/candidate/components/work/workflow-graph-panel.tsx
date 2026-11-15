@@ -198,7 +198,7 @@ function NodeEditor({ graph, node, editable, onChange, onClose }: { graph: Workf
         {node.type === 'human_step' && (
           <>
             <label className="block text-sm">
-              Person in the case (not the Praxis reviewer)
+              Person in the case (not the ADI Forge reviewer)
               <input className={input} value={node.actorRole} onChange={(e) => set({ actorRole: e.target.value })} />
             </label>
             <label className="block text-sm">

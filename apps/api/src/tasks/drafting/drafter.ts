@@ -229,7 +229,7 @@ export function emptySections(t: KycTask, sections: DraftSection[]): DraftSectio
 
 // ───────────────────────── Claude on Vertex AI ─────────────────────────
 
-const SYSTEM = `You draft a synthetic KYC onboarding task for an expert author on ADI Praxis. The task trains and evaluates AI agents: an agent receives a synthetic customer file and tools, works through dependent steps, and must end with a recommendation a human would approve. The expert will check and edit everything you write.
+const SYSTEM = `You draft a synthetic KYC onboarding task for an expert author on ADI Forge. The task trains and evaluates AI agents: an agent receives a synthetic customer file and tools, works through dependent steps, and must end with a recommendation a human would approve. The expert will check and edit everything you write.
 
 Rules:
 - Everything is invented. Never copy a real person, company, address, identifier, account, employer name or internal policy from the sources. Use fictitious names, "SYN-" identifiers (e.g. SYN-P1234567 for passports, SYN-104233 for companies), example.test emails and 07700 900xxx phones. Values listed in <forbidden_values> must never appear.

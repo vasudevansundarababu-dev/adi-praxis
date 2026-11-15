@@ -185,3 +185,38 @@ only: the job refuses `APP_ENV=production`. Decisions: `docs/DECISIONS.md`, "QA 
   `governing_state`, and the template's own criterion IDs and evaluators, which it reads from the workbench pre-check
   (`POST /me/tasks/:id/check`) as an author would. The `authoring` step reports `criteriaFrom: "pre-check"`. Each
   pre-check adds one embedding call to the cost (two on KYC v6).
+- **New-flow pass (MVP1, ADI Forge; 15 Nov 2026).** After the steps above, the same job runs the MVP1 flow when the
+  client's new flow is on (`QA_SMOKE_NEW_FLOW=auto`, the default; `on` makes a client with the flow off a FAIL; `off`
+  never runs it). It is reported under `forge` in the same JSON line and counts towards the exit code. Steps:
+  `forge-settings` (reads `GET /admin/forge-settings`; needs Offline candidate sign-in, never changes the settings),
+  `forge-project` (`SYNTHETIC QA smoke (new flow) — <UTC date time to the second>` on the same template, review route
+  `QA_SMOKE_FORGE_ROUTE`, default `SME_EXPERT_PM`; a template that makes more than one task, such as KYC v6's five
+  states, is probed with a one-task project, which is cancelled at once, and the real project is sized so one SME may
+  hold every task), `forge-policy` (the same synthetic policy, one hand-written rule citing it, reviewed and published;
+  no extraction), `forge-tasks` (one row per slot, made once; export closed), `forge-sourcing` (a synthetic SME
+  `smoke-forge-sme-<timestamp>@praxis.test` and, on the Reviewer route, a Reviewer `smoke-forge-rev-<timestamp>@praxis.test`,
+  first name `SYNTHETIC`, agency `SYNTHETIC QA smoke`), `forge-assign` (the SME on every task, the Reviewer on every
+  task), `forge-sign-in` (Offline sign-in, Before you start, Home lists every task as New; needs published Terms),
+  `forge-authoring` (a valid synthetic case per task, declaration, submit; no assistant call), `forge-review` (the
+  Reviewer passes each task; the PM approves each, checking before each approval that export is still closed with
+  "n of N now"; records and hash chain checked), `forge-export` (export is open and lists every task; it never
+  exports and never validates with RL Gym), `forge-cleanup` (signs the two candidates out; cancels the project unless
+  it completed). Paid calls: one embedding per submit (and per pre-check on forms without a worked example).
+  Optional env: `QA_SMOKE_NEW_FLOW`, `QA_SMOKE_FORGE_ROUTE`, `QA_SMOKE_FORGE_SME_EMAIL`,
+  `QA_SMOKE_FORGE_REVIEWER_EMAIL`.
+
+## 8. Fresh start: SME cleanup and matched SMEs (14 Nov 2026)
+
+The owner asked to remove all SMEs, projects (with their documents and policies) and every template except the two from Anvil, then start again in the new flow. Console users (Admin, PM, reviewers) and their passwords are kept. Anything that cannot be deleted is archived: projects cancelled, SMEs retired, templates retired. Decisions are in `docs/DECISIONS.md` ("QA fresh start"). Every step needs the owner's direct yes in the DevOps session. Run each one as a dry run first and show the owner its counts.
+
+| Step | Command (`praxis-migrate` image, `run.ts`) | What it does |
+|---|---|---|
+| 1 | `qa-project-cleanup`, then `qa-project-cleanup --apply` with `QA_PROJECT_CLEANUP_CONFIRM=delete-all-projects` | Deletes projects without protected history and cancels the rest. That includes the old Chicago project and its policy documents, which are immutable. |
+| 2 | `qa-sme-cleanup`, then `qa-sme-cleanup --apply` with `QA_SME_CLEANUP_CONFIRM=delete-all-smes` | Hard-deletes SMEs without protected history. Retires the rest: no sign-in, nothing open, out of matching, account closed and anonymised. |
+| 2b | `qa-template-cleanup --keep <kycTemplateId> --keep <marketingTemplateId>` (dry run lists every template, marked "from Anvil"), then `--apply` with `QA_TEMPLATE_CLEANUP_CONFIRM=delete-other-templates` | Keeps the two named Anvil templates and other versions of their lineage. Deletes every other unused template; retires (archives) the rest. |
+| 3 | Owner, in praxis-web | Create the new KYC and Marketing projects, upload the policy files, publish each project's opportunity. |
+| 4 | `qa-users --matched --project <kycProjectId> --project <marketingProjectId>` (try `--dry-run` first) | 8 KYC and 4 Marketing synthetic personas, each through the real journey into the matching project. Needs the same secrets as `praxis-qa-users`. |
+| 5 | Owner, staffing page | Re-run match, then Assign. |
+| 6 | `qa-users --accept` | The seeded personas accept their proposals. The owner can then sign in as one (mock Google, for example `kyc07@praxis.test`) and author. |
+
+Steps 1 and 2 print one JSON report line each (`report: "qa-project-cleanup"` / `"qa-sme-cleanup"`) with a tally. Re-running them changes nothing more.

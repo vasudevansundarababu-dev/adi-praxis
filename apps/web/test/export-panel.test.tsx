@@ -10,9 +10,9 @@ const base: ExportState = { canValidate: true, canExport: false, reason: 'Export
 describe('project export panel (owner, 12 Nov 2026)', () => {
   it('validate one task now; Export is disabled until the project is complete; says Anvil is not connected', () => {
     const m = html(<ExportPanel projectId={P} initial={base} />);
-    expect(text(m)).toContain('Anvil validation is not connected yet');
+    expect(text(m)).toContain('RL Gym validation is not connected yet');
     expect(text(m)).toContain('1 of 2 required tasks approved');
-    expect(m).toMatch(/<button[^>]*disabled=""[^>]*>Export<\/button>/);
+    expect(m).toMatch(/<button[^>]*disabled=""[^>]*>Export to RL Gym<\/button>/);
     expect(text(m)).toContain('Validate');
     expect(a11yProblems(m)).toEqual([]);
   });
@@ -24,6 +24,16 @@ describe('project export panel (owner, 12 Nov 2026)', () => {
     expect(text(m)).toContain('0 valid, 1 need fixing');
     expect(text(m)).toContain('Teen joint checking (NY) — needs fixing: Name the output field this rule or criterion checks');
     expect(m).toContain(`href="/api/v1/projects/${P}/exports/x/download"`);
+  });
+
+  it('new flow: shows how many tasks are approved while export is closed, and enables Export to RL Gym when all are', () => {
+    const closed = html(<ExportPanel projectId={P} initial={{ ...base, reason: 'Export opens when all 5 tasks are approved (1 of 5 now).' }} />);
+    expect(text(closed)).toContain('Export opens when all 5 tasks are approved (1 of 5 now).');
+    expect(closed).toMatch(/<button[^>]*disabled=""[^>]*>Export to RL Gym<\/button>/);
+    expect(closed).toMatch(/<button[^>]*>Validate<\/button>/);
+    const open = html(<ExportPanel projectId={P} initial={{ ...base, canExport: true, reason: null }} />);
+    expect(open).toMatch(/<button type="button" class="btn btn-primary[^"]*">Export to RL Gym<\/button>/);
+    expect(text(open)).not.toContain('Export opens');
   });
 
   it('with no approved task there is nothing to validate', () => {

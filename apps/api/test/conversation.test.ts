@@ -392,6 +392,33 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       expect((await get(admin, `/dataset/records/${record.id}/replay`)).statusCode).toBe(200);
       const executable=await get(admin, `/dataset/records/${record.id}/praxis-contract`); expect(executable.statusCode).toBe(409); expect(executable.json().error).toBe('NO_EXECUTABLE_CONTRACT');
     });
+    it('reads the proposal and its run in one snapshot, so a run finishing mid-read never hides Confirm', async () => {
+      const { a, id } = await kycTask();
+      await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-only/1', accepted: true });
+      const m = await post(a.cookie, `/me/tasks/${id}/conversation/messages`, { content: 'A fictional case: identifiers missing, applicability unresolved.', expectedRevision: (await task(a, id)).revision });
+      const runId = m.json().runId as string;
+      // Block reads of the run table, let the GET read the task first, then finish the run (proposal + SUCCEEDED) and
+      // commit while the GET waits on the run read.
+      let view!: { run: { status: string }; state: { pending?: { runId: string } } };
+      await db.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe('LOCK TABLE "TaskDraftRun" IN ACCESS EXCLUSIVE MODE');
+        const reading = get(a.cookie, `/me/tasks/${id}/conversation`).then((r) => { view = r.json(); });
+        await new Promise((r) => setTimeout(r, 500));
+        const t = await tx.taskInstance.findUniqueOrThrow({ where: { id } });
+        const drafting = (t.drafting ?? {}) as { conversation?: object };
+        const pending = { runId, revision: t.revision, policyDigest: 'none', proposal: { reply: 'r', question: 'q', changes: [], ruleLinks: [], unresolved: [] }, problems: [] };
+        await tx.taskInstance.update({ where: { id }, data: { drafting: { ...drafting, conversation: { ...(drafting.conversation ?? {}), pending } } } });
+        await tx.taskDraftRun.update({ where: { id: runId }, data: { status: 'SUCCEEDED', finishedAt: new Date() } });
+        void reading;
+      }, { timeout: 10_000 });
+      await expect.poll(() => view, { timeout: 10_000 }).toBeTruthy();
+      // Consistent either way: still running (the page keeps polling) or done with its proposal.
+      if (view.run.status === 'SUCCEEDED') expect(view.state.pending?.runId).toBe(runId);
+      else expect(view.state.pending).toBeUndefined();
+      const after = (await get(a.cookie, `/me/tasks/${id}/conversation`)).json();
+      expect(after.run.status).toBe('SUCCEEDED');
+      expect(after.state.pending.runId).toBe(runId);
+    });
     it('does not turn provider failure into a fake successful proposal', async () => {
       const { a, id } = await kycTask(); const r = await post(a.cookie, `/me/tasks/${id}/conversation/messages`, { content: 'A fictional missing evidence case', expectedRevision: 0 });
       await executeConversation(db, { model: 'test-unavailable', async propose() { throw new Error('down'); } }, r.json().runId);

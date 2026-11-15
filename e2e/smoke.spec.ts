@@ -11,7 +11,7 @@ test.describe('console smoke', () => {
   test('an Admin signs in and sees the console for their role', async ({ page }) => {
     await page.goto(`${WEB}/login`);
     await page.waitForLoadState('networkidle'); // let the form hydrate before submitting it
-    await expect(page).toHaveTitle(/ADI Praxis/);
+    await expect(page).toHaveTitle(/ADI Forge/);
     await page.getByLabel('Email').fill(ADMIN.email);
     await page.getByLabel('Password').fill(ADMIN.password);
     await page.getByRole('button', { name: /sign in/i }).click();
@@ -91,7 +91,7 @@ test('a prepared synthetic project exposes its unapproved draft download in the 
   await call('POST', `/projects/${project.id}/submit`);
   await page.goto(`${WEB}/projects/${project.id}`);
   await page.getByRole('link', { name: 'Tasks and invites' }).click();
-  const download = page.getByRole('link', { name: 'Download synthetic draft for Anvil qualification' });
+  const download = page.getByRole('link', { name: 'Download synthetic draft for RL Gym qualification' });
   await expect(download).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Tasks (0)', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Create synthetic draft', exact: true }).click();
@@ -107,7 +107,7 @@ test.describe('candidate smoke', () => {
   test('the sign-in page offers Google sign-in and never the local mock in a deployed environment', async ({ page }) => {
     test.skip(!EXTERNAL, 'deployed environments only');
     await page.goto(`${CANDIDATE}/sign-in`);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to ADI Praxis');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to ADI Forge');
     await expect(page.getByText('Dev sign-in (mock Google)')).toHaveCount(0);
   });
 

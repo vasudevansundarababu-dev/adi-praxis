@@ -84,6 +84,34 @@ export async function decideTask(tx: Tx, actor: InternalActor, taskId: string, b
   if (t.project.reviewRoute === 'SME_EXPERT_PM') throw new AppError(409, 'STAGE_DECISION_REQUIRED', 'This project uses Expert review then PM approval; record a stage decision instead.');
   if (t.status !== 'SUBMITTED') throw new AppError(409, 'NOT_AWAITING_REVIEW', `This task is ${t.status.toLowerCase()}, not awaiting review.`);
   if (t.revision !== body.expectedRevision) throw new AppError(409, 'STALE_REVISION', 'The task changed; reload before deciding.');
+  return decideOneStep(tx, t, { id: actor.userId, kind: 'USER' }, body, { version: t.submissions.at(-1)?.version ?? 1 }, audit, emit);
+}
+
+/** Who records a decision: a console user, or (MVP1) an external Reviewer signed in to the candidate app. */
+export interface ReviewerIdentity {
+  id: string;
+  kind: 'USER' | 'SME';
+}
+
+export type OneStepDecision = Pick<TaskDecisionRequest, 'decision' | 'rejectReason' | 'duplicateDecision' | 'notes' | 'confirmedCoverage'> & {
+  checklist: Record<string, boolean>;
+  comments: { section?: string; text: string }[];
+};
+
+/**
+ * The SME -> PM decision once access, status and revision are checked: duplicate and coverage guards, the contract
+ * check on accept, the append-only TaskReview row, then accept, rework or reject. Shared by the Reviews screen and
+ * (MVP1) the project's Tasks tab.
+ */
+export async function decideOneStep(
+  tx: Tx,
+  t: ReviewedTask,
+  reviewer: ReviewerIdentity,
+  body: OneStepDecision,
+  opts: { version: number; contentHash?: string; auditExtra?: Record<string, unknown> },
+  audit: Audit,
+  emit: (e: OutboxInput) => Promise<void>,
+) {
   const checks = t.checks as StoredChecks | null;
   const flaggedDuplicate = (checks?.similar ?? []).some((m) => m.flagged);
   // A flagged near-duplicate needs an explicit duplicate decision that matches the outcome.
@@ -95,7 +123,8 @@ export async function decideTask(tx: Tx, actor: InternalActor, taskId: string, b
     const issues = praxisContractChecks((t.output ?? {}) as Record<string, unknown>, t.project.template.workflowName === EXECUTABLE_WORKFLOW).filter((c) => !c.ok);
     if (issues.length) throw new AppError(422, 'CONTRACT_INVALID', 'Executable contract needs attention before acceptance.', { checks: issues });
   }
-  const version = t.submissions.at(-1)?.version ?? 1;
+  const version = opts.version;
+  const extra = opts.auditExtra ?? {};
   const now = new Date();
   const isOpen = t.slot?.isOpen ?? false;
   if (body.decision === 'ACCEPT' && isOpen && hasQuotas(t.project.template) && !body.confirmedCoverage) throw new AppError(400, 'CONFIRM_TAGS', 'Open slot: confirm (or correct) the author’s coverage tags and edge case before accepting.');
@@ -106,29 +135,30 @@ export async function decideTask(tx: Tx, actor: InternalActor, taskId: string, b
       clientId: t.clientId,
       taskInstanceId: t.id,
       submissionVersion: version,
-      reviewerId: actor.userId,
+      reviewerId: reviewer.id,
       decision: body.decision,
       rejectReason: body.rejectReason ?? null,
       duplicateDecision: flaggedDuplicate ? (body.duplicateDecision ?? null) : null,
       checklist: body.checklist,
       comments: body.comments as Prisma.InputJsonValue,
       notes: body.notes ?? null,
+      ...(opts.contentHash ? { contentHash: opts.contentHash } : {}),
     },
   });
-  const common = { reviewerId: actor.userId, reviewNotes: body.notes ?? null, revision: { increment: 1 } };
+  const common = { ...(reviewer.kind === 'USER' ? { reviewerId: reviewer.id } : {}), reviewNotes: body.notes ?? null, revision: { increment: 1 } };
 
   if (body.decision === 'ACCEPT') {
-    const record = await acceptTask(tx, t, { reviewerId: actor.userId, notes: body.notes ?? null, coverage, duplicateDecision: flaggedDuplicate ? 'ACCEPT_AS_DISTINCT' : null, now, extraUpdate: common, auditAfter: { version } }, audit, emit);
+    const record = await acceptTask(tx, t, { reviewerId: reviewer.id, notes: body.notes ?? null, coverage, duplicateDecision: flaggedDuplicate ? 'ACCEPT_AS_DISTINCT' : null, now, extraUpdate: common, auditAfter: { version, ...extra } }, audit, emit);
     return { status: 'ACCEPTED', recordId: record.id };
   }
 
   if (body.decision === 'REWORK') {
     await tx.taskInstance.update({ where: { id: t.id }, data: { ...common, status: 'REWORK', reworkCount: { increment: 1 } } });
-    await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.rework_requested', before: { status: 'SUBMITTED' }, after: { status: 'REWORK', comments: body.comments.length, version } });
+    await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.rework_requested', before: { status: 'SUBMITTED' }, after: { status: 'REWORK', comments: body.comments.length, version, ...extra } });
     return { status: 'REWORK' };
   }
 
-  await rejectTask(tx, t, { reason: body.rejectReason!, now, extraUpdate: common, auditAfter: { version } }, audit);
+  await rejectTask(tx, t, { reason: body.rejectReason!, now, extraUpdate: common, auditAfter: { version, ...extra } }, audit);
   return { status: 'REJECTED' };
 }
 

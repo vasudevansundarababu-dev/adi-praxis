@@ -1,20 +1,24 @@
 import type { DemographicAttributeDto, JobDescriptionDto, ProjectDto, TemplateDto } from '@praxis/shared';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { ForgeProjectPage } from '@/components/forge/project-page';
 import type { ExportState } from '@/components/projects/export-panel';
 import { ProjectSummary } from '@/components/projects/summary';
 import { ProjectWizard } from '@/components/projects/wizard';
-import { apiGet, getCurrentUser } from '@/lib/api';
+import { apiGet, getCurrentUser, newFlowOn } from '@/lib/api';
+import { projectTab } from '@/lib/forge-console';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { data } = await apiGet<ProjectDto>(`/projects/${(await params).id}`);
   return { title: data?.name ?? 'Project' };
 }
 
-export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string | string[] }> }) {
   const { id } = await params;
   const { data: project } = await apiGet<ProjectDto>(`/projects/${id}`);
   if (!project) notFound();
+  // MVP1 (owner, 15 Nov): with the new flow on, a submitted project opens on the four-tab page.
+  if (project.status !== 'DRAFT' && (await newFlowOn())) return <ForgeProjectPage project={project} tab={projectTab((await searchParams).tab)} />;
 
   const [t, a, j, own] = await Promise.all([
     apiGet<{ items: TemplateDto[] }>('/templates?view=offerable'),

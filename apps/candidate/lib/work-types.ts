@@ -40,6 +40,8 @@ export interface TaskView extends TaskSummary {
   effectiveAuthoringExperience?: 'CLASSIC'|'CHATBOT'|'BOTH';
   /** Authoring v2.1: fixed by the template, read-only here. */
   agentMode?: 'SINGLE' | 'MULTI';
+  /** MVP1 step 7: the template's tutorial video, or null. */
+  tutorial?: import('@praxis/shared').Tutorial | null;
   reviewRoute?: 'SME_PM' | 'SME_EXPERT_PM';
   phase?: import('@praxis/shared').TaskPhaseView;
   startingGraph?: import('@praxis/shared').WorkflowGraphInput | null;

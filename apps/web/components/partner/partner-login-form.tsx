@@ -31,7 +31,7 @@ export function PartnerLoginForm() {
       }
       const body = (await res.json().catch(() => null)) as { message?: string } | null;
       if (res.status === 429) setError('Too many attempts. Wait a minute and try again.');
-      else if (res.status === 404) setError('The partner portal is not switched on here. Contact your ADI Praxis partner manager.');
+      else if (res.status === 404) setError('The partner portal is not switched on here. Contact your ADI Forge partner manager.');
       else if (res.status === 400) setError('Enter a valid email address and your password.');
       else setError(body?.message ?? 'Sign-in failed. Try again.');
     } catch {

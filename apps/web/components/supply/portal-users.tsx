@@ -116,7 +116,7 @@ export function PortalUsers({ partnerId, users }: { partnerId: string; users: Pa
         <button type="submit" disabled={a.pending || !name || !email} className="btn btn-primary">
           Add user
         </button>
-        <p className="text-xs text-fg-muted sm:col-span-3">Praxis creates a temporary password and shows it once; the person chooses their own when they first sign in.</p>
+        <p className="text-xs text-fg-muted sm:col-span-3">ADI Forge creates a temporary password and shows it once; the person chooses their own when they first sign in.</p>
       </form>
       <ActionMessages error={a.error} problems={a.problems} notice={a.notice} />
     </div>

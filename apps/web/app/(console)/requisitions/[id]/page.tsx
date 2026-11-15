@@ -61,7 +61,7 @@ export default async function RequisitionPage({ params }: { params: Promise<{ id
           ['Partners allowed', r.allowedPartnerIds.length ? r.allowedPartnerIds.map((pid) => partnerName.get(pid) ?? 'Partner').join(', ') : 'None'],
           ['Careers page', r.directChannel ? 'Accepting direct applications' : 'Off'],
           ['Deadline', `${fmtDateTime(r.submissionDeadline)}${r.maxPerPartner ? ` · at most ${r.maxPerPartner} per partner` : ''}`],
-          ['Pay route', r.payRoute === 'DIRECT' ? 'Direct: Praxis pays each SME' : 'Via partner: the partner pays its people'],
+          ['Pay route', r.payRoute === 'DIRECT' ? 'Direct: ADI Forge pays each SME' : 'Via partner: the partner pays its people'],
           ['Guidelines', pkg ? `${pkg.name}${r.guidelinesVersion ? ` · version ${r.guidelinesVersion}` : ' · latest published version'}` : r.guidelinesPackageId ? 'Linked' : 'Not linked yet'],
           ['Rate card', card ? `${card.name} v${card.version} (${card.currency})` : r.rateCardId ? 'Linked' : r.payRoute === 'DIRECT' ? 'Not linked yet: SMEs earn nothing until one is linked' : 'Not needed (paid via partner)'],
           ['Submissions', counts.length ? counts.map(([s, n]) => `${humanize(s)}: ${n}`).join(' · ') : 'None yet'],
@@ -76,7 +76,7 @@ export default async function RequisitionPage({ params }: { params: Promise<{ id
           ) : (
             <section className="card p-4 text-sm">
               <h2 className="font-semibold">Rate card</h2>
-              <p className="mt-2 text-fg-muted">Not needed: this requisition is paid via the partner, so Praxis records no earnings for it.</p>
+              <p className="mt-2 text-fg-muted">Not needed: this requisition is paid via the partner, so ADI Forge records no earnings for it.</p>
             </section>
           )}
         </div>

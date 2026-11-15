@@ -159,6 +159,9 @@ export const metaCompilerRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config 
             profileId: null,
             anvilSpec: Prisma.DbNull,
             caseSelector: Prisma.DbNull,
+            // So is the tutorial video (MVP1 step 7): the new workflow starts without one.
+            tutorialVideoUrl: null,
+            tutorialChapters: Prisma.DbNull,
             workflowName: label,
             lineageId,
             version: 1,

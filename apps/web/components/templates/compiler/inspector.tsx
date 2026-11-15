@@ -95,8 +95,8 @@ export function Inspector({ artifacts, counters, initialTab = 'uispec' }: { arti
 export function AnvilDefinedSummary({ anvil }: { anvil: AnvilDefinitionDto }) {
   return (
     <div data-testid="anvil-defined">
-      <p className="text-sm font-semibold">Defined by Anvil</p>
-      <p className="mt-1 text-xs text-fg-muted">Execution, tools, rubric and environment come from Anvil. The blueprint stages are not checked for this template.</p>
+      <p className="text-sm font-semibold">Defined by RL Gym</p>
+      <p className="mt-1 text-xs text-fg-muted">Execution, tools, rubric and environment come from RL Gym. The blueprint stages are not checked for this template.</p>
       <dl className="mt-2 space-y-1 text-xs">
         <div>
           <dt className="text-fg-muted">Execution schema</dt>

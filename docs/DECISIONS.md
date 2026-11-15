@@ -1109,3 +1109,410 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
 - **(chosen by Claude)** Extraction progress: the page polls `GET /policy/extraction` every 3 s while any job is not terminal. It stops when all jobs are terminal and then reloads the rules. It gives up after 35 minutes, since the worker's deadline is 30.
 - **(chosen by Claude)** **Apply all suggested** is a button the PM clicks after reading the suggestions. It ticks each suggested rule as that PM, one audited command per rule, and skips any rule whose evidence needs a confirmation. The AI itself still ticks nothing.
 - **(owner, via the DevOps session)** A ticked rule that is still incomplete (type unknown, no scope, no effective scope) is applied with a warning but **blocks publication** until it is defined, because Anvil cannot accept it. Unverified quotes warn and need confirmation but do not block. This replaces PRD AC06's separate review step: the tick is the review.
+
+## MVP1 design approved (15 Nov 2026)
+
+- **(owner)** "Ok approved." This covers the MVP1 design in `docs/design/PROJECT-SCREEN-DESIGN.md` and the review page
+  (claude.ai artifact "Praxis MVP1 Design", version 7).
+- Development follows the no-breakages rule and the build order, starting with step 1: the PM or Admin assigns a
+  person to a specific task.
+- Before development, the owner tells Anvil (Keystone) to pause integration testing. The message is in the shared
+  outputs folder.
+
+## MVP1 build: one PR, built in one run (15 Nov 2026)
+
+- **(owner)** "One PR for everything." Steps 1 to 9 of the MVP1 build order are built on `feat/mvp1-forge` in one continuous run, committed step by step with tests, and opened as one PR.
+- Push, merge and deploy each still need the owner's yes. QA runs need the owner's yes in the DevOps session.
+## QA fresh start: SME cleanup and matched SME seed (14 Nov 2026)
+
+- **(owner)** "Delete all SME ... First Delete All the users and Purge all the data. Second get 10-15 Profiles which matches the requirement. Then I should be able to directly assign to the Project. and Start authoring the task." Later in the same message: "Also Remove already uploaded documents and Policies. I will start fresh."
+- **(owner)** The candidate UI and journey will be rewritten from a spec the owner will give later. Nothing in the candidate app changes here.
+- **(chosen by Claude)** "All the users" means SMEs. Console users (Admin, PM, the 10 seeded Reviewers), templates and the audit log are kept.
+- **(non-negotiable)** Append-only and immutable rows are never deleted or changed, and triggers are never disabled. An SME with such history is **retired**, not deleted:
+  - history that triggers retirement: selection decisions, approved task records, SME-authored tasks, earnings, standings, policy proposals, payouts, certifications, or tasks issued to them;
+  - retirement deletes their sign-in identities and sessions, so they cannot sign in and the same email later starts a brand-new account;
+  - it deletes their matches, withdraws open applications, cancels proposed or accepted work with no task issued, marks the candidate deleted, and closes and anonymises the account.
+  - Matching already skips deleted and closed candidates. Every other SME is hard-deleted with all their rows. Job: `qa-sme-cleanup`.
+- **(non-negotiable)** Policy documents, their versions, rules, citations and published rule sets are immutable. "Remove documents and policies" is done by cancelling the projects that hold them with the existing `qa-project-cleanup` job; the owner then creates new projects and uploads policies there.
+- **(chosen by Claude)** 12 matched synthetic personas (`apps/api/src/jobs/qa-personas.ts`):
+  - 8 KYC personas spread over CA, NY, TX, FL and IL;
+  - 4 Marketing personas.
+- **(chosen by Claude)** The personas are seeded with `qa-users --matched --project <id>`:
+  - only into the projects named, each persona matched to the project's template by track;
+  - through the real journey, so a named seeded Reviewer still makes every selection;
+  - a template that is neither KYC nor Marketing is refused.
+- **(chosen by Claude)** "Directly assign" keeps the PM's Assign click as the decision. `qa-users --accept` then makes the seeded personas accept their proposals through the candidate endpoint, so the PM can sign in as one and author straight away. It never signs up a persona that was not seeded.
+- **Run order in QA** (each step needs the owner's direct yes in the DevOps session; dry runs first):
+  1. `qa-project-cleanup`, then `--apply`;
+  2. `qa-sme-cleanup`, then `--apply` with `QA_SME_CLEANUP_CONFIRM=delete-all-smes`;
+  3. the owner creates the new KYC and Marketing projects, uploads policies and publishes each opportunity;
+  4. `qa-users --matched --project <kyc> --project <marketing>`;
+  5. the owner assigns on the staffing page;
+  6. `qa-users --accept`.
+
+## QA reset before the new flow (15 Nov 2026)
+
+- **(owner)** "Delete all the users. We will create it in new flow. Delete all the projects. Only two templates from Anvil. Rest of the templates you can delete it. In Admin keep all the users and password." Also: "If we cannot delete it please archive it."
+- **(chosen by Claude)** "Users" means candidate-app people (SMEs and Reviewers). Console users are kept.
+- **(non-negotiable)** Rows with locked history are archived, not deleted:
+  - projects are cancelled;
+  - SMEs are retired (closed, anonymised);
+  - templates are retired.
+- **(chosen by Claude)** The two templates are named by id (`--keep`). Other versions of the same lineage are left untouched, so published history (KYC v4, v5) stays immutable.
+- **Job:** `qa-template-cleanup`.
+- **Run order:** projects, then SMEs, then templates. A dry run comes first each time, and each run needs the owner's yes in the DevOps session.
+- **(owner, 15 Nov 2026) Standing approvals for the MVP1 build:**
+  - push `feat/mvp1-forge` and open the single MVP1 PR;
+  - merge it into main once every CI check passes;
+  - fold in `feat/qa-sme-reset` (QA reset jobs) and `fix/policy-suggest-timeout`;
+  - message the DevOps session to prepare the QA deploy;
+  - "gcp deployment".
+  - The DevOps session's own rule still asks for the owner's yes in that session for each deploy and QA data run.
+
+## MVP1 step 1: direct assignment (15 Nov 2026)
+
+- **Settings** live in `Client.settings.forge` (`newFlow` default off, `candidateSignIn` default `OFFLINE`), read by
+  Admins and PMs at `GET /admin/forge-settings`, changed by Admins only (`PUT`, audited `forge.settings_updated`).
+- **(chosen by Claude)** Offline sign-in is refused when `APP_ENV=production` (and for a production build that claims
+  `APP_ENV=local`), as the design says. Staging and demo (QA) allow it.
+- **(chosen by Claude)** Sourcing works whatever the switch says (it is additive). Direct assignment and change of
+  author need the new flow (`409 NEW_FLOW_OFF`).
+- **(chosen by Claude)** "New or active projects" for Sourcing: Ready for staffing, Staffing, Staffed, In progress and
+  Paused. Draft, Completed and Cancelled are refused (`PROJECT_NOT_OPEN`).
+- **(chosen by Claude)** A person is never both SME and Reviewer on one project: the same email assigned in the other
+  role is refused (`BOTH_ROLES`) and hidden from the Assign screen.
+- **(chosen by Claude)** Task rows (one per coverage slot, CREATED) are made on submit with the new flow on, and lazily
+  (audited `project.task_rows_created`) by the project's People and Assign reads and the assign route. The task's
+  `input.slot` is built by the same function as `allocateTasks`.
+- **(chosen by Claude)** Account for a directly assigned person: an SmeUser already signed in with `mock-<email>`, or
+  with that contact email, is reused; otherwise one is created with no sign-in identity (claimed at first sign-in in a
+  later step). The SME gets a minimal Candidate (`poolStatus ASSIGNED_DIRECT`) and a ProjectAssignment with no
+  proposal; a Reviewer gets no Candidate.
+- **(chosen by Claude)** No per-expert cap is applied when the project's `maxPerExpert` is empty. SME places count the
+  SMEs currently assigned against `requiredWorkers`; a person who already holds a place can take more tasks.
+- **(chosen by Claude)** The first direct author assignment moves a Ready for staffing, Staffing or Staffed project to
+  In progress (audited `project.started`, `direct: true`), so Pause and Resume work as today.
+- **(chosen by Claude)** Changing the author (only while Assigned and not started): when the old author holds no other
+  task on the project, their Sourcing entry and project place are released (audited).
+- **(chosen by Claude)** Candidate gate: the new-flow rules apply when the setting is on **and** the SME is assigned by a
+  PM or Admin on that project. Then identity, proposal-acceptance, selection and onboarding checks are skipped, pulling
+  returns `409 PM_ASSIGNS_TASKS`, `canPull` is false and the studio's first open never allocates. An SME from the
+  earlier journey keeps the earlier rules (and can still pull) while the setting is on, so the old journey keeps
+  working until the owner retires it.
+
+## MVP1 step 2: task review (15 Nov 2026)
+
+- **Routes.** `GET /projects/:id/forge-tasks` and `GET /projects/:id/forge-tasks/:taskId` (Tasks tab and task page) and
+  `POST /projects/:id/tasks/:taskId/decision` (decision box), for Admins and the owning PM. `GET /me/reviews`,
+  `GET /me/reviews/:taskId` and `POST /me/reviews/:taskId/decision` for the external Reviewer (candidate app). All need
+  the new flow (`409 NEW_FLOW_OFF`); the earlier `/review/...` routes are unchanged.
+- **(chosen by Claude)** One engine: the Reviews screen, the Tasks tab and the external Reviewer share the same
+  decision code (`decideOneStep` for Author → PM/Admin, `decideStageFor` for Author → Reviewer → PM/Admin), with the
+  decider given as a console user or an external Reviewer. Audits keep their action names and add `via: tasks_tab`
+  (Tasks tab) or `reviewer: external, smeUserId` (Reviewer).
+- **(chosen by Claude)** Checklist: the review checklist keys are generic (realistic, correct, covers the slot, fair
+  difficulty, distinct, rubric catches failures), so approving on the Author → PM/Admin route needs all of them true
+  (`400 CHECKLIST_INCOMPLETE`), as the Reviews screen does. PM approval on the Reviewer route needs no checklist (as
+  today's stage decision), and the external Reviewer's checklist is optional and stored as sent (the design shows only
+  per-section comments).
+- **(chosen by Claude)** The person who wrote a task (email match) or declared a conflict with its author never decides
+  on it from the Tasks tab, Admins included (as the Reviewer route already does). Their row shows "Waiting for PM".
+- **(chosen by Claude)** The Tasks-tab decision is bound to the submitted version and its content hash on both routes
+  (`expectedVersion`, `expectedRevision`; stale → `409 STALE_STAGE_DECISION` / `STALE_REVISION`); SME → PM decisions made
+  here also store the content hash.
+- **(chosen by Claude)** The external Reviewer's request also takes `duplicateDecision` and `confirmedCoverage`
+  (optional): needed only for a task flagged as a likely duplicate or on an open coverage slot, as the Expert stage
+  requires today. Without them such a task could not be passed.
+- **(chosen by Claude)** TaskReview has no reviewer kind column: an external Reviewer's decisions carry their SmeUser id
+  in `reviewerId`; names are looked up in users, then candidate accounts. The task's console `reviewerId` is set only by
+  console users.
+- **(chosen by Claude)** Reviewer Home statuses come from the Reviewer's own latest decision: To review (submitted and
+  waiting for them), Sent back (they returned it), Approved (they passed it, whatever happened next). Tasks not yet
+  submitted and never decided by them are not listed. The Review page shows the latest submitted version, its checks
+  and flags (as a Validator sees them), never other authors' content (no similar-task texts).
+- **(chosen by Claude)** Task page output: none while Open, the draft read-only while Assigned or In progress, else the
+  latest submitted version. "Date" is the latest of created, assigned, started, submitted and decision times.
+
+## MVP1 step 3: candidate app (15 Nov 2026)
+
+- **Routes.** `GET /public/forge-settings` (public: `newFlow`, `candidateSignIn`, for the client sign-in uses),
+  `GET`/`POST /me/forge/terms` (Before you start) and `GET /me/forge/home` (Home). Terms routes need the new flow
+  (`409 NEW_FLOW_OFF`); Home answers `newFlow: false` with empty lists when it is off.
+- **(chosen by Claude)** Account claim. The design makes the email a PM or Admin uploaded in Sourcing the candidate's
+  sign-in, so with the new flow on, a first sign-in whose Google email is verified and matches a sourced SME or
+  Reviewer in the client links the new sign-in identity to the account made for that person (pre-created in step 1,
+  no sign-in identity yet), setting the 18+ time if missing. If no account was made yet, a new one is created and
+  every sourced row with that email points at it. An account that already has a sign-in identity is never taken over
+  (a second Google account with the same email gets a new, empty account), nor is one when the person's rows point
+  at more than one account. Unverified emails never claim. With the new flow off, sign-in never merges by email, as
+  before. Audited `candidate.account_claimed` with ids only.
+- **(chosen by Claude)** Terms. Acceptance is recorded as Consent rows: `terms:<key>` with the document's sha256 as
+  the version (one per current terms document) and `synthetic_data_only` version `1`. Accepting needs the hashes of
+  the current versions (`409 TERMS_CHANGED`), is refused for placeholder terms where onboarding refuses them (live
+  identity required, or a production build other than demo: `409 TERMS_PLACEHOLDER`) and is idempotent (no second
+  set of rows; each call is audited `candidate.terms_accepted`, the repeat with `alreadyAccepted: true`). A newer
+  published version must be accepted again.
+- **(chosen by Claude)** Directly assigned work (step 1's gate) also needs accepted terms: the gate answers step
+  `terms` (`href: /welcome`). The external Reviewer's task page and decision answer `409 TERMS_REQUIRED` until
+  accepted; the Reviewer list on Home is not gated.
+- **(chosen by Claude)** Home: author tasks are the tasks assigned to the person in projects where they are a directly
+  assigned SME (status as `smeTaskStatus`; `reworkComments` counts the latest send-back's comments while in Rework).
+  Review tasks are step 2's Reviewer list. Sorted on screen rework first; the next step is rework, then To review,
+  then In progress, then New. No tasks at all shows "No tasks for this account yet" with the signed-in email.
+- **(chosen by Claude)** Candidate app with the new flow on: the header shows only Home and Sign out (signed out:
+  Sign in); sign-in skips the identity step and goes to Before you start until the terms are accepted, then Home; the
+  task page returns to Home. A failing settings or session read is treated as the earlier journey and signed out, so
+  pages never fail on it. The Online sign-in screen is a later step.
+- **(chosen by Claude)** Review comments: the Review page has one comment box per design group of the form's eight
+  sections (S1, S2, S3-S4, S5, S6-S8, hyphen as stored). The task page places a comment under every section its key
+  covers (a range covers each section in it; an en dash is accepted), highlights those sections, opens on the first
+  one, and lists comments naming no section of the form (for example W04 from the console) at the top. The KYC v1
+  workbench is unchanged.
+- **(chosen by Claude)** The Reviewer's Approve on a task flagged as a likely duplicate needs a tick that it is
+  distinct (sent as `ACCEPT_AS_DISTINCT`; send-back sends `REWORK`), and on an open coverage slot a tick confirming
+  the task's own coverage tags and edge case, because step 2's API requires them.
+## MVP1 step 4: export (15 Nov 2026)
+
+- **(chosen by Claude)** With `newFlow` on for the project's client, a project's tasks are its coverage slots. A slot
+  counts as approved when it has a current (not superseded) ApprovedTaskRecord or an ACCEPTED task; a REJECTED task
+  does not count. Export opens only when every slot is approved and there is at least one slot; "marked complete", the
+  end date and the distinct target no longer open it. Validate still needs one approved task, at any time. Reason text:
+  "Export opens when all 5 tasks are approved (1 of 5 now)." ("the task is" for one). With `newFlow` off nothing
+  changes. The rule is the pure `exportEligibility` with an optional `allTasks: {totalTasks, approvedTasks}` input.
+- **(chosen by Claude)** KYC v7 export: a task whose template has a case selector other than `governing_state` gets
+  `case_selector: {field, value}` in its manifest entry. The value is the slot's case value (`input.slot.case.value`),
+  or the authored value at `caseSelector.source` when the slot has none. A differing authored value is a package
+  problem (`GENERIC_CASE_SELECTOR_MISMATCH`), and no value at all is `GENERIC_CASE_SELECTOR_MISSING`; the task is not
+  sent. `coverage: {example_governing_state}` is added when `S1.exampleGoverningState` is a non-empty string, and left
+  out otherwise. The new keys change v7 package hashes only.
+- **(chosen by Claude)** v6 (state-selector) packages stay byte-identical, behind
+  `CASE_SELECTOR_IN_STATE_PACKAGES = false` in `apps/api/src/anvil/generic-package.ts`, until Anvil confirms whether
+  v6 should carry `{field: 'governing_state'}` too. A test pins a v6 fixture's package and ZIP hashes to the values the
+  code produced before this change. The schema, file names, API paths and identifiers are unchanged.
+- **(chosen by Claude)** Export panel: the button is "Export to RL Gym" and validation is "Validate"; the panel shows
+  the API's reason while export is closed. The contract §6 text on the Praxis side ("marked complete, or end date")
+  describes the old flow only; it was not edited in this step.
+## MVP1 step 7: Tutorial and Help (15 Nov 2026)
+
+- **(chosen by Claude)** Tutorial. New nullable `Template.tutorialVideoUrl` and `tutorialChapters` (`[{title, at}]`,
+  seconds), migration `20261130000000_template_tutorial` (additive). `PUT /templates/:id/tutorial` (Admin) takes an
+  https address of at most 500 characters, or `null` to clear, and up to 20 chapters (title 1-100 characters, `at` 0 or
+  more), stored sorted by time; clearing also clears the chapters. It is display metadata, so it creates no template
+  version and is set on every version of the workflow (projects keep the version they use, and each sees the same
+  video); a new version copies it, a variant (a new workflow) starts without one. Audited `template.tutorial_set` once,
+  on the version named, with before/after and the number of versions changed. Template DTOs carry `tutorial`;
+  `GET /me/tasks/:id` and `GET /me/reviews/:taskId` carry `tutorial: {videoUrl, chapters} | null`.
+- **(chosen by Claude)** Console: the template page has a "Tutorial video" card (address, chapter rows with title and
+  mm:ss, Save) for Admins and the current value read-only for PMs. Candidate app: "Tutorial" opens a card with an
+  HTML5 video when the address ends in .mp4, .webm or .mov (query and fragment ignored), chapters seek it; any other
+  address is a link "Open the tutorial video" (new tab, noopener). The reviewer page also has the Tutorial button, as
+  this step's brief asks (the design calls Tutorial "for authors").
+- **(chosen by Claude)** Help. `POST /me/tasks/:id/help` (the author's own task, the same access as `GET
+  /me/tasks/:id`) and `POST /me/reviews/:taskId/help` (the assigned Reviewer, the same access as `GET
+  /me/reviews/:taskId`: new flow on, terms accepted, not their own task) take `{question 1-1000, history ≤ 10}` and
+  answer `{answer, scoped: true}`. Help works for any task the caller may open: the author's route with the new flow on
+  or off, the Reviewer's only with it on (as the review page). Same Support Bot model and mock as `/me/support/ask`, the
+  same per-session limit (20 a minute); the Support Bot has no daily cap, so none is added. Questions are not stored.
+- **(chosen by Claude)** The scoped prompt is the SME Support Bot prompt plus task rules: answer only about this task,
+  its template's sections and the project's published rules (and how to submit, or for the Reviewer how to send back or
+  approve); explain and give a generic example, never write the author's content; for the Reviewer, explain what to
+  check and never decide; anything else gets exactly "I can only help with this task and its form. Ask me about a
+  section, the rules for this case, or how to submit." Context, as data in the `<record source="this task">` and
+  `<template>` tags: the template name and its generated guide, the slot brief, status and coverage tags, each
+  section's title and whether it is filled (never the author's answers), the published agent-visible rules in force
+  (ids and titles only; the task's snapshot first), and the review comments the person already sees (the author: the
+  latest author-facing decision; the Reviewer: their own decisions). No off-topic pre-filter. The local mock answers
+  from the help pack, the template guide and the context, and gives the refusal sentence when nothing matches.
+- **(chosen by Claude)** On the task page and the review page, Tutorial and Help buttons sit above the page; Help opens
+  a right-hand drawer with the scope note, four suggested questions (author or reviewer set), the conversation and an
+  Ask box. The general floating Support Bot is removed from the task page (the review page never had it) and stays on
+  Home.
+
+## MVP1 step 5: Sourcing and Export to Recruiter (15 Nov 2026)
+
+- **(chosen by Claude)** The recruiter pack is built from the project, never typed in: the role, pay and location from
+  the frozen JD snapshot (the live JD before submit); requirements from the JD (mandatory skills, experience,
+  education Required; added skills Preferred; a hand-picked JD with no mandatory skills keeps the job post's rule that
+  the first skill is Required) and from the demographic profile (the JD's, else the project's filters in plain words);
+  the questions from the author job post's question policy (owner-edited or the default, as candidates get them). The
+  combined requirements question is shown as "how does their experience meet the requirements in section 2?" so the
+  list is not repeated; "Tap all that apply" is dropped and the choices are listed. Evidence text per requirement is a
+  fixed phrase per kind ("Role history with dates", "Highest qualification", ...).
+- **(chosen by Claude)** The cheat sheet has the eight common sections (S1–S8) in plain words written for recruiters,
+  plus the template form's first five field labels and the first field example the form provides, per section.
+- **(chosen by Claude)** The pack is the author (SME) pack only. A Reviewer pack for Reviewer-route projects is not in
+  the design; it can be added with `?role=REVIEWER` later.
+- **(chosen by Claude)** Public names: every free-text value in the pack (project name, JD text, template examples) goes
+  through `publicText`, which shows the internal product name as "ADI Forge" and the RL platform as "RL Gym". The PDF
+  title, author, creator and producer are "ADI Forge".
+- **(chosen by Claude)** Files: the sheet is `candidate-assessment-<project-slug>.xlsx` (slug: the project name with
+  each run of other characters replaced by "-", case kept, as in the mockup); the PDF is
+  `recruiter-pack-<project-slug>.pdf`. The sheet has a "Candidates" sheet (header row only, frozen, Yes/No drop-downs on
+  every "Met?" column for 200 rows) and an "Instructions" sheet. Question headers are "Q1. <question>", cut to 180
+  characters so they stay valid assessment keys. The PDF uses the standard Helvetica fonts (no font files), so
+  characters outside WinAnsi are replaced; the sheet is embedded as a PDF file attachment.
+- **(chosen by Claude)** Import (`POST /sourcing/people/import`): fields `projectId` and `role` come before the file;
+  `dryRun` defaults to 0. Row 1 is the header; columns are matched by name (ignoring `*` and "(Gmail)"), so extra or
+  reordered columns are fine; a sheet without First name, Last name and Email columns is refused (422 BAD_SHEET), as is
+  one with no rows or over 1,000. Each row is checked with the same `SourcedPersonInput` schema and project rules as
+  Sourcing → New (shared `sourcingTarget` + `createSourcedPerson`). A row whose email is already on the project for
+  that role, or repeats an earlier row, is reported and skipped; other rows still import. Every other non-empty column
+  except Agency is kept as the person's assessment `{header: value}`; Agency fills `agency`. The sheet is stored once
+  and its key set on every person created from it. Each person gets the usual `sourcing.person_added` audit, plus one
+  `sourcing.people_imported` with counts and the file hash (no names or emails). A dry run writes nothing and is not
+  audited.
+- **(chosen by Claude)** Console: the Sourcing list loads every person the caller may see once and filters in the
+  browser (tab, or a search across both roles); the API's `q` search is unchanged. New uploads the profile, then the
+  profile PDF and the assessment, and returns to the right tab. "Export to Recruiter" is a button on the project
+  summary, shown for every project that is not a draft, cancelled or completed, until the four-tab project page lands.
+
+## MVP1 step 8: console screens (15 Nov 2026)
+
+- **(chosen by Claude)** The switch. Console pages read `newFlow` on the server from `GET /admin/forge-settings`; any
+  failure or 403 (Reviewers, Finance) counts as off, and the layout reads it only for Admins and PMs. With it off every
+  existing page renders as before (one extra settings read on the project page). No API change in this step.
+- **(chosen by Claude)** Project page. With the new flow on, a non-draft project opens on the header and four tabs,
+  chosen by `?tab=dashboard|people|tasks|policies` (plain links, default Dashboard). Drafts keep the wizard. The old
+  summary's Overview rows are now `projectDetailRows` (same output) and are reused on the Dashboard, with Review route,
+  Reviewers and Export to RL Gym inserted before Submitted. Tab counts: SMEs assigned / Required workers, tasks, rules
+  in the latest published rule set.
+- **(chosen by Claude)** Task labels. Task ID is `TSK-001`... by slot order (the API's list order), computed on screen,
+  not stored. Task name is the first sentence of the slot brief (for example "Governing state: California (CA)"),
+  since tasks have no other name before the author writes one. "Coverage by <selector>" reads the selector field and
+  value from the same brief (case-selector slots: "Application type: Joint (JOINT). ..."; dimension slots: the first
+  "label: value"), so v6 shows state and v7 application type without an API change. *(Step 9: the API now sends
+  each row's `selector`; the brief is read only when a row has none.)*
+- **(chosen by Claude)** Dashboard. Cards: Experts (assigned SMEs / Required workers), Tasks approved / total with the
+  number waiting, Rule set (latest published version and its rule count, from `GET /policy/rule-sets`), Rework rate and
+  active time (from `GET /dashboard`). Next step, first that applies: a task waiting for your decision (opens it), a task
+  waiting for its Reviewer, experts still needed (opens Assign), tasks with no author, all approved (export), tasks in
+  rework, else "Authors are working". Reviewers are the people assigned as Reviewer on the project, with an Assign link.
+- **(chosen by Claude)** Tasks tab. "Assign SME…" is offered only on Open tasks with no author and lists the SMEs already
+  assigned on the project (new people come in through the Assign screen); it calls `POST assignments/direct`. A status
+  filter is added, as in the mockup. Changing an author (the API exists) has no control yet. The export area is the
+  existing Export panel; its links for tasks that need fixing still open the earlier Task review page (route kept).
+  *(Step 9: Change author is on the task page, and in the new flow the fix links open the new task page.)*
+- **(chosen by Claude)** Assign screen at `/projects/[id]/assign`: one row per assignable person, a required Task select
+  ("To author (SME)"; on the Reviewer route a Reviewer sees "To review (Reviewer)" with only the tasks they may review),
+  Assign as SME (replaced by "SME places full" when full) and Assign as Reviewer (Reviewer route only). Matching skills
+  shows the skills found in the recruiter's assessment, or "Not assessed yet".
+- **(chosen by Claude)** Task page at `/projects/[id]/tasks/[taskId]/review` (the policy page keeps `.../policy`). The
+  form is rendered from the template profile, section by section, with arrays of records as tables and unknown shapes
+  as JSON; an Open task shows the sections with dashes. Comments are per section (S1 to S8 one by one; add more), and a
+  note also counts as the author comment, as the API rules. The checklist shows when the API says it is required; the
+  "distinct" confirmation only on Author → PM/Admin for a flagged task (the PM step of the Reviewer route does not need
+  it); the coverage confirmation with an editable edge case when the API asks for it. On the Reviewer route the trail's
+  Reviewer step offers "Assign reviewer…" (the project's Reviewers, never the author) while the task has an author, no
+  Reviewer and is not decided, because the Assign screen hides people already assigned. Validate finds the task's
+  approved record in `GET /export` and shows the latest result for it from the last runs.
+- **(chosen by Claude)** Admin → Candidate app sign-in at `/admin/candidate-sign-in`: the New flow switch (On/Off) and the
+  Offline/Online mode on one page. Admins save; PMs see it read-only. Offline is disabled with an explanation when the
+  API says `offlineAllowed: false`. Save sends only what changed, so a stored Offline mode never blocks switching the
+  flow where Offline is refused. ~~**Not implemented:** the design says changing the mode signs everyone out of the
+  candidate app; the API (`forge/settings.ts`, `PUT /admin/forge-settings`) only audits the change, so the page does not
+  claim it. Open for a later step.~~ **Implemented in step 9** (see "MVP1 step 9"): a mode change ends every candidate
+  session of the client and the page says so.
+- **(chosen by Claude)** Menus. With the new flow on: Home, Projects (Projects, Templates, Approved exports), Sourcing,
+  Admin (all existing pages plus Candidate app sign-in) and Tutorials; Reviews, Certification, Partners, Payments and
+  Requisitions are hidden from the menu only and their routes still open. Candidate app sign-in shows in Admin for
+  Admins with the flow on or off (it is where the flow is switched on), and for PMs only with it on.
+- **(chosen by Claude)** With the new flow off, the new Assign and task pages show a short note and a link back instead
+  of calling the new-flow APIs (which answer `409 NEW_FLOW_OFF`).
+
+## MVP1 step 6: candidate sign-in modes (15 Nov 2026)
+
+Owner's design: docs/design/PROJECT-SCREEN-DESIGN.md, "Admin: candidate app sign-in mode". Everything below applies
+only with `newFlow` on; with it off every sign-in behaves as before (the password routes answer 409 SIGN_IN_MODE, and
+Forgot password still answers 202 and sends nothing).
+
+- **(chosen by Claude)** Mode enforcement: Offline keeps `POST /auth/google` (the mock sign-in with email and name);
+  `POST /auth/password` and `/auth/password/set` answer 409 SIGN_IN_MODE. Online makes `/auth/google` answer 409
+  SIGN_IN_MODE ("Sign in with your email and password."). Production already refuses Offline in the settings; the dev
+  token route stays registered only with the mock verifier.
+- **(chosen by Claude)** Password sign-in finds the account through a SourcedPerson in this client with that email that
+  was assigned at least once and is linked to an account (a released person can still sign in). With several accounts
+  for one email, only the single one with a password counts. Every failure (unknown email, no password yet, wrong
+  password) is 401 INVALID_CREDENTIALS with one message, verifying against a dummy hash when there is no password.
+  An inactive account (403) and a missing 18+ confirmation on the first sign-in (400) are reported only after the
+  password matched. Audit `candidate.signed_in_password` holds ids and `firstSignIn` only.
+- **(chosen by Claude)** The set link is sent on every direct assignment path (assign as SME or Reviewer, and Change
+  author) when the mode is Online, the account has no password and no unused unexpired set link. The email goes to
+  the uploaded address inside the same command after the database work, as invites do, so a failed send undoes the
+  assignment. Subject "Your ADI Forge account"; the link is `${CANDIDATE_APP_URL}/set-password/<token>`, 72 hours.
+- **(chosen by Claude)** `POST /projects/:id/people/:sourcedPersonId/password-link` (Admin, or the PM who owns the
+  project): Online only (409 SIGN_IN_MODE otherwise), for a currently assigned person (409 NOT_ASSIGNED); it deletes
+  the person's unused set links (no schema change) and emails a new one, also when they already have a password.
+  Audit `candidate.password_link_sent` with ids, `replaced` and `expiresAt`.
+- **(chosen by Claude)** `POST /auth/password/set` checks the link before the password, so a weak password does not use
+  up the link. Rule: at least 12 characters and no email local part (of 3 characters or more) from any address the
+  account is known by (shared `candidatePasswordProblem`). Using a link marks every other unused link of that person
+  used and signs out all their candidate sessions; it does not sign in.
+- **(chosen by Claude)** Forgot password always answers 202 `{ok:true}`. A reset link (1 hour) is created and emailed
+  only in Online mode for an email that signs in to an account (same lookup as sign-in, so a sourced but never
+  assigned person gets nothing). A failed send is logged without the email and still answers 202. Audit
+  `candidate.password_reset_requested` (actor SYSTEM, ids only) only when a link was created.
+- **(chosen by Claude)** Candidate app: `/sign-in` picks the form with `signInVariant` (password, offline, classic). The
+  Offline form is the existing simulated one, labelled "Offline sign-in (test environment): no password". New pages
+  `/set-password/[token]` (no referrer sent) and `/forgot-password`.
+
+## MVP1 step 9: QA smoke and finishing (15 Nov 2026)
+
+- **(chosen by Claude)** QA smoke, new-flow pass. The job is parameterised by environment, so the pass is
+  `QA_SMOKE_NEW_FLOW=auto|on|off` (default `auto`: run only when `GET /admin/forge-settings` says the client's new flow
+  is on; a 403 or 404 there counts as not available). It runs after the earlier journey's steps, which are unchanged,
+  as its own steps (`forge-settings` ... `forge-cleanup`, reported under `forge` in the same JSON line, counted in `ok`
+  and the exit code). It never changes the client's settings, so it cannot switch the flow or the mode for others.
+- **(chosen by Claude)** It needs Offline candidate sign-in (QA): Online would need the set-password email, which the
+  job cannot read. Online is a FAIL of `forge-settings` with the reason, before anything is created.
+- **(chosen by Claude)** Its project is `SYNTHETIC QA smoke (new flow) — <UTC date time to the second>` (project names
+  are unique per client; seconds keep re-runs apart), on the same template as the earlier journey (or the same
+  choice: newest published version, or `QA_SMOKE_TEMPLATE_ID`), review route `QA_SMOKE_FORGE_ROUTE` (default
+  Author → Reviewer → PM/Admin, so the Reviewer path is covered; `SME_PM` covers the other). One SME authors every task:
+  the per-expert cap cannot exceed the target and the template API does not expose the case selector, so the job
+  first makes a one-task project; when the template makes more tasks than that (KYC v6: five states) it cancels it at
+  once and makes the real project sized to that count (named `... (5 tasks)`).
+- **(chosen by Claude)** Policy without extraction: the same synthetic policy is uploaded and the PM writes one rule
+  that quotes it (`POST /policy/rules`), reviews it and publishes the rule set, so tasks can cite a published rule and
+  the pass makes no extraction call. The earlier journey still covers live extraction.
+- **(chosen by Claude)** People: a synthetic SME and Reviewer per run (`smoke-forge-sme-<timestamp>@praxis.test`,
+  `smoke-forge-rev-<timestamp>@praxis.test`, first name SYNTHETIC, agency `SYNTHETIC QA smoke`), uploaded through
+  Sourcing → New and assigned to every task. They sign in with the mock Google (Offline) sign-in, accept the current
+  terms (missing terms: FAIL "must be published before anyone signs in"), and Home must list every task as New, then
+  In review after submit, Accepted after approval. Authoring uses the earlier journey's synthetic case builder and
+  pre-check binding, with no assistant call (one embedding per submit is counted).
+- **(chosen by Claude)** Decisions are people's: the Reviewer passes each task (checklist, duplicate and coverage
+  confirmations only when the API asks), the PM approves each. Before each approval the job checks export is still
+  closed with "n of N now", and after the last that it is open and lists every task. It never calls export or
+  validate, so it never reaches RL Gym. Cleanup signs the two candidates out (`POST /me/logout`) and cancels the
+  project unless it completed; append-only records stay, as in the earlier journey.
+- **Found while testing, not changed:** a second earlier-journey run in the same database submits the same golden case
+  again, so its review is refused with `DUPLICATE_DECISION_REQUIRED` (the earlier journey's review step sends no
+  duplicate decision). This is the earlier journey's behaviour and is left as it is; the new-flow pass sends the
+  duplicate decision when the API flags a task.
+- **(chosen by Claude)** Task selector. `ForgeTaskRow.selector` is `{field, value, label} | null`, from the task's slot:
+  a case-selector slot gives the form field's label and the option's label ("Governing state", "CA",
+  "California (CA)"), a dimension slot its first tag in dimension order with the dimension label, an edge-case slot
+  "Edge case", an open slot `{field: '', value: '', label: 'Open slot'}`, no slot null. The field is optional in the
+  type so a console reading an older API falls back to the brief parser.
+- **(chosen by Claude)** Sign-out on mode change. When `PUT /admin/forge-settings` changes `candidateSignIn`, every
+  open candidate-app session of the client is revoked in the same transaction (SMEs and Reviewers; other clients and
+  console sessions untouched), audited `candidate.sessions_ended` with `{reason: 'sign_in_mode_changed', count}` only.
+  The response adds `candidateSessionsEnded`. Switching only `newFlow`, or saving the same mode, signs nobody out; a
+  replay with the same Idempotency-Key does nothing more.
+- **(chosen by Claude)** Change author. The control is on the task page for Assigned, In progress and Rework tasks
+  with an author (as asked), but the design and the API allow a change only before the author starts, so it is
+  enabled only for Assigned and shown disabled with "The author can be changed only before they start the task." for
+  the other two (the API would answer `AUTHOR_STARTED`). It lists the project's other SMEs (never the author or a
+  Reviewer), asks to confirm, then calls `POST /projects/:id/tasks/:taskId/author`; errors show inline.
+- **(chosen by Claude)** With the new flow on, the export panel's "needs fixing" links open
+  `/projects/[id]/tasks/[taskId]/review` (the Tasks tab's panel is new flow only); the project summary's panel, used with
+  the flow off, keeps `/review/tasks/:id`. The recruiter page's back link goes to `/projects/[id]?tab=people` with the
+  flow on, else to the project.
+- **Runbook:** `docs/design/MVP1-RUNBOOK.md` (switching the flow, Offline and Online, Terms first, the PM/Admin order,
+  the QA smoke command).
+- **(chosen by Claude)** CI fixes for PR #73. `GET /me/tasks/:id/conversation` now reads the task and its latest run in
+  one REPEATABLE READ transaction. Read separately, a run that finished between the two reads came back as done without
+  its proposal, so the chatbot stopped polling and never showed Confirm changes (the intermittent conversation-browser
+  failure; the route is unchanged from main, so main had the same race). The template page's tutorial button is now
+  "Save tutorial": step 7 put a second "Save" on the page beside the Meta-Compiler's Save. The e2e smoke tests expect
+  the public names (ADI Forge, RL Gym).

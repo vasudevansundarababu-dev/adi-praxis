@@ -11,15 +11,15 @@ export default function TutorialsPage() {
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-8">
       <section className="hero p-6 sm:p-8">
-        <p className="muted text-sm">ADI Praxis for subject-matter experts</p>
+        <p className="muted text-sm">ADI Forge for subject-matter experts</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">Tutorials</h1>
         <p className="muted mt-2 max-w-xl">See the whole journey in one short video, then keep the expert guide open while you work.</p>
       </section>
       <article className="card overflow-hidden">
-        <video controls preload="metadata" src="/tutorials/07-expert-sme.mp4" aria-label="How experts work on ADI Praxis video" className="block aspect-[16/10] w-full bg-black" />
+        <video controls preload="metadata" src="/tutorials/07-expert-sme.mp4" aria-label="How experts work on ADI Forge video" className="block aspect-[16/10] w-full bg-black" />
         <div className="space-y-1 p-5">
           <p className="muted font-mono text-xs">8:33 · captions, no sound</p>
-          <h2 className="text-lg font-semibold">How experts work on ADI Praxis</h2>
+          <h2 className="text-lg font-semibold">How experts work on ADI Forge</h2>
           <p className="muted text-sm">
             Opening an invite, the identity check, the profile chat, onboarding, writing a KYC task with the AI interview, the course and certification test, and payment
             set-up.

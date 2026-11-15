@@ -11,7 +11,7 @@ export default async function PartnerRequisitionsPage() {
   return (
     <div>
       <h1 className="text-2xl font-semibold">Requisitions</h1>
-      <p className="mt-1 text-sm text-fg-muted">Roles ADI Praxis has opened to you. Open a requisition to read its requirements and submit a candidate.</p>
+      <p className="mt-1 text-sm text-fg-muted">Roles ADI Forge has opened to you. Open a requisition to read its requirements and submit a candidate.</p>
       {status !== 200 && (
         <p role="alert" className="mt-4 text-sm text-error">
           Could not load requisitions. Refresh the page; if it keeps failing, contact your partner manager.

@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project · ADI Forge (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Geist+Mono:wght@400;500;600&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
+<style>
+/* Values copied from packages/shared/theme/theme.css (light theme). Mockup only. */
+:root{--bg:#f5f7fa;--surface:#f5f7fa;--text:#0a2170;--muted:#5b6b77;--border:#8597a3;--link:#1d68b0;--focus:#2a80d0;--accent:#3fac95;--error:#b91c1c;--warning:#b45309;--success:#15803d;--hairline:#dde4ec;--elevated:#fff;--shadow:0 1px 2px rgb(10 33 112 / .06),0 8px 24px -12px rgb(10 33 112 / .18)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-size:14px;line-height:1.5}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+.demo{background:var(--warning);color:#fff;text-align:center;font-size:12px;font-weight:500;padding:4px}
+header{background:#0a2170;color:#fff;box-shadow:0 4px 12px rgb(0 0 0 / .15)}
+.hwrap{max-width:72rem;margin:0 auto;padding:12px 16px 8px;display:flex;align-items:center;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
+.brand img{height:28px}
+.who{margin-left:auto;font-size:13px;color:rgb(255 255 255 / .7);display:flex;gap:14px;align-items:center}
+.who a{color:rgb(255 255 255 / .85)}
+nav.main{max-width:72rem;margin:0 auto;padding:0 16px 6px;display:flex;gap:4px;font-size:13px}
+nav.main span{padding:6px 10px;border-radius:8px;color:rgb(255 255 255 / .8)}
+nav.main span.on{background:rgb(255 255 255 / .14);color:#fff;font-weight:600}
+.rail{height:4px;background:linear-gradient(90deg,#0a2170 0%,#2a80d0 50%,#3fac95 100%)}
+main{max-width:72rem;margin:0 auto;padding:32px 16px 96px}
+h1{font-size:24px;font-weight:600;margin:0}
+.card{background:var(--elevated);border:1px solid var(--hairline);border-radius:16px;box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:10px 18px;font-weight:600;font-size:14px;font-family:inherit;cursor:pointer;border:0}
+.btn-primary{color:#fff;background:linear-gradient(90deg,#1f64b8 0%,#2a80d0 45%,#2f9c8a 100%);box-shadow:0 8px 20px -10px rgb(42 128 208 / .8)}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-secondary{border:1px solid var(--hairline);background:var(--elevated);color:var(--text)}
+.btn-secondary:hover{border-color:var(--focus)}
+.btn-danger{border:1px solid var(--hairline);background:var(--elevated);color:var(--error)}
+.btn-sm{padding:7px 12px;font-size:13px;border-radius:10px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;line-height:20px;white-space:nowrap;background:color-mix(in srgb,var(--pill,var(--muted)) 14%,transparent);color:var(--text)}
+.pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--pill,var(--muted))}
+.pill-info{--pill:var(--link)}.pill-success{--pill:var(--success)}.pill-warning{--pill:var(--warning)}.pill-error{--pill:var(--error)}.pill-brand{--pill:var(--accent)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--hairline);margin:28px 0 24px}
+.tabs button{font-family:inherit;font-size:14px;font-weight:600;color:var(--muted);background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;cursor:pointer;display:flex;gap:8px;align-items:center}
+.tabs button.on{color:var(--text);border-bottom-color:#2a80d0}
+.tabs .n{font-size:11px;font-weight:600;background:#e8eef6;color:var(--text);border-radius:999px;padding:1px 8px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.metric{padding:16px 18px}.metric dt{font-size:13px;color:var(--muted)}.metric dd{margin:4px 0 0;font-size:26px;font-weight:700}
+.metric small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+dl.rows{margin:0}dl.rows>div{display:grid;grid-template-columns:11rem 1fr;gap:8px;padding:10px 16px;border-top:1px solid var(--hairline)}
+dl.rows>div:first-child{border-top:0}dl.rows dt{font-weight:500;color:var(--muted)}dl.rows dd{margin:0}
+h2{font-size:18px;font-weight:600;margin:28px 0 12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:10px 16px;background:#f8fafc;border-bottom:1px solid var(--hairline)}
+td{padding:12px 16px;border-top:1px solid var(--hairline);vertical-align:top}
+tr:first-child td{border-top:0}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.muted{color:var(--muted)}
+.note{font-size:13px;color:var(--muted);margin:10px 0 0}
+.banner{display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px solid color-mix(in srgb,var(--warning) 40%,transparent);background:color-mix(in srgb,var(--warning) 7%,#fff);border-radius:12px;font-size:14px}
+.stepper{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.step{font-family:inherit;text-align:left;padding:14px 16px;cursor:pointer;color:var(--text)}
+.step .dot{width:22px;height:22px;border-radius:999px;display:inline-grid;place-items:center;font-size:11px;font-weight:700;border:2px solid var(--hairline);color:var(--muted);margin-right:6px}
+.step.done .dot{background:var(--accent);border-color:var(--accent);color:#fff}
+.step.on{border-color:#2a80d0;box-shadow:0 0 0 1px #2a80d0,var(--shadow)}
+.step.on .dot{border-color:#2a80d0;color:#2a80d0}
+.step .lbl{font-size:13px;font-weight:600}.step .val{display:block;font-size:20px;font-weight:700;margin-top:6px}.step .sub{font-size:12px;color:var(--muted)}
+.cov td,.cov th{text-align:center}.cov td:first-child,.cov th:first-child{text-align:left;font-weight:600}
+.cell{display:inline-block;width:22px;height:22px;border-radius:6px;background:#eef2f7;vertical-align:middle}
+.cell.ok{background:var(--accent)}.cell.wip{background:color-mix(in srgb,#2a80d0 35%,#fff)}.cell.rev{background:color-mix(in srgb,var(--warning) 35%,#fff)}
+.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+select,input,textarea{font-family:inherit;font-size:14px;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px;background:#fff}
+.sec{padding:18px 20px;margin-bottom:16px}
+.sec h3{font-size:15px;font-weight:600;margin:0 0 12px;display:flex;align-items:center;gap:10px}
+.sec h3 .tag{font-size:12px;font-weight:600;color:var(--muted)}
+.fl{display:grid;grid-template-columns:12rem 1fr;gap:10px 16px;font-size:14px}
+.fl dt{color:var(--muted);font-weight:500}.fl dd{margin:0}
+.tool{display:inline-block;font-size:12px;font-weight:600;border:1px solid var(--hairline);border-radius:999px;padding:0 8px;margin-left:6px;color:var(--link);background:#f5f9ff}
+.chip{display:inline-block;border:1px solid var(--hairline);background:#fff;border-radius:999px;padding:3px 12px;font-size:13px;margin:0 6px 6px 0}
+.err{color:var(--error);font-size:13px;margin:6px 0 0;display:none}
+.hidden{display:none}
+.wsteps{display:flex;gap:6px;flex-wrap:wrap;list-style:none;padding:0;margin:0 0 16px;font-size:13px}.wsteps li{padding:6px 12px;border-radius:999px;border:1px solid var(--hairline);background:#fff;color:var(--muted)}.wsteps li.on{border-color:#2a80d0;color:var(--text);font-weight:600}.wsteps li.done{background:color-mix(in srgb,var(--accent) 14%,#fff);color:var(--text)}
+.wf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.wf label{font-size:13px;display:block}.wf input,.wf select,.wf textarea{width:100%;margin-top:4px}
+.seg{font-family:inherit;font-size:13px;font-weight:600;border:0;background:#fff;color:var(--muted);padding:8px 16px;cursor:pointer}.seg.on{background:#0a2170;color:#fff}
+.src{display:inline-block;font-size:12px;font-weight:500;color:var(--muted);background:#eef2f7;border-radius:6px;padding:1px 8px;margin:1px 0}
+#tdetail.empty .fl dd{font-size:0}#tdetail.empty .fl dd::after{content:'—';font-size:14px;color:var(--muted)}
+#tdetail.empty .sec tbody tr{display:none}#tdetail.empty .sec tbody::after{content:'Not authored yet';display:block;padding:10px 16px;color:var(--muted);font-size:13px}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:10px}
+.legend span{display:flex;align-items:center;gap:6px}
+.mock{position:fixed;right:16px;bottom:16px;background:#0a2170;color:#fff;font-size:12px;padding:6px 12px;border-radius:999px}
+
+/* Typography (owner, 15 Nov 2026): Geist for headings, titles and primary buttons; Inter for body, labels and tables; Geist Mono for numbers, badges, IDs and code. */
+body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-optical-sizing:auto}
+h1,h2,h3,.brand,.btn-primary,.tabs button,.hero div[style*="font-size:26px"],.step .val,.metric dd,.mock .t{font-family:'Geist','Inter',ui-sans-serif,system-ui,sans-serif;letter-spacing:-0.02em}
+h1{font-weight:700}h2,h3{font-weight:600}.btn-primary{font-weight:600}
+.mono,code,.pill,.tabs .n,.cnt,.metric dd,.step .val,td.mono,.tag{font-family:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.pill,.tabs .n{font-weight:500;letter-spacing:0}
+</style>
+</head>
+<body>
+<p class="demo">QA environment: synthetic data only. Candidate sign-in and identity checks are simulated.</p>
+<header>
+  <div class="hwrap">
+    <span class="brand"><img src="../brand-forge/adi-forge-mark-512.png" alt=""> ADI Forge</span>
+    <span class="who"><span>Platform Admin · Admin</span><a>Change password</a><a>Sign out</a></span>
+  </div>
+  <nav class="main"><span>Home</span><span class="on" data-nav="list" style="cursor:pointer">Projects</span><span data-nav="src" style="cursor:pointer">Sourcing</span><span data-nav="adm" style="cursor:pointer">Admin</span><span>Tutorials</span></nav>
+  <div class="rail"></div>
+</header>
+
+<main>
+<div id="projPage">
+<a href="#">← Projects</a>
+<div style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap">
+  <h1>KYC-Of US bank Chicago</h1><span class="pill pill-warning">Staffing</span>
+  <span style="margin-left:auto;display:flex;gap:8px"><button class="btn btn-secondary btn-sm">Pause</button><button class="btn btn-secondary btn-sm" style="color:var(--error)">Cancel project</button></span>
+</div>
+<p class="muted" style="margin:6px 0 0;max-width:48rem">KYC workflow for a bank headquartered in Chicago with branches in 5 states. Retail customers opening an account: single, joint, minor and custodian scenarios.</p>
+
+<div class="tabs" role="tablist">
+  <button data-tab="dash" class="on">Dashboard</button>
+  <button data-tab="res">Resource assignments <span class="n">0 / 2</span></button>
+  <button data-tab="tasks">Tasks <span class="n">5</span></button>
+  <button data-tab="proc">Policies <span class="n">16 rules</span></button>
+</div>
+
+<!-- ───────────── Dashboard ───────────── -->
+<section id="dash">
+  <div class="grid4">
+    <dl class="card metric"><dt>Experts</dt><dd>1 / 2</dd><small>assigned</small></dl>
+    <dl class="card metric"><dt>Tasks approved</dt><dd>1 / 5</dd><small>1 waiting for review</small></dl>
+    <dl class="card metric"><dt>Rule set</dt><dd>v1</dd><small>16 rules · published</small></dl>
+    <dl class="card metric"><dt>Rework rate</dt><dd>0%</dd><small>active time 52 / 60 min</small></dl>
+  </div>
+  <div class="banner" style="margin-top:20px"><span class="pill pill-warning">Next step</span>TSK-002 is waiting for review.<a style="margin-left:auto" href="#" data-go="tasks">Open tasks →</a></div>
+
+  <h2>Coverage by state</h2>
+  <div class="card" style="overflow:hidden">
+    <table>
+      <thead><tr><th>State</th><th>Task</th><th>Authored by</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><strong>California</strong></td><td class="mono">TSK-001</td><td>Morgan Hale</td><td><span class="pill pill-success">Approved</span></td></tr>
+        <tr><td><strong>New York</strong></td><td class="mono">TSK-002</td><td>Morgan Hale</td><td><span class="pill pill-warning">Submitted</span></td></tr>
+        <tr><td><strong>Texas</strong></td><td class="mono">TSK-003</td><td>Morgan Hale</td><td><span class="pill pill-info">In progress</span></td></tr>
+        <tr><td><strong>Florida</strong></td><td class="mono">TSK-004</td><td></td><td><span class="pill">Open</span></td></tr>
+        <tr><td><strong>Illinois</strong></td><td class="mono">TSK-005</td><td></td><td><span class="pill">Open</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">1 of 5 states covered by an approved task.</p>
+
+  <h2>Project details</h2>
+  <dl class="card rows">
+    <div><dt>Workflow</dt><dd>Banking — KYC onboarding and refresh (template v6)</dd></div>
+    <div><dt>Owner</dt><dd>Platform Admin</dd></div>
+    <div><dt>Authoring experience</dt><dd>CLASSIC</dd></div>
+    <div><dt>Dates</dt><dd>2026-11-13 to 2026-11-14</dd></div>
+    <div><dt>Mode</dt><dd>Authoring: 5 distinct tasks, max 4 per expert</dd></div>
+    <div><dt>TPT</dt><dd>60 minutes (4 h per worker per day)</dd></div>
+    <div><dt>Required workers</dt><dd>2</dd></div>
+    <div><dt>Demographics</dt><dd>Country / region (required), Languages and proficiency (required), Education level (required), Domain experience (required)</dd></div>
+    <div><dt>Job description</dt><dd>KYC onboarding and refresh task author (Banking): 50 USD per task, remote (mandatory skills Consumer deposit KYC, Evidence based investigation; 5+ years; Bachelor's or equivalent or higher)</dd></div>
+    <div><dt>Review route</dt><dd id="dRoute"></dd></div>
+    <div><dt>Reviewers</dt><dd id="dReviewers"></dd></div>
+    <div><dt>Export to RL Gym</dt><dd>Not exported · opens when all 5 tasks are approved (1 of 5 now)</dd></div>
+    <div><dt>Submitted</dt><dd>11/13/2026, 5:55:34 PM</dd></div>
+  </dl>
+  <p class="note">The job description, demographics and template version were frozen at submit; later edits to them don't change this project.</p>
+</section>
+
+<!-- ───────────── Resource assignments ───────────── -->
+<section id="res" class="hidden">
+  <div class="toolbar">
+    <span class="muted" id="resSum"></span>
+    <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm" id="recBtn">Export to Recruiter</button>
+      <button class="btn btn-primary btn-sm" id="assignBtn">Assign</button>
+    </span>
+  </div>
+  <div class="card" style="overflow:hidden">
+    <table>
+      <thead><tr><th>First name</th><th>Last name</th><th>Email</th><th style="width:110px">Role</th><th style="width:110px">Status</th><th style="width:110px">Task ID</th><th style="width:140px">Task status</th></tr></thead>
+      <tbody id="aRows"></tbody>
+    </table>
+  </div>
+  <p class="note" id="resNote"></p>
+</section>
+
+<!-- ───────────── Tasks ───────────── -->
+<section id="tasks" class="hidden">
+  <div id="tlist">
+    <div class="toolbar"><span class="muted">5 tasks set for this project · <span id="tsum"></span></span><select style="margin-left:auto"><option>All statuses</option><option>Submitted</option><option>Rework</option><option>Approved</option></select>
+      <button class="btn btn-primary" id="exportBtn" disabled style="opacity:.5;cursor:not-allowed">Export to RL Gym</button></div>
+    <p class="note" id="exportGate" style="margin:-4px 0 12px"></p>
+    <div class="card" style="overflow:hidden">
+      <table>
+        <thead><tr><th style="width:110px">Task ID</th><th>Task name</th><th style="width:170px">Authored by</th><th style="width:140px">Status</th><th style="width:110px">Date</th></tr></thead>
+        <tbody id="trows"></tbody>
+      </table>
+    </div>
+    <p class="note">One row per task set on the project. The PM or Admin picks the SME for each task from the accepted experts; until then "Authored by" offers "Assign SME…". An author can be changed only before they start.</p>
+  </div>
+
+  <div id="tdetail" class="hidden">
+    <a href="#" id="tback">← Tasks</a>
+    <div style="display:flex;align-items:center;gap:12px;margin:8px 0 4px;flex-wrap:wrap"><h1 style="font-size:22px" id="ttitle"></h1><span id="tstat"></span></div>
+    <p class="muted" style="margin:0 0 12px" id="tmeta"></p>
+    <div class="banner" id="tbanner" style="margin-bottom:16px"></div>
+
+    <div class="card sec"><h3>S1 · Reusable assignment</h3><dl class="fl">
+      <dt>Title</dt><dd>Open a joint checking account for two adults, one with an expired driver's licence</dd>
+      <dt>Trigger</dt><dd>The branch receives a joint account application flagged as a new customer.</dd>
+      <dt>Business context</dt><dd>Praxis Demo Bank, N.A., New York branch. Both applicants are new to the bank.</dd>
+      <dt>Deliverable</dt><dd>A KYC decision for the application, with the evidence and rules relied on.</dd>
+      <dt>Governing state</dt><dd>NY</dd><dt>Scope</dt><dd>Retail · joint account · new customer</dd><dt>Language</dt><dd>English</dd></dl></div>
+
+    <div class="card sec"><h3>S2 · Input contract</h3><dl class="fl">
+      <dt>Applicant A</dt><dd>Synthetic adult, 41. NY driver's licence, valid to 2029. US residential address in Albany, NY.</dd>
+      <dt>Applicant B</dt><dd>Synthetic adult, 38. NY driver's licence expired 3 months ago. Same address.</dd>
+      <dt>Product</dt><dd>Joint checking. Opening deposit $2,500 by transfer from an external US bank.</dd>
+      <dt>Screening data</dt><dd>No OFAC or PEP match for either applicant.</dd></dl></div>
+
+    <div class="card sec"><h3>S3 · Environment <span class="tag">golden_kyc_openenv · 21 tools</span></h3><dl class="fl">
+      <dt>Tools used</dt><dd><span class="chip">verify_identity</span><span class="chip">request_information</span><span class="chip">screen_sanctions</span><span class="chip">record_decision</span></dd>
+      <dt>Failure behaviour</dt><dd>Fail closed: if a tool errors, hold the application and escalate; never open the account.</dd></dl></div>
+
+    <div class="card sec"><h3>S4 · State policies <span class="tag">rule set v1</span></h3>
+      <table style="font-size:13px"><thead><tr><th>Rule</th><th>Version</th><th>Applies because</th></tr></thead><tbody>
+      <tr><td><strong>FED-CIP-01</strong> Collect name, DOB, address, ID number</td><td>1</td><td>Both holders are new customers.</td></tr>
+      <tr><td><strong>FED-CIP-02</strong> Documentary or non-documentary verification</td><td>1</td><td>Applicant B's ID is expired.</td></tr>
+      <tr><td><strong>FED-OFAC-01</strong> Screen every holder</td><td>1</td><td>Required for each account holder.</td></tr>
+      <tr><td><strong>NY-DATA-01</strong> Mask ID numbers in records</td><td>1</td><td>Governing state is NY.</td></tr></tbody></table></div>
+
+    <div class="card sec"><h3>S5 · Steps</h3>
+      <table style="font-size:13px"><thead><tr><th style="width:40px">#</th><th>Action</th><th>Tool</th><th>If it fails</th></tr></thead><tbody>
+      <tr><td>1</td><td>Verify applicant A against CIP using the valid licence.</td><td><span class="tool">verify_identity</span></td><td>Hold and escalate</td></tr>
+      <tr><td>2</td><td>Detect B's expired licence; ask for a current ID or run one non-documentary check.</td><td><span class="tool">request_information</span></td><td>Keep pending</td></tr>
+      <tr><td>3</td><td>Screen both applicants against OFAC.</td><td><span class="tool">screen_sanctions</span></td><td>Hold and escalate</td></tr>
+      <tr><td>4</td><td>Hold the opening until B is verified; record the reason.</td><td><span class="tool">record_decision</span></td><td>Hold and escalate</td></tr></tbody></table></div>
+
+    <div class="card sec"><h3>S6 · Output contract</h3><dl class="fl">
+      <dt>Expected outcome</dt><dd><span class="pill pill-info">request_information</span></dd>
+      <dt>Reason</dt><dd>An expired ID is not grounds to refuse; it needs current evidence before the account opens.</dd></dl></div>
+
+    <div class="card sec"><h3>S7 · Criteria <span class="tag">20 criteria · 5 points each</span></h3>
+      <table style="font-size:13px"><tbody>
+      <tr><td style="width:40px">1</td><td>No account opens before both holders pass CIP. <span class="pill pill-error">Critical</span></td><td style="width:70px">5</td></tr>
+      <tr><td>2</td><td>Asks for a current ID or a non-documentary check for applicant B.</td><td>5</td></tr>
+      <tr><td>3</td><td>Screens both holders against OFAC.</td><td>5</td></tr>
+      <tr><td class="muted" colspan="3">+ 17 more</td></tr></tbody></table></div>
+
+    <div class="card sec"><h3>S8 · Sources and reviewer notes</h3><dl class="fl">
+      <dt>Sources used</dt><dd>US Federal KYC Policy (Praxis Demo Bank) v1 · New York KYC State Addendum v1</dd>
+      <dt>Note to reviewer</dt><dd>Edge case: an expired ID leads to a request for information, not a refusal.</dd></dl></div>
+
+    <div class="card sec" id="anvilCard">
+      <h3>RL Gym validation <span class="tag">checks this task against RL Gym's export contract; doesn't export it</span></h3>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-secondary" id="valBtn">Validate</button><span id="valOut" class="muted">Not validated yet.</span></div>
+      <p class="note">PM or Admin. RL Gym's fixes (PX codes) are listed per task; nothing changes automatically. "Valid" isn't approval or RL Gym readiness.</p>
+    </div>
+
+    <div class="card sec" id="reviewCard">
+      <h3>Review <span class="tag"><span id="routeTag"></span></span></h3>
+      <ol class="trail" id="trail" style="list-style:none;margin:0;padding:0;display:flex;gap:10px;flex-wrap:wrap;font-size:13px"></ol>
+      <p class="note" id="routeNote"></p>
+    </div>
+
+    <div class="card sec" style="border-color:#2a80d0" id="decideBox">
+      <h3 id="decideTitle">Your decision</h3>
+      <label for="cm" style="font-size:13px;color:var(--muted)">Comment for the author (required for Rework and Reject)</label>
+      <textarea id="cm" rows="3" style="width:100%;margin-top:6px"></textarea>
+      <p class="err" id="err">Add a comment for the author before asking for rework or rejecting.</p>
+      <div style="display:flex;gap:10px;margin-top:12px"><button class="btn btn-primary" id="ap">Approve</button><button class="btn btn-secondary" id="rw">Rework</button><button class="btn btn-danger" id="rj">Reject</button></div>
+      <p class="note">Approve adds the task to the approved dataset. Rework returns it to the author with your comment. Reject is final and frees the slot.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Policies ───────────── -->
+<section id="proc" class="hidden">
+  <div class="toolbar"><span class="pill pill-success">Rule set v1 published</span><span class="muted">Every task in this project inherits the published set. Extraction suggests; only a person marks a rule Reviewed.</span></div>
+  <div class="toolbar"><button class="btn btn-primary">Add document</button><button class="btn btn-secondary">Extract candidates</button><button class="btn btn-secondary" style="margin-left:auto">Publish rule set</button></div>
+  <h2 style="margin-top:8px">Documents</h2>
+  <div class="card" style="overflow:hidden"><table>
+    <thead><tr><th>Document</th><th>Jurisdiction</th><th>Rules</th><th>Citations</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td><strong>US Federal KYC Policy (Praxis Demo Bank)</strong></td><td>US</td><td>16</td><td>35 / 36 resolved</td><td><span class="pill pill-success">Extracted</span></td></tr>
+      <tr><td><strong>Illinois KYC State Addendum</strong></td><td>US-IL</td><td>5</td><td>10 / 10 resolved</td><td><span class="pill pill-info">Extracting</span></td></tr>
+      <tr><td><strong>California, New York, Texas, Florida addenda</strong></td><td>US-CA, NY, TX, FL</td><td>—</td><td>—</td><td><span class="pill">Not uploaded</span></td></tr>
+    </tbody></table></div>
+  <h2>Suggest rules</h2>
+  <div style="display:flex;gap:10px"><input style="flex:1" placeholder="Retail account opening: single, joint, minor and custodian accounts"><button class="btn btn-secondary">Suggest</button></div>
+  <h2>Rules</h2>
+  <div class="card" style="overflow:hidden"><table>
+    <thead><tr><th style="width:110px">Apply to project</th><th>Rule</th><th>Source</th><th>State</th></tr></thead>
+    <tbody>
+      <tr><td><input type="checkbox" checked></td><td><strong>FED-CIP-01</strong> Collect name, date of birth, address and ID number before opening</td><td>Federal Part A</td><td><span class="pill pill-success">Reviewed</span></td></tr>
+      <tr><td><input type="checkbox" checked></td><td><strong>FED-BO-01</strong> Identify each 25% owner and one control person</td><td>Federal Part B</td><td><span class="pill pill-success">Reviewed</span></td></tr>
+      <tr><td><input type="checkbox" checked></td><td><strong>FED-OFAC-01</strong> Screen every account holder against OFAC</td><td>Federal Part E</td><td><span class="pill pill-success">Reviewed</span></td></tr>
+      <tr><td><input type="checkbox"></td><td><strong>FED-CTR-01</strong> Report cash over $10,000</td><td>Federal Part D</td><td><span class="pill">Not applied</span> <span class="pill pill-brand">Suggested</span></td></tr>
+      <tr><td><input type="checkbox"></td><td><strong>IL-BIO-01</strong> Written consent before a biometric face match</td><td>Illinois addendum</td><td><span class="pill pill-warning">Draft</span></td></tr>
+    </tbody></table></div>
+</section>
+</div>
+<div id="listPage" class="hidden">
+  <div class="toolbar"><h1>Projects</h1><button class="btn btn-primary" id="newProjBtn" style="margin-left:auto">New project</button></div>
+  <div class="card" style="overflow:hidden"><table>
+    <thead><tr><th>Project</th><th>Template</th><th>Status</th><th>Tasks</th><th>People</th></tr></thead>
+    <tbody>
+      <tr><td><a href="#" data-openproj><strong>KYC-Of US bank Chicago</strong></a></td><td>Banking — KYC onboarding and refresh v6</td><td><span class="pill pill-warning">Staffing</span></td><td>1 / 5 approved</td><td>1 / 2</td></tr>
+      <tr><td><strong>Marketing launch — VEYRA</strong></td><td>Marketing — Campaign brief v1</td><td><span class="pill pill-info">New</span></td><td>0 / 4</td><td>0 / 2</td></tr>
+      <tr><td class="muted">KYC pilot (Oct)</td><td class="muted">Banking — KYC onboarding and refresh v5</td><td><span class="pill pill-success">Completed</span></td><td class="muted">3 / 3</td><td class="muted">2 / 2</td></tr>
+    </tbody></table></div>
+  <p class="note">Unchanged from today, apart from the new project page it opens.</p>
+</div>
+
+<div id="wizPage" class="hidden">
+  <a href="#" id="wizBack">← Projects</a>
+  <h1 style="margin:8px 0 14px">New project</h1>
+  <ol class="wsteps" id="wsteps"></ol>
+  <div class="card" style="padding:20px 24px;max-width:52rem" id="wbody"></div>
+  <div style="display:flex;gap:10px;margin-top:14px;max-width:52rem"><button class="btn btn-secondary" id="wPrev">Back</button><button class="btn btn-primary" id="wNext" style="margin-left:auto">Next</button></div>
+  <p class="note">The existing six-step wizard, unchanged. Submitting freezes the template version, job description and demographics, and creates one task per slot (5 for this template: CA, NY, TX, FL, IL).</p>
+</div>
+<div id="recPage" class="hidden">
+  <a href="#" id="recBack">← KYC-Of US bank Chicago · Resource assignments</a>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 4px"><h1>Export to Recruiter</h1>
+    <span style="margin-left:auto;display:flex;gap:8px"><button class="btn btn-secondary btn-sm">Download Excel only</button><button class="btn btn-primary btn-sm">Download PDF</button></span></div>
+  <p class="muted" style="margin:0 0 18px;max-width:52rem">One PDF for recruitment agencies, built from the project. Preview it here, then download and send it. The candidate assessment sheet (Excel) is attached inside the PDF.</p>
+
+  <div class="card" style="padding:26px 30px;max-width:52rem">
+    <div style="display:flex;align-items:center;gap:10px;border-bottom:2px solid #0a2170;padding-bottom:10px;margin-bottom:16px"><img src="../brand-forge/adi-forge-mark-512.png" alt="" style="height:26px"><strong>ADI Forge</strong><span class="muted" style="margin-left:auto;font-size:12px">Recruiter pack · KYC-Of US bank Chicago · 15 Nov 2026</span></div>
+
+    <h2 style="margin-top:0">1 · The role</h2>
+    <dl class="fl"><dt>Role</dt><dd>Task author · Banking · KYC onboarding and refresh</dd><dt>Work</dt><dd>Write realistic, fully synthetic KYC cases used to train and evaluate AI agents.</dd><dt>Location · language</dt><dd>Remote, United States · English</dd><dt>Pay · effort</dt><dd>50 USD per accepted task · about 60 minutes per task · up to 4 tasks</dd><dt>People needed</dt><dd>2</dd></dl>
+
+    <h2>2 · Requirements</h2>
+    <table style="font-size:13px"><thead><tr><th>Requirement</th><th>Detail</th><th>Level</th><th>Evidence to check</th></tr></thead><tbody>
+      <tr><td>Skill</td><td>Hands-on consumer deposit KYC</td><td>Required</td><td>Roles where they opened or refreshed retail accounts</td></tr>
+      <tr><td>Skill</td><td>Evidence-based investigation</td><td>Required</td><td>Cases they investigated</td></tr>
+      <tr><td>Experience</td><td>5+ years in banking KYC or AML</td><td>Required</td><td>Role history with dates</td></tr>
+      <tr><td>Education</td><td>Bachelor's or higher</td><td>Required</td><td>Highest qualification</td></tr>
+      <tr><td>Country · language</td><td>United States · English (fluent)</td><td>Required</td><td>Country of work, language level</td></tr>
+      <tr><td>Jurisdiction</td><td>US state rules (CA, NY, TX, FL, IL)</td><td>Preferred</td><td>States they worked under</td></tr>
+    </tbody></table>
+
+    <h2>3 · The task they would author (SME cheat sheet)</h2>
+    <p style="margin:0 0 8px">Each expert writes one or more KYC cases as a reusable task in a fixed form, using made-up customers only:</p>
+    <table style="font-size:13px"><tbody>
+      <tr><td style="width:150px"><strong>S1</strong> Assignment</td><td>The case in one line, what triggers it, and its scope. Example: a joint checking account where one applicant's licence has expired.</td></tr>
+      <tr><td><strong>S2</strong> Inputs</td><td>The synthetic applicants, documents and product.</td></tr>
+      <tr><td><strong>S3–S4</strong> Tools and rules</td><td>Which bank tools are used, and which federal and state rules apply.</td></tr>
+      <tr><td><strong>S5</strong> Steps</td><td>What a careful KYC officer does, step by step, and what happens if a check fails.</td></tr>
+      <tr><td><strong>S6–S8</strong> Outcome and scoring</td><td>The right decision (for example "request information"), 20 scoring criteria, sources.</td></tr>
+    </tbody></table>
+    <p class="note">Good fits have done this work themselves: they can explain a real (anonymised) case step by step and say which rule drove each decision.</p>
+
+    <h2>4 · What to send back for each candidate</h2>
+    <table style="font-size:13px"><tbody>
+      <tr><td style="width:190px"><strong>First name, last name, email</strong></td><td>Required. The email must be the candidate's Gmail address; it becomes their sign-in.</td></tr>
+      <tr><td><strong>Assessment against the JD</strong></td><td>For each requirement in section 2: met or not, with the evidence you checked.</td></tr>
+      <tr><td><strong>Why they fit</strong></td><td>A few sentences in your words.</td></tr>
+      <tr><td><strong>Answers to the questions</strong></td><td>The candidate's answers to the six questions in the sheet.</td></tr>
+      <tr><td><strong>Optional</strong></td><td>LinkedIn URL and a CV (PDF).</td></tr>
+    </tbody></table>
+    <p class="note">Fill in the attached sheet, one row per candidate, and send it back with any CVs. Never include real customer or employer data.</p>
+
+    <div style="display:flex;align-items:center;gap:12px;margin-top:18px;padding:12px 14px;border:1px dashed var(--border);border-radius:12px">
+      <span class="pill pill-info">Attached</span>
+      <div><strong>Attachment: candidate-assessment-KYC-Of-US-bank-Chicago.xlsx</strong><div class="muted" style="font-size:12px">Columns: First name* · Last name* · Email (Gmail)* · LinkedIn URL · one "Met? / Evidence" pair per requirement (6) · Q1–Q6 answers · Why they fit · Recruiter name · Agency</div></div>
+    </div>
+  </div>
+  <p class="note">Some PDF viewers (for example Chrome and email previews) hide attachments. "Download Excel only" gives the same sheet on its own.</p>
+</div>
+<div id="assignPage" class="hidden">
+  <a href="#" id="assignBack">← KYC-Of US bank Chicago · Resource assignments</a>
+  <h1 style="margin:8px 0 4px">Assign people</h1>
+  <p class="muted" style="margin:0 0 6px">Choose the task each person works on. Profiles from Sourcing whose skills match this project's template: <strong id="tplSkills">Consumer deposit KYC, Evidence-based investigation</strong>.</p>
+  <p class="muted" style="margin:0 0 18px" id="assignRoute"></p>
+  <div class="card" style="overflow:hidden">
+    <table>
+      <thead><tr><th>First name</th><th>Last name</th><th>Email</th><th>Matching skills</th><th style="width:230px">Task <span style="color:var(--error)">*</span></th><th style="width:250px"></th></tr></thead>
+      <tbody id="pRows"></tbody>
+    </table>
+  </div>
+</div>
+<div id="mePage" class="hidden">
+  <div style="background:#212227;color:#fff;margin:-32px -16px 24px;padding:14px 20px;border-radius:0 0 16px 16px;display:flex;align-items:center;gap:12px"><strong>ADI Forge</strong><span style="opacity:.7;font-size:13px">Candidate app · signed in with Google as morgan.hale.qa@gmail.com</span></div>
+  <h1>Your tasks</h1>
+  <p class="muted" style="margin:6px 0 18px">KYC-Of US bank Chicago · tasks your project manager assigned to you.</p>
+  <div class="card" style="overflow:hidden"><table><thead><tr><th style="width:100px">Task ID</th><th>Task</th><th style="width:130px">Status</th><th style="width:180px"></th></tr></thead><tbody id="meRows"></tbody></table></div>
+  <p class="note">A task sent back for rework shows the reviewer's comment and a Fix and resubmit link.</p>
+</div>
+<div id="admPage" class="hidden">
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;font-size:13px">
+    <span class="chip" style="margin:0">Users</span><span class="chip" style="margin:0">Taxonomy</span><span class="chip" style="margin:0">Terms</span><span class="chip" style="margin:0">Failure codes</span><span class="chip" style="margin:0">API clients</span><span class="chip" style="margin:0;border-color:#2a80d0;font-weight:600">Candidate app sign-in <span class="pill pill-info" style="margin-left:4px">New</span></span>
+  </div>
+  <p class="note" style="margin:-8px 0 16px">Existing Admin pages (Users with add user and reset password, Taxonomy, Terms, Failure codes, API clients) stay exactly as they are.</p>
+  <h1>Admin · Candidate app sign-in</h1>
+  <p class="muted" style="margin:6px 0 20px;max-width:48rem">How SMEs and Reviewers sign in to the candidate app. Applies to everyone at once.</p>
+  <div class="card" style="padding:18px 20px;max-width:48rem">
+    <label class="mode" style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--hairline);cursor:pointer"><input type="radio" name="mode" value="offline" checked style="margin-top:4px"><span><strong>Offline</strong> <span class="pill pill-warning">QA and demos only</span><br><span class="muted">People sign in by typing their email and name. No password. Anyone who knows an uploaded email can sign in as that person.</span></span></label>
+    <label class="mode" style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;cursor:pointer"><input type="radio" name="mode" value="online" style="margin-top:4px"><span><strong>Online</strong><br><span class="muted">People sign in with their email (their Gmail address) and a password. When a PM or Admin assigns a new person to a project, ADI Forge emails them a one-time link to set their password (never the password itself).</span></span></label>
+    <div id="modeWarn" class="banner" style="margin-top:12px"><span class="pill pill-warning">Offline</span>Never use Offline in production.</div>
+    <div style="display:flex;gap:10px;margin-top:16px;align-items:center"><button class="btn btn-primary" id="modeSave">Save</button><span class="muted" id="modeMsg" style="font-size:13px"></span></div>
+    <p class="note">Changing the mode signs everyone out of the candidate app. Audited.</p>
+  </div>
+</div>
+<div id="srcPage" class="hidden">
+  <h1>Sourcing</h1>
+  <p class="muted" style="margin:6px 0 20px;max-width:48rem">Profiles sent by recruitment agencies, uploaded by a PM or Admin. Each profile is for one project and goes to that project's Screening.</p>
+  <div id="srcList">
+      <div class="toolbar">
+        <div style="display:inline-flex;border:1px solid var(--hairline);border-radius:12px;overflow:hidden;background:#fff">
+          <button class="seg on" data-kind="SME">SMEs</button><button class="seg" data-kind="Reviewer" id="segRev">Reviewers</button>
+        </div>
+        <input type="search" id="srcQ" placeholder="Search name, email, role or skill" style="margin-left:auto;width:300px"><button class="btn btn-primary btn-sm" id="newBtn">New</button>
+      </div>
+      <p class="note" id="revOff" style="margin:-4px 0 12px">Reviewers can be added only to projects whose review route has a Reviewer step.</p>
+
+
+      <p class="note" id="srcHint" style="margin:-4px 0 10px"></p>
+      <div class="card" style="overflow:hidden" id="srcTable">
+        <table>
+          <thead><tr><th>First name</th><th>Last name</th><th>Email</th><th>Role</th><th>Project</th><th>Skills (from the project)</th><th>Submitted by</th><th style="width:110px">Date</th></tr></thead>
+          <tbody id="cRows"></tbody>
+        </table>
+      </div>
+      <p class="note">Each upload creates a profile in the <span id="kindTable">SME</span> table. The email is the person's Google sign-in to the candidate app, for SMEs and Reviewers alike (QA: dummy Google accounts). A duplicate email is flagged, not added.</p>
+    </div>
+</div>
+    <div id="srcNew" class="hidden">
+  <a href="#" id="newBack">← Sourcing</a>
+  <h1 style="margin:8px 0 4px">New <span class="kindName">SME</span> profile</h1>
+  <p class="muted" style="margin:0 0 20px">From a recruitment agency. Required: project, first name, last name and email.</p>
+      <div class="card" style="padding:20px 24px;max-width:56rem">
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+          <label style="font-size:13px;grid-column:span 3">Project <span style="color:var(--error)">*</span><select id="fProj" style="width:100%;margin-top:4px"></select><span class="muted" id="fSkills" style="display:block;font-size:12px;margin-top:4px"></span></label>
+          <label style="font-size:13px">First name <span style="color:var(--error)">*</span><input id="fFirst" style="width:100%;margin-top:4px"></label>
+          <label style="font-size:13px">Last name <span style="color:var(--error)">*</span><input id="fLast" style="width:100%;margin-top:4px"></label>
+          <label style="font-size:13px">Email <span style="color:var(--error)">*</span><input id="fEmail" type="email" placeholder="name@gmail.com" style="width:100%;margin-top:4px"></label>
+          <label style="font-size:13px;grid-column:span 2">LinkedIn URL<input id="fLi" placeholder="https://www.linkedin.com/in/…" style="width:100%;margin-top:4px"></label>
+          <label style="font-size:13px">Profile (PDF, up to 10 MB)<input type="file" accept=".pdf" style="width:100%;margin-top:4px;padding:6px"></label>
+        </div>
+        <label style="font-size:13px;display:block;margin-top:14px">Candidate assessment (the recruiter's filled-in sheet: Excel, or PDF)<input type="file" accept=".xlsx,.xls,.pdf" style="width:100%;margin-top:4px;padding:6px"></label>
+        <p class="note">Accepted in good faith; ADI Forge doesn't check the answers yet.</p>
+        <p class="err" id="fErr"></p>
+        <div style="display:flex;gap:8px;margin-top:16px;align-items:center"><button class="btn btn-primary" id="fSave">Upload</button><button class="btn btn-secondary" id="fCancel">Cancel</button><span class="muted" style="margin-left:auto;font-size:13px">Several candidates? <a href="#">Upload the recruiter's assessment sheet</a> (one profile per row)</span></div>
+      </div>
+    </div>
+</main>
+<div class="mock" style="display:flex;gap:8px;align-items:center;border-radius:12px;padding:8px 12px">Mockup controls (not part of the design):
+  route <select id="routeSel" style="font-size:12px;padding:2px 6px"><option value="SME_PM">Author → PM/Admin</option><option value="SME_EXPERT_PM">Author → Reviewer → PM/Admin</option></select>
+  <button class="btn btn-secondary btn-sm" id="meBtn" style="padding:3px 10px;font-size:12px">SME view</button> viewer <select id="roleSel" style="font-size:12px;padding:2px 6px"><option value="PM">PM/Admin</option><option value="REVIEWER">Reviewer</option></select></div>
+
+<script>
+const tabs=[...document.querySelectorAll('.tabs button')];
+function tab(id){tabs.forEach(b=>b.classList.toggle('on',b.dataset.tab===id));['dash','res','tasks','proc'].forEach(s=>document.getElementById(s).classList.toggle('hidden',s!==id));}
+tabs.forEach(b=>b.onclick=()=>tab(b.dataset.tab));
+document.querySelectorAll('[data-go]').forEach(a=>a.onclick=e=>{e.preventDefault();tab(a.dataset.go)});
+const steps=[...document.querySelectorAll('.step')];
+steps.forEach(b=>b.onclick=()=>{steps.forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.sp').forEach(p=>p.classList.toggle('hidden',p.id!==b.dataset.step));});
+
+const ST={CREATED:['Open',''],ASSIGNED:['Assigned','pill-info'],IN_PROGRESS:['In progress','pill-info'],SUBMITTED:['Submitted','pill-warning'],ACCEPTED:['Approved','pill-success'],REWORK:['Rework','pill-warning'],REJECTED:['Rejected','pill-error']};
+const T=[
+ {id:'TSK-001',n:'California single account, elder-abuse signal',a:'Morgan Hale',s:'ACCEPTED',d:'2026-11-14'},
+ {id:'TSK-002',n:'New York joint checking account',a:'Morgan Hale',s:'SUBMITTED',d:'2026-11-15',open:true},
+ {id:'TSK-003',n:'Texas minor account with a guardian',a:'Morgan Hale',s:'REWORK',d:'2026-11-15',cm:'Step 2 needs the guardian\'s CIP check before the minor\'s account opens.'},
+ {id:'TSK-004',n:'Florida custodian account funded by an LLC',a:'',s:'CREATED',d:'2026-11-13'},
+ {id:'TSK-005',n:'Illinois joint account with biometric consent',a:'',s:'CREATED',d:'2026-11-13'}];
+const pill=s=>`<span class="pill ${ST[s][1]}">${ST[s][0]}</span>`;
+function draw(){
+ document.getElementById('trows').innerHTML=T.map((t,i)=>`<tr><td class="mono">${t.id}</td><td><a href="#" data-i="${i}"><strong>${t.n}</strong></a></td><td>${t.a?t.a:`<select data-as="${i}" style="font-size:13px;padding:4px 8px"><option value="">Assign SME…</option>${smeOptions()}</select>`}</td><td>${pill(t.s)}</td><td>${t.d}</td></tr>`).join('');
+ document.querySelectorAll('[data-i]').forEach(a=>a.onclick=e=>{e.preventDefault();openTask(+a.dataset.i)});
+ document.querySelectorAll('[data-as]').forEach(sel=>sel.onchange=()=>{if(!sel.value)return;const t=T[+sel.dataset.as];t.a=sel.value;t.s='ASSIGNED';t.d='2026-11-15';draw();});
+ const ap=T.filter(t=>t.s==='ACCEPTED').length,sb=T.filter(t=>t.s==='SUBMITTED').length;
+ document.getElementById('tsum').textContent=`${ap} approved · ${sb} waiting for review`;
+ const all=ap===T.length, eb=document.getElementById('exportBtn');
+ eb.disabled=!all; eb.style.opacity=all?'':'.5'; eb.style.cursor=all?'':'not-allowed';
+ document.getElementById('exportGate').textContent=all?'All 5 tasks approved. Export validates every task with RL Gym first, then sends them as one batch.':`Export opens when all ${T.length} tasks are approved (${ap} of ${T.length} now). You can validate an approved task on its own page at any time.`;
+}
+let cur=1;
+const META={CREATED:['Not assigned yet. The form fills in once an expert is assigned and starts authoring.',false],ASSIGNED:['Assigned. The expert has not started authoring yet.',false],IN_PROGRESS:['Draft in progress. Read-only; you can review it once the expert submits.',true],SUBMITTED:['Submitted. Waiting for review.',true],ACCEPTED:['Approved on 14 Nov by Platform Admin. Added to the approved dataset.',true],REWORK:['Sent back for rework with your comment. The expert can edit and resubmit.',true],REJECTED:['Rejected. Final; the slot is free for a new task.',true]};
+function openTask(i){cur=i;const t=T[i];const [msg,filled]=META[t.s];
+ document.getElementById('tlist').classList.add('hidden');document.getElementById('tdetail').classList.remove('hidden');
+ document.getElementById('tdetail').classList.toggle('empty',!filled);
+ document.getElementById('ttitle').textContent=`${t.id} · ${t.n}`;document.getElementById('tstat').innerHTML=pill(t.s);
+ document.getElementById('tmeta').textContent=t.a?`Authored by ${t.a} · ${t.d} · rule set v1`:'No author assigned · rule set v1';
+ document.getElementById('tbanner').textContent=msg;
+ document.getElementById('decideBox').classList.toggle('hidden',t.s!=='SUBMITTED');
+ document.getElementById('anvilCard').classList.toggle('hidden',t.s!=='ACCEPTED');
+ document.getElementById('valOut').innerHTML='Not validated yet.';
+ document.getElementById('reviewCard').classList.toggle('hidden',!['SUBMITTED','ACCEPTED','REWORK','REJECTED'].includes(t.s));
+ window.scrollTo(0,0);}
+function back(){document.getElementById('tdetail').classList.add('hidden');document.getElementById('tlist').classList.remove('hidden');draw();}
+document.getElementById('tback').onclick=e=>{e.preventDefault();back()};
+const cm=document.getElementById('cm'),err=document.getElementById('err');cm.oninput=()=>err.style.display='none';
+function decide(s,needs){if(needs&&!cm.value.trim()){err.style.display='block';return}T[cur].s=s;T[cur].d='2026-11-15';cm.value='';back();}
+const routeSel=document.getElementById('routeSel'),roleSel=document.getElementById('roleSel');
+let stage='first';let revName='';
+function renderRoute(){
+ const two=routeSel.value==='SME_EXPERT_PM';
+ document.getElementById('routeTag').textContent=two?'Author → Reviewer → PM/Admin · set by the template, read-only':'Author → PM/Admin · set by the template, read-only';
+ const steps=two?[['Author','Morgan Hale','done','Submitted 15 Nov'],['Reviewer',revName||'<select id="revSel" style="font-size:13px;padding:4px 8px"><option value="">Assign reviewer…</option><option>KYC SME 08 (Reviewer)</option><option>KYC SME 04 (Reviewer)</option></select>',stage==='first'?'current':'done',stage==='first'?'Waiting':'Passed 15 Nov: "Clear CIP handling."'],['PM/Admin','Platform Admin',stage==='first'?'next':'current','Final decision']]:[['Author','Morgan Hale','done','Submitted 15 Nov'],['PM/Admin','Platform Admin','current','Final decision']];
+ document.getElementById('trail').innerHTML=steps.map(([r,who,st,txt])=>`<li class="card" style="box-shadow:none;padding:10px 14px;min-width:180px;${st==='current'?'border-color:#2a80d0':''}"><span class="pill ${st==='done'?'pill-success':st==='current'?'pill-info':''}">${r}</span><div style="margin-top:6px;font-weight:600">${who}</div><div class="muted" style="font-size:12px">${txt}</div></li>`).join('<li style="align-self:center" class="muted">→</li>');
+ const rs=document.getElementById('revSel');if(rs)rs.onchange=()=>{revName=rs.value;renderRoute();};
+ const turn=two?(stage==='first'?'REVIEWER':'PM'):'PM';
+ const mine=roleSel.value===turn;
+ document.querySelectorAll('#decideBox button').forEach(b=>b.disabled=!mine);
+ document.querySelectorAll('#decideBox button').forEach(b=>b.style.opacity=mine?'':'.45');
+ document.getElementById('decideTitle').textContent=mine?(turn==='REVIEWER'?'Your review (first check)':'Your decision (final)'):`Waiting for the ${turn==='REVIEWER'?'Reviewer':'PM/Admin'}`;
+ document.getElementById('ap').textContent=turn==='REVIEWER'?'Pass to PM/Admin':'Approve';
+ document.getElementById('routeNote').textContent=two?'The PM or Admin assigns the Reviewer for this task (never its author). The Reviewer checks first; Rework or Reject there goes straight back to the author. Only the PM/Admin approval adds the task to the dataset.':'The PM or Admin reviews directly. Approve adds the task to the dataset.';
+}
+function renderDash(){const two=routeSel.value==='SME_EXPERT_PM';
+ document.getElementById('dRoute').textContent=(two?'Author → Reviewer → PM/Admin':'Author → PM/Admin')+' · chosen at project creation, read-only';
+ document.getElementById('dReviewers').innerHTML=two?'Jamie Okafor (Reviewer) · <a href="#">Manage</a> <span class="muted">· PM or Admin</span>':'<span class="muted">Not used: this project\'s route has no Reviewer step, so no reviewer can be assigned.</span>';}
+routeSel.addEventListener('change',renderDash);renderDash();
+routeSel.onchange=()=>{stage='first';renderRoute()};roleSel.onchange=renderRoute;
+document.getElementById('ap').onclick=()=>{if(routeSel.value==='SME_EXPERT_PM'&&stage==='first'){stage='second';cm.value='';renderRoute();return}decide('ACCEPTED',false)};
+renderRoute();
+if(false)
+document.getElementById('rw').onclick=()=>decide('REWORK',true);
+document.getElementById('rj').onclick=()=>decide('REJECTED',true);
+document.getElementById('valBtn').onclick=()=>{document.getElementById('valOut').innerHTML='<span class="pill pill-success">Valid per RL Gym</span> <span class="muted">15 Nov, 11:02 · RL Gym request a1b2c3 · 0 fixes</span>'};
+draw();
+
+let kind='SME';
+const P=[
+ {n:'KYC-Of US bank Chicago',st:'Staffing',sk:'Consumer deposit KYC, Evidence-based investigation',rev:false},
+ {n:'Marketing launch — VEYRA',st:'New',sk:'Campaign planning, Claims review, Audience segmentation',rev:true},
+ {n:'KYC pilot (Oct)',st:'Completed',sk:'KYC / onboarding',rev:false},
+ {n:'Sanctions screening trial',st:'Cancelled',sk:'Sanctions review',rev:false}];
+const open_=P.filter(p=>!['Completed','Cancelled'].includes(p.st));
+const sk=n=>P.find(p=>p.n===n).sk;
+const D={SME:[
+ {f:'Morgan',l:'Hale',e:'morgan.hale.qa@gmail.com',p:P[0].n,by:'Platform Admin',d:'2026-11-14'},
+ {f:'Riley',l:'Chen',e:'riley.chen.qa@gmail.com',p:P[0].n,by:'Pat Morgan (PM)',d:'2026-11-14'},
+ {f:'Taylor',l:'Brooks',e:'taylor.brooks.qa@gmail.com',p:P[1].n,by:'Pat Morgan (PM)',d:'2026-11-15'},
+ {f:'Casey',l:'Nguyen',e:'casey.nguyen.qa@gmail.com',p:P[0].n,by:'Platform Admin',d:'2026-11-15'}],
+ Reviewer:[{f:'Jamie',l:'Okafor',e:'jamie.okafor.qa@gmail.com',p:P[1].n,by:'Platform Admin',d:'2026-11-15'}]};
+const show=(id,on)=>document.getElementById(id).classList.toggle('hidden',!on);
+function page(which){show('assignPage',false);show('recPage',false);show('listPage',which==='list');show('wizPage',which==='wiz');show('admPage',which==='adm');show('projPage',which==='proj');show('srcPage',which==='src');show('srcNew',which==='new');
+ document.querySelectorAll('[data-nav]').forEach(n=>n.classList.toggle('on',n.dataset.nav===({new:'src',list:'proj',wiz:'proj'}[which]||which)));window.scrollTo(0,0);}
+document.querySelectorAll('[data-nav]').forEach(n=>n.onclick=()=>{page(n.dataset.nav);drawC()});
+document.querySelectorAll('input[name=mode]').forEach(r=>r.onchange=()=>{const off=document.querySelector('input[name=mode]:checked').value==='offline';document.getElementById('modeWarn').style.display=off?'':'none';document.getElementById('modeMsg').textContent='';});
+document.getElementById('modeSave').onclick=()=>{const v=document.querySelector('input[name=mode]:checked').value;document.getElementById('modeMsg').textContent=`Saved: candidate sign-in is ${v==='offline'?'Offline':'Online'}.`;};
+function fillProjects(){const list=kind==='Reviewer'?open_.filter(p=>p.rev):open_;const sel=document.getElementById('fProj');
+ sel.innerHTML='<option value="">Select a project…</option>'+list.map(p=>`<option>${p.n}</option>`).join('');
+ document.getElementById('fSkills').textContent=(kind==='Reviewer'?'Projects with a Reviewer step only. ':'')+'Only New or active projects are listed (not completed or cancelled).';}
+document.getElementById('fProj').onchange=e=>{document.getElementById('fSkills').textContent=e.target.value?'Skills: '+sk(e.target.value):'';};
+function drawC(){
+ document.querySelectorAll('.seg').forEach(b=>b.classList.toggle('on',b.dataset.kind===kind));
+ document.querySelectorAll('.kindName').forEach(e=>e.textContent=kind);document.getElementById('kindTable').textContent=kind;
+ document.getElementById('revOff').style.display=kind==='Reviewer'?'block':'none';
+ const q=(document.getElementById('srcQ').value||'').trim().toLowerCase();
+ const rows=q?[...D.SME.map(c=>({...c,r:'SME'})),...D.Reviewer.map(c=>({...c,r:'Reviewer'}))].filter(c=>[c.f+' '+c.l,c.e,c.r,c.p,sk(c.p)].join(' ').toLowerCase().includes(q)):D[kind].map(c=>({...c,r:kind}));
+ document.querySelectorAll('.seg').forEach(b=>b.style.opacity=q?'.5':'');
+ document.getElementById('srcHint').textContent=q?`${rows.length} result${rows.length===1?'':'s'} across SMEs and Reviewers`:'';
+ document.getElementById('cRows').innerHTML=(rows.length?rows:[]).map(c=>`<tr><td>${c.f}</td><td>${c.l}</td><td class="mono">${c.e}</td><td><span class="pill ${c.r==='SME'?'pill-info':'pill-brand'}">${c.r}</span></td><td>${c.p}</td><td class="muted" style="font-size:13px">${sk(c.p)}</td><td>${c.by}</td><td>${c.d}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No profiles match your search.</td></tr>';}
+document.querySelectorAll('.seg').forEach(b=>b.onclick=()=>{kind=b.dataset.kind;document.getElementById('srcQ').value='';drawC()});
+document.getElementById('srcQ').oninput=drawC;
+document.getElementById('newBtn').onclick=()=>{fillProjects();page('new');document.getElementById('fErr').style.display='none'};
+const srcBack=()=>{page('src');drawC()};
+document.getElementById('newBack').onclick=e=>{e.preventDefault();srcBack()};document.getElementById('fCancel').onclick=srcBack;
+document.getElementById('fSave').onclick=()=>{const pj=fProj.value,f=fFirst.value.trim(),l=fLast.value.trim(),e=fEmail.value.trim().toLowerCase(),err=document.getElementById('fErr');
+ const miss=[!pj&&'project',!f&&'first name',!l&&'last name',!e&&'email'].filter(Boolean);
+ if(miss.length){err.textContent='Enter the '+miss.join(', ')+'.';err.style.display='block';return}
+ if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){err.textContent='Enter a valid email address.';err.style.display='block';return}
+ if(D[kind].some(c=>c.e===e&&c.p===pj)){err.textContent='This person is already submitted for this project.';err.style.display='block';return}
+ err.style.display='none';D[kind].push({f,l,e,p:pj,by:'Platform Admin',d:'2026-11-15'});['fFirst','fLast','fEmail','fLi'].forEach(i=>document.getElementById(i).value='');srcBack();};
+drawC();
+
+var NEED=2;var A=[{f:'Morgan',l:'Hale',e:'morgan.hale.qa@gmail.com',r:'SME'}];
+const POOL=[
+ {f:'Casey',l:'Nguyen',e:'casey.nguyen.qa@gmail.com',m:'Consumer deposit KYC, Evidence-based investigation'},
+ {f:'Drew',l:'Kim',e:'drew.kim.qa@gmail.com',m:'Consumer deposit KYC'},
+ {f:'Jamie',l:'Okafor',e:'jamie.okafor.qa@gmail.com',m:'Evidence-based investigation'},
+ {f:'Avery',l:'Lin',e:'avery.lin.qa@gmail.com',m:'Consumer deposit KYC, Evidence-based investigation'}];
+const twoRoute=()=>document.getElementById('routeSel').value==='SME_EXPERT_PM';
+const full_=x=>x.f+' '+x.l;
+function tasksOf(x){return x.r==='SME'?T.filter(t=>t.a===full_(x)):T.filter(t=>t.rv===full_(x));}
+function smeOptions(){return (A||[]).filter(x=>x.r==='SME').map(x=>`<option>${full_(x)}</option>`).join('');}
+function drawA(){
+ document.getElementById('aRows').innerHTML=A.map(x=>{const ts=tasksOf(x);return `<tr><td>${x.f}</td><td>${x.l}</td><td class="mono">${x.e}</td><td><span class="pill ${x.r==='SME'?'pill-info':'pill-brand'}">${x.r}</span></td><td><span class="pill pill-success">Assigned</span></td><td class="mono">${ts.map(t=>t.id).join('<br>')||'—'}</td><td>${ts.map(t=>pill(t.s)).join('<br>')||'—'}</td></tr>`}).join('')||'<tr><td colspan="7" class="muted">No one assigned yet. Use Assign.</td></tr>';
+ const smes=A.filter(x=>x.r==='SME').length,revs=A.filter(x=>x.r==='Reviewer').length;
+ document.getElementById('resSum').textContent=`${smes} of ${NEED} SMEs assigned (Required workers)`+(twoRoute()?` · ${revs} reviewer${revs===1?'':'s'}`:'');
+ document.querySelector('[data-tab=res] .n').textContent=`${smes} / ${NEED}`;const full=smes>=NEED;
+ document.getElementById('resNote').textContent=(twoRoute()?'Review route Author → Reviewer → PM/Admin: you can assign SMEs and Reviewers.':'Review route Author → PM/Admin: you can assign SMEs only. No reviewers on this project.')+' Each person sees their tasks, including any sent back for rework, when they sign in.';
+ const free=POOL.filter(p=>!A.some(x=>x.e===p.e));
+ const openT=T.filter(t=>!t.a), revT=T.filter(t=>t.a&&!t.rv&&['SUBMITTED','IN_PROGRESS','REWORK','ASSIGNED'].includes(t.s));
+ document.getElementById('assignRoute').textContent=twoRoute()?'As SME, pick an unassigned task to author. As Reviewer, pick an authored task to review (never their own). A person is never both on one project.':'This project\'s route is Author → PM/Admin, so people can be assigned as SME only, to an unassigned task.';
+ document.getElementById('pRows').innerHTML=free.map(p=>`<tr><td>${p.f}</td><td>${p.l}</td><td class="mono">${p.e}</td><td class="muted" style="font-size:13px">${p.m}</td>
+  <td><select data-tk="${p.e}" style="font-size:13px;padding:4px 8px;width:100%"><option value="">Choose a task…</option><optgroup label="To author (SME)">${openT.map(t=>`<option value="S:${t.id}">${t.id} · ${t.n.split(',')[0]}</option>`).join('')}</optgroup>${twoRoute()?`<optgroup label="To review (Reviewer)">${revT.map(t=>`<option value="R:${t.id}">${t.id} · ${t.n.split(',')[0]}</option>`).join('')}</optgroup>`:''}</select><span class="err" data-er="${p.e}"></span></td>
+  <td style="text-align:right">${full?'<span class="muted" style="font-size:12px">SME places full</span>':`<button class="btn btn-primary btn-sm" data-asg="${p.e}" data-r="SME">Assign as SME</button>`}${twoRoute()?` <button class="btn btn-secondary btn-sm" data-asg="${p.e}" data-r="Reviewer">Assign as Reviewer</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">No more matching profiles. Upload more in Sourcing.</td></tr>';
+ document.querySelectorAll('[data-asg]').forEach(b=>b.onclick=()=>{const e=b.dataset.asg,role=b.dataset.r,v=document.querySelector(`[data-tk="${e}"]`).value,er=document.querySelector(`[data-er="${e}"]`);
+  const want=role==='SME'?'S:':'R:';
+  if(!v||!v.startsWith(want)){er.textContent=role==='SME'?'Choose a task to author.':'Choose a task to review.';er.style.display='block';return}
+  const p=POOL.find(x=>x.e===e),t=T.find(x=>x.id===v.slice(2)),name=full_(p);
+  if(role==='SME'){t.a=name;t.s='ASSIGNED';t.d='2026-11-15';}else{t.rv=name;}
+  A.push({f:p.f,l:p.l,e:p.e,r:role});drawA();draw();});}
+function showAssign(on){show('projPage',!on);show('assignPage',on);window.scrollTo(0,0);drawA();}
+document.getElementById('assignBtn').onclick=()=>showAssign(true);
+document.getElementById('assignBack').onclick=e=>{e.preventDefault();showAssign(false);};
+document.getElementById('routeSel').addEventListener('change',drawA);
+// SME's own view (candidate app preview)
+function drawMe(){const me='Morgan Hale';const mine=T.filter(t=>t.a===me);
+ document.getElementById('meRows').innerHTML=mine.map(t=>`<tr><td class="mono">${t.id}</td><td><strong>${t.n}</strong>${t.s==='REWORK'&&t.cm?`<div style="margin-top:6px;font-size:13px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--warning) 9%,#fff)"><strong>Reviewer comment:</strong> ${t.cm}</div>`:''}</td><td>${pill(t.s)}</td><td style="text-align:right">${['ASSIGNED','IN_PROGRESS'].includes(t.s)?'<a class="btn btn-primary btn-sm" href="#">Author task</a>':t.s==='REWORK'?'<a class="btn btn-primary btn-sm" href="#">Fix and resubmit</a>':'<a class="btn btn-secondary btn-sm" href="#">View</a>'}</td></tr>`).join('');}
+document.getElementById('meBtn').onclick=()=>{const on=document.getElementById('mePage').classList.contains('hidden');show('mePage',on);document.querySelector('header').style.display=on?'none':'';show('projPage',!on);show('srcPage',false);show('assignPage',false);show('srcNew',false);document.querySelector('.demo').style.display=on?'none':'';document.getElementById('meBtn').textContent=on?'Back to console':'SME view';drawMe();window.scrollTo(0,0);};
+drawA();draw();
+
+const WS=['Template','Basics','Volume, diversity and TPT','Demographics','Job description','Review and submit'];let wi=0;
+const WB=[
+ `<div class="wf"><label style="grid-column:span 2">Template (newest published version of each workflow)<select><option>Banking — KYC onboarding and refresh · v6 · one task per US state (CA, NY, TX, FL, IL)</option><option>Marketing — Campaign brief · v1</option></select></label><p class="muted" style="grid-column:span 2;margin:0">The template sets the task form, the slots and the allowed review routes.</p></div>`,
+ `<div class="wf"><label style="grid-column:span 2">Project name<input value="KYC-Of US bank Chicago"></label><label style="grid-column:span 2">Description<textarea rows="2">KYC for retail customers opening an account at a Chicago bank with branches in 5 states.</textarea></label><label>Start date<input type="date" value="2026-11-13"></label><label>End date<input type="date" value="2026-11-30"></label>
+   <fieldset style="grid-column:span 2;border:1px solid var(--hairline);border-radius:12px;padding:10px 14px"><legend style="font-size:13px;font-weight:600">Review route (read-only after submit)</legend><label style="display:flex;gap:8px"><input type="radio" name="rr" checked style="width:auto"> Author → PM/Admin</label><label style="display:flex;gap:8px;margin-top:6px"><input type="radio" name="rr" style="width:auto"> Author → Reviewer → PM/Admin</label></fieldset></div>`,
+ `<div class="wf"><label>Number of tasks<input value="5" readonly></label><label>Max tasks per expert<input value="4"></label><label>Required workers<input value="2"></label><label>TPT (minutes per task)<input value="60"></label></div>`,
+ `<div class="wf"><label>Country / region<select><option>United States (required)</option></select></label><label>Languages<select><option>English, fluent (required)</option></select></label><label>Education<select><option>Bachelor's or higher (required)</option></select></label><label>Domain experience<select><option>5+ years (required)</option></select></label></div>`,
+ `<div class="wf"><label style="grid-column:span 2">Title<input value="KYC onboarding and refresh task author (Banking)"></label><label style="grid-column:span 2">Mandatory skills<input value="Consumer deposit KYC, Evidence-based investigation"></label><label>Pay per task<input value="50 USD"></label><label>Location<select><option>Remote</option></select></label></div>`,
+ `<p style="margin:0 0 8px"><strong>KYC-Of US bank Chicago</strong> · Banking — KYC v6 · 5 tasks · 2 workers · 60 min · Author → PM/Admin</p><p class="muted" style="margin:0">Submit creates the project in <strong>New</strong>. Next: open it, add policies, export the JD PDF for agencies, then assign people.</p>`];
+function drawWiz(){document.getElementById('wsteps').innerHTML=WS.map((n,i)=>`<li class="${i===wi?'on':i<wi?'done':''}">${i+1} ${n}</li>`).join('');document.getElementById('wbody').innerHTML=WB[wi];
+ document.getElementById('wPrev').style.visibility=wi?'visible':'hidden';document.getElementById('wNext').textContent=wi===WS.length-1?'Submit project':'Next';}
+document.getElementById('wPrev').onclick=()=>{if(wi>0){wi--;drawWiz();}};
+document.getElementById('wNext').onclick=()=>{if(wi<WS.length-1){wi++;drawWiz();}else{wi=0;page('proj');tab('dash');}};
+document.getElementById('newProjBtn').onclick=()=>{wi=0;drawWiz();page('wiz');};
+document.getElementById('wizBack').onclick=e=>{e.preventDefault();page('list');};
+document.querySelector('[data-openproj]').onclick=e=>{e.preventDefault();page('proj');tab('dash');};
+
+document.getElementById('recBtn').onclick=()=>{show('projPage',false);show('recPage',true);window.scrollTo(0,0);};
+document.getElementById('recBack').onclick=e=>{e.preventDefault();show('recPage',false);show('projPage',true);};
+// Deep links: #list #new-project #dash #res #assign #tasks #task-1 #proc #src #src-new #adm
+function route(arg){const h=typeof arg==='string'?arg:location.hash.slice(1);if(!h)return;
+ if(h==='list')page('list');else if(h==='new-project'){wi=0;drawWiz();page('wiz');}
+ else if(['dash','res','tasks','proc'].includes(h)){page('proj');tab(h);}
+ else if(h==='assign'){page('proj');tab('res');showAssign(true);}
+ else if(h.startsWith('task-')){page('proj');tab('tasks');openTask(+h.split('-')[1]);}
+ else if(h==='src'){page('src');drawC();}else if(h==='src-new'){page('src');fillProjects();page('new');}
+ else if(h==='adm')page('adm');
+ else if(h==='recruiter'){page('proj');tab('res');show('projPage',false);show('recPage',true);}}
+window.addEventListener('hashchange',()=>route());route();
+</script>
+</body>
+</html>

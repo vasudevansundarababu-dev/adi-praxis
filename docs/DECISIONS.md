@@ -1109,3 +1109,12 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
 - **(chosen by Claude)** Extraction progress: the page polls `GET /policy/extraction` every 3 s while any job is not terminal. It stops when all jobs are terminal and then reloads the rules. It gives up after 35 minutes, since the worker's deadline is 30.
 - **(chosen by Claude)** **Apply all suggested** is a button the PM clicks after reading the suggestions. It ticks each suggested rule as that PM, one audited command per rule, and skips any rule whose evidence needs a confirmation. The AI itself still ticks nothing.
 - **(owner, via the DevOps session)** A ticked rule that is still incomplete (type unknown, no scope, no effective scope) is applied with a warning but **blocks publication** until it is defined, because Anvil cannot accept it. Unverified quotes warn and need confirmation but do not block. This replaces PRD AC06's separate review step: the tick is the review.
+
+## MVP1 design approved (15 Nov 2026)
+
+- **(owner)** "Ok approved." This covers the MVP1 design in `docs/design/PROJECT-SCREEN-DESIGN.md` and the review page
+  (claude.ai artifact "Praxis MVP1 Design", version 7).
+- Development follows the no-breakages rule and the build order, starting with step 1: the PM or Admin assigns a
+  person to a specific task.
+- Before development, the owner tells Anvil (Keystone) to pause integration testing. The message is in the shared
+  outputs folder.

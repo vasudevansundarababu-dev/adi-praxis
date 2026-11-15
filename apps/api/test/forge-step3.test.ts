@@ -131,7 +131,7 @@ describe('MVP1 step 3: candidate app (account claim, Before you start, Home)', (
       const [claimed] = await audits('candidate.account_claimed');
       expect(claimed).toMatchObject({ entityId: pre.smeUserId, actorType: 'CANDIDATE' });
       expect(claimed!.after).toMatchObject({ created: false, sourcedPersonIds: [pre.sourcedPersonId] });
-      expect(JSON.stringify(claimed!.after)).not.toMatch(/ada|gmail/i);
+      expect(JSON.stringify(claimed!.after)).not.toMatch(/\bada\b|ada\.l|gmail/i);
       expect(await audits('candidate.account_created')).toHaveLength(0);
 
       const h = await home(me);

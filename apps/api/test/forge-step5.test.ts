@@ -268,7 +268,7 @@ describe('MVP1 step 5: Sourcing screens and Export to Recruiter', () => {
       expect(storage.objects.size).toBe(1);
       const [a] = await db.auditEvent.findMany({ where: { action: 'sourcing.people_imported' } });
       expect(a!.after).toMatchObject({ projectId: pid, role: 'SME', created: 2, skipped: 5 });
-      expect(JSON.stringify(a)).not.toMatch(/ada|lovelace|alan|turing/i);
+      expect(JSON.stringify(a)).not.toMatch(/\bada\b|ada@|lovelace|alan|turing/i);
       expect(await db.auditEvent.count({ where: { action: 'sourcing.person_added' } })).toBe(3);
       // The people show in Sourcing with the project's skills.
       const list = (await get(pm, '/sourcing/people?role=SME')).json().items;

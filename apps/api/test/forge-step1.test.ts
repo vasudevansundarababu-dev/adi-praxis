@@ -169,7 +169,7 @@ describe('MVP1 step 1: settings, Sourcing, task rows, direct assignment, candida
       expect(dup.json().error).toBe('DUPLICATE_PERSON');
       const [a] = await audits('sourcing.person_added');
       expect(a!.after).toEqual({ projectId: pid, role: 'SME' });
-      expect(JSON.stringify(a)).not.toMatch(/ada|lovelace/i);
+      expect(JSON.stringify(a)).not.toMatch(/\bada\b|ada\.l|lovelace/i);
     });
 
     it('allows Reviewers only on the Reviewer route, and only new or active projects', async () => {

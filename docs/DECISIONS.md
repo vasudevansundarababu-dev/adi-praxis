@@ -1737,3 +1737,20 @@ Evaluator kind and version, Output field, Comparison, Expected value) is replace
   readable line per ticked source. Existing text is never overwritten. The field is found from its definition, not
   its section number.
 - **(chosen by Claude)** The source list is internal (`RubricTaskSources`, append-only, audited) and isn't exported.
+
+## One mockup for the whole SME task form (15 Nov 2026)
+
+`docs/design/mockups/rubric-editor.html` is renamed `docs/design/mockups/sme-task-form.html` and now covers the whole
+KYC v7 SME task form (plan section 17). It's awaiting the owner's approval; no feature code yet.
+
+- **(chosen by Claude)** In S4 the SME picks **documents, not individual rules**. Each picked document brings its
+  applied rules. This matches the S4 item shape: Policy ID, Version, Publication reference and SHA-256 are
+  document-level. Rules show read-only under "Show rules", with the PR #81 marking.
+- **(chosen by Claude)** The S4 picker shows only published documents and their applied rules. Draft, unapplied and
+  extraction-state rules are never shown to the SME.
+- **(chosen by Claude)** S4, "Sources used for this task" (S7) and S8 "Sources" are linked. Picking a policy in S4
+  adds a ticked source, and S8 shows the ticked list. There's one list, not three.
+- **(owner, D3)** The declaration text is exactly "I won't use real customer, employer or account information." The
+  rule is unchanged.
+- **(chosen by Claude)** The S4 picker design is shared with the policy-annotations session (PR #81) through the
+  side-session notes, using its six marking labels and chip colours, so both mockups match.

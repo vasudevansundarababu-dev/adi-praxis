@@ -2,7 +2,7 @@
 
 Given by the owner on 15 Nov 2026 and passed to this work by the DevOps session. Reproduced verbatim below. It is
 combined with `docs/prd/PRD-RUBRIC-RECOMMENDATIONS.md`, D8 and D9 in `docs/plan/PLAN-RUBRIC-RECOMMENDATIONS.md`, whose
-section 14 lists the conflicts and decisions. The mockup to approve is `docs/design/mockups/rubric-editor.html`.
+section 14 lists the conflicts and decisions. The mockup to approve is `docs/design/mockups/sme-task-form.html`.
 
 ---
 

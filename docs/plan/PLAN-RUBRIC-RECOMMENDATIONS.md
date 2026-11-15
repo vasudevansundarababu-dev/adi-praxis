@@ -4,7 +4,7 @@
 | --- | --- |
 | Status | **Plan only, awaiting the owner's approval.** No code yet. |
 | Requirements | `docs/prd/PRD-RUBRIC-RECOMMENDATIONS.md` and `docs/prd/PRD-SIMPLIFIED-RUBRIC-EDITOR.md` (owner specs, 15 Nov 2026, verbatim). Section 14 reconciles them. |
-| Mockup | `docs/design/mockups/rubric-editor.html` (**owner approval needed before any build**) |
+| Mockup | `docs/design/mockups/sme-task-form.html`: the whole SME task form on KYC v7 (S1–S8, S4 picker, S7 rubric, declaration). **Owner approval needed before any build.** |
 | Related | QA defects D8 (S7 typed by hand), D9 (technical criterion fields typed with no source) and D6 (S4 picked from the policy library); policy rule annotations plan (PR #81) |
 | Code baseline | `main` at `4b424b00` |
 | Release boundary | Everything ships behind flags that are **off** by default. With the flags off, nothing changes for users, exports or the RL Gym QA deployment. |
@@ -49,7 +49,7 @@ Section 10 lists the decisions I took so we don't need a round of questions. Sec
 
 ## 2. Where the UI lives: the simplified rubric editor
 
-**Mockup for approval:** `docs/design/mockups/rubric-editor.html`. It's a clickable mockup on the KYC v7 Custodian
+**Mockup for approval:** `docs/design/mockups/sme-task-form.html`. It's a clickable mockup on the KYC v7 Custodian
 task, showing `identification_verification`, `revision_integrity` and `account_authority` plus one suggested
 addition. The picker bar at the bottom jumps to each requested state.
 
@@ -514,3 +514,20 @@ Output field, Comparison, Expected value) and asked for something simple. The SM
 - `evidenceRefs` is untouched on save;
 - S8 is filled only when empty and is never overwritten;
 - export bytes are unchanged with the source list present.
+
+## 17. Scope widened: one mockup for the whole SME task form (owner, 15 Nov 2026)
+
+The mockup now covers the full KYC v7 task form an SME fills in, not only S7. The file is
+`docs/design/mockups/sme-task-form.html`; it was `rubric-editor.html`, which has been renamed. The bottom bar jumps to
+each state. The console Project → Policies page is out of scope; the policy-annotations session (PR #81) owns it.
+
+| Item | What the mockup shows | Plan |
+| --- | --- | --- |
+| **S4 policy references (D6)** | Picked policies as cards. Policy ID, Version, Publication reference and Content SHA-256 are read-only "From the project library", and the GB-01…GB-07 values are the real v7 ones. The SME writes only Applicability, Rationale and Exceptions (private notes). **Add policy** opens a picker of the project's *published* documents, each with the policy-annotation summary chips (Mandatory n · Mandatory when applicable n · Permitted option n · Needs clarification n) and "Show rules", which lists the applied rules with their marking and "Applies when". **Empty state:** "This project has no published policies yet. Ask your project admin to add policies." plus "Propose a policy document". | S4 item values are filled from `PolicyDocument`/`PolicyDocumentVersion` (`sha256`); the stored and exported shape is unchanged. Submit checks each reference against the library. The picker reads the PR #81 annotations through an interface; without them it shows rule counts only. The shared picker design is agreed with the PR #81 session in the side-session notes (`s4-policy-picker-shared-design.md`). |
+| **S7 rubric** | Everything in sections 2 and 16: sources as checkboxes, template-default Pass/Partial/Fail, automatic "Derived from" chips, the Change dialog, whole-task failure, read-only technical settings, the three warning states, and the AI suggestion label. | Unchanged. |
+| **Sources ↔ S4 ↔ S8** | Adding a policy in S4 adds a ticked row to "Sources used for this task". S8 "Sources" shows the ticked list read-only, with "Change sources". | S8 is filled from the list only when empty (section 16). |
+| **Declaration (D3)** | Exact text: "I won't use real customer, employer or account information." No "Synthetic data only" label. Submit without it ticked shows "Tick the declaration to submit." | Wording change only. The rule and the `syntheticDeclaration` flag are unchanged; the other places that show the declaration (Before you start, reviewer screens, help) get the same text. |
+| **No internal names (D5, D9)** | Template help reads "RL Gym assigns…" and "RL Gym provides…". | Our own help text in `helpers.ts` is fixed directly. Template text on published v6/v7 follows the owner's D5 choice (a new RL Gym version or display-time substitution); the mockup shows the result. |
+| **Incomplete draft** | Save works with gaps across the form (e.g. S1 Language empty, plus the S7 items). Each gap links to its field and section, and a section tab with something to finish gets an amber dot. Submit still runs the existing checks. | Section 7 and AC 8. |
+
+Out of scope here and unchanged: the console Policies page (PR #81), D1, D2, D4 and D7.

@@ -70,15 +70,27 @@ export function toSourcedPersonDto(
   };
 }
 
-/** Sourcing → New: one person for one project and role. The same person twice on a project and role is refused. */
-export async function addSourcedPerson(tx: Tx, actor: Actor, input: SourcedPersonInput, audit: Audit) {
-  const p = await sourcingProject(tx, actor, input.projectId);
+type SourcingTarget = Awaited<ReturnType<typeof sourcingProject>>;
+
+/** The rules for adding anyone to a project: it is new or active, and Reviewers only where the route has a Reviewer step. */
+export function assertCanSource(p: Pick<Project, 'status' | 'reviewRoute'>, role: 'SME' | 'REVIEWER') {
   if (!(SOURCING_OPEN_STATUSES as readonly string[]).includes(p.status)) {
     throw new AppError(409, 'PROJECT_NOT_OPEN', 'People can be added only to new or active projects.');
   }
-  if (input.role === 'REVIEWER' && p.reviewRoute !== 'SME_EXPERT_PM') {
+  if (role === 'REVIEWER' && p.reviewRoute !== 'SME_EXPERT_PM') {
     throw new AppError(409, 'NO_REVIEWER_STEP', 'This project has no Reviewer step, so Reviewers cannot be added to it.');
   }
+}
+
+/** Loads the project (caller's visibility) and checks the sourcing rules: the shared start of Sourcing → New and the sheet import. */
+export async function sourcingTarget(tx: Db | Tx, actor: Actor, projectId: string, role: 'SME' | 'REVIEWER') {
+  const p = await sourcingProject(tx, actor, projectId);
+  assertCanSource(p, role);
+  return p;
+}
+
+/** Creates one sourced person on a checked project. The same person twice on a project and role is refused. Audited without names or emails. */
+export async function createSourcedPerson(tx: Tx, actor: Actor, p: SourcingTarget, input: Omit<SourcedPersonInput, 'projectId'>, audit: Audit, extra: { assessmentStorageKey?: string } = {}) {
   const emailNorm = normEmail(input.email);
   const dup = await tx.sourcedPerson.findUnique({ where: { projectId_role_emailNorm: { projectId: p.id, role: input.role, emailNorm } } });
   if (dup) throw new AppError(409, 'DUPLICATE_PERSON', 'This person was already submitted to this project for this role.', { sourcedPersonId: dup.id });
@@ -95,6 +107,7 @@ export async function addSourcedPerson(tx: Tx, actor: Actor, input: SourcedPerso
         linkedinUrl: input.linkedinUrl ?? null,
         agency: input.agency ?? null,
         assessment: (input.assessment ?? {}) as Prisma.InputJsonValue,
+        assessmentStorageKey: extra.assessmentStorageKey ?? null,
         submittedById: actor.userId,
       },
     });
@@ -104,7 +117,24 @@ export async function addSourcedPerson(tx: Tx, actor: Actor, input: SourcedPerso
   }
   // Ids and role only: names and emails stay out of the audit log.
   await audit({ entityType: 'SourcedPerson', entityId: s.id, action: 'sourcing.person_added', after: { projectId: p.id, role: s.role } });
+  return s;
+}
+
+/** Sourcing → New: one person for one project and role. */
+export async function addSourcedPerson(tx: Tx, actor: Actor, input: SourcedPersonInput, audit: Audit) {
+  const p = await sourcingTarget(tx, actor, input.projectId, input.role);
+  const s = await createSourcedPerson(tx, actor, p, input, audit);
   return { person: s, project: { name: p.name, skills: projectSkills(p) } };
+}
+
+/** Projects the caller may upload people for (the New screen's dropdown): new or active, never draft, completed or cancelled. */
+export async function sourcingProjects(db: Db, actor: Actor) {
+  const ps = await db.project.findMany({
+    where: { ...visibleProjects(actor), status: { in: [...SOURCING_OPEN_STATUSES] } },
+    include: PROJECT_SKILL_INCLUDE,
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+  });
+  return ps.map((p) => ({ id: p.id, name: p.name, status: p.status, reviewRoute: p.reviewRoute, skills: projectSkills(p) }));
 }
 
 /** Sourcing list and search. With a search term both roles are searched (owner, 15 Nov). */

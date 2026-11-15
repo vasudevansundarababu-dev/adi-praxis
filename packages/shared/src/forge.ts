@@ -245,4 +245,70 @@ export interface ForgeHomeDto {
   name: string | null;
   authorTasks: ForgeAuthorTask[];
   reviewTasks: ForgeReviewTask[];
+// ── MVP1 step 5: Sourcing screens and Export to Recruiter ──
+
+/** A project on the Sourcing → New dropdown: new or active, with the skills from its job description. */
+export interface SourcingProjectDto {
+  id: string;
+  name: string;
+  status: string;
+  reviewRoute: 'SME_PM' | 'SME_EXPERT_PM';
+  skills: string[];
+}
+
+export interface RecruiterRequirement {
+  /** Skill, Experience, Education, or the demographic's label (for example Country / region). */
+  kind: string;
+  detail: string;
+  level: 'Required' | 'Preferred';
+  /** What the recruiter checks to say the requirement is met. */
+  evidence: string;
+}
+
+/** The recruiter pack (one PDF with the assessment sheet inside), built from the project. Public text: ADI Forge only. */
+export interface RecruiterPackDto {
+  projectId: string;
+  projectName: string;
+  /** For example 15 Nov 2026. */
+  date: string;
+  fileName: string;
+  role: { title: string; work: string; location: string; language: string; pay: string; effort: string; peopleNeeded: number | null };
+  requirements: RecruiterRequirement[];
+  cheatSheetIntro: string;
+  cheatSheet: { section: string; title: string; explanation: string }[];
+  questions: { n: number; text: string; required: boolean }[];
+  sendBack: { item: string; detail: string }[];
+  sheetColumns: string[];
+}
+
+/** One row of an imported assessment sheet: what would be (or was) created, or why not. */
+export interface SourcingImportRow {
+  row: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  ok: boolean;
+  problems: string[];
+}
+
+export interface SourcingImportResult {
+  projectId: string;
+  role: SourcedRole;
+  dryRun: boolean;
+  rows: SourcingImportRow[];
+  valid: number;
+  created: number;
+  skipped: number;
+}
+
+/** The New screen's form, checked in the browser before anything is sent (the API checks it again). */
+export function sourcedPersonFormProblems(f: { projectId: string; firstName: string; lastName: string; email: string; linkedinUrl: string }): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!f.projectId) out.projectId = 'Choose a project.';
+  if (!f.firstName.trim()) out.firstName = 'Enter the first name.';
+  if (!f.lastName.trim()) out.lastName = 'Enter the last name.';
+  if (!f.email.trim()) out.email = 'Enter the email (the Gmail address they will sign in with).';
+  else if (!z.string().email().safeParse(f.email.trim()).success) out.email = 'Enter a valid email address.';
+  if (f.linkedinUrl.trim() && !/^https?:\/\/\S+\.\S+/.test(f.linkedinUrl.trim())) out.linkedinUrl = 'Enter a full web address starting with https://';
+  return out;
 }

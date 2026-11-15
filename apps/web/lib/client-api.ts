@@ -32,3 +32,23 @@ export async function mutate<T>(method: 'POST' | 'PATCH' | 'PUT', path: string, 
     return { ok: false, status: 0, data: null, error: 'Could not reach the server. Check your connection and try again.' };
   }
 }
+
+/**
+ * Multipart upload from the browser (files and form fields), through the same /api/v1 proxy and with a fresh
+ * Idempotency-Key. Append text fields before the file: the API reads them first.
+ */
+export async function upload<T>(path: string, form: FormData): Promise<MutationResult<T>> {
+  try {
+    const res = await fetch(`/api/v1${path}`, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: form });
+    const json = (await res.json().catch(() => null)) as (T & { message?: string; details?: { problems?: string[] } }) | null;
+    return {
+      ok: res.ok,
+      status: res.status,
+      data: res.ok ? json : null,
+      error: res.ok ? null : (json?.message ?? `Upload failed (${res.status})`),
+      problems: res.ok ? undefined : json?.details?.problems,
+    };
+  } catch {
+    return { ok: false, status: 0, data: null, error: 'Could not reach the server. Check your connection and try again.' };
+  }
+}

@@ -30,6 +30,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Requisitions', href: '/requisitions', roles: ['ADMIN', 'PM', 'REVIEWER'], smeSupply: true },
     ],
   },
+  // MVP1 (owner, 15 Nov): Sourcing is its own top-level item, right after Projects.
+  { key: 'sourcing', label: 'Sourcing', items: [{ label: 'Sourcing', href: '/sourcing', roles: ['ADMIN', 'PM'] }] },
   {
     key: 'reviews',
     label: 'Reviews',

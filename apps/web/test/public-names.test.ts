@@ -15,8 +15,10 @@ import { describe, expect, it } from 'vitest';
 const ROOT = path.resolve(import.meta.dirname, '../../..');
 const API_USER_FACING = [
   'apps/api/src/anvil/validator.ts',
+  'apps/api/src/anvil/generic-package.ts',
   'apps/api/src/routes/tasks.ts',
   'apps/api/src/tasks/submission.ts',
+  'apps/api/src/tasks/definitions.ts',
   'apps/api/src/support/help-pack.ts',
   'apps/api/src/support/authoring-help.ts',
   'apps/api/src/support/assistant.ts',

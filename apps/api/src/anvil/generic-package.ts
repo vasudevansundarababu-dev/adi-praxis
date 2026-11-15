@@ -138,11 +138,14 @@ function selectorBlock(input: PackageInput, authored: Record<string, unknown>): 
   const s = sectionKey ? sections[sectionKey] : undefined;
   const authoredValue = isObj(s) && fieldKey ? s[fieldKey] : undefined;
   const slot = isObj(input.record.input) && isObj(input.record.input.slot) ? input.record.input.slot : {};
-  const slotCase = isObj(slot.case) && slot.case.field === sel.field && typeof slot.case.value === 'string' ? slot.case.value : undefined;
+  // A slot made for another selector field (the template changed under it) is a conflict, never ignored.
+  if (isObj(slot.case) && slot.case.field !== sel.field) return { problem: { code: 'GENERIC_CASE_SELECTOR_MISMATCH', message: `The task's slot is for ${String(slot.case.field)}, but its template selects tasks by ${sel.field}.` } };
+  const slotCase = isObj(slot.case) && typeof slot.case.value === 'string' ? slot.case.value : undefined;
   const authoredText = typeof authoredValue === 'string' && authoredValue !== '' ? authoredValue : undefined;
   const value = slotCase ?? authoredText;
   if (!value) return { problem: { code: 'GENERIC_CASE_SELECTOR_MISSING', message: `The task has no ${sel.field} value (from its task slot or ${sel.source}).` } };
   if (slotCase && authoredText && authoredText !== slotCase) return { problem: { code: 'GENERIC_CASE_SELECTOR_MISMATCH', message: `The task's slot is ${sel.field} "${slotCase}" but ${sel.source} says "${authoredText}". Fix the task so they agree.` } };
+  if (!sel.values.includes(value)) return { problem: { code: 'GENERIC_CASE_SELECTOR_UNKNOWN', message: `The task's ${sel.field} "${value}" is not one of the template's values (${sel.values.join(', ')}).` } };
   const s1 = isObj(sections.S1) ? sections.S1 : {};
   const example = typeof s1.exampleGoverningState === 'string' && s1.exampleGoverningState.trim() !== '' ? s1.exampleGoverningState : undefined;
   return { fields: { case_selector: { field: sel.field, value }, ...(example ? { coverage: { example_governing_state: example } } : {}) } };
@@ -153,7 +156,7 @@ function taskFiles(input: PackageInput): TaskFiles | PackageProblem {
   const base = { recordId: record.id, taskId: record.taskInstanceId };
   if (template.status !== 'PUBLISHED' && template.status !== 'RETIRED') return { ...base, code: 'GENERIC_TEMPLATE_NOT_PUBLISHED', message: 'The task’s template version is not published.' };
   const spec = jointTemplateSpec(template);
-  if (!spec) return { ...base, code: 'GENERIC_TEMPLATE_NOT_JOINT', message: 'This template version has no Anvil execution part (it was not proposed by Anvil as praxis.anvil.template-spec.v1), so Anvil cannot take its tasks yet.' };
+  if (!spec) return { ...base, code: 'GENERIC_TEMPLATE_NOT_JOINT', message: 'This template version has no RL Gym execution part (it was not proposed by RL Gym as a joint template spec), so RL Gym cannot take its tasks yet.' };
   const a = authoredRecord(record.output);
   if ('problem' in a) return { ...base, ...a.problem };
   const form = spec.authoring.profile;
@@ -166,7 +169,7 @@ function taskFiles(input: PackageInput): TaskFiles | PackageProblem {
     // private can reach an agent through the export.
     // The form is Praxis's own schema, so Praxis's allow-list projection applies to it directly.
     const praxisView = form.storage === 'canonical' ? null : agentProjection(form as unknown as TemplateProfile, record.output);
-    if (!praxisView || jcs((praxisView as { sections?: unknown }).sections ?? {}) !== jcs(actor.sections)) return { ...base, code: 'GENERIC_PRIVATE_EXPOSURE', message: 'Anvil’s public view of this task would include fields Praxis keeps private (for example a policy citation’s rationale), so it is not sent. The published form must declare those sub-fields as private.' };
+    if (!praxisView || jcs((praxisView as { sections?: unknown }).sections ?? {}) !== jcs(actor.sections)) return { ...base, code: 'GENERIC_PRIVATE_EXPOSURE', message: 'RL Gym’s public view of this task would include fields ADI Forge keeps private (for example a policy citation’s rationale), so it is not sent. The published form must declare those sub-fields as private.' };
     const privateRef = { purpose: 'grader_only_reference_and_rubric', access: 'private_rubric', authored: a.authored };
     const formPath = `forms/${String(form.profileId)}.json`;
     const taskId = record.taskInstanceId;
@@ -236,6 +239,14 @@ export function buildGenericPackages(inputs: PackageInput[], scope: { projectId:
     forms.set(t.formPath, formHash);
     ready.push(t);
   }
+  // A case-selector template's tasks cover its values together: when one task's selector value is missing, unknown or
+  // conflicting, none of that template version's tasks is sent, so an export never silently lacks a value.
+  const selectorBlocked = new Set(inputs.filter((i) => problems.some((p) => p.recordId === i.record.id && p.code.startsWith('GENERIC_CASE_SELECTOR_'))).map((i) => i.template.id));
+  if (selectorBlocked.size) {
+    for (const t of ready.filter((r) => selectorBlocked.has(r.input.template.id)))
+      problems.push({ recordId: t.input.record.id, taskId: t.input.record.taskInstanceId, code: 'GENERIC_CASE_SELECTOR_BATCH_BLOCKED', message: 'Not sent: another task of this template has a selector problem, and the template’s tasks are sent together. Fix that task first.' });
+    ready.splice(0, ready.length, ...ready.filter((r) => !selectorBlocked.has(r.input.template.id)));
+  }
   if (!ready.length) return { batchId: null, parts: [], problems };
 
   // Content-derived batch identity: the same tasks (same revisions, templates and files) give the same IDs.
@@ -250,13 +261,13 @@ export function buildGenericPackages(inputs: PackageInput[], scope: { projectId:
     const trial = [...current, t];
     if (trial.length > MAX_TASKS_PER_PART || assemble(trial, ids(9999, 9999)).zip.length > MAX_PART_BYTES) {
       if (!current.length) {
-        problems.push({ recordId: t.input.record.id, taskId: t.input.record.taskInstanceId, code: 'GENERIC_TASK_TOO_LARGE', message: 'This one task is larger than Anvil’s 1 MiB package bound.' });
+        problems.push({ recordId: t.input.record.id, taskId: t.input.record.taskInstanceId, code: 'GENERIC_TASK_TOO_LARGE', message: 'This one task is larger than RL Gym’s 1 MiB package bound.' });
         continue;
       }
       groups.push(current);
       current = [t];
       if (assemble(current, ids(9999, 9999)).zip.length > MAX_PART_BYTES) {
-        problems.push({ recordId: t.input.record.id, taskId: t.input.record.taskInstanceId, code: 'GENERIC_TASK_TOO_LARGE', message: 'This one task is larger than Anvil’s 1 MiB package bound.' });
+        problems.push({ recordId: t.input.record.id, taskId: t.input.record.taskInstanceId, code: 'GENERIC_TASK_TOO_LARGE', message: 'This one task is larger than RL Gym’s 1 MiB package bound.' });
         current = [];
       }
     } else current = trial;

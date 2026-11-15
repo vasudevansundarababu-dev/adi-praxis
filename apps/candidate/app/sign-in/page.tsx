@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { FullLogo } from '@/components/brand';
 import { SignInForm } from '@/components/sign-in-form';
 import { getForgeSettings, getMeSafe } from '@/lib/api';
+import { signInVariant } from '@/lib/forge';
 
 export const metadata: Metadata = { title: { absolute: pageTitle('Sign in') } };
 
@@ -19,18 +20,20 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
       <FullLogo />
       <h1 className="mt-10 text-xl font-semibold">Sign in to ADI Forge</h1>
       {forge.newFlow ? (
-        <p className="mt-2 text-sm text-fg-muted">Sign in with the email you gave your recruitment agency. You&apos;ll see the tasks assigned to you.</p>
+        <p className="mt-2 text-sm text-fg-muted">
+          Sign in with the email you gave your recruitment agency{signInVariant(forge) === 'password' ? ' and your password' : ''}. You&apos;ll see the tasks assigned to you.
+        </p>
       ) : (
         <p className="mt-2 text-sm text-fg-muted">
           ADI Forge invites subject-matter experts to write realistic, synthetic tasks. We check your identity to protect
           the contributor community, and we ask about your relevant experience to match you with suitable work.
         </p>
       )}
-      <SignInForm newFlow={forge.newFlow} returnTo={returnTo} googleClientId={process.env.GOOGLE_OAUTH_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''} demo={process.env.PRAXIS_DEMO === '1'} />
+      <SignInForm newFlow={forge.newFlow} variant={signInVariant(forge)} returnTo={returnTo} googleClientId={process.env.GOOGLE_OAUTH_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''} demo={process.env.PRAXIS_DEMO === '1'} />
       <p className="mt-6 text-xs text-fg-muted">
         By continuing you agree to the <Link href="/terms" className="text-link underline">contributor terms</Link> and
-        the <Link href="/privacy" className="text-link underline">privacy notice</Link>. We only ask Google for your
-        sign-in; we never access Gmail, Drive or contacts.
+        the <Link href="/privacy" className="text-link underline">privacy notice</Link>.
+        {signInVariant(forge) === 'password' ? ' We store only a secure hash of your password, never the password itself.' : ' We only ask Google for your sign-in; we never access Gmail, Drive or contacts.'}
       </p>
     </main>
   );

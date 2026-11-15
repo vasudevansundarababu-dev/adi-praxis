@@ -1,11 +1,13 @@
 'use client';
 
 import type { CandidateMeDto } from '@praxis/shared';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Req, RequiredNote } from '@/components/required';
 import { call } from '@/lib/client';
+import { ONLINE_NEW_HERE, type SignInVariant } from '@/lib/forge';
 
 declare global {
   interface Window {
@@ -23,7 +25,8 @@ export function destination(me: CandidateMeDto, returnTo: string, forge?: { term
   return returnTo || '/home';
 }
 
-export function SignInForm({ returnTo, googleClientId, demo = false, newFlow = false }: { returnTo: string; googleClientId: string; demo?: boolean; newFlow?: boolean }) {
+export function SignInForm({ returnTo, googleClientId, demo = false, newFlow = false, variant }: { returnTo: string; googleClientId: string; demo?: boolean; newFlow?: boolean; variant?: SignInVariant }) {
+  const mode: SignInVariant = variant ?? (newFlow ? 'offline' : 'classic');
   const router = useRouter();
   const [adult, setAdult] = useState(false);
   const [needsAdult, setNeedsAdult] = useState(false);
@@ -33,10 +36,13 @@ export function SignInForm({ returnTo, googleClientId, demo = false, newFlow = f
   adultRef.current = adult;
 
   const finish = useCallback(
-    async (credential: string) => {
+    async (credential: string | { email: string; password: string }) => {
       setPending(true);
       setError(null);
-      const res = await call<CandidateMeDto>('POST', '/auth/google', { credential, adultAttested: adultRef.current });
+      const res =
+        typeof credential === 'string'
+          ? await call<CandidateMeDto>('POST', '/auth/google', { credential, adultAttested: adultRef.current })
+          : await call<CandidateMeDto>('POST', '/auth/password', { ...credential, adultAttested: adultRef.current });
       setPending(false);
       if (res.ok) {
         const forge = newFlow ? await call<{ newFlow: boolean; termsAccepted: boolean }>('GET', '/me/forge/home') : null;
@@ -66,6 +72,11 @@ export function SignInForm({ returnTo, googleClientId, demo = false, newFlow = f
   // Local dev only: mock Google.
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  async function passwordSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    await finish({ email, password });
+  }
   async function devSignIn(e: React.FormEvent) {
     e.preventDefault();
     const t = await call<{ credential: string }>('POST', '/auth/dev/google-token', { email, name });
@@ -84,7 +95,31 @@ export function SignInForm({ returnTo, googleClientId, demo = false, newFlow = f
         </span>
       </label>
 
-      {!googleClientId && process.env.NODE_ENV === 'production' && !demo ? (
+      {mode === 'password' ? (
+        <form onSubmit={passwordSignIn} className="space-y-3">
+          <div>
+            <label htmlFor="pw-email" className="block text-sm">
+              Email
+              <Req />
+            </label>
+            <input id="pw-email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2" />
+          </div>
+          <div>
+            <label htmlFor="pw-password" className="block text-sm">
+              Password
+              <Req />
+            </label>
+            <input id="pw-password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2" />
+            <p className="mt-1 text-right text-sm">
+              <Link href="/forgot-password" className="text-link underline">Forgot password?</Link>
+            </p>
+          </div>
+          <button type="submit" disabled={pending} className="w-full btn btn-primary disabled:opacity-60">
+            {pending ? 'Signing in…' : 'Sign in'}
+          </button>
+          <p className="text-sm text-fg-muted">{ONLINE_NEW_HERE}</p>
+        </form>
+      ) : !googleClientId && process.env.NODE_ENV === 'production' && !demo ? (
         <p role="alert" className="text-sm text-error">Sign-in is not configured yet. Please try again later.</p>
       ) : googleClientId ? (
         <>
@@ -93,7 +128,9 @@ export function SignInForm({ returnTo, googleClientId, demo = false, newFlow = f
         </>
       ) : (
         <form onSubmit={devSignIn} className="space-y-3 rounded-md border border-warning p-4">
-          <p className="text-sm font-medium text-warning">{demo ? 'Demo sign-in (simulated Google) — demo environment, synthetic data only' : 'Dev sign-in (mock Google) — local development only'}</p>
+          <p className="text-sm font-medium text-warning">
+            {mode === 'offline' ? 'Offline sign-in (test environment): no password' : demo ? 'Demo sign-in (simulated Google) — demo environment, synthetic data only' : 'Dev sign-in (mock Google) — local development only'}
+          </p>
           <div>
             <label htmlFor="dev-email" className="block text-sm">
               Email
@@ -109,7 +146,7 @@ export function SignInForm({ returnTo, googleClientId, demo = false, newFlow = f
             <input id="dev-name" required value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2" />
           </div>
           <button type="submit" disabled={pending} className="w-full btn btn-primary disabled:opacity-60">
-            {pending ? 'Signing in…' : 'Continue with Google (mock)'}
+            {pending ? 'Signing in…' : mode === 'offline' ? 'Sign in' : 'Continue with Google (mock)'}
           </button>
         </form>
       )}

@@ -1,4 +1,4 @@
-import type { ForgeAuthorTask, ForgeComment, ForgeHomeDto, ForgeReviewTask, SmeTaskStatus, TemplateProfile } from '@praxis/shared';
+import { candidatePasswordProblem, type ForgeAuthorTask, type ForgeComment, type ForgeHomeDto, type ForgeReviewTask, type PublicForgeSettings, type SmeTaskStatus, type TemplateProfile } from '@praxis/shared';
 
 /**
  * MVP1 candidate app (docs/design/PROJECT-SCREEN-DESIGN.md, "Candidate app for MVP1"; mockup
@@ -120,3 +120,27 @@ export function welcomeProblem(contributor: boolean, synthetic: boolean): string
   if (contributor && synthetic) return null;
   return 'Accept both to continue.';
 }
+
+// ── MVP1 step 6: candidate sign-in modes ──
+
+/**
+ * Which sign-in form to show: `password` (new flow, Online: email and password), `offline` (new flow, Offline: the
+ * simulated email-and-name sign-in, test environments only) or `classic` (new flow off: unchanged).
+ */
+export type SignInVariant = 'password' | 'offline' | 'classic';
+export function signInVariant(forge: PublicForgeSettings): SignInVariant {
+  if (!forge.newFlow) return 'classic';
+  return forge.candidateSignIn === 'ONLINE' ? 'password' : 'offline';
+}
+
+/** The Set password form's check before it is sent (the server checks again, including the email rule). */
+export function newPasswordProblem(password: string, confirm: string, email?: string | null): string | null {
+  if (!password) return 'Enter a new password.';
+  const p = candidatePasswordProblem(password, email ? [email] : []);
+  if (p) return p;
+  if (password !== confirm) return 'The two passwords do not match.';
+  return null;
+}
+
+export const FORGOT_SENT = "If that email has an account, we've sent a link.";
+export const ONLINE_NEW_HERE = 'New here? We emailed you a link to set your password when you were assigned to a project.';

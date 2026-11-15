@@ -1902,3 +1902,11 @@ D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos ar
   - In the editor, Weight and Group are editable where the template doesn't set them. A criterion-level whole-task
     failure is flagged "Evaluation setup needed".
   - The golden Marketing test runs end to end with the flag on.
+- **(chosen by Claude, D10)** **Pay before the first save.**
+  - On Projects → New → Job description, "Generate from the template" shows the generated JDs with editable Wage
+    per task, currency, location type and location before the draft exists.
+  - The values are kept in the wizard (not auto-saved when the step opens). On Save they are written to the JDs the
+    API generates, only where the PM entered a wage and the JD has none.
+  - Next is blocked on this step until each needed JD has a wage, and a location unless remote. The problem is shown
+    inline. "Use or write my own" needs a chosen JD with a wage.
+  - Save itself never asks for a field the PM couldn't see.

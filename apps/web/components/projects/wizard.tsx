@@ -15,6 +15,8 @@ import {
   REVIEW_ROUTE_LABELS,
   REVIEW_ROUTES,
   publicText,
+  generateJobDescriptions,
+  JD_ROLE_LABELS,
 } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -23,7 +25,7 @@ import { Req, RequiredNote } from '@/components/required';
 import { DemographicsStep } from './demographics-step';
 import { FiguresPanel } from './figures-panel';
 import { JobDescriptionStep } from './jd-step';
-import { GeneratedJdPanel, type ProjectJds } from './generated-jd';
+import { EMPTY_PAY, GeneratedJdPanel, payProblem, type JdPay, type ProjectJds } from './generated-jd';
 
 const STEPS = ['Template', 'Basics', 'Volume, diversity and TPT', 'Demographics', 'Job description', 'Review and submit'] as const;
 
@@ -119,6 +121,42 @@ export function ProjectWizard(props: {
   };
   const template = templates.find((t) => t.id === state.templateId);
   const [projectJds, setProjectJds] = useState<ProjectJds | null>(null);
+  // D10: pay and location of the generated JDs, editable before the first save and applied when the draft is saved.
+  const [jdPay, setJdPay] = useState<{ author: JdPay; reviewer: JdPay }>({ author: EMPTY_PAY, reviewer: EMPTY_PAY });
+  const [jdTried, setJdTried] = useState(false);
+  /** What still blocks leaving the Job description step (D10): a wage, and a location unless remote. */
+  const jdStepProblems = (): string[] => {
+    if (!template) return [];
+    if (!state.jdGenerated) {
+      const own = jobDescriptions.find((j) => j.id === state.jobDescriptionId);
+      return !own ? ['Choose or write a job description.'] : own.wagePerTask > 0 ? [] : ['The chosen job description has no wage per task. Choose another or write one with a wage.'];
+    }
+    const label = (r: 'AUTHOR' | 'REVIEWER') => `${JD_ROLE_LABELS[r].toLowerCase()} job description`;
+    if (projectJds?.author) {
+      return [projectJds.author, projectJds.reviewer]
+        .filter((j): j is NonNullable<typeof j> => !!j)
+        .filter((j) => !(j.wagePerTask > 0))
+        .map((j) => `Set the wage per task for the ${label(j.role as 'AUTHOR' | 'REVIEWER')} and save it.`);
+    }
+    const preview = generateJobDescriptions({ workflowName: template.workflowName, domainName: template.domainName, primaryWork: template.primaryWork, skills: template.skills, taskMode: state.taskMode, reviewRoute: state.reviewRoute, tptMinutes: num(state.tptMinutes), filters: state.demographicFilters, attributes });
+    return [payProblem(jdPay.author, label('AUTHOR')), preview.reviewer ? payProblem(jdPay.reviewer, label('REVIEWER')) : null].filter((x): x is string => !!x);
+  };
+  /** After a save, the pay entered before the JDs existed is written to them (only where the PM entered a wage). */
+  async function applyPay(id: string) {
+    if (!state.jdGenerated || !(Number(jdPay.author.wagePerTask) > 0)) return;
+    const r = await fetch(`/api/v1/projects/${id}/job-descriptions`, { cache: 'no-store' });
+    if (!r.ok) return;
+    const jds = (await r.json()) as ProjectJds;
+    const next: ProjectJds = { ...jds };
+    for (const key of ['author', 'reviewer'] as const) {
+      const jd = jds[key];
+      const pay = jdPay[key];
+      if (!jd || !(Number(pay.wagePerTask) > 0) || jd.wagePerTask > 0) continue;
+      const res = await mutate<typeof jd>('PATCH', `/job-descriptions/${jd.id}`, { wagePerTask: Number(pay.wagePerTask), wageCurrency: pay.wageCurrency, locationType: pay.locationType, location: pay.location.trim() || null });
+      if (res.ok) next[key] = res.data!;
+    }
+    setProjectJds(next);
+  }
   const jd = state.jdGenerated ? (projectJds?.author ?? null) : (jobDescriptions.find((j) => j.id === state.jobDescriptionId) ?? null);
   const figures = useMemo(
     () =>
@@ -175,6 +213,7 @@ export function ProjectWizard(props: {
       setMessage({ kind: 'error', text: res.error! });
       return null;
     }
+    await applyPay(res.data!.id);
     if (!projectId) {
       setProjectId(res.data!.id);
       // Keep the wizard open on the draft's own URL.
@@ -416,6 +455,9 @@ export function ProjectWizard(props: {
               projectId={projectId}
               jds={projectJds}
               onJdsChange={setProjectJds}
+              pay={jdPay}
+              onPayChange={setJdPay}
+              showProblems={jdTried}
             />
           )}
           {step === 4 && !state.jdGenerated && (
@@ -432,6 +474,14 @@ export function ProjectWizard(props: {
 
           {step === 5 && (
             <ReviewStep state={state} template={template} jd={jd} reviewerJd={projectJds?.reviewer ?? null} attributes={attributes} />
+          )}
+
+          {step === 4 && jdTried && jdStepProblems().length > 0 && (
+            <ul role="alert" className="mt-4 list-disc pl-5 text-sm text-error" data-jd-problems>
+              {jdStepProblems().map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
           )}
 
           {message && (
@@ -457,7 +507,16 @@ export function ProjectWizard(props: {
               Save as draft
             </button>
             {step < STEPS.length - 1 ? (
-              <button type="button" onClick={() => setStep(step + 1)} className="btn btn-primary">
+              <button
+                type="button"
+                onClick={() => {
+                  // D10: the Job description step needs a wage (and a location unless remote) before moving on.
+                  if (step === 4 && jdStepProblems().length) return setJdTried(true);
+                  setJdTried(false);
+                  setStep(step + 1);
+                }}
+                className="btn btn-primary"
+              >
                 Next
               </button>
             ) : (

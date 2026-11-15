@@ -22,6 +22,66 @@ export interface ProjectJds {
   reviewer: JobDescriptionDto | null;
 }
 
+/**
+ * D10 (owner, 15 Nov 2026): pay and location of a generated JD, editable before the draft's first save. Kept in the
+ * wizard and applied to the generated JDs when the draft is saved, so Save never fails on a field the PM couldn't see.
+ */
+export interface JdPay {
+  wagePerTask: string;
+  wageCurrency: string;
+  locationType: string;
+  location: string;
+}
+export const EMPTY_PAY: JdPay = { wagePerTask: '', wageCurrency: 'USD', locationType: 'REMOTE', location: '' };
+export const payProblem = (p: JdPay | null | undefined, label: string) =>
+  !p || !(Number(p.wagePerTask) > 0) ? `Set the wage per task for the ${label}.` : p.locationType !== 'REMOTE' && !p.location.trim() ? `Set the location for the ${label}.` : null;
+
+/** The pay and location fields of one generated JD before it is saved. */
+export function PayFields({ role, pay, onChange, problem }: { role: 'AUTHOR' | 'REVIEWER'; pay: JdPay; onChange: (p: JdPay) => void; problem: string | null }) {
+  const id = (k: string) => `pay-${role.toLowerCase()}-${k}`;
+  return (
+    <div className="mt-3 grid gap-3 sm:grid-cols-2" data-pay-fields={role}>
+      <div>
+        <label htmlFor={id('wage')} className="block text-sm font-medium">
+          Wage per task
+          <Req />
+        </label>
+        <input id={id('wage')} aria-required="true" aria-invalid={problem ? true : undefined} aria-describedby={problem ? id('problem') : undefined} type="number" min={0.01} step={0.01} value={pay.wagePerTask} onChange={(e) => onChange({ ...pay, wagePerTask: e.target.value })} className={input} />
+      </div>
+      <div>
+        <label htmlFor={id('cur')} className="block text-sm font-medium">
+          Currency (ISO code)
+          <Req />
+        </label>
+        <input id={id('cur')} maxLength={3} value={pay.wageCurrency} onChange={(e) => onChange({ ...pay, wageCurrency: e.target.value.toUpperCase() })} className={input} />
+      </div>
+      <div>
+        <label htmlFor={id('lt')} className="block text-sm font-medium">
+          Location type
+        </label>
+        <select id={id('lt')} value={pay.locationType} onChange={(e) => onChange({ ...pay, locationType: e.target.value })} className={input}>
+          {LOCATION_TYPES.map((l) => (
+            <option key={l} value={l}>
+              {l[0] + l.slice(1).toLowerCase()}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor={id('loc')} className="block text-sm font-medium">
+          Location {pay.locationType === 'REMOTE' ? '(optional)' : <Req />}
+        </label>
+        <input id={id('loc')} value={pay.location} onChange={(e) => onChange({ ...pay, location: e.target.value })} className={input} />
+      </div>
+      {problem && (
+        <p id={id('problem')} role="alert" className="text-sm text-error sm:col-span-2">
+          {problem}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** Requirements block shared by the preview and the saved JD: mandatory skills, experience, education, demographics. */
 export function JdRequirements({ jd }: { jd: Pick<GeneratedJd, 'mandatorySkills' | 'minExperienceYears' | 'educationLevel' | 'demographicProfile'> & { skills?: string[] } }) {
   const mandatory = new Set(jd.mandatorySkills.map((s) => s.toLowerCase()));
@@ -189,6 +249,11 @@ export function GeneratedJdPanel(props: {
   projectId: string | null;
   jds: ProjectJds | null;
   onJdsChange: (jds: ProjectJds) => void;
+  /** D10: pay and location before the first save. */
+  pay?: { author: JdPay; reviewer: JdPay };
+  onPayChange?: (pay: { author: JdPay; reviewer: JdPay }) => void;
+  /** D10: show the inline problems (after Next was pressed). */
+  showProblems?: boolean;
 }) {
   const { template, projectId, jds, onJdsChange } = props;
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -240,14 +305,19 @@ export function GeneratedJdPanel(props: {
         </>
       ) : (
         <>
-          <p className="text-sm">Preview. Save the draft to create these job descriptions, then set the pay and location.</p>
-          {[preview.author, preview.reviewer].filter((j): j is GeneratedJd => !!j).map((j) => (
-            <section key={j.role} aria-label={`${JD_ROLE_LABELS[j.role]} preview`} className="rounded-md border border-line p-4">
-              <h3 className="font-semibold">{j.title}</h3>
-              <p className="mt-1 whitespace-pre-wrap text-sm">{j.responsibilities}</p>
-              <JdRequirements jd={{ ...j, skills: j.mandatorySkills }} />
-            </section>
-          ))}
+          <p className="text-sm">Generated from the template and the Demographics step. Set the pay and location now; they are saved with the draft.</p>
+          {[preview.author, preview.reviewer].filter((j): j is GeneratedJd => !!j).map((j) => {
+            const key = j.role === 'REVIEWER' ? 'reviewer' : 'author';
+            const pay = props.pay?.[key] ?? EMPTY_PAY;
+            return (
+              <section key={j.role} aria-label={`${JD_ROLE_LABELS[j.role]} job description`} className="rounded-md border border-line p-4">
+                <h3 className="font-semibold">{j.title}</h3>
+                <p className="mt-1 whitespace-pre-wrap text-sm">{j.responsibilities}</p>
+                <JdRequirements jd={{ ...j, skills: j.mandatorySkills }} />
+                {props.onPayChange && <PayFields role={j.role} pay={pay} onChange={(p) => props.onPayChange!({ ...(props.pay ?? { author: EMPTY_PAY, reviewer: EMPTY_PAY }), [key]: p })} problem={props.showProblems ? payProblem(pay, `${JD_ROLE_LABELS[j.role].toLowerCase()} job description`) : null} />}
+              </section>
+            );
+          })}
         </>
       )}
     </div>

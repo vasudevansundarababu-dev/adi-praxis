@@ -1532,3 +1532,8 @@ Forgot password still answers 202 and sends nothing).
 - **(chosen by Claude)** The m10 pay-run test now cancels, through the Finance API, a run an earlier attempt left part-way
   for its week, then builds the week again. Before, a retry found the first attempt's confirmed run and failed on "Finance
   cannot approve before a PM confirms" for that reason alone, hiding the real first failure.
+- **Owner, 15 Nov 2026:** "On the new flow." and "Again the old flow is irrelevant". Each failing test was judged against
+  the MVP1 new flow. None asserts old-flow behaviour that MVP1 changed. The smoke test accepts the Admin landing on Home
+  ("Welcome, …"): it never checks the landing page, and goes on through the Projects menu and New project. It failed
+  only because both pages were still compiling (4.6 s and 4.7 s) when its 5 s check ran. All three failures that were
+  retried passed on retry with unchanged code, so no test was rewritten.

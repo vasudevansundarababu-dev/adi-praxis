@@ -80,8 +80,17 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
   useEffect(() => {
     if (readOnly || seeded.current || !view.seed) return;
     seeded.current = true;
-    onChange(view.seed);
-  }, [readOnly, view.seed, onChange]);
+    // Merge into what is on screen (never replace it): missing template criteria are added; existing items keep every
+    // value except the read-only evaluator fields, which come from the template.
+    const seed = view.seed;
+    const have = new Set(items.map((i) => i.id));
+    const kept = items.map((i) => {
+      const s = seed.find((x) => x.id === i.id);
+      return s && (s.evaluatorKind !== i.evaluatorKind || s.evaluatorVersion !== i.evaluatorVersion) ? { ...i, evaluatorKind: s.evaluatorKind, evaluatorVersion: s.evaluatorVersion } : i;
+    });
+    const added = seed.filter((s) => !have.has(s.id));
+    if (added.length || kept.some((k, n) => k !== items[n])) onChange([...kept, ...added]);
+  }, [readOnly, view.seed, onChange, items]);
   // The first visit derives suggestions from the task (no model) so links keep a snapshot of their sources.
   useEffect(() => {
     if (readOnly || ran.current || view.run) return;

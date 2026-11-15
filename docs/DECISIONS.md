@@ -1645,3 +1645,33 @@ Forgot password still answers 202 and sends nothing).
   Admin → Terms and update the seed files.
 - **(owner)** Certification, Partners and Payments are hidden from the console menu whatever the new-flow setting;
   the routes stay.
+
+## Rubric recommendations in Authoring: plan (15 Nov 2026)
+
+Plan: `docs/plan/PLAN-RUBRIC-RECOMMENDATIONS.md`. Owner spec: `docs/prd/PRD-RUBRIC-RECOMMENDATIONS.md`. **Awaiting the
+owner's approval; no code yet.**
+
+- **(chosen by Claude)** Everything sits behind `RUBRIC_RECOMMENDATIONS_ENABLED` (default false), including D8 seeding.
+  Model wording sits behind `RUBRIC_AI_ENABLED` (default false). With the defaults, nothing changes in QA and no paid
+  call is possible.
+- **(chosen by Claude)** Derivation is deterministic, from the selected template version's own field definitions
+  (contract pointers, field types, workflow graph, output schema, then a labelled heuristic), never from section
+  numbers. Unclassified fields are listed under "Sources not used". The AI only writes wording, labelled; it never
+  sets IDs, scoring, applicability or sources.
+- **(chosen by Claude)** Derivation metadata, source links (with snapshot hashes) and runs go in new append-only tables
+  (`RubricRecommendationRun`, `RubricCriterionAnnotation`), never in `TaskInstance.output`. That's what keeps the
+  RL Gym package and `ApprovedTaskRecord.contentHash` byte-identical. Restore uses the existing `TaskSubmission`
+  history.
+- **(chosen by Claude)** On a template with an evaluator map (KYC v6/v7), a new criterion stays **internal only**,
+  labelled "not sent to RL Gym", until a contract change is agreed.
+- **(chosen by Claude)** Coverage gaps, unresolved items and duplicate weighting are warnings in S7 and the pre-check.
+  They aren't new blockers, and there's no new approval stage.
+- **(chosen by Claude)** D8 "template default, SME edits" is the base layer: S7 is seeded from the evaluator map's IDs
+  (read-only). Defaults come from an optional `criterionDefaults` key on the criterion field definition (template data,
+  validated against the field's scale). Old template versions are unchanged. Fallback: IDs, a name derived from the ID
+  (labelled) and blank anchors.
+- **(chosen by Claude)** Weights and thresholds come only from structured template data. v7's "weight 5 each" is help
+  prose, so it's shown as a linked note and not applied.
+- **(chosen by Claude)** The policy rule annotations from PR #81 (mandatory marking, applies-when, responsible actor)
+  are used through an interface when present. Without them the fallback is `PolicyRule.required`, and applicability is
+  UNKNOWN where the rule body doesn't say. No hard dependency.

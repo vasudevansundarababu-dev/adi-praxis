@@ -1,4 +1,4 @@
-# Rubric details kept in ADI Forge (not sent to RL Gym yet)
+# Rubric and policy annotation details kept in ADI Forge (not sent to RL Gym yet)
 
 Rubric editor and recommendations (plan: `docs/plan/PLAN-RUBRIC-RECOMMENDATIONS.md`). This release is Authoring-only.
 **The export contract and payload are unchanged**, and no RL Gym change is needed. Sending the details below to RL Gym,
@@ -45,3 +45,10 @@ Tests prove the boundary:
 - `apps/api/test/anvil-generic-package.test.ts`: the pinned v6 package hashes;
 - `apps/api/test/rubric-recommendations.test.ts`: the whole-task condition text never enters the task output, and
   additions never enter S7.
+
+## Policy rule annotations (PR #81 work, merged here)
+
+The classification, mandatory marking, applies-when, responsible actor and the rest of each rule's annotation are kept
+in the rule body (`PolicyRuleBody.annotation`) and `PolicyRuleAnnotationRevision`. They are **not exported**: the
+proposed RL Gym annotations document was not built (non-integration scope, owner 15 Nov 2026). The project policy
+manifest v1 is unchanged.

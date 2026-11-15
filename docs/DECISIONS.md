@@ -1855,3 +1855,50 @@ Spec: `docs/prd/PRD-POLICY-RULE-ANNOTATIONS.md` (owner, verbatim). Plan: `docs/p
   - **Out of scope here:** the mockup's "Owner decisions" step shows the A1/A5/AI choices for review only and is not a
     product screen. The S4 picker (step 7) belongs to the SME task form (PR #82), and the rule drawer stays the existing
     rule page (navigation preserved, spec §0).
+
+## MVP1 QA defects in one PR: non-integration scope (15 Nov 2026)
+
+The owner, 15 Nov 2026: "Now combine all the defects into one PR and start coding. Again no integration with Anvil is
+needed. Just work in non Integration model." This approves both mockups (PR #81 Policies, PR #82 SME task form). One
+branch, `fix/mvp1-qa-defects`, builds: the policy rule annotations, the rubric editor and recommendations, and defects
+D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos are generated and what that costs.
+
+- **(owner)** **No RL Gym integration change.** The proposed `praxis.anvil.project_policy_annotations.v1` document,
+  its endpoint, contract files, schema script and change note are not taken. This supersedes the "additive document"
+  line in the annotations section above. Annotations stay internal. The export modules are byte-for-byte the same as
+  `main`, and the pinned v6 package hashes and the v7 export tests still pass.
+- **(owner, via PR #81's recommended options)** The automatic AI annotation pass after extraction plus "Suggest
+  annotations with AI"; A1 ("Apply" means include, not "mandatory"); A5 (an applied Unresolved rule publishes only when
+  marked Needs clarification).
+- **(owner)** **AI in QA uses Gemini on Vertex**, the same route as SUITABILITY_MODEL and PROFILE_MODEL (QA has no
+  Claude quota). `POLICY_AI_MODEL` and `RUBRIC_AI_MODEL` are empty in `.env.example`. An empty value follows a Gemini
+  `AUTHORING_MODEL`. Rubric wording is behind `RUBRIC_AI_ENABLED` (off). Tests use mocks and never call Vertex. AI
+  output is a labelled suggestion that a person accepts.
+- **(chosen by Claude)** **Which changes are behind the flag.**
+  - Always on: D1, D3, D4, D5 (display), D7.
+  - Behind `RUBRIC_RECOMMENDATIONS_ENABLED`: D6, D8, D9 and the rubric editor (with their submit checks and the D9
+    save normalisation). The flag is off in code and tests by default. QA turns it on with the owner's yes, so other
+    environments and the existing jobs see no change until then.
+- **(chosen by Claude)** **D1.**
+  - A case-selector template's target can't be above its number of cases. The form caps the target and says why;
+    the API refuses a higher target with `TARGET_ABOVE_CASES` on create and edit, and clamps the template default.
+  - Resource assignments list sourced SMEs who hold no task, as "No open task left" when every task is taken, else
+    "Not assigned yet".
+- **(owner, D3)** The declaration reads exactly "I won't use real customer, employer or account information." on
+  Before you start and at submit. The API's `syntheticOnly` and `syntheticDeclaration` fields are unchanged.
+- **(owner, D5 non-integration)** No arrival-check change. Template text (labels, help, section titles, primary
+  work, verification, human gate) is shown through `publicText()`: Anvil becomes RL Gym, and Praxis or ADI-Labs becomes
+  ADI Forge. The stored template, and so its hashes, are unchanged.
+- **(owner, D8 non-integration)** The owner's 20-criterion KYC table (names, Pass/Partial/Fail, weight 5 each,
+  critical on identification_verification, screening and decision) is kept in Authoring. It's in
+  `apps/api/src/tasks/rubric/defaults/golden-kyc-rubric-v1.ts`, keyed by the `golden-kyc-rubric-v1` evaluator, and
+  applies to v6 and v7. It is used only when a template carries no defaults of its own. The SME can edit it and reset
+  to the default; reviewers see what changed. This settles plan option B: weight 5 now comes from these defaults.
+- **(chosen by Claude)** **The D6 library check is a warning.** The S4 picker stops SMEs typing references, but the
+  `policy.library-reference` submit check warns rather than blocks. RL Gym hasn't confirmed which identities its v6/v7
+  grader expects (manifest or template-supplied GB IDs), and the QA smoke job still types the template's identities.
+- **(chosen by Claude)** **Marketing keeps its conventions.**
+  - Levels 0–4, groups A–G, critical rules CR-01..CR-06, and no KYC defaults.
+  - In the editor, Weight and Group are editable where the template doesn't set them. A criterion-level whole-task
+    failure is flagged "Evaluation setup needed".
+  - The golden Marketing test runs end to end with the flag on.

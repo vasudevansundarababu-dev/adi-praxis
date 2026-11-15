@@ -24,6 +24,15 @@ into `contracts/anvil/project-policy-v1/` (`schema.json`, `README.md`, `example.
   `RULE_WITHOUT_SOURCE`, `UNSUPPORTED_INHERITANCE_MODE`, `SNAPSHOT_RULE_SET_MISSING`.
 - Both routes are in the generated OpenAPI document (`/docs/json`, tag `anvil`).
 
+## Policy rule annotations (proposed, additive)
+
+`GET /api/v1/projects/:id/anvil/project-policy/annotations` serves `praxis.anvil.project_policy_annotations.v1`:
+classification, mandatory marking, applicability, relationships and provenance for each manifest rule, bound to the
+manifest by `x-praxis-manifest-sha256`. The v1 manifest above is unchanged. It has the same access, audit
+(`anvil.project_policy_annotations_exported` / `_blocked`) and 409 rules. **Proposed until RL Gym agrees:**
+[change note](../anvil/RL-GYM-POLICY-ANNOTATIONS-CHANGE-NOTE.md),
+[schema](../../contracts/praxis/project-policy-annotations-v1/schema.json).
+
 ## Field mapping
 
 | Anvil field | Praxis source |

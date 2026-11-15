@@ -1645,3 +1645,59 @@ Forgot password still answers 202 and sends nothing).
   Admin → Terms and update the seed files.
 - **(owner)** Certification, Partners and Payments are hidden from the console menu whatever the new-flow setting;
   the routes stay.
+
+## Policy rule classification, mandatory marking and annotations (15 Nov 2026)
+
+Spec: `docs/prd/PRD-POLICY-RULE-ANNOTATIONS.md` (owner, verbatim). Plan: `docs/plan/PLAN-POLICY-RULE-ANNOTATIONS.md`.
+
+- **(owner)** The plan was approved as proposed:
+  - An additive `praxis.anvil.project_policy_annotations.v1` document. The v1 manifest is unchanged, and the new
+    document stays "proposed" until RL Gym agrees in writing; the owner sends
+    `docs/anvil/RL-GYM-POLICY-ANNOTATIONS-CHANGE-NOTE.md`.
+  - An automatic AI annotation pass after every extraction, plus a "Suggest annotations with AI" button.
+  - A1: "Apply to project" means "include this rule version, with its annotation, in the published set", not
+    "mandatory".
+  - A5: an applied rule classified Unresolved may publish only when it is marked Needs clarification. Any other
+    applied rule with an unknown type still blocks as "incomplete".
+- **(owner, defaults in plan §9)**
+  - Editors are exported as an opaque user ID plus role.
+  - `severity` stays `high` in v1.
+  - The new preview checks warn and never block.
+  - The RL Gym review is used as test data only.
+  - D6 is out of scope.
+- **(chosen by Claude)** **Annotation stored in the rule body.** It is the optional `PolicyRuleBody.annotation`, never
+  defaulted, so existing content hashes and published digests are unchanged. Editing it goes through `editRule`, so an
+  applied rule gets a new draft version that must be ticked again. The append-only `PolicyRuleAnnotationRevision`
+  table (trigger) keeps every AI suggestion and author edit, with annotation version, role and time. Omitting the
+  annotation on a save keeps it, so older clients never drop one.
+- **(chosen by Claude)** **Classification and requirement type.** `classification` is the source of truth. The old
+  `requirementType` follows it (applicability_precedence → definition, unresolved → unknown), and the editor hides the
+  type selector on annotated rules.
+- **(chosen by Claude)** **Links are declared on one rule.** The reverse direction is computed when the rules are read
+  (`linkedFrom`, export `linked_from`). The plan said both sides would be kept in sync on save, but writing the
+  reverse link into the other rule would un-apply that rule as a side effect. The prompt asks the model for both
+  directions (threshold definitions and the rules that use them). The preview also flags an applied rule whose
+  threshold definition is not applied.
+- **(chosen by Claude)** **When an AI suggestion is used.** It is adopted only on a Draft or Needs definition version
+  whose annotation is absent or an unedited AI suggestion. Otherwise it is stored as "offered" (`adopted: false`) and
+  shown as "Use AI suggestion". An applied rule is never changed by AI.
+  - A compound statement that is not found word for word in the document is dropped.
+  - Links to unknown rule keys are dropped.
+  - A run is idempotent per run ID and counts toward `POLICY_AI_DAILY_CALL_CAP` as one assistant run. Over the cap it
+    is skipped and audited.
+- **(chosen by Claude)** **Define with AI on an unannotated rule** queues the same annotation pass for that one rule
+  (worker). The plan said Define would return the annotation in its own call; queueing it reuses one prompt and one
+  validation path.
+- **(chosen by Claude)** **Export provenance is derived, not frozen.**
+  - The AI suggestion shown is the current revision when it is unedited; otherwise it is the newest AI revision before
+    the author's edit.
+  - The approval is the reviewed version's `reviewedById`/`reviewedAt`.
+  - Both read immutable rows, so the same published state gives the same bytes. Rule-set content is unchanged.
+- **(chosen by Claude)** **Applicability filter.** "Show rules for application type / governing state" on the Rules page
+  uses `ruleApplicability` from `packages/shared`. Out-of-scope rules are hidden and unknown stays visible. The model
+  is given the template's case-selector values (KYC v7: individual, adult_joint, teen_joint, custodial), never the
+  project name.
+- **(chosen by Claude)** **The retired `required` flag.** The column stays. The API still accepts `required` and ignores
+  it, and no screen shows it; the preview's "marked required" count became counts per marking.
+- **(chosen by Claude)** The console user guide has no policy chapter yet, so none was added. The Rules page and the
+  rule page explain the annotations in place.

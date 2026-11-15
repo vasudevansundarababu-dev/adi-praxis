@@ -25,6 +25,9 @@ import { grantAppRole } from './grant-app-role';
  *   passed. Never production.
  * - `qa-project-cleanup [--apply]`: QA-only. Deletes every project without protected history; cancels the rest. Dry run
  *   by default; --apply also needs QA_PROJECT_CLEANUP_CONFIRM=delete-all-projects. Never production.
+ * - `qa-template-cleanup --keep <id> [--keep <id>] [--apply]`: QA-only. Keeps the named templates (and other versions
+ *   of the same lineage); deletes every other unused template and retires (archives) the rest. Dry run by default;
+ *   --apply also needs QA_TEMPLATE_CLEANUP_CONFIRM=delete-other-templates. Never production.
  * - `case-selector-slots <projectId> [--apply]`: replaces a case-selector project's generic slots with one slot per
  *   value, only while no task has been issued. Dry run by default.
  * Exits non-zero on failure so Cloud Run retries and alerts.
@@ -121,6 +124,22 @@ try {
     const tally = r.reduce<Record<string, number>>((acc, o) => ({ ...acc, [o.outcome]: (acc[o.outcome] ?? 0) + 1 }), {});
     log('info', 'qa sme cleanup', { apply, tally });
     console.log(JSON.stringify({ report: 'qa-sme-cleanup', apply, tally, smes: r }));
+  } else if (job === 'qa-template-cleanup') {
+    if (config.appEnv === 'production') throw new Error('qa-template-cleanup refuses to run with APP_ENV=production');
+    const args = process.argv.slice(3);
+    const keep: string[] = [];
+    let apply = false;
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '--apply') apply = true;
+      else if (args[i] === '--keep' && /^[0-9a-f-]{36}$/i.test(args[i + 1] ?? '')) keep.push(args[++i]!);
+      else throw new Error(`Unknown qa-template-cleanup argument "${args[i]}". Use: --keep <templateId> (repeat) [--apply]`);
+    }
+    if (apply && process.env.QA_TEMPLATE_CLEANUP_CONFIRM !== 'delete-other-templates') throw new Error('qa-template-cleanup --apply needs QA_TEMPLATE_CLEANUP_CONFIRM=delete-other-templates');
+    const { cleanupTemplates } = await import('./qa-template-cleanup');
+    const r = await cleanupTemplates(db, { keep, apply, log: (m, extra) => log('info', m, extra) });
+    const tally = r.reduce<Record<string, number>>((acc, o) => ({ ...acc, [o.outcome]: (acc[o.outcome] ?? 0) + 1 }), {});
+    log('info', 'qa template cleanup', { apply, tally });
+    console.log(JSON.stringify({ report: 'qa-template-cleanup', apply, keep, tally, templates: r }));
   } else if (job === 'case-selector-slots') {
     const rest = process.argv.slice(3);
     const apply = rest.includes('--apply');
@@ -134,7 +153,7 @@ try {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-project-cleanup | qa-sme-cleanup | case-selector-slots`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

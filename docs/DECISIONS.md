@@ -1149,3 +1149,15 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
   4. `qa-users --matched --project <kyc> --project <marketing>`;
   5. the owner assigns on the staffing page;
   6. `qa-users --accept`.
+
+## QA reset before the new flow (15 Nov 2026)
+
+- **(owner)** "Delete all the users. We will create it in new flow. Delete all the projects. Only two templates from Anvil. Rest of the templates you can delete it. In Admin keep all the users and password." Also: "If we cannot delete it please archive it."
+- **(chosen by Claude)** "Users" means candidate-app people (SMEs and Reviewers). Console users are kept.
+- **(non-negotiable)** Rows with locked history are archived, not deleted:
+  - projects are cancelled;
+  - SMEs are retired (closed, anonymised);
+  - templates are retired.
+- **(chosen by Claude)** The two templates are named by id (`--keep`). Other versions of the same lineage are left untouched, so published history (KYC v4, v5) stays immutable.
+- **Job:** `qa-template-cleanup`.
+- **Run order:** projects, then SMEs, then templates. A dry run comes first each time, and each run needs the owner's yes in the DevOps session.

@@ -188,12 +188,13 @@ only: the job refuses `APP_ENV=production`. Decisions: `docs/DECISIONS.md`, "QA 
 
 ## 8. Fresh start: SME cleanup and matched SMEs (14 Nov 2026)
 
-The owner asked to remove all SMEs, documents and policies, then seed only SMEs that match the KYC and Marketing work. Decisions are in `docs/DECISIONS.md` ("QA fresh start"). Every step needs the owner's direct yes in the DevOps session. Run each one as a dry run first and show the owner its counts.
+The owner asked to remove all SMEs, projects (with their documents and policies) and every template except the two from Anvil, then start again in the new flow. Console users (Admin, PM, reviewers) and their passwords are kept. Anything that cannot be deleted is archived: projects cancelled, SMEs retired, templates retired. Decisions are in `docs/DECISIONS.md` ("QA fresh start"). Every step needs the owner's direct yes in the DevOps session. Run each one as a dry run first and show the owner its counts.
 
 | Step | Command (`praxis-migrate` image, `run.ts`) | What it does |
 |---|---|---|
 | 1 | `qa-project-cleanup`, then `qa-project-cleanup --apply` with `QA_PROJECT_CLEANUP_CONFIRM=delete-all-projects` | Deletes projects without protected history and cancels the rest. That includes the old Chicago project and its policy documents, which are immutable. |
 | 2 | `qa-sme-cleanup`, then `qa-sme-cleanup --apply` with `QA_SME_CLEANUP_CONFIRM=delete-all-smes` | Hard-deletes SMEs without protected history. Retires the rest: no sign-in, nothing open, out of matching, account closed and anonymised. |
+| 2b | `qa-template-cleanup --keep <kycTemplateId> --keep <marketingTemplateId>` (dry run lists every template, marked "from Anvil"), then `--apply` with `QA_TEMPLATE_CLEANUP_CONFIRM=delete-other-templates` | Keeps the two named Anvil templates and other versions of their lineage. Deletes every other unused template; retires (archives) the rest. |
 | 3 | Owner, in praxis-web | Create the new KYC and Marketing projects, upload the policy files, publish each project's opportunity. |
 | 4 | `qa-users --matched --project <kycProjectId> --project <marketingProjectId>` (try `--dry-run` first) | 8 KYC and 4 Marketing synthetic personas, each through the real journey into the matching project. Needs the same secrets as `praxis-qa-users`. |
 | 5 | Owner, staffing page | Re-run match, then Assign. |

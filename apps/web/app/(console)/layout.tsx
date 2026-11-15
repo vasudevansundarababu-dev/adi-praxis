@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { NavBrand } from '@/components/brand';
 import { SignOutButton, ThemeToggle } from '@/components/shell-controls';
-import { getCurrentUser } from '@/lib/api';
+import { getCurrentUser, newFlowOn } from '@/lib/api';
 import { MainNav } from '@/components/main-nav';
 import { SupportBot } from '@/components/support/support-bot';
 import { navGroupsFor } from '@/lib/nav';
@@ -13,6 +13,8 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
   if (!user) redirect('/login');
   // A temporary password from an Admin must be replaced first (the API refuses everything else until then).
   if (user.mustChangePassword) redirect('/change-password');
+  // MVP1: with the new flow on, the menu is Home, Projects, Sourcing, Admin and Tutorials. Only PMs and Admins can read it.
+  const newFlow = user.roles.some((r) => r === 'ADMIN' || r === 'PM') ? await newFlowOn() : false;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -38,7 +40,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
             <SignOutButton />
           </div>
         </div>
-        <MainNav groups={navGroupsFor(user.roles)} />
+        <MainNav groups={navGroupsFor(user.roles, undefined, newFlow)} />
         <div className="h-1 bg-brand-gradient" aria-hidden />
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8 pb-24">{children}</main>

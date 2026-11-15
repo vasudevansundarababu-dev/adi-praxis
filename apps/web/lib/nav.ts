@@ -6,6 +6,10 @@ export interface NavItem {
   roles: InternalRole[];
   /** M10: shown only when SME_SUPPLY_ENABLED is on in this app's environment (docs/SME-SUPPLY.md section 13). */
   smeSupply?: boolean;
+  /** MVP1 (owner, 15 Nov): hidden from the menu when the new flow is on (the route stays). */
+  oldFlowOnly?: boolean;
+  /** Roles that see this item only when the new flow is on (in addition to `roles`, which always see it). */
+  newFlowRoles?: InternalRole[];
 }
 
 export interface NavGroup {
@@ -27,7 +31,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Projects', href: '/projects', roles: ['ADMIN', 'PM'] },
       { label: 'Templates', href: '/templates', roles: ['ADMIN', 'PM'] },
       { label: 'Approved exports', href: '/dataset', roles: ['ADMIN'] },
-      { label: 'Requisitions', href: '/requisitions', roles: ['ADMIN', 'PM', 'REVIEWER'], smeSupply: true },
+      { label: 'Requisitions', href: '/requisitions', roles: ['ADMIN', 'PM', 'REVIEWER'], smeSupply: true, oldFlowOnly: true },
     ],
   },
   // MVP1 (owner, 15 Nov): Sourcing is its own top-level item, right after Projects.
@@ -36,23 +40,23 @@ export const NAV_GROUPS: NavGroup[] = [
     key: 'reviews',
     label: 'Reviews',
     items: [
-      { label: 'Applications', href: '/review/applications', roles: ['REVIEWER', 'ADMIN'] },
-      { label: 'Task reviews', href: '/review/tasks', roles: ['REVIEWER', 'ADMIN', 'PM'] },
-      { label: 'RL reviews', href: '/review/rl', roles: ['REVIEWER', 'ADMIN'] },
-      { label: 'Identity reviews', href: '/review/identity', roles: ['REVIEWER', 'ADMIN'] },
-      { label: 'Conflicts', href: '/review/conflicts', roles: ['REVIEWER', 'ADMIN'] },
+      { label: 'Applications', href: '/review/applications', roles: ['REVIEWER', 'ADMIN'], oldFlowOnly: true },
+      { label: 'Task reviews', href: '/review/tasks', roles: ['REVIEWER', 'ADMIN', 'PM'], oldFlowOnly: true },
+      { label: 'RL reviews', href: '/review/rl', roles: ['REVIEWER', 'ADMIN'], oldFlowOnly: true },
+      { label: 'Identity reviews', href: '/review/identity', roles: ['REVIEWER', 'ADMIN'], oldFlowOnly: true },
+      { label: 'Conflicts', href: '/review/conflicts', roles: ['REVIEWER', 'ADMIN'], oldFlowOnly: true },
     ],
   },
   {
     key: 'certification',
     label: 'Certification',
     items: [
-      { label: 'Guidelines', href: '/guidelines', roles: ['ADMIN', 'REVIEWER'], smeSupply: true },
-      { label: 'Certification reviews', href: '/certifications', roles: ['REVIEWER', 'ADMIN'], smeSupply: true },
+      { label: 'Guidelines', href: '/guidelines', roles: ['ADMIN', 'REVIEWER'], smeSupply: true, oldFlowOnly: true },
+      { label: 'Certification reviews', href: '/certifications', roles: ['REVIEWER', 'ADMIN'], smeSupply: true, oldFlowOnly: true },
     ],
   },
-  { key: 'partners', label: 'Partners', items: [{ label: 'Partners', href: '/partners', roles: ['ADMIN'], smeSupply: true }] },
-  { key: 'payments', label: 'Payments', items: [{ label: 'Payments', href: '/payments/pay-runs', roles: ['FINANCE', 'ADMIN', 'PM'], smeSupply: true }] },
+  { key: 'partners', label: 'Partners', items: [{ label: 'Partners', href: '/partners', roles: ['ADMIN'], smeSupply: true, oldFlowOnly: true }] },
+  { key: 'payments', label: 'Payments', items: [{ label: 'Payments', href: '/payments/pay-runs', roles: ['FINANCE', 'ADMIN', 'PM'], smeSupply: true, oldFlowOnly: true }] },
   {
     key: 'admin',
     label: 'Admin',
@@ -62,6 +66,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Terms', href: '/terms', roles: ['ADMIN'] },
       { label: 'Failure codes', href: '/failure-codes', roles: ['ADMIN'] },
       { label: 'API clients', href: '/api-clients', roles: ['ADMIN'] },
+      // MVP1 (owner, 15 Nov): the new flow switch and the candidate app sign-in mode. PMs read it with the new flow on.
+      { label: 'Candidate app sign-in', href: '/admin/candidate-sign-in', roles: ['ADMIN'], newFlowRoles: ['PM'] },
     ],
   },
   // Captioned videos and the user guide (docs/user-guide), for every console role.
@@ -73,13 +79,18 @@ export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
 const smeSupplyOn = () => ['true', '1'].includes(process.env.SME_SUPPLY_ENABLED ?? '');
 
-const visible = (i: NavItem, roles: InternalRole[], smeSupply: boolean) => (smeSupply || !i.smeSupply) && i.roles.some((r) => roles.includes(r));
+const visible = (i: NavItem, roles: InternalRole[], smeSupply: boolean, newFlow: boolean) =>
+  (smeSupply || !i.smeSupply) && !(newFlow && i.oldFlowOnly) && [...i.roles, ...(newFlow ? (i.newFlowRoles ?? []) : [])].some((r) => roles.includes(r));
 
-export const navFor = (roles: InternalRole[], smeSupply = smeSupplyOn()) => NAV_ITEMS.filter((i) => visible(i, roles, smeSupply));
+export const navFor = (roles: InternalRole[], smeSupply = smeSupplyOn(), newFlow = false) => NAV_ITEMS.filter((i) => visible(i, roles, smeSupply, newFlow));
 
-/** The groups this user can see, each with only the pages they can open. */
-export const navGroupsFor = (roles: InternalRole[], smeSupply = smeSupplyOn()): NavGroup[] =>
-  NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => visible(i, roles, smeSupply)) })).filter((g) => g.items.length > 0);
+/**
+ * The groups this user can see, each with only the pages they can open. With the MVP1 new flow on (owner, 15 Nov) the
+ * menu is Home, Projects, Sourcing, Admin and Tutorials: Reviews, Certification, Partners, Payments and Requisitions are
+ * hidden from the menu only; their routes stay.
+ */
+export const navGroupsFor = (roles: InternalRole[], smeSupply = smeSupplyOn(), newFlow = false): NavGroup[] =>
+  NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => visible(i, roles, smeSupply, newFlow)) })).filter((g) => g.items.length > 0);
 
 /** The group a path belongs to: the page whose href is the longest prefix of the path. */
 export function activeGroup(groups: NavGroup[], pathname: string): NavGroup | null {

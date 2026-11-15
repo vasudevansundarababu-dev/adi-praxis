@@ -8,6 +8,8 @@ export interface NavItem {
   smeSupply?: boolean;
   /** MVP1 (owner, 15 Nov): hidden from the menu when the new flow is on (the route stays). */
   oldFlowOnly?: boolean;
+  /** Owner, 15 Nov: hidden from the menu whatever the flow setting (the route stays). */
+  hidden?: boolean;
   /** Roles that see this item only when the new flow is on (in addition to `roles`, which always see it). */
   newFlowRoles?: InternalRole[];
 }
@@ -51,12 +53,12 @@ export const NAV_GROUPS: NavGroup[] = [
     key: 'certification',
     label: 'Certification',
     items: [
-      { label: 'Guidelines', href: '/guidelines', roles: ['ADMIN', 'REVIEWER'], smeSupply: true, oldFlowOnly: true },
-      { label: 'Certification reviews', href: '/certifications', roles: ['REVIEWER', 'ADMIN'], smeSupply: true, oldFlowOnly: true },
+      { label: 'Guidelines', href: '/guidelines', roles: ['ADMIN', 'REVIEWER'], smeSupply: true, oldFlowOnly: true, hidden: true },
+      { label: 'Certification reviews', href: '/certifications', roles: ['REVIEWER', 'ADMIN'], smeSupply: true, oldFlowOnly: true, hidden: true },
     ],
   },
-  { key: 'partners', label: 'Partners', items: [{ label: 'Partners', href: '/partners', roles: ['ADMIN'], smeSupply: true, oldFlowOnly: true }] },
-  { key: 'payments', label: 'Payments', items: [{ label: 'Payments', href: '/payments/pay-runs', roles: ['FINANCE', 'ADMIN', 'PM'], smeSupply: true, oldFlowOnly: true }] },
+  { key: 'partners', label: 'Partners', items: [{ label: 'Partners', href: '/partners', roles: ['ADMIN'], smeSupply: true, oldFlowOnly: true, hidden: true }] },
+  { key: 'payments', label: 'Payments', items: [{ label: 'Payments', href: '/payments/pay-runs', roles: ['FINANCE', 'ADMIN', 'PM'], smeSupply: true, oldFlowOnly: true, hidden: true }] },
   {
     key: 'admin',
     label: 'Admin',
@@ -80,7 +82,7 @@ export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 const smeSupplyOn = () => ['true', '1'].includes(process.env.SME_SUPPLY_ENABLED ?? '');
 
 const visible = (i: NavItem, roles: InternalRole[], smeSupply: boolean, newFlow: boolean) =>
-  (smeSupply || !i.smeSupply) && !(newFlow && i.oldFlowOnly) && [...i.roles, ...(newFlow ? (i.newFlowRoles ?? []) : [])].some((r) => roles.includes(r));
+  !i.hidden && (smeSupply || !i.smeSupply) && !(newFlow && i.oldFlowOnly) && [...i.roles, ...(newFlow ? (i.newFlowRoles ?? []) : [])].some((r) => roles.includes(r));
 
 export const navFor = (roles: InternalRole[], smeSupply = smeSupplyOn(), newFlow = false) => NAV_ITEMS.filter((i) => visible(i, roles, smeSupply, newFlow));
 

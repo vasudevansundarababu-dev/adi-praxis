@@ -43,7 +43,8 @@ describe('MVP1 step 3: candidate app (account claim, Before you start, Home)', (
   });
   beforeEach(async () => {
     await resetDb();
-    const { client } = await seed(db, { SEED_ADMIN_EMAIL: 'admin@test.local', SEED_ADMIN_PASSWORD: 'admin-password-123', TASKFLOW_PATH: '/none' });
+    // These tests exercise placeholder terms, so seed without the approved texts.
+    const { client } = await seed(db, { SEED_ADMIN_EMAIL: 'admin@test.local', SEED_ADMIN_PASSWORD: 'admin-password-123', TASKFLOW_PATH: '/none', SEED_TERMS_DIR: 'none' });
     clientId = client.id;
     admin = await login(app, 'admin@test.local', 'admin-password-123');
     pm = await login(app, (await createUser(clientId, ['PM'])).email);

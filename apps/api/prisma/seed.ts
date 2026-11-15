@@ -1,9 +1,10 @@
 import { PrismaClient, type Prisma } from '@prisma/client';
 import { SEED_DEMOGRAPHIC_ATTRIBUTES } from '@praxis/shared';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { hashPassword } from '../src/auth/password';
-import { seedPlaceholderTerms } from '../src/candidate/onboarding-service';
+import { seedTerms, type ApprovedTermsText } from '../src/candidate/onboarding-service';
+import { TERMS_KEYS } from '@praxis/shared';
 import { importTaskflow, readTaskflow, type ImportResult } from '../src/templates/taskflow-import';
 import { seedCatalogV2, type CatalogPlan } from './catalog/catalog-v2';
 
@@ -18,8 +19,25 @@ export { seedCatalogV2 };
  * - the template catalog from docs/Taskflow.xlsx (or TASKFLOW_PATH), all as drafts, then the Meta-Compiler catalog
  *   (seedCatalogV2, PRD D15): Digital Marketing and the 12 mockup Banking workflows, with the full blueprints published.
  *   Old-catalog workflows are retired by the `catalog-v2` job (D15a).
- * - placeholder contributor terms (version 1) until an Admin publishes approved text; production blocks onboarding on them
+ * - the owner's approved contributor terms from prisma/seed-data/terms (published 15 Nov 2026); create-only, never
+ *   overwriting an Admin's later version. A key with no file there falls back to placeholder text, which production
+ *   refuses for onboarding
  */
+export const APPROVED_TERMS_DIR = path.resolve(import.meta.dirname, 'seed-data/terms');
+
+/** The approved terms texts kept in the repo, one `<key>.json` ({ title, body }) per terms document. */
+export function readApprovedTerms(dir = APPROVED_TERMS_DIR): Partial<Record<(typeof TERMS_KEYS)[number], ApprovedTermsText>> {
+  const out: Partial<Record<(typeof TERMS_KEYS)[number], ApprovedTermsText>> = {};
+  for (const key of TERMS_KEYS) {
+    const file = path.join(dir, `${key}.json`);
+    if (!existsSync(file)) continue;
+    const { title, body } = JSON.parse(readFileSync(file, 'utf8')) as ApprovedTermsText;
+    if (typeof title !== 'string' || typeof body !== 'string' || !title.trim() || body.trim().length < 20) throw new Error(`Bad approved terms file: ${file}`);
+    out[key] = { title, body };
+  }
+  return out;
+}
+
 export const DEFAULT_TASKFLOW_PATH = path.resolve(import.meta.dirname, '../../../docs/Taskflow.xlsx');
 
 export const FAILURE_REASON_CODES = [
@@ -71,7 +89,7 @@ export async function seed(db: PrismaClient, env: NodeJS.ProcessEnv = process.en
     });
   }
 
-  await seedPlaceholderTerms(db, client.id, admin.id);
+  await seedTerms(db, client.id, admin.id, env.SEED_TERMS_DIR === 'none' ? {} : readApprovedTerms(env.SEED_TERMS_DIR || APPROVED_TERMS_DIR));
 
   const taskflowPath = env.TASKFLOW_PATH || DEFAULT_TASKFLOW_PATH;
   let templates: ImportResult | null = null;

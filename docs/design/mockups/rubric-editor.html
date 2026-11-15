@@ -115,6 +115,12 @@ mark{background:rgb(251 191 36 / .25);color:inherit;border-radius:3px;padding:0 
 .picker button:hover{background:rgb(255 255 255 / .12)}
 .flash{animation:flash 1.6s ease-out}
 @keyframes flash{0%{box-shadow:0 0 0 3px #fbbf24}100%{box-shadow:var(--shadow)}}
+.lk.auto{padding:2px 10px;font-size:12px;background:#24262c}
+.srcs{padding:16px 18px;margin-bottom:14px}
+.srcs ul{list-style:none;margin:8px 0 10px;padding:0}
+.srcs li{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--hairline);font-size:13.5px}
+.srcs li:last-child{border-bottom:0}
+.tick{color:var(--success);font-weight:700}
 .addlist{margin-top:8px;border:1px solid var(--hairline);border-radius:10px;background:#24262c;display:none}
 .addlist.on{display:block}
 .addlist button{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);padding:7px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--hairline)}
@@ -147,6 +153,14 @@ mark{background:rgb(251 191 36 / .25);color:inherit;border-radius:3px;padding:0 
     <button class="btn btn-secondary btn-sm" id="regen">Refresh suggestions</button>
   </div>
 
+  <div class="card srcs" id="sources">
+    <h2>Sources used for this task</h2>
+    <p class="muted" style="margin:2px 0 0;font-size:13px">Ticked for you from what this task already uses. Untick a source the task didn't use, or add another. The criteria below link to the ticked sources automatically. Also shown in S8 · Sources used.</p>
+    <ul id="srcList"></ul>
+    <button class="btn btn-secondary btn-sm" id="addSrc">Add another source</button>
+    <div class="addlist" id="srcPick"></div>
+  </div>
+
   <div id="crits"></div>
 
   <div class="card crit" id="c-add" style="border-style:dashed">
@@ -154,7 +168,7 @@ mark{background:rgb(251 191 36 / .25);color:inherit;border-radius:3px;padding:0 
     <div class="bd">
       <div class="banner info"><div class="grow"><strong>Suggested addition.</strong> No template criterion covers S5 step 5's "refer to a specialist": a bank officer approves an unproven authority, not the agent. This template's 20 criteria are fixed, so an addition stays in ADI Forge and RL Gym doesn't score it.</div><button class="btn btn-secondary btn-sm" id="dismissAdd">Dismiss</button><button class="btn btn-secondary btn-sm" id="keepAdd">Keep as internal note</button></div>
       <div class="f"><div class="lb">What should the agent do?</div><textarea>Refer an unproven custodian authority to a specialist and wait. Never mark the authority as approved itself.</textarea></div>
-      <div class="f"><div class="lb">Derived from</div><div class="links"><span class="lk sug"><a href="#" data-src="s5step5">Workflow · Verify custodian's authority</a><button title="Confirm">✓</button><button title="Remove">✕</button></span><span class="lk sug"><a href="#" data-src="s3tools">S3 · Permitted tools · specialist.refer</a><button>✓</button><button>✕</button></span></div></div>
+      <div class="f"><div class="lb">Derived from</div><div class="links"><span class="lk auto"><a href="#" data-src="s5step5">Workflow · Verify custodian's authority</a></span><span class="lk auto"><a href="#" data-src="s3tools">S3 · Permitted tools</a></span></div></div>
       <div class="f"><div class="lb">When does this apply?</div><div class="appl"><p class="muted"><em>Not set yet.</em></p><span class="pill pill-warning">Undefined</span></div></div>
       <div class="f"><div class="lb">How should we score it? <small>Template scale</small></div><div class="score"><label><span class="pts">Pass · 5</span><textarea>Every unproven authority is referred with specialist.refer, and no approval is recorded by the agent.</textarea></label><label><span class="pts">Partial · 2</span><textarea placeholder="Not written yet"></textarea></label><label><span class="pts">Fail · 0</span><textarea>The agent treats the authority as approved.</textarea></label></div></div>
       <div class="f"><div class="lb">How it will be checked</div><p class="checked"><strong style="color:var(--warning)">Evaluation setup needed.</strong> The template has no evaluator for this criterion, so RL Gym won't score it. Adding one is a template change for the template admin, agreed with RL Gym.</p></div>
@@ -192,7 +206,7 @@ mark{background:rgb(251 191 36 / .25);color:inherit;border-radius:3px;padding:0 
 </div></div>
 
 <div class="picker"><strong style="margin-right:4px">Show state:</strong>
-  <button data-show="links">Suggested links</button>
+  <button data-show="links">Sources used</button>
   <button data-show="need">Source link needed</button>
   <button data-show="changed">Source changed</button>
   <button data-show="appl">Change applicability</button>
@@ -213,13 +227,13 @@ const SRC={
  s1type:{t:'S1 · Application type',sec:'S1 Reusable assignment › Application type',ver:'Task revision 14',p:'<mark>Custodian</mark> (case selector: product = custodial). Each application RL Gym runs supplies its own product and governing state.'},
  s4gb02:{t:'S4 · Policy rules · GB-02',sec:'Project policy › rule GB-02 · version golden-kyc-1.0.0',ver:'Rule version golden-kyc-1.0.0 · document "Golden Bank approved operating choices", section 2 (illustrative)',p:'<em>Illustrative passage:</em> <mark>Verify the identity of each owner and each person acting for an owner</mark> by documentary or non-documentary methods before the account is approved. A minor beneficiary of a custodial account is identified, not verified as an owner.'},
  s6out:{t:'S6 · Required output',sec:'S6 Output contract',ver:'Task revision 14 · output schema from template v7',p:'One recommendation per application from the allowed values (<span class="mono">recommendation</span>), supported by the cited evidence for the custodian and the minor beneficiary, <mark>with any unresolved gaps and the human handoff stated</mark>.'},
+ custproc:{t:'Policy · Custodial accounts procedure',sec:'Project policy library › Custodial accounts procedure › section 3',ver:'Document version 2026-10 (illustrative)',p:'<em>Illustrative passage:</em> <mark>Before opening a custodial account, confirm the custodian\'s authority to act for the minor</mark> from the custodial agreement or court order. An unproven authority is referred to a bank officer.'},
  s4gb05:{t:'S4 · Policy rules · GB-05',sec:'Project policy › rule GB-05 · version golden-kyc-1.0.0',ver:'Rule version golden-kyc-1.0.0 (illustrative)',p:'<em>Illustrative passage:</em> Use the most recent version of each supporting document; record any change between versions.'}
 };
-const ADDABLE=['s1type','s2inputs','s3tools','s5step2','s5step5','s5step6','s6out','s4gb02','s4gb05'];
 const C=[
  {id:'identification_verification',name:'Identity verified',nameDefault:'Identity verified',open:true,
   todo:'Verify the identity of the custodian, and of anyone else acting for the account, with documentary or non-documentary checks, and record each result.',
-  links:[{k:'s5step2',st:'ok'},{k:'s3tools',st:'ok'},{k:'s2inputs',st:'ok'},{k:'s4gb02',st:'sug'},{k:'s6out',st:'sug'}],
+  links:[{k:'s5step2',st:'ok'},{k:'s3tools',st:'ok'},{k:'s2inputs',st:'ok'},{k:'s4gb02',st:'ok'},{k:'s6out',st:'ok'}],
   chain:['S5 · Procedure step 2','Investigating agent','Verifying identity documents'],
   why:'Step 2 and rule GB-02 require identity verification; S6 requires the evidence to be cited.',
   ak:'always',cond:'Every person the application names as an owner, custodian or authorised signer. The minor beneficiary is identified (step 6), not verified as an owner, unless the policy requires it.',exc:'',
@@ -255,17 +269,34 @@ const C=[
 const AK={always:['Required throughout','pill-brand'],when:['Required when a condition applies','pill-info'],option:['Permitted option','pill-info'],other:['Human officer or other role','pill-info'],unset:['Undefined','pill-warning']};
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 
+function srcOn(k){if(k==='s4gb02'||k==='s4gb05')return TASKSRC[0].on;if(k==='custproc')return TASKSRC[3].shown&&TASKSRC[3].on;return true}
+function linksOf(c){const L=c.links.filter(l=>l.st==='need'||srcOn(l.k));if(c.id==='account_authority'&&srcOn('custproc'))return L.filter(l=>l.st!=='need').concat([{k:'custproc',st:'ok'}]);if(c.id==='identification_verification'&&!TASKSRC[0].on)L.push({need:'Policy rule',st:'need',why:'The ticked sources have no policy rule for identity verification.'});return L}
 function linkHtml(c,l,i){
- if(l.st==='need')return `<span class="lk need" title="${esc(l.why)}">Source link needed · ${l.need} <button data-addto="${c.id}" style="color:var(--warning)">Pick a source</button></span>`;
- const s=SRC[l.k];const cls=l.st==='sug'?'lk sug':l.st==='chg'?'lk chg':'lk';
- const tag=l.st==='sug'?'<span class="muted" style="font-size:11px">suggested</span>':l.st==='chg'?'<span style="color:var(--warning);font-size:11px">changed</span>':'';
- const btns=l.st==='sug'?`<button data-ok="${c.id}:${i}" title="Confirm this link">✓</button><button data-rm="${c.id}:${i}" title="Remove">✕</button>`:`<button data-rm="${c.id}:${i}" title="Remove">✕</button>`;
- return `<span class="${cls}"><a href="#" data-src="${l.k}">${s.t}</a>${tag}${btns}</span>`;
+ if(l.st==='need')return `<span class="lk need" title="${esc(l.why)}">Source link needed · ${l.need} <button data-needsrc="1" style="color:var(--warning)">Add a source</button></span>`;
+ const s=SRC[l.k];
+ return `<span class="lk auto${l.st==='chg'?' chg':''}"><a href="#" data-src="${l.k}">${s.t}</a>${l.st==='chg'?'<span style="color:var(--warning);font-size:11px">changed</span>':''}</span>`;
 }
+const TASKSRC=[
+ {t:'Golden Bank approved operating choices · rules GB-01 to GB-07',v:'version golden-kyc-1.0.0 · selected in S4',src:'s4gb02',shown:true,on:true},
+ {t:'Template references · KYC onboarding and refresh v7',v:'tool catalogue, output schema, federal policy references and the rubric evaluator map',shown:true,on:true},
+ {t:'Federal policy references from the template',v:'template v7 · read-only',shown:false,on:false},
+ {t:'Custodial accounts procedure (project policy library)',v:'version 2026-10 · pick by name; the version comes from the library (illustrative)',src:'custproc',shown:false,on:false}
+];
+function renderSrc(){
+ document.getElementById('srcList').innerHTML=TASKSRC.map((x,i)=>x.shown?`<li><label class="chk" style="align-items:flex-start"><input type="checkbox" data-tchk="${i}" ${x.on?'checked':''}><span>${x.src?`<a href="#" data-src="${x.src}">${x.t}</a>`:x.t}<br><span class="muted" style="font-size:12.5px">${x.v}${x.added?' · added by you':''}</span></span></label></li>`:'').join('');
+ const left=TASKSRC.map((x,i)=>x.shown?'':`<button data-tsrc="${i}">${x.t}<br><small>${x.v}</small></button>`).join('');
+ document.getElementById('srcPick').innerHTML=left||'<button disabled><small>Nothing else to add</small></button>';
+ document.querySelectorAll('[data-tsrc]').forEach(b=>b.onclick=()=>{const x=TASKSRC[b.dataset.tsrc];x.shown=true;x.on=true;x.added=true;
+   
+   document.getElementById('srcPick').classList.remove('on');renderSrc();render()});
+ document.querySelectorAll('[data-tchk]').forEach(cb=>cb.onchange=()=>{TASKSRC[cb.dataset.tchk].on=cb.checked;renderSrc();render()});
+ document.querySelectorAll('#srcList [data-src]').forEach(a=>a.onclick=e=>{e.preventDefault();openSrc(a.dataset.src)});
+}
+document.getElementById('addSrc').onclick=()=>document.getElementById('srcPick').classList.toggle('on');
 function render(){
  document.getElementById('crits').innerHTML=C.map(c=>{
-  const [akT,akC]=AK[c.ak];const sug=c.links.filter(l=>l.st==='sug').length;
-  const chips=[c.wt?'<span class="pill pill-error">Whole-task failure</span>':'',c.changed?'<span class="pill pill-warning">Source changed — check rubric</span>':'',c.links.some(l=>l.st==='need')?'<span class="pill pill-warning">Source link needed</span>':'',Object.keys(c.edited).length?'<span class="pill pill-info">Edited</span>':'<span class="pill">Template default</span>'].join('');
+  const [akT,akC]=AK[c.ak];
+  const chips=[c.wt?'<span class="pill pill-error">Whole-task failure</span>':'',c.changed?'<span class="pill pill-warning">Source changed — check rubric</span>':'',linksOf(c).some(l=>l.st==='need')?'<span class="pill pill-warning">Source link needed</span>':'',Object.keys(c.edited).length?'<span class="pill pill-info">Edited</span>':'<span class="pill">Template default</span>'].join('');
   const sc=(k,label,pts)=>`<label><span class="pts">${label} · ${pts}</span><textarea data-sc="${c.id}:${k}">${esc(c[k])}</textarea>${c.edited[k]?`<span class="reset muted">Edited · <button class="btn-link reset" data-reset="${c.id}:${k}">Reset to template</button></span>`:'<span class="reset muted">Template default</span>'}</label>`;
   return `<div class="card crit${c.open?' open':''}" id="c-${c.id}">
   <div class="hd" data-toggle="c-${c.id}"><span class="mono muted">${c.id}</span><strong>${esc(c.name)}</strong><span class="pill ${akC}">${akT}</span>${chips}<span class="chev">5 points ▾</span></div>
@@ -273,9 +304,8 @@ function render(){
    ${c.changed?`<div class="banner warn" id="chg-${c.id}"><div class="grow"><strong>Source changed — check rubric.</strong> S2 · Inputs changed in revision 14 after this criterion was linked to it (revision 12). Nothing here was changed for you.<div class="diff"><div class="old"><span class="muted">Linked text (rev 12)</span><br>… documents.list and document.read for evidence …</div><div class="new"><span class="muted">Now (rev 14)</span><br>… document.read and document.compare for evidence; a document can arrive in more than one version …</div></div></div><button class="btn btn-secondary btn-sm" data-keep="${c.id}">Reviewed, keep as is</button></div>`:''}
    <div class="f"><div class="lb">Criterion name ${c.name!==c.nameDefault?`<small>Edited · <button class="btn-link reset" data-resetname="${c.id}">Reset</button></small>`:'<small>From template</small>'}</div><input type="text" value="${esc(c.name)}" data-name="${c.id}"></div>
    <div class="f"><div class="lb">What should the agent do?</div><textarea>${esc(c.todo)}</textarea></div>
-   <div class="f" id="links-${c.id}"><div class="lb">Derived from ${sug?`<small>${sug} suggested · confirm or remove</small>`:''}</div>
-     <div class="links">${c.links.map((l,i)=>linkHtml(c,l,i)).join('')}<button class="btn-link" data-addto="${c.id}" style="font-size:12.5px;margin-left:4px">+ Add source</button></div>
-     <div class="addlist" id="add-${c.id}">${ADDABLE.filter(k=>!c.links.some(l=>l.k===k)).map(k=>`<button data-pick="${c.id}:${k}">${SRC[k].t}<br><small>${SRC[k].ver}</small></button>`).join('')}</div>
+   <div class="f" id="links-${c.id}"><div class="lb">Derived from <small>Linked automatically · nothing to maintain</small></div>
+     <div class="links">${linksOf(c).map((l,i)=>linkHtml(c,l,i)).join('')}</div>
      <div class="chain">${c.chain.map(x=>`<b>${x}</b>`).join(' → ')} → <b>this criterion</b></div>
      <div class="why">Why suggested: ${c.why}</div></div>
    <div class="f" id="appl-${c.id}"><div class="lb">When does this apply?</div><div class="appl"><p>${esc(c.cond)}${c.exc?`<br><span class="muted" style="font-size:12.5px">Exception: ${esc(c.exc)}</span>`:''}</p><span class="pill ${akC}">${akT}</span><button class="btn btn-secondary btn-sm" data-appl="${c.id}">Change</button></div>
@@ -293,16 +323,15 @@ function render(){
    <div class="f"><div class="lb">What evidence should support the score?</div><textarea>${esc(c.evidence)}</textarea></div>
    <div class="f"><div class="lb">How it will be checked</div><p class="checked">RL Gym scores this from the recorded run (the tool calls, documents read, findings and recommendation) with the template's KYC rubric evaluator, version 1. No reference answer is stored in the task.</p><p class="explain">This mapping comes from the template. Whether the evaluator is installed and calibrated is confirmed in RL Gym, not here.</p></div>
    <div class="f" id="tech-${c.id}"><details class="tech"><summary>Technical grading settings · From template</summary>
-     <dl class="kv"><dt>Evaluator</dt><dd class="mono">golden-kyc-rubric-v1</dd><dt>Evaluator version</dt><dd class="mono">1</dd><dt>Evidence source</dt><dd>Recorded run <span class="mono muted">(run_evidence)</span></dd><dt>Output field</dt><dd class="muted">Not used: scored from the run, not from an output field</dd><dt>Comparison</dt><dd class="muted">Not used</dd><dt>Expected value</dt><dd class="muted">Not used</dd><dt>Weight</dt><dd>5 of 100</dd><dt>Scale</dt><dd>Pass 5 · Partial 2 · Fail 0</dd><dt>Whole-task failure flag</dt><dd>${c.wt?'On':'Off'}</dd><dt>Evidence or rule IDs sent</dt><dd class="mono">${c.links.filter(l=>l.st==='ok'&&l.k&&/s5|s4/.test(l.k)).map(l=>l.k==='s5step2'?'S5-2':l.k==='s5step5'?'S5-5':l.k==='s4gb02'?'GB-02':'GB-05').join(', ')||'—'}</dd></dl>
-     <p class="lock">🔒 Read-only. These come from template v7 and can't be typed here. Template admins change them in the template.</p></details></div>
+     <dl class="kv"><dt>Evaluator</dt><dd class="mono">golden-kyc-rubric-v1</dd><dt>Evaluator version</dt><dd class="mono">1</dd><dt>Evidence source</dt><dd>Recorded run <span class="mono muted">(run_evidence)</span></dd><dt>Output field</dt><dd class="muted">Not used: scored from the run, not from an output field</dd><dt>Comparison</dt><dd class="muted">Not used</dd><dt>Expected value</dt><dd class="muted">Not used</dd><dt>Weight</dt><dd>5 of 100</dd><dt>Scale</dt><dd>Pass 5 · Partial 2 · Fail 0</dd><dt>Whole-task failure flag</dt><dd>${c.wt?'On':'Off'}</dd></dl>
+     <p class="lock">🔒 Read-only. These come from template v7 and can't be typed here. Template admins change them in the template. Evidence or rule IDs saved earlier are kept as they were.</p></details></div>
   </div></div>`}).join('');
  bind();gapsCount();
 }
 function gaps(){
  const g=[];
  for(const c of C){
-  if(c.links.some(l=>l.st==='need'))g.push(`<a href="#" data-jump="links-${c.id}">${c.id}</a>: source link needed (policy rule)`);
-  const s=c.links.filter(l=>l.st==='sug').length;if(s)g.push(`<a href="#" data-jump="links-${c.id}">${c.id}</a>: ${s} suggested source link${s>1?'s':''} not confirmed`);
+  if(linksOf(c).some(l=>l.st==='need'))g.push(`<a href="#" data-jump="links-${c.id}">${c.id}</a>: source link needed (no ticked source covers it; tick or add one under Sources used)`);
   if(c.changed)g.push(`<a href="#" data-jump="c-${c.id}">${c.id}</a>: source changed — check rubric`);
   if(c.wt&&!c.wtCond.trim())g.push(`<a href="#" data-jump="fail-${c.id}">${c.id}</a>: whole-task failure condition is empty`);
   if(c.wt&&c.wtKind==='other')g.push(`<a href="#" data-jump="fail-${c.id}">${c.id}</a>: whole-task failure needs evaluation setup`);
@@ -317,10 +346,7 @@ function find(id){return C.find(c=>c.id===id)}
 function bind(){
  document.querySelectorAll('[data-toggle]').forEach(h=>h.onclick=e=>{if(e.target.closest('button,a,input'))return;const el=document.getElementById(h.dataset.toggle);el.classList.toggle('open');const c=find(h.dataset.toggle.slice(2));if(c)c.open=el.classList.contains('open')});
  document.querySelectorAll('[data-src]').forEach(a=>a.onclick=e=>{e.preventDefault();openSrc(a.dataset.src)});
- document.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>{const[id,i]=b.dataset.ok.split(':');find(id).links[i].st='ok';render()});
- document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const[id,i]=b.dataset.rm.split(':');find(id).links.splice(+i,1);render()});
- document.querySelectorAll('[data-addto]').forEach(b=>b.onclick=()=>document.getElementById('add-'+b.dataset.addto).classList.toggle('on'));
- document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{const[id,k]=b.dataset.pick.split(':');const c=find(id);const n=c.links.findIndex(l=>l.st==='need'&&k.startsWith('s4'));if(n>=0)c.links.splice(n,1,{k,st:'ok'});else c.links.push({k,st:'ok'});render()});
+ document.querySelectorAll('[data-needsrc]').forEach(b=>b.onclick=()=>{jump('sources');document.getElementById('srcPick').classList.add('on')});
  document.querySelectorAll('[data-keep]').forEach(b=>b.onclick=()=>{const c=find(b.dataset.keep);c.changed=false;c.links.forEach(l=>{if(l.st==='chg'){l.st='ok';l.k='s2inputs'}});render()});
  document.querySelectorAll('[data-appl]').forEach(b=>b.onclick=()=>openAppl(b.dataset.appl));
  document.querySelectorAll('[data-wt]').forEach(x=>x.onchange=()=>{find(x.dataset.wt).wt=x.checked;render()});
@@ -356,7 +382,7 @@ document.getElementById('regen').onclick=e=>{e.target.textContent='Suggestions r
 function jump(id){const el=document.getElementById(id);if(!el)return;const card=el.closest('.crit');if(card&&!card.classList.contains('open')){card.classList.add('open');const c=find(card.id.slice(2));if(c)c.open=true}
  el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}
 function show(s){document.getElementById('drawer').classList.remove('on');document.getElementById('applDlg').classList.remove('on');
- if(s==='links')jump('links-identification_verification');
+ if(s==='links'){jump('sources');document.getElementById('srcPick').classList.add('on')}
  if(s==='need')jump('links-account_authority');
  if(s==='changed')jump('c-revision_integrity');
  if(s==='appl'){jump('appl-account_authority');setTimeout(()=>openAppl('account_authority'),500)}
@@ -365,7 +391,7 @@ function show(s){document.getElementById('drawer').classList.remove('on');docume
  if(s==='setup'){if(addDismissed){addDismissed=false;document.getElementById('c-add').style.display=''}jump('c-add');gapsCount()}
  if(s==='save')document.getElementById('saveBtn').click();}
 document.querySelectorAll('[data-show]').forEach(b=>b.onclick=()=>show(b.dataset.show));
-render();
+renderSrc();render();
 const h=location.hash.slice(1);if(h)setTimeout(()=>show(h),300);
 </script>
 </body>

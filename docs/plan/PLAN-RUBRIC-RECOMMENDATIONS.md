@@ -65,13 +65,15 @@ simplified-editor fields in the owner's order:
 | --- | --- | --- | --- |
 | 1 | Criterion name | From the template (D8 default); editable, with "Reset". The ID is read-only. | S7 item `name` (exported, as today) |
 | 2 | What should the agent do? | Plain-English behaviour, editable. | annotation `assesses` (internal) |
-| 3 | Derived from | Suggested source links as readable chips (**S2 · Inputs**, **S3 · Permitted tools**, **S4 · Policy rules · GB-02**, **Workflow · Verify identity**, **S6 · Required output**). Each is ✓ confirm or ✕ remove; "+ Add source" picks from readable names, never typed IDs. **Source link needed** when none is reliable. Below it: the chain *source → step/role → skill → this criterion* and "Why suggested". | annotation `sources` (internal). Confirmed rule, step and evidence IDs also fill `evidenceRefs` (D9). |
+| 3 | Derived from | Small read-only chips linked automatically (**S2 · Inputs**, **S3 · Permitted tools**, **S4 · Policy rules · GB-02**, **Workflow · Verify identity**, **S6 · Required output**). Clicking one opens the passage. The SME doesn't confirm, remove or maintain them (owner, "make it simple"). Links follow the ticked **Sources used for this task** (below). **Source link needed** appears when no ticked source covers the criterion, and its button opens "Add another source". The chain *source → step/role → skill → this criterion* and "Why suggested" are shown under the chips. | annotation `sources` (internal only; nothing is written to `evidenceRefs`) |
 | 4 | When does this apply? | A readable statement, an applicability pill and **Change**. The dialog offers the four kinds (required throughout; required when a condition applies; permitted option; human officer or other role), the condition and exceptions. The Not applicable, Unknown and missing-evidence wording is shown. | annotation (internal) |
 | 5 | How should we score it? | Pass, Partial and Fail text, labelled with the template's points (5/2/0 for KYC, levels 0–4 for Marketing). Each shows *Template default* or *Edited · Reset to template*. | S7 item `passCondition` / `partialCredit` / `failCondition` (or `level*`), exported as today |
 | 6 | Whole-task failure | "Make this a whole-task failure when…" with a required condition. A radio says whether it's what a **Fail (0)** on this criterion means (*Supported*) or a behaviour the Fail doesn't cover (**Evaluation setup needed**, kept as a note). The line below explains this template's rule. | S7 item `critical` (exported, unchanged meaning); the condition is in the annotation |
 | 7 | What evidence should support the score? | Editable. | annotation `evidenceRequired` (internal) |
 | 8 | How it will be checked | Read-only sentence built from the template mapping (e.g. "RL Gym scores this from the recorded run … KYC rubric evaluator, version 1"). It never says "Ready". With no mapping: **Evaluation setup needed**. | computed |
 | 9 | Technical grading settings · From template | Collapsed by default and read-only: evaluator, version, evidence source, output field, comparison, expected value, weight, scale, whole-task flag, and the evidence or rule IDs sent. Each is "Not used" when it doesn't apply (`run_evidence`). There's a lock note. | S7 item `evaluatorKind`, `evaluatorVersion`, binding fields, `weight` (exported, filled from the template) |
+
+**Sources used for this task (once per task, above the cards):** a list of real checkboxes, ticked by default from what the task already uses: the policy documents and versions selected in S4 (D6), and the template references (tool catalogue, output schema, federal policy references and the evaluator map of the task's template version). The SME can untick a source. **Add another source** adds a new ticked row, picked by readable name from the project's policy library or the template's references; nothing is typed. The list is internal (`RubricTaskSources`, section 16) and drives the criteria's automatic links.
 
 **Above the cards:** a summary ("20 criteria … Pass 5 · Partial 2 · Fail 0, 100 points"), a coverage pill, an "N to
 finish" pill and **Refresh suggestions**. **Below them:** suggested additions. On a fixed evaluator map these are
@@ -301,7 +303,7 @@ come from changes.
   must equal the mapped capability). So a filled-in task gets the same bytes an SME who typed the correct values gets
   today. The current help text's "e.g. run_evidence" contradicts that check and is corrected. The fields are hidden
   when the template has no evaluator spec. They're also hidden for an internal-only criterion, which has no mapping.
-- **Evidence or rule links (`evidenceRefs`, still a string array).** These become a picker with no free typing. It
+- **Evidence or rule links (`evidenceRefs`, still a string array).** *Superseded by section 16: the field is no longer shown or written by the editor; saved values are kept.* Original proposal: these become a picker with no free typing. It
   lists the task's selected policy rules (rule keys from the task's effective rule set; the D6 picker once it ships),
   the workflow step IDs (from S5 steps or the workflow graph) and the evidence item IDs (from the task's
   `evidence_record` fields). Values that were already saved and aren't in the list are kept, never deleted, and are
@@ -434,7 +436,7 @@ on what the author sees. The recommendations spec wins on how suggestions are de
 | 2 | **Critical trigger.** Recommendations §4 asks whether zero, partial or a specific behaviour triggers it. Editor §5 says don't assume partial triggers it, and reflect only what the contract supports. | The editor offers only what the template supports. For KYC v6/v7 that's "a Fail (0) on this criterion fails the whole task", per the S7 scoring rule. "Partial triggers it" isn't offered. A behaviour the Fail doesn't cover is saved as a note and flagged **Evaluation setup needed**. Only the existing `critical` flag is exported. |
 | 3 | **Criterion name.** D8 said ID and name read-only. Editor §1 says the name is editable under existing permissions. | The ID stays read-only. The name is editable, as it is today, with "Reset to template" and an "Edited from template" marker for the Reviewer and PM. This is D8's "template default, SME edits" applied to the name. |
 | 4 | **Applicability kinds.** Recommendations uses mandatory/conditional plus §7 rules. The editor names four kinds. | Four kinds (required throughout, required when, permitted option, human officer or other role), plus UNKNOWN for derived requirements and UNSET for a new suggestion. The Not applicable, Unknown and missing-evidence treatment stays as the template's scoring rule defines it, and nothing in the export changes. |
-| 5 | **"Evidence or rule links" (D9 picker) vs "Derived from" (editor §2).** These are two link controls for one idea. | One control: "Derived from". Confirmed links of exportable kinds (policy rule keys, step IDs, evidence IDs) fill the existing `evidenceRefs` list. Suggested-but-unconfirmed links don't. `evidenceRefs` is then shown read-only under Technical settings ("Evidence or rule IDs sent"). Existing saved values are kept. The field's meaning ("IDs this criterion checks") is unchanged, so nothing is repurposed. |
+| 5 | **"Evidence or rule links" (D9 picker) vs "Derived from" (editor §2), then the owner's "make it simple".** | Superseded by section 16: one task-level checkbox list, **Sources used for this task**. Per-criterion "Derived from" chips are automatic and read-only. The per-criterion evidence/rule links control is gone. `evidenceRefs` is not written by the editor; saved values are kept unchanged. |
 | 6 | **Technical fields.** D9 auto-fills and hides them. The editor puts them in a collapsed read-only "From template" section. | Collapsed and read-only in "Technical grading settings · From template", shown with "Not used" rather than hidden. It's filled only from the exact template mapping, never guessed; with no mapping it reads **Evaluation setup needed**. This is D9's sourcing with the editor's presentation. |
 | 7 | **Weights.** Editor §4 says load the template's weights. Plan option B left v7's weight (help prose only) unfilled. | Weight is shown read-only from structured template data: D8 `criterionDefaults`, `groups` or `weightTotal`. The mockup assumes a template version carrying D8 defaults (weight 5). On today's v7 without defaults, weight stays author-entered with the prose shown as a note, unless the owner picks option B. |
 | 8 | **New criteria.** Recommendations proposes additions; editor §4 says keep unsupported changes out of the executable export. | Additions are shown separately under the cards, labelled *AI suggestion* / *Internal only — not sent to RL Gym* / *Evaluation setup needed*. They never enter `S7.criteria` on a fixed evaluator map. |
@@ -457,3 +459,58 @@ on what the author sees. The recommendations spec wins on how suggestions are de
 | 10 | No new task statuses, review stages or decision routes (enum and route snapshot test). |
 | 11 | No change under RL Gym contract fixtures (contract files byte-identical; template hashes unchanged). |
 | 12 | Flags-off tests: S7 renders as today and the endpoints return 404. The migration is additive only. No deploy. |
+
+## 16. "Make it simple": task-level sources (owner direction, 15 Nov 2026)
+
+The owner looked at the lower block of an S7 criterion (Critical, Evidence or rule links, Evaluator kind and version,
+Output field, Comparison, Expected value) and asked for something simple. The SME should see only this:
+
+> **Sources used for this task**
+> ☑ Selected policy documents and versions
+> ☑ Linked template references
+> [Add another source]
+
+**What changes:**
+
+- **One checkbox list per task, in S7 above the criteria** (mockup: "Sources used for this task"). Each source is a
+  real checkbox:
+  - Defaults come from what the task uses, so they start ticked: each policy document and version picked in S4, and
+    the template references of the task's template version.
+  - The SME can untick a source the task didn't use.
+  - **Add another source** opens a picker of readable names (the project's policy library documents and versions, and
+    the template's reference parts) and adds a new ticked row. No IDs are typed.
+- **Per-criterion links become automatic.** "Derived from" shows small read-only chips that the SME doesn't maintain.
+  They are derived only from ticked sources and the task's own sections. Unticking a source removes its chips. A
+  criterion that ends up with no reliable policy source shows **Source link needed**, and its button opens "Add another
+  source". "Source changed — check rubric" still works the same way (snapshots per link).
+- **The lower block disappears from the criterion:**
+  - "Critical" is replaced by the simplified-editor field **Whole-task failure** with its condition. The spec requires
+    it; it's the same exported `critical` flag.
+  - Evidence or rule links are replaced by the task-level list. The editor no longer writes `evidenceRefs`; values
+    saved earlier are kept unchanged, so stored and exported bytes don't change.
+  - Evaluator kind and version, Output field, Comparison and Expected value stay in the collapsed, read-only
+    **Technical grading settings · From template**.
+- **S8 "Sources used".** On KYC v7 this is a free-text field (`S8.sourcesUsed`, visible to the agent). The same list is
+  shown there read-only. When the field is empty, it's filled with one readable line per ticked source (for example
+  "Golden Bank approved operating choices, rules GB-01 to GB-07, version golden-kyc-1.0.0"). Text the SME already wrote
+  is never overwritten; the list is offered beside it. The field is found from its definition (a long-text field whose
+  key or label names sources), not by section number. A template without such a field just keeps the S7 list. This
+  writes only an existing string field with readable names, so no schema change or new export field.
+- **Data model.** One more internal, append-only table:
+
+  ```prisma
+  RubricTaskSources {
+    id, clientId, taskInstanceId, version, createdById, createdAt
+    items  // [{ kind: POLICY_DOCUMENT | TEMPLATE_REFERENCE, ref, version, label, ticked, origin: DEFAULT | ADDED }]
+  }
+  ```
+
+  It's authorised, idempotent and audited like the annotations.
+
+**Tests added:**
+- defaults are ticked from the S4 picks and the template;
+- unticking a source removes its derived chips and can raise "Source link needed";
+- "Add another source" only accepts library documents or template references (the API schema has no free-text path);
+- `evidenceRefs` is untouched on save;
+- S8 is filled only when empty and is never overwritten;
+- export bytes are unchanged with the source list present.

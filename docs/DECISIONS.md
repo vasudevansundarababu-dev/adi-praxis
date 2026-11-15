@@ -1716,3 +1716,24 @@ author sees, and the recommendations spec wins on derivation and storage.
 - **(chosen by Claude) Mockup data:** the Custodian task on KYC v7, with real criterion IDs, scale, tools and S5 steps.
   Anchor text is from the QA cheat sheet and is shown as D8 template defaults. Policy rule numbers and passages are
   illustrative and labelled as such.
+
+## Rubric editor "make it simple": task-level sources as checkboxes (15 Nov 2026)
+
+Owner direction, relayed by the DevOps session. The S7 criterion's lower block (Critical, Evidence or rule links,
+Evaluator kind and version, Output field, Comparison, Expected value) is replaced, for the SME, by one task-level list:
+"Sources used for this task", made of real checkboxes. See plan section 16 and the mockup.
+
+- **(owner)** The sources are checkboxes. The policy documents and versions selected in S4 and the template
+  references start ticked. The SME can untick a source. "Add another source" adds a ticked row chosen by readable
+  name. No typed IDs.
+- **(chosen by Claude)** "Derived from" stays on each criterion as small automatic, read-only chips. They're built
+  only from ticked sources and the task's own sections. The SME doesn't confirm or remove them, which replaces the
+  earlier per-link ✓/✕. "Source link needed" sends the SME to "Add another source".
+- **(chosen by Claude)** "Critical" is replaced by the editor's Whole-task failure field (same exported flag), not
+  removed: the simplified-editor spec requires it.
+- **(chosen by Claude)** The editor no longer writes `evidenceRefs`; values saved earlier are kept. This supersedes
+  the decision that confirmed links fill `evidenceRefs`, and keeps exported content unchanged.
+- **(chosen by Claude)** S8 "Sources used" on v7 shows the same list. When the field is empty it's filled with one
+  readable line per ticked source. Existing text is never overwritten. The field is found from its definition, not
+  its section number.
+- **(chosen by Claude)** The source list is internal (`RubricTaskSources`, append-only, audited) and isn't exported.

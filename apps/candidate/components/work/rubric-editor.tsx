@@ -101,7 +101,9 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
     if (view.aiEnabled && view.run?.mode === 'AI') void fetch(`${base}/ai-scoring`).then((r) => (r.ok ? r.json() : null)).then((d) => d && setAiScoring(d.items));
   }, [view.aiEnabled, view.run, base]);
 
-  const setItem = (id: string, patch: Record<string, unknown>) => onChange(items.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  // A criterion the template lists but the form has not stored yet is added on its first edit (never lost).
+  const setItem = (id: string, patch: Record<string, unknown>) =>
+    onChange(items.some((i) => i.id === id) ? items.map((i) => (i.id === id ? { ...i, ...patch } : i)) : [...items, { ...newItem(field, items), ...(view.seed?.find((x) => x.id === id) ?? {}), id, ...patch }]);
   const saveDetail = async (c: { id: string; annotationVersion: number }, body: Omit<SaveCriterionRequest, 'expectedVersion'>) => {
     const r = await send('PUT', `${base}/criteria/${encodeURIComponent(c.id)}`, { expectedVersion: c.annotationVersion, ...body });
     if (!r.ok) setMsg(r.message);
@@ -173,6 +175,7 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
               </button>
               {isOpen && (
                 <CriterionBody
+                  field={field}
                   c={c}
                   item={item}
                   view={view}
@@ -308,6 +311,7 @@ function ToFinishList({ todo, onJump }: { todo: ToFinish[]; onJump: (id: string)
 }
 
 function CriterionBody(p: {
+  field: ItemField;
   c: RubricCriterionView;
   item: Record<string, unknown>;
   view: RubricView;
@@ -404,7 +408,29 @@ function CriterionBody(p: {
       </Field>
 
       <Field label="How should we score it?" note={`Template scale: ${view.template.scoreKeys.map((k) => `${k.label} ${k.points}`).join(' · ')}`}>
-        <div className="grid gap-3 sm:grid-cols-3">
+        {(p.field.groups?.length || d?.weight === undefined) && (
+          // Weight (and group, e.g. Marketing A-G) are the author's where the template doesn't set them.
+          <div className="mb-2 flex flex-wrap gap-3">
+            {p.field.groups?.length ? (
+              <label className="text-xs text-fg-muted">
+                Group
+                <select className={input} disabled={readOnly} value={String(item.group ?? '')} onChange={(e) => p.setItem({ group: e.target.value })}>
+                  <option value="">Choose…</option>
+                  {p.field.groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.id} · {g.label} ({g.weight})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <label className="text-xs text-fg-muted">
+              Weight
+              <input className={input} type="number" min={0} max={100} disabled={readOnly} value={typeof item.weight === 'number' ? item.weight : ''} onChange={(e) => p.setItem({ weight: e.target.value === '' ? null : Number(e.target.value) })} />
+            </label>
+          </div>
+        )}
+        <div className={`grid gap-3 ${view.template.scoreKeys.length > 3 ? 'sm:grid-cols-5' : 'sm:grid-cols-3'}`}>
           {view.template.scoreKeys.map((k) => {
             const dv = d?.[k.key];
             const v = String(item[k.key] ?? '');

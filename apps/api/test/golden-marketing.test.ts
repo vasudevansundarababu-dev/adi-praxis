@@ -92,7 +92,9 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
   const email = new MemoryEmailSender();
   const google = new MockGoogleVerifier(SECRET);
   const storage = new MemoryStorage();
-  const config = testConfig({ ANVIL_CREDENTIAL_NOT_AFTER: new Date(Date.now() + 60 * 86_400_000).toISOString() });
+  // The rubric editor, S4 picker and their submit checks are ON here (RUBRIC_RECOMMENDATIONS_ENABLED): Marketing must keep
+  // working end to end with them, on its own 0-4 scale and groups.
+  const config = testConfig({ ANVIL_CREDENTIAL_NOT_AFTER: new Date(Date.now() + 60 * 86_400_000).toISOString(), RUBRIC_RECOMMENDATIONS_ENABLED: 'true' });
   let clientId: string;
   let admin: string;
   let anvilKey: string;
@@ -235,6 +237,13 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
     expect(t.startingGraph).toMatchObject({ agentMode: 'MULTI', templateVersion: 1 });
     expect(t.startingGraph.roles).toHaveLength(5);
 
+    // The rubric editor reads Marketing's own conventions: levels 0-4, groups A-G, no KYC defaults, no criterion-level
+    // whole-task failure (its critical rules are CR-01..CR-06).
+    const rv = (await get(s.sme, `/me/tasks/${s.taskId}/rubric`)).json();
+    expect(rv.template).toMatchObject({ scale: 'zero_to_four', criterionFailureSupported: false, fixedSet: true });
+    expect(rv.template.scoreKeys.map((k: { points: number }) => k.points)).toEqual([4, 3, 2, 1, 0]);
+    expect(rv.criteria.every((c: { defaults: unknown }) => c.defaults === null)).toBe(true);
+    expect(JSON.stringify(rv)).not.toMatch(/partialCredit|golden-kyc/);
     // The worked case plus the workflow, with the project's published rule versions, passes every check.
     const output = { ...withRuleVersions(GOLDEN_MARKETING_EXAMPLE, s.versions), workflowGraph: marketingTask2Graph(1) };
     const saved = await save(s.sme, s.taskId, output);

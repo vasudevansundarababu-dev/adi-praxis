@@ -564,7 +564,7 @@ export function normaliseRubricOutput(task: TaskWithTemplate, output: Record<str
 export async function rubricSubmitChecks(tx: Db | Tx, task: TaskWithTemplate) {
   const ctx = rubricContext(task);
   if (!ctx) return [];
-  const checks: { id: string; section: string; ok: boolean; message: string }[] = [];
+  const checks: { id: string; section: string; ok: boolean; message: string; severity?: 'warning' }[] = [];
   if (ctx.rubric.fixedSet) {
     const have = new Set(rubricItems(ctx).map((i) => i.id));
     const missing = ctx.rubric.criteria.filter((c) => !have.has(c.id)).map((c) => c.id);
@@ -579,7 +579,9 @@ export async function rubricSubmitChecks(tx: Db | Tx, task: TaskWithTemplate) {
       const sha = Object.entries(it).find(([k]) => /sha256/i.test(k))?.[1];
       return !lib.documents.some((d) => d.sha256 === sha && d.policyId === it.ruleId && d.version === it.ruleVersion);
     });
-    checks.push({ id: 'policy.library-reference', section: pf.section, ok: !bad.length, message: bad.length ? `Pick policies from the project’s library; ${bad.length} reference${bad.length === 1 ? ' does' : 's do'} not match a published document version` : 'Every policy reference is a published document of this project' });
+    // A warning, not a blocker: the picker already stops typing, and RL Gym has yet to confirm which identities its
+    // v6/v7 grader expects (manifest vs template-supplied), so existing typed references and the QA smoke job still submit.
+    checks.push({ id: 'policy.library-reference', section: pf.section, severity: 'warning', ok: !bad.length, message: bad.length ? `Pick policies from the project’s library; ${bad.length} reference${bad.length === 1 ? ' does' : 's do'} not match a published document version` : 'Every policy reference is a published document of this project' });
   }
   return checks;
 }

@@ -1,10 +1,11 @@
 import type { Prisma, PolicyDocumentVersion } from '@prisma/client';
-import { PolicyRuleBody, type CandidateCitation, type CandidateRule } from '@praxis/shared';
+import { PolicyRuleBody, isOpenClarification, type CandidateCitation, type CandidateRule } from '@praxis/shared';
 import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, conflict, notFound } from '../lib/errors';
 import type { AuditInput } from '../platform/audit';
 import { needsDefinition, resolveCitation } from './extraction/normalise';
+import { prepareAnnotation, recordRevision, type AnnotationSave } from './annotations';
 
 export const contentHash = (body: PolicyRuleBody, citations: Array<{ documentVersionId: string; fieldPath: string; quote: string }>) =>
   sha256(stableStringify({ body, citations: citations.map((c) => [c.documentVersionId, c.fieldPath, c.quote]).sort() }));
@@ -25,19 +26,22 @@ async function uniqueKey(tx: Tx, projectId: string, wanted: string) {
  */
 export async function createRuleFromCandidate(
   tx: Tx,
-  input: { clientId: string; projectId: string; documentVersion: PolicyDocumentVersion; doc: { text: string; pages: string[]; format: string }; candidate: CandidateRule; origin: string; editedById: string; extractionJobId?: string | null; ruleKey?: string | null; state?: 'DRAFT' | 'NEEDS_DEFINITION' },
+  input: { clientId: string; projectId: string; documentVersion: PolicyDocumentVersion; doc: { text: string; pages: string[]; format: string }; candidate: CandidateRule; origin: string; editedById: string; extractionJobId?: string | null; ruleKey?: string | null; state?: 'DRAFT' | 'NEEDS_DEFINITION'; annotationSave?: AnnotationSave },
 ) {
   const { citations: raw, ruleKey: proposedKey, ...rest } = input.candidate;
-  const body = PolicyRuleBody.parse(rest);
+  const parsed = PolicyRuleBody.parse(rest);
   const resolved = raw.map((c: CandidateCitation) => ({ c, r: resolveCitation(c, input.doc) }));
-  const key = await uniqueKey(tx, input.projectId, input.ruleKey ?? proposedKey ?? slug(body.title));
+  const key = await uniqueKey(tx, input.projectId, input.ruleKey ?? proposedKey ?? slug(parsed.title));
   const rule = await tx.policyRule.create({ data: { clientId: input.clientId, projectId: input.projectId, ruleKey: key, sourceKey: (input.ruleKey ?? proposedKey)?.trim() || null } });
+  const prepared = await prepareAnnotation(tx, rule.id, undefined, parsed);
+  const body = prepared.body;
   const citations = resolved.map(({ c, r }) => ({ documentVersionId: input.documentVersion.id, fieldPath: c.fieldPath, quote: r.quote }));
   const unresolved = resolved.length === 0 || !resolved.some(({ c, r }) => c.fieldPath === 'requirement' && r.resolution === 'RESOLVED');
   const state = input.state ?? (needsDefinition(input.candidate) || unresolved ? 'NEEDS_DEFINITION' : 'DRAFT');
   const version = await tx.policyRuleVersion.create({
     data: { clientId: input.clientId, ruleId: rule.id, version: 1, state, body: body as unknown as Prisma.InputJsonValue, contentHash: contentHash(body, citations), extractionJobId: input.extractionJobId ?? null, origin: input.origin, editedById: input.editedById },
   });
+  if (prepared.changed) await recordRevision(tx, { clientId: input.clientId, ruleId: rule.id, ruleVersionId: version.id, annotation: body.annotation!, adopted: true, save: input.annotationSave ?? { source: 'AUTHOR_EDIT', editedById: input.editedById } });
   for (const { c, r } of resolved) {
     await tx.policyCitation.create({
       data: { clientId: input.clientId, ruleVersionId: version.id, documentVersionId: input.documentVersion.id, fieldPath: c.fieldPath, role: c.role, quote: r.quote, locator: r.locator as unknown as Prisma.InputJsonValue, resolution: r.resolution, providerRaw: { page: c.page, chunkId: c.chunkId, lineStart: c.lineStart, lineEnd: c.lineEnd, confidence: c.confidence } as Prisma.InputJsonValue },
@@ -73,7 +77,7 @@ export interface CitationEdit {
 export async function editRule(
   tx: Tx,
   deps: { loadText: (v: PolicyDocumentVersion) => Promise<{ text: string; pages: string[] }> },
-  input: { clientId: string; projectId: string; ruleId: string; actorId: string; expectedContentHash: string; body: PolicyRuleBody; citations?: CitationEdit[] },
+  input: { clientId: string; projectId: string; ruleId: string; actorId: string; expectedContentHash: string; body: PolicyRuleBody; citations?: CitationEdit[]; annotationSave?: AnnotationSave },
   audit: (a: AuditInput) => Promise<void>,
 ) {
   const rule = await tx.policyRule.findFirst({ where: { id: input.ruleId, clientId: input.clientId, projectId: input.projectId }, include: { versions: { orderBy: { version: 'desc' }, take: 1, include: { citations: true } } } });
@@ -81,7 +85,10 @@ export async function editRule(
   await tx.$queryRaw`SELECT id FROM "PolicyRule" WHERE id = ${rule.id}::uuid FOR UPDATE`;
   const cur = rule.versions[0];
   if (cur.contentHash !== input.expectedContentHash) throw conflict('This rule changed since you opened it. Reload to see the latest version.');
-  const body = PolicyRuleBody.parse(input.body);
+  // An annotation edit gets the next annotation version; an unchanged one keeps its version; a body sent without one
+  // (an older client) keeps the current annotation: annotations are never dropped by omission.
+  const prepared = await prepareAnnotation(tx, rule.id, PolicyRuleBody.parse(cur.body).annotation, PolicyRuleBody.parse(input.body));
+  const body = prepared.body;
 
   const citationInputs = input.citations ?? cur.citations.map((c) => ({ documentVersionId: c.documentVersionId, fieldPath: c.fieldPath, role: c.role as CitationEdit['role'], quote: c.quote, section: (c.locator as { section?: string | null })?.section ?? null }));
   const resolved = [];
@@ -106,7 +113,15 @@ export async function editRule(
   for (const { c, r } of resolved) {
     await tx.policyCitation.create({ data: { clientId: input.clientId, ruleVersionId: version.id, documentVersionId: c.documentVersionId, fieldPath: c.fieldPath, role: c.role, quote: r.quote, locator: r.locator as unknown as Prisma.InputJsonValue, resolution: r.resolution, confirmedById: input.actorId } });
   }
-  await audit({ entityType: 'PolicyRuleVersion', entityId: version.id, action: 'policy.rule_edited', before: { contentHash: cur.contentHash, version: cur.version, state: cur.state }, after: { contentHash: hash, version: version.version } });
+  const save = input.annotationSave ?? { source: 'AUTHOR_EDIT' as const, editedById: input.actorId };
+  if (prepared.changed) await recordRevision(tx, { clientId: input.clientId, ruleId: rule.id, ruleVersionId: version.id, annotation: body.annotation!, adopted: true, save });
+  await audit({
+    entityType: 'PolicyRuleVersion',
+    entityId: version.id,
+    action: 'policy.rule_edited',
+    before: { contentHash: cur.contentHash, version: cur.version, state: cur.state },
+    after: { contentHash: hash, version: version.version, ...(prepared.changed ? { annotationVersion: body.annotation!.version, annotationSource: save.source } : {}) },
+  });
   return version;
 }
 
@@ -116,7 +131,8 @@ export function definitionProblems(body: unknown): string[] {
   const p: string[] = [];
   const a = b.applicability;
   if (!b.requirement.trim()) p.push('Add the requirement.');
-  if (b.requirementType === 'unknown') p.push('Choose whether this is an obligation, prohibition, permission or definition.');
+  // An unresolved rule openly marked "needs clarification" may be applied and published, flagged (owner, A5).
+  if (b.requirementType === 'unknown' && !isOpenClarification(b.annotation)) p.push('Choose whether this is an obligation, prohibition, permission or definition.');
   if (!a.universal && a.actors.length + a.actions.length + a.channels.length + a.entities.length + a.locales.length + a.jurisdictions.length === 0 && !a.conditionText) p.push('Define where the rule applies, or mark it as applying everywhere.');
   if (!b.effective.from && !b.effective.to && !b.effective.conditionText) p.push('Set the effective scope (a date, or "always" in the condition).');
   return p;
@@ -138,7 +154,10 @@ export function reviewProblems(v: { body: unknown; citations: Array<{ fieldPath:
   return [...definitionProblems(v.body), ...evidenceProblems(v)];
 }
 
-/** Marks the current version Reviewed (PM/ADMIN; D-R1: the editor may review). Stale decisions are rejected. */
+/**
+ * Marks the current version Reviewed (PM/ADMIN; D-R1: the editor may review). Stale decisions are rejected. `required`
+ * is accepted from older clients and ignored: the annotation's mandatory marking replaced it (15 Nov 2026).
+ */
 export async function markReviewed(tx: Tx, input: { clientId: string; projectId: string; ruleVersionId: string; actorId: string; expectedContentHash: string; required?: boolean }, audit: (a: AuditInput) => Promise<void>) {
   const v = await ruleVersionFull(tx, input.clientId, input.ruleVersionId);
   if (v.rule.projectId !== input.projectId) throw notFound('Rule version not found');
@@ -151,7 +170,6 @@ export async function markReviewed(tx: Tx, input: { clientId: string; projectId:
   const problems = reviewProblems(v);
   if (problems.length) throw new AppError(422, 'NOT_REVIEWABLE', `This rule is not ready to review: ${problems.join(' ')}`);
   const out = await tx.policyRuleVersion.update({ where: { id: v.id }, data: { state: 'REVIEWED', reviewedById: input.actorId, reviewedAt: new Date() } });
-  if (input.required !== undefined) await tx.policyRule.update({ where: { id: v.ruleId }, data: { required: input.required } });
   await audit({ entityType: 'PolicyRuleVersion', entityId: v.id, action: 'policy.rule_reviewed', after: { contentHash: v.contentHash, version: v.version, ruleKey: v.rule.ruleKey } });
   return out;
 }
@@ -213,7 +231,6 @@ export async function setApplied(
   if (evidence.length && !input.acceptUnverifiedEvidence) throw new AppError(422, 'EVIDENCE_UNVERIFIED', `The source evidence is not verified: ${evidence.join(' ')} Check the source, then confirm to apply anyway.`);
   const target = v.state === 'EXCLUDED' ? await copyVersion(tx, v, 'DRAFT', input.actorId, 'reapplied') : v;
   const out = await tx.policyRuleVersion.update({ where: { id: target.id }, data: { state: 'REVIEWED', reviewedById: input.actorId, reviewedAt: new Date() } });
-  if (input.required !== undefined) await tx.policyRule.update({ where: { id: v.ruleId }, data: { required: input.required } });
   const warnings = [...definition, ...evidence];
   await audit({
     entityType: 'PolicyRuleVersion',

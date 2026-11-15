@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { PolicyRuleBody } from '@praxis/shared';
+import { PolicyRuleBody, REVERSE_RELATION, annotationFlags, type AnnotationFlag } from '@praxis/shared';
 import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, conflict } from '../lib/errors';
@@ -78,7 +78,14 @@ export interface Preview {
   included: Array<{ ruleKey: string; ruleVersionId: string; version: number; title: string }>;
   excluded: Array<{ ruleKey: string; reason: string | null }>;
   /** Rules a PM or Admin has not applied to the project (PR-M08): left out, never blocking. */
-  notApplied: Array<{ ruleKey: string; state: string; required: boolean }>;
+  notApplied: Array<{ ruleKey: string; state: string; required: boolean; marking: string | null }>;
+  /** Applied rules per mandatory marking (`not_annotated` for rules without an annotation). */
+  markingCounts: Record<string, number>;
+  /**
+   * Non-blocking warnings on applied rules (plan §5, owner A4): not annotated, needs clarification, a link to a rule
+   * that is not applied (unresolved dependency), a duplicate or overlap. They are exported as uncertainty.
+   */
+  annotationWarnings: Array<{ ruleKey: string; flags: AnnotationFlag[] }>;
   blocking: string[];
   conflicts: Conflict[];
   counts: Record<string, number>;
@@ -126,11 +133,29 @@ export async function previewRuleSet(tx: Db | Tx, clientId: string, projectId: s
   }
   const content = setContent(items);
   if (content.rules.length === 0) blocking.push('No rule is applied to the project yet.');
+  const markingCounts: Record<string, number> = {};
+  const annotationWarnings: Preview['annotationWarnings'] = [];
+  for (const i of items.filter((x) => x.version.state === 'REVIEWED')) {
+    const a = PolicyRuleBody.parse(i.version.body).annotation;
+    markingCounts[a?.marking ?? 'not_annotated'] = (markingCounts[a?.marking ?? 'not_annotated'] ?? 0) + 1;
+    const flags = annotationFlags(a, { known: applied, knownLabel: 'applied to the project' }).filter((f) => f.code !== 'UNKNOWN_FIELD' && f.code !== 'OPEN_QUESTION');
+    if (flags.length) annotationWarnings.push({ ruleKey: i.rule.ruleKey, flags });
+  }
+  // A threshold definition that is not applied leaves the applied rules that use it with an unresolved dependency.
+  for (const i of items.filter((x) => x.version.state !== 'REVIEWED' && x.version.state !== 'EXCLUDED')) {
+    for (const l of PolicyRuleBody.parse(i.version.body).annotation?.links ?? []) {
+      if (!applied.has(l.ruleKey) || REVERSE_RELATION[l.relation] !== 'uses_definition') continue;
+      const w = annotationWarnings.find((x) => x.ruleKey === l.ruleKey) ?? annotationWarnings[annotationWarnings.push({ ruleKey: l.ruleKey, flags: [] }) - 1]!;
+      w.flags.push({ code: 'UNRESOLVED_LINK', message: `Uses the definition in ${i.rule.ruleKey}, which is not applied to the project.` });
+    }
+  }
   const latest = await tx.projectRuleSet.findFirst({ where: { clientId, projectId }, orderBy: { version: 'desc' }, select: { id: true, version: true, digest: true } });
   return {
     included: content.rules.map((r) => ({ ruleKey: r.ruleKey, ruleVersionId: r.ruleVersionId, version: r.version, title: r.body.title })),
     excluded: [...items.filter((i) => i.version.state === 'EXCLUDED').map((i) => ({ ruleKey: i.rule.ruleKey, reason: i.version.excludeReason })), ...notApplied.map((i) => ({ ruleKey: i.rule.ruleKey, reason: NOT_APPLIED }))],
-    notApplied: notApplied.map((i) => ({ ruleKey: i.rule.ruleKey, state: i.version.state, required: i.rule.required })),
+    notApplied: notApplied.map((i) => ({ ruleKey: i.rule.ruleKey, state: i.version.state, required: i.rule.required, marking: PolicyRuleBody.parse(i.version.body).annotation?.marking ?? null })),
+    markingCounts,
+    annotationWarnings,
     blocking,
     conflicts,
     counts,

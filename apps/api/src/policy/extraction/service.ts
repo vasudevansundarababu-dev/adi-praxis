@@ -11,6 +11,7 @@ import type { EventHandler } from '../../outbox/handlers';
 import { loadVersionText } from '../documents';
 import { resolveProfile } from '../profiles';
 import { createRuleFromCandidate } from '../rules';
+import { emitEvent } from '../../outbox/outbox';
 import { GoogleLayoutGeminiAdapter } from './google';
 import { LlamaExtractAdapter } from './llamaextract';
 import { ProviderError, type ExtractionAdapter, type ExtractionInput, type ProfileSnapshot, type ProviderId, type ProviderResult } from './types';
@@ -184,7 +185,7 @@ export async function processExtractionJob(w: WorkerDeps, jobId: string) {
 }
 
 async function persistResult(w: WorkerDeps, jobId: string, input: ExtractionInput, result: ProviderResult, operationId: string, profile: ProfileSnapshot) {
-  const job = await w.db.extractionJob.findUniqueOrThrow({ where: { id: jobId }, include: { documentVersion: true } });
+  const job = await w.db.extractionJob.findUniqueOrThrow({ where: { id: jobId }, include: { documentVersion: true, batch: true } });
   const receiptKey = `policy/${job.clientId}/${job.documentVersion.projectId}/receipts/${job.id}.json`;
   await w.storage.put(receiptKey, Buffer.from(JSON.stringify({ provider: profile.provider, profile: profile.id, revision: profile.revision, operationId, raw: result.raw })), 'application/json');
   const done = await w.db.$transaction(
@@ -203,6 +204,11 @@ async function persistResult(w: WorkerDeps, jobId: string, input: ExtractionInpu
         data: { status: result.partial ? 'PARTIAL' : 'SUCCEEDED', candidateCount: n, rawReceiptKey: receiptKey, usage: result.usage as unknown as Prisma.InputJsonValue, actualUsd: actual === null ? null : new Prisma.Decimal(actual), finishedAt: new Date(), error: result.partial ? 'Some provider output could not be read; usable rules were kept.' : null },
       });
       await tx.auditEvent.create({ data: { clientId: job.clientId, actorType: 'SYSTEM', actorId: 'policy-extraction', entityType: 'ExtractionJob', entityId: job.id, action: 'policy.extraction_completed', after: { candidates: n, partial: result.partial, actualUsd: actual } } });
+      // AI annotation suggestions for the new rules (PRD-POLICY-RULE-ANNOTATIONS §1); the worker runs them separately.
+      if (n > 0) {
+        const doc = await tx.policyDocumentVersion.findUniqueOrThrow({ where: { id: job.documentVersionId }, select: { documentId: true } });
+        await emitEvent(tx, job.clientId, { name: 'policy.annotation_requested', aggregateType: 'ExtractionJob', aggregateId: job.id, payload: { clientId: job.clientId, projectId: job.documentVersion.projectId, documentId: doc.documentId, requestedById: job.batch.requestedById, requestedRoles: [], trigger: 'extraction' } });
+      }
       return true;
     },
     { timeout: 60_000, maxWait: 10_000 },

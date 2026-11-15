@@ -12,6 +12,9 @@ import { redisConnection } from './lib/redis';
 import { createDomainEventsQueue, createDomainEventsWorker, startOutboxPoller } from './outbox/dispatcher';
 import { defaultHandlers } from './outbox/handlers';
 import { defaultAdapters, policyExtractionHandler } from './policy/extraction/service';
+import { policyAnnotationHandler } from './policy/annotate-job';
+import { POLICY_AI_ACTIONS } from './policy/ai-cap';
+import { defaultRuleAssistant } from './policy/rule-assistant';
 import { resolveDeps } from './meta-compiler/deps';
 import { defaultDrafterFactory } from './meta-compiler/drafter';
 import { defaultJudge } from './meta-compiler/judge';
@@ -33,6 +36,7 @@ const registry = defaultHandlers({ evaluator: defaultEvaluator(config), email: d
 // Templates Meta-Compiler: generation, verification, per-task verification and judge jobs.
 const storage = defaultStorage(config);
 registry.register(policyExtractionHandler({ storage, adapters: defaultAdapters(config.policy) }));
+registry.register(policyAnnotationHandler({ storage, assistant: defaultRuleAssistant(config), dailyCap: config.POLICY_AI_DAILY_CALL_CAP, capActions: POLICY_AI_ACTIONS }));
 for (const h of metaCompilerHandlers({ config, storage, drafters: defaultDrafterFactory(config), deps: resolveDeps(), runner: defaultRunner(config, storage), judge: defaultJudge(config) })) registry.register(h);
 const worker = createDomainEventsWorker(db, registry, connection);
 const log = (level: string, msg: string, extra: object = {}) =>

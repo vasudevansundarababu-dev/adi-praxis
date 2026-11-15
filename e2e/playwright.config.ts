@@ -15,6 +15,8 @@ const storage = { EVIDENCE_BUCKET: 'praxis-evidence', GCS_EMULATOR_HOST: 'http:/
 export default defineConfig({
   testDir: '.',
   testIgnore: 'demo-videos/**', // the demo video recorder has its own config
+  // Compiles every page on the local `next dev` servers before the tests start (no-op against a deployed environment).
+  globalSetup: './warm-up.ts',
   timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
   reporter: [['list']],

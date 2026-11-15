@@ -1516,3 +1516,24 @@ Forgot password still answers 202 and sends nothing).
   failure; the route is unchanged from main, so main had the same race). The template page's tutorial button is now
   "Save tutorial": step 7 put a second "Save" on the page beside the Meta-Compiler's Save. The e2e smoke tests expect
   the public names (ADI Forge, RL Gym).
+
+## MVP1 deploy: e2e failures on main 952f17d5 (15 Nov 2026)
+
+- **(chosen by Claude)** The nightly QA deploy stopped on 4 e2e failures (run 43711501765). None was a change in app
+  behaviour; all were `next dev` compiling a route on its first request while a test waited. The traces show it: the
+  Meta-Compiler page `/templates/[id]` took 12.7 s to compile for one worker, and the other worker's pay-run Approve
+  call, proxied through the same dev server at that moment, never returned (m10 pay run); `/projects/new` (4.7 s, smoke),
+  `/review/tasks/[id]` (4.5 s, journey) and the factory-blueprint read (journey Reset) used up their 5 s expectations.
+  MVP1 made these pages larger, so the first compiles got slower; the PR #73 run was lucky on timing.
+- **Fix:** an e2e global set-up (`e2e/warm-up.ts`) requests every page of the console and the candidate app once, after
+  the servers start and before any test, so tests never wait on a first compile. It finds the pages from the app
+  folders (no list to maintain), never fails the run, and is skipped against a deployed environment. No test assertion
+  or timeout was changed, and no app code.
+- **(chosen by Claude)** The m10 pay-run test now cancels, through the Finance API, a run an earlier attempt left part-way
+  for its week, then builds the week again. Before, a retry found the first attempt's confirmed run and failed on "Finance
+  cannot approve before a PM confirms" for that reason alone, hiding the real first failure.
+- **Owner, 15 Nov 2026:** "On the new flow." and "Again the old flow is irrelevant". Each failing test was judged against
+  the MVP1 new flow. None asserts old-flow behaviour that MVP1 changed. The smoke test accepts the Admin landing on Home
+  ("Welcome, …"): it never checks the landing page, and goes on through the Projects menu and New project. It failed
+  only because both pages were still compiling (4.6 s and 4.7 s) when its 5 s check ran. All three failures that were
+  retried passed on retry with unchanged code, so no test was rewritten.

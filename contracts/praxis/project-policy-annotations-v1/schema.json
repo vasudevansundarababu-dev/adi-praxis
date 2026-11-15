@@ -1,0 +1,1222 @@
+{
+  "$ref": "#/definitions/ProjectPolicyAnnotations",
+  "definitions": {
+    "ProjectPolicyAnnotations": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "const": "praxis.anvil.project_policy_annotations.v1"
+        },
+        "contract_status": {
+          "type": "string",
+          "const": "proposed"
+        },
+        "source_project": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "required": [
+            "id",
+            "version"
+          ],
+          "additionalProperties": false
+        },
+        "template": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "version": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "version"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "interpretation": {
+          "type": "object",
+          "properties": {
+            "outcomes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "applies",
+                  "trigger_to_check",
+                  "out_of_scope",
+                  "other_role",
+                  "unknown"
+                ]
+              }
+            },
+            "notice": {
+              "type": "string",
+              "maxLength": 20000
+            }
+          },
+          "required": [
+            "outcomes",
+            "notice"
+          ],
+          "additionalProperties": false
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "policy_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "policy_version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "rule_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "annotation_status": {
+                "type": "string",
+                "enum": [
+                  "annotated",
+                  "not_annotated"
+                ]
+              },
+              "identity": {
+                "type": "object",
+                "properties": {
+                  "praxis_rule_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "rule_key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "rule_version_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "rule_version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "content_hash": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "project_rule_set": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "digest": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "digest"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "praxis_rule_id",
+                  "rule_key",
+                  "rule_version_id",
+                  "rule_version",
+                  "content_hash",
+                  "project_rule_set"
+                ],
+                "additionalProperties": false
+              },
+              "source": {
+                "type": "object",
+                "properties": {
+                  "document_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "document_version_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "document_version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "quotation": {
+                    "type": "string",
+                    "maxLength": 20000
+                  },
+                  "quotation_verified": {
+                    "type": "boolean"
+                  },
+                  "locator": {
+                    "type": "object",
+                    "properties": {
+                      "page": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "section": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "line_start": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "line_end": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "page",
+                      "section",
+                      "line_start",
+                      "line_end"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "source_location": {
+                    "type": "string",
+                    "maxLength": 20000
+                  }
+                },
+                "required": [
+                  "document_id",
+                  "document_version_id",
+                  "document_version",
+                  "sha256",
+                  "quotation",
+                  "quotation_verified",
+                  "locator",
+                  "source_location"
+                ],
+                "additionalProperties": false
+              },
+              "meaning": {
+                "type": "object",
+                "properties": {
+                  "requirement": {
+                    "type": "string",
+                    "maxLength": 20000
+                  },
+                  "classification": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "obligation",
+                          "prohibition",
+                          "permission",
+                          "definition",
+                          "applicability_precedence",
+                          "unresolved"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "requirement",
+                  "classification"
+                ],
+                "additionalProperties": false
+              },
+              "mandatory": {
+                "type": "object",
+                "properties": {
+                  "marking": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "mandatory",
+                          "mandatory_when_applicable",
+                          "permitted_option",
+                          "required_reference",
+                          "other_responsibility",
+                          "needs_clarification"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "explanation": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "marking",
+                  "explanation"
+                ],
+                "additionalProperties": false
+              },
+              "applicability": {
+                "type": "object",
+                "properties": {
+                  "responsible_actor": {
+                    "type": "string",
+                    "enum": [
+                      "agent",
+                      "human_officer",
+                      "bank_operations",
+                      "task_author",
+                      "customer",
+                      "other",
+                      "unknown"
+                    ]
+                  },
+                  "actor_note": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "actors_as_extracted": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "maxItems": 100
+                  },
+                  "application_types": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "all",
+                          "listed",
+                          "unknown"
+                        ]
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 2000
+                        },
+                        "maxItems": 100
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "items"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "jurisdictions": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "all",
+                          "listed",
+                          "unknown"
+                        ]
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 2000
+                        },
+                        "maxItems": 100
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "items"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "applies_when": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "prerequisites": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "maxItems": 100
+                  },
+                  "workflow_stage": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "effective": {
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "to": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "condition": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 20000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "from",
+                      "to",
+                      "condition"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "responsible_actor",
+                  "actor_note",
+                  "actors_as_extracted",
+                  "application_types",
+                  "jurisdictions",
+                  "applies_when",
+                  "prerequisites",
+                  "workflow_stage",
+                  "effective"
+                ],
+                "additionalProperties": false
+              },
+              "exceptions_timing": {
+                "type": "object",
+                "properties": {
+                  "exceptions": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "unknown",
+                          "listed"
+                        ]
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "statement": {
+                              "type": "string",
+                              "maxLength": 20000
+                            },
+                            "conditions": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 20000
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "statement",
+                            "conditions"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "maxItems": 20
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "items"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "deadline": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "unknown",
+                          "stated"
+                        ]
+                      },
+                      "text": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 20000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "measured_from": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 20000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "text",
+                      "measured_from"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "exceptions",
+                  "deadline"
+                ],
+                "additionalProperties": false
+              },
+              "relationships": {
+                "type": "object",
+                "properties": {
+                  "links": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "relation": {
+                          "type": "string",
+                          "maxLength": 40
+                        },
+                        "rule_key": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "rule_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "rule_version_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "rule_version": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "in_set",
+                            "not_in_set"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "relation",
+                        "rule_key",
+                        "rule_id",
+                        "rule_version_id",
+                        "rule_version",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 100
+                  },
+                  "linked_from": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "relation": {
+                          "type": "string",
+                          "maxLength": 40
+                        },
+                        "rule_key": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "rule_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "rule_version_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "rule_version": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "in_set",
+                            "not_in_set"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "relation",
+                        "rule_key",
+                        "rule_id",
+                        "rule_version_id",
+                        "rule_version",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 500
+                  },
+                  "compound": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "group_key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "original_statement": {
+                            "type": "string",
+                            "maxLength": 20000
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "primary",
+                              "companion",
+                              "condition",
+                              "exception",
+                              "component"
+                            ]
+                          },
+                          "members": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            "maxItems": 50
+                          }
+                        },
+                        "required": [
+                          "group_key",
+                          "original_statement",
+                          "role",
+                          "members"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "precedence": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "rule_key": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "relation": {
+                          "type": "string",
+                          "maxLength": 40
+                        },
+                        "note": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 20000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "rule_key",
+                        "relation",
+                        "note"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 20
+                  }
+                },
+                "required": [
+                  "links",
+                  "linked_from",
+                  "compound",
+                  "precedence"
+                ],
+                "additionalProperties": false
+              },
+              "evidence": {
+                "type": "object",
+                "properties": {
+                  "known": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "maxItems": 100
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "stated",
+                      "partly_stated",
+                      "unknown"
+                    ]
+                  },
+                  "missing": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "maxItems": 100
+                  }
+                },
+                "required": [
+                  "known",
+                  "status",
+                  "missing"
+                ],
+                "additionalProperties": false
+              },
+              "uncertainty": {
+                "type": "object",
+                "properties": {
+                  "open_questions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "maxItems": 100
+                  },
+                  "notes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "maxItems": 100
+                  },
+                  "unresolved_dependencies": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "maxItems": 100
+                  },
+                  "duplicates_or_overlaps": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "maxItems": 100
+                  }
+                },
+                "required": [
+                  "open_questions",
+                  "notes",
+                  "unresolved_dependencies",
+                  "duplicates_or_overlaps"
+                ],
+                "additionalProperties": false
+              },
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "ai_suggestion": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "annotation": {
+                            "type": "object",
+                            "properties": {
+                              "annotation_version": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "classification": {
+                                "type": "string",
+                                "enum": [
+                                  "obligation",
+                                  "prohibition",
+                                  "permission",
+                                  "definition",
+                                  "applicability_precedence",
+                                  "unresolved"
+                                ]
+                              },
+                              "marking": {
+                                "type": "string",
+                                "enum": [
+                                  "mandatory",
+                                  "mandatory_when_applicable",
+                                  "permitted_option",
+                                  "required_reference",
+                                  "other_responsibility",
+                                  "needs_clarification"
+                                ]
+                              },
+                              "applies_when": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 20000
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "why": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 20000
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "annotation_version",
+                              "classification",
+                              "marking",
+                              "applies_when",
+                              "why"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "model": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "prompt_version": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "created_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "annotation",
+                          "model",
+                          "prompt_version",
+                          "created_at"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "current": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "annotation": {
+                            "type": "object",
+                            "properties": {
+                              "annotation_version": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "classification": {
+                                "type": "string",
+                                "enum": [
+                                  "obligation",
+                                  "prohibition",
+                                  "permission",
+                                  "definition",
+                                  "applicability_precedence",
+                                  "unresolved"
+                                ]
+                              },
+                              "marking": {
+                                "type": "string",
+                                "enum": [
+                                  "mandatory",
+                                  "mandatory_when_applicable",
+                                  "permitted_option",
+                                  "required_reference",
+                                  "other_responsibility",
+                                  "needs_clarification"
+                                ]
+                              },
+                              "applies_when": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 20000
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "why": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 20000
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "annotation_version",
+                              "classification",
+                              "marking",
+                              "applies_when",
+                              "why"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "ai_suggestion_unedited",
+                              "author_edit"
+                            ]
+                          },
+                          "edited_by": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "maxLength": 100
+                              },
+                              "role": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 40
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "role"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "edited_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "annotation",
+                          "source",
+                          "edited_by",
+                          "edited_at"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "approval": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "const": "applied"
+                      },
+                      "decided_by": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "role": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "role"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "decided_at": {
+                        "type": "string"
+                      },
+                      "decided_by_human": {
+                        "type": "boolean",
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "decided_by",
+                      "decided_at",
+                      "decided_by_human"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "ai_suggestion",
+                  "current",
+                  "approval"
+                ],
+                "additionalProperties": false
+              },
+              "readable_text": {
+                "type": "string",
+                "maxLength": 20000
+              }
+            },
+            "required": [
+              "policy_id",
+              "policy_version",
+              "rule_id",
+              "annotation_status",
+              "identity",
+              "source",
+              "meaning",
+              "mandatory",
+              "applicability",
+              "exceptions_timing",
+              "relationships",
+              "evidence",
+              "uncertainty",
+              "provenance",
+              "readable_text"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 10000
+        }
+      },
+      "required": [
+        "schema_version",
+        "contract_status",
+        "source_project",
+        "template",
+        "manifest_sha256",
+        "interpretation",
+        "rules"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

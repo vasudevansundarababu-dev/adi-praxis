@@ -153,3 +153,9 @@ export function validateProjectPolicyAnnotations(doc: unknown, manifest: { sourc
   for (const k of want) if (!seen.has(k)) out.push({ code: 'MISSING_RULE', path: 'rules', message: `${k} has no annotation entry.` });
   return out;
 }
+
+/** JSON Schema of the proposed document (published in contracts/praxis/project-policy-annotations-v1/schema.json). */
+export async function projectPolicyAnnotationsJsonSchema(): Promise<Record<string, unknown>> {
+  const { zodToJsonSchema } = await import('zod-to-json-schema');
+  return zodToJsonSchema(ProjectPolicyAnnotations, { name: 'ProjectPolicyAnnotations', target: 'jsonSchema7', $refStrategy: 'none' }) as Record<string, unknown>;
+}

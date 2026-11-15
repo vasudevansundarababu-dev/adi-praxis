@@ -1,5 +1,5 @@
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
-import { PolicyRuleBody, REQUIREMENT_TYPES } from '@praxis/shared';
+import { COMPOUND_ROLES, MANDATORY_MARKINGS, PolicyRuleBody, REQUIREMENT_TYPES, RESPONSIBLE_ACTORS, RULE_CLASSIFICATIONS, RULE_LINK_RELATIONS, RuleAnnotationInput } from '@praxis/shared';
 import { z } from 'zod';
 import { GeminiVertexContentDrafter } from '../meta-compiler/drafter';
 
@@ -35,11 +35,38 @@ export type Definition = z.infer<typeof Definition>;
 
 export class RuleAssistantUnavailableError extends Error {}
 
+/** One rule as the annotation pass sees it. */
+export interface AnnotateRule {
+  ruleKey: string;
+  title: string;
+  requirement: string;
+  /** Verbatim source quotes (the requirement's first). */
+  quotes: string[];
+  conditionText: string | null;
+  jurisdictions: string[];
+  exceptions: string[];
+}
+export interface AnnotateInput {
+  documentTitle: string;
+  /** The policy document's text: data, never instructions. */
+  documentText: string;
+  rules: AnnotateRule[];
+  /** Application types the project's template distinguishes (e.g. KYC v7 case-selector values); empty = none known. */
+  applicationTypes: string[];
+}
+export const AnnotationItem = z.object({ ruleKey: z.string(), annotation: RuleAnnotationInput });
+export type AnnotationItem = z.infer<typeof AnnotationItem>;
+const AnnotateOut = z.object({ items: z.array(AnnotationItem) });
+
 export interface PolicyRuleAssistant {
   readonly modelVersion: string;
   suggest(prompt: string, rules: SuggestRule[]): Promise<Suggestion[]>;
   define(input: DefineInput): Promise<Definition>;
+  /** Suggests an annotation for each rule (classification, mandatory marking, applicability, links). Never decides. */
+  annotate(input: AnnotateInput): Promise<AnnotationItem[]>;
 }
+
+export const ANNOTATION_PROMPT_VERSION = 'policy-annotation-1';
 
 const SuggestOut = z.object({ items: z.array(z.object({ ruleKey: z.string(), match: z.boolean(), reason: z.string().max(400) })) });
 
@@ -93,13 +120,91 @@ Task: complete the definition of ONE rule from the policy document so an evaluat
 Answer with one JSON object only, matching this JSON schema:
 ${JSON.stringify(DEFINE_SCHEMA)}`;
 
-const strip = (s: string) => s.replace(/<\/?(criteria|rules|rule|policy_document)>/gi, '');
+const ANNOTATE_SCHEMA = {
+  type: 'object',
+  required: ['items'],
+  properties: {
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['ruleKey', 'annotation'],
+        properties: {
+          ruleKey: { type: 'string' },
+          annotation: {
+            type: 'object',
+            required: ['classification', 'marking', 'appliesWhen', 'why', 'responsibleActor', 'applicationTypes', 'jurisdictions', 'deadline', 'evidence', 'links', 'compound', 'openQuestions'],
+            properties: {
+              classification: { type: 'string', enum: [...RULE_CLASSIFICATIONS] },
+              marking: { type: 'string', enum: [...MANDATORY_MARKINGS] },
+              appliesWhen: { type: ['string', 'null'] },
+              why: { type: 'string' },
+              responsibleActor: { type: 'string', enum: [...RESPONSIBLE_ACTORS] },
+              actorNote: { type: ['string', 'null'] },
+              applicationTypes: { type: 'object', properties: { kind: { type: 'string', enum: ['all', 'listed', 'unknown'] }, items: { type: 'array', items: { type: 'string' } } } },
+              jurisdictions: { type: 'object', properties: { kind: { type: 'string', enum: ['all', 'listed', 'unknown'] }, items: { type: 'array', items: { type: 'string' } } } },
+              workflowStage: { type: ['string', 'null'] },
+              deadline: { type: 'object', properties: { kind: { type: 'string', enum: ['none', 'unknown', 'stated'] }, text: { type: ['string', 'null'] }, measuredFrom: { type: ['string', 'null'] } } },
+              evidence: { type: 'object', properties: { status: { type: 'string', enum: ['stated', 'partly_stated', 'unknown'] }, missing: { type: 'array', items: { type: 'string' } } } },
+              links: { type: 'array', items: { type: 'object', properties: { ruleKey: { type: 'string' }, relation: { type: 'string', enum: [...RULE_LINK_RELATIONS] }, note: { type: ['string', 'null'] } } } },
+              compound: { type: ['object', 'null'], properties: { groupKey: { type: 'string' }, originalStatement: { type: 'string' }, role: { type: 'string', enum: [...COMPOUND_ROLES] } } },
+              openQuestions: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+/** The annotation instructions (spec §2–§5). Exported so tests can check every rule of the spec is stated. */
+export const ANNOTATE_SYSTEM = `${BASE}
+Task: for EVERY rule in <rules>, suggest an annotation that says what the rule means and how a workflow must treat it. A person reviews and edits every suggestion; extraction and your suggestion are not approval or legal validation.
+Classify by the meaning of the rule in the context of <policy_document>, never by keywords alone:
+- classification: obligation (an action is required), prohibition (an action is forbidden), permission (an option is allowed but not compulsory), definition (defines a term, threshold, period or parameter), applicability_precedence (decides which policy applies or takes priority), unresolved (the text is insufficient or conflicting).
+- marking: mandatory (required within the stated workflow scope), mandatory_when_applicable (required when a stated condition holds), permitted_option (an allowed choice; link any mandatory companion condition), required_reference (needed to interpret or apply another rule), other_responsibility (belongs to another actor, product or operational process; this does NOT mean the bank's obligation is optional), needs_clarification (cannot be applied reliably until a gap or conflict is resolved).
+Compound and modal statements:
+- "may accept X only with Y": two linked components. The permission to accept X is a permitted_option; Y is mandatory_when_applicable when that route is chosen. Give both the same compound.groupKey, the original statement word for word in compound.originalStatement, and link them with companion_of.
+- "must ... unless ..." is an obligation with an exception: keep both (state the exception in why and appliesWhen; never drop it).
+- "must not ..." is a prohibition.
+- "may not ..." needs interpretation in context: it can be a prohibition or a permission not to act. Never make it a permission automatically; if the context does not settle it, use unresolved and needs_clarification with an open question.
+- "should ..." is not mandatory unless the policy defines "should" that way; otherwise say so in why or use needs_clarification.
+- A definition that sets a binding threshold must be linked (defines_threshold_for) to the rules in <rules> that use it, and those rules link back with uses_definition.
+- Link duplicates or overlapping rules with duplicate_of or overlaps so they are not counted twice.
+Applicability:
+- responsibleActor: agent (actions the AI agent takes), human_officer (decisions a human officer or analyst must make), bank_operations (bank infrastructure or operations duties), task_author (authoring, data preparation or policy review duties), customer, other, unknown. Never turn a human approval requirement into permission for the agent to approve.
+- applicationTypes and jurisdictions: "all" only if the policy says the rule applies to every value; "listed" with the values; otherwise "unknown". Use the application types in <application_types> when the policy names them. Jurisdictions as US (federal) or US-XX (state). A project name or an example state never limits where a rule applies.
+- appliesWhen: the trigger in plain words, or "Always, within the workflow scope" when it always applies; null if unknown.
+Never invent conditions, deadlines, exceptions or evidence. Missing information stays unknown (null, "unknown", or listed in evidence.missing and openQuestions). Flag conflicts and unresolved references in openQuestions rather than choosing an interpretation.
+why: one or two plain-English sentences explaining the marking, e.g. "Accepting the passport is permitted; 'only with' makes the non-documentary check compulsory."
+Links may only use rule keys from <rules>.
+Answer with one JSON object only, matching this JSON schema:
+${JSON.stringify(ANNOTATE_SCHEMA)}`;
+
+const strip = (s: string) => s.replace(/<\/?(criteria|rules|rule|policy_document|application_types)>/gi, '');
 
 export function suggestUser(prompt: string, rules: SuggestRule[]) {
   return [`<criteria>\n${strip(prompt)}\n</criteria>`, `<rules>\n${rules.map((r) => `${r.ruleKey} | ${strip(r.title)} | ${r.required ? 'required' : 'optional'} | ${strip(r.requirement)} | applies: ${strip(r.scope) || 'not stated'}`).join('\n')}\n</rules>`].join('\n\n');
 }
 export function defineUser(i: DefineInput) {
   return [`<rule>\nkey: ${i.ruleKey}\ncurrent draft: ${strip(JSON.stringify(i.body))}\nquoted evidence: ${i.quotes.map(strip).join(' | ') || 'none'}\n</rule>`, `<policy_document>\n${strip(i.documentText).slice(0, 120_000)}\n</policy_document>`].join('\n\n');
+}
+
+export function annotateUser(i: AnnotateInput) {
+  const rules = i.rules.map((r) => `${r.ruleKey} | ${strip(r.title)} | ${strip(r.requirement)} | condition: ${strip(r.conditionText ?? 'not stated')} | jurisdictions: ${r.jurisdictions.join(', ') || 'not stated'} | exceptions: ${r.exceptions.map(strip).join('; ') || 'not stated'} | quote: ${r.quotes.map(strip).join(' / ') || 'none'}`);
+  return [`<application_types>\n${i.applicationTypes.join(', ') || 'none defined'}\n</application_types>`, `<rules>\n${rules.join('\n')}\n</rules>`, `<policy_document title="${strip(i.documentTitle).replace(/"/g, "'")}">\n${strip(i.documentText).slice(0, 120_000)}\n</policy_document>`].join('\n\n');
+}
+
+/** One annotation per known rule; unknown keys and links to unknown rules are dropped (the AI cannot invent rules). */
+export function sanitizeAnnotations(items: AnnotationItem[], rules: AnnotateRule[], allKeys: Set<string>): AnnotationItem[] {
+  const by = new Map(items.map((i) => [i.ruleKey.trim(), i]));
+  const out: AnnotationItem[] = [];
+  for (const r of rules) {
+    const a = by.get(r.ruleKey);
+    if (!a) continue;
+    out.push({ ruleKey: r.ruleKey, annotation: { ...a.annotation, links: a.annotation.links.filter((l) => allKeys.has(l.ruleKey) && l.ruleKey !== r.ruleKey) } });
+  }
+  return out;
 }
 
 /** Keeps one suggestion per known rule; unknown keys are dropped and missing ones count as "not matched". */
@@ -140,6 +245,10 @@ export interface CallOptions {
 export const SUGGEST_CHUNK = 15;
 export const SUGGEST_PARALLEL = 6;
 export const MODEL_CALL_TIMEOUT_MS = 25_000;
+/** The annotation pass runs in the worker, not behind the web proxy: larger batches and a longer limit. */
+export const ANNOTATE_CHUNK = 25;
+export const ANNOTATE_PARALLEL = 3;
+export const ANNOTATE_TIMEOUT_MS = 180_000;
 
 export class ModelRuleAssistant implements PolicyRuleAssistant {
   constructor(readonly modelVersion: string, private readonly llm: Completer) {}
@@ -162,6 +271,24 @@ export class ModelRuleAssistant implements PolicyRuleAssistant {
 
   async define(input: DefineInput): Promise<Definition> {
     return parseJson(await this.call(DEFINE_SYSTEM, defineUser(input), 16000, { timeoutMs: MODEL_CALL_TIMEOUT_MS }), Definition);
+  }
+
+  /** Batches of 25 rules, each call seeing the whole document so it can link components and thresholds. */
+  async annotate(input: AnnotateInput): Promise<AnnotationItem[]> {
+    const keys = new Set(input.rules.map((r) => r.ruleKey));
+    const chunks: AnnotateRule[][] = [];
+    for (let i = 0; i < input.rules.length; i += ANNOTATE_CHUNK) chunks.push(input.rules.slice(i, i + ANNOTATE_CHUNK));
+    const results: AnnotationItem[][] = new Array(chunks.length);
+    let next = 0;
+    const worker = async () => {
+      while (next < chunks.length) {
+        const i = next++;
+        const text = await this.call(ANNOTATE_SYSTEM, annotateUser({ ...input, rules: chunks[i]! }), 32000, { timeoutMs: ANNOTATE_TIMEOUT_MS });
+        results[i] = sanitizeAnnotations(parseJson(text, AnnotateOut).items, chunks[i]!, keys);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(ANNOTATE_PARALLEL, chunks.length) }, worker));
+    return results.flat();
   }
 
   private async call(system: string, user: string, max: number, opts: CallOptions) {
@@ -245,6 +372,60 @@ export class MockRuleAssistant implements PolicyRuleAssistant {
       quotes: quote.length >= 8 ? [{ fieldPath: 'requirement', quote: quote.slice(0, 1000) }] : [],
     };
   }
+
+  async annotate(i: AnnotateInput): Promise<AnnotationItem[]> {
+    return i.rules.map((r) => ({ ruleKey: r.ruleKey, annotation: mockAnnotation(r, i.rules, i.applicationTypes) }));
+  }
+}
+
+/**
+ * Clearly not a model: a phrase-based annotation for local dev and CI, so the Rules page has something to show. It
+ * follows the spec's modal rules and leaves everything else unknown. Rules sharing one source quote are grouped.
+ */
+export function mockAnnotation(r: AnnotateRule, all: AnnotateRule[], applicationTypes: string[]): RuleAnnotationInput {
+  const t = ` ${r.requirement} `.toLowerCase();
+  const quote = r.quotes[0] ?? '';
+  const siblings = quote ? all.filter((o) => o.ruleKey !== r.ruleKey && o.quotes[0] === quote) : [];
+  const only = /\bmay\b[^.]*\bonly (with|if|after|when)\b/.test(t);
+  let classification: RuleAnnotationInput['classification'] = 'obligation';
+  let marking: RuleAnnotationInput['marking'] = 'mandatory';
+  let why = 'The policy states this as a requirement.';
+  if (/\bmust not\b|\bshall not\b|\bprohibited\b|\bnever\b/.test(t)) {
+    classification = 'prohibition';
+    why = 'The policy forbids this action.';
+  } else if (/\bmay not\b/.test(t)) {
+    classification = 'unresolved';
+    marking = 'needs_clarification';
+    why = '"May not" can be a prohibition or a permission not to act; the context does not settle it.';
+  } else if (/\b(means|is defined as|refers to)\b/.test(t)) {
+    classification = 'definition';
+    marking = 'required_reference';
+    why = 'Defines a term or threshold that other rules use.';
+  } else if (/\bshould\b/.test(t) && !/\bmust\b/.test(t)) {
+    classification = 'unresolved';
+    marking = 'needs_clarification';
+    why = '"Should" is not mandatory unless the policy defines it that way.';
+  } else if (/\bmay\b|\bcan\b/.test(t) && !/\bmust\b/.test(t)) {
+    classification = 'permission';
+    marking = 'permitted_option';
+    why = only ? 'The option is permitted; "only with" makes its condition compulsory when the option is chosen.' : 'The policy allows this option but does not require it.';
+  } else if (/\bunless\b/.test(t) || r.exceptions.length) {
+    why = 'Required, with the exception the policy states.';
+  }
+  if (classification === 'obligation' && (r.conditionText || /\b(if|when|where)\b/.test(t))) marking = 'mandatory_when_applicable';
+  const listedJ = r.jurisdictions.length ? { kind: 'listed' as const, items: r.jurisdictions } : { kind: 'unknown' as const, items: [] };
+  return RuleAnnotationInput.parse({
+    classification,
+    marking,
+    appliesWhen: r.conditionText ?? (marking === 'mandatory' ? 'Always, within the workflow scope' : null),
+    why,
+    responsibleActor: /\b(officer|analyst|compliance|approv)/.test(t) ? 'human_officer' : 'unknown',
+    applicationTypes: { kind: 'unknown', items: applicationTypes.filter((a) => t.includes(a.replace(/_/g, ' '))) },
+    jurisdictions: listedJ,
+    links: siblings.map((o) => ({ ruleKey: o.ruleKey, relation: 'companion_of' })),
+    compound: siblings.length ? { groupKey: `C-${[r.ruleKey, ...siblings.map((o) => o.ruleKey)].sort()[0]}`, originalStatement: quote, role: classification === 'permission' ? 'primary' : 'companion' } : null,
+    openQuestions: classification === 'unresolved' ? ['Confirm whether this is binding in the stated workflow.'] : [],
+  });
 }
 
 export function defaultRuleAssistant(config: { assistantMode: string; VERTEX_PROJECT_ID: string; VERTEX_LOCATION: string; POLICY_AI_MODEL: string; AUTHORING_MODEL: string }): PolicyRuleAssistant {

@@ -93,7 +93,7 @@ export async function openRunOf(tx: Tx, clientId: string, lineageId: string, aud
   const open = await tx.templateTutorialRun.findFirst({ where: { clientId, lineageId, status: { in: [...OPEN_TUTORIAL_RUN_STATUSES] } } });
   if (open && (WORKING as readonly string[]).includes(open.status) && Date.now() - open.updatedAt.getTime() > STALE_RUN_MS) {
     await tx.templateTutorialRun.update({ where: { id: open.id }, data: { status: 'FAILED', error: 'The generation stopped responding.' } });
-    await releaseReservation(tx, open.id);
+    await releaseReservation(tx, open);
     await audit({ entityType: 'TemplateTutorialRun', entityId: open.id, action: 'template.tutorial_failed', before: { status: open.status }, after: { status: 'FAILED', error: 'The generation stopped responding.' } });
     return null;
   }
@@ -134,7 +134,7 @@ export async function requestTutorialRun(
       requestedBy: input.requestedBy,
     },
   });
-  await recordSpend(tx, run.id, 'reserve', 'reservation', status.worstCaseUsd);
+  await recordSpend(tx, run, 'reserve', 'reservation', status.worstCaseUsd);
   await ctx.emit({ name: 'template.tutorial_requested', aggregateType: 'TemplateTutorialRun', aggregateId: run.id, payload: { runId: run.id } });
   await ctx.audit({
     entityType: 'TemplateTutorialRun',
@@ -145,11 +145,11 @@ export async function requestTutorialRun(
   return { kind: 'started', run };
 }
 
-async function releaseReservation(tx: Db | Tx, runId: string) {
-  const rows = await tx.tutorialSpend.findMany({ where: { runId } });
+async function releaseReservation(tx: Db | Tx, run: { id: string; clientId: string }) {
+  const rows = await tx.tutorialSpend.findMany({ where: { runId: run.id } });
   if (rows.some((r) => r.kind === 'release')) return;
   const reserved = rows.filter((r) => r.kind === 'reserve').reduce((n, r) => n + num(r.amountUsd), 0);
-  await recordSpend(tx, runId, 'release', 'reservation', reserved);
+  await recordSpend(tx, run, 'release', 'reservation', reserved);
 }
 
 export class TutorialCapError extends Error {
@@ -157,13 +157,14 @@ export class TutorialCapError extends Error {
 }
 
 /** Records a billed call before it is made; refuses it when the run would go over its per-video cap. */
-async function charge(db: Db, cfg: TutorialConfig, runId: string, provider: string, amount: number) {
+async function charge(db: Db, cfg: TutorialConfig, run: { id: string; clientId: string }, provider: string, amount: number) {
+  const runId = run.id;
   await db.$transaction(async (tx) => {
     await lockSpend(tx);
     const spent = await tx.tutorialSpend.aggregate({ where: { runId, kind: 'actual' }, _sum: { amountUsd: true } });
     const total = num(spent._sum.amountUsd ?? 0) + amount;
     if (cfg.costCapUsd !== null && total > cfg.costCapUsd + 1e-9) throw new TutorialCapError(`Stopped: the per-video cost cap of $${cfg.costCapUsd.toFixed(2)} was reached.`);
-    await recordSpend(tx, runId, 'actual', provider, amount);
+    await recordSpend(tx, run, 'actual', provider, amount);
     await tx.templateTutorialRun.update({ where: { id: runId }, data: { actualUsd: new Prisma.Decimal(Math.round(total * 10_000) / 10_000) } });
   });
 }
@@ -200,7 +201,7 @@ export async function executeTutorialRun(db: Db, p: TutorialPipeline, runId: str
     if (!profile) throw new Error('This template has no sections form.');
     const plan = chapterPlan(run.template, profile);
 
-    await charge(db, cfg, runId, `script:${p.script.model}`, textCost(cfg) * plan.length);
+    await charge(db, cfg, run, `script:${p.script.model}`, textCost(cfg) * plan.length);
     const drafted = await p.script.draft({ workflowName: run.template.workflowName, chapters: plan });
     const final = finalizeScript(drafted.script, plan);
     if ('problem' in final) throw new Error(final.problem);
@@ -210,7 +211,7 @@ export async function executeTutorialRun(db: Db, p: TutorialPipeline, runId: str
     const scenes = script.chapters.flatMap((c, i) => c.scenes.map((scene) => ({ chapter: i, scene })));
     const clips = await mapPool(scenes, p.concurrency ?? 3, async ({ scene }) => {
       for (let attempt = 1; ; attempt++) {
-        await charge(db, cfg, runId, `veo:${p.clips.model}`, clipCost(cfg));
+        await charge(db, cfg, run, `veo:${p.clips.model}`, clipCost(cfg));
         try {
           return await p.clips.generate(attempt === 1 ? scene : FALLBACK_SCENE, CLIP_SECONDS);
         } catch (e) {
@@ -222,7 +223,7 @@ export async function executeTutorialRun(db: Db, p: TutorialPipeline, runId: str
     await setStatus(db, runId, 'NARRATION');
     const media: ChapterMedia[] = [];
     for (const [i, c] of script.chapters.entries()) {
-      await charge(db, cfg, runId, `tts:${p.narration.voice}`, textCost(cfg));
+      await charge(db, cfg, run, `tts:${p.narration.voice}`, textCost(cfg));
       const voice = await p.narration.synthesize(c.narration);
       media.push({ title: c.title, narration: c.narration, cards: c.cards, clips: clips.filter((_, j) => scenes[j]!.chapter === i), audio: voice.audio, audioSeconds: voice.seconds });
     }
@@ -238,7 +239,7 @@ export async function executeTutorialRun(db: Db, p: TutorialPipeline, runId: str
         where: { id: runId },
         data: { status: 'READY_FOR_REVIEW', objectKey: key, captionsKey: captionsKeyFor(key), chapters: out.chapters as unknown as Prisma.InputJsonValue, durationSeconds: out.durationSeconds },
       });
-      await releaseReservation(tx, runId);
+      await releaseReservation(tx, run);
       await writeAudit(tx, { clientId: run.clientId, ...SYSTEM_ACTOR }, {
         entityType: 'TemplateTutorialRun',
         entityId: runId,
@@ -250,7 +251,7 @@ export async function executeTutorialRun(db: Db, p: TutorialPipeline, runId: str
     const error = e instanceof TutorialCapError || e instanceof Error ? e.message.slice(0, 500) : 'The generation failed.';
     await db.$transaction(async (tx) => {
       const r = await tx.templateTutorialRun.update({ where: { id: runId }, data: { status: 'FAILED', error } });
-      await releaseReservation(tx, runId);
+      await releaseReservation(tx, run);
       await writeAudit(tx, { clientId: run.clientId, ...SYSTEM_ACTOR }, { entityType: 'TemplateTutorialRun', entityId: runId, action: 'template.tutorial_failed', after: { status: 'FAILED', error, actualUsd: num(r.actualUsd) } });
     });
   }

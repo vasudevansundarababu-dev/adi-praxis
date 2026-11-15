@@ -50,6 +50,6 @@ export function capProblem(cfg: TutorialConfig, worstCase: number, spentToday: n
   return null;
 }
 
-export async function recordSpend(tx: Db | Tx, runId: string, kind: 'reserve' | 'actual' | 'release', provider: string, amountUsd: number) {
-  await tx.tutorialSpend.create({ data: { runId, kind, provider, amountUsd: new Prisma.Decimal(round4(amountUsd)) } });
+export async function recordSpend(tx: Db | Tx, run: { id: string; clientId: string }, kind: 'reserve' | 'actual' | 'release', provider: string, amountUsd: number) {
+  await tx.tutorialSpend.create({ data: { clientId: run.clientId, runId: run.id, kind, provider, amountUsd: new Prisma.Decimal(round4(amountUsd)) } });
 }

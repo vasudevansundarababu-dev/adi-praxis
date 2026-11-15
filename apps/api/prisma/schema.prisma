@@ -3607,6 +3607,7 @@ model TemplateTutorialRun {
 /// release of the unused reservation when the run ends.
 model TutorialSpend {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
   runId     String   @map("run_id") @db.Uuid
   kind      String
   provider  String

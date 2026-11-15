@@ -36,6 +36,7 @@ ALTER TABLE "TemplateTutorialRun" ADD CONSTRAINT "TemplateTutorialRun_template_i
 
 CREATE TABLE "TutorialSpend" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "client_id" UUID NOT NULL,
     "run_id" UUID NOT NULL,
     "kind" TEXT NOT NULL CHECK ("kind" IN ('reserve', 'actual', 'release')),
     "provider" TEXT NOT NULL,

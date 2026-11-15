@@ -1510,3 +1510,9 @@ Forgot password still answers 202 and sends nothing).
   flow on, else to the project.
 - **Runbook:** `docs/design/MVP1-RUNBOOK.md` (switching the flow, Offline and Online, Terms first, the PM/Admin order,
   the QA smoke command).
+- **(chosen by Claude)** CI fixes for PR #73. `GET /me/tasks/:id/conversation` now reads the task and its latest run in
+  one REPEATABLE READ transaction. Read separately, a run that finished between the two reads came back as done without
+  its proposal, so the chatbot stopped polling and never showed Confirm changes (the intermittent conversation-browser
+  failure; the route is unchanged from main, so main had the same race). The template page's tutorial button is now
+  "Save tutorial": step 7 put a second "Save" on the page beside the Meta-Compiler's Save. The e2e smoke tests expect
+  the public names (ADI Forge, RL Gym).

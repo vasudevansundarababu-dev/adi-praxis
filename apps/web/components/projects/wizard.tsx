@@ -14,6 +14,7 @@ import {
   ENABLED_REVIEW_ROUTES,
   REVIEW_ROUTE_LABELS,
   REVIEW_ROUTES,
+  publicText,
 } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -270,7 +271,7 @@ export function ProjectWizard(props: {
                       ).map(([k, v]) => (
                         <div key={k}>
                           <dt className="font-medium text-fg-muted">{k}</dt>
-                          <dd>{v ?? '—'}</dd>
+                          <dd>{v ? publicText(v) : '—'}</dd>
                         </div>
                       ))}
                       {template.status !== 'PUBLISHED' && <p className="text-error">This template is no longer published. Choose another.</p>}
@@ -342,7 +343,13 @@ export function ProjectWizard(props: {
                       Distinct-task target
                       <Req />
                     </label>
-                    <input id="distinctTarget" aria-required="true" type="number" min={1} value={state.distinctTarget} onChange={(e) => set({ distinctTarget: e.target.value })} className={input} />
+                    <input id="distinctTarget" aria-required="true" aria-describedby={template?.caseCount ? 'distinctTarget-cases' : undefined} type="number" min={1} max={template?.caseCount ?? undefined} value={state.distinctTarget} onChange={(e) => set({ distinctTarget: template?.caseCount && Number(e.target.value) > template.caseCount ? String(template.caseCount) : e.target.value })} className={input} />
+                    {template?.caseCount ? (
+                      // D1 (owner, 15 Nov 2026): one task per case-selector value, so the target can't be higher.
+                      <p id="distinctTarget-cases" className="mt-1 text-xs text-fg-muted">
+                        This template makes one task per {template.caseLabel ?? 'case'}: {template.caseCount} in all. The target can be {template.caseCount} or fewer.
+                      </p>
+                    ) : null}
                   </div>
                   <div>
                     <label htmlFor="maxPerExpert" className="block text-sm font-medium">

@@ -169,10 +169,11 @@ describe('task form with and without the flag', () => {
   }
   const form = (formV2: boolean, section: number) => text(renderToStaticMarkup(<ProfileEditor task={task(formV2)} profile={PROFILE} onSubmitted={() => undefined} initialSection={section} initialRubric={formV2 ? VIEW : null} initialLibrary={{ setVersion: null, documents: [] }} />));
 
-  it('template help shows RL Gym, never the internal name, when on (D5); unchanged when off', () => {
-    expect(form(true, 1)).toContain('RL Gym assigns one isolated application snapshot');
-    expect(form(true, 1)).not.toMatch(/Anvil/);
-    expect(form(false, 1)).toContain('Anvil assigns one isolated application snapshot');
+  it('template help shows RL Gym, never the internal name, with or without the flag (D5)', () => {
+    for (const on of [true, false]) {
+      expect(form(on, 1)).toContain('RL Gym assigns one isolated application snapshot');
+      expect(form(on, 1)).not.toMatch(/Anvil|Praxis|ADI-Labs/);
+    }
   });
 
   it('S7 is the simplified editor when on, and the old repeated list when off', () => {

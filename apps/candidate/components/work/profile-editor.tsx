@@ -33,9 +33,8 @@ import { useAutosave } from './use-autosave';
 import { PolicyPicker, type LibraryView } from './policy-picker';
 import { RubricEditor, SourcePanel, useRubricView } from './rubric-editor';
 
-/** RUBRIC_RECOMMENDATIONS_ENABLED: template help is shown with public names (D5); the S4/S7/S8 controls change. */
+/** RUBRIC_RECOMMENDATIONS_ENABLED: the S4/S7/S8 controls change. Template text always shows public names (D5). */
 const FormV2 = createContext(false);
-const helpText = (v2: boolean, s: string) => (v2 ? publicText(s) : s);
 
 /**
  * The Classic editor for any registered template profile (handover v2.1 ch. 04/05): eight sections with progress,
@@ -111,18 +110,18 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
   const header = (
     <>
       <label htmlFor={id} className="block text-sm font-medium">
-        {field.label}
+        {publicText(field.label)}
         {required && <Req />}
       </label>
       <p id={`${id}-help`} className="text-xs text-fg-muted">
-        {helpText(v2, field.help)}
+        {publicText(field.help)}
       </p>
     </>
   );
   const example = field.example ? (
     <details className="mt-1 text-xs">
       <summary className="cursor-pointer text-link">Example</summary>
-      <p className="mt-1 whitespace-pre-wrap break-words text-fg-muted">{field.example}</p>
+      <p className="mt-1 whitespace-pre-wrap break-words text-fg-muted">{publicText(field.example)}</p>
     </details>
   ) : null;
 
@@ -134,11 +133,11 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
       return (
         <fieldset className="min-w-0" aria-describedby={describedBy}>
           <legend className="text-sm font-medium">
-            {field.label}
+            {publicText(field.label)}
             {required && <Req />}
           </legend>
           <p id={`${id}-help`} className="text-xs text-fg-muted">
-            {helpText(v2, field.help)}
+            {publicText(field.help)}
           </p>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
             {field.options.map((o) => (
@@ -155,11 +154,11 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
     return (
       <fieldset className="min-w-0" aria-describedby={describedBy}>
         <legend className="text-sm font-medium">
-          {field.label}
+          {publicText(field.label)}
           {required && <Req />}
         </legend>
         <p id={`${id}-help`} className="text-xs text-fg-muted">
-          {helpText(v2, field.help)}
+          {publicText(field.help)}
         </p>
         {list.length === 0 && <p className="mt-1 text-xs text-fg-muted">None yet.</p>}
         {list.map((v, i) => (
@@ -187,7 +186,7 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
           {field.label}
         </label>
         <p id={`${id}-help`} className="text-xs text-fg-muted">
-          {helpText(v2, field.help)}
+          {publicText(field.help)}
         </p>
       </div>
     );
@@ -230,16 +229,16 @@ function ArrayControl({ field, value, path, problems, lookup, onChange }: FieldP
   return (
     <fieldset className="min-w-0 rounded-md border border-line p-3" aria-describedby={`${id}-help`}>
       <legend className="px-1 text-sm font-medium">
-        {field.label}
+        {publicText(field.label)}
         {required && <Req />}
       </legend>
       <p id={`${id}-help`} className="text-xs text-fg-muted">
-        {helpText(v2, field.help)}
+        {publicText(field.help)}
       </p>
       {field.example && (
         <details className="mt-1 text-xs">
           <summary className="cursor-pointer text-link">Example</summary>
-          <p className="mt-1 whitespace-pre-wrap break-words text-fg-muted">{field.example}</p>
+          <p className="mt-1 whitespace-pre-wrap break-words text-fg-muted">{publicText(field.example)}</p>
         </details>
       )}
       <Messages id={`${id}-problems`} problems={mine} />
@@ -294,7 +293,7 @@ export function SelectorField({ field, value, label }: { field: TemplateProfile[
   );
 }
 
-/** The D3 declaration (owner, 15 Nov 2026): exactly this text, nothing else. */
+/** The D3 declaration (owner, 15 Nov 2026): exactly this text, nothing else, everywhere it appears. */
 export const DECLARATION_V2 = 'I won’t use real customer, employer or account information.';
 const isPolicyReferenceField = (f: ItemField) => f.type === 'repeated_array' && (f.itemFields ?? []).some((x) => /sha256/i.test(x.key));
 const isSourcesField = (f: ItemField) => f.type === 'long_text' && /source/i.test(`${f.key} ${f.label}`) && f.visibility !== 'private_reference' && f.visibility !== 'private_rubric';
@@ -419,9 +418,9 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
             Section {active + 1} of {profile.sections.length}
           </p>
           <h2 id="pf-section-h" className="text-lg font-semibold">
-            {section.key} · {section.title}
+            {section.key} · {publicText(section.title)}
           </h2>
-          {section.help && <p className="mt-1 text-sm text-fg-muted">{section.help}</p>}
+          {section.help && <p className="mt-1 text-sm text-fg-muted">{publicText(section.help)}</p>}
           {here.map((c, i) => (
             <p key={i} role="status" data-section-comment={section.key} className="mt-2 rounded-md border border-warning bg-warning/10 px-3 py-2 text-sm">
               <strong className="text-warning">Reviewer:</strong> {c.text}
@@ -511,7 +510,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
                 ))}
               </ul>
             )}
-            {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(s) => goTo(sectionIndex(s))} submitLabel={rework ? 'Resubmit for review' : undefined} declaration={v2 ? DECLARATION_V2 : undefined} />}
+            {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(s) => goTo(sectionIndex(s))} submitLabel={rework ? 'Resubmit for review' : undefined} declaration={DECLARATION_V2} />}
           </div>
         )}
 

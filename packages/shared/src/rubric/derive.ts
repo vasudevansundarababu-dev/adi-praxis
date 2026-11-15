@@ -237,20 +237,24 @@ function criterionText(input: DeriveInput, id: string, item: Record<string, unkn
   return [id.replace(/[_.-]/g, ' '), str(item?.name), d?.name ?? '', ...input.rubric.scoreKeys.map((k) => str(item?.[k.key] ?? d?.[k.key] ?? ''))].join(' ');
 }
 
-const MAX_LINKS = 5;
+const MAX_LINKS = 6;
 
-/** Rank sources for one criterion by shared word stems; at most two per role, five in all. */
+/**
+ * Rank sources for one criterion by shared word stems. The best source of each kind comes first (so a policy rule is
+ * never crowded out by several workflow steps), then the next best, at most two per kind and six in all.
+ */
 function pick(atoms: Atom[], text: string): Atom[] {
   const cs = stems(text);
   const scored = atoms.map((a) => ({ a, s: overlap(cs, stems(a.text)) })).filter((x) => x.s >= 2).sort((x, y) => y.s - x.s);
-  const per = new Map<FieldRole, number>();
   const out: Atom[] = [];
-  for (const { a } of scored) {
-    const n = per.get(a.role) ?? 0;
-    if (n >= 2 || out.length >= MAX_LINKS) continue;
-    per.set(a.role, n + 1);
-    out.push(a);
-  }
+  const per = new Map<FieldRole, number>();
+  for (const round of [1, 2])
+    for (const { a } of scored) {
+      const n = per.get(a.role) ?? 0;
+      if (n >= round || out.length >= MAX_LINKS || out.includes(a)) continue;
+      per.set(a.role, n + 1);
+      out.push(a);
+    }
   return out;
 }
 

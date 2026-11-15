@@ -22,6 +22,7 @@ import {
   type KycStep,
   type KycTask,
   type KycToolResponse,
+  publicText,
 } from '@praxis/shared';
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { Req, RequiredNote } from '@/components/required';
@@ -294,11 +295,11 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                 <p>{slot?.brief}</p>
                 <dl className="mt-2 grid gap-1 sm:grid-cols-[10rem_1fr]">
                   <dt className="text-fg-muted">Primary work</dt>
-                  <dd>{task.template.primaryWork}</dd>
+                  <dd>{publicText(task.template.primaryWork ?? '')}</dd>
                   <dt className="text-fg-muted">Verification</dt>
-                  <dd>{task.template.verificationCriteria}</dd>
+                  <dd>{publicText(task.template.verificationCriteria ?? '')}</dd>
                   <dt className="text-fg-muted">Human gate</dt>
-                  <dd>{task.template.humanGate}</dd>
+                  <dd>{publicText(task.template.humanGate ?? '')}</dd>
                   <dt className="text-fg-muted">Tools</dt>
                   <dd>{KYC_TOOLS.map((x) => x.label).join(', ')}</dd>
                 </dl>

@@ -85,7 +85,9 @@ describe('Before you start (MVP1)', () => {
     expect(html).toMatch(/<details[^>]*><summary[^>]*>Contributor agreement/);
     expect(t).toContain('Agreement text.');
     expect(html.match(/type="checkbox" aria-required="true"/g)).toHaveLength(2);
-    expect(t).toContain('Synthetic data only');
+    // D3 (owner, 15 Nov 2026): exactly this text.
+    expect(t).toContain("I won't use real customer, employer or account information.");
+    expect(t).not.toContain('Synthetic data only');
     expect(t).toContain('Accept and continue');
     expect(t).not.toContain('Accept both to continue.');
     expect(text(renderToStaticMarkup(<WelcomeForm terms={terms} initialError="Accept both to continue." />))).toContain('Accept both to continue.');

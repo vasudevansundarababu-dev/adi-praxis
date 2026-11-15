@@ -7,7 +7,7 @@ import type { Actor } from '../auth/actor';
 import type { MalwareScanner, ObjectStorage } from '../candidate/storage';
 import type { Db, Tx } from '../db';
 import { buildAssessmentSheet, buildRecruiterPack, buildRecruiterPdf, COLUMN_KEYS, columnValue, isFixedColumn, packFileName, readAssessmentSheet, type SheetRow } from '../forge/recruiter-pack';
-import { addSourcedPerson, assignable, changeAuthor, createSourcedPerson, directAssign, listSourcedPeople, projectPeople, sourcingProject, sourcingProjects, sourcingTarget, toSourcedPersonDto } from '../forge/sourcing';
+import { addSourcedPerson, assignable, changeAuthor, createSourcedPerson, directAssign, listSourcedPeople, projectPeople, sourcedWithoutTask, sourcingProject, sourcingProjects, sourcingTarget, toSourcedPersonDto } from '../forge/sourcing';
 import { resendSetLink, setLinkOnAssign, passwordMode, signInModeError } from '../forge/password';
 import { forgeSettings } from '../forge/settings';
 import type { Config } from '../config';
@@ -122,7 +122,7 @@ export const forgeSourcingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
   app.get('/projects/:id/people', { config: { access: ACCESS }, schema: { tags: ['sourcing'], params: IdParams } }, async (req) => {
     const p = await sourcingProject(db, req.actor!, req.params.id);
     await withTaskRows(req.actor!, String(req.id), p.id);
-    return { reviewRoute: p.reviewRoute, requiredWorkers: p.requiredWorkers, items: await projectPeople(db, p.id) };
+    return { reviewRoute: p.reviewRoute, requiredWorkers: p.requiredWorkers, items: await projectPeople(db, p.id), withoutTask: await sourcedWithoutTask(db, p.id) };
   });
 
   app.get('/projects/:id/assignable', { config: { access: ACCESS }, schema: { tags: ['sourcing'], params: IdParams } }, async (req) => {

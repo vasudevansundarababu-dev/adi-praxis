@@ -85,12 +85,16 @@ export function evaluatorsOf(execution: unknown): Map<string, EvaluatorRef> {
   return out;
 }
 
-export function templateRubric(profile: TemplateProfile, execution: unknown): TemplateRubric | null {
+/**
+ * `authoringDefaults` (D8, non-integration): default criteria kept in Authoring for an evaluator, used only when the
+ * template's own field carries none. They never change the template or the export.
+ */
+export function templateRubric(profile: TemplateProfile, execution: unknown, authoringDefaults: CriterionDefault[] = []): TemplateRubric | null {
   const rf = rubricField(profile);
   if (!rf) return null;
   const scale = rf.field.scale ?? 'five_two_zero';
   const map = evaluatorsOf(execution);
-  const defaults = rf.field.criterionDefaults ?? [];
+  const defaults = rf.field.criterionDefaults ?? (scale === 'five_two_zero' || authoringDefaults.every((d) => d.partialCredit === undefined) ? authoringDefaults.filter((d) => map.has(d.id)) : []);
   const ids = [...map.keys(), ...defaults.map((d) => d.id).filter((id) => !map.has(id))];
   const criteria = ids.map((id) => ({ id, defaults: defaults.find((d) => d.id === id) ?? null, evaluator: map.get(id) ?? null }));
   const schema = isObj(execution) && isObj(execution.output_schema) ? execution.output_schema : {};

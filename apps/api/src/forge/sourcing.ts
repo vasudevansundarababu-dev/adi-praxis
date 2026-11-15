@@ -179,6 +179,16 @@ export async function projectPeople(tx: Db | Tx, projectId: string): Promise<Pro
   }));
 }
 
+/**
+ * D1 (owner, 15 Nov 2026): sourced SMEs on the project who hold no task (never assigned, or released), so Resource
+ * assignments can say why ("No open task left") instead of leaving them invisible.
+ */
+export async function sourcedWithoutTask(tx: Db | Tx, projectId: string) {
+  const people = await tx.sourcedPerson.findMany({ where: { projectId, role: 'SME', OR: [{ assignedAt: null }, { releasedAt: { not: null } }] }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] });
+  const open = await tx.taskInstance.count({ where: { projectId, taskType: EXPERT_TASK_TYPES, assignedToId: null, status: { in: ['CREATED', 'ASSIGNED'] } } });
+  return { openTasks: open, items: people.map((p) => ({ sourcedPersonId: p.id, firstName: p.firstName, lastName: p.lastName, email: p.emailNorm })) };
+}
+
 /** Assigned SMEs on the project (each holds an SME place). */
 export const assignedSmeCount = (tx: Db | Tx, projectId: string) => tx.sourcedPerson.count({ where: { projectId, role: 'SME', assignedAt: { not: null }, releasedAt: null } });
 

@@ -229,6 +229,14 @@ describe('Dashboard and Resource assignments tabs', () => {
     expect(t).toContain('Review route Author → PM/Admin: you can assign SMEs only.');
     expect(a11yProblems(m)).toEqual([]);
   });
+
+  it('D1: sourced SMEs without a task are listed with the reason, never hidden', () => {
+    const full = text(renderToStaticMarkup(<ForgePeopleTab projectId={PID} reviewRoute="SME_PM" requiredWorkers={2} people={PEOPLE.slice(0, 1)} tasks={TASKS} withoutTask={{ openTasks: 0, items: [{ sourcedPersonId: 'sp5', firstName: 'Fifth', lastName: 'Person', email: 'fifth@gmail.test' }] }} />));
+    expect(full).toContain('Fifth Person fifth@gmail.test SME No task No open task left: every task is assigned.');
+    const open = text(renderToStaticMarkup(<ForgePeopleTab projectId={PID} reviewRoute="SME_PM" requiredWorkers={2} people={[]} tasks={TASKS} withoutTask={{ openTasks: 2, items: [{ sourcedPersonId: 'sp5', firstName: 'Fifth', lastName: 'Person', email: 'fifth@gmail.test' }] }} />));
+    expect(open).toContain('Not assigned yet. Use Assign.');
+    expect(open).not.toContain('No one assigned yet');
+  });
 });
 
 const ASSIGNABLE: AssignableData = {

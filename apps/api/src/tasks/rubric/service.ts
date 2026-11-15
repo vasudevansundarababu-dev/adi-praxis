@@ -37,6 +37,7 @@ import { latestRuleSet } from '../../policy/rule-sets';
 import { policyVersion } from '../../policy/anvil-project-policy';
 import { profileFor } from '../profile-output';
 import { caseSelectorOf } from '../task-service';
+import { authoringDefaultsFor } from './authoring-defaults';
 import { RUBRIC_PROMPT_VERSION, type RubricAssistant, type WordingInput } from './assistant';
 
 /**
@@ -65,7 +66,7 @@ export function rubricContext(task: TaskWithTemplate): RubricContext | null {
   const profile = profileFor({ workflowName: template.workflowName, profileId: template.profileId });
   if (!profile || profile.storage !== 'sections') return null;
   const execution = jointParts(template)?.execution ?? null;
-  const rubric = templateRubric(profile, execution);
+  const rubric = templateRubric(profile, execution, authoringDefaultsFor(execution));
   if (!rubric) return null;
   return { task, template, profile, execution, rubric, output: isObj(task.output) ? task.output : {} };
 }

@@ -198,12 +198,16 @@ describe('rubric recommendations (flag on)', () => {
     await s.save(authored(s.v7));
     const v = await s.view();
     expect(v.criteria.map((c) => c.id)).toEqual(V7_IDS);
-    expect(v.template).toMatchObject({ scale: 'five_two_zero', fixedSet: true, criterionFailureSupported: true, weightsFromTemplate: false });
+    expect(v.template).toMatchObject({ scale: 'five_two_zero', fixedSet: true, criterionFailureSupported: true, weightsFromTemplate: true });
     expect(v.template.scoreKeys.map((k) => [k.label, k.points])).toEqual([['Pass', 5], ['Partial', 2], ['Fail', 0]]);
     expect(v.seed!.map((i) => i.id)).toEqual(V7_IDS);
-    expect(v.seed![0]).toMatchObject({ id: 'identification_parties', name: 'Identification parties', evaluatorKind: 'golden-kyc-rubric-v1', evaluatorVersion: '1', weight: null, passCondition: '', critical: false });
+    // D8 (non-integration): the owner's 20-criterion table is the default, kept in Authoring; weight 5 each = 100.
+    expect(v.seed![0]).toMatchObject({ id: 'identification_parties', name: 'All parties identified', evaluatorKind: 'golden-kyc-rubric-v1', evaluatorVersion: '1', weight: 5, critical: false });
+    expect(v.seed![0]!.passCondition).toMatch(/^Every owner, signer and authorised party/);
+    expect(v.seed!.reduce((n, i) => n + (i.weight as number), 0)).toBe(100);
+    expect(v.seed!.filter((i) => i.critical === true).map((i) => i.id)).toEqual(['identification_verification', 'screening', 'decision']);
     const c = crit(v, 'account_authority');
-    expect(c).toMatchObject({ origin: 'TEMPLATE', exportable: true, defaults: null });
+    expect(c).toMatchObject({ origin: 'TEMPLATE_DEFAULT', exportable: true, defaults: expect.objectContaining({ id: 'account_authority', name: 'Authority' }) });
     expect(c.technical).toEqual(expect.arrayContaining([{ label: 'Evaluator', value: 'golden-kyc-rubric-v1', note: 'From template' }, { label: 'Evidence source', value: 'Recorded run', note: 'From template' }, { label: 'Output field', value: '—', note: 'Not used' }, { label: 'Comparison', value: '—', note: 'Not used' }]));
     expect(c.howChecked.setupNeeded).toBe(false);
     expect(c.howChecked.text).toMatch(/recorded run/);
@@ -314,7 +318,7 @@ describe('rubric recommendations (flag on)', () => {
     const s = await setup();
     await s.save(authored(s.v7));
     let v = await s.view();
-    const items = v.seed!.map((i) => (i.id === 'identification_verification' ? { ...i, critical: true } : i));
+    const items = v.seed!.map((i) => (i.id === 'identification_verification' ? { ...i, critical: true, failCondition: '' } : i));
     await s.save(authored(s.v7, { criteria: items }));
     const c = crit(await s.view(), 'identification_verification');
     expect((await put(s.me.cookie, `/me/tasks/${s.task.id}/rubric/criteria/identification_verification`, { expectedVersion: c.annotationVersion, wholeTaskFailure: { kind: 'FAIL_OF_CRITERION', condition: '' } })).statusCode).toBe(200);
@@ -457,4 +461,32 @@ describe('rubric recommendations (flag on)', () => {
     await expect(db.$executeRawUnsafe(`UPDATE "RubricCriterionAnnotation" SET status = 'REMOVED' WHERE id = '${row.id}'`)).rejects.toThrow(/append-only/);
     await expect(db.$executeRawUnsafe(`DELETE FROM "RubricRecommendationRun"`)).rejects.toThrow(/append-only/);
   });
+  // ── D1: a case-selector template's target never goes above its number of cases ──
+
+  it('D1: the target is capped at the case count (create and edit), the default is clamped, and sourced people without a task are listed', async () => {
+    const s = await setup();
+    const v7 = s.v7;
+    const jd = (await post(pm, '/job-descriptions', { title: 'Analyst', responsibilities: 'Author cases.', skills: v7.skills, wagePerTask: 40, wageCurrency: 'GBP', locationType: 'REMOTE' })).json();
+    const body = (o: object) => ({ authoringExperience: 'CLASSIC', reviewRoute: 'SME_PM', templateId: v7.id, name: `P ${randomUUID().slice(0, 6)}`, taskMode: 'AUTHORING', maxPerExpert: 4, tptMinutes: 60, startDate: '2026-10-05', endDate: '2026-10-06', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['GB'], required: true }], ...o });
+    const tooMany = await post(pm, '/projects', body({ distinctTarget: 5 }));
+    expect(tooMany.statusCode).toBe(422);
+    expect(tooMany.json()).toMatchObject({ error: 'TARGET_ABOVE_CASES' });
+    expect(tooMany.json().message).toBe('This template makes one task per product: 4 in all. Set the distinct-task target to 4 or fewer (you asked for 5).');
+    const ok = await post(pm, '/projects', body({ distinctTarget: 4 }));
+    expect(ok.statusCode, ok.body).toBe(201);
+    const edit = await call(app, 'PATCH', pm, `/projects/${ok.json().id}`, { distinctTarget: 9 });
+    expect(edit.statusCode).toBe(422);
+    const dflt = await post(pm, '/projects', body({ name: `Q ${randomUUID().slice(0, 6)}` }));
+    expect(dflt.statusCode, dflt.body).toBe(201);
+    expect(dflt.json().distinctTarget).toBeLessThanOrEqual(4);
+    const tpl = (await get(pm, `/templates/${v7.id}`)).json();
+    expect(tpl).toMatchObject({ caseCount: 4, caseLabel: 'product' });
+
+    // Resource assignments: a sourced SME with no task is listed with the reason.
+    await kit.source(s.pid, 'SME', { email: 'fifth@gmail.test', first: 'Fifth', last: 'Person' });
+    const people = (await get(pm, `/projects/${s.pid}/people`)).json();
+    expect(people.withoutTask.items.map((p: { email: string }) => p.email)).toContain('fifth@gmail.test');
+    expect(typeof people.withoutTask.openTasks).toBe('number');
+  });
 });
+

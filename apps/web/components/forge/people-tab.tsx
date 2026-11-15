@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { smesOf, reviewersOf, taskCodes, taskStatusLabel, taskStatusTone, type ReviewRoute } from '@/lib/forge-console';
 import { TD, TH } from './project-shell';
 
+/** D1: sourced SMEs with no task, and how many tasks are still open. */
+export type WithoutTask = { openTasks: number; items: { sourcedPersonId: string; firstName: string; lastName: string; email: string }[] };
+
 /** MVP1 Resource assignments tab (owner, 15 Nov: one screen, no steps): the people assigned, each with their tasks. */
 export function ForgePeopleTab({
   projectId,
@@ -10,12 +13,14 @@ export function ForgePeopleTab({
   requiredWorkers,
   people,
   tasks,
+  withoutTask,
 }: {
   projectId: string;
   reviewRoute: ReviewRoute;
   requiredWorkers: number | null;
   people: ProjectPersonDto[];
   tasks: Pick<ForgeTaskRow, 'taskId'>[];
+  withoutTask?: WithoutTask;
 }) {
   const codes = taskCodes(tasks);
   const smes = smesOf(people).length;
@@ -70,7 +75,11 @@ export function ForgePeopleTab({
                           </Link>
                         </div>
                       ))
-                    : '—'}
+                    : p.role === 'SME' && withoutTask
+                      ? withoutTask.openTasks === 0
+                        ? 'No open task left'
+                        : 'No task yet'
+                      : '—'}
                 </td>
                 <td className={TD}>
                   {p.tasks.length
@@ -83,7 +92,23 @@ export function ForgePeopleTab({
                 </td>
               </tr>
             ))}
-            {people.length === 0 && (
+            {(withoutTask?.items ?? []).map((p) => (
+              <tr key={p.sourcedPersonId} data-person={p.sourcedPersonId} data-without-task>
+                <td className={TD}>{p.firstName}</td>
+                <td className={TD}>{p.lastName}</td>
+                <td className={`${TD} font-mono text-xs`}>{p.email}</td>
+                <td className={TD}>
+                  <span className="pill pill-info">SME</span>
+                </td>
+                <td className={TD}>
+                  <span className="pill pill-warning">No task</span>
+                </td>
+                <td className={TD} colSpan={2}>
+                  {withoutTask!.openTasks === 0 ? 'No open task left: every task is assigned.' : 'Not assigned yet. Use Assign.'}
+                </td>
+              </tr>
+            ))}
+            {people.length === 0 && !(withoutTask?.items.length) && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-fg-muted">
                   No one assigned yet. Use Assign.

@@ -1,6 +1,6 @@
 import type { DemographicAttributeDto, ForgeTaskRow, JobDescriptionDto, ProjectDto, ProjectPersonDto } from '@praxis/shared';
 import { ForgeDashboardTab, type DashboardNumbers } from '@/components/forge/dashboard-tab';
-import { ForgePeopleTab } from '@/components/forge/people-tab';
+import { ForgePeopleTab, type WithoutTask } from '@/components/forge/people-tab';
 import { ForgeProjectShell } from '@/components/forge/project-shell';
 import { ForgeTasksTab } from '@/components/forge/tasks-tab';
 import { PolicyWorkspace, type DocumentsData, type ExtractionData, type PreviewData, type RuleRow } from '@/components/policy/policy-workspace';
@@ -8,7 +8,7 @@ import type { ExportState } from '@/components/projects/export-panel';
 import { apiGet, getCurrentUser } from '@/lib/api';
 import { smesOf, type ProjectTab, type ReviewRoute } from '@/lib/forge-console';
 
-type People = { reviewRoute: ReviewRoute; requiredWorkers: number | null; items: ProjectPersonDto[] };
+type People = { reviewRoute: ReviewRoute; requiredWorkers: number | null; items: ProjectPersonDto[]; withoutTask?: WithoutTask };
 
 /** The MVP1 project page: header and tabs Dashboard, Resource assignments, Tasks, Policies (`?tab=`). */
 export async function ForgeProjectPage({ project, tab }: { project: ProjectDto; tab: ProjectTab }) {
@@ -28,7 +28,7 @@ export async function ForgeProjectPage({ project, tab }: { project: ProjectDto; 
 
   let body: React.ReactNode;
   if (tab === 'people') {
-    body = <ForgePeopleTab projectId={id} reviewRoute={reviewRoute} requiredWorkers={requiredWorkers} people={people} tasks={tasks} />;
+    body = <ForgePeopleTab projectId={id} reviewRoute={reviewRoute} requiredWorkers={requiredWorkers} people={people} tasks={tasks} withoutTask={peopleRes.data?.withoutTask} />;
   } else if (tab === 'tasks') {
     const { data: exportState } = await apiGet<ExportState>(`/projects/${id}/export`);
     body = <ForgeTasksTab projectId={id} tasks={tasks} people={people} exportState={exportState} />;

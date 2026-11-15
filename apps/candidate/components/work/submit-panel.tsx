@@ -134,7 +134,7 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
       <label className="flex items-start gap-2 text-sm">
         <input type="checkbox" aria-required="true" checked={declared} onChange={(e) => setDeclared(e.target.checked)} className="mt-1" />
         <span>
-          {humanOnly ? 'This revision is my own work; no external LLM wrote the answers; all sources are authorised and the case contains no real personal or confidential data.' : props.declaration ?? 'This case is entirely synthetic. It contains no real customer, colleague, employer or confidential information.'}
+          {humanOnly ? 'This revision is my own work; no external LLM wrote the answers; all sources are authorised and the case contains no real personal or confidential data.' : props.declaration ?? 'I won’t use real customer, employer or account information.'}
           <Req />
         </span>
       </label>

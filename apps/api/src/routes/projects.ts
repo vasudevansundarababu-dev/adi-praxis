@@ -20,7 +20,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Actor } from '../auth/actor';
 import type { Db, Tx } from '../db';
-import { ensureSlots, ensureSlotTasks } from '../tasks/task-service';
+import { caseSelectorOf, ensureSlots, ensureSlotTasks } from '../tasks/task-service';
 import { forgeSettings } from '../forge/settings';
 import { AppError, badRequest, conflict, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
@@ -143,6 +143,13 @@ function assertReviewRouteEnabled(route: ReviewRoute | undefined) {
   }
 }
 
+/** D1 (owner, 15 Nov 2026): a case-selector template makes one task per value, so a higher target is refused. */
+export function assertTargetWithinCases(cases: { field: string; values: string[] } | null, target: number | null | undefined) {
+  if (!cases || target === undefined || target === null || target <= cases.values.length) return;
+  const what = cases.field.replace(/_/g, ' ');
+  throw new AppError(422, 'TARGET_ABOVE_CASES', `This template makes one task per ${what}: ${cases.values.length} in all. Set the distinct-task target to ${cases.values.length} or fewer (you asked for ${target}).`, { max: cases.values.length });
+}
+
 function scalarData(body: z.infer<typeof UpdateProjectRequest>): Prisma.ProjectUncheckedUpdateInput {
   const d: Prisma.ProjectUncheckedUpdateInput = {};
   if (body.authoringExperience !== undefined) d.authoringExperience = body.authoringExperience;
@@ -209,10 +216,13 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         assertReviewRouteEnabled(req.body.reviewRoute);
         if (!t.taskModes.includes(taskMode)) throw badRequest(`This template does not allow ${taskMode.toLowerCase()} projects`);
 
+        // D1: a case-selector template makes one task per value; the target can't be higher than that.
+        const cases = caseSelectorOf(t.caseSelector);
+        assertTargetWithinCases(cases, req.body.distinctTarget);
         // Defaults come from the template; the PM's values override them.
         const created = await tx.project.create({
           data: {
-            distinctTarget: t.defaultDistinctTarget,
+            distinctTarget: cases ? Math.min(t.defaultDistinctTarget, cases.values.length) : t.defaultDistinctTarget,
             maxPerExpert: t.defaultMaxPerExpert,
             openSlotShare: t.openSlotShare,
             tptMinutes: t.defaultTptMinutes,
@@ -260,6 +270,9 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         }
         if (req.body.name !== undefined) await assertUniqueName(tx, actor.clientId, req.body.name, before.id);
         await assertJd(tx, req.body.jobDescriptionId, actor.clientId);
+        // D1: the target never goes above the template's number of cases (checked against the template after the edit).
+        const cases = caseSelectorOf((await tx.template.findUniqueOrThrow({ where: { id: (data.templateId as string | undefined) ?? before.templateId } })).caseSelector);
+        assertTargetWithinCases(cases, req.body.distinctTarget ?? (data.templateId !== undefined ? before.distinctTarget : undefined));
 
         // Always touch updatedAt: an edit may change only the filters, and an empty update would match no row.
         const { count } = await tx.project.updateMany({ where: { id: before.id, status: 'DRAFT' }, data: { ...data, updatedAt: new Date() } });

@@ -1,6 +1,6 @@
 'use client';
 
-import { getFieldValue, isArrayType, itemFieldsOf, type ForgeComment, type ItemField, type ReviewerTaskStatus, type RubricView, type SectionKey, type TemplateProfile } from '@praxis/shared';
+import { getFieldValue, isArrayType, itemFieldsOf, type ForgeComment, type ItemField, type ReviewerTaskStatus, type RubricView, type SectionKey, type TemplateProfile, publicText } from '@praxis/shared';
 import { RubricReadOnly } from './rubric-readonly';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -156,11 +156,11 @@ export function ReviewPage({ initial, rubric = null }: { initial: ReviewView; ru
                   const s = profile.sections.find((x) => x.key === key)!;
                   return (
                     <div key={key} className="mt-3 space-y-2">
-                      {g.sections.length > 1 && <h3 className="text-sm font-semibold text-fg-muted">{s.key} · {s.title}</h3>}
+                      {g.sections.length > 1 && <h3 className="text-sm font-semibold text-fg-muted">{s.key} · {publicText(s.title)}</h3>}
                       <dl className="space-y-2">
                         {s.fields.map((f) => (
                           <div key={f.key}>
-                            <dt className="text-xs font-medium text-fg-muted">{f.label}</dt>
+                            <dt className="text-xs font-medium text-fg-muted">{publicText(f.label)}</dt>
                             <dd>
                               <Value field={f} value={getFieldValue(profile, view.output, s.key as SectionKey, f)} />
                               {rubric && f.type === 'criterion' && <RubricReadOnly view={rubric} items={(getFieldValue(profile, view.output, s.key as SectionKey, f) as Record<string, unknown>[] | undefined) ?? []} />}

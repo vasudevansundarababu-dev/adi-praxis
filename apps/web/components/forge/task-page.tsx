@@ -1,6 +1,6 @@
 'use client';
 
-import { getFieldValue, isArrayType, itemFieldsOf, PROFILE_SECTIONS, type ForgeComment, type ItemField, type ProjectPersonDto, type RubricView, type SectionKey, type TemplateProfile, type ValidationRunDto } from '@praxis/shared';
+import { getFieldValue, isArrayType, itemFieldsOf, PROFILE_SECTIONS, type ForgeComment, type ItemField, type ProjectPersonDto, type RubricView, type SectionKey, type TemplateProfile, type ValidationRunDto, publicText } from '@praxis/shared';
 import { RubricReadOnly } from './rubric-readonly';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -136,7 +136,7 @@ export function AuthoredForm({ profile, output, rubric = null }: { profile: Temp
       {profile.sections.map((s) => (
         <section key={s.key} className="card mb-4 p-5" data-section={s.key}>
           <h3 className="mb-3 font-semibold">
-            {s.key} · {s.title}
+            {s.key} · {publicText(s.title)}
           </h3>
           {s.fields.length === 0 ? (
             <p className="text-sm text-fg-muted">Checks and submission only.</p>
@@ -144,7 +144,7 @@ export function AuthoredForm({ profile, output, rubric = null }: { profile: Temp
             <dl className="grid gap-x-4 gap-y-2.5 text-sm sm:grid-cols-[12rem_1fr]">
               {s.fields.map((f) => (
                 <div key={f.key} className="contents">
-                  <dt className="font-medium text-fg-muted">{f.label}</dt>
+                  <dt className="font-medium text-fg-muted">{publicText(f.label)}</dt>
                   <dd>
                     <FieldValue field={f} value={output ? getFieldValue(profile, output, s.key as SectionKey, f) : undefined} />
                     {rubric && f.type === 'criterion' && <RubricReadOnly view={rubric} items={((output ? getFieldValue(profile, output, s.key as SectionKey, f) : undefined) as Record<string, unknown>[] | undefined) ?? []} />}

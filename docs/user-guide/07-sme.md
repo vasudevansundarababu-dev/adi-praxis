@@ -191,7 +191,7 @@ Live checks under each section show ✓ or • (for example "Rubric weights must
 2. **Possible real data**: replace each flagged value with a synthetic one, or explain why it is not real (the
    Validator sees your explanation).
 3. **Closest existing tasks**: make your case clearly different from these.
-4. Tick "This case is entirely synthetic…" and select **Submit for review**.
+4. Tick "I won’t use real customer, employer or account information." and select **Submit for review**.
 
 The task becomes read-only and shows "Submitted · awaiting review".
 

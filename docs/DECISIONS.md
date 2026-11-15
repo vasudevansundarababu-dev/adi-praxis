@@ -1754,3 +1754,10 @@ KYC v7 SME task form (plan section 17). It's awaiting the owner's approval; no f
   rule is unchanged.
 - **(chosen by Claude)** The S4 picker design is shared with the policy-annotations session (PR #81) through the
   side-session notes, using its six marking labels and chip colours, so both mockups match.
+- **(agreed with the PR #81 session)** The S4 picker and the Policies-page mockup match: the six marking labels; chip
+  colours (Mandatory teal; when applicable and permitted blue; needs clarification amber; required reference and
+  other grey); rows with a jurisdiction chip, "N rules applied" and "Show rules".
+- **(chosen by Claude, to confirm with RL Gym)** S4's read-only Policy ID, Version, Publication reference and SHA-256
+  come from the project policy manifest identities (PR #81: document id, `rs<set>.d<doc>`, "project rule set vN",
+  `sha256`), not from the GB-01…GB-07 identities RL Gym supplied with v7. This gives one source of truth. RL Gym
+  confirms which identities its v7 grader expects before S4 ships. The mockup's GB-style values are example data.

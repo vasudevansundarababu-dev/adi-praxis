@@ -531,3 +531,18 @@ each state. The console Project → Policies page is out of scope; the policy-an
 | **Incomplete draft** | Save works with gaps across the form (e.g. S1 Language empty, plus the S7 items). Each gap links to its field and section, and a section tab with something to finish gets an amber dot. Submit still runs the existing checks. | Section 7 and AC 8. |
 
 Out of scope here and unchanged: the console Policies page (PR #81), D1, D2, D4 and D7.
+
+**S4 identity values: one point to confirm with RL Gym before building.** The PR #81 session confirmed the shared
+picker: same six labels, same chip colours, and rows with a jurisdiction chip and "N rules applied" (the mockup now
+matches). It fills the four read-only fields from the **project policy manifest** sent to RL Gym:
+
+- Policy ID: the `PolicyDocument` id;
+- Version: the manifest version `rs<set>.d<doc>`;
+- Publication reference: "project rule set vN";
+- SHA-256: `PolicyDocumentVersion.sha256`.
+
+The v7 QA cheat sheet instead uses the identities RL Gym supplied with the template (GB-01…GB-07, `golden-kyc-1.0.0`).
+The plan follows PR #81: S4 is filled from the same manifest identities RL Gym receives, so every S4 reference resolves
+against that manifest, with one source of truth. Whether RL Gym's v7 grader expects the manifest identities or its
+own GB identities is RL Gym's call. It goes into the RL Gym change note and is checked before S4 ships. The mockup keeps
+GB-style example data, which the PR #81 session agreed is fine because the fields are the same.

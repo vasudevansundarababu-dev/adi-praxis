@@ -536,7 +536,7 @@ const POL=Object.keys(SHA).map((id,i)=>({id,title:'Golden Bank approved operatin
 POL.push({id:'CUST-PROC',title:'Custodial accounts procedure',ver:'2026-10',ref:'Project policy library · section 3 (illustrative)',sha:'(from the library; illustrative)',eff:'1 Oct 2026',added:false,open:false,counts:[[2,'m'],[1,'w'],[0,'p'],[1,'c']],notes:{a:'',r:'',e:''}});
 const RULES={'GB-02':[['R-ID-1','Verify the identity of each owner and each person acting for an owner','m','Always'],['R-ID-2','Non-documentary check when a foreign passport is used','w','When the foreign-passport route is chosen'],['R-ID-3','A foreign passport may be accepted','p','Permitted route; R-ID-2 applies with it']],
  'CUST-PROC':[['R-CU-1','Confirm the custodian\'s authority to act for the minor','m','Always, for custodial accounts'],['R-CU-2','Refer an unproven authority to a bank officer','w','When authority can\'t be proven'],['R-CU-3','Court-order evidence for a guardian custodian','c','Needs clarification: which states accept it']]};
-const MK={m:['Mandatory','mk-m'],w:['Mandatory when applicable','mk-w'],p:['Permitted option','mk-w'],c:['Needs clarification','mk-c'],o:['Other responsibility/scope','mk-o']};
+const MK={m:['Mandatory','mk-m'],w:['Mandatory when applicable','mk-w'],p:['Permitted option','mk-w'],c:['Needs clarification','mk-c'],r:['Required reference','mk-o'],o:['Other responsibility/scope','mk-o']};
 let noPolicies=false;
 const mkChips=c=>c.filter(([n])=>n).map(([n,k])=>`<span class="mk ${MK[k][1]}">${MK[k][0]} ${n}</span>`).join(' ');
 function renderPol(){
@@ -554,7 +554,7 @@ function renderPol(){
  document.querySelectorAll('[data-polrm]').forEach(b=>b.onclick=()=>{POL.find(p=>p.id===b.dataset.polrm).added=false;renderPol();syncSrc()});
 }
 function renderPolDlg(){
- document.getElementById('polRows').innerHTML=POL.map(x=>`<div class="prow"><input type="checkbox" data-polpick="${x.id}" ${x.added?'checked disabled':''}><div><strong>${x.title}</strong> <span class="mono muted">${x.id}</span> · version ${x.ver} · effective ${x.eff} ${x.added?'<span class="pill pill-success">Added</span>':''}<br>
+ document.getElementById('polRows').innerHTML=POL.map(x=>`<div class="prow"><input type="checkbox" data-polpick="${x.id}" ${x.added?'checked disabled':''}><div><strong>${x.title}</strong> <span class="mono muted">${x.id}</span> <span class="pill">${x.jur||'US-TX'}</span> · version ${x.ver} · effective ${x.eff} · ${x.counts.reduce((n,[c])=>n+c,0)} rules applied ${x.added?'<span class="pill pill-success">Added</span>':''}<br>
  <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-top:4px">${mkChips(x.counts)}</span> ${RULES[x.id]?`<button class="btn-link" data-showrules="${x.id}" style="font-size:12.5px;margin-left:6px">Show rules</button><ul class="rules" id="rules-${x.id}" style="display:none">${RULES[x.id].map(r=>`<li><span class="mono">${r[0]}</span>${r[1]}<span class="mk ${MK[r[2]][1]}">${MK[r[2]][0]}</span><span class="muted">Applies when: ${r[3]}</span></li>`).join('')}</ul>`:''}</div></div>`).join('');
  document.querySelectorAll('[data-showrules]').forEach(b=>b.onclick=()=>{const u=document.getElementById('rules-'+b.dataset.showrules);u.style.display=u.style.display==='none'?'':'none'});
 }

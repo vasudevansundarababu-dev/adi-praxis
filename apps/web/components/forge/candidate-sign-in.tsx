@@ -29,7 +29,8 @@ export function CandidateSignInSettings({ initial, canEdit }: { initial: ForgeSe
     const res = await mutate<ForgeSettingsView>('PUT', '/admin/forge-settings', body);
     setPending(false);
     if (!res.ok) return setMsg({ ok: false, text: res.error ?? 'Could not save.' });
-    setMsg({ ok: true, text: `Saved: the new flow is ${res.data!.newFlow ? 'on' : 'off'}; candidate sign-in is ${res.data!.candidateSignIn === 'OFFLINE' ? 'Offline' : 'Online'}.` });
+    const ended = res.data!.candidateSessionsEnded ?? 0;
+    setMsg({ ok: true, text: `Saved: the new flow is ${res.data!.newFlow ? 'on' : 'off'}; candidate sign-in is ${res.data!.candidateSignIn === 'OFFLINE' ? 'Offline' : 'Online'}.${ended ? ` ${ended} candidate ${ended === 1 ? 'session was' : 'sessions were'} signed out.` : ''}` });
     router.refresh();
   }
 
@@ -96,7 +97,9 @@ export function CandidateSignInSettings({ initial, canEdit }: { initial: ForgeSe
           )}
         </div>
       )}
-      <p className="mt-3 text-xs text-fg-muted">Every change is audited.</p>
+      <p className="mt-3 text-xs text-fg-muted" data-sign-out-note>
+        Changing the sign-in mode signs everyone out of the candidate app (SMEs and Reviewers sign in again with the new mode). Every change is audited.
+      </p>
     </div>
   );
 }

@@ -13,6 +13,8 @@ export interface ForgeSettingsView {
   candidateSignIn: 'OFFLINE' | 'ONLINE';
   /** False when the server refuses Offline sign-in (production). */
   offlineAllowed: boolean;
+  /** PUT only: candidate-app sessions signed out because the sign-in mode changed. */
+  candidateSessionsEnded?: number;
 }
 
 /** The Save body: only what changed, so a stored Offline mode never blocks switching the flow where Offline is refused. */
@@ -80,11 +82,20 @@ export function slotSelector(label: string): { field: string; value: string } | 
   return m ? { field: m[1]!.trim(), value: m[2]!.trim() } : null;
 }
 
-/** The heading word for the coverage table, e.g. "governing state", from the tasks' briefs (most common field). */
-export function selectorName(rows: Pick<ForgeTaskRow, 'label'>[]): string {
+/**
+ * The coverage selector of one task row: the API's `selector` (read from the task's slot, MVP1 step 9), shown as
+ * field and display value. Only a row without one (an older API) falls back to reading the brief.
+ */
+export function rowSelector(r: Pick<ForgeTaskRow, 'label' | 'selector'>): { field: string; value: string } | null {
+  if (r.selector !== undefined) return r.selector ? { field: r.selector.field, value: r.selector.label } : null;
+  return slotSelector(r.label);
+}
+
+/** The heading word for the coverage table, e.g. "governing state", from the tasks' selectors (most common field). */
+export function selectorName(rows: Pick<ForgeTaskRow, 'label' | 'selector'>[]): string {
   const counts = new Map<string, number>();
   for (const r of rows) {
-    const f = slotSelector(r.label)?.field;
+    const f = rowSelector(r)?.field;
     if (f) counts.set(f, (counts.get(f) ?? 0) + 1);
   }
   const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
@@ -99,6 +110,22 @@ export function tasksSummary(rows: Pick<ForgeTaskRow, 'status'>[]): string {
   const approved = rows.filter((r) => r.status === 'ACCEPTED').length;
   const waiting = rows.filter((r) => r.status === 'SUBMITTED').length;
   return `${approved} approved · ${waiting} waiting for review`;
+}
+
+/** Where an export result that needs fixing links: the new task page with the new flow on, else Task review. */
+export const exportFixHref = (projectId: string, taskId: string, newFlow: boolean) => (newFlow ? `/projects/${projectId}/tasks/${taskId}/review` : `/review/tasks/${taskId}`);
+
+/** The recruiter page's back link: the project's Resource assignments tab with the new flow on, else the project. */
+export const recruiterBackHref = (projectId: string, newFlow: boolean) => (newFlow ? tabHref(projectId, 'people') : `/projects/${projectId}`);
+
+/**
+ * "Change author" on the task page (PM or Admin): shown for Assigned, In progress and Rework tasks that have an author.
+ * The author can be changed only before they start (owner, 15 Nov; the API answers AUTHOR_STARTED otherwise), so it
+ * is enabled only while the task is Assigned.
+ */
+export function changeAuthorState(status: string, hasAuthor: boolean): 'enabled' | 'started' | null {
+  if (!hasAuthor || !['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(status)) return null;
+  return status === 'ASSIGNED' ? 'enabled' : 'started';
 }
 
 /** The Tasks tab offers "Assign SME…" only on an Open task with no author. */

@@ -4,6 +4,7 @@ import type { ValidationRunDto } from '@praxis/shared';
 import Link from 'next/link';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { exportFixHref } from '@/lib/forge-console';
 
 export interface ExportState {
   canValidate: boolean;
@@ -19,7 +20,7 @@ export interface ExportState {
  * is complete (in the MVP1 new flow, 15 Nov 2026: once every task is approved; the API's reason says how many are).
  * The validator's verdict lists the tasks that need fixing; it changes nothing by itself.
  */
-export function ExportPanel({ projectId, initial }: { projectId: string; initial: ExportState }) {
+export function ExportPanel({ projectId, initial, newFlow = false }: { projectId: string; initial: ExportState; newFlow?: boolean }) {
   const [state, setState] = useState(initial);
   const [recordId, setRecordId] = useState(initial.tasks[0]?.recordId ?? '');
   const [pending, setPending] = useState(false);
@@ -91,7 +92,7 @@ export function ExportPanel({ projectId, initial }: { projectId: string; initial
                 .filter((r) => r.status !== 'valid')
                 .map((r) => (
                   <li key={r.recordId}>
-                    <Link href={`/review/tasks/${r.taskId}`}>{r.title}</Link> — {r.status === 'needs_fix' ? 'needs fixing' : 'not validated'}:{' '}
+                    <Link href={exportFixHref(projectId, r.taskId, newFlow)}>{r.title}</Link> — {r.status === 'needs_fix' ? 'needs fixing' : 'not validated'}:{' '}
                     {r.issues
                       .slice(0, 3)
                       .map((i) => i.message)

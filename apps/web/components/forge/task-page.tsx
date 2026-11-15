@@ -7,6 +7,7 @@ import { useState } from 'react';
 import type { ExportState } from '@/components/projects/export-panel';
 import { mutate } from '@/lib/client-api';
 import {
+  changeAuthorState,
   decisionBody,
   decisionProblem,
   fmtWhen,
@@ -16,6 +17,7 @@ import {
   reviewersOf,
   reviewTrail,
   routeLabel,
+  smesOf,
   tabHref,
   taskBanner,
   taskName,
@@ -195,6 +197,96 @@ function AssignReviewer({ projectId, view, people }: { projectId: string; view: 
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * "Change author" (PM or Admin, MVP1 step 9): pick another SME assigned on the project, confirm, and the existing
+ * POST /projects/:id/tasks/:taskId/author makes the change. Only before the author starts (owner, 15 Nov): on an In
+ * progress or Rework task the control is shown disabled with the reason.
+ */
+export function ChangeAuthor({ projectId, view, people }: { projectId: string; view: ForgeTaskView; people: ProjectPersonDto[] }) {
+  const router = useRouter();
+  const [choice, setChoice] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const state = changeAuthorState(view.status, !!view.author);
+  if (!state) return null;
+  const authorEmail = view.author?.email?.toLowerCase() ?? null;
+  const options = smesOf(people).filter((p) => p.email.toLowerCase() !== authorEmail);
+  const chosen = options.find((o) => o.sourcedPersonId === choice) ?? null;
+  const disabled = state !== 'enabled' || pending || !options.length;
+
+  async function change() {
+    if (!chosen) return setError('Choose the new author.');
+    setPending(true);
+    setError(null);
+    const res = await mutate('POST', `/projects/${projectId}/tasks/${view.taskId}/author`, { sourcedPersonId: chosen.sourcedPersonId });
+    setPending(false);
+    setConfirming(false);
+    if (!res.ok) return setError(res.error);
+    setChoice('');
+    router.refresh();
+  }
+
+  return (
+    <section aria-labelledby="change-author-h" className="card mb-4 p-5" data-change-author>
+      <h3 id="change-author-h" className="mb-2 font-semibold">
+        Change author
+      </h3>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <select
+          aria-label="New author"
+          value={choice}
+          disabled={disabled}
+          onChange={(e) => {
+            setChoice(e.target.value);
+            setConfirming(false);
+            setError(null);
+          }}
+          className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm disabled:opacity-60"
+        >
+          <option value="">{options.length ? 'Choose an SME…' : 'No other SMEs on this project'}</option>
+          {options.map((p) => (
+            <option key={p.sourcedPersonId} value={p.sourcedPersonId}>
+              {fullName(p)} ({p.email})
+            </option>
+          ))}
+        </select>
+        {!confirming && (
+          <button
+            type="button"
+            disabled={disabled}
+            className="btn btn-secondary disabled:opacity-60"
+            onClick={() => (chosen ? (setConfirming(true), setError(null)) : setError('Choose the new author.'))}
+          >
+            Change author…
+          </button>
+        )}
+      </div>
+      {confirming && chosen && (
+        <div className="mt-3 rounded-lg border border-warning/40 bg-warning/5 p-3 text-sm" data-confirm>
+          <p>
+            Change the author from {view.author?.name ?? 'the current author'} to {fullName(chosen)}? If this was their only task on the project, {view.author?.name ?? 'the current author'} is released from it.
+          </p>
+          <div className="mt-2 flex gap-2.5">
+            <button type="button" disabled={pending} className="btn btn-primary disabled:opacity-60" onClick={() => void change()}>
+              Confirm change
+            </button>
+            <button type="button" disabled={pending} className="btn btn-secondary disabled:opacity-60" onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {state === 'started' && <p className="mt-2 text-xs text-fg-muted">The author can be changed only before they start the task.</p>}
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-error">
+          {error}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -430,6 +522,8 @@ export function ForgeTaskPage({ code, view, people, exportState }: { code: strin
         {taskBanner(view.status, decided && last ? last : null)}
         {decided && last?.rejectReason ? ` Reason: ${REJECT_REASONS.find((r) => r.value === last.rejectReason)?.label ?? last.rejectReason}.` : ''}
       </p>
+
+      <ChangeAuthor projectId={projectId} view={view} people={people} />
 
       <AuthoredForm profile={view.template.profile} output={view.status === 'CREATED' ? null : view.output} />
 

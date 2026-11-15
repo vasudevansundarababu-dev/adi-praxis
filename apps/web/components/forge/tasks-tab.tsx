@@ -120,7 +120,7 @@ export function ForgeTasksTab({ projectId, tasks, people, exportState }: { proje
         One row per task set on the project. The PM or Admin picks the SME for each task from the assigned experts; until then &quot;Authored by&quot; offers &quot;Assign SME…&quot;. An author
         can be changed only before they start.
       </p>
-      {exportState && <ExportPanel projectId={projectId} initial={exportState} />}
+      {exportState && <ExportPanel projectId={projectId} initial={exportState} newFlow />}
     </section>
   );
 }

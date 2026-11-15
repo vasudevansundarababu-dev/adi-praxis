@@ -2,7 +2,7 @@ import type { DemographicAttributeDto, ForgeTaskRow, JobDescriptionDto, ProjectD
 import Link from 'next/link';
 import type { ExportState } from '@/components/projects/export-panel';
 import { projectDetailRows } from '@/components/projects/summary';
-import { exportStatusLine, fullName, nextStep, reviewersOf, routeLabel, selectorName, slotSelector, smesOf, taskCode, taskName, taskStatusLabel, taskStatusTone, type ReviewRoute } from '@/lib/forge-console';
+import { exportStatusLine, fullName, nextStep, reviewersOf, routeLabel, rowSelector, selectorName, smesOf, taskCode, taskName, taskStatusLabel, taskStatusTone, type ReviewRoute } from '@/lib/forge-console';
 import { TD, TH } from './project-shell';
 
 export interface DashboardNumbers {
@@ -112,7 +112,7 @@ export function ForgeDashboardTab({
           <tbody className="divide-y divide-hairline">
             {tasks.map((t, i) => (
               <tr key={t.taskId} data-coverage-row>
-                <td className={`${TD} font-semibold`}>{slotSelector(t.label)?.value ?? taskName(t.label)}</td>
+                <td className={`${TD} font-semibold`}>{rowSelector(t)?.value ?? taskName(t.label)}</td>
                 <td className={`${TD} font-mono text-xs`}>{taskCode(i)}</td>
                 <td className={TD}>{t.author?.name ?? ''}</td>
                 <td className={TD}>

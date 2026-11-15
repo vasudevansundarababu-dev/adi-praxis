@@ -429,7 +429,7 @@ describe('Menus and Admin → Candidate app sign-in', () => {
     expect(offline(admin)).not.toContain('disabled');
     expect(admin).not.toContain('data-offline-refused');
     expect(text(admin)).toContain('one-time link to set their password');
-    expect(text(admin)).not.toContain('signs everyone out');
+    expect(text(admin)).toContain('signs everyone out of the candidate app');
     expect(admin).toContain('>Save<');
     expect(a11yProblems(admin)).toEqual([]);
     const prod = renderToStaticMarkup(<CandidateSignInSettings initial={{ newFlow: true, candidateSignIn: 'ONLINE', offlineAllowed: false }} canEdit />);

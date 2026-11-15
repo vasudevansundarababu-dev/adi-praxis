@@ -99,3 +99,79 @@ export function smeTaskStatus(status: string): SmeTaskStatus {
       return 'Rejected';
   }
 }
+
+// ── MVP1 step 2: task review on the project's Tasks tab, and by the external Reviewer in the candidate app ──
+
+export const TASK_REJECT_REASONS = ['DUPLICATE', 'NOT_REALISTIC', 'INCORRECT', 'REAL_DATA'] as const;
+export const TaskRejectReason = z.enum(TASK_REJECT_REASONS);
+export type TaskRejectReason = z.infer<typeof TaskRejectReason>;
+
+/** A comment for the author, placed under one section of the authored form (for example S1, S3-S4, W02). */
+export const ForgeComment = z.object({
+  section: z.string().trim().regex(/^[A-Za-z0-9_.-]{1,40}$/),
+  text: z.string().trim().min(1).max(2000),
+});
+export type ForgeComment = z.infer<typeof ForgeComment>;
+
+const DuplicateDecision = z.enum(['ACCEPT_AS_DISTINCT', 'REWORK', 'REJECT_DUPLICATE']);
+const ConfirmedCoverage = z.object({ tags: z.record(z.string(), z.string()), edgeCase: z.string().trim().min(1).max(200) });
+const hasAuthorComment = (d: { comments: unknown[]; notes?: string }) => d.comments.length > 0 || !!d.notes;
+
+/** The PM's or Admin's decision box on the task page. Rework and Reject need a comment for the author (owner, 15 Nov). */
+export const ForgeDecisionRequest = z
+  .object({
+    decision: z.enum(['APPROVE', 'REWORK', 'REJECT']),
+    expectedVersion: z.number().int().min(1),
+    expectedRevision: z.number().int().min(0),
+    comments: z.array(ForgeComment).max(50).default([]),
+    notes: z.string().trim().max(4000).optional(),
+    rejectReason: TaskRejectReason.optional(),
+    checklist: z.record(z.string().max(40), z.boolean()).optional(),
+    duplicateDecision: DuplicateDecision.optional(),
+    confirmedCoverage: ConfirmedCoverage.optional(),
+  })
+  .refine((d) => d.decision === 'APPROVE' || hasAuthorComment(d), { message: 'Rework and Reject need a comment for the author', path: ['comments'] })
+  .refine((d) => d.decision !== 'REJECT' || !!d.rejectReason, { message: 'Choose a reason for rejecting', path: ['rejectReason'] });
+export type ForgeDecisionRequest = z.infer<typeof ForgeDecisionRequest>;
+
+/** The external Reviewer's decision: pass to the PM or Admin, or send back to the author. A Reviewer never rejects. */
+export const ReviewerDecisionRequest = z
+  .object({
+    decision: z.enum(['PASS', 'REWORK']),
+    expectedVersion: z.number().int().min(1),
+    expectedRevision: z.number().int().min(0),
+    comments: z.array(ForgeComment).max(50).default([]),
+    notes: z.string().trim().max(4000).optional(),
+    checklist: z.record(z.string().max(40), z.boolean()).optional(),
+    /** Needed only when the task was flagged as a likely duplicate. */
+    duplicateDecision: DuplicateDecision.optional(),
+    /** Needed only to pass a task on an open coverage slot. */
+    confirmedCoverage: ConfirmedCoverage.optional(),
+  })
+  .refine((d) => d.decision !== 'REWORK' || d.comments.length > 0, { message: 'Sending back for rework needs at least one comment', path: ['comments'] });
+export type ReviewerDecisionRequest = z.infer<typeof ReviewerDecisionRequest>;
+
+export interface ForgePerson {
+  name: string;
+  email: string | null;
+}
+
+/** One row of the project's Tasks tab. */
+export interface ForgeTaskRow {
+  taskId: string;
+  label: string;
+  slotLabel: string;
+  status: string;
+  smeStatus: SmeTaskStatus;
+  author: ForgePerson | null;
+  reviewer: ForgePerson | null;
+  reviewStage: 'EXPERT_REVIEW' | 'PM_APPROVAL' | null;
+  /** Last status change (ISO). */
+  date: string;
+  canDecide: boolean;
+  waitingFor: 'REVIEWER' | 'PM' | null;
+}
+
+/** Statuses of a task as its external Reviewer sees it on the candidate app's Home. */
+export const REVIEWER_TASK_STATUSES = ['To review', 'Sent back', 'Approved'] as const;
+export type ReviewerTaskStatus = (typeof REVIEWER_TASK_STATUSES)[number];

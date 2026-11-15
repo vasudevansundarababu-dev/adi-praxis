@@ -3,6 +3,7 @@ import { modelProviderRoutes } from './routes/model-providers';
 import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import { forgeSettingsRoutes } from './routes/forge-settings';
+import { forgeReviewRoutes } from './routes/forge-review';
 import { forgeSourcingRoutes } from './routes/forge-sourcing';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
@@ -381,6 +382,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(rlRoutes, { db: deps.db });
       await v1.register(forgeSettingsRoutes, { db: deps.db, config: deps.config });
       await v1.register(forgeSourcingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner });
+      await v1.register(forgeReviewRoutes, { db: deps.db });
       await v1.register(taskRoutes, { db: deps.db, config: deps.config, email: deps.email ?? defaultEmail(deps.config) });
       await v1.register(candidateAuthRoutes, {
         db: deps.db,

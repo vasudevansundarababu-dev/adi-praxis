@@ -124,7 +124,7 @@ export async function listSourcedPeople(db: Db, actor: Actor, args: { role?: 'SM
   return rows.filter(hit).map((r) => toSourcedPersonDto(r.s, { name: r.s.project.name, skills: r.skills }, by.get(r.s.submittedById) ?? ''));
 }
 
-const taskLabel = (t: Pick<TaskInstance, 'input'> & { slot?: { position: number } | null }) =>
+export const taskLabel = (t: Pick<TaskInstance, 'input'> & { slot?: { position: number } | null }) =>
   (t.input as { slot?: { brief?: string } }).slot?.brief ?? (t.slot ? `Task ${t.slot.position + 1}` : 'Task');
 
 /** Resource assignments: the people assigned to the project, each with the tasks they author or review. */

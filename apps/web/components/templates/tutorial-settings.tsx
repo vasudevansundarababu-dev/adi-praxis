@@ -30,7 +30,9 @@ export function tutorialFormProblem(url: string, rows: Row[]): string | null {
 export function TutorialSettings({ template, canEdit }: { template: Pick<TemplateDto, 'id' | 'tutorial'>; canEdit: boolean }) {
   const router = useRouter();
   const current = template.tutorial ?? null;
-  const [url, setUrl] = useState(current?.videoUrl ?? '');
+  // D2: an approved AI-generated video is stored privately (`storage:` address), never edited as a URL here.
+  const generated = !!current?.videoUrl.startsWith('storage:');
+  const [url, setUrl] = useState(generated ? '' : (current?.videoUrl ?? ''));
   const [rows, setRows] = useState<Row[]>(rowsOf(current));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -61,9 +63,13 @@ export function TutorialSettings({ template, canEdit }: { template: Pick<Templat
       {!canEdit ? (
         current ? (
           <div className="mt-3 text-sm">
-            <a href={current.videoUrl} target="_blank" rel="noopener noreferrer" className="break-all text-link hover:underline">
-              {current.videoUrl}
-            </a>
+            {generated ? (
+              <p>Generated tutorial video (approved by an Admin).</p>
+            ) : (
+              <a href={current.videoUrl} target="_blank" rel="noopener noreferrer" className="break-all text-link hover:underline">
+                {current.videoUrl}
+              </a>
+            )}
             {current.chapters.length > 0 && (
               <ol className="mt-2 list-inside list-decimal space-y-0.5">
                 {current.chapters.map((c, i) => (
@@ -79,6 +85,7 @@ export function TutorialSettings({ template, canEdit }: { template: Pick<Templat
         )
       ) : (
         <div className="mt-3 space-y-3">
+          {generated && <p className="text-sm">Task pages show the approved generated video below. Saving an address here replaces it; saving with no address removes it.</p>}
           <label className="block text-sm">
             Video address (https)
             <input type="url" value={url} maxLength={500} onChange={(e) => setUrl(e.target.value)} placeholder="https://…/tutorial.mp4" className={input} />

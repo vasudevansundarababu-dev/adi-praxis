@@ -1,4 +1,4 @@
-import type { JobDescriptionDto, TemplateDto } from '@praxis/shared';
+import type { JobDescriptionDto, TemplateDto, TutorialRunsResponse } from '@praxis/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -9,6 +9,7 @@ import { McHeader } from '@/components/templates/mc-header';
 import { StatusBadge } from '@/components/templates/status-badge';
 import { TemplateActions, type FormOption } from '@/components/templates/template-actions';
 import { TutorialSettings } from '@/components/templates/tutorial-settings';
+import { TutorialVideoPanel } from '@/components/templates/tutorial-video-panel';
 import { apiGet, getCurrentUser } from '@/lib/api';
 import { mcServer } from '@/lib/mc/server';
 
@@ -53,12 +54,13 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
     );
   }
 
-  const [versions, presets, directory, jds, forms] = await Promise.all([
+  const [versions, presets, directory, jds, forms, tutorialRuns] = await Promise.all([
     mcServer.versions(id).then((r) => r.data?.items ?? []),
     mcServer.presets(t.domainId).then((r) => r.data?.items ?? []),
     mcServer.directory().then((r) => r.data),
     apiGet<{ items: JobDescriptionDto[] }>('/job-descriptions').then((r) => r.data?.items ?? []),
     apiGet<{ items: FormOption[] }>(`/template-profiles?workflow=${encodeURIComponent(t.workflowName)}`).then((r) => r.data?.items),
+    apiGet<TutorialRunsResponse>(`/templates/${id}/tutorial/runs`).then((r) => r.data),
   ]);
   const switcher = (directory?.domains ?? []).flatMap((d) => d.rows.map((r) => ({ id: r.templateId, label: `${d.domainName} // ${r.workflowName} (v${r.version})` })));
   if (!switcher.some((o) => o.id === t.id)) switcher.unshift({ id: t.id, label: `${t.domainName} // ${t.workflowName} (v${t.version})` });
@@ -87,6 +89,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
         </nav>
       )}
       <TutorialSettings key={`tutorial:${t.updatedAt}`} template={t} canEdit />
+      {tutorialRuns && <TutorialVideoPanel templateId={t.id} initial={tutorialRuns} />}
       <div className="mt-4">
         <MetaCompiler
           key={`${t.id}:${bp.blueprintRevision}`}

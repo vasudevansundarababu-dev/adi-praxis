@@ -119,6 +119,36 @@ export function caseCheck(c: SlotCase, output: Record<string, unknown>): TaskChe
   };
 }
 
+/** A task's case-selector slot value (`input.slot.case`), or null for a task without one. */
+export function slotCaseOf(input: unknown): SlotCase | null {
+  const c = (input as { slot?: { case?: Partial<SlotCase> | null } } | null)?.slot?.case;
+  return c && typeof c.field === 'string' && typeof c.source === 'string' && typeof c.value === 'string' ? { field: c.field, source: c.source, value: c.value, ...(typeof c.label === 'string' ? { label: c.label } : {}) } : null;
+}
+
+/**
+ * The case-selector field is set by the task, never chosen by its author (15 Nov 2026): a save that puts another value
+ * there is refused with this message. An empty field is allowed (the editor fills it); the submission check needs it.
+ */
+export function caseLockProblem(input: unknown, output: unknown): string | null {
+  const c = slotCaseOf(input);
+  if (!c) return null;
+  const [section, field] = c.source.split('.') as [string, string];
+  const sections = ((output as { sections?: unknown } | null)?.sections ?? {}) as Record<string, Record<string, unknown> | undefined>;
+  const value = sections[section]?.[field];
+  if (value === undefined || value === null || value === '' || value === c.value) return null;
+  return `This task is for ${c.label ?? c.value}. That choice is set by the task and cannot be changed.`;
+}
+
+/** The output with the slot's case-selector value written in (for changes the author did not type, e.g. a proposal). */
+export function withCaseLocked(input: unknown, output: Record<string, unknown>): Record<string, unknown> {
+  const c = slotCaseOf(input);
+  if (!c) return output;
+  const [section, field] = c.source.split('.') as [string, string];
+  const sections = (output.sections && typeof output.sections === 'object' ? output.sections : {}) as Record<string, Record<string, unknown> | undefined>;
+  if (sections[section]?.[field] === c.value) return output;
+  return { ...output, sections: { ...sections, [section]: { ...(sections[section] ?? {}), [field]: c.value } } };
+}
+
 registerDefinition('Marketing', EXECUTABLE_WORKFLOW, { ...genericDefinition, key: 'praxis-contract-v1', validateTaskInput: (_t, input) => praxisContractIssues((input as Record<string, unknown> | null)?.praxisContract).map((i) => `${i.path}: ${i.message}`), validateSubmission: (_t, output) => praxisContractChecks(output, true) });
 
 /**

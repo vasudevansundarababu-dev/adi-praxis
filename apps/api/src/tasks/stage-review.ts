@@ -1,4 +1,4 @@
-import { hasQuotas } from './definitions';
+import { caseLockProblem, hasQuotas } from './definitions';
 import { Prisma } from '@prisma/client';
 import { EXECUTABLE_WORKFLOW, jsonDiff, materialPaths, praxisContractChecks, STAGE_LABELS, type ExpertEditRequest, type PendingStage, type StageDecisionRequest } from '@praxis/shared';
 import type { InternalActor } from '../auth/actor';
@@ -262,6 +262,8 @@ export async function expertEdit(tx: Tx, actor: InternalActor, taskId: string, b
   const workflow = t.project.template.workflowName;
   const shape = t.taskType === 'AUTHORING' ? profileSaveProblems(t.project.template, body.output) : [];
   if (shape.length) throw new AppError(422, 'INVALID_PROFILE_OUTPUT', 'This edit does not match the template profile.', { problems: shape });
+  const locked = t.taskType === 'AUTHORING' ? caseLockProblem(t.input, body.output) : null;
+  if (locked) throw new AppError(422, 'CASE_SELECTOR_LOCKED', locked);
   const changes = jsonDiff(authoredContent(v.output), authoredContent(body.output));
   if (!changes.length) throw new AppError(400, 'NO_CHANGE', 'The edit changes nothing; pass or return the task instead.');
   // Owner decision (11 Nov 2026): a change to the rubric or the reference answer is always material.

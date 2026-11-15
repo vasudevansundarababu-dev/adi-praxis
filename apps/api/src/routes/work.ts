@@ -8,7 +8,7 @@ import { AppError, notFound } from '../lib/errors';
 import { runCandidateCommand } from '../platform/command';
 import type { SelectionGate } from '../staffing/selection-gate';
 import type { EmbeddingProvider } from '../tasks/embeddings';
-import { definitionFor } from '../tasks/definitions';
+import { caseLockProblem, definitionFor } from '../tasks/definitions';
 import { redeemInvite } from '../tasks/invites';
 import { findSimilar } from '../tasks/similarity';
 import { evaluateTask, submitTask, type StoredChecks } from '../tasks/submission';
@@ -241,6 +241,8 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       if (t.project.status === 'PAUSED') throw new AppError(409, 'PROJECT_PAUSED', 'This project is paused. Your work is saved; you can continue when it resumes.');
       const shape = t.taskType === 'AUTHORING' ? profileSaveProblems(t.project.template, req.body.output) : [];
       if (shape.length) throw new AppError(422, 'INVALID_PROFILE_OUTPUT', 'This draft does not match the template profile.', { problems: shape });
+      const locked = t.taskType === 'AUTHORING' ? caseLockProblem(t.input, req.body.output) : null;
+      if (locked) throw new AppError(422, 'CASE_SELECTOR_LOCKED', locked);
       const now = new Date();
       const { count } = await tx.taskInstance.updateMany({
         where: { id: t.id, revision: req.body.expectedRevision },

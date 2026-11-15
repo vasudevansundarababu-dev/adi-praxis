@@ -28,16 +28,16 @@ describe('MVP1 step 7: template Tutorial video card', () => {
     expect(tutorialFormProblem('https://x.test/a.mp4', [{ title: 'Start', time: '0:10' }])).toBeNull();
   });
 
-  it('Admins get the URL input, chapter rows and Save; others see the current value read-only', () => {
+  it('Admins get the URL input, chapter rows and Save tutorial; others see the current value read-only', () => {
     const admin = renderToStaticMarkup(<TutorialSettings template={{ id: ID, tutorial }} canEdit />);
     expect(admin).toContain('Tutorial video');
     expect(admin).toContain('value="https://v.example.test/kyb.mp4"');
     expect(admin).toContain('value="2:30"');
-    expect(admin).toContain('>Save<');
+    expect(admin).toContain('>Save tutorial<');
     expect(a11yProblems(admin)).toEqual([]);
     const pm = renderToStaticMarkup(<TutorialSettings template={{ id: ID, tutorial }} canEdit={false} />);
     expect(pm).not.toContain('<input');
-    expect(pm).not.toContain('>Save<');
+    expect(pm).not.toContain('>Save tutorial<');
     expect(pm).toContain('href="https://v.example.test/kyb.mp4"');
     expect(pm).toContain('Submitting');
     expect(renderToStaticMarkup(<TutorialSettings template={{ id: ID, tutorial: null }} canEdit={false} />)).toContain('No tutorial video yet.');

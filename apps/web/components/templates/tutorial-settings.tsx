@@ -112,9 +112,9 @@ export function TutorialSettings({ template, canEdit }: { template: Pick<Templat
               {error}
             </p>
           )}
-          {saved && <p role="status" className="text-sm text-fg-muted">Saved.</p>}
+          {saved && <p role="status" className="text-sm text-fg-muted">Tutorial saved.</p>}
           <button type="button" className="btn btn-primary disabled:opacity-60" disabled={pending} onClick={() => void save()}>
-            Save
+            Save tutorial
           </button>
         </div>
       )}

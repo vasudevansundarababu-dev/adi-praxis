@@ -1645,3 +1645,283 @@ Forgot password still answers 202 and sends nothing).
   Admin → Terms and update the seed files.
 - **(owner)** Certification, Partners and Payments are hidden from the console menu whatever the new-flow setting;
   the routes stay.
+
+## Rubric recommendations in Authoring: plan (15 Nov 2026)
+
+Plan: `docs/plan/PLAN-RUBRIC-RECOMMENDATIONS.md`. Owner spec: `docs/prd/PRD-RUBRIC-RECOMMENDATIONS.md`. **Awaiting the
+owner's approval; no code yet.**
+
+- **(chosen by Claude)** Everything sits behind `RUBRIC_RECOMMENDATIONS_ENABLED` (default false), including D8 seeding.
+  Model wording sits behind `RUBRIC_AI_ENABLED` (default false). With the defaults, nothing changes in QA and no paid
+  call is possible.
+- **(chosen by Claude)** Derivation is deterministic, from the selected template version's own field definitions
+  (contract pointers, field types, workflow graph, output schema, then a labelled heuristic), never from section
+  numbers. Unclassified fields are listed under "Sources not used". The AI only writes wording, labelled; it never
+  sets IDs, scoring, applicability or sources.
+- **(chosen by Claude)** Derivation metadata, source links (with snapshot hashes) and runs go in new append-only tables
+  (`RubricRecommendationRun`, `RubricCriterionAnnotation`), never in `TaskInstance.output`. That's what keeps the
+  RL Gym package and `ApprovedTaskRecord.contentHash` byte-identical. Restore uses the existing `TaskSubmission`
+  history.
+- **(chosen by Claude)** On a template with an evaluator map (KYC v6/v7), a new criterion stays **internal only**,
+  labelled "not sent to RL Gym", until a contract change is agreed.
+- **(chosen by Claude)** Coverage gaps, unresolved items and duplicate weighting are warnings in S7 and the pre-check.
+  They aren't new blockers, and there's no new approval stage.
+- **(chosen by Claude)** D8 "template default, SME edits" is the base layer: S7 is seeded from the evaluator map's IDs
+  (read-only). Defaults come from an optional `criterionDefaults` key on the criterion field definition (template data,
+  validated against the field's scale). Old template versions are unchanged. Fallback: IDs, a name derived from the ID
+  (labelled) and blank anchors.
+- **(chosen by Claude)** Weights and thresholds come only from structured template data. v7's "weight 5 each" is help
+  prose, so it's shown as a linked note and not applied.
+- **(chosen by Claude)** The policy rule annotations from PR #81 (mandatory marking, applies-when, responsible actor)
+  are used through an interface when present. Without them the fallback is `PolicyRule.required`, and applicability is
+  UNKNOWN where the rule body doesn't say. No hard dependency.
+- **(owner, D9)** The technical criterion fields get a source instead of free typing. Evaluator kind and version are
+  auto-filled, read-only, from `execution.evaluators[]`: kind is `capability.id`, which is what the existing submit
+  check requires (the old help text's "e.g. run_evidence" was wrong). Evidence or rule links are a picker of the task's
+  rules, step IDs and evidence IDs. Output field, Comparison and Expected value are shown only for evaluators that
+  compare the output; Output field is then a picker from the output schema. Help text says "RL Gym".
+- **(chosen by Claude)** D9 keeps values already saved: an unknown link or a value on a hidden field is flagged, never
+  stripped, so stored and exported bytes don't change. It sits behind the same flag.
+
+## Simplified rubric editor combined with rubric recommendations, D8 and D9 (15 Nov 2026)
+
+Owner spec: `docs/prd/PRD-SIMPLIFIED-RUBRIC-EDITOR.md`. It's combined into `docs/plan/PLAN-RUBRIC-RECOMMENDATIONS.md`
+(sections 2, 14 and 15). Mockup for approval: `docs/design/mockups/rubric-editor.html`. **Awaiting the owner's approval of
+the mockup and the plan; no feature code yet.** Where the specs conflict, the simplified-editor spec wins on what the
+author sees, and the recommendations spec wins on derivation and storage.
+
+- **(chosen by Claude) Field list:** the editor shows the owner's 9 fields in order. Step/role and skill appear in the
+  "Derived from" chain, exceptions in the Change dialog, "why suggested" under the links, and unresolved items in
+  the to-finish list. No extra top-level fields.
+- **(chosen by Claude) Whole-task failure:** only what the template supports is offered. For KYC v6/v7 that's "a Fail
+  (0) on this criterion fails the whole task" (S7 scoring rule). "Partial triggers it" isn't offered. A behaviour the
+  Fail doesn't cover is kept as a note and flagged "Evaluation setup needed". Only the existing `critical` flag is
+  exported.
+- **(chosen by Claude) Criterion name:** the ID is read-only. The name is editable (as today) with "Reset to template"
+  and an "Edited from template" marker. This replaces D8's read-only name, following the later spec.
+- **(chosen by Claude) Applicability:** the editor's four kinds (required throughout, required when, permitted option,
+  human officer or other role), plus UNKNOWN for derived requirements. The template's own Not applicable, Unknown and
+  missing-evidence treatment is unchanged in the export.
+- **(chosen by Claude) One link control:** "Derived from" replaces D9's separate "Evidence or rule links" picker.
+  Confirmed links of exportable kinds (rule keys, step IDs, evidence IDs) fill the existing `evidenceRefs`; unconfirmed
+  suggestions don't. `evidenceRefs` is shown read-only under Technical settings. Saved values are kept.
+- **(chosen by Claude) Technical settings:** collapsed and read-only in "Technical grading settings · From template",
+  with "Not used" rather than hidden (D9 said hidden). Filled only from the exact template mapping. With no mapping:
+  "Evaluation setup needed". "How it will be checked" never says "Ready".
+- **(chosen by Claude) Weights:** shown read-only from structured template data only (D8 `criterionDefaults`, groups,
+  `weightTotal`). The mockup assumes a v7 version with D8 defaults (weight 5). Plan option B stays the owner's choice
+  for today's v7.
+- **(chosen by Claude) Suggested additions:** shown separately and labelled AI suggestion / Internal only / Evaluation
+  setup needed. They never enter `S7.criteria` on a fixed evaluator map.
+- **(chosen by Claude) Mockup data:** the Custodian task on KYC v7, with real criterion IDs, scale, tools and S5 steps.
+  Anchor text is from the QA cheat sheet and is shown as D8 template defaults. Policy rule numbers and passages are
+  illustrative and labelled as such.
+
+## Rubric editor "make it simple": task-level sources as checkboxes (15 Nov 2026)
+
+Owner direction, relayed by the DevOps session. The S7 criterion's lower block (Critical, Evidence or rule links,
+Evaluator kind and version, Output field, Comparison, Expected value) is replaced, for the SME, by one task-level list:
+"Sources used for this task", made of real checkboxes. See plan section 16 and the mockup.
+
+- **(owner)** The sources are checkboxes. The policy documents and versions selected in S4 and the template
+  references start ticked. The SME can untick a source. "Add another source" adds a ticked row chosen by readable
+  name. No typed IDs.
+- **(chosen by Claude)** "Derived from" stays on each criterion as small automatic, read-only chips. They're built
+  only from ticked sources and the task's own sections. The SME doesn't confirm or remove them, which replaces the
+  earlier per-link ✓/✕. "Source link needed" sends the SME to "Add another source".
+- **(chosen by Claude)** "Critical" is replaced by the editor's Whole-task failure field (same exported flag), not
+  removed: the simplified-editor spec requires it.
+- **(chosen by Claude)** The editor no longer writes `evidenceRefs`; values saved earlier are kept. This supersedes
+  the decision that confirmed links fill `evidenceRefs`, and keeps exported content unchanged.
+- **(chosen by Claude)** S8 "Sources used" on v7 shows the same list. When the field is empty it's filled with one
+  readable line per ticked source. Existing text is never overwritten. The field is found from its definition, not
+  its section number.
+- **(chosen by Claude)** The source list is internal (`RubricTaskSources`, append-only, audited) and isn't exported.
+
+## One mockup for the whole SME task form (15 Nov 2026)
+
+`docs/design/mockups/rubric-editor.html` is renamed `docs/design/mockups/sme-task-form.html` and now covers the whole
+KYC v7 SME task form (plan section 17). It's awaiting the owner's approval; no feature code yet.
+
+- **(chosen by Claude)** In S4 the SME picks **documents, not individual rules**. Each picked document brings its
+  applied rules. This matches the S4 item shape: Policy ID, Version, Publication reference and SHA-256 are
+  document-level. Rules show read-only under "Show rules", with the PR #81 marking.
+- **(chosen by Claude)** The S4 picker shows only published documents and their applied rules. Draft, unapplied and
+  extraction-state rules are never shown to the SME.
+- **(chosen by Claude)** S4, "Sources used for this task" (S7) and S8 "Sources" are linked. Picking a policy in S4
+  adds a ticked source, and S8 shows the ticked list. There's one list, not three.
+- **(owner, D3)** The declaration text is exactly "I won't use real customer, employer or account information." The
+  rule is unchanged.
+- **(chosen by Claude)** The S4 picker design is shared with the policy-annotations session (PR #81) through the
+  side-session notes, using its six marking labels and chip colours, so both mockups match.
+- **(agreed with the PR #81 session)** The S4 picker and the Policies-page mockup match: the six marking labels; chip
+  colours (Mandatory teal; when applicable and permitted blue; needs clarification amber; required reference and
+  other grey); rows with a jurisdiction chip, "N rules applied" and "Show rules".
+- **(chosen by Claude, to confirm with RL Gym)** S4's read-only Policy ID, Version, Publication reference and SHA-256
+  come from the project policy manifest identities (PR #81: document id, `rs<set>.d<doc>`, "project rule set vN",
+  `sha256`), not from the GB-01…GB-07 identities RL Gym supplied with v7. This gives one source of truth. RL Gym
+  confirms which identities its v7 grader expects before S4 ships. The mockup's GB-style values are example data.
+
+## Rubric editor and recommendations: build (15 Nov 2026)
+
+The owner approved the SME task-form mockup and the combined plan. This is built on branch
+`claude/rubric-recommendations`, behind `RUBRIC_RECOMMENDATIONS_ENABLED` (off) and `RUBRIC_AI_ENABLED` (off).
+
+- **(chosen by Claude)** The first visit to S7 runs a rules-only derivation (no model) so that every link has a
+  snapshot. "Refresh suggestions" reruns it. The same inputs reuse the earlier run, and the reuse is audited.
+- **(chosen by Claude)** S8 "Sources": the field shows the ticked list read-only, with a one-click "Fill the field
+  below from this list" when the field is empty. It is not filled automatically: that text is agent-visible, so the
+  author does it with one click. Existing text is never overwritten. This refines the earlier "filled when empty".
+- **(chosen by Claude)** Policy rule annotations (PR #81) are read through `RuleAnnotationSource`. Until PR #81 is
+  merged, that returns none: rules show without a marking, and applicability falls back to "Required throughout" when
+  a workflow step supports it, else "Undefined". Wiring PR #81's table in is a one-function change, done after it merges.
+- **(chosen by Claude)** Matching criteria to sources is deterministic: shared word stems with light suffix stripping,
+  at most two links per role and five in all. On KYC v7, which has no default text, some criteria get few links and
+  show "Source link needed". That is deliberate: nothing is invented.
+- **(chosen by Claude)** D8 and D6 submit checks (`rubric.template-criteria`, `policy.library-reference`) and the D9
+  evaluator normalisation on save run only with the flag on. With it off, saving and submitting are exactly as before.
+- **(chosen by Claude)** The Criterion item's "Critical" flag is labelled "Whole-task failure" in our help text. The
+  key and its meaning are unchanged.
+- **(owner, D3)** Before you start and the submit panel use exactly "I won't use real customer, employer or account
+  information." with the flag on. The `syntheticOnly` / `syntheticDeclaration` API fields are unchanged.
+- **(chosen by Claude)** D5 for template text: with the flag on, template help is shown through `publicText()`
+  ("Anvil" becomes "RL Gym", "Praxis" and "ADI-Labs" become "ADI Forge"). The stored template is unchanged, so its
+  hashes are too. The arrival check for new templates (D5 part 1) is not part of this work.
+## Policy rule classification, mandatory marking and annotations (15 Nov 2026)
+
+Spec: `docs/prd/PRD-POLICY-RULE-ANNOTATIONS.md` (owner, verbatim). Plan: `docs/plan/PLAN-POLICY-RULE-ANNOTATIONS.md`.
+
+- **(owner)** The plan was approved as proposed:
+  - An additive `praxis.anvil.project_policy_annotations.v1` document. The v1 manifest is unchanged, and the new
+    document stays "proposed" until RL Gym agrees in writing; the owner sends
+    `docs/anvil/RL-GYM-POLICY-ANNOTATIONS-CHANGE-NOTE.md`.
+  - An automatic AI annotation pass after every extraction, plus a "Suggest annotations with AI" button.
+  - A1: "Apply to project" means "include this rule version, with its annotation, in the published set", not
+    "mandatory".
+  - A5: an applied rule classified Unresolved may publish only when it is marked Needs clarification. Any other
+    applied rule with an unknown type still blocks as "incomplete".
+- **(owner, defaults in plan §9)**
+  - Editors are exported as an opaque user ID plus role.
+  - `severity` stays `high` in v1.
+  - The new preview checks warn and never block.
+  - The RL Gym review is used as test data only.
+  - D6 is out of scope.
+- **(chosen by Claude)** **Annotation stored in the rule body.** It is the optional `PolicyRuleBody.annotation`, never
+  defaulted, so existing content hashes and published digests are unchanged. Editing it goes through `editRule`, so an
+  applied rule gets a new draft version that must be ticked again. The append-only `PolicyRuleAnnotationRevision`
+  table (trigger) keeps every AI suggestion and author edit, with annotation version, role and time. Omitting the
+  annotation on a save keeps it, so older clients never drop one.
+- **(chosen by Claude)** **Classification and requirement type.** `classification` is the source of truth. The old
+  `requirementType` follows it (applicability_precedence → definition, unresolved → unknown), and the editor hides the
+  type selector on annotated rules.
+- **(chosen by Claude)** **Links are declared on one rule.** The reverse direction is computed when the rules are read
+  (`linkedFrom`, export `linked_from`). The plan said both sides would be kept in sync on save, but writing the
+  reverse link into the other rule would un-apply that rule as a side effect. The prompt asks the model for both
+  directions (threshold definitions and the rules that use them). The preview also flags an applied rule whose
+  threshold definition is not applied.
+- **(chosen by Claude)** **When an AI suggestion is used.** It is adopted only on a Draft or Needs definition version
+  whose annotation is absent or an unedited AI suggestion. Otherwise it is stored as "offered" (`adopted: false`) and
+  shown as "Use AI suggestion". An applied rule is never changed by AI.
+  - A compound statement that is not found word for word in the document is dropped.
+  - Links to unknown rule keys are dropped.
+  - A run is idempotent per run ID and counts toward `POLICY_AI_DAILY_CALL_CAP` as one assistant run. Over the cap it
+    is skipped and audited.
+- **(chosen by Claude)** **Define with AI on an unannotated rule** queues the same annotation pass for that one rule
+  (worker). The plan said Define would return the annotation in its own call; queueing it reuses one prompt and one
+  validation path.
+- **(chosen by Claude)** **Export provenance is derived, not frozen.**
+  - The AI suggestion shown is the current revision when it is unedited; otherwise it is the newest AI revision before
+    the author's edit.
+  - The approval is the reviewed version's `reviewedById`/`reviewedAt`.
+  - Both read immutable rows, so the same published state gives the same bytes. Rule-set content is unchanged.
+- **(chosen by Claude)** **Applicability filter.** "Show rules for application type / governing state" on the Rules page
+  uses `ruleApplicability` from `packages/shared`. Out-of-scope rules are hidden and unknown stays visible. The model
+  is given the template's case-selector values (KYC v7: individual, adult_joint, teen_joint, custodial), never the
+  project name.
+- **(chosen by Claude)** **The retired `required` flag.** The column stays. The API still accepts `required` and ignores
+  it, and no screen shows it; the preview's "marked required" count became counts per marking.
+- **(chosen by Claude)** The console user guide has no policy chapter yet, so none was added. The Rules page and the
+  rule page explain the annotations in place.
+- **(owner, 15 Nov 2026)** **Policies-page mockup approved.** `docs/design/mockups/policy-rules.html` (PR #81) was
+  approved before release. The build follows it on these points:
+  - **D4:** the rules prompt has a short placeholder, a "Use this example" link, and a "Type what the template needs"
+    hint beside the disabled button.
+  - **D7:** no cost or budget figures on the Policies page, Admin included. Costs are still recorded by the API for
+    the planned Admin "Usage and costs" page; only the "budget is used up" notice remains.
+  - **Suggested rules:** they show Accept and Reject. Accept is the Apply tick ("Define with AI, then accept" when
+    fields are missing). Reject only hides the suggestion in that session, and the rule stays unapplied.
+  - **Filter:** a new "Applied only" filter.
+  - **Published versions:** listed with their rules per marking; `GET /policy/rule-sets` gains `markingCounts`.
+  - **Out of scope here:** the mockup's "Owner decisions" step shows the A1/A5/AI choices for review only and is not a
+    product screen. The S4 picker (step 7) belongs to the SME task form (PR #82), and the rule drawer stays the existing
+    rule page (navigation preserved, spec §0).
+
+## MVP1 QA defects in one PR: non-integration scope (15 Nov 2026)
+
+The owner, 15 Nov 2026: "Now combine all the defects into one PR and start coding. Again no integration with Anvil is
+needed. Just work in non Integration model." This approves both mockups (PR #81 Policies, PR #82 SME task form). One
+branch, `fix/mvp1-qa-defects`, builds: the policy rule annotations, the rubric editor and recommendations, and defects
+D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos are generated and what that costs.
+
+- **(owner)** **No RL Gym integration change.** The proposed `praxis.anvil.project_policy_annotations.v1` document,
+  its endpoint, contract files, schema script and change note are not taken. This supersedes the "additive document"
+  line in the annotations section above. Annotations stay internal. The export modules are byte-for-byte the same as
+  `main`, and the pinned v6 package hashes and the v7 export tests still pass.
+- **(owner, via PR #81's recommended options)** The automatic AI annotation pass after extraction plus "Suggest
+  annotations with AI"; A1 ("Apply" means include, not "mandatory"); A5 (an applied Unresolved rule publishes only when
+  marked Needs clarification).
+- **(owner)** **AI in QA uses Gemini on Vertex**, the same route as SUITABILITY_MODEL and PROFILE_MODEL (QA has no
+  Claude quota). `POLICY_AI_MODEL` and `RUBRIC_AI_MODEL` are empty in `.env.example`. An empty value follows a Gemini
+  `AUTHORING_MODEL`. Rubric wording is behind `RUBRIC_AI_ENABLED` (off). Tests use mocks and never call Vertex. AI
+  output is a labelled suggestion that a person accepts.
+- **(chosen by Claude)** **Which changes are behind the flag.**
+  - Always on: D1, D3, D4, D5 (display), D7.
+  - Behind `RUBRIC_RECOMMENDATIONS_ENABLED`: D6, D8, D9 and the rubric editor (with their submit checks and the D9
+    save normalisation). The flag is off in code and tests by default. QA turns it on with the owner's yes, so other
+    environments and the existing jobs see no change until then.
+- **(chosen by Claude)** **D1.**
+  - A case-selector template's target can't be above its number of cases. The form caps the target and says why;
+    the API refuses a higher target with `TARGET_ABOVE_CASES` on create and edit, and clamps the template default.
+  - Resource assignments list sourced SMEs who hold no task, as "No open task left" when every task is taken, else
+    "Not assigned yet".
+- **(owner, D3)** The declaration reads exactly "I won't use real customer, employer or account information." on
+  Before you start and at submit. The API's `syntheticOnly` and `syntheticDeclaration` fields are unchanged.
+- **(owner, D5 non-integration)** No arrival-check change. Template text (labels, help, section titles, primary
+  work, verification, human gate) is shown through `publicText()`: Anvil becomes RL Gym, and Praxis or ADI-Labs becomes
+  ADI Forge. The stored template, and so its hashes, are unchanged.
+- **(owner, D8 non-integration)** The owner's 20-criterion KYC table (names, Pass/Partial/Fail, weight 5 each,
+  critical on identification_verification, screening and decision) is kept in Authoring. It's in
+  `apps/api/src/tasks/rubric/defaults/golden-kyc-rubric-v1.ts`, keyed by the `golden-kyc-rubric-v1` evaluator, and
+  applies to v6 and v7. It is used only when a template carries no defaults of its own. The SME can edit it and reset
+  to the default; reviewers see what changed. This settles plan option B: weight 5 now comes from these defaults.
+- **(chosen by Claude)** **The D6 library check is a warning.** The S4 picker stops SMEs typing references, but the
+  `policy.library-reference` submit check warns rather than blocks. RL Gym hasn't confirmed which identities its v6/v7
+  grader expects (manifest or template-supplied GB IDs), and the QA smoke job still types the template's identities.
+- **(chosen by Claude)** **Marketing keeps its conventions.**
+  - Levels 0–4, groups A–G, critical rules CR-01..CR-06, and no KYC defaults.
+  - In the editor, Weight and Group are editable where the template doesn't set them. A criterion-level whole-task
+    failure is flagged "Evaluation setup needed".
+  - The golden Marketing test runs end to end with the flag on.
+- **(chosen by Claude, D10)** **Pay before the first save.**
+  - On Projects → New → Job description, "Generate from the template" shows the generated JDs with editable Wage
+    per task, currency, location type and location before the draft exists.
+  - The values are kept in the wizard (not auto-saved when the step opens). On Save they are written to the JDs the
+    API generates, only where the PM entered a wage and the JD has none.
+  - Next is blocked on this step until each needed JD has a wage, and a location unless remote. The problem is shown
+    inline. "Use or write my own" needs a chosen JD with a wage.
+  - Save itself never asks for a field the PM couldn't see.
+- **(owner, D11)** The open-slot edge-case field reads "Edge case this task tests" everywhere, with the owner's help text (`EDGE_CASE_LABEL` and `EDGE_CASE_HELP` in `packages/shared/src/forge.ts`).
+- **(owner, D12)** **Save is always visible.** The authoring forms (sections form, generic task page, KYC workbench)
+  have a sticky action bar at the bottom with Save. Save is the autosave's flush: it never submits and never runs
+  Submit's checks. The bar shows "Saving…", "Saved at HH:MM" or "Couldn't save, try again", and the button becomes
+  Try again. Beside Save is "Check and submit", which goes to the last section. Autosave is unchanged. The bar is
+  hidden on read-only tasks and in print.
+- **(owner, D13)** **Help is a floating mascot: "Ember", our own ADI Forge character.** It is a friendly flame-like
+  forge ember with a face, in the ADI Forge purples with a teal spark, with no anvil (an internal name stays out of sight). It is original, with no terminal face or
+  cloud-robot silhouette. It is an inline SVG (64 px) fixed at the bottom right, above the sticky Save bar, so it never
+  covers Save, Submit or a field. It has a gentle idle bob (none under `prefers-reduced-motion`) and a "Need help?"
+  bubble on hover or focus. `aria-label="Help"` with a focus ring; it is hidden in print and while the drawer is open.
+  Clicking it or pressing Enter opens the existing Help drawer. It is on the task and review pages. Screenshots are in
+  `docs/design/mascot/`.
+- **(chosen by Claude, D13)** Tutorial stays at the top of the page: it opens an inline video card, which would cover
+  the form if it floated.

@@ -1,8 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import '@fastify/multipart';
 import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { CandidateRule, LOCATOR_GRANULARITY, PolicyRuleBody, TaskChangeInput } from '@praxis/shared';
+import { CandidateRule, LOCATOR_GRANULARITY, PolicyRuleBody, ProjectRuleSetContent, REVERSE_RELATION, RuleAnnotationInput, TaskChangeInput, annotationFlags } from '@praxis/shared';
 import type { MalwareScanner, ObjectStorage } from '../candidate/storage';
 import type { Config } from '../config';
 import type { Db } from '../db';
@@ -10,6 +11,7 @@ import { AppError, badRequest, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { POLICY_ACCESS, isAdmin, policyProject, policyTask, requireAdmin } from '../policy/access';
 import { MAX_POLICY_BYTES, readPolicyDocument } from '../policy/document-reader';
+import { caseSelectorOf } from '../tasks/task-service';
 import { addDocumentVersion, loadVersionText } from '../policy/documents';
 import { startBatch, spentUsd, type Adapters } from '../policy/extraction/service';
 import { ensureProfiles } from '../policy/profiles';
@@ -17,6 +19,9 @@ import { previewRuleSet, publishRuleSet } from '../policy/rule-sets';
 import { RuleAssistantUnavailableError, type PolicyRuleAssistant, type SuggestRule } from '../policy/rule-assistant';
 import { contentHash, createRuleFromCandidate, currentVersions, definitionProblems, editRule, evidenceProblems, markExcluded, markReviewed, reviewProblems, ruleVersionFull, setApplied, type CitationEdit } from '../policy/rules';
 import { addChange, effectivePolicy, removeChange, sidecar, snapshotTask } from '../policy/task-policy';
+import { annotationState, editorRole, revisionDto, revisionsForRules, type RevisionRow } from '../policy/annotations';
+import { ANNOTATION_ACTIONS } from '../policy/annotate-job';
+import { POLICY_AI_ACTIONS } from '../policy/ai-cap';
 
 const ProjectParams = z.object({ projectId: z.string().uuid() });
 /** Per signed-in session rather than per IP, so colleagues behind one office address do not share a limit. */
@@ -34,7 +39,10 @@ const ManualText = DocMeta.extend({ documentId: z.string().uuid().nullish(), tex
 const ExtractBody = z.object({ documentVersionIds: z.array(z.string().uuid()).min(1).max(20), profileId: z.string().max(100).nullish(), parentBatchId: z.string().uuid().nullish() });
 const CitationIn = z.object({ documentVersionId: z.string().uuid(), fieldPath: z.string().min(1).max(100), role: z.enum(['supports', 'qualifies', 'exception', 'conflict']), quote: z.string().min(1).max(4000), section: z.string().max(200).nullish() });
 const ManualRule = z.object({ documentVersionId: z.string().uuid(), ruleKey: z.string().trim().max(60).nullish(), body: PolicyRuleBody, citations: z.array(CitationIn.omit({ documentVersionId: true })).max(50) });
-const EditBody = z.object({ expectedContentHash: z.string().length(64), body: PolicyRuleBody, citations: z.array(CitationIn).max(50).optional() });
+const EditBody = z.object({ expectedContentHash: z.string().length(64), body: PolicyRuleBody, citations: z.array(CitationIn).max(50).optional(), annotationBasedOnRevisionId: z.string().uuid().nullish() });
+const AnnotateBody = z.object({ documentId: z.string().uuid() });
+const AnnotationEdit = z.object({ expectedContentHash: z.string().length(64), annotation: RuleAnnotationInput, basedOnRevisionId: z.string().uuid().nullish() });
+/** `required` is deprecated (15 Nov 2026): accepted from older clients and ignored; the annotation's marking replaced it. */
 const Decision = z.object({ expectedContentHash: z.string().length(64), required: z.boolean().optional() });
 const ExcludeBody = z.object({ expectedContentHash: z.string().length(64), reason: z.string().trim().min(1).max(1000) });
 const PublishBody = z.object({ expectedLatestVersion: z.number().int().positive().nullable() });
@@ -43,7 +51,6 @@ const ProfilePatch = z.object({ enabled: z.boolean() });
 const ApplyBody = z.object({ applied: z.boolean(), expectedContentHash: z.string().length(64), acceptUnverifiedEvidence: z.boolean().optional(), required: z.boolean().optional() });
 const DefineBody = z.object({ expectedContentHash: z.string().length(64) });
 const SuggestBody = z.object({ documentId: z.string().uuid(), prompt: z.string().trim().min(1).max(4000) });
-const AI_ACTIONS = ['policy.rule_suggestions_requested', 'policy.rule_ai_defined'];
 
 function versionDto(v: { id: string; version: number; sha256: string; fileName: string; format: string; mediaType: string; sizeBytes: number; pageCount: number; pageCountMethod: string; locatorGranularity: string; origin: string; createdAt: Date }) {
   return { id: v.id, version: v.version, sha256: v.sha256, fileName: v.fileName, format: v.format, mediaType: v.mediaType, sizeBytes: v.sizeBytes, pageCount: v.pageCount, pageCountMethod: v.pageCountMethod, locatorGranularity: v.locatorGranularity, origin: v.origin, createdAt: v.createdAt };
@@ -55,7 +62,34 @@ function scopeText(b: PolicyRuleBody) {
   return [a.actors.join(', '), a.actions.join(', '), a.entities.join(', '), a.channels.join(', '), a.locales.join(', '), a.jurisdictions.join(', '), a.conditionText ?? ''].filter(Boolean).join('; ');
 }
 
-function ruleDto(r: Awaited<ReturnType<typeof currentVersions>>[number]) {
+type Current = Awaited<ReturnType<typeof currentVersions>>[number];
+
+/** Links pointing at each rule, computed when read (linking never edits the other rule). */
+function reverseLinks(items: Current[]) {
+  const out = new Map<string, Array<{ ruleKey: string; relation: string }>>();
+  for (const i of items) {
+    for (const l of PolicyRuleBody.parse(i.version.body).annotation?.links ?? []) {
+      const list = out.get(l.ruleKey) ?? [];
+      list.push({ ruleKey: i.rule.ruleKey, relation: REVERSE_RELATION[l.relation] });
+      out.set(l.ruleKey, list);
+    }
+  }
+  return out;
+}
+
+/** The annotation part of a rule row: current annotation, who set it, a pending AI suggestion, flags, reverse links. */
+function annotationDto(b: PolicyRuleBody, revisions: RevisionRow[], known: Set<string>, linkedFrom: Array<{ ruleKey: string; relation: string }>) {
+  const { current, pending } = annotationState(b, revisions);
+  return {
+    annotation: b.annotation ?? null,
+    annotationSource: current ? { source: current.source, editedRole: current.editedRole, editedById: current.editedById, at: current.createdAt, model: current.model } : null,
+    pendingAiSuggestion: pending ? revisionDto(pending) : null,
+    flags: annotationFlags(b.annotation, { known }),
+    linkedFrom,
+  };
+}
+
+function ruleDto(r: Current, ann: ReturnType<typeof annotationDto>) {
   const b = PolicyRuleBody.parse(r.version.body);
   const evidence = r.version.citations.find((c) => c.fieldPath === 'requirement') ?? r.version.citations[0];
   return {
@@ -77,6 +111,8 @@ function ruleDto(r: Awaited<ReturnType<typeof currentVersions>>[number]) {
     definitionProblems: definitionProblems(r.version.body),
     evidenceProblems: evidenceProblems(r.version),
     sources: r.version.citations.map((c) => ({ document: c.documentVersion.document.title, documentVersion: c.documentVersion.version, locator: c.locator, resolution: c.resolution })),
+    effective: { from: b.effective.from, to: b.effective.to },
+    ...ann,
   };
 }
 
@@ -216,14 +252,27 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
   app.get('/projects/:projectId/policy/rules', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams } }, async (req) => {
     const p = await policyProject(db, req.actor!, req.params.projectId);
     const items = await currentVersions(db, req.actor!.clientId, p.id);
-    return { items: items.map(ruleDto) };
+    const revisions = await revisionsForRules(db, req.actor!.clientId, items.map((i) => i.rule.id));
+    const byRule = new Map<string, RevisionRow[]>();
+    for (const r of revisions) byRule.set(r.ruleId, [...(byRule.get(r.ruleId) ?? []), r]);
+    const known = new Set(items.map((i) => i.rule.ruleKey));
+    const reverse = reverseLinks(items);
+    return { items: items.map((i) => ruleDto(i, annotationDto(PolicyRuleBody.parse(i.version.body), byRule.get(i.rule.id) ?? [], known, reverse.get(i.rule.ruleKey) ?? []))) };
   });
 
   async function ruleDetail(projectId: string, clientId: string, versionId: string) {
     const v = await ruleVersionFull(db, clientId, versionId);
     if (v.rule.projectId !== projectId) throw notFound('Rule version not found');
     const history = await db.policyRuleVersion.findMany({ where: { ruleId: v.ruleId }, orderBy: { version: 'desc' }, select: { id: true, version: true, state: true, origin: true, reviewedAt: true, createdAt: true } });
+    const revisions = await revisionsForRules(db, clientId, [v.ruleId]);
+    const all = await currentVersions(db, clientId, projectId);
+    const ann = annotationDto(PolicyRuleBody.parse(v.body), revisions, new Set(all.map((i) => i.rule.ruleKey)), reverseLinks(all).get(v.rule.ruleKey) ?? []);
+    const template = await db.project.findUnique({ where: { id: projectId }, select: { template: { select: { caseSelector: true } } } });
     return {
+      ...ann,
+      annotationHistory: [...revisions].reverse().map(revisionDto),
+      applicationTypeOptions: caseSelectorOf(template?.template.caseSelector)?.values ?? [],
+      projectRuleKeys: all.map((i) => i.rule.ruleKey),
       ruleId: v.ruleId,
       ruleKey: v.rule.ruleKey,
       required: v.rule.required,
@@ -275,7 +324,7 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
   async function checkAiCap(clientId: string) {
     const since = new Date();
     since.setUTCHours(0, 0, 0, 0);
-    const used = await db.auditEvent.count({ where: { clientId, action: { in: AI_ACTIONS }, createdAt: { gte: since } } });
+    const used = await db.auditEvent.count({ where: { clientId, action: { in: POLICY_AI_ACTIONS }, createdAt: { gte: since } } });
     if (used >= config.POLICY_AI_DAILY_CALL_CAP) throw new AppError(429, 'MODEL_DAILY_CAP', 'The policy assistant has reached today’s usage limit. You can still tick rules and edit them by hand.');
   }
   const unavailable = (e: unknown): never => {
@@ -334,7 +383,7 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
     // A verified AI quote replaces an unverified one for the same field; everything else the PM had is kept.
     const citations = [...kept, ...added].slice(0, 50);
     const newBody = PolicyRuleBody.parse({ ...def.body, title: def.body.title || body.title });
-    await runCommand(db, req, reply, async ({ tx, actor: a, audit }) => {
+    await runCommand(db, req, reply, async ({ tx, actor: a, audit, emit }) => {
       const out = await editRule(tx, { loadText }, { clientId: a.clientId, projectId: p.id, ruleId: v.ruleId, actorId: a.userId, expectedContentHash: v.contentHash, body: newBody, citations }, audit);
       const full = await ruleVersionFull(tx, a.clientId, out.id);
       // Drop AI-added quotes that Praxis could not find in the document, so only verified AI evidence is kept.
@@ -346,10 +395,55 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
         final = await tx.policyRuleVersion.update({ where: { id: out.id }, data: { contentHash: contentHash(newBody, left.map((c) => ({ documentVersionId: c.documentVersionId, fieldPath: c.fieldPath, quote: c.quote }))) } });
       }
       const after = await ruleVersionFull(tx, a.clientId, final.id);
+      // Define with AI also asks for an annotation when the rule has none (worker, same pass as "Suggest annotations").
+      if (!PolicyRuleBody.parse(after.body).annotation) await emit({ name: 'policy.annotation_requested', aggregateType: 'PolicyAnnotationRun', aggregateId: randomUUID(), payload: { clientId: a.clientId, projectId: p.id, documentId: dv.documentId, requestedById: a.userId, requestedRoles: a.roles, trigger: 'manual', ruleKeys: [v.rule.ruleKey] } });
       await audit({ entityType: 'PolicyRuleVersion', entityId: final.id, action: 'policy.rule_ai_defined', after: { model: assistant.modelVersion, ruleKey: v.rule.ruleKey, quotesAdded: added.length - badAdded.length, quotesRejected: badAdded.length, definitionProblems: definitionProblems(after.body) } });
       return { status: 200, body: { versionId: final.id, version: final.version, state: final.state, contentHash: final.contentHash, model: assistant.modelVersion, verifiedQuotes: after.citations.filter((c) => c.resolution === 'RESOLVED').length, rejectedQuotes: badAdded.length, definitionProblems: definitionProblems(after.body), evidenceProblems: evidenceProblems(after) } };
     });
     return reply;
+  });
+
+  /**
+   * Suggest annotations (PRD-POLICY-RULE-ANNOTATIONS §1, plan §4): queues the AI annotation pass for one document's
+   * rules. Suggestions are stored as AI revisions; a PM or Admin still decides by editing and ticking Apply. Asking
+   * again while a run is still going returns that run.
+   */
+  app.post('/projects/:projectId/policy/annotation-suggestions', { config: { access: POLICY_ACCESS, rateLimit: perSession(10) }, schema: { tags: ['policy'], params: ProjectParams, body: AnnotateBody } }, async (req, reply) => {
+    const actor = req.actor!;
+    const p = await policyProject(db, actor, req.params.projectId);
+    const doc = await db.policyDocument.findFirst({ where: { id: req.body.documentId, projectId: p.id } });
+    if (!doc) throw notFound('Document not found');
+    await checkAiCap(actor.clientId);
+    const running = await annotationRun(actor.clientId, doc.id);
+    if (running?.status === 'running') return reply.status(200).send(running);
+    await runCommand(db, req, reply, async ({ audit, emit }) => {
+      const runId = randomUUID();
+      await emit({ name: 'policy.annotation_requested', aggregateType: 'PolicyAnnotationRun', aggregateId: runId, payload: { clientId: actor.clientId, projectId: p.id, documentId: doc.id, requestedById: actor.userId, requestedRoles: actor.roles, trigger: 'manual' } });
+      await audit({ entityType: 'PolicyDocument', entityId: doc.id, action: ANNOTATION_ACTIONS.requested, after: { runId } });
+      return { status: 202, body: { status: 'running', runId, documentId: doc.id } };
+    });
+    return reply;
+  });
+
+  /** The latest annotation run for a document (requested, then suggested / failed / skipped), for the page's progress. */
+  async function annotationRun(clientId: string, documentId: string) {
+    const events = await db.auditEvent.findMany({ where: { clientId, entityType: 'PolicyDocument', entityId: documentId, action: { in: Object.values(ANNOTATION_ACTIONS) } }, orderBy: { createdAt: 'desc' }, take: 20 });
+    const req = events.find((e) => e.action === ANNOTATION_ACTIONS.requested);
+    const end = events.find((e) => e.action !== ANNOTATION_ACTIONS.requested);
+    if (!req && !end) return null;
+    const stale = req && Date.now() - req.createdAt.getTime() > 30 * 60_000;
+    if (req && (!end || end.createdAt < req.createdAt) && !stale) return { status: 'running' as const, runId: (req.after as { runId?: string } | null)?.runId ?? null, documentId, requestedAt: req.createdAt };
+    if (!end) return { status: 'failed' as const, runId: null, documentId, error: 'The run did not finish within 30 minutes. Try again.' };
+    const after = (end.after ?? {}) as Record<string, unknown>;
+    const status = end.action === ANNOTATION_ACTIONS.suggested ? 'done' : end.action === ANNOTATION_ACTIONS.skipped ? 'skipped' : 'failed';
+    return { status, runId: (after.runId as string) ?? null, documentId, finishedAt: end.createdAt, annotated: after.annotated ?? 0, offered: after.offered ?? 0, model: after.model ?? null, error: after.error ?? after.reason ?? null };
+  }
+
+  app.get('/projects/:projectId/policy/annotation-suggestions', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams, querystring: AnnotateBody } }, async (req) => {
+    const p = await policyProject(db, req.actor!, req.params.projectId);
+    const doc = await db.policyDocument.findFirst({ where: { id: req.query.documentId, projectId: p.id }, select: { id: true } });
+    if (!doc) throw notFound('Document not found');
+    return (await annotationRun(req.actor!.clientId, doc.id)) ?? { status: 'none', documentId: doc.id };
   });
 
   app.post('/projects/:projectId/policy/rules', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams, body: ManualRule } }, async (req, reply) => {
@@ -369,8 +463,28 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
   app.put('/projects/:projectId/policy/rules/:ruleId', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ ruleId: z.string().uuid() }), body: EditBody } }, async (req, reply) => {
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
       const p = await policyProject(tx, actor, req.params.projectId);
-      const v = await editRule(tx, { loadText }, { clientId: actor.clientId, projectId: p.id, ruleId: req.params.ruleId, actorId: actor.userId, expectedContentHash: req.body.expectedContentHash, body: req.body.body, citations: req.body.citations as CitationEdit[] | undefined }, audit);
+      const annotationSave = { source: 'AUTHOR_EDIT' as const, editedById: actor.userId, editedRole: editorRole(actor.roles), basedOnRevisionId: req.body.annotationBasedOnRevisionId ?? null };
+      const v = await editRule(tx, { loadText }, { clientId: actor.clientId, projectId: p.id, ruleId: req.params.ruleId, actorId: actor.userId, expectedContentHash: req.body.expectedContentHash, body: req.body.body, citations: req.body.citations as CitationEdit[] | undefined, annotationSave }, audit);
       return { status: 200, body: { versionId: v.id, version: v.version, state: v.state, contentHash: v.contentHash } };
+    });
+    return reply;
+  });
+
+  /**
+   * Edit only the annotation (marking, applies when, why, …) through the same rule edit: new annotation version, a new
+   * draft rule version if the rule is applied (tick it again), the source quotation untouched (spec §4).
+   */
+  app.put('/projects/:projectId/policy/rules/:ruleId/annotation', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ ruleId: z.string().uuid() }), body: AnnotationEdit } }, async (req, reply) => {
+    await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+      const p = await policyProject(tx, actor, req.params.projectId);
+      const latest = await tx.policyRuleVersion.findFirst({ where: { ruleId: req.params.ruleId, clientId: actor.clientId, rule: { projectId: p.id } }, orderBy: { version: 'desc' } });
+      if (!latest) throw notFound('Rule not found');
+      if (req.body.basedOnRevisionId && !(await tx.policyRuleAnnotationRevision.findFirst({ where: { id: req.body.basedOnRevisionId, ruleId: req.params.ruleId, clientId: actor.clientId }, select: { id: true } }))) throw notFound('Annotation revision not found');
+      const body = { ...PolicyRuleBody.parse(latest.body), annotation: { ...req.body.annotation, version: 1 } };
+      const annotationSave = { source: 'AUTHOR_EDIT' as const, editedById: actor.userId, editedRole: editorRole(actor.roles), basedOnRevisionId: req.body.basedOnRevisionId ?? null };
+      const v = await editRule(tx, { loadText }, { clientId: actor.clientId, projectId: p.id, ruleId: req.params.ruleId, actorId: actor.userId, expectedContentHash: req.body.expectedContentHash, body, annotationSave }, audit);
+      const saved = PolicyRuleBody.parse(v.body).annotation!;
+      return { status: 200, body: { versionId: v.id, version: v.version, state: v.state, contentHash: v.contentHash, annotationVersion: saved.version, applied: v.state === 'REVIEWED' } };
     });
     return reply;
   });
@@ -413,8 +527,17 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
 
   app.get('/projects/:projectId/policy/rule-sets', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams } }, async (req) => {
     const p = await policyProject(db, req.actor!, req.params.projectId);
-    const sets = await db.projectRuleSet.findMany({ where: { projectId: p.id }, orderBy: { version: 'desc' }, select: { id: true, version: true, digest: true, ruleVersionIds: true, publishedById: true, createdAt: true } });
-    return { items: sets.map((s) => ({ ...s, ruleCount: s.ruleVersionIds.length })) };
+    const sets = await db.projectRuleSet.findMany({ where: { projectId: p.id }, orderBy: { version: 'desc' }, select: { id: true, version: true, digest: true, ruleVersionIds: true, publishedById: true, createdAt: true, content: true } });
+    // Rules per mandatory marking in each published version (`not_annotated` for rules published without one).
+    const markingCounts = (content: unknown) => {
+      const out: Record<string, number> = {};
+      for (const r of ProjectRuleSetContent.parse(content).rules) {
+        const m = r.body.annotation?.marking ?? 'not_annotated';
+        out[m] = (out[m] ?? 0) + 1;
+      }
+      return out;
+    };
+    return { items: sets.map(({ content, ...s }) => ({ ...s, ruleCount: s.ruleVersionIds.length, markingCounts: markingCounts(content) })) };
   });
 
   // ───────── Task policy (slice 6) ─────────

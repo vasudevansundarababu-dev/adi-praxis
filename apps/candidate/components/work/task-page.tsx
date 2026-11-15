@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useSyncExternalStore } from 'react';
-import { AUTHORSHIP_VERSION, exportStatusLine } from '@praxis/shared';
+import { AUTHORSHIP_VERSION, exportStatusLine, EDGE_CASE_LABEL, EDGE_CASE_HELP } from '@praxis/shared';
 import { ProfileDiagnostic, ProfileEditor, profileRouteFor } from './profile-editor';
 import { call } from '@/lib/client';
 import { AuthoringConsent } from './authoring-controls';
@@ -20,6 +20,7 @@ import { minutes, TASK_STATUS } from '@/lib/work-types';
 import { KycWorkbench } from './kyc-workbench';
 import { SubmitPanel } from './submit-panel';
 import { useAutosave, type SaveState } from './use-autosave';
+import { SaveBar } from './save-bar';
 
 export function SaveIndicator({ state, readOnly }: { state: SaveState; readOnly: boolean }) {
   if (readOnly && state.kind !== 'error' && state.kind !== 'conflict') return <span className="rounded-full border border-line px-2 py-0.5 text-xs">Read-only</span>;
@@ -134,9 +135,12 @@ function GenericAuthoring({ task, onSubmitted }: { task: TaskView; onSubmitted: 
               </label>
             ))}
             <label className="block text-sm">
-              Edge case this task tests
+              {EDGE_CASE_LABEL}
               <Req />
-              <input aria-required="true" value={value.header.edgeCase ?? ''} onChange={(e) => update({ ...value, header: { ...value.header, edgeCase: e.target.value } })} className={input} />
+              <input aria-required="true" aria-describedby="edge-case-help" value={value.header.edgeCase ?? ''} onChange={(e) => update({ ...value, header: { ...value.header, edgeCase: e.target.value } })} className={input} />
+              <span id="edge-case-help" className="mt-1 block text-xs text-fg-muted">
+                {EDGE_CASE_HELP}
+              </span>
             </label>
           </div>
         )}
@@ -148,6 +152,7 @@ function GenericAuthoring({ task, onSubmitted }: { task: TaskView; onSubmitted: 
           <textarea value={value.body ?? ''} rows={14} onChange={(e) => update({ ...value, body: e.target.value })} className={input} />
         </label>
       </fieldset>
+      <SaveBar state={state} flush={flush} readOnly={task.readOnly} />
       {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} />}
     </div>
   );

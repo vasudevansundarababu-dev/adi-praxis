@@ -4,7 +4,7 @@ import { expect } from 'vitest';
 import type { MockGoogleVerifier } from '../src/candidate/google';
 import { idem } from './helpers';
 
-export type Method = 'GET' | 'POST' | 'PUT';
+export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH';
 
 /** An API call with a session cookie; state-changing calls carry a fresh Idempotency-Key. */
 export const call = (a: FastifyInstance, method: Method, cookie: string, url: string, payload?: object) =>

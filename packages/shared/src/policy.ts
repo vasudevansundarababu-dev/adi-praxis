@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RuleAnnotation } from './policy-annotations';
 
 /**
  * Policy Rules shared contracts (docs/architecture/ARCH-POLICY-RULES.md sections 5 and 8). The canonical candidate
@@ -83,6 +84,11 @@ export const PolicyRuleBody = z.object({
   evidenceNeeds: list.default([]),
   verificationHint: shortText.nullable().default(null),
   uncertainty: list.default([]),
+  /**
+   * Classification, mandatory marking and applicability (PRD-POLICY-RULE-ANNOTATIONS). Optional, never defaulted: a
+   * rule without one has the same body, content hash and rule-set digest as before annotations existed.
+   */
+  annotation: RuleAnnotation.optional(),
 });
 export type PolicyRuleBody = z.infer<typeof PolicyRuleBody>;
 

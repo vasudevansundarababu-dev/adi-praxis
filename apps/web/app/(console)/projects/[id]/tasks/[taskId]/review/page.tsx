@@ -1,4 +1,4 @@
-import type { ForgeTaskRow, ProjectPersonDto } from '@praxis/shared';
+import type { ForgeTaskRow, ProjectPersonDto, RubricView } from '@praxis/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -22,14 +22,16 @@ export default async function ForgeTaskReviewPage({ params }: { params: Promise<
         </Link>
       </div>
     );
-  const [v, list, people, exp] = await Promise.all([
+  const [v, list, people, exp, rubric] = await Promise.all([
     apiGet<ForgeTaskView>(`/projects/${id}/forge-tasks/${taskId}`),
     apiGet<{ items: ForgeTaskRow[] }>(`/projects/${id}/forge-tasks`),
     apiGet<{ items: ProjectPersonDto[] }>(`/projects/${id}/people`),
     apiGet<ExportState>(`/projects/${id}/export`),
+    // The rubric's internal details (RUBRIC_RECOMMENDATIONS_ENABLED); a 404 when the flag is off shows nothing extra.
+    apiGet<RubricView>(`/projects/${id}/forge-tasks/${taskId}/rubric`),
   ]);
   if (v.status === 403) return <NoAccess need="PMs and Admins" />;
   if (!v.data) notFound();
   const code = taskCodes(list.data?.items ?? []).get(taskId) ?? 'Task';
-  return <ForgeTaskPage code={code} view={v.data} people={people.data?.items ?? []} exportState={exp.data} />;
+  return <ForgeTaskPage code={code} view={v.data} people={people.data?.items ?? []} exportState={exp.data} rubric={rubric.data} />;
 }

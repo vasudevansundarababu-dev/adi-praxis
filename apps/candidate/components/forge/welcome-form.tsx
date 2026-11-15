@@ -7,7 +7,7 @@ import { Req, RequiredNote } from '@/components/required';
 import { call } from '@/lib/client';
 import { welcomeProblem } from '@/lib/forge';
 
-/** Before you start (first sign-in, once): the contributor terms and the synthetic-data-only confirmation. */
+/** Before you start (first sign-in, once): the contributor terms and the no-real-data declaration (D3). */
 export function WelcomeForm({ terms, initialError = null }: { terms: (ForgeTermsDoc | null)[]; initialError?: string | null }) {
   const router = useRouter();
   const [contributor, setContributor] = useState(false);
@@ -65,9 +65,10 @@ export function WelcomeForm({ terms, initialError = null }: { terms: (ForgeTerms
       <div className="card p-4">
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" aria-required="true" checked={synthetic} onChange={(e) => setSynthetic(e.target.checked)} className="mt-1" />
+          {/* D3 (owner, 15 Nov 2026): exactly this text. The rule itself is unchanged. */}
           <span>
-            <strong>Synthetic data only</strong>
-            <Req /> Everything I write is made up. I won&apos;t use real customer, employer or account information.
+            I won&apos;t use real customer, employer or account information.
+            <Req />
           </span>
         </label>
       </div>

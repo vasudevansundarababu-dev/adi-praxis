@@ -141,7 +141,7 @@ async function extractedRule() {
 
 beforeAll(async () => {
   storage = new MemoryStorage();
-  app = await buildApp({ config: testConfig({ POLICY_BUDGET_LLAMA_USD: '20', POLICY_BUDGET_GOOGLE_USD: '30' }), db, pingRedis: async () => true, selectionGate: stubSelectionGate, storage, policyAdapters: { get llamaextract() { return llama; }, get google() { return google; } } as Adapters, ruleAssistant: { get modelVersion() { return ai.modelVersion; }, suggest: (p, r) => ai.suggest(p, r), define: (i) => ai.define(i) } });
+  app = await buildApp({ config: testConfig({ POLICY_BUDGET_LLAMA_USD: '20', POLICY_BUDGET_GOOGLE_USD: '30' }), db, pingRedis: async () => true, selectionGate: stubSelectionGate, storage, policyAdapters: { get llamaextract() { return llama; }, get google() { return google; } } as Adapters, ruleAssistant: { get modelVersion() { return ai.modelVersion; }, suggest: (p, r) => ai.suggest(p, r), annotate: (i) => ai.annotate(i), define: (i) => ai.define(i) } });
 });
 afterAll(async () => {
   await app.close();
@@ -546,7 +546,7 @@ describe('rules table and Apply to project (PRD 5.6, owner 14 Nov 2026)', () => 
     await api(pmCookie).put(`/projects/${projectId}/policy/rules/${rule.ruleId}/applied`, { applied: true, expectedContentHash: rule.contentHash });
     const preview = (await api(pmCookie).get(`/projects/${projectId}/policy/rule-set/preview`)).json();
     expect(preview.blocking).toEqual([]);
-    expect(preview.notApplied).toEqual([{ ruleKey: 'R-REFUNDS', state: 'NEEDS_DEFINITION', required: true }]);
+    expect(preview.notApplied).toEqual([{ ruleKey: 'R-REFUNDS', state: 'NEEDS_DEFINITION', required: true, marking: null }]);
     expect(preview.excluded).toContainEqual({ ruleKey: 'R-REFUNDS', reason: 'Not applied to this project' });
     const pub = await api(pmCookie).post(`/projects/${projectId}/policy/rule-set`, { expectedLatestVersion: null });
     expect(pub.statusCode).toBe(201);

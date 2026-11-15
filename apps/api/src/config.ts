@@ -131,6 +131,15 @@ const Env = z.object({
   META_COMPILER_CODEGEN_ENABLED: flag,
   /** D5a: allow tasks that use real public data. Off = every task is SYNTHETIC. */
   REAL_DATA_ENABLED: flag,
+  /**
+   * Rubric editor and recommendations, the S4 policy picker and the SME form wording (docs/plan/PLAN-RUBRIC-
+   * RECOMMENDATIONS.md). Off by default: with it off the rubric routes return 404 and the task form is as before.
+   */
+  RUBRIC_RECOMMENDATIONS_ENABLED: flag,
+  /** Model wording for rubric recommendations (needs RUBRIC_RECOMMENDATIONS_ENABLED). Off = rules only, no paid call. */
+  RUBRIC_AI_ENABLED: flag,
+  /** Model for rubric wording on Vertex (`gemini:<model>` or a Claude id). Empty = follows AUTHORING_MODEL. */
+  RUBRIC_AI_MODEL: z.string().default(''),
   /** Harbor verification runner: mock (tests, local), docker (manual local runs), job (Cloud Run sandbox job). */
   HARBOR_RUNNER: z.enum(['mock', 'docker', 'job']).optional(),
   HARBOR_VERIFY_JOB: z.string().default(''),

@@ -1,6 +1,6 @@
 import { SEED_DEMOGRAPHIC_ATTRIBUTES, type DemographicAttributeDto, type JobDescriptionDto } from '@praxis/shared';
 import { describe, expect, it } from 'vitest';
-import { GeneratedJdPanel } from '../components/projects/generated-jd';
+import { EMPTY_PAY, GeneratedJdPanel, payProblem } from '../components/projects/generated-jd';
 import { html, template, text } from './helpers';
 
 const attributes = SEED_DEMOGRAPHIC_ATTRIBUTES.map((a, i) => ({ ...a, id: `00000000-0000-4000-8000-0000000009${String(i).padStart(2, '0')}` })) as unknown as DemographicAttributeDto[];
@@ -59,5 +59,27 @@ describe('generated JD step (owner, 12 Nov 2026)', () => {
     expect(text(markup)).toContain('Other skills Python');
     expect(markup).toContain('value="Senior EDD author"');
     expect(markup).toContain('value="40"');
+  });
+});
+
+describe('D10: pay and location before the first save', () => {
+  it('a new project shows Wage per task, currency and location on the generated JDs, with no "save first" message', () => {
+    const out = panel({ reviewRoute: 'SME_EXPERT_PM', pay: { author: EMPTY_PAY, reviewer: EMPTY_PAY }, onPayChange: () => {} });
+    expect(out.match(/Wage per task/g)).toHaveLength(2);
+    expect(out).toContain('Currency (ISO code)');
+    expect(out).toContain('Set the pay and location now; they are saved with the draft.');
+    expect(out).not.toContain('Save the draft to create these job descriptions');
+  });
+
+  it('shows the inline problem once Next was tried, and none when a wage is set', () => {
+    expect(panel({ pay: { author: EMPTY_PAY, reviewer: EMPTY_PAY }, onPayChange: () => {}, showProblems: true })).toContain('Set the wage per task for the task author (sme) job description.');
+    expect(panel({ pay: { author: { ...EMPTY_PAY, wagePerTask: '40' }, reviewer: EMPTY_PAY }, onPayChange: () => {}, showProblems: true })).not.toContain('Set the wage per task');
+  });
+
+  it('payProblem: a wage above zero, and a location unless remote', () => {
+    expect(payProblem({ ...EMPTY_PAY }, 'x')).toBe('Set the wage per task for the x.');
+    expect(payProblem({ ...EMPTY_PAY, wagePerTask: '0' }, 'x')).toBe('Set the wage per task for the x.');
+    expect(payProblem({ ...EMPTY_PAY, wagePerTask: '25', locationType: 'ONSITE' }, 'x')).toBe('Set the location for the x.');
+    expect(payProblem({ ...EMPTY_PAY, wagePerTask: '25' }, 'x')).toBeNull();
   });
 });

@@ -388,3 +388,8 @@ export function candidatePasswordProblem(password: string, emails: (string | nul
   }
   return null;
 }
+
+/** D11 (owner, 15 Nov 2026): the open-slot edge-case field, the same label and help everywhere. */
+export const EDGE_CASE_LABEL = 'Edge case this task tests';
+export const EDGE_CASE_HELP =
+  "In one line, name the unusual situation this task covers, the twist that makes it harder than a routine case. Your evidence (S2), steps (S5) and rubric (S7) must show it; the reviewer confirms it before approval. Example: 'Weekly report arrives late; the agent must hold, not guess.'";

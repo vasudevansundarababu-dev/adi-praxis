@@ -98,7 +98,9 @@ test('a partner signs in, submits a candidate for a requisition and sees them in
   await page.getByLabel('Email').fill(s.portal.email);
   await page.getByLabel('Password').fill(s.portal.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Welcome');
+  // The first partner page after sign-in compiles its client bundle on demand under `next dev` (the warm-up can't reach
+  // it: an anonymous /partner redirects to sign-in), so allow for that compile, as the other first sign-ins here do.
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Welcome', { timeout: 30_000 });
   await page.goto(`${WEB}/partner/requisitions/${s.requisitionId}`);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(s.title);
   await page.getByRole('link', { name: /submit/i }).first().click();

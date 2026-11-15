@@ -71,6 +71,8 @@ export interface TaskView extends TaskSummary {
   /** Anvil export readiness of a template-profile task, compiled at submission. */
   exportStatus?: ExportStatusView | null;
   readOnly: boolean;
+  /** Rubric editor, S4 policy picker and SME form wording (RUBRIC_RECOMMENDATIONS_ENABLED; off by default). */
+  formV2?: boolean;
   review: { decision: string; comments: { section: string; text: string }[]; notes: string | null; rejectReason: string | null; at: string } | null;
 }
 

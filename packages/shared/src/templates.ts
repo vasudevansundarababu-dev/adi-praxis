@@ -149,6 +149,10 @@ export const TemplateDto = z.object({
   openSlotShare: z.number(),
   similarityThreshold: z.number(),
   profileId: z.string().nullable(),
+  /** D1: one task per case-selector value (e.g. 4 application types); null without a case selector. */
+  caseCount: z.number().int().nullable().optional(),
+  /** D1: what each task is for, e.g. "application type". */
+  caseLabel: z.string().nullable().optional(),
   /** MVP1 step 7: the tutorial video shown on every task of this template (display metadata). */
   tutorial: Tutorial.nullable().optional(),
   publishedAt: z.string().nullable(),

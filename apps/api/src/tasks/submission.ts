@@ -1,4 +1,5 @@
 import { evaluatorMap, JOINT_TEMPLATE_SPEC, jointToolIds } from '../anvil/joint-template';
+import { rubricSubmitChecks } from './rubric/service';
 import type { Prisma, TaskInstance } from '@prisma/client';
 import { praxisContractChecks } from '@praxis/shared';
 import type { CoverageTags, SubmitTaskRequest, TaskCheck } from '@praxis/shared';
@@ -30,7 +31,7 @@ export interface StoredChecks {
 export const blocking = (c: TaskCheck) => !c.ok && c.severity !== 'warning';
 
 /** Every automated check for the task's current output (TASK-KYC section 5), without changing anything. */
-export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 'projectId' | 'taskType' | 'output' | 'input' | 'drafting' | 'revision'>) {
+export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 'projectId' | 'taskType' | 'output' | 'input' | 'drafting' | 'revision'>, opts: { rubricChecks?: boolean } = {}) {
   const project = await tx.project.findUniqueOrThrow({ where: { id: task.projectId }, include: { template: true } });
   const template = await templateRef(tx, project.templateId);
   const def = definitionFor(template);
@@ -47,6 +48,8 @@ export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 
   }
   if (task.taskType === 'AUTHORING' && template.profileId) checks.push(...(await boundRuleChecks(tx, project.clientId, task, output)));
   if (task.taskType === 'AUTHORING' && project.template.anvilSpec) checks.push(...anvilSpecChecks(project.template.anvilSpec, output));
+  // RUBRIC_RECOMMENDATIONS_ENABLED: every template criterion present (D8); S4 references from the project library (D6).
+  if (task.taskType === 'AUTHORING' && opts.rubricChecks) checks.push(...(await rubricSubmitChecks(tx, { id: task.id, clientId: project.clientId, projectId: task.projectId, revision: task.revision, output: task.output, taskType: task.taskType, project: { template: project.template } })));
   const coverage: CoverageTags | null = task.taskType === 'AUTHORING' ? finalCoverage(slot, output) : null;
   return {
     project,
@@ -67,7 +70,7 @@ export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 
  */
 export async function submitTask(
   tx: Tx,
-  args: { task: TaskInstance; body: SubmitTaskRequest; embedding: number[] | null; embeddingModel: string | null },
+  args: { task: TaskInstance; body: SubmitTaskRequest; embedding: number[] | null; embeddingModel: string | null; rubricChecks?: boolean },
   audit: Audit,
   emit: (e: OutboxInput) => Promise<void>,
 ) {
@@ -76,7 +79,7 @@ export async function submitTask(
   if (t.revision !== args.body.expectedRevision) throw new AppError(409, 'STALE_REVISION', 'This task changed in another window. Reload to continue.', { revision: t.revision });
   if (!t.output) throw new AppError(422, 'EMPTY', 'Save your work before submitting.');
 
-  const ev = await evaluateTask(tx, t);
+  const ev = await evaluateTask(tx, t, { rubricChecks: args.rubricChecks });
   const unexplained = ev.flags.filter((f) => !args.body.flagExplanations[f.id]);
   if (ev.checks.some(blocking) || unexplained.length) {
     throw new AppError(422, 'CHECKS_FAILED', 'Some checks need attention before you can submit.', { checks: ev.checks, flags: ev.flags, unexplained: unexplained.map((f) => f.id) });

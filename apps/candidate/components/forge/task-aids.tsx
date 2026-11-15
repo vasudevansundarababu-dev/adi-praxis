@@ -3,6 +3,7 @@
 import { chapterTime, TASK_HELP_SUGGESTIONS, tutorialKind, type Tutorial } from '@praxis/shared';
 import { useEffect, useRef, useState } from 'react';
 import { call } from '@/lib/client';
+import { HelpMascot } from './help-mascot';
 
 /**
  * MVP1 step 7 (docs/design/PROJECT-SCREEN-DESIGN.md, "Candidate app for MVP1"): the task page's Tutorial (the video
@@ -167,7 +168,7 @@ export function HelpDrawer({ endpoint, kind, onClose }: { endpoint: string; kind
   );
 }
 
-/** The Tutorial and Help buttons for a task page (author) or review page (reviewer), with their card and drawer. */
+/** The Tutorial button (top of the page) and the floating Help button (D13) for a task or review page, with their card and drawer. */
 export function TaskAids({ taskId, kind, tutorial, initial = null }: { taskId: string; kind: AidsFor; tutorial: Tutorial | null | undefined; initial?: 'tutorial' | 'help' | null }) {
   const [showTutorial, setShowTutorial] = useState(initial === 'tutorial');
   const [showHelp, setShowHelp] = useState(initial === 'help');
@@ -178,10 +179,9 @@ export function TaskAids({ taskId, kind, tutorial, initial = null }: { taskId: s
         <button type="button" className="btn btn-secondary" aria-expanded={showTutorial} onClick={() => setShowTutorial((v) => !v)}>
           ▶ Tutorial
         </button>
-        <button type="button" className="btn btn-secondary" aria-expanded={showHelp} onClick={() => setShowHelp((v) => !v)}>
-          ? Help
-        </button>
       </div>
+      {/* D13 (owner, 15 Nov 2026): Help is the floating Ember mascot; it hides while the drawer is open. */}
+      {!showHelp && <HelpMascot onOpen={() => setShowHelp(true)} />}
       {showTutorial && (
         <div className="mt-3">
           <TutorialCard tutorial={tutorial} onClose={() => setShowTutorial(false)} />

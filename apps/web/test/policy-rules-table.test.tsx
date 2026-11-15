@@ -49,7 +49,7 @@ describe('Issue 2: rules table selection (PR-M01, PR-M02)', () => {
     expect(applySteps(rule({ definitionProblems: ['Choose a type.'], evidenceProblems: ['Link the requirement.'] }))).toEqual({ define: true, confirmEvidence: true });
   });
 
-  it('renders the dropdown, prompt box and the four columns, with the rule name as a link and accessible checkboxes', () => {
+  it('renders the dropdown, prompt box and the annotation columns, with the rule name as a link and accessible checkboxes', () => {
     const html = renderToStaticMarkup(
       <RulesTable projectId="p1" documents={[{ id: 'd1', title: 'SEED — Federal KYC policy' }, { id: 'd2', title: 'SEED — CA addendum' }]} rules={[rule(), rule({ ruleId: 'r2', ruleKey: 'R-BAD', title: 'Beneficial owner CIP', evidence: { quote: 'a beneficial owner who is also a signer must pass full CIP .', resolution: 'QUOTE_MISMATCH', document: 'SEED — Federal KYC policy', documentVersion: 1 }, evidenceProblems: ['Link the requirement to a quote found in the source document.'] }), rule({ ruleId: 'r3', ruleKey: 'R-CA', documentIds: ['d2'] })]} />,
     );
@@ -57,7 +57,8 @@ describe('Issue 2: rules table selection (PR-M01, PR-M02)', () => {
     expect(html).toMatch(/<option value="d1"[^>]*>SEED — Federal KYC policy<\/option>/);
     expect(html).toContain('Which rules does this template need?');
     expect(html).toContain('KYC for single, joint and minor accounts');
-    for (const h of ['Rule name', 'Evidence', 'Required', 'Apply to project']) expect(html).toContain(`>${h}</th>`);
+    for (const h of ['Rule name', 'Evidence', 'Mandatory marking', 'Applies when', 'Why', 'Apply to project']) expect(html).toContain(`>${h}</th>`);
+    expect(html).not.toContain('>Required</th>');
     expect(html).toContain('href="/projects/p1/policy/rules/r1"');
     expect(html).toContain('aria-label="Apply Joint holder CIP to the project"');
     expect(html).toContain('Quote not found in the document — check it before applying.');

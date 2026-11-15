@@ -1,3 +1,4 @@
+import { publicText } from '@praxis/shared';
 import type { Metadata } from 'next';
 import { pageTitle } from '@praxis/shared/theme';
 import Link from 'next/link';
@@ -49,7 +50,7 @@ export default async function ProjectTasksPage({ params, searchParams }: { param
       {v.project.status === 'PAUSED' && <p role="status" className="mt-4 rounded-md border border-warning p-3 text-sm">This project is paused. Your work is saved.</p>}
       {v.project.status === 'COMPLETED' && <p role="status" className="mt-4 rounded-md border border-success p-3 text-sm">This project is complete. Thank you.</p>}
       {submitted && <p role="status" className="mt-4 rounded-md border border-success p-3 text-sm">Submitted. A Validator will look at it; you’ll see the outcome here.</p>}
-      {v.project.humanGate && <p className="mt-4 text-sm"><span className="font-medium">Human gate: </span>{v.project.humanGate}</p>}
+      {v.project.humanGate && <p className="mt-4 text-sm"><span className="font-medium">Human gate: </span>{publicText(v.project.humanGate)}</p>}
 
       <section className="mt-6" aria-labelledby="open-h">
         <div className="flex flex-wrap items-center gap-3">

@@ -14,18 +14,28 @@ import {
   setFieldValue,
   startProfileOutput,
   withSlotCase,
+  publicText,
+  rubricToFinish,
   type ItemField,
+  type RubricView,
+  type ViewLink,
   type ProfileProblem,
   type SectionKey,
-  type TemplateProfile,
+  type TemplateProfile, EDGE_CASE_LABEL, EDGE_CASE_HELP,
 } from '@praxis/shared';
-import { useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { Req, RequiredNote } from '@/components/required';
 import { placeComments } from '@/lib/forge';
 import type { TaskView } from '@/lib/work-types';
 import { SubmitPanel } from './submit-panel';
 import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
+import { SaveBar } from './save-bar';
+import { PolicyPicker, type LibraryView } from './policy-picker';
+import { RubricEditor, SourcePanel, useRubricView } from './rubric-editor';
+
+/** RUBRIC_RECOMMENDATIONS_ENABLED: the S4/S7/S8 controls change. Template text always shows public names (D5). */
+const FormV2 = createContext(false);
 
 /**
  * The Classic editor for any registered template profile (handover v2.1 ch. 04/05): eight sections with progress,
@@ -92,6 +102,7 @@ function Messages({ id, problems }: { id: string; problems: ProfileProblem[] }) 
 }
 
 function FieldControl({ field, value, path, problems, lookup, onChange }: FieldProps) {
+  const v2 = useContext(FormV2);
   const id = domId(path);
   const mine = problems.filter((p) => p.path === path);
   const describedBy = [`${id}-help`, mine.length ? `${id}-problems` : ''].filter(Boolean).join(' ');
@@ -100,18 +111,18 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
   const header = (
     <>
       <label htmlFor={id} className="block text-sm font-medium">
-        {field.label}
+        {publicText(field.label)}
         {required && <Req />}
       </label>
       <p id={`${id}-help`} className="text-xs text-fg-muted">
-        {field.help}
+        {publicText(field.help)}
       </p>
     </>
   );
   const example = field.example ? (
     <details className="mt-1 text-xs">
       <summary className="cursor-pointer text-link">Example</summary>
-      <p className="mt-1 whitespace-pre-wrap break-words text-fg-muted">{field.example}</p>
+      <p className="mt-1 whitespace-pre-wrap break-words text-fg-muted">{publicText(field.example)}</p>
     </details>
   ) : null;
 
@@ -123,11 +134,11 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
       return (
         <fieldset className="min-w-0" aria-describedby={describedBy}>
           <legend className="text-sm font-medium">
-            {field.label}
+            {publicText(field.label)}
             {required && <Req />}
           </legend>
           <p id={`${id}-help`} className="text-xs text-fg-muted">
-            {field.help}
+            {publicText(field.help)}
           </p>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
             {field.options.map((o) => (
@@ -144,11 +155,11 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
     return (
       <fieldset className="min-w-0" aria-describedby={describedBy}>
         <legend className="text-sm font-medium">
-          {field.label}
+          {publicText(field.label)}
           {required && <Req />}
         </legend>
         <p id={`${id}-help`} className="text-xs text-fg-muted">
-          {field.help}
+          {publicText(field.help)}
         </p>
         {list.length === 0 && <p className="mt-1 text-xs text-fg-muted">None yet.</p>}
         {list.map((v, i) => (
@@ -176,7 +187,7 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
           {field.label}
         </label>
         <p id={`${id}-help`} className="text-xs text-fg-muted">
-          {field.help}
+          {publicText(field.help)}
         </p>
       </div>
     );
@@ -209,6 +220,7 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
 }
 
 function ArrayControl({ field, value, path, problems, lookup, onChange }: FieldProps) {
+  const v2 = useContext(FormV2);
   const id = domId(path);
   const items = Array.isArray(value) ? (value as Record<string, unknown>[]) : [];
   const noun = field.itemLabel ?? 'item';
@@ -218,16 +230,16 @@ function ArrayControl({ field, value, path, problems, lookup, onChange }: FieldP
   return (
     <fieldset className="min-w-0 rounded-md border border-line p-3" aria-describedby={`${id}-help`}>
       <legend className="px-1 text-sm font-medium">
-        {field.label}
+        {publicText(field.label)}
         {required && <Req />}
       </legend>
       <p id={`${id}-help`} className="text-xs text-fg-muted">
-        {field.help}
+        {publicText(field.help)}
       </p>
       {field.example && (
         <details className="mt-1 text-xs">
           <summary className="cursor-pointer text-link">Example</summary>
-          <p className="mt-1 whitespace-pre-wrap break-words text-fg-muted">{field.example}</p>
+          <p className="mt-1 whitespace-pre-wrap break-words text-fg-muted">{publicText(field.example)}</p>
         </details>
       )}
       <Messages id={`${id}-problems`} problems={mine} />
@@ -282,7 +294,16 @@ export function SelectorField({ field, value, label }: { field: TemplateProfile[
   );
 }
 
-export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { task: TaskView; profile: TemplateProfile; onSubmitted: () => void; initialSection?: number }) {
+/** The D3 declaration (owner, 15 Nov 2026): exactly this text, nothing else, everywhere it appears. */
+export const DECLARATION_V2 = 'I won’t use real customer, employer or account information.';
+const isPolicyReferenceField = (f: ItemField) => f.type === 'repeated_array' && (f.itemFields ?? []).some((x) => /sha256/i.test(x.key));
+const isSourcesField = (f: ItemField) => f.type === 'long_text' && /source/i.test(`${f.key} ${f.label}`) && f.visibility !== 'private_reference' && f.visibility !== 'private_rubric';
+
+export function ProfileEditor({ task, profile, onSubmitted, initialSection, initialRubric = null, initialLibrary = null }: { task: TaskView; profile: TemplateProfile; onSubmitted: () => void; initialSection?: number; initialRubric?: RubricView | null; initialLibrary?: LibraryView | null }) {
+  const v2 = task.formV2 === true;
+  const hasRubric = profile.sections.some((s) => s.fields.some((f) => f.type === 'criterion'));
+  const rubric = useRubricView(task.id, initialRubric, undefined, v2 && hasRubric);
+  const [openLink, setOpenLink] = useState<ViewLink | null>(null);
   const initial = useMemo(
     () => withSlotCase(profile, profileApplies(profile, task.output) ? (task.output as Record<string, unknown>) : startProfileOutput(profile, task.output), task.readOnly ? null : task.input.slot?.case, { lock: true }),
     [profile, task.output, task.input.slot?.case, task.readOnly],
@@ -316,13 +337,31 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
     return i >= 0 ? i : key === 'W01' ? 0 : profile.sections.length - 1;
   };
   const setField = (key: string, v: unknown) => update((prev) => setFieldValue(profile, prev, section.key as SectionKey, key, v));
+  const setRubric = useCallback(
+    (sectionKey: SectionKey, key: string) => (v: unknown) => update((prev) => setFieldValue(profile, prev, sectionKey, key, v)),
+    [update, profile],
+  );
+  const rubricItems = useMemo(() => {
+    const rf = profile.sections.flatMap((s) => s.fields.filter((f) => f.type === 'criterion').map((f) => getFieldValue(profile, value, s.key as SectionKey, f)))[0];
+    return Array.isArray(rf) ? (rf as Record<string, unknown>[]) : [];
+  }, [profile, value]);
+  const rubricTodo = useMemo(() => (v2 && rubric.view ? rubricToFinish(rubric.view, rubricItems) : []), [v2, rubric.view, rubricItems]);
+  const openInForm = (l: ViewLink) => {
+    setOpenLink(null);
+    if (!l.section) return;
+    goTo(sectionIndex(l.section));
+    const target = `pf-${`${l.section}.${l.field ?? ''}`.replace(/[^A-Za-z0-9]+/g, '-')}`;
+    setTimeout(() => document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+  };
   // Review comments sit under their own section (S1, or a range such as S3-S4); the rest are listed at the top.
   const rework = task.status === 'REWORK';
   const placed = useMemo(() => placeComments(task.review?.comments ?? [], profile.sections.map((s) => s.key)), [task.review, profile.sections]);
   const here = placed.bySection[section.key] ?? [];
 
   return (
+    <FormV2.Provider value={v2}>
     <div className="max-w-4xl min-w-0 space-y-4">
+      {openLink && <SourcePanel link={openLink} onClose={() => setOpenLink(null)} onOpenInForm={openInForm} />}
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="min-w-0 break-words text-xl font-semibold">{header.title || 'New task'}</h1>
         <SaveIndicator state={state} readOnly={task.readOnly} />
@@ -380,9 +419,9 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
             Section {active + 1} of {profile.sections.length}
           </p>
           <h2 id="pf-section-h" className="text-lg font-semibold">
-            {section.key} · {section.title}
+            {section.key} · {publicText(section.title)}
           </h2>
-          {section.help && <p className="mt-1 text-sm text-fg-muted">{section.help}</p>}
+          {section.help && <p className="mt-1 text-sm text-fg-muted">{publicText(section.help)}</p>}
           {here.map((c, i) => (
             <p key={i} role="status" data-section-comment={section.key} className="mt-2 rounded-md border border-warning bg-warning/10 px-3 py-2 text-sm">
               <strong className="text-warning">Reviewer:</strong> {c.text}
@@ -413,15 +452,32 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
                   </label>
                 ))}
               <label className="block text-sm font-medium">
-                Edge case this task tests
+                {EDGE_CASE_LABEL}
                 <Req />
-                <input aria-required="true" value={header.edgeCase ?? ''} onChange={(e) => update((prev) => ({ ...prev, header: { ...(prev.header as object), edgeCase: e.target.value } }))} className={input} />
+                <input aria-required="true" aria-describedby="edge-case-help" value={header.edgeCase ?? ''} onChange={(e) => update((prev) => ({ ...prev, header: { ...(prev.header as object), edgeCase: e.target.value } }))} className={input} />
+                <span id="edge-case-help" className="mt-1 block text-xs font-normal text-fg-muted">
+                  {EDGE_CASE_HELP}
+                </span>
               </label>
             </div>
           )}
           {section.fields.map((f) =>
             slot?.case && slot.case.source === `${section.key}.${f.key}` ? (
               <SelectorField key={f.key} field={f} value={slot.case.value} label={slot.case.label} />
+            ) : v2 && f.type === 'criterion' ? (
+              rubric.view ? (
+                <RubricEditor key={f.key} taskId={task.id} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} onChange={setRubric(section.key as SectionKey, f.key)} view={rubric.view} reload={rubric.reload} readOnly={task.readOnly} onOpenSource={setOpenLink} />
+              ) : (
+                <p key={f.key} role="status" className="text-sm text-fg-muted">
+                  {rubric.error ?? 'Loading the rubric…'}
+                </p>
+              )
+            ) : v2 && isPolicyReferenceField(f) ? (
+              <PolicyPicker key={f.key} taskId={task.id} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} onChange={(v) => setField(f.key, v)} readOnly={task.readOnly} initialLibrary={initialLibrary} />
+            ) : v2 && isSourcesField(f) && rubric.view ? (
+              <SourcesUsedField key={f.key} view={rubric.view} value={getFieldValue(profile, value, section.key as SectionKey, f)} onFill={(text) => setField(f.key, text)} readOnly={task.readOnly} onChangeSources={() => goTo(sectionIndex(rubric.view!.rubric.section))}>
+                <FieldControl field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} path={`${section.key}.${f.key}`} problems={problems} lookup={lookup} onChange={(v) => setField(f.key, v)} />
+              </SourcesUsedField>
             ) : (
               <FieldControl key={f.key} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} path={`${section.key}.${f.key}`} problems={problems} lookup={lookup} onChange={(v) => setField(f.key, v)} />
             ),
@@ -431,8 +487,21 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
         {section.key === 'S8' && (
           <div className="space-y-3">
             <h3 className="font-semibold">Still to fix</h3>
+            {rubricTodo.length > 0 && (
+              <ul className="space-y-1 text-sm" data-rubric-to-finish>
+                {rubricTodo.map((t, i) => (
+                  <li key={i}>
+                    <button type="button" className="text-left text-link underline" onClick={() => goTo(sectionIndex(rubric.view!.rubric.section))}>
+                      {rubric.view!.rubric.section}
+                    </button>{' '}
+                    {t.criterionId ? `${t.criterionId}: ` : ''}
+                    {t.message}
+                  </li>
+                ))}
+              </ul>
+            )}
             {problems.length === 0 ? (
-              <p className="text-sm">Every required field is complete. Run the checks, then submit.</p>
+              <p className="text-sm">{rubricTodo.length ? 'Every required field is complete. The rubric items above are still to finish; saving never waits for them.' : 'Every required field is complete. Run the checks, then submit.'}</p>
             ) : (
               <ul className="space-y-1 text-sm">
                 {problems.slice(0, 50).map((p, i) => (
@@ -445,9 +514,17 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
                 ))}
               </ul>
             )}
-            {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(s) => goTo(sectionIndex(s))} submitLabel={rework ? 'Resubmit for review' : undefined} />}
+            {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(s) => goTo(sectionIndex(s))} submitLabel={rework ? 'Resubmit for review' : undefined} declaration={DECLARATION_V2} />}
           </div>
         )}
+
+        <SaveBar state={state} flush={flush} readOnly={task.readOnly}>
+          {active !== profile.sections.length - 1 && (
+            <button type="button" className="btn btn-primary" onClick={() => goTo(profile.sections.length - 1)}>
+              Check and submit
+            </button>
+          )}
+        </SaveBar>
 
         <div className="flex flex-wrap justify-between gap-2">
           <button type="button" className={button} disabled={active === 0} onClick={() => goTo(active - 1)}>
@@ -459,6 +536,47 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
         </div>
       </section>
 
+    </div>
+    </FormV2.Provider>
+  );
+}
+
+/**
+ * S8 "Sources" (owner, "make it simple"): the ticked "Sources used for this task", read-only, with a link to change
+ * them in the rubric step. An empty field is filled with one readable line per ticked source; text the author already
+ * wrote is never overwritten.
+ */
+function SourcesUsedField({ view, value, onFill, readOnly, onChangeSources, children }: { view: RubricView; value: unknown; onFill: (text: string) => void; readOnly: boolean; onChangeSources: () => void; children: React.ReactNode }) {
+  const ticked = view.sources.items.filter((s) => s.ticked);
+  const text = ticked.map((s) => `${s.label} (${s.detail})`).join('\n');
+  const empty = typeof value !== 'string' || !value.trim();
+  return (
+    <div className="space-y-2" data-sources-used>
+      <div className="rounded-md border border-dashed border-line p-3 text-sm">
+        <p className="font-medium">Sources used for this task</p>
+        {ticked.length ? (
+          <ul className="mt-1 list-disc pl-5">
+            {ticked.map((s) => (
+              <li key={s.ref}>
+                {s.label} <span className="text-xs text-fg-muted">({s.detail})</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-fg-muted">No sources ticked.</p>
+        )}
+        <div className="mt-2 flex flex-wrap gap-3">
+          <button type="button" className="text-link underline" onClick={onChangeSources}>
+            Change sources
+          </button>
+          {!readOnly && empty && ticked.length > 0 && (
+            <button type="button" className="text-link underline" onClick={() => onFill(text)}>
+              Fill the field below from this list
+            </button>
+          )}
+        </div>
+      </div>
+      {children}
     </div>
   );
 }

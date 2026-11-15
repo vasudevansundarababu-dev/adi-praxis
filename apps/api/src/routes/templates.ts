@@ -1,3 +1,4 @@
+import { caseSelectorOf } from '../tasks/task-service';
 import { Prisma, type Domain, type Template } from '@prisma/client';
 import {
   CoverageDimensions,
@@ -64,6 +65,8 @@ export function toTemplateDto(t: TemplateWithDomain): TemplateDto {
     openSlotShare: Number(t.openSlotShare),
     similarityThreshold: Number(t.similarityThreshold),
     profileId: t.profileId,
+    caseCount: caseSelectorOf(t.caseSelector)?.values.length ?? null,
+    caseLabel: caseSelectorOf(t.caseSelector)?.field.replace(/_/g, ' ') ?? null,
     tutorial: tutorialOf(t),
     publishedAt: t.publishedAt?.toISOString() ?? null,
     retiredAt: t.retiredAt?.toISOString() ?? null,

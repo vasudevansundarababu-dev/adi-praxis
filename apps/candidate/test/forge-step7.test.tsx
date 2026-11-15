@@ -64,7 +64,7 @@ describe('MVP1 step 7: Help drawer', () => {
   it('the task page bar has Tutorial and Help buttons; the drawer is closed until Help is pressed', () => {
     const closed = renderToStaticMarkup(<TaskAids taskId="t1" kind="author" tutorial={null} />);
     expect(text(closed)).toContain('Tutorial');
-    expect(text(closed)).toContain('Help');
+    expect(closed).toContain('aria-label="Help"'); // D13: the floating Ember mascot
     expect(closed).not.toContain('data-task-help');
     const open = renderToStaticMarkup(<TaskAids taskId="t1" kind="author" tutorial={null} initial="help" />);
     expect(open).toContain('data-task-help');

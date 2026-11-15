@@ -23,6 +23,7 @@ import { chatOf, draftingWith } from '../tasks/conversation/service';
 import { authoringPolicyView, effectivePolicy, sidecar } from '../policy/task-policy';
 import { profileSaveProblems } from '../tasks/profile-output';
 import { tutorialOf } from '../forge/tutorial';
+import { normaliseRubricOutput, rubricSubmitChecks } from '../tasks/rubric/service';
 
 const IdParams = z.object({ id: z.string().uuid() });
 
@@ -88,7 +89,7 @@ const taskSummary = (t: { id: string; status: string; taskType: string; input: u
 });
 
 /** FLOW 3 for candidates: invite, project task list, pull, autosave, check and submit. */
-export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: SelectionGate; embeddings: EmbeddingProvider }> = async (app, { db, selectionGate, embeddings }) => {
+export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: SelectionGate; embeddings: EmbeddingProvider; rubricEnabled?: boolean }> = async (app, { db, selectionGate, embeddings, rubricEnabled = false }) => {
   app.post('/me/invites/redeem', { config: { access: 'candidate', rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['work'], body: z.object({ token: z.string().min(20).max(200) }) } }, async (req, reply) => {
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => ({ status: 200, body: await redeemInvite(tx, req.body.token, actor.smeUserId, audit) }));
     return reply;
@@ -160,6 +161,8 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       tptMinutes: t.project.tptMinutes,
       // MVP1 step 7: the template's tutorial video, or null.
       tutorial: tutorialOf(t.project.template),
+      // Rubric editor, S4 policy picker and the SME form wording (RUBRIC_RECOMMENDATIONS_ENABLED; off by default).
+      formV2: rubricEnabled,
       definition: definitionFor(template).key,
       template: {
         workflow: template.workflowName,
@@ -243,12 +246,14 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       if (shape.length) throw new AppError(422, 'INVALID_PROFILE_OUTPUT', 'This draft does not match the template profile.', { problems: shape });
       const locked = t.taskType === 'AUTHORING' ? caseLockProblem(t.input, req.body.output) : null;
       if (locked) throw new AppError(422, 'CASE_SELECTOR_LOCKED', locked);
+      // D9 (flag on): a mapped criterion's evaluator and version always come from the template (correct values unchanged).
+      const output = rubricEnabled && t.taskType === 'AUTHORING' ? normaliseRubricOutput(t, req.body.output) : req.body.output;
       const now = new Date();
       const { count } = await tx.taskInstance.updateMany({
         where: { id: t.id, revision: req.body.expectedRevision },
         data: {
           ...(t.taskType === 'AUTHORING' && t.project.authoringExperience ? {drafting: JSON.parse(JSON.stringify(draftingWith(t,{...chatOf(t),humanOnly:true,declaration:undefined,needsReview:true}))) as Prisma.InputJsonValue} : {}),
-          output: req.body.output as Prisma.InputJsonValue,
+          output: output as Prisma.InputJsonValue,
           status: 'IN_PROGRESS',
           startedAt: t.startedAt ?? now,
           lastSavedAt: now,
@@ -268,7 +273,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
   // W06: run every automated check now (no state change) and show the closest existing tasks' briefs.
   app.post('/me/tasks/:id/check', { config: { access: 'candidate', rateLimit: { max: 30, timeWindow: '1 minute' } }, schema: { tags: ['work'], params: IdParams } }, async (req) => {
     const t = await ownTask(db, req.params.id, req.candidate!.smeUserId);
-    const ev = await evaluateTask(db, t);
+    const ev = await evaluateTask(db, t, { rubricChecks: rubricEnabled });
     let similar: { brief: string | null; score: number; flagged: boolean }[] = [];
     if (t.taskType === 'AUTHORING' && t.output) {
       const matches = await findSimilar(db, { taskId: t.id, lineageId: ev.lineageId, embedding: await embeddings.embed(ev.text), coverage: ev.coverage, keyInputs: ev.keyInputs, threshold: ev.threshold, limit: 3 });
@@ -294,7 +299,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       const ctx = await workContext(tx, selectionGate, actor.smeUserId, t.projectId);
       if (!ctx.ok) outstanding(ctx);
       if (t.project.status === 'PAUSED') throw new AppError(409, 'PROJECT_PAUSED', 'This project is paused. Your work is saved; you can submit when it resumes.');
-      const r = await submitTask(tx, { task: t, body: req.body, embedding, embeddingModel: embedding ? embeddings.model : null }, audit, emit);
+      const r = await submitTask(tx, { task: t, body: req.body, embedding, embeddingModel: embedding ? embeddings.model : null, rubricChecks: rubricEnabled }, audit, emit);
       return { status: 200, body: { status: 'SUBMITTED', version: r.version } };
     });
     return reply;

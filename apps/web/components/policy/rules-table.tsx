@@ -3,11 +3,13 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MANDATORY_MARKINGS, MARKING_LABEL, type MandatoryMarking, type RuleAnnotationInput } from '@praxis/shared';
 import { mutate } from '@/lib/client-api';
+import { MARKING_FILTERS, OUTCOME_LABEL, applicationTypeOptions, byMarking, forApplication, sourceLabel, withMarking, type AnnotatedRow, type MarkingFilter } from './annotation-logic';
 import { setRuleApplied, type ApplyTarget } from './apply-rule';
 import { applySteps, rulesForDocument, STATE_LABEL, visibleRules, type Suggestion, type TableRule } from './rules-table-logic';
 
-export interface RulesTableRule extends TableRule {
+export interface RulesTableRule extends TableRule, AnnotatedRow {
   versionId: string;
   version: number;
   contentHash: string;
@@ -15,7 +17,11 @@ export interface RulesTableRule extends TableRule {
   evidence: { quote: string; resolution: string; document: string; documentVersion: number } | null;
 }
 
+type AnnotationRun = { status: 'none' | 'running' | 'done' | 'failed' | 'skipped'; annotated?: number; offered?: number; error?: string | null; model?: string | null };
+
 const EXAMPLE = 'This template is for KYC for single, joint and minor accounts. Select all the rules that are mandatory for these tasks, including edge cases and special cases.';
+/** D4 (owner, 15 Nov 2026): a short placeholder, so the example never looks like real input. */
+const PLACEHOLDER = 'Describe the tasks this template covers…';
 
 /**
  * Rules table with prompt-guided selection (PRD 5.6). The AI only marks rules as Suggested, with a reason; the PM's
@@ -34,9 +40,65 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
   const [confirm, setConfirm] = useState<{ target: ApplyTarget; problems: string[]; title: string } | null>(null);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const runId = useRef(0);
+  const [markingFilter, setMarkingFilter] = useState<MarkingFilter>('all');
+  const [appType, setAppType] = useState('');
+  const [govState, setGovState] = useState('');
+  const [annotationRun, setAnnotationRun] = useState<AnnotationRun | null>(null);
+  const [appliedOnly, setAppliedOnly] = useState(false);
+  /** Suggestions the PM rejected in this session: hidden from the suggested list; the rule itself is unchanged. */
+  const [rejected, setRejected] = useState<Set<string>>(new Set());
 
   const docRules = useMemo(() => rulesForDocument(rules, docId), [rules, docId]);
-  const rows = useMemo(() => visibleRules(docRules, suggestions, showAll), [docRules, suggestions, showAll]);
+  const rows = useMemo(() => {
+    const kept = suggestions && !showAll ? docRules.filter((r) => !rejected.has(r.ruleKey) || r.applied) : docRules;
+    const visible = visibleRules(kept, suggestions, showAll).filter((r) => !appliedOnly || r.applied);
+    return forApplication(byMarking(visible, markingFilter), { applicationType: appType, governingState: govState.trim() });
+  }, [docRules, suggestions, showAll, markingFilter, appType, govState, appliedOnly, rejected]);
+  const appTypes = useMemo(() => applicationTypeOptions(rules), [rules]);
+  const filtering = !!appType || !!govState.trim();
+
+  // The AI annotation run for the chosen document: polled while it runs, then the rules reload.
+  useEffect(() => {
+    if (!docId) return;
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      const res = await fetch(`/api/v1/projects/${projectId}/policy/annotation-suggestions?documentId=${docId}`, { cache: 'no-store' }).catch(() => null);
+      if (stop || !res?.ok) return;
+      const r = (await res.json()) as AnnotationRun;
+      setAnnotationRun((prev) => {
+        if (prev?.status === 'running' && r.status !== 'running') router.refresh();
+        return r;
+      });
+      if (r.status === 'running') timer = setTimeout(poll, 4000);
+    };
+    void poll();
+    return () => {
+      stop = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [docId, projectId, router, annotationRun?.status === 'running']);
+
+  async function suggestAnnotations() {
+    if (!docId) return;
+    setMsg(null);
+    const r = await mutate<AnnotationRun>('POST', `/projects/${projectId}/policy/annotation-suggestions`, { documentId: docId });
+    if (!r.ok) return setMsg({ kind: 'error', text: r.error ?? 'Could not ask for annotation suggestions.' });
+    setAnnotationRun({ status: 'running' });
+  }
+
+  async function saveAnnotation(r: RulesTableRule, annotation: RuleAnnotationInput, basedOnRevisionId: string | null, done: string) {
+    setMsg(null);
+    setRowStage((x) => ({ ...x, [r.ruleId]: 'Saving…' }));
+    const out = await mutate<{ applied: boolean; version: number }>('PUT', `/projects/${projectId}/policy/rules/${r.ruleId}/annotation`, { expectedContentHash: r.contentHash, annotation, basedOnRevisionId });
+    setRowStage((x) => {
+      const { [r.ruleId]: _, ...rest } = x;
+      return rest;
+    });
+    if (!out.ok) return setMsg({ kind: 'error', text: `${r.ruleKey}: ${out.error ?? 'Could not save the annotation.'}` });
+    setMsg({ kind: 'ok', text: `${r.ruleKey}: ${done}${r.applied ? ' The rule was applied, so this is a new draft version: tick Apply to project again when it is right.' : ''}` });
+    router.refresh();
+  }
   const suggestedCount = suggestions ? docRules.filter((r) => suggestions.get(r.ruleKey)?.match).length : 0;
 
   const run = useCallback(
@@ -91,7 +153,7 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
   }
 
   async function applyAllSuggested() {
-    const todo = rows.filter((r) => suggestions?.get(r.ruleKey)?.match && !r.applied);
+    const todo = rows.filter((r) => suggestions?.get(r.ruleKey)?.match && !r.applied && !rejected.has(r.ruleKey));
     let done = 0;
     const skipped: string[] = [];
     for (const r of todo) {
@@ -131,14 +193,22 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
           <label htmlFor="rule-prompt" className="font-medium">
             Which rules does this template need?
           </label>
-          <textarea id="rule-prompt" className="min-h-16 rounded-md border border-line bg-surface px-2 py-1 text-fg" value={prompt} placeholder={EXAMPLE} onChange={(e) => setPrompt(e.target.value)} aria-describedby="rule-prompt-hint" />
+          <textarea id="rule-prompt" className="min-h-16 rounded-md border border-line bg-surface px-2 py-1 text-fg" value={prompt} placeholder={PLACEHOLDER} onChange={(e) => setPrompt(e.target.value)} aria-describedby="rule-prompt-hint" />
+          <span className="text-xs">
+            Example:{' '}
+            <button type="button" className="text-link underline" onClick={() => setPrompt(EXAMPLE)}>
+              Use this example
+            </button>{' '}
+            <span className="text-fg-muted">— “{EXAMPLE}”</span>
+          </span>
           <span id="rule-prompt-hint" className="text-xs text-fg-muted">
-            Leave empty to see every rule. The assistant only suggests; you decide by ticking Apply to project.
+            Leave empty to see every rule. The assistant only suggests; you decide by accepting (ticking Apply to project).
           </span>
           <div className="flex flex-wrap gap-2">
             <button type="submit" className="btn btn-primary disabled:opacity-50" disabled={!!busy || !prompt.trim()}>
               Suggest rules
             </button>
+            {!prompt.trim() && <span className="self-center text-xs text-warning">Type what the template needs</span>}
             {ranPrompt && (
               <button type="button" className="btn btn-secondary" onClick={clearPrompt}>
                 Clear and show all
@@ -170,11 +240,55 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
             </label>
             {suggestedCount > 0 && (
               <button type="button" className="btn btn-secondary disabled:opacity-50" disabled={!!busy} onClick={applyAllSuggested}>
-                Apply all suggested
+                Accept all suggested
               </button>
             )}
           </>
         )}
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3 rounded border border-line p-2">
+        <label className="flex flex-col gap-1">
+          <span className="font-medium">Mandatory marking</span>
+          <select className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={markingFilter} onChange={(e) => setMarkingFilter(e.target.value as MarkingFilter)}>
+            {MARKING_FILTERS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="font-medium">Show rules for application type</span>
+          <select className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={appType} onChange={(e) => setAppType(e.target.value)}>
+            <option value="">Any type</option>
+            {appTypes.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="font-medium">Governing state</span>
+          <input className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-fg" value={govState} placeholder="e.g. CA" maxLength={8} onChange={(e) => setGovState(e.target.value)} />
+        </label>
+        <label className="inline-flex items-center gap-1 self-end pb-1">
+          <input type="checkbox" checked={appliedOnly} onChange={(e) => setAppliedOnly(e.target.checked)} /> Applied only
+        </label>
+        <div className="flex flex-col gap-1">
+          <button type="button" className="btn btn-secondary disabled:opacity-50" disabled={!docId || annotationRun?.status === 'running'} onClick={suggestAnnotations}>
+            Suggest annotations with AI
+          </button>
+        </div>
+        <p className="basis-full text-xs text-fg-muted">
+          {filtering ? 'Rules are matched on their own scope and the application’s attributes only; the project name and example states never exclude a rule. Out-of-scope rules are hidden; unknown applicability stays visible. ' : ''}
+          {annotationRun?.status === 'running' && 'The assistant is suggesting annotations for this document… '}
+          {annotationRun?.status === 'done' && `Last AI suggestion run (${annotationRun.model ?? 'assistant'}): ${annotationRun.annotated ?? 0} annotated, ${annotationRun.offered ?? 0} offered next to an existing annotation. `}
+          {annotationRun?.status === 'failed' && `The last AI suggestion run failed: ${annotationRun.error ?? 'try again'}. `}
+          {annotationRun?.status === 'skipped' && 'The last AI suggestion run was skipped: today’s assistant limit was reached. '}
+          AI annotations are suggestions; your edit and your Apply tick are the decision.
+        </p>
       </div>
 
       {confirm && (
@@ -220,7 +334,13 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
                   Evidence
                 </th>
                 <th scope="col" className="pr-3">
-                  Required
+                  Mandatory marking
+                </th>
+                <th scope="col" className="pr-3">
+                  Applies when
+                </th>
+                <th scope="col" className="pr-3">
+                  Why
                 </th>
                 <th scope="col">Apply to project</th>
               </tr>
@@ -245,6 +365,7 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
                         </span>
                       )}
                       {!r.applied && steps.define && <span className="mt-1 block text-xs text-fg-muted">Some fields are missing; ticking defines them with AI first.</span>}
+                      {filtering && <span className="mt-1 block text-xs text-fg-muted">For this application: {OUTCOME_LABEL[r.outcome]}</span>}
                     </td>
                     <td className="max-w-md pr-3 text-xs">
                       {r.evidence ? (
@@ -259,8 +380,58 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
                         <span className="text-warning">⚠ No source quote.</span>
                       )}
                     </td>
-                    <td className="pr-3">{r.required ? 'Yes' : 'No'}</td>
+                    <td className="pr-3 text-xs">
+                      <select
+                        aria-label={`Mandatory marking for ${r.title}`}
+                        className="rounded-md border border-line bg-surface px-1 py-0.5 text-fg"
+                        value={r.annotation?.marking ?? ''}
+                        disabled={!!stage || !!busy}
+                        onChange={(e) => e.target.value && void saveAnnotation(r, withMarking(r.annotation, e.target.value as MandatoryMarking), null, `marked ${MARKING_LABEL[e.target.value as MandatoryMarking]}.`)}
+                      >
+                        {!r.annotation && <option value="">Not annotated</option>}
+                        {MANDATORY_MARKINGS.map((m) => (
+                          <option key={m} value={m}>
+                            {MARKING_LABEL[m]}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="mt-1 block text-fg-muted">{sourceLabel(r)}</span>
+                      {r.pendingAiSuggestion && (
+                        <button type="button" className="mt-1 block text-link underline disabled:opacity-50" disabled={!!stage || !!busy} onClick={() => void saveAnnotation(r, r.pendingAiSuggestion!.annotation, r.pendingAiSuggestion!.id, 'AI suggestion used.')}>
+                          Use AI suggestion ({MARKING_LABEL[r.pendingAiSuggestion.annotation.marking]})
+                        </button>
+                      )}
+                      {(r.flags ?? []).filter((f) => f.code !== 'NOT_ANNOTATED').length > 0 && (
+                        <ul className="mt-1 space-y-0.5 text-warning" aria-label={`Flags for ${r.title}`}>
+                          {(r.flags ?? [])
+                            .filter((f) => f.code !== 'NOT_ANNOTATED')
+                            .map((f, i) => (
+                              <li key={i}>⚠ {f.message}</li>
+                            ))}
+                        </ul>
+                      )}
+                    </td>
+                    <td className="max-w-xs pr-3 text-xs">{r.annotation ? (r.annotation.appliesWhen ?? <span className="text-warning">Unknown</span>) : <span className="text-fg-muted">—</span>}</td>
+                    <td className="max-w-xs pr-3 text-xs">{r.annotation ? (r.annotation.why ?? <span className="text-warning">Not given</span>) : <span className="text-fg-muted">—</span>}</td>
                     <td>
+                      {s?.match && !r.applied && !rejected.has(r.ruleKey) && (
+                        <div className="mb-1 flex flex-col gap-1">
+                          <button type="button" className="btn btn-primary px-2 py-1 text-xs disabled:opacity-50" disabled={!!stage || !!busy} onClick={() => void toggle(r, true)}>
+                            {steps.define ? 'Define with AI, then accept' : 'Accept'}
+                          </button>
+                          <button type="button" className="btn btn-secondary px-2 py-1 text-xs" onClick={() => setRejected((x) => new Set(x).add(r.ruleKey))} aria-label={`Reject the suggestion ${r.title}`}>
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                      {s?.match && rejected.has(r.ruleKey) && !r.applied && (
+                        <span className="mb-1 block text-xs text-fg-muted">
+                          Rejected · not applied{' '}
+                          <button type="button" className="text-link underline" onClick={() => setRejected((x) => new Set([...x].filter((k) => k !== r.ruleKey)))}>
+                            Undo
+                          </button>
+                        </span>
+                      )}
                       <label className="inline-flex items-center gap-1">
                         <input type="checkbox" checked={r.applied} disabled={!!stage || !!busy} onChange={(e) => void toggle(r, e.target.checked)} aria-label={`Apply ${r.title} to the project`} />
                         <span className="sr-only">{r.applied ? 'Applied' : 'Not applied'}</span>

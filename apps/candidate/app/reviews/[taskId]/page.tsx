@@ -1,3 +1,4 @@
+import type { RubricView } from '@praxis/shared';
 import type { Metadata } from 'next';
 import { pageTitle } from '@praxis/shared/theme';
 import { cookies } from 'next/headers';
@@ -19,12 +20,15 @@ export default async function ReviewRoute({ params }: { params: Promise<{ taskId
   const body = (await res.json().catch(() => null)) as (ReviewView & { error?: string }) | null;
   if (res.status === 409 && body?.error === 'TERMS_REQUIRED') redirect('/welcome');
   if (!res.ok || !body) notFound();
+  // The rubric's internal details (RUBRIC_RECOMMENDATIONS_ENABLED); a 404 when the flag is off shows nothing extra.
+  const rub = await fetch(`${API_BASE}/api/v1/me/reviews/${taskId}/rubric`, { headers: { cookie: (await cookies()).toString() }, cache: 'no-store' });
+  const rubric = rub.ok ? ((await rub.json()) as RubricView) : null;
   return (
     <>
       <div className="mx-auto max-w-4xl px-4 pt-6">
         <TaskAids taskId={body.taskId} kind="reviewer" tutorial={body.tutorial ?? null} />
       </div>
-      <ReviewPage initial={body} />
+      <ReviewPage initial={body} rubric={rubric} />
     </>
   );
 }

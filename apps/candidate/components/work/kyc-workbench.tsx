@@ -22,6 +22,7 @@ import {
   type KycStep,
   type KycTask,
   type KycToolResponse,
+  publicText, EDGE_CASE_LABEL, EDGE_CASE_HELP,
 } from '@praxis/shared';
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { Req, RequiredNote } from '@/components/required';
@@ -30,6 +31,7 @@ import { SectionDraftBanner, StartPanel, useDrafting } from './drafting';
 import { SubmitPanel } from './submit-panel';
 import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
+import { SaveBar } from './save-bar';
 
 const input = 'mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5 disabled:opacity-70';
 const PHONE_QUERY = '(max-width: 767px)';
@@ -294,11 +296,11 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                 <p>{slot?.brief}</p>
                 <dl className="mt-2 grid gap-1 sm:grid-cols-[10rem_1fr]">
                   <dt className="text-fg-muted">Primary work</dt>
-                  <dd>{task.template.primaryWork}</dd>
+                  <dd>{publicText(task.template.primaryWork ?? '')}</dd>
                   <dt className="text-fg-muted">Verification</dt>
-                  <dd>{task.template.verificationCriteria}</dd>
+                  <dd>{publicText(task.template.verificationCriteria ?? '')}</dd>
                   <dt className="text-fg-muted">Human gate</dt>
-                  <dd>{task.template.humanGate}</dd>
+                  <dd>{publicText(task.template.humanGate ?? '')}</dd>
                   <dt className="text-fg-muted">Tools</dt>
                   <dd>{KYC_TOOLS.map((x) => x.label).join(', ')}</dd>
                 </dl>
@@ -311,7 +313,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                     {task.template.coverageDimensions.filter((d) => d.values.length && !slot.tags[d.key]).map((d) => (
                       <Pick key={d.key} label={d.label} value={t.header?.coverageTags?.[d.key]} options={d.values} format={(v) => v} onChange={(v) => set('header', { coverageTags: { ...(t.header?.coverageTags ?? {}), [d.key]: v } })} />
                     ))}
-                    {slot.isOpen && <Field label="Name the edge case this task tests" required value={t.header?.edgeCase} onChange={(v) => set('header', { edgeCase: v })} />}
+                    {slot.isOpen && <Field label={EDGE_CASE_LABEL} hint={EDGE_CASE_HELP} required value={t.header?.edgeCase} onChange={(v) => set('header', { edgeCase: v })} />}
                   </div>
                 </div>
               )}
@@ -559,6 +561,13 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
           )}
         </fieldset>
         {section === 'W00' && <StartPanel taskId={task.id} drafting={drafting} onBlank={() => void changeSection('W01')} beforeDraft={flush} readOnly={ro} />}
+        <SaveBar state={state} flush={flush} readOnly={ro}>
+          {section !== 'W06' && (
+            <button type="button" className="btn btn-primary" onClick={() => void changeSection('W06')}>
+              Check and submit
+            </button>
+          )}
+        </SaveBar>
         {/* W06 sits in the same column as the other sections (outside the fieldset so its own controls stay usable). */}
         {section === 'W06' && !ro && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(next) => void changeSection(next)} />}
         {section === 'W06' && ro && <p>This task is read-only.</p>}

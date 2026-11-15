@@ -1327,3 +1327,41 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
   a right-hand drawer with the scope note, four suggested questions (author or reviewer set), the conversation and an
   Ask box. The general floating Support Bot is removed from the task page (the review page never had it) and stays on
   Home.
+
+## MVP1 step 5: Sourcing and Export to Recruiter (15 Nov 2026)
+
+- **(chosen by Claude)** The recruiter pack is built from the project, never typed in: the role, pay and location from
+  the frozen JD snapshot (the live JD before submit); requirements from the JD (mandatory skills, experience,
+  education Required; added skills Preferred; a hand-picked JD with no mandatory skills keeps the job post's rule that
+  the first skill is Required) and from the demographic profile (the JD's, else the project's filters in plain words);
+  the questions from the author job post's question policy (owner-edited or the default, as candidates get them). The
+  combined requirements question is shown as "how does their experience meet the requirements in section 2?" so the
+  list is not repeated; "Tap all that apply" is dropped and the choices are listed. Evidence text per requirement is a
+  fixed phrase per kind ("Role history with dates", "Highest qualification", ...).
+- **(chosen by Claude)** The cheat sheet has the eight common sections (S1–S8) in plain words written for recruiters,
+  plus the template form's first five field labels and the first field example the form provides, per section.
+- **(chosen by Claude)** The pack is the author (SME) pack only. A Reviewer pack for Reviewer-route projects is not in
+  the design; it can be added with `?role=REVIEWER` later.
+- **(chosen by Claude)** Public names: every free-text value in the pack (project name, JD text, template examples) goes
+  through `publicText`, which shows the internal product name as "ADI Forge" and the RL platform as "RL Gym". The PDF
+  title, author, creator and producer are "ADI Forge".
+- **(chosen by Claude)** Files: the sheet is `candidate-assessment-<project-slug>.xlsx` (slug: the project name with
+  each run of other characters replaced by "-", case kept, as in the mockup); the PDF is
+  `recruiter-pack-<project-slug>.pdf`. The sheet has a "Candidates" sheet (header row only, frozen, Yes/No drop-downs on
+  every "Met?" column for 200 rows) and an "Instructions" sheet. Question headers are "Q1. <question>", cut to 180
+  characters so they stay valid assessment keys. The PDF uses the standard Helvetica fonts (no font files), so
+  characters outside WinAnsi are replaced; the sheet is embedded as a PDF file attachment.
+- **(chosen by Claude)** Import (`POST /sourcing/people/import`): fields `projectId` and `role` come before the file;
+  `dryRun` defaults to 0. Row 1 is the header; columns are matched by name (ignoring `*` and "(Gmail)"), so extra or
+  reordered columns are fine; a sheet without First name, Last name and Email columns is refused (422 BAD_SHEET), as is
+  one with no rows or over 1,000. Each row is checked with the same `SourcedPersonInput` schema and project rules as
+  Sourcing → New (shared `sourcingTarget` + `createSourcedPerson`). A row whose email is already on the project for
+  that role, or repeats an earlier row, is reported and skipped; other rows still import. Every other non-empty column
+  except Agency is kept as the person's assessment `{header: value}`; Agency fills `agency`. The sheet is stored once
+  and its key set on every person created from it. Each person gets the usual `sourcing.person_added` audit, plus one
+  `sourcing.people_imported` with counts and the file hash (no names or emails). A dry run writes nothing and is not
+  audited.
+- **(chosen by Claude)** Console: the Sourcing list loads every person the caller may see once and filters in the
+  browser (tab, or a search across both roles); the API's `q` search is unchanged. New uploads the profile, then the
+  profile PDF and the assessment, and returns to the right tab. "Export to Recruiter" is a button on the project
+  summary, shown for every project that is not a draft, cancelled or completed, until the four-tab project page lands.

@@ -1537,3 +1537,11 @@ Forgot password still answers 202 and sends nothing).
   ("Welcome, …"): it never checks the landing page, and goes on through the Projects menu and New project. It failed
   only because both pages were still compiling (4.6 s and 4.7 s) when its 5 s check ran. All three failures that were
   retried passed on retry with unchanged code, so no test was rewritten.
+- **(chosen by Claude)** The PR's first CI run showed the warm-up working (every page compiled in 169 s before the
+  tests), but three tests still needed a retry, for test-timing reasons the compile had been hiding. (1) Smoke: MVP1
+  Home has its own "New project" link, so after clicking Projects the test found Home's link and clicked it while the
+  Projects navigation was still in flight. The test now waits for `/projects`, then for `/projects/new`, as the new-flow
+  design intends (Home first, Projects through the menu). (2) Journey: the Reviewer's click on a queued task now waits
+  for the review page's URL before looking for the title. (3) The m10 partner sign-in now waits for the form to hydrate,
+  as the other two partner sign-ins and `staffLogin` already did; it was submitted before hydration and stayed on the
+  sign-in page. No assertion was removed or relaxed.

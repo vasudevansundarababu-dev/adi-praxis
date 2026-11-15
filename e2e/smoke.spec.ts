@@ -19,9 +19,13 @@ test.describe('console smoke', () => {
     const nav = page.getByRole('navigation', { name: 'Main' });
     await expect(nav.getByRole('link', { name: 'Projects' })).toBeVisible({ timeout: 30_000 });
     await expect(nav.getByRole('link', { name: 'Admin' })).toBeVisible();
+    // MVP1 Home ("Welcome, …") has its own "New project" link: wait for the Projects page before using its link,
+    // or the test clicks Home's link while the Projects navigation is still in flight.
     await nav.getByRole('link', { name: 'Projects' }).click();
+    await page.waitForURL(/\/projects(\?|$)/);
     await expect(page.getByRole('link', { name: /new project/i })).toBeVisible();
     await page.getByRole('link', { name: /new project/i }).click();
+    await page.waitForURL(/\/projects\/new(\?|$)/);
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/project/i);
     await nav.getByRole('link', { name: 'Projects' }).click();
     await page.getByRole('navigation', { name: 'Projects pages' }).getByRole('link', { name: 'Templates' }).click();

@@ -94,6 +94,7 @@ async function staffLogin(page: Page, email: string, password: string) {
 test('a partner signs in, submits a candidate for a requisition and sees them in the tracker', async ({ page }) => {
   const s = await supply();
   await page.goto(`${WEB}/partner/login`);
+  await page.waitForLoadState('networkidle'); // let the form hydrate before submitting it, as staffLogin does
   await page.getByLabel('Email').fill(s.portal.email);
   await page.getByLabel('Password').fill(s.portal.password);
   await page.getByRole('button', { name: 'Sign in' }).click();

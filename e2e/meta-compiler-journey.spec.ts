@@ -107,6 +107,7 @@ test('an Admin takes a template from the directory to a deployed studio; the SME
   const item = rev.getByRole('listitem').filter({ hasText: `${s.projectName} · ${WORKFLOW}` });
   await expect(item).toHaveCount(1);
   await item.getByRole('link').click();
+  await rev.waitForURL(/\/review\/tasks\/[0-9a-f-]{36}/); // the review page renders its task server-side
   await expect(rev.getByText(title).first()).toBeVisible();
   const decision = rev.getByRole('complementary', { name: 'Decision' });
   for (const group of await decision.getByRole('radiogroup').all()) await group.getByLabel('Yes').check();

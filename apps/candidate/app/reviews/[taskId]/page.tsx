@@ -3,6 +3,7 @@ import { pageTitle } from '@praxis/shared/theme';
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { ReviewPage, type ReviewView } from '@/components/forge/review-page';
+import { TaskAids } from '@/components/forge/task-aids';
 import { getForgeSettings, getMeSafe } from '@/lib/api';
 
 export const metadata: Metadata = { title: { absolute: pageTitle('Review') } };
@@ -18,5 +19,12 @@ export default async function ReviewRoute({ params }: { params: Promise<{ taskId
   const body = (await res.json().catch(() => null)) as (ReviewView & { error?: string }) | null;
   if (res.status === 409 && body?.error === 'TERMS_REQUIRED') redirect('/welcome');
   if (!res.ok || !body) notFound();
-  return <ReviewPage initial={body} />;
+  return (
+    <>
+      <div className="mx-auto max-w-4xl px-4 pt-6">
+        <TaskAids taskId={body.taskId} kind="reviewer" tutorial={body.tutorial ?? null} />
+      </div>
+      <ReviewPage initial={body} />
+    </>
+  );
 }

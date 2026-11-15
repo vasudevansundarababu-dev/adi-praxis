@@ -8,6 +8,7 @@ import { AnvilReadinessBadge, type AnvilReadiness } from '@/components/templates
 import { McHeader } from '@/components/templates/mc-header';
 import { StatusBadge } from '@/components/templates/status-badge';
 import { TemplateActions, type FormOption } from '@/components/templates/template-actions';
+import { TutorialSettings } from '@/components/templates/tutorial-settings';
 import { apiGet, getCurrentUser } from '@/lib/api';
 import { mcServer } from '@/lib/mc/server';
 
@@ -46,6 +47,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
       <div>
         <McHeader isAdmin={false} active={{ workflowName: t.workflowName, version: t.version }} />
         {heading}
+        <TutorialSettings template={t} canEdit={false} />
         <BlueprintSummary bp={bp.blueprint} templateId={t.id} />
       </div>
     );
@@ -84,6 +86,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
           )}
         </nav>
       )}
+      <TutorialSettings key={`tutorial:${t.updatedAt}`} template={t} canEdit />
       <div className="mt-4">
         <MetaCompiler
           key={`${t.id}:${bp.blueprintRevision}`}

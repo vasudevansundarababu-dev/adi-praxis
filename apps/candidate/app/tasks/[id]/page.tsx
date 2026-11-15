@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { pageTitle } from '@praxis/shared/theme';
 import { notFound, redirect } from 'next/navigation';
 import { TaskPage } from '@/components/work/task-page';
-import { SupportBot } from '@/components/support/support-bot';
+import { TaskAids } from '@/components/forge/task-aids';
 import { PolicyProposals } from '@/components/work/policy-proposals';
 import { TaskRules, type TaskRulesView } from '@/components/work/task-rules';
 import { api, getForgeSettings, getMe } from '@/lib/api';
@@ -25,10 +25,11 @@ export default async function TaskRoute({ params }: { params: Promise<{ id: stri
   }
   return (
     <main className="mx-auto max-w-6xl px-4 py-6">
+      {/* MVP1 step 7: the task's Tutorial and task-scoped Help replace the general floating Support Bot here. */}
+      <TaskAids taskId={data.id} kind="author" tutorial={data.tutorial ?? null} />
       {policy && <TaskRules policy={policy} />}
       {data.taskType === 'AUTHORING' && <PolicyProposals taskId={data.id} readOnly={data.readOnly} />}
       <TaskPage task={data} newFlow={newFlow} />
-      <SupportBot />
     </main>
   );
 }

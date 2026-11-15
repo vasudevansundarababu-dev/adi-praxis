@@ -16,6 +16,8 @@ export interface ReviewView {
   status: ReviewerTaskStatus | null;
   taskStatus: string;
   template: { workflow: string; profileId: string | null; profile: TemplateProfile | null };
+  /** MVP1 step 7: the template's tutorial video, or null. */
+  tutorial?: import('@praxis/shared').Tutorial | null;
   output: Record<string, unknown> | null;
   version: number | null;
   coverageTags: { tags: Record<string, string>; edgeCase: string | null } | null;

@@ -3420,6 +3420,7 @@ model SourcedPerson {
 /// Only the argon2id hash is stored. Offline mode (email and name, test environments only) never uses it.
 model CandidateCredential {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
   smeUserId    String   @unique @map("sme_user_id") @db.Uuid
   passwordHash String   @map("password_hash")
   setAt        DateTime @default(now()) @map("set_at")
@@ -3431,6 +3432,7 @@ model CandidateCredential {
 /// One-time link to set or reset a candidate password. Only the sha256 of the token is stored; single use; expires.
 model CandidatePasswordToken {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String    @map("client_id") @db.Uuid
   smeUserId String    @map("sme_user_id") @db.Uuid
   tokenHash String    @unique @map("token_hash")
   purpose   String

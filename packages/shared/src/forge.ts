@@ -314,3 +314,31 @@ export function sourcedPersonFormProblems(f: { projectId: string; firstName: str
   if (f.linkedinUrl.trim() && !/^https?:\/\/\S+\.\S+/.test(f.linkedinUrl.trim())) out.linkedinUrl = 'Enter a full web address starting with https://';
   return out;
 }
+
+// ── MVP1 step 6: candidate sign-in modes (Online = email and password; set and reset by one-time link) ──
+
+/** Same minimum as console passwords (NIST SP 800-63B: length over composition rules). */
+export const CANDIDATE_PASSWORD_MIN = 12;
+/** A set-your-password link (sent when a PM or Admin assigns a new person) lasts 72 hours; a reset link 1 hour. */
+export const SET_PASSWORD_LINK_HOURS = 72;
+export const RESET_PASSWORD_LINK_HOURS = 1;
+
+const Password = z.string().min(1).max(200);
+export const PasswordSignInRequest = z.object({ email: z.string().trim().max(254), password: Password, adultAttested: z.boolean().optional() });
+export type PasswordSignInRequest = z.infer<typeof PasswordSignInRequest>;
+export const PasswordSetRequest = z.object({ token: z.string().min(1).max(200), password: Password });
+export type PasswordSetRequest = z.infer<typeof PasswordSetRequest>;
+export const PasswordForgotRequest = z.object({ email: z.string().trim().max(254) });
+export type PasswordForgotRequest = z.infer<typeof PasswordForgotRequest>;
+
+/** Why a new candidate password is refused (null when it is fine). Mirrors the console rule: long enough, no email name. */
+export function candidatePasswordProblem(password: string, emails: (string | null | undefined)[] = []): string | null {
+  if (password.length < CANDIDATE_PASSWORD_MIN) return `Use at least ${CANDIDATE_PASSWORD_MIN} characters.`;
+  if (password.length > 200) return 'Use at most 200 characters.';
+  const lower = password.toLowerCase();
+  for (const e of emails) {
+    const local = e?.split('@')[0]?.trim().toLowerCase();
+    if (local && local.length >= 3 && lower.includes(local)) return 'Do not use your email address in your password.';
+  }
+  return null;
+}

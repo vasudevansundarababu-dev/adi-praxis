@@ -8,7 +8,10 @@ import type { MalwareScanner, ObjectStorage } from '../candidate/storage';
 import type { Db, Tx } from '../db';
 import { buildAssessmentSheet, buildRecruiterPack, buildRecruiterPdf, COLUMN_KEYS, columnValue, isFixedColumn, packFileName, readAssessmentSheet, type SheetRow } from '../forge/recruiter-pack';
 import { addSourcedPerson, assignable, changeAuthor, createSourcedPerson, directAssign, listSourcedPeople, projectPeople, sourcingProject, sourcingProjects, sourcingTarget, toSourcedPersonDto } from '../forge/sourcing';
+import { resendSetLink, setLinkOnAssign, passwordMode, signInModeError } from '../forge/password';
 import { forgeSettings } from '../forge/settings';
+import type { Config } from '../config';
+import type { EmailSender } from '../lib/email';
 import { sha256 } from '../lib/crypto';
 import { AppError, badRequest } from '../lib/errors';
 import { writeAudit, type AuditInput } from '../platform/audit';
@@ -70,7 +73,7 @@ function checkRow(r: SheetRow, projectId: string, role: SourcedRole, seen: Map<s
 }
 
 /** MVP1 Sourcing and direct task assignment (docs/design/PROJECT-SCREEN-DESIGN.md: Sourcing, Resource assignments, Tasks). */
-export const forgeSourcingRoutes: FastifyPluginAsyncZod<{ db: Db; storage: ObjectStorage; scanner: MalwareScanner }> = async (app, { db, storage, scanner }) => {
+export const forgeSourcingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; storage: ObjectStorage; scanner: MalwareScanner; email: EmailSender }> = async (app, { db, config, storage, scanner, email }) => {
   /** A read that may lazily create task rows: one short transaction, audited as the caller. */
   const withTaskRows = (actor: Actor, requestId: string, projectId: string) =>
     db.$transaction((tx) => ensureTaskRows(tx, projectId, actor.clientId, (input) => writeAudit(tx, { clientId: actor.clientId, actorType: 'USER', actorId: actor.userId, requestId }, input)));
@@ -132,10 +135,13 @@ export const forgeSourcingRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Objec
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
       const p = await sourcingProject(tx, actor, req.params.id);
       await tx.$executeRaw`SELECT 1 FROM "Project" WHERE id = ${p.id}::uuid FOR UPDATE`;
-      if (!(await forgeSettings(tx, p.clientId)).newFlow) throw new AppError(409, 'NEW_FLOW_OFF', 'Direct task assignment is not switched on for this platform.');
+      const f = await forgeSettings(tx, p.clientId);
+      if (!f.newFlow) throw new AppError(409, 'NEW_FLOW_OFF', 'Direct task assignment is not switched on for this platform.');
       if (p.status === 'DRAFT' || p.status === 'COMPLETED' || p.status === 'CANCELLED') throw new AppError(409, 'PROJECT_NOT_OPEN', 'People can be assigned only on new or active projects.');
       await ensureTaskRows(tx, p.id, p.clientId, audit);
       const t = await directAssign(tx, p, req.body, actor, audit);
+      // Online sign-in: a new person gets a set-your-password link (after the database work, as invites do).
+      await setLinkOnAssign(tx, { email, config }, f, req.body.sourcedPersonId, audit);
       return { status: 200, body: { taskId: t.id, status: t.status, revision: t.revision, people: await projectPeople(tx, p.id) } };
     });
     return reply;
@@ -148,14 +154,33 @@ export const forgeSourcingRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Objec
       await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
         const p = await sourcingProject(tx, actor, req.params.id);
         await tx.$executeRaw`SELECT 1 FROM "Project" WHERE id = ${p.id}::uuid FOR UPDATE`;
-        if (!(await forgeSettings(tx, p.clientId)).newFlow) throw new AppError(409, 'NEW_FLOW_OFF', 'Direct task assignment is not switched on for this platform.');
+        const f = await forgeSettings(tx, p.clientId);
+        if (!f.newFlow) throw new AppError(409, 'NEW_FLOW_OFF', 'Direct task assignment is not switched on for this platform.');
         if (p.status === 'DRAFT' || p.status === 'COMPLETED' || p.status === 'CANCELLED') throw new AppError(409, 'PROJECT_NOT_OPEN', 'People can be assigned only on new or active projects.');
         const t = await changeAuthor(tx, p, { taskId: req.params.taskId, sourcedPersonId: req.body.sourcedPersonId }, actor, audit);
+        await setLinkOnAssign(tx, { email, config }, f, req.body.sourcedPersonId, audit);
         return { status: 200, body: { taskId: t.id, status: t.status, revision: t.revision, people: await projectPeople(tx, p.id) } };
       });
       return reply;
     },
   );
+  // ── MVP1 step 6: (re)send a set-your-password link to an assigned person (Online sign-in only) ──
+  app.post(
+    '/projects/:id/people/:sourcedPersonId/password-link',
+    { config: { access: ACCESS, rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['sourcing'], params: IdParams.extend({ sourcedPersonId: z.string().uuid() }) } },
+    async (req, reply) => {
+      await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+        const p = await sourcingProject(tx, actor, req.params.id);
+        if (!passwordMode(await forgeSettings(tx, p.clientId))) throw signInModeError(false);
+        const s = await tx.sourcedPerson.findFirst({ where: { id: req.params.sourcedPersonId, projectId: p.id } });
+        if (!s) throw new AppError(404, 'NOT_FOUND', 'Person not found on this project');
+        const r = await resendSetLink(tx, { email, config }, s.id, audit);
+        return { status: 200, body: { sent: true, expiresAt: r.expiresAt.toISOString() } };
+      });
+      return reply;
+    },
+  );
+
   // ── MVP1 step 5: Sourcing screens and Export to Recruiter ──
 
   app.get('/sourcing/projects', { config: { access: ACCESS }, schema: { tags: ['sourcing'] } }, async (req) => ({ items: await sourcingProjects(db, req.actor!) }));

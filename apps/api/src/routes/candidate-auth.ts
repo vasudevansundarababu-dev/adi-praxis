@@ -15,6 +15,7 @@ import type { Db, Tx } from '../db';
 import { AppError, notFound, unauthorized } from '../lib/errors';
 import { runCandidateCommand, runCommand } from '../platform/command';
 import { claimTarget } from '../forge/candidate';
+import { passwordMode, signInModeError } from '../forge/password';
 import { forgeSettings } from '../forge/settings';
 
 export interface CandidateDeps {
@@ -36,7 +37,7 @@ function identityReviewScope(actor: InternalActor): Prisma.SmeUserWhereInput {
   }) };
 }
 
-async function meDto(tx: Db | Tx, smeUserId: string, requireLive: boolean): Promise<z.infer<typeof CandidateMeDto>> {
+export async function meDto(tx: Db | Tx, smeUserId: string, requireLive: boolean): Promise<z.infer<typeof CandidateMeDto>> {
   const u = await tx.smeUser.findUniqueOrThrow({
     where: { id: smeUserId },
     include: { enrollments: { include: { opportunityVersion: true }, orderBy: { createdAt: 'desc' } } },
@@ -96,6 +97,9 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
     async (req, reply) => {
       const g = await google.verify(req.body.credential);
       const clientId = await deps.resolveClientId();
+      // MVP1 step 6: in the new flow with Online sign-in, people sign in with email and password instead.
+      const mode = await forgeSettings(db, clientId);
+      if (passwordMode(mode)) throw signInModeError(true);
       // The stable Google subject is the identity key. Never merge accounts by email (FLOW2 C01), with one exception:
       // in the MVP1 new flow a verified email that a PM or Admin uploaded in Sourcing claims the account made for it
       // (see claimTarget); an account that already has a sign-in identity is never taken over.
@@ -104,7 +108,7 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
         if (req.body.adultAttested !== true) {
           throw new AppError(400, 'ADULT_ATTESTATION_REQUIRED', 'Please confirm you are 18 or over to create an account.');
         }
-        const newFlow = (await forgeSettings(db, clientId)).newFlow;
+        const newFlow = mode.newFlow;
         pid = await db.$transaction(async (tx) => {
           const claim = newFlow && g.emailVerified && g.email ? await claimTarget(tx, clientId, g.email) : null;
           const audit = (action: string, smeUserId: string, after: Prisma.InputJsonValue) =>

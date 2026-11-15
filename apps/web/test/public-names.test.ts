@@ -30,6 +30,9 @@ const API_USER_FACING = [
   'apps/api/src/routes/forge-sourcing.ts',
   'apps/api/src/forge/recruiter-pack.ts',
   'apps/api/src/forge/sourcing.ts',
+  'apps/api/src/forge/password.ts',
+  'apps/api/src/routes/candidate-password.ts',
+  'apps/api/src/routes/candidate-auth.ts',
   'packages/shared/theme/tokens.ts',
 ];
 const BANNED = [

@@ -68,6 +68,7 @@ import { HashingEmbeddingProvider, VertexEmbeddingProvider, type EmbeddingProvid
 import { profileRoutes } from './routes/profile';
 import { reviewRoutes } from './routes/review';
 import { candidateAuthRoutes } from './routes/candidate-auth';
+import { candidatePasswordRoutes } from './routes/candidate-password';
 import { candidateRoutes } from './routes/candidates';
 import { opportunityRoutes } from './routes/opportunities';
 import { reviewerRecruitmentRoutes } from './routes/reviewer-recruitment';
@@ -385,24 +386,26 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(anvilRoutes, { db: deps.db, storage });
       await v1.register(rlRoutes, { db: deps.db });
       await v1.register(forgeSettingsRoutes, { db: deps.db, config: deps.config });
-      await v1.register(forgeSourcingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner });
+      await v1.register(forgeSourcingRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, email: deps.email ?? defaultEmail(deps.config) });
       await v1.register(forgeReviewRoutes, { db: deps.db });
       await v1.register(forgeCandidateRoutes, { db: deps.db, config: deps.config });
       await v1.register(taskRoutes, { db: deps.db, config: deps.config, email: deps.email ?? defaultEmail(deps.config) });
+      const resolveClientId =
+        deps.resolveClientId ??
+        (async () => {
+          const byName = await deps.db.client.findFirst({ where: { name: process.env.SEED_CLIENT_NAME || 'ADI-Labs' } });
+          const c = byName ?? (await deps.db.client.findFirst({ orderBy: { createdAt: 'asc' } }));
+          if (!c) throw new Error('No client configured; run the seed');
+          return c.id;
+        });
       await v1.register(candidateAuthRoutes, {
         db: deps.db,
         config: deps.config,
         google: deps.google ?? defaultGoogleVerifier(deps.config),
         identity: deps.identity ?? defaultIdentityProvider(deps.config),
-        resolveClientId:
-          deps.resolveClientId ??
-          (async () => {
-            const byName = await deps.db.client.findFirst({ where: { name: process.env.SEED_CLIENT_NAME || 'ADI-Labs' } });
-            const c = byName ?? (await deps.db.client.findFirst({ orderBy: { createdAt: 'asc' } }));
-            if (!c) throw new Error('No client configured; run the seed');
-            return c.id;
-          }),
+        resolveClientId,
       });
+      await v1.register(candidatePasswordRoutes, { db: deps.db, config: deps.config, email: deps.email ?? defaultEmail(deps.config), resolveClientId });
     },
     { prefix: '/api/v1' },
   );

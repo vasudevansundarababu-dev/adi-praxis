@@ -22,7 +22,8 @@ import { grantAppRole } from './grant-app-role';
  *   rest. Dry run by default; --apply also needs QA_SME_CLEANUP_CONFIRM=delete-all-smes. Never production.
  * - `qa-smoke`: QA-only end-to-end smoke test over the public API at API_URL (real QA infrastructure: live extraction,
  *   live models, the deployed worker). Prints one JSON line `report: "qa-smoke"`; exit 0 only when every step that ran
- *   passed. Never production.
+ *   passed. With the client's MVP1 new flow on (QA_SMOKE_NEW_FLOW=auto|on|off), it also walks the new flow (`forge`).
+ *   Never production.
  * - `qa-project-cleanup [--apply]`: QA-only. Deletes every project without protected history; cancels the rest. Dry run
  *   by default; --apply also needs QA_PROJECT_CLEANUP_CONFIRM=delete-all-projects. Never production.
  * - `qa-template-cleanup --keep <id> [--keep <id>] [--apply]`: QA-only. Keeps the named templates (and other versions

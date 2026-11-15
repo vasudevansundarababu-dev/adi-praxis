@@ -34,5 +34,6 @@ export const DOMAIN_EVENTS = [
   'studio.task_verified',
   // Policy Rules (docs/architecture/ARCH-POLICY-RULES.md section 4): one event per extraction job.
   'policy.extraction_requested',
+  'policy.annotation_requested',
 ] as const;
 export type DomainEventName = (typeof DOMAIN_EVENTS)[number];

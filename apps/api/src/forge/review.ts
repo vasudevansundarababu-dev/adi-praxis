@@ -12,6 +12,7 @@ import type { StoredChecks } from '../tasks/submission';
 import { caseSelectorOf, EXPERT_TASK_TYPES, templateRef } from '../tasks/task-service';
 import { forgeSettings } from './settings';
 import { tutorialOf } from './tutorial';
+import { servedTutorial } from './tutorial-video/service';
 import { sourcingProject, taskLabel } from './sourcing';
 
 type Audit = (i: AuditInput) => Promise<void>;
@@ -285,7 +286,7 @@ export async function reviewerTaskView(db: Db, actor: CandidateActor, taskId: st
     reviewStage: t.reviewStage,
     template: await templateView(db, t),
     // MVP1 step 7: the template's tutorial video, or null.
-    tutorial: tutorialOf(t.project.template),
+    tutorial: await servedTutorial(tutorialOf(t.project.template)),
     input: t.input,
     // Mirrors what the console review shows a Validator: the authored output, checks and flags; never other authors' content.
     output: t.quarantinedAt ? null : (latest?.output ?? null),

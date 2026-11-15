@@ -98,6 +98,9 @@ import { defaultDrafterFactory } from './meta-compiler/drafter';
 import { defaultRunner } from './harbor/runner';
 import type { MetaCompilerOverrides } from './meta-compiler/handlers';
 import { userRoutes } from './routes/users';
+import { tutorialVideoRoutes } from './routes/tutorial-videos';
+import { defaultTutorialStorage, setTutorialMediaStorage, tutorialSettings } from './forge/tutorial-video';
+import type { SignedUrlStorage } from './candidate/storage';
 
 export interface AppDeps {
   config: Config;
@@ -122,6 +125,8 @@ export interface AppDeps {
   assistant?: ProfileAssistant;
   /** Evidence storage (GCS; the emulator locally) and malware scanning (stub in v1). */
   storage?: ObjectStorage;
+  /** D2: private bucket of generated tutorial videos (signed addresses for SMEs, Reviewers and the Admin preview). */
+  tutorialStorage?: SignedUrlStorage;
   scanner?: MalwareScanner;
   /** Suitability assessment (reviewer aid only): Claude on Vertex when configured, otherwise the local mock. */
   evaluator?: SuitabilityEvaluator;
@@ -215,6 +220,8 @@ export function defaultIdentityProvider(config: Config): IdentityProvider {
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const storage = deps.storage ?? defaultStorage(deps.config);
+  const tutorialStorage = deps.tutorialStorage ?? defaultTutorialStorage(deps.config);
+  setTutorialMediaStorage(tutorialStorage);
   const selectionGate = deps.selectionGate ?? dbSelectionGate;
   const app = Fastify({
     logger: deps.logger ?? false,
@@ -325,7 +332,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       v1.get('/openapi.json', { config: { access: 'public' }, schema: { hide: true } }, async () => app.swagger());
       await v1.register(authRoutes, { db: deps.db, config: deps.config });
       await v1.register(userRoutes, { db: deps.db });
-      await v1.register(templateRoutes, { db: deps.db });
+      await v1.register(templateRoutes, { db: deps.db, tutorial: tutorialSettings(deps.config) });
+      await v1.register(tutorialVideoRoutes, { db: deps.db, settings: tutorialSettings(deps.config), storage: tutorialStorage });
       await v1.register(projectExportRoutes, { db: deps.db, storage, validator: deps.anvilValidator ?? (deps.config.ANVIL_EXPORT_BASE_URL ? new AnvilGatedValidator(new AnvilExportClient(deps.config.ANVIL_EXPORT_BASE_URL, deps.anvilIdTokenProvider ?? googleIdTokenProvider(anvilAudience(deps.config.ANVIL_EXPORT_BASE_URL, deps.config.ANVIL_OUTBOUND_AUDIENCE)))) : new PraxisPrecheckValidator()) });
       await v1.register(templateProfileRoutes, { db: deps.db });
       await v1.register(anvilTemplateRoutes, { db: deps.db, anvil: { environment: deps.config.ANVIL_ENVIRONMENT, exportBaseUrl: deps.config.ANVIL_EXPORT_BASE_URL } });

@@ -71,3 +71,10 @@ export const stubScanner: MalwareScanner = {
     return 'CLEAN';
   },
 };
+
+/** In-memory storage with stand-in signed addresses (tests). */
+export class MemorySignedStorage extends MemoryStorage implements SignedUrlStorage {
+  async signedUrl(key: string, action: 'read' | 'write', opts: { expiresInSeconds: number }) {
+    return `https://storage.test/${key}?action=${action}&expires=${opts.expiresInSeconds}`;
+  }
+}

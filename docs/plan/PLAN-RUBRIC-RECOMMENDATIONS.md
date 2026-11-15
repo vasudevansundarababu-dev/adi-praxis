@@ -1,10 +1,10 @@
-# Plan: rubric recommendations in Authoring (with D8 "template default, SME edits")
+# Plan: rubric recommendations in Authoring (with D8 template defaults and D9 sourced criterion fields)
 
 | Item | Value |
 | --- | --- |
 | Status | **Plan only, awaiting the owner's approval.** No code yet. |
 | Requirement | `docs/prd/PRD-RUBRIC-RECOMMENDATIONS.md` (owner spec, 15 Nov 2026, verbatim) |
-| Related | QA defects D8 (S7 typed by hand) and D6 (S4 picked from the policy library); policy rule annotations plan (PR #81) |
+| Related | QA defects D8 (S7 typed by hand), D9 (technical criterion fields typed with no source) and D6 (S4 picked from the policy library); policy rule annotations plan (PR #81) |
 | Code baseline | `main` at `4b424b00` |
 | Release boundary | Everything ships behind flags that are **off** by default. With the flags off, nothing changes for users, exports or the RL Gym QA deployment. |
 
@@ -269,6 +269,45 @@ D8 ("template default, SME edits") becomes the base layer of this work:
 4. **Marketing:** no evaluator-map seeding (its criteria are authored per task within groups A–G). Defaults apply
    only if a Marketing template version ever carries `criterionDefaults`.
 
+### 8a. D9: the technical fields on each criterion get a source instead of free typing
+
+D9 (owner, 15 Nov 2026) is folded in. Today the SME types five grading fields with no source, and the help text says
+"Anvil". They are existing criterion item keys, so the stored and exported shape doesn't change. Only where the values
+come from changes.
+
+- **Evaluator kind and version.** These are filled automatically from the selected template version's
+  `execution.evaluators[]` for the criterion's ID (`evaluatorMap` in `joint-template.ts`), and are read-only:
+  - kind is `capability.id`, e.g. `golden-kyc-rubric-v1`;
+  - version is `capability.version`, e.g. `1`.
+
+  This is exactly what the existing joint-template submit check already requires (`submission.ts`: kind and version
+  must equal the mapped capability). So a filled-in task gets the same bytes an SME who typed the correct values gets
+  today. The current help text's "e.g. run_evidence" contradicts that check and is corrected. The fields are hidden
+  when the template has no evaluator spec. They're also hidden for an internal-only criterion, which has no mapping.
+- **Evidence or rule links (`evidenceRefs`, still a string array).** These become a picker with no free typing. It
+  lists the task's selected policy rules (rule keys from the task's effective rule set; the D6 picker once it ships),
+  the workflow step IDs (from S5 steps or the workflow graph) and the evidence item IDs (from the task's
+  `evidence_record` fields). Values that were already saved and aren't in the list are kept, never deleted, and are
+  marked "not found in this task" as a warning. The picker offers IDs only. The richer source links of section 6
+  stay internal and are never written here.
+- **Output field, Comparison and Expected value.** These are shown only when the template's evaluator for that
+  criterion compares the output, meaning its `evidence_source` isn't `run_evidence`. For KYC v6 and v7 (all
+  `run_evidence`) they're hidden, which matches the template's "no per-case reference answers". When they're shown,
+  Output field is a picker of the properties in the template's `execution.output_schema`. Expected value follows the
+  property's type and enum. Values already saved on a hidden field are kept (not stripped, so bytes don't change) and
+  flagged for the author.
+- **Wording.** All criterion help text in `helpers.ts` says "RL Gym", never "Anvil". Code comments can keep internal
+  names.
+
+These are display and fill rules on the existing keys, so they work on old tasks too. They sit behind the same flag as
+the rest of this work. With the flag off, S7 renders as today. Tests:
+- the auto-fill values pass the existing submit check unchanged;
+- export bytes are identical whether a value was auto-filled or typed;
+- the picker refuses free text but keeps legacy values;
+- binding fields are hidden for `run_evidence` and shown with an output-schema picker for a synthetic output-comparing
+  evaluator;
+- no user-facing "Anvil" string remains in the criterion help (string scan).
+
 D6 is used, not changed: once S4 is a picker, its picked rule versions are exact policy sources. Until then the
 derivation reads the task's effective rule set, which is already exact.
 
@@ -341,7 +380,7 @@ template-default provenance.
 2. API: migration (two tables), config flags, service and routes (authorisation, idempotency, audit), source-change
    detection, restore, the `RubricAssistant` interface with a mock and a Vertex implementation, and D8 seeding and
    submit ID checks behind the flag.
-3. Candidate app: S7 status chips, Assessment details, Recommendations panel, coverage bar, source-link navigation,
+3. Candidate app: D9 pickers (evidence or rule links, output field) and hiding of fields that don't apply, S7 status chips, Assessment details, Recommendations panel, coverage bar, source-link navigation,
    reset to default, restore.
 4. Console and Reviewer: read-only chips, details, coverage and "changed from default".
 5. Export-compatibility tests (section 9), the docs (`docs/integrations/` note of what RL Gym doesn't receive, and a
@@ -356,7 +395,7 @@ Every API test uses a per-run docker `pgvector/pgvector:pg16` on a free port wit
 | --- | --- |
 | 1 | `derive()` on the v7, v6 and Marketing fixtures: roles come from contract, type, graph and output schema, not section number. A synthetic profile with S2 and S5 swapped gives the same requirements. Unclassified fields are listed under "Sources not used". |
 | 2 | Each item has an explanation and links. Link targets resolve (API `GET` returns resolvable section, field and item paths, rule and document IDs). Web test: clicking a link switches to that section and focuses the field; a policy link opens the rule. |
-| 3 | v7: 20 template IDs seeded and read-only; regeneration never renames, drops or replaces them; submit refuses unknown or missing IDs; `criterionDefaults` text kept exactly. |
+| 3 | v7: 20 template IDs seeded and read-only; evaluator kind and version auto-filled from the evaluator map and passing the existing submit check (D9); regeneration never renames, drops or replaces them; submit refuses unknown or missing IDs; `criterionDefaults` text kept exactly. |
 | 4 | Annotation PUT edits applicability, condition, evidence required and the critical trigger. S7 edits of Pass/Partial/Fail and weight save through autosave. A 409 on a stale version. Only the assigned author can write. |
 | 5 | Author edits a recommended field, regenerates: the field is unchanged and the new value appears as a proposed change. A dismissed item is not re-offered unless its source changed. The same digest reuses the run. |
 | 6 | Change a linked task field or rule version: the criterion shows "Source changed"; criterion and annotation bytes unchanged; "Reviewed, keep" re-snapshots and is audited. |

@@ -1675,3 +1675,10 @@ owner's approval; no code yet.**
 - **(chosen by Claude)** The policy rule annotations from PR #81 (mandatory marking, applies-when, responsible actor)
   are used through an interface when present. Without them the fallback is `PolicyRule.required`, and applicability is
   UNKNOWN where the rule body doesn't say. No hard dependency.
+- **(owner, D9)** The technical criterion fields get a source instead of free typing. Evaluator kind and version are
+  auto-filled, read-only, from `execution.evaluators[]`: kind is `capability.id`, which is what the existing submit
+  check requires (the old help text's "e.g. run_evidence" was wrong). Evidence or rule links are a picker of the task's
+  rules, step IDs and evidence IDs. Output field, Comparison and Expected value are shown only for evaluators that
+  compare the output; Output field is then a picker from the output schema. Help text says "RL Gym".
+- **(chosen by Claude)** D9 keeps values already saved: an unknown link or a value on a hidden field is flagged, never
+  stripped, so stored and exported bytes don't change. It sits behind the same flag.

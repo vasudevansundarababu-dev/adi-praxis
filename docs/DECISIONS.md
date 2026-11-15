@@ -1380,7 +1380,8 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
   not stored. Task name is the first sentence of the slot brief (for example "Governing state: California (CA)"),
   since tasks have no other name before the author writes one. "Coverage by <selector>" reads the selector field and
   value from the same brief (case-selector slots: "Application type: Joint (JOINT). ..."; dimension slots: the first
-  "label: value"), so v6 shows state and v7 application type without an API change.
+  "label: value"), so v6 shows state and v7 application type without an API change. *(Step 9: the API now sends
+  each row's `selector`; the brief is read only when a row has none.)*
 - **(chosen by Claude)** Dashboard. Cards: Experts (assigned SMEs / Required workers), Tasks approved / total with the
   number waiting, Rule set (latest published version and its rule count, from `GET /policy/rule-sets`), Rework rate and
   active time (from `GET /dashboard`). Next step, first that applies: a task waiting for your decision (opens it), a task
@@ -1390,6 +1391,7 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
   assigned on the project (new people come in through the Assign screen); it calls `POST assignments/direct`. A status
   filter is added, as in the mockup. Changing an author (the API exists) has no control yet. The export area is the
   existing Export panel; its links for tasks that need fixing still open the earlier Task review page (route kept).
+  *(Step 9: Change author is on the task page, and in the new flow the fix links open the new task page.)*
 - **(chosen by Claude)** Assign screen at `/projects/[id]/assign`: one row per assignable person, a required Task select
   ("To author (SME)"; on the Reviewer route a Reviewer sees "To review (Reviewer)" with only the tasks they may review),
   Assign as SME (replaced by "SME places full" when full) and Assign as Reviewer (Reviewer route only). Matching skills
@@ -1406,9 +1408,10 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
 - **(chosen by Claude)** Admin → Candidate app sign-in at `/admin/candidate-sign-in`: the New flow switch (On/Off) and the
   Offline/Online mode on one page. Admins save; PMs see it read-only. Offline is disabled with an explanation when the
   API says `offlineAllowed: false`. Save sends only what changed, so a stored Offline mode never blocks switching the
-  flow where Offline is refused. **Not implemented:** the design says changing the mode signs everyone out of the
+  flow where Offline is refused. ~~**Not implemented:** the design says changing the mode signs everyone out of the
   candidate app; the API (`forge/settings.ts`, `PUT /admin/forge-settings`) only audits the change, so the page does not
-  claim it. Open for a later step.
+  claim it. Open for a later step.~~ **Implemented in step 9** (see "MVP1 step 9"): a mode change ends every candidate
+  session of the client and the page says so.
 - **(chosen by Claude)** Menus. With the new flow on: Home, Projects (Projects, Templates, Approved exports), Sourcing,
   Admin (all existing pages plus Candidate app sign-in) and Tutorials; Reviews, Certification, Partners, Payments and
   Requisitions are hidden from the menu only and their routes still open. Candidate app sign-in shows in Admin for
@@ -1451,3 +1454,59 @@ Forgot password still answers 202 and sends nothing).
 - **(chosen by Claude)** Candidate app: `/sign-in` picks the form with `signInVariant` (password, offline, classic). The
   Offline form is the existing simulated one, labelled "Offline sign-in (test environment): no password". New pages
   `/set-password/[token]` (no referrer sent) and `/forgot-password`.
+
+## MVP1 step 9: QA smoke and finishing (15 Nov 2026)
+
+- **(chosen by Claude)** QA smoke, new-flow pass. The job is parameterised by environment, so the pass is
+  `QA_SMOKE_NEW_FLOW=auto|on|off` (default `auto`: run only when `GET /admin/forge-settings` says the client's new flow
+  is on; a 403 or 404 there counts as not available). It runs after the earlier journey's steps, which are unchanged,
+  as its own steps (`forge-settings` ... `forge-cleanup`, reported under `forge` in the same JSON line, counted in `ok`
+  and the exit code). It never changes the client's settings, so it cannot switch the flow or the mode for others.
+- **(chosen by Claude)** It needs Offline candidate sign-in (QA): Online would need the set-password email, which the
+  job cannot read. Online is a FAIL of `forge-settings` with the reason, before anything is created.
+- **(chosen by Claude)** Its project is `SYNTHETIC QA smoke (new flow) — <UTC date time to the second>` (project names
+  are unique per client; seconds keep re-runs apart), on the same template as the earlier journey (or the same
+  choice: newest published version, or `QA_SMOKE_TEMPLATE_ID`), review route `QA_SMOKE_FORGE_ROUTE` (default
+  Author → Reviewer → PM/Admin, so the Reviewer path is covered; `SME_PM` covers the other). One SME authors every task:
+  the per-expert cap cannot exceed the target and the template API does not expose the case selector, so the job
+  first makes a one-task project; when the template makes more tasks than that (KYC v6: five states) it cancels it at
+  once and makes the real project sized to that count (named `... (5 tasks)`).
+- **(chosen by Claude)** Policy without extraction: the same synthetic policy is uploaded and the PM writes one rule
+  that quotes it (`POST /policy/rules`), reviews it and publishes the rule set, so tasks can cite a published rule and
+  the pass makes no extraction call. The earlier journey still covers live extraction.
+- **(chosen by Claude)** People: a synthetic SME and Reviewer per run (`smoke-forge-sme-<timestamp>@praxis.test`,
+  `smoke-forge-rev-<timestamp>@praxis.test`, first name SYNTHETIC, agency `SYNTHETIC QA smoke`), uploaded through
+  Sourcing → New and assigned to every task. They sign in with the mock Google (Offline) sign-in, accept the current
+  terms (missing terms: FAIL "must be published before anyone signs in"), and Home must list every task as New, then
+  In review after submit, Accepted after approval. Authoring uses the earlier journey's synthetic case builder and
+  pre-check binding, with no assistant call (one embedding per submit is counted).
+- **(chosen by Claude)** Decisions are people's: the Reviewer passes each task (checklist, duplicate and coverage
+  confirmations only when the API asks), the PM approves each. Before each approval the job checks export is still
+  closed with "n of N now", and after the last that it is open and lists every task. It never calls export or
+  validate, so it never reaches RL Gym. Cleanup signs the two candidates out (`POST /me/logout`) and cancels the
+  project unless it completed; append-only records stay, as in the earlier journey.
+- **Found while testing, not changed:** a second earlier-journey run in the same database submits the same golden case
+  again, so its review is refused with `DUPLICATE_DECISION_REQUIRED` (the earlier journey's review step sends no
+  duplicate decision). This is the earlier journey's behaviour and is left as it is; the new-flow pass sends the
+  duplicate decision when the API flags a task.
+- **(chosen by Claude)** Task selector. `ForgeTaskRow.selector` is `{field, value, label} | null`, from the task's slot:
+  a case-selector slot gives the form field's label and the option's label ("Governing state", "CA",
+  "California (CA)"), a dimension slot its first tag in dimension order with the dimension label, an edge-case slot
+  "Edge case", an open slot `{field: '', value: '', label: 'Open slot'}`, no slot null. The field is optional in the
+  type so a console reading an older API falls back to the brief parser.
+- **(chosen by Claude)** Sign-out on mode change. When `PUT /admin/forge-settings` changes `candidateSignIn`, every
+  open candidate-app session of the client is revoked in the same transaction (SMEs and Reviewers; other clients and
+  console sessions untouched), audited `candidate.sessions_ended` with `{reason: 'sign_in_mode_changed', count}` only.
+  The response adds `candidateSessionsEnded`. Switching only `newFlow`, or saving the same mode, signs nobody out; a
+  replay with the same Idempotency-Key does nothing more.
+- **(chosen by Claude)** Change author. The control is on the task page for Assigned, In progress and Rework tasks
+  with an author (as asked), but the design and the API allow a change only before the author starts, so it is
+  enabled only for Assigned and shown disabled with "The author can be changed only before they start the task." for
+  the other two (the API would answer `AUTHOR_STARTED`). It lists the project's other SMEs (never the author or a
+  Reviewer), asks to confirm, then calls `POST /projects/:id/tasks/:taskId/author`; errors show inline.
+- **(chosen by Claude)** With the new flow on, the export panel's "needs fixing" links open
+  `/projects/[id]/tasks/[taskId]/review` (the Tasks tab's panel is new flow only); the project summary's panel, used with
+  the flow off, keeps `/review/tasks/:id`. The recruiter page's back link goes to `/projects/[id]?tab=people` with the
+  flow on, else to the project.
+- **Runbook:** `docs/design/MVP1-RUNBOOK.md` (switching the flow, Offline and Online, Terms first, the PM/Admin order,
+  the QA smoke command).

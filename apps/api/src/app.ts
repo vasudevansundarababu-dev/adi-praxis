@@ -55,6 +55,7 @@ import { certAdminRoutes } from './routes/cert-admin';
 import { certCandidateRoutes } from './routes/cert-candidate';
 import { paymentCandidateRoutes, paymentRoutes } from './routes/payments';
 import { supportRoutes } from './routes/support';
+import { forgeHelpRoutes } from './routes/forge-help';
 import { ClaudeVertexSupportAssistant, GeminiSupportAssistant, MockSupportAssistant, supportModel, type SupportAssistant } from './support/assistant';
 import { MockPayoutProvider, TrolleyPayoutProvider, type PayoutProvider } from './pay/provider';
 import { ClaudeVertexCurriculumGenerator, MockCurriculumGenerator, type CurriculumGenerator } from './cert/generator';
@@ -377,7 +378,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         await v1.register(paymentCandidateRoutes, { db: deps.db, payouts });
         await v1.register(certCandidateRoutes, { db: deps.db, config: deps.config, gen, box, embeddings, selfie: deps.selfie ?? defaultSelfie(deps.config), storage });
       }
-      await v1.register(supportRoutes, { assistant: deps.support ?? defaultSupport(deps.config), partnerPortal: deps.config.SME_SUPPLY_ENABLED });
+      const support = deps.support ?? defaultSupport(deps.config);
+      await v1.register(supportRoutes, { assistant: support, partnerPortal: deps.config.SME_SUPPLY_ENABLED });
+      await v1.register(forgeHelpRoutes, { db: deps.db, assistant: support });
       await v1.register(datasetRoutes, { db: deps.db });
       await v1.register(anvilRoutes, { db: deps.db, storage });
       await v1.register(rlRoutes, { db: deps.db });

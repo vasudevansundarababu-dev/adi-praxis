@@ -20,6 +20,8 @@ const API_USER_FACING = [
   'apps/api/src/support/help-pack.ts',
   'apps/api/src/support/authoring-help.ts',
   'apps/api/src/support/assistant.ts',
+  'apps/api/src/routes/forge-help.ts',
+  'packages/shared/src/forge-help.ts',
   'apps/api/src/supply/submissions.ts',
   'apps/api/src/routes/supply-candidate.ts',
   'apps/api/src/cert/generator.ts',

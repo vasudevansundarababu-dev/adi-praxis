@@ -1,5 +1,6 @@
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
 import { GeminiVertexContentDrafter } from '../meta-compiler/drafter';
+import { TASK_HELP_REFUSAL } from '@praxis/shared';
 import { logModelCall, parseAuthoringModel } from '../tasks/conversation/assistant';
 
 /**
@@ -27,6 +28,11 @@ export interface SupportContext {
   help: string;
   /** Guides for the template(s) the question or the record is about (generated from the template profiles). */
   templates?: string[];
+  /**
+   * MVP1 step 7: Help scoped to one task (the author's own task, or a task the person reviews). The record is then
+   * that task's minimal context; the system prompt adds the task-scope rules.
+   */
+  scope?: 'TASK_AUTHOR' | 'TASK_REVIEWER';
 }
 
 export interface SupportTurn {
@@ -65,7 +71,16 @@ ${audience === 'SME' ? '- Never write task content for the author: no case facts
 - Say which fields are required (marked with a red asterisk) when asked what to fill in, with the allowed values if the screen or the template guide lists them.
 - Be brief and practical: plain English, short paragraphs or a short list, active voice. Use the field labels exactly as they appear on screen.`;
 
-const SYSTEM = SUPPORT_SYSTEM;
+/** The extra rules for Help on one task (MVP1 step 7). They narrow the rules above; they never widen them. */
+export const TASK_SCOPE_RULES = (scope: NonNullable<SupportContext['scope']>) => `
+TASK HELP. You are the Help panel of one task${scope === 'TASK_REVIEWER' ? ' that this person reviews' : ' that this person authors'}. These rules win over the ones above:
+- Answer only about this task (the <record source="this task">), its template's form sections (the <template> guide), the project's published rules listed in the record, and ${scope === 'TASK_REVIEWER' ? 'how to send the task back for rework or approve it' : 'how to save and submit the task'}.
+- Explain what a section or field needs and give a generic example that is not this task's case. Never write the author's content: no case facts, steps, findings, rubric criteria, outcomes or expected values for this task, even when asked for a draft, a suggestion or an example for this case.
+${scope === 'TASK_REVIEWER' ? '- Explain what to check in each section and what good work looks like. Never decide for the reviewer: do not say whether to approve or send back, or whether a section passes. The reviewer decides.\n' : ''}- For anything outside this task (other topics, other tasks or projects, general chat, personal questions, questions about you), reply exactly: "${TASK_HELP_REFUSAL}"
+- The names rule above still applies.`;
+
+/** The system prompt for a question: the Support Bot rules, plus the task-scope rules when Help is scoped to a task. */
+export const systemFor = (ctx: Pick<SupportContext, 'audience' | 'scope'>) => SUPPORT_SYSTEM(ctx.audience) + (ctx.scope ? TASK_SCOPE_RULES(ctx.scope) : '');
 
 const fieldLine = (f: ScreenField) => `- ${f.label}${f.required ? ' (required)' : ''} [${f.type}]${f.options?.length ? ` options: ${f.options.slice(0, 30).join(' | ')}` : ''}${f.value ? ` current: ${f.value.slice(0, 120)}` : ''}${f.help ? ` — ${f.help.slice(0, 200)}` : ''}`;
 
@@ -97,7 +112,7 @@ export class ClaudeVertexSupportAssistant implements SupportAssistant {
           output_config: { effort: 'low' },
           // The help pack is the same for every question from this audience: cached.
           system: [
-            { type: 'text', text: SYSTEM(ctx.audience) },
+            { type: 'text', text: systemFor(ctx) },
             { type: 'text', text: `<help>\n${ctx.help}\n</help>`, cache_control: { type: 'ephemeral' } },
           ],
           messages: [
@@ -127,7 +142,7 @@ export class GeminiSupportAssistant implements SupportAssistant {
   }
 
   async answer(ctx: SupportContext, history: SupportTurn[], question: string): Promise<SupportAnswer> {
-    const system = `${SYSTEM(ctx.audience)}\nReturn JSON only: {"answer": "<your answer as plain text>"}.\n\n<help>\n${ctx.help}\n</help>`;
+    const system = `${systemFor(ctx)}\nReturn JSON only: {"answer": "<your answer as plain text>"}.\n\n<help>\n${ctx.help}\n</help>`;
     const user = [...history.map((t) => `${t.role === 'user' ? 'User' : 'Assistant'}: ${t.text}`), `${contextBlock(ctx)}\n\nQuestion: ${question}`].join('\n\n');
     const started = Date.now();
     let out;
@@ -186,10 +201,16 @@ export function rankParagraphs(text: string, question: string, limit = 2): strin
 /** Deterministic stand-in for local development, the demo and tests: answers from the screen, the help pack and the template guides. */
 export class MockSupportAssistant implements SupportAssistant {
   readonly model = 'mock-support-1';
-  readonly calls: { ctx: SupportContext; history: SupportTurn[]; question: string }[] = [];
+  readonly calls: { ctx: SupportContext; history: SupportTurn[]; question: string; system: string; context: string }[] = [];
 
   async answer(ctx: SupportContext, history: SupportTurn[], question: string): Promise<SupportAnswer> {
-    this.calls.push({ ctx, history, question });
+    this.calls.push({ ctx, history, question, system: systemFor(ctx), context: contextBlock(ctx) });
+    if (ctx.scope) {
+      // Task-scoped Help: answers only from this task's template guide and context; anything else gets the refusal.
+      const hits = rankParagraphs([ctx.help, ...(ctx.templates ?? []), JSON.stringify(ctx.record?.data ?? '')].join('\n\n').replace(/\n(?=\s*- )/g, '\n\n'), question, 3);
+      const answer = hits.length ? `${hits.join('\n\n')}\n\n(Local assistant: answers come from this task's form guide and the help pack, not from a model. You write the task.)` : TASK_HELP_REFUSAL;
+      return { answer, usage: { inputTokens: 0, outputTokens: 0 } };
+    }
     const q = question.toLowerCase();
     const required = ctx.screen.fields.filter((f) => f.required);
     const parts: string[] = [];

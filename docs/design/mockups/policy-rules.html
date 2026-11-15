@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project policies · ADI Forge (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Geist+Mono:wght@400;500;600&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
+<style>
+/* Values copied from packages/shared/theme/theme.css (light theme), as in project-screen.html. Mockup only. */
+:root{--bg:#f5f7fa;--text:#0a2170;--muted:#5b6b77;--border:#8597a3;--link:#1d68b0;--focus:#2a80d0;--accent:#3fac95;--error:#b91c1c;--warning:#b45309;--success:#15803d;--hairline:#dde4ec;--elevated:#fff;--shadow:0 1px 2px rgb(10 33 112 / .06),0 8px 24px -12px rgb(10 33 112 / .18)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-size:14px;line-height:1.5}
+a{color:var(--link);text-decoration:none;cursor:pointer}a:hover{text-decoration:underline}
+.demo{background:var(--warning);color:#fff;text-align:center;font-size:12px;font-weight:500;padding:4px;margin:0}
+header{background:#0a2170;color:#fff;box-shadow:0 4px 12px rgb(0 0 0 / .15)}
+.hwrap{max-width:76rem;margin:0 auto;padding:12px 16px 8px;display:flex;align-items:center;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}.brand img{height:28px}
+.who{margin-left:auto;font-size:13px;color:rgb(255 255 255 / .7);display:flex;gap:14px}
+nav.main{max-width:76rem;margin:0 auto;padding:0 16px 6px;display:flex;gap:4px;font-size:13px}
+nav.main span{padding:6px 10px;border-radius:8px;color:rgb(255 255 255 / .8)}nav.main span.on{background:rgb(255 255 255 / .14);color:#fff;font-weight:600}
+.rail{height:4px;background:linear-gradient(90deg,#0a2170 0%,#2a80d0 50%,#3fac95 100%)}
+main{max-width:76rem;margin:0 auto;padding:28px 16px 120px}
+h1{font-size:24px;margin:0}h2{font-size:18px;margin:0 0 4px}h3{font-size:15px;margin:0 0 10px}
+.card{background:var(--elevated);border:1px solid var(--hairline);border-radius:16px;box-shadow:var(--shadow)}
+.pad{padding:18px 20px}.mt{margin-top:16px}.mt8{margin-top:8px}
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:12px;padding:9px 16px;font-weight:600;font-size:14px;font-family:inherit;cursor:pointer;border:0}
+.btn-primary{color:#fff;background:linear-gradient(90deg,#1f64b8 0%,#2a80d0 45%,#2f9c8a 100%)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.btn-secondary{border:1px solid var(--hairline);background:#fff;color:var(--text)}.btn-secondary:hover{border-color:var(--focus)}
+.btn-sm{padding:6px 11px;font-size:13px;border-radius:10px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:1px 10px;font-size:12px;font-weight:500;line-height:20px;white-space:nowrap;background:color-mix(in srgb,var(--pill,var(--muted)) 14%,transparent)}
+.pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--pill,var(--muted))}
+.p-info{--pill:var(--link)}.p-ok{--pill:var(--success)}.p-warn{--pill:var(--warning)}.p-err{--pill:var(--error)}.p-brand{--pill:var(--accent)}
+/* Mandatory-marking chips: shared with the SME S4 picker mockup (PR #82). */
+.mk{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600;white-space:nowrap}
+.mk-mandatory{background:color-mix(in srgb,var(--accent) 22%,#fff);color:#0d5e4f}
+.mk-when,.mk-permitted{background:color-mix(in srgb,var(--link) 14%,#fff);color:#164f87}
+.mk-clarify{background:color-mix(in srgb,var(--warning) 18%,#fff);color:#7a3a05}
+.mk-ref,.mk-other,.mk-none{background:#eef2f7;color:var(--muted)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--hairline);margin:22px 0 18px}
+.tabs button{font-family:inherit;font-size:14px;font-weight:600;color:var(--muted);background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px}
+.tabs button.on{color:var(--text);border-bottom-color:#2a80d0}
+.n{font-size:11px;background:#e8eef6;border-radius:999px;padding:1px 8px;margin-left:6px}
+.steps{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-bottom:18px}
+.step{font-family:inherit;text-align:left;padding:10px 12px;cursor:pointer;color:var(--text);background:#fff;border:1px solid var(--hairline);border-radius:12px}
+.step b{display:block;font-size:12px;color:var(--muted)}.step span{font-weight:600;font-size:13px}
+.step.on{border-color:#2a80d0;box-shadow:0 0 0 1px #2a80d0}
+section.view{display:none}section.view.on{display:block}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:9px 12px;background:#f8fafc;border-bottom:1px solid var(--hairline)}
+td{padding:10px 12px;border-top:1px solid var(--hairline);vertical-align:top}
+.mono,code{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-size:12.5px}
+.muted{color:var(--muted)}.small{font-size:12px}.warn{color:var(--warning)}.err{color:var(--error)}
+select,input,textarea{font-family:inherit;font-size:14px;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:7px 10px;background:#fff}
+textarea{width:100%}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.drop{border:2px dashed var(--border);border-radius:14px;padding:22px;text-align:center;color:var(--muted);cursor:pointer;background:#fbfcfe}
+.bar{height:8px;background:#e8eef6;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#2a80d0,#3fac95)}
+.decide{border:2px solid #7c3aed;background:#faf7ff;border-radius:14px;padding:14px 16px}
+.decide h3{color:#5b21b6}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--hairline);background:#fff;border-radius:12px;padding:10px 12px;margin-top:8px;cursor:pointer}
+.opt.on{border-color:#7c3aed;box-shadow:0 0 0 1px #7c3aed}
+.opt input{margin-top:3px}
+.tagd{font-size:11px;font-weight:700;color:#5b21b6;background:#ede9fe;border-radius:6px;padding:1px 7px;margin-left:6px}
+.flag{font-size:12px;color:var(--warning);margin-top:4px}
+.aisrc{font-size:11px;color:var(--muted);margin-top:4px}
+.ai{font-size:11px;font-weight:700;color:#164f87;background:#e6f0fb;border-radius:6px;padding:0 6px}
+.ed{font-size:11px;font-weight:700;color:#0d5e4f;background:#e3f4f0;border-radius:6px;padding:0 6px}
+.drawer{position:fixed;inset:0 0 0 auto;width:min(46rem,100%);background:#fff;box-shadow:-12px 0 40px rgb(10 33 112 / .2);transform:translateX(105%);transition:transform .2s;overflow:auto;z-index:20}
+.drawer.on{transform:none}
+.dlg{position:fixed;inset:0;background:rgb(10 33 112 / .35);display:none;align-items:center;justify-content:center;z-index:30}
+.dlg.on{display:flex}
+.dlg .card{width:min(52rem,94vw);max-height:88vh;overflow:auto}
+dl.f{display:grid;grid-template-columns:11rem 1fr;gap:6px 14px;margin:0}dl.f dt{color:var(--muted)}dl.f dd{margin:0}
+blockquote{margin:6px 0;border-left:3px solid var(--hairline);padding-left:10px}
+.mockfoot{position:fixed;right:16px;bottom:16px;background:#0a2170;color:#fff;font-size:12px;padding:6px 12px;border-radius:999px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#0a2170;color:#fff;padding:8px 16px;border-radius:10px;font-size:13px;display:none;z-index:40}
+.counts{display:flex;gap:6px;flex-wrap:wrap}
+.hint{font-size:12px;color:var(--warning)}
+h1,h2,h3,.brand,.btn-primary,.tabs button{font-family:'Geist','Inter',sans-serif;letter-spacing:-.02em}
+</style>
+</head>
+<body>
+<p class="demo">QA environment: synthetic data only. Mockup for owner approval — nothing here is built yet. Purple boxes are owner decisions.</p>
+<header>
+  <div class="hwrap"><span class="brand"><img src="../brand-forge/adi-forge-mark-512.png" alt=""> ADI Forge</span><span class="who"><span>Platform Admin · Admin</span><span>Sign out</span></span></div>
+  <nav class="main"><span>Home</span><span class="on">Projects</span><span>Sourcing</span><span>Admin</span></nav>
+  <div class="rail"></div>
+</header>
+
+<main>
+<a>← Projects</a>
+<div class="row mt8"><h1>KYC Texas Project For 5 Golden Tasks</h1><span class="pill p-warn">Staffing</span><span class="muted small">Template: KYC onboarding and refresh v7 · application types: individual, adult joint, teen joint, custodial</span></div>
+<div class="tabs"><button>Dashboard</button><button>Resource assignments</button><button>Tasks <span class="n">5</span></button><button class="on">Policies <span class="n">318 rules · 27 applied</span></button></div>
+
+<div class="steps" role="tablist">
+  <button class="step on" data-v="docs"><b>1</b><span>Documents</span></button>
+  <button class="step" data-v="extract"><b>2</b><span>Extraction</span></button>
+  <button class="step" data-v="choose"><b>3</b><span>Which rules?</span></button>
+  <button class="step" data-v="rules"><b>4</b><span>Rules &amp; annotations</span></button>
+  <button class="step" data-v="decide"><b>5</b><span>Owner decisions</span></button>
+  <button class="step" data-v="publish"><b>6</b><span>Publish &amp; versions</span></button>
+  <button class="step" data-v="sme"><b>7</b><span>SME view (S4)</span></button>
+</div>
+
+<!-- 1 ───────── Documents ───────── -->
+<section class="view on" id="docs">
+  <div class="card pad">
+    <h2>Policy documents</h2>
+    <p class="muted small">PDF, Word, text or Markdown, up to 20 pages. Each upload is kept as an exact, versioned copy; rules are always linked to the version they came from.</p>
+    <div class="drop" id="drop">Drop a policy file here, or <a>choose a file</a> · or <a>paste text</a></div>
+    <table class="mt"><thead><tr><th>Document</th><th>Version</th><th>Pages</th><th>Jurisdiction</th><th>SHA-256</th><th>Rules extracted</th><th>Uploaded</th></tr></thead>
+    <tbody id="docRows"></tbody></table>
+  </div>
+</section>
+
+<!-- 2 ───────── Extraction ───────── -->
+<section class="view" id="extract">
+  <div class="card pad">
+    <div class="row"><h2>Extraction</h2><span class="muted small">Extraction finds candidate rules. It is not approval or legal validation.</span><button class="btn btn-secondary btn-sm" style="margin-left:auto" id="reextract">Extract new versions</button></div>
+    <table class="mt"><thead><tr><th>Run</th><th>Documents</th><th>Status</th><th>Rules found</th><th>AI annotation suggestions</th><th>Started</th></tr></thead>
+    <tbody>
+      <tr id="runLive"><td class="mono">run 4</td><td>04-FL-KYC-state-addendum.md v2</td><td><span class="pill p-info">Extracting</span><div class="bar mt8" style="width:10rem"><i style="width:62%"></i></div><span class="small muted">about 2 min left</span></td><td>—</td><td class="small" id="aiLive">Starts automatically when extraction finishes</td><td>14:02</td></tr>
+      <tr><td class="mono">run 3</td><td>California Laws v1</td><td><span class="pill p-ok">Succeeded</span></td><td>54</td><td class="small"><span class="pill p-ok">Done</span> 54 suggested · 0 offered</td><td>15 Nov 09:40</td></tr>
+      <tr><td class="mono">run 2</td><td>02-NY, 03-TX, 05-IL addenda v1</td><td><span class="pill p-ok">Succeeded</span></td><td>141</td><td class="small"><span class="pill p-ok">Done</span> 141 suggested</td><td>14 Nov 17:12</td></tr>
+      <tr><td class="mono">run 1</td><td>00-US-federal-KYC-policy.md v1</td><td><span class="pill p-warn">Partly read</span><div class="small muted">Some provider output could not be read; usable rules were kept.</div></td><td>123</td><td class="small"><span class="pill p-ok">Done</span> 116 suggested · 7 need definition first</td><td>14 Nov 16:55</td></tr>
+    </tbody></table>
+    <p class="small muted mt8">No costs on project screens (D7). Spending on extraction and AI calls moves to a separate Admin page, <b>Usage and costs</b> (planned, scope to be agreed).</p>
+    <p class="small muted" id="aiModeNote"></p>
+  </div>
+</section>
+
+<!-- 3 ───────── Which rules? (D4) ───────── -->
+<section class="view" id="choose">
+  <div class="card pad">
+    <h2>Which rules does this template need?</h2>
+    <div class="grid2 mt8" style="grid-template-columns:minmax(12rem,18rem) 1fr">
+      <label>Policy document<br><select id="chooseDoc" style="width:100%"><option>00-US-federal-KYC-policy.md</option><option>California Laws</option><option selected>03-TX-KYC-state-addendum.md</option></select></label>
+      <div>
+        <label for="prompt"><b>Describe the tasks</b></label>
+        <textarea id="prompt" rows="3" placeholder="Describe the tasks this template covers…"></textarea>
+        <div class="small">Example: <a id="useEx">Use this example</a> <span class="muted">— “KYC for individual, joint, teen joint and custodial accounts. Select the rules these tasks must follow, including edge cases.”</span></div>
+        <div class="row mt8"><button class="btn btn-primary" id="suggest" disabled>Suggest rules</button><span class="hint" id="suggestHint">Type what the template needs</span><span class="small muted">The assistant only suggests. You decide by accepting.</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card pad mt" id="suggestions" style="display:none">
+    <div class="row"><h3 style="margin:0">Suggested rules <span class="muted small">(11 of 54 from 03-TX-KYC-state-addendum.md)</span></h3><label class="small" style="margin-left:auto"><input type="checkbox"> Show all rules</label><button class="btn btn-secondary btn-sm" id="acceptAll">Accept all ready</button></div>
+    <table class="mt8"><thead><tr><th>Rule</th><th>Why suggested</th><th>Mandatory marking (AI)</th><th>Decision</th></tr></thead><tbody id="sugRows"></tbody></table>
+    <p class="small muted mt8">Accept = tick “Apply to project” (that tick is the review; no other approval). Reject hides the suggestion; the rule stays in the library, not applied.</p>
+  </div>
+</section>
+
+<!-- 4 ───────── Rules & annotations ───────── -->
+<section class="view" id="rules">
+  <div class="card pad">
+    <div class="row"><h2>Rules and annotations</h2><span class="muted small">318 rules from 6 documents · 27 applied</span><button class="btn btn-secondary btn-sm" style="margin-left:auto" id="aiAnnot">Suggest annotations with AI</button></div>
+    <div class="counts mt8" id="markCounts"></div>
+    <div class="row mt" style="background:#f8fafc;border:1px solid var(--hairline);border-radius:12px;padding:10px">
+      <label class="small">Mandatory marking<br><select id="fMark"><option value="">All markings</option><option value="mandatory">Mandatory</option><option value="when">Mandatory when applicable</option><option value="permitted">Permitted option</option><option value="ref">Required reference</option><option value="other">Other responsibility/scope</option><option value="clarify">Needs clarification</option><option value="flag">Has flags</option></select></label>
+      <label class="small">Show rules for application type<br><select id="fType"><option value="">Any type</option><option>individual</option><option value="adult_joint">adult joint</option><option value="teen_joint">teen joint</option><option>custodial</option></select></label>
+      <label class="small">Governing state<br><select id="fState"><option value="">Any</option><option>CA</option><option>NY</option><option>TX</option><option>FL</option><option>IL</option></select></label>
+      <label class="small"><input type="checkbox" id="fApplied"> Applied only</label>
+      <span class="small muted" style="flex-basis:100%" id="fNote">AI annotations are suggestions; your edit and your Apply tick are the decision.</span>
+    </div>
+    <table class="mt"><thead><tr><th style="width:24%">Rule</th><th style="width:16%">Mandatory marking</th><th style="width:20%">Applies when</th><th>Why</th><th style="width:7rem">Apply to project</th></tr></thead><tbody id="ruleRows"></tbody></table>
+    <p class="small muted mt8">Showing a sample of the 318 rules. Click a rule name for the rule page (source passage, full annotation, edit, history).</p>
+  </div>
+</section>
+
+<!-- 5 ───────── Owner decisions ───────── -->
+<section class="view" id="decide">
+  <p class="muted">These three choices change what the pages above and below show. Click an option to see its effect on the other steps. <span class="tagd">Approved 15 Nov</span> marks what the plan (PR #81) currently assumes.</p>
+  <div class="decide">
+    <h3>A1 · What does “Apply to project” mean?</h3>
+    <label class="opt on" data-d="a1" data-o="include"><input type="radio" name="a1" checked><div><b>Include in the published set, with its marking</b><span class="tagd">Approved 15 Nov</span><div class="small muted">Permitted options, references and other-role duties can be applied so RL Gym sees them; the marking says how each is treated. Today’s 27 applied rules stay valid (12 of them are permitted options).</div></div></label>
+    <label class="opt" data-d="a1" data-o="mandatory"><input type="radio" name="a1"><div><b>Apply only mandatory rules</b><div class="small muted">Only Mandatory / Mandatory when applicable rules can be ticked. RL Gym never learns which permitted routes and references exist; 12 currently applied permitted options and 3 references would have to be unticked.</div></div></label>
+  </div>
+  <div class="decide mt">
+    <h3>A5 · An applied rule that is still “Needs clarification”</h3>
+    <label class="opt on" data-d="a5" data-o="publish"><input type="radio" name="a5" checked><div><b>Publish it, flagged as unresolved</b><span class="tagd">Approved 15 Nov</span><div class="small muted">RL Gym receives it with its open question and must not score it as pass or “not applicable” (RL Gym’s review asked not to silently omit these). A warning shows; publishing is not blocked.</div></div></label>
+    <label class="opt" data-d="a5" data-o="block"><input type="radio" name="a5"><div><b>Block publishing until it is clarified</b><div class="small muted">Today 1 applied rule (R-DOCUMENT-DESCRIPTION-POLICY) would block the next rule set until the SME question is answered.</div></div></label>
+  </div>
+  <div class="decide mt">
+    <h3>When does the AI suggest annotations?</h3>
+    <label class="opt on" data-d="ai" data-o="auto"><input type="radio" name="ai" checked><div><b>Automatically after every extraction, plus a button</b><span class="tagd">Approved 15 Nov</span><div class="small muted">New rules arrive already annotated (as AI suggestions). For the 318 existing rules: one click per document, about 13 model calls in total, within the daily AI limit.</div></div></label>
+    <label class="opt" data-d="ai" data-o="manual"><input type="radio" name="ai"><div><b>Only when a PM or Admin clicks “Suggest annotations with AI”</b><div class="small muted">No model calls without a click; new rules show “Not annotated” until someone asks.</div></div></label>
+  </div>
+</section>
+
+<!-- 6 ───────── Publish & versions ───────── -->
+<section class="view" id="publish">
+  <div class="card pad">
+    <h2>Publish the project rule set</h2>
+    <p class="small muted">Every task in the project inherits the published set (5 tasks now). Only applied rules are included; unapplied rules never block.</p>
+    <div class="counts mt8" id="pubCounts"></div>
+    <div id="pubBlock" class="mt8"></div>
+    <details class="mt8" open><summary class="warn">3 applied rules have annotation warnings — they do not block publishing and are exported as open issues</summary>
+      <ul class="small">
+        <li><b>R-DOCUMENT-DESCRIPTION-POLICY</b>: Needs clarification — “Do full-ID prohibitions apply only to display/copies?”</li>
+        <li><b>R-ACCEPT-FOREIGN-PASSPORT</b> and <b>R-ACCEPT-FOREIGN-PASSPORT-2</b>: duplicates — apply one deliberately so it is not counted twice.</li>
+        <li><b>R-CIP-DATE-OF-BIRTH</b>: uses the definition in R-INDIVIDUAL-CUSTOMER-DEFINITION, which is not applied.</li>
+      </ul>
+    </details>
+    <div class="row mt"><button class="btn btn-primary" id="publishBtn">Publish rule set v3</button><span class="small muted">Not applied: 291 rules, of which 129 are marked Mandatory or Mandatory when applicable.</span></div>
+  </div>
+  <div class="card pad mt">
+    <h3>Published versions</h3>
+    <table><thead><tr><th>Version</th><th>Rules</th><th>By marking</th><th>Digest</th><th>Published</th><th>RL Gym</th></tr></thead><tbody id="verRows">
+      <tr><td class="mono">v2</td><td>27</td><td class="small">Not annotated 27</td><td class="mono">b375507a…</td><td>15 Nov 17:47 · Admin</td><td class="small">Manifest v1 ready · annotations: none</td></tr>
+      <tr><td class="mono">v1</td><td>16</td><td class="small">Not annotated 16</td><td class="mono">5c19e0d4…</td><td>14 Nov 18:20 · PM</td><td class="small">Superseded</td></tr>
+    </tbody></table>
+    <p class="small muted mt8">RL Gym reads the unchanged policy manifest (v1). The new <b>annotations document</b> (marking, applies when, why, links, provenance) is ready on our side but <b>proposed</b>: it is not sent until RL Gym agrees to the versioned change.</p>
+  </div>
+</section>
+
+<!-- 7 ───────── SME view ───────── -->
+<section class="view" id="sme">
+  <p class="muted">Read-only preview of how the published rules reach the SME in task section <b>S4 · Task policy references and applicability</b> (D6). The full SME task form is in the other mockup (PR #82); this uses the same layout and chips.</p>
+  <div class="card pad">
+    <h3>S4 · Task policy references and applicability</h3>
+    <div class="card pad" style="box-shadow:none">
+      <div class="row"><b>00-US-federal-KYC-policy.md</b><span class="pill p-info">version 1</span><span class="pill p-brand">Published in project rule set v3</span><button class="btn btn-secondary btn-sm" style="margin-left:auto" disabled>Remove</button></div>
+      <div class="small muted mt8">From the project library 🔒</div>
+      <dl class="f mt8 small"><dt>Policy ID</dt><dd class="mono">1d172068-…-a3f9</dd><dt>Version</dt><dd class="mono">rs3.d1</dd><dt>Publication reference</dt><dd class="mono">project rule set v3</dd><dt>Content SHA-256</dt><dd class="mono">a5c0aa26ed48… <a>Copy</a></dd></dl>
+      <div class="small muted mt">Only reviewers see these; the agent doesn’t.</div>
+      <div class="grid2 mt8"><label class="small">Applicability<textarea rows="2" disabled>Applies to every application in this case.</textarea></label><label class="small">Rationale<textarea rows="2" disabled>Federal CIP minimums for a Texas individual account.</textarea></label></div>
+    </div>
+    <div class="row mt"><button class="btn btn-secondary" id="openPicker">+ Add policy</button><span class="small muted">The SME picks published documents; references are never typed.</span></div>
+  </div>
+</section>
+</main>
+
+<!-- Rule page drawer -->
+<aside class="drawer" id="drawer" aria-label="Rule page">
+  <div class="pad" id="drawerBody"></div>
+</aside>
+
+<!-- S4 picker dialog -->
+<div class="dlg" id="picker"><div class="card pad">
+  <div class="row"><h2>Add policy</h2><button class="btn btn-secondary btn-sm" style="margin-left:auto" id="closePicker">Close</button></div>
+  <div class="row mt8"><input placeholder="Search policies" style="flex:1"><span class="pill">All states</span><span class="pill p-info">TX</span><span class="pill">Federal</span></div>
+  <div id="pickRows" class="mt8"></div>
+  <div class="row mt"><button class="btn btn-primary" disabled>Add selected (1)</button><span class="small">Missing a policy? <a>Propose a policy document</a></span></div>
+  <p class="small muted">If nothing is published: “This project has no published policies yet. Ask your project admin to add policies.”</p>
+</div></div>
+
+<div class="toast" id="toast"></div>
+<div class="mockfoot">Mockup · policy rules · 15 Nov 2026</div>
+
+<script>
+const MK = { mandatory: ['Mandatory', 'mk-mandatory'], when: ['Mandatory when applicable', 'mk-when'], permitted: ['Permitted option', 'mk-permitted'], ref: ['Required reference', 'mk-ref'], other: ['Other responsibility/scope', 'mk-other'], clarify: ['Needs clarification', 'mk-clarify'] };
+const chip = (m) => m ? `<span class="mk ${MK[m][1]}">${MK[m][0]}</span>` : '<span class="mk mk-none">Not annotated</span>';
+const $ = (s) => document.querySelector(s);
+const toast = (t) => { const e = $('#toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(e._t); e._t = setTimeout(() => (e.style.display = 'none'), 2600); };
+const state = { a1: 'include', a5: 'publish', ai: 'auto', published: false };
+
+const DOCS = [
+  ['00-US-federal-KYC-policy.md', 1, 6, 'US (federal)', 'a5c0aa26ed48', 123, '14 Nov'],
+  ['California Laws', 1, 9, 'US-CA', 'e742db607993', 54, '15 Nov'],
+  ['02-NY-KYC-state-addendum.md', 1, 3, 'US-NY', '6188ee04c3fd', 41, '14 Nov'],
+  ['03-TX-KYC-state-addendum.md', 1, 3, 'US-TX', 'c03a34ff7b73', 54, '14 Nov'],
+  ['04-FL-KYC-state-addendum.md', 2, 3, 'US-FL', 'ea4d63299fbe', '—', '15 Nov'],
+  ['05-IL-KYC-state-addendum.md', 1, 3, 'US-IL', '6ffee92f36dc', 46, '14 Nov'],
+];
+$('#docRows').innerHTML = DOCS.map((d) => `<tr><td><b>${d[0]}</b></td><td class="mono">v${d[1]}</td><td>${d[2]}</td><td>${d[3]}</td><td class="mono">${d[4]}…</td><td>${d[5] === '—' ? '<span class="pill p-info">Extracting</span>' : d[5]}</td><td>${d[6]}</td></tr>`).join('');
+$('#drop').onclick = () => toast('Uploading 06-NJ-KYC-state-addendum.md… (mockup)');
+
+// Rules: real QA rule keys and texts from project 7e5e96c5; markings follow RL Gym's review mapped to the six markings.
+const R = [
+  { k: 'R-CASE-STATE-LAW-SCOPE', t: 'Case state-law scope', doc: 'Federal', m: 'mandatory', src: 'ai', when: 'Always, within the workflow scope', why: 'Every case applies federal policy plus its one governing-state file; a project name or example state never narrows it.', types: 'all', st: 'all', applied: true, cls: 'Applicability/precedence', actor: 'Agent', quote: 'A case must apply this federal policy plus the one governing state file, and no other state.', loc: 'line 14' },
+  { k: 'R-CIP-DATE-OF-BIRTH', t: 'CIP date of birth', doc: 'Federal', m: 'when', src: 'author', when: 'The customer is an individual, before the account is opened.', why: 'Required for individual customers; the trigger is the customer type, not the product.', types: 'all', st: 'all', applied: true, flags: ['Uses the definition in R-INDIVIDUAL-CUSTOMER-DEFINITION, which is not applied.'], cls: 'Obligation', actor: 'Agent', quote: "Before an account is opened, the bank must obtain the customer's date of birth when the customer is an individual.", loc: 'line 22' },
+  { k: 'R-CIP-CUSTOMER-NOTICE', t: 'CIP customer notice', doc: 'Federal', m: 'mandatory', src: 'ai', when: 'Always, within the workflow scope', why: 'A standard account-opening control in the bank policy.', types: 'all', st: 'all', applied: true, cls: 'Obligation', actor: 'Bank operations', quote: 'The bank must give customers adequate notice that it is requesting information to verify their identity.', loc: 'line 25' },
+  { k: 'R-ACCEPT-FOREIGN-PASSPORT', t: 'Accept foreign passport', doc: 'California Laws', m: 'permitted', src: 'ai', when: 'A foreign passport is offered as the identity document.', why: 'Accepting the passport is permitted; “only with” makes the accompanying non-documentary check compulsory.', types: 'all', st: 'CA', applied: true, compound: 'C-FOREIGN-PASSPORT', flags: ['Duplicates R-ACCEPT-FOREIGN-PASSPORT-2: apply one deliberately, so it is not counted twice.'], cls: 'Permission', actor: 'Agent', quote: 'The bank may accept a foreign passport only with a non-documentary check.', loc: 'section 3.2' },
+  { k: 'R-FOREIGN-PASSPORT-NDC', t: 'Non-documentary check for a foreign passport', doc: 'California Laws', m: 'when', src: 'ai', when: 'A foreign passport is selected for the identification route.', why: 'The companion obligation of the passport permission: compulsory when that route is chosen.', types: 'all', st: 'CA', applied: false, compound: 'C-FOREIGN-PASSPORT', cls: 'Obligation', actor: 'Agent', quote: 'The bank may accept a foreign passport only with a non-documentary check.', loc: 'section 3.2' },
+  { k: 'R-ACCEPT-CALIFORNIA-DRIVER-S-LICENSE-OR-ID', t: "Accept California driver's license or ID card", doc: 'California Laws', m: 'permitted', src: 'ai', when: 'The governing state is CA and the customer presents this document.', why: 'An allowed document; other documents remain acceptable.', types: 'all', st: 'CA', applied: true, cls: 'Permission', actor: 'Agent', quote: "The bank may accept a California driver's license or ID card as an identity document.", loc: 'section 2.1' },
+  { k: 'R-AB-60-LICENSE-DOES-NOT-PROVE-IMMIGRATION', t: 'AB 60 license does not prove immigration status', doc: 'California Laws', m: 'when', src: 'ai', when: "The case's governing state is CA and an AB 60 license is presented.", why: 'An interpretation guard: the licence must not be treated as evidence of immigration status.', types: 'all', st: 'CA', applied: true, flags: ['Unknown: exceptions.'], cls: 'Prohibition', actor: 'Agent', quote: 'An AB 60 license does not prove immigration status.', loc: 'section 2.4' },
+  { k: 'R-CA-JOINT-HOLDER-ID', t: 'California joint holder ID', doc: 'California Laws', m: 'when', src: 'ai', when: 'California joint accounts: each joint holder.', why: 'Joint applications need every holder identified under the California rules.', types: 'adult_joint,teen_joint', st: 'CA', applied: false, cls: 'Obligation', actor: 'Agent', quote: 'For California joint accounts, each joint holder must provide a California-compliant ID.', loc: 'section 4.1' },
+  { k: 'R-NY-JOINT-CONSENT', t: 'New York joint account consent', doc: '02-NY', m: 'when', src: 'ai', when: 'New York joint accounts.', why: 'A New York-only joint requirement.', types: 'adult_joint', st: 'NY', applied: false, cls: 'Obligation', actor: 'Agent', quote: 'Each New York joint account holder must consent to the survivorship terms.', loc: 'line 31' },
+  { k: 'R-VULNERABLE-ADULT-DEFINITION', t: 'Vulnerable adult definition', doc: '03-TX', m: 'ref', src: 'ai', when: "The case's governing state is TX.", why: 'Defines a term other Texas rules use; it is not a separate task action.', types: 'all', st: 'TX', applied: true, cls: 'Definition', actor: 'Unknown', quote: 'A vulnerable adult is defined as an elderly person or a person with a disability.', loc: 'line 9' },
+  { k: 'R-ASSESS-EXPLOITATION-SUSPICION', t: 'Assess exploitation suspicion', doc: '03-TX', m: 'when', src: 'ai', when: 'An employee suspects financial exploitation of a vulnerable adult.', why: 'Required only when that suspicion arises; the assessment is a human officer’s decision, the agent prepares evidence and routes.', types: 'all', st: 'TX', applied: true, cls: 'Obligation', actor: 'Human officer', quote: 'The bank must assess the suspicion of financial exploitation.', loc: 'line 17' },
+  { k: 'R-DOCUMENT-DESCRIPTION-POLICY', t: 'Document description policy', doc: 'Federal', m: 'clarify', src: 'ai', when: null, why: 'Conflicts with CIP record-keeping unless it means masked presentation; cannot be scored until clarified.', types: 'all', st: 'all', applied: true, flags: ['Needs clarification before it can be applied reliably.', 'Do full-ID prohibitions apply only to display/copies?'], cls: 'Unresolved', actor: 'Unknown', quote: 'The bank must keep a description of each document, never an image or a copy of the full ID number.', loc: 'line 40' },
+  { k: 'R-AFFILIATE-OPT-OUT-OPPORTUNITY', t: 'Affiliate opt-out opportunity', doc: 'Federal', m: 'other', src: 'ai', when: 'Before information is shared with affiliates.', why: 'An institution-wide privacy duty, not an account-opening action. The bank’s obligation is not optional.', types: 'unknown', st: 'all', applied: false, cls: 'Obligation', actor: 'Bank operations', quote: 'A consumer must be given a chance to opt out before information is shared with affiliates.', loc: 'line 66' },
+  { k: 'R-CHECK-OFFICIAL-SOURCE', t: 'Check official source', doc: 'California Laws', m: 'other', src: 'ai', when: 'Before relying on a law-summary detail.', why: 'A task-author / policy-reviewer duty, not a skill the agent is scored on.', types: 'all', st: 'all', applied: false, cls: 'Obligation', actor: 'Task author', quote: 'The official source must be checked before relying on a law summary detail.', loc: 'section 1' },
+  { k: 'R-FULL-ID-NUMBER-COPY-PROHIBITION', t: 'Full ID number copy prohibition', doc: 'Federal', m: null, src: null, when: null, why: null, types: 'unknown', st: 'unknown', applied: false, needsDef: true, cls: '—', actor: '—', quote: 'The bank must never keep a copy of the full ID number.', loc: 'line 41' },
+];
+
+function outcome(r, type, st) {
+  if (!r.m) return 'unknown';
+  if (st && r.st !== 'all' && r.st !== 'unknown' && r.st !== st) return 'out';
+  if (type && r.types !== 'all' && r.types !== 'unknown' && !r.types.split(',').includes(type)) return 'out';
+  if (r.st === 'unknown' || r.types === 'unknown' || r.m === 'clarify') return 'unknown';
+  if (r.m === 'other') return 'other role';
+  if (r.m === 'when' || r.m === 'permitted') return 'if triggered';
+  return 'applies';
+}
+const OUT = { applies: '<span class="pill p-ok">Applies</span>', 'if triggered': '<span class="pill p-info">Applies if its trigger is met</span>', 'other role': '<span class="pill">Another role’s duty</span>', unknown: '<span class="pill p-warn">Applicability unknown</span>' };
+
+function renderCounts() {
+  const all = { mandatory: 25, when: 108, permitted: 28, ref: 22, other: 133, clarify: 2 };
+  $('#markCounts').innerHTML = Object.entries(all).map(([m, n]) => `${chip(m)} <span class="small muted" style="margin-right:8px">${n}</span>`).join('') + '<span class="small muted">· AI suggestions after the annotation pass; 0 not annotated</span>';
+}
+function renderRules() {
+  const fm = $('#fMark').value, ft = $('#fType').value, fs = $('#fState').value, fa = $('#fApplied').checked;
+  const rows = R.filter((r) => (!fm || (fm === 'flag' ? r.flags || r.needsDef : r.m === fm)) && (!fa || r.applied)).map((r) => ({ r, o: outcome(r, ft, fs) })).filter((x) => x.o !== 'out');
+  $('#fNote').innerHTML = ft || fs ? `Matched on each rule’s own scope and the application’s attributes only — the project name (Texas) and example states never exclude a rule. Out-of-scope rules are hidden; unknown stays visible.` : 'AI annotations are suggestions; your edit and your Apply tick are the decision.';
+  $('#ruleRows').innerHTML = rows.map(({ r, o }) => {
+    const blocked = state.a1 === 'mandatory' && r.m && !['mandatory', 'when'].includes(r.m);
+    const src = r.src === 'ai' ? '<span class="ai">AI suggestion</span> v1' : r.src === 'author' ? '<span class="ed">Edited by PM</span> v2' : '';
+    return `<tr><td><a data-rule="${r.k}"><b>${r.t}</b></a><div class="mono small muted">${r.k} · ${r.doc}</div>
+      ${r.compound ? `<div class="small muted">Part of a compound statement (${r.compound})</div>` : ''}
+      ${r.needsDef ? '<div class="flag">Needs definition: ticking defines its fields with AI first.</div>' : ''}
+      ${ft || fs ? `<div class="mt8">${OUT[o]}</div>` : ''}</td>
+      <td><select class="small" data-mk="${r.k}">${r.m ? '' : '<option>Not annotated</option>'}${Object.entries(MK).map(([k, v]) => `<option value="${k}" ${k === r.m ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
+        <div class="mt8">${chip(r.m)}</div><div class="aisrc">${src}</div>${(r.flags || []).map((f) => `<div class="flag">⚠ ${f}</div>`).join('')}
+        ${r.k === 'R-ASSESS-EXPLOITATION-SUSPICION' ? '<div class="small mt8"><a>Use AI suggestion (Mandatory when applicable, v3)</a></div>' : ''}</td>
+      <td class="small">${r.m ? (r.when ?? '<span class="warn">Unknown</span>') : '—'}</td>
+      <td class="small">${r.m ? (r.why ?? '<span class="warn">Not given</span>') : '<a>Suggest annotation with AI</a>'}</td>
+      <td><label><input type="checkbox" data-apply="${r.k}" ${r.applied ? 'checked' : ''} ${blocked && !r.applied ? 'disabled' : ''}> ${r.applied ? 'Applied' : 'Apply'}</label>${blocked ? '<div class="small err">Option A1-b: only mandatory rules can be applied</div>' : ''}</td></tr>`;
+  }).join('');
+}
+['#fMark', '#fType', '#fState', '#fApplied'].forEach((s) => ($(s).onchange = renderRules));
+document.addEventListener('change', (e) => {
+  const k = e.target.dataset?.mk;
+  if (k) { const r = R.find((x) => x.k === k); r.m = e.target.value; r.src = 'author'; toast(r.applied ? `${k}: saved as annotation v2. It was applied, so this is a new draft: tick Apply again when it is right.` : `${k}: saved as annotation v2.`); if (r.applied) r.applied = false; renderRules(); }
+  const a = e.target.dataset?.apply;
+  if (a) { const r = R.find((x) => x.k === a); r.applied = e.target.checked; toast(r.applied ? `${a} applied to the project (your tick is the review).` : `${a} is no longer applied.`); renderRules(); }
+});
+$('#aiAnnot').onclick = () => toast('Suggesting annotations for 03-TX-KYC-state-addendum.md… Rules you edited keep your annotation; the AI version is offered next to it.');
+
+function drawer(k) {
+  const r = R.find((x) => x.k === k);
+  $('#drawerBody').innerHTML = `<div class="row"><a id="closeD">← Back to rules</a><span class="pill ${r.applied ? 'p-ok' : 'p-warn'}" style="margin-left:auto">${r.applied ? 'Applied to the project' : 'Draft — not applied'}</span></div>
+  <h2 class="mt8">${r.t}</h2><div class="mono small muted">${r.k} · version ${r.src === 'author' ? 2 : 1}</div>
+  <div class="mt"><b>Source passage</b> <span class="small muted">${r.doc} v1 · ${r.loc} · quote found in this version</span><blockquote>${r.quote}</blockquote><div class="small muted">The source quotation is never changed by an annotation edit.</div></div>
+  <h3 class="mt">Annotation</h3>
+  <dl class="f small"><dt>Mandatory marking</dt><dd>${chip(r.m)}</dd><dt>Applies when</dt><dd>${r.when ?? '<span class="warn">Unknown</span>'}</dd><dt>Why</dt><dd>${r.why ?? '<span class="warn">Not given</span>'}</dd>
+  <dt>Classification</dt><dd>${r.cls}</dd><dt>Responsible actor</dt><dd>${r.actor}</dd><dt>Application types</dt><dd>${r.types === 'all' ? 'All' : r.types === 'unknown' ? '<span class="warn">Unknown</span>' : r.types.replace(/_/g, ' ')}</dd>
+  <dt>Jurisdictions</dt><dd>${r.st === 'all' ? 'US (federal) — every state' : r.st === 'unknown' ? '<span class="warn">Unknown</span>' : 'US-' + r.st}</dd><dt>Workflow stage</dt><dd><span class="warn">Unknown</span></dd><dt>Deadline</dt><dd>None stated</dd>
+  <dt>Evidence</dt><dd>Partly stated — missing: which record shows it</dd>
+  ${r.compound ? `<dt>Compound statement</dt><dd>${r.compound} · companion of ${r.k === 'R-ACCEPT-FOREIGN-PASSPORT' ? 'R-FOREIGN-PASSPORT-NDC' : 'R-ACCEPT-FOREIGN-PASSPORT'}<blockquote>${r.quote}</blockquote></dd>` : ''}
+  <dt>Linked rules</dt><dd>${r.k === 'R-CIP-DATE-OF-BIRTH' ? 'uses definition R-INDIVIDUAL-CUSTOMER-DEFINITION <span class="warn">(not applied)</span>' : '—'}</dd></dl>
+  <details class="mt"><summary><b>Edit annotation</b></summary><div class="grid2 mt8 small">
+    <label>Classification<br><select><option>${r.cls}</option></select></label><label>Mandatory marking<br><select>${Object.values(MK).map((v) => `<option>${v[0]}</option>`).join('')}</select></label>
+    <label>Applies when<textarea rows="2">${r.when ?? ''}</textarea></label><label>Why<textarea rows="2">${r.why ?? ''}</textarea></label>
+    <label>Responsible actor<br><select><option>${r.actor}</option><option>Human officer</option><option>Bank operations / infrastructure</option><option>Task author</option><option>Unknown</option></select></label>
+    <label>Application types<br><select><option>All</option><option>Only these…</option><option>Unknown</option></select></label>
+    <label>Deadline<br><select><option>Unknown</option><option>The policy sets no deadline</option><option>Stated…</option></select></label><label>Open questions<textarea rows="2"></textarea></label>
+  </div><button class="btn btn-primary btn-sm mt8">${r.applied ? 'Save annotation as new draft' : 'Save annotation'}</button> <span class="small muted">${r.applied ? 'The rule is applied: saving makes a new draft version that you tick again.' : ''}</span></details>
+  <h3 class="mt">Annotation history</h3>
+  <table class="small"><thead><tr><th>Annotation</th><th>By</th><th>Marking</th><th>Used</th><th>When</th></tr></thead><tbody>
+  ${r.src === 'author' ? `<tr><td>v2</td><td>Edit by PM</td><td>${chip(r.m)}</td><td>Current</td><td>15 Nov 16:20</td></tr><tr><td>v1</td><td>AI suggestion (gemini-2.5-pro)</td><td>${chip('mandatory')}</td><td>Yes</td><td>15 Nov 09:44</td></tr>` : r.m ? `<tr><td>v1</td><td>AI suggestion (gemini-2.5-pro)</td><td>${chip(r.m)}</td><td>Current</td><td>15 Nov 09:44</td></tr>` : '<tr><td colspan="5" class="muted">Not annotated yet.</td></tr>'}
+  </tbody></table>`;
+  $('#drawer').classList.add('on');
+  $('#closeD').onclick = () => $('#drawer').classList.remove('on');
+}
+document.addEventListener('click', (e) => { const k = e.target.closest('[data-rule]')?.dataset.rule; if (k) drawer(k); });
+
+// D4: the prompt box
+const EX = 'KYC for individual, joint, teen joint and custodial accounts. Select the rules these tasks must follow, including edge cases.';
+const syncSuggest = () => { const empty = !$('#prompt').value.trim(); $('#suggest').disabled = empty; $('#suggestHint').style.display = empty ? '' : 'none'; };
+$('#prompt').oninput = syncSuggest;
+$('#useEx').onclick = () => { $('#prompt').value = EX; syncSuggest(); };
+const SUG = [
+  ['R-CASE-STATE-LAW-SCOPE', 'Case state-law scope', 'Every case applies federal plus its governing-state file.', 'mandatory'],
+  ['R-VULNERABLE-ADULT-DEFINITION', 'Vulnerable adult definition', 'Texas term used by the exploitation rules.', 'ref'],
+  ['R-ASSESS-EXPLOITATION-SUSPICION', 'Assess exploitation suspicion', 'Edge case: elderly or disabled customers.', 'when'],
+  ['R-TX-DL-ACCEPTED', 'Accept Texas driver license', 'Identity document route for Texas customers.', 'permitted'],
+  ['R-TX-MINOR-GUARDIAN-ID', 'Guardian ID for custodial accounts', 'Custodial and teen joint accounts.', 'when'],
+  ['R-TX-ELDER-REPORT-DEADLINE', 'Report suspected exploitation', 'Edge case; the reporting deadline is not stated in the policy.', null],
+];
+$('#suggest').onclick = () => {
+  $('#suggestions').style.display = 'block';
+  $('#sugRows').innerHTML = SUG.map(([k, t, why, m]) => `<tr><td><b>${t}</b><div class="mono small muted">${k}</div>${m ? '' : '<div class="flag">Needs definition: some fields are missing</div>'}</td><td class="small">${why}</td><td>${chip(m)}</td>
+    <td class="row">${m ? `<button class="btn btn-primary btn-sm" data-acc="${k}">Accept</button>` : `<button class="btn btn-secondary btn-sm" data-def="${k}">Define with AI, then accept</button>`}<button class="btn btn-secondary btn-sm" data-rej="${k}">Reject</button></td></tr>`).join('');
+};
+document.addEventListener('click', (e) => {
+  const t = e.target.dataset || {};
+  if (t.acc) { e.target.closest('td').innerHTML = '<span class="pill p-ok">Accepted · applied</span> <a class="small">Undo</a>'; }
+  if (t.rej) { e.target.closest('tr').style.opacity = .45; e.target.closest('td').innerHTML = '<span class="pill">Rejected · not applied</span> <a class="small">Undo</a>'; }
+  if (t.def) { e.target.closest('td').innerHTML = '<span class="small muted">Defining with AI… then you review and accept.</span>'; }
+});
+$('#acceptAll').onclick = () => document.querySelectorAll('[data-acc]').forEach((b) => b.click());
+
+// Owner decisions
+document.querySelectorAll('.opt').forEach((o) => (o.onclick = () => {
+  document.querySelectorAll(`.opt[data-d="${o.dataset.d}"]`).forEach((x) => { x.classList.remove('on'); x.querySelector('input').checked = false; });
+  o.classList.add('on'); o.querySelector('input').checked = true;
+  state[o.dataset.d] = o.dataset.o;
+  applyDecisions();
+  toast('Changed: see Extraction, Rules & annotations and Publish.');
+}));
+function applyDecisions() {
+  $('#aiLive').innerHTML = state.ai === 'auto' ? 'Starts automatically when extraction finishes' : '<a>Suggest annotations with AI</a> (not automatic)';
+  $('#aiModeNote').textContent = state.ai === 'auto' ? 'AI annotation suggestions run automatically after each extraction (one assistant run per document, within the daily AI limit).' : 'AI annotation suggestions run only when a PM or Admin asks.';
+  const blocking = state.a5 === 'block' ? '<div class="card pad" style="border-color:var(--error);box-shadow:none"><b class="err">Publishing is blocked</b><div class="small">R-DOCUMENT-DESCRIPTION-POLICY is applied but marked Needs clarification. Clarify it, or untick it.</div></div>' : '';
+  const a1 = state.a1 === 'mandatory' ? '<div class="card pad mt8" style="border-color:var(--error);box-shadow:none"><b class="err">15 applied rules are not mandatory</b><div class="small">12 permitted options and 3 required references must be unticked before publishing under option A1-b.</div></div>' : '';
+  $('#pubBlock').innerHTML = blocking + a1;
+  $('#publishBtn').disabled = state.a5 === 'block' || state.a1 === 'mandatory';
+  renderRules();
+}
+function renderPub() {
+  const by = { permitted: 12, when: 6, mandatory: 4, ref: 3, clarify: 1, other: 1 };
+  $('#pubCounts').innerHTML = '<span class="small muted">27 applied, by marking:</span> ' + Object.entries(by).map(([m, n]) => `${chip(m)} <span class="small">${n}</span>`).join(' ');
+}
+$('#publishBtn').onclick = () => {
+  if (state.published) return;
+  state.published = true;
+  $('#verRows').insertAdjacentHTML('afterbegin', '<tr style="background:#f3fbf8"><td class="mono">v3</td><td>27</td><td class="small">Mandatory 4 · When applicable 6 · Permitted 12 · Reference 3 · Clarification 1 · Other 1</td><td class="mono">9e41c7b2…</td><td>now · Admin</td><td class="small">Manifest v1 ready · annotations document ready (proposed)</td></tr>');
+  $('#verRows').children[1].lastElementChild.textContent = 'Superseded';
+  toast('Rule set v3 published. Tasks inherit it; SMEs can pick its documents in S4.');
+};
+
+// S4 picker (shared with PR #82)
+const PICK = [
+  ['00-US-federal-KYC-policy.md', 'Federal', 'v1', '14 Nov 2026', 14, { mandatory: 3, when: 3, permitted: 4, ref: 2, clarify: 1, other: 1 }, true],
+  ['03-TX-KYC-state-addendum.md', 'US-TX', 'v1', '14 Nov 2026', 5, { mandatory: 1, when: 2, permitted: 1, ref: 1 }, false],
+  ['California Laws', 'US-CA', 'v1', '15 Nov 2026', 8, { when: 1, permitted: 7 }, false],
+];
+$('#pickRows').innerHTML = PICK.map(([t, j, v, eff, n, c, on], i) => `<div class="card pad mt8" style="box-shadow:none"><div class="row"><input type="checkbox" ${on ? 'checked' : ''}><b>${t}</b><span class="pill">${j}</span><span class="mono small">${v}</span><span class="small muted">effective ${eff} · ${n} rules applied</span><a style="margin-left:auto" data-show="${i}">Show rules</a></div>
+  <div class="counts mt8">${Object.entries(c).map(([m, k]) => `${chip(m)}<span class="small">${k}</span>`).join(' ')}</div>
+  <div id="show${i}" style="display:none"><table class="mt8 small"><thead><tr><th>Rule</th><th>Marking</th><th>Applies when</th></tr></thead><tbody>${R.filter((r) => r.applied && (i === 0 ? r.doc === 'Federal' : i === 1 ? r.doc === '03-TX' : r.doc === 'California Laws')).map((r) => `<tr><td><span class="mono">${r.k}</span><div>${r.t}</div></td><td>${chip(r.m)}</td><td>${r.when ?? '<span class="warn">Unknown</span>'}</td></tr>`).join('')}</tbody></table><p class="small muted">Read-only. The SME picks documents; their applied rules come along.</p></div></div>`).join('');
+document.addEventListener('click', (e) => { const i = e.target.dataset?.show; if (i !== undefined) { const el = $('#show' + i); el.style.display = el.style.display === 'none' ? 'block' : 'none'; } });
+$('#openPicker').onclick = () => $('#picker').classList.add('on');
+$('#closePicker').onclick = () => $('#picker').classList.remove('on');
+
+document.querySelectorAll('.step').forEach((b) => (b.onclick = () => {
+  document.querySelectorAll('.step').forEach((x) => x.classList.toggle('on', x === b));
+  document.querySelectorAll('section.view').forEach((s) => s.classList.toggle('on', s.id === b.dataset.v));
+  $('#drawer').classList.remove('on');
+}));
+$('#reextract').onclick = () => toast('Queued extraction for new document versions (mockup).');
+renderCounts(); renderPub(); applyDecisions(); syncSuggest();
+</script>
+</body>
+</html>

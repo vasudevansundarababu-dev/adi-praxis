@@ -23,3 +23,24 @@ describe('project export eligibility', () => {
     expect(exportEligibility({ ...base, status: 'CANCELLED', approvedTasks: 10 }).canExport).toBe(false);
   });
 });
+
+describe('project export eligibility in the new flow (owner, 15 Nov 2026: all tasks approved)', () => {
+  const nf = (approved: number, total = 5, over: Partial<typeof base> = {}) => exportEligibility({ ...base, approvedTasks: approved, ...over, allTasks: { totalTasks: total, approvedTasks: approved } });
+  it('export stays closed until every task is approved, with the count in the reason; validate opens with one', () => {
+    expect(nf(1)).toEqual({ canValidate: true, canExport: false, reason: 'Export opens when all 5 tasks are approved (1 of 5 now).' });
+    expect(nf(0)).toEqual({ canValidate: false, canExport: false, reason: 'Export opens when all 5 tasks are approved (0 of 5 now).' });
+    expect(nf(4).canExport).toBe(false);
+    expect(nf(5)).toEqual({ canValidate: true, canExport: true, reason: null });
+    expect(nf(0, 1).reason).toBe('Export opens when the task is approved (0 of 1 now).');
+  });
+  it('marked complete, the end date or the distinct target no longer open export', () => {
+    expect(nf(2, 5, { status: 'COMPLETED' }).canExport).toBe(false);
+    expect(nf(2, 5, { today: '2027-01-01' }).canExport).toBe(false);
+    expect(nf(2, 5, { distinctTarget: 2 }).canExport).toBe(false);
+  });
+  it('a project without tasks never exports; drafts and cancelled projects still cannot', () => {
+    expect(nf(0, 0)).toEqual({ canValidate: false, canExport: false, reason: 'Export opens when the project has tasks and all of them are approved.' });
+    expect(nf(5, 5, { status: 'DRAFT' }).canExport).toBe(false);
+    expect(nf(5, 5, { status: 'CANCELLED' }).canExport).toBe(false);
+  });
+});

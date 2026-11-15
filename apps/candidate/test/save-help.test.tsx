@@ -29,6 +29,8 @@ describe('D12: Save is always on screen', () => {
     expect(saveStatus({ kind: 'idle' }, at, false).text).toMatch(/^Saved at /);
     expect(saveStatus({ kind: 'error', message: 'x' }, null, false)).toEqual({ text: 'Couldn’t save, try again', error: true });
     expect(saveStatus({ kind: 'idle' }, null, true)).toEqual({ text: 'Couldn’t save, try again', error: true });
+    // A conflict's own message stays in the header only (no duplicate text on the page).
+    expect(saveStatus({ kind: 'conflict', message: 'The task changed. Reload before saving.' }, null, false)).toEqual({ text: 'Not saved: reload the page to continue', error: true });
   });
 
   it('a read-only task has no Save bar', () => {

@@ -9,7 +9,8 @@ const hhmm = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-di
 export function saveStatus(state: SaveState, manualAt: string | null, failed: boolean): { text: string; error: boolean } {
   if (state.kind === 'saving') return { text: 'Saving…', error: false };
   if (failed || state.kind === 'error') return { text: 'Couldn’t save, try again', error: true };
-  if (state.kind === 'conflict') return { text: state.message ?? 'Changed in another window: reload to continue', error: true };
+  // The header already shows the conflict's own message; the bar says what to do, without repeating it.
+  if (state.kind === 'conflict') return { text: 'Not saved: reload the page to continue', error: true };
   const at = [state.kind === 'saved' ? state.at : undefined, manualAt].filter((x): x is string => !!x).sort().pop();
   return at ? { text: `Saved at ${hhmm(at)}`, error: false } : { text: 'All changes save automatically', error: false };
 }

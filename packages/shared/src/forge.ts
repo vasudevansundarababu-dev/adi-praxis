@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TERMS_KEYS, type TermsKey } from './selection';
 
 /**
  * MVP1 (ADI Forge), approved by the owner on 15 Nov 2026 (docs/design/PROJECT-SCREEN-DESIGN.md).
@@ -175,3 +176,73 @@ export interface ForgeTaskRow {
 /** Statuses of a task as its external Reviewer sees it on the candidate app's Home. */
 export const REVIEWER_TASK_STATUSES = ['To review', 'Sent back', 'Approved'] as const;
 export type ReviewerTaskStatus = (typeof REVIEWER_TASK_STATUSES)[number];
+
+// ── MVP1 step 3: the candidate app (sign-in, Before you start, Home task list) ──
+
+/** What the candidate app needs before sign-in: the flow switch and the sign-in mode (public, no secrets). */
+export interface PublicForgeSettings {
+  newFlow: boolean;
+  candidateSignIn: CandidateSignInMode;
+}
+
+/** Consent purposes recorded on the Before you start screen. Terms versions are their content hashes. */
+export const termsConsentPurpose = (key: TermsKey) => `terms:${key}`;
+export const SYNTHETIC_ONLY_PURPOSE = 'synthetic_data_only';
+export const SYNTHETIC_ONLY_VERSION = '1';
+
+const Sha256 = z.string().regex(/^[a-f0-9]{64}$/);
+/** Accept the current contributor terms (each by its content hash) and confirm synthetic data only. Both are required. */
+export const ForgeTermsAcceptRequest = z
+  .object({
+    hashes: z.object(Object.fromEntries(TERMS_KEYS.map((k) => [k, Sha256])) as Record<TermsKey, typeof Sha256>).strict(),
+    syntheticOnly: z.literal(true),
+  })
+  .strict();
+export type ForgeTermsAcceptRequest = z.infer<typeof ForgeTermsAcceptRequest>;
+
+export interface ForgeTermsDoc {
+  key: TermsKey;
+  title: string;
+  body: string;
+  version: number;
+  sha256: string;
+  placeholder: boolean;
+}
+
+export interface ForgeTermsView {
+  /** One per terms key; null when that document has not been published. */
+  terms: (ForgeTermsDoc | null)[];
+  accepted: boolean;
+}
+
+/** One of the SME's own tasks on Home. */
+export interface ForgeAuthorTask {
+  taskId: string;
+  label: string;
+  projectName: string;
+  status: SmeTaskStatus;
+  /** Last status change (ISO). */
+  date: string;
+  /** Comments on the latest send-back (0 unless the task is in Rework). */
+  reworkComments: number;
+}
+
+/** One task the person reviews, as GET /me/reviews lists it. */
+export interface ForgeReviewTask {
+  taskId: string;
+  label: string;
+  slotLabel: string;
+  projectId: string;
+  projectName: string;
+  author: string | null;
+  status: ReviewerTaskStatus;
+  date: string;
+}
+
+export interface ForgeHomeDto {
+  newFlow: boolean;
+  termsAccepted: boolean;
+  name: string | null;
+  authorTasks: ForgeAuthorTask[];
+  reviewTasks: ForgeReviewTask[];
+}

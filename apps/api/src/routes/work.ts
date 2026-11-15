@@ -15,6 +15,7 @@ import { evaluateTask, submitTask, type StoredChecks } from '../tasks/submission
 import { activeAssignment, allocateTasks, templateRef } from '../tasks/task-service';
 import { forgeSettings } from '../forge/settings';
 import { directlyAssignedSme } from '../forge/sourcing';
+import { forgeTermsAccepted } from '../forge/candidate';
 import { conversationInputProblems } from '../tasks/conversation/guards';
 import { allowEditor, experienceOf } from '../tasks/authoring-experience';
 import { AUTHORSHIP_VERSION } from '../tasks/conversation/authorship';
@@ -25,7 +26,7 @@ import { profileSaveProblems } from '../tasks/profile-output';
 const IdParams = z.object({ id: z.string().uuid() });
 
 /** What still stands between this candidate and the project's tasks (SPEC FLOW 3, candidate login step 4). */
-type Step = { step: 'identity' | 'account' | 'accept' | 'onboarding' | 'eligibility' | 'not_assigned'; message: string; href: string | null };
+type Step = { step: 'identity' | 'account' | 'accept' | 'onboarding' | 'eligibility' | 'not_assigned' | 'terms'; message: string; href: string | null };
 
 /**
  * Whether the SME works on this project through the MVP1 new flow: the setting is on and a PM or Admin assigned them
@@ -47,7 +48,11 @@ export async function workContext(tx: Db | Tx, gate: SelectionGate, smeUserId: s
   if (sa?.status === 'PROPOSED') return { ok: false, step: 'accept', message: 'Accept the assignment on your home page first.', href: '/home' };
   const pa = candidate ? await activeAssignment(tx, projectId, candidate.id) : null;
   if (!candidate || !pa) return { ok: false, step: 'not_assigned', message: 'You are not assigned to this project.', href: '/home' };
-  if (direct) return { ok: true, candidateId: candidate.id, paId: pa.id, direct: true };
+  if (direct) {
+    // MVP1: the one-time Before you start screen (contributor terms, synthetic data only) comes before any work.
+    if (!(await forgeTermsAccepted(tx, u.id, u.clientId))) return { ok: false, step: 'terms', message: 'Accept the contributor terms first.', href: '/welcome' };
+    return { ok: true, candidateId: candidate.id, paId: pa.id, direct: true };
+  }
   const g = await gate.check(tx, { candidateId: candidate.id, projectId });
   if (!g.ok) {
     const onboarding = /onboarding|terms|checklist/.test(g.reason);

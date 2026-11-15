@@ -3,6 +3,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db } from '../db';
 import { forgeDecide, forgeTaskRows, forgeTaskView, requireNewFlow, reviewerDecide, reviewerTaskList, reviewerTaskView } from '../forge/review';
+import { requireForgeTerms } from '../forge/candidate';
 import { forgeSettings } from '../forge/settings';
 import { sourcingProject } from '../forge/sourcing';
 import { writeAudit } from '../platform/audit';
@@ -45,11 +46,15 @@ export const forgeReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, 
 
   app.get('/me/reviews/:taskId', { config: { access: 'candidate' }, schema: { tags: ['work'], params: z.object({ taskId: z.string().uuid() }) } }, async (req) => {
     await requireNewFlow(db, req.candidate!.clientId);
+    await requireForgeTerms(db, req.candidate!);
     return reviewerTaskView(db, req.candidate!, req.params.taskId);
   });
 
   app.post('/me/reviews/:taskId/decision', { config: { access: 'candidate' }, schema: { tags: ['work'], params: z.object({ taskId: z.string().uuid() }), body: ReviewerDecisionRequest } }, async (req, reply) => {
-    await runCandidateCommand(db, req, reply, async ({ tx, actor, audit, emit }) => ({ status: 200, body: await reviewerDecide(tx, actor, req.params.taskId, req.body, audit, emit) }));
+    await runCandidateCommand(db, req, reply, async ({ tx, actor, audit, emit }) => {
+      await requireForgeTerms(tx, actor);
+      return { status: 200, body: await reviewerDecide(tx, actor, req.params.taskId, req.body, audit, emit) };
+    });
     return reply;
   });
 };

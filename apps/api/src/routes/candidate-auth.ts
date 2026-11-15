@@ -1,4 +1,4 @@
-import { CandidateMeDto, GoogleSignInRequest, IDENTITY_HELP_REASONS, identityEligible } from '@praxis/shared';
+import { CandidateMeDto, GoogleSignInRequest, IDENTITY_HELP_REASONS, identityEligible, normEmail, type PublicForgeSettings } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Prisma } from '@prisma/client';
 import type { InternalActor } from '../auth/actor';
@@ -14,6 +14,8 @@ import type { Config } from '../config';
 import type { Db, Tx } from '../db';
 import { AppError, notFound, unauthorized } from '../lib/errors';
 import { runCandidateCommand, runCommand } from '../platform/command';
+import { claimTarget } from '../forge/candidate';
+import { forgeSettings } from '../forge/settings';
 
 export interface CandidateDeps {
   db: Db;
@@ -78,6 +80,12 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
   const { db, config, google, identity } = deps;
   const cookieOptions = { path: '/', httpOnly: true, sameSite: 'lax' as const, secure: config.COOKIE_SECURE };
 
+  // MVP1: what the candidate app shows before sign-in (flow switch and sign-in mode), for the same client sign-in uses.
+  app.get('/public/forge-settings', { config: { access: 'public' }, schema: { tags: ['candidate'] } }, async (): Promise<PublicForgeSettings> => {
+    const f = await forgeSettings(db, await deps.resolveClientId());
+    return { newFlow: f.newFlow, candidateSignIn: f.candidateSignIn };
+  });
+
   // ── C01 sign-in ──
   app.post(
     '/auth/google',
@@ -88,25 +96,35 @@ export const candidateAuthRoutes: FastifyPluginAsyncZod<CandidateDeps> = async (
     async (req, reply) => {
       const g = await google.verify(req.body.credential);
       const clientId = await deps.resolveClientId();
-      // The stable Google subject is the identity key. Never merge accounts by email (FLOW2 C01).
+      // The stable Google subject is the identity key. Never merge accounts by email (FLOW2 C01), with one exception:
+      // in the MVP1 new flow a verified email that a PM or Admin uploaded in Sourcing claims the account made for it
+      // (see claimTarget); an account that already has a sign-in identity is never taken over.
       let pid = await db.providerIdentity.findUnique({ where: { provider_subject: { provider: 'GOOGLE', subject: g.subject } } });
       if (!pid) {
         if (req.body.adultAttested !== true) {
           throw new AppError(400, 'ADULT_ATTESTATION_REQUIRED', 'Please confirm you are 18 or over to create an account.');
         }
+        const newFlow = (await forgeSettings(db, clientId)).newFlow;
         pid = await db.$transaction(async (tx) => {
-          const u = await tx.smeUser.create({
-            data: {
-              clientId,
-              displayName: g.name,
-              contactEmail: g.emailVerified ? g.email : null,
-              adultAttestedAt: new Date(),
-            },
-          });
-          const p = await tx.providerIdentity.create({ data: { clientId, smeUserId: u.id, provider: 'GOOGLE', subject: g.subject, emailAtLink: g.email } });
-          await tx.auditEvent.create({
-            data: { clientId, actorType: 'CANDIDATE', actorId: u.id, entityType: 'SmeUser', entityId: u.id, action: 'candidate.account_created', after: { provider: 'GOOGLE', adultAttested: true } },
-          });
+          const claim = newFlow && g.emailVerified && g.email ? await claimTarget(tx, clientId, g.email) : null;
+          const audit = (action: string, smeUserId: string, after: Prisma.InputJsonValue) =>
+            tx.auditEvent.create({ data: { clientId, actorType: 'CANDIDATE', actorId: smeUserId, entityType: 'SmeUser', entityId: smeUserId, action, after } });
+          let smeUserId: string;
+          if (claim?.kind === 'link') {
+            const u = await tx.smeUser.findUniqueOrThrow({ where: { id: claim.smeUserId } });
+            if (!u.adultAttestedAt) await tx.smeUser.update({ where: { id: u.id }, data: { adultAttestedAt: new Date() } });
+            smeUserId = u.id;
+          } else {
+            const u = await tx.smeUser.create({ data: { clientId, displayName: g.name, contactEmail: g.emailVerified ? g.email : null, adultAttestedAt: new Date() } });
+            smeUserId = u.id;
+            await audit('candidate.account_created', u.id, { provider: 'GOOGLE', adultAttested: true });
+          }
+          const p = await tx.providerIdentity.create({ data: { clientId, smeUserId, provider: 'GOOGLE', subject: g.subject, emailAtLink: g.email } });
+          if (claim) {
+            // Every sourced row with this email in the client points at the claimed account (ids only in the audit).
+            await tx.sourcedPerson.updateMany({ where: { clientId, emailNorm: normEmail(g.email!), smeUserId: null }, data: { smeUserId } });
+            await audit('candidate.account_claimed', smeUserId, { provider: 'GOOGLE', providerIdentityId: p.id, created: claim.kind === 'create', sourcedPersonIds: claim.sourcedPersonIds });
+          }
           return p;
         });
       }

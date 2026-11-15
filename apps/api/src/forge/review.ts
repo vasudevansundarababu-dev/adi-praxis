@@ -34,7 +34,7 @@ const person = (u: { displayName: string | null; contactEmail: string | null } |
   u ? { name: u.displayName ?? u.contactEmail ?? 'Unknown', email: u.contactEmail } : null;
 
 /** Last status change: the latest of the task's dated steps and its review decisions. */
-function lastChange(t: { createdAt: Date; assignedAt: Date | null; startedAt: Date | null; submittedAt: Date | null }, reviewDates: Date[]) {
+export function lastChange(t: { createdAt: Date; assignedAt: Date | null; startedAt: Date | null; submittedAt: Date | null }, reviewDates: Date[]) {
   const all = [t.createdAt, t.assignedAt, t.startedAt, t.submittedAt, ...reviewDates].filter((d): d is Date => !!d);
   return new Date(Math.max(...all.map((d) => d.getTime()))).toISOString();
 }

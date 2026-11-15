@@ -1168,3 +1168,34 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
   - message the DevOps session to prepare the QA deploy;
   - "gcp deployment".
   - The DevOps session's own rule still asks for the owner's yes in that session for each deploy and QA data run.
+
+## MVP1 step 1: direct assignment (15 Nov 2026)
+
+- **Settings** live in `Client.settings.forge` (`newFlow` default off, `candidateSignIn` default `OFFLINE`), read by
+  Admins and PMs at `GET /admin/forge-settings`, changed by Admins only (`PUT`, audited `forge.settings_updated`).
+- **(chosen by Claude)** Offline sign-in is refused when `APP_ENV=production` (and for a production build that claims
+  `APP_ENV=local`), as the design says. Staging and demo (QA) allow it.
+- **(chosen by Claude)** Sourcing works whatever the switch says (it is additive). Direct assignment and change of
+  author need the new flow (`409 NEW_FLOW_OFF`).
+- **(chosen by Claude)** "New or active projects" for Sourcing: Ready for staffing, Staffing, Staffed, In progress and
+  Paused. Draft, Completed and Cancelled are refused (`PROJECT_NOT_OPEN`).
+- **(chosen by Claude)** A person is never both SME and Reviewer on one project: the same email assigned in the other
+  role is refused (`BOTH_ROLES`) and hidden from the Assign screen.
+- **(chosen by Claude)** Task rows (one per coverage slot, CREATED) are made on submit with the new flow on, and lazily
+  (audited `project.task_rows_created`) by the project's People and Assign reads and the assign route. The task's
+  `input.slot` is built by the same function as `allocateTasks`.
+- **(chosen by Claude)** Account for a directly assigned person: an SmeUser already signed in with `mock-<email>`, or
+  with that contact email, is reused; otherwise one is created with no sign-in identity (claimed at first sign-in in a
+  later step). The SME gets a minimal Candidate (`poolStatus ASSIGNED_DIRECT`) and a ProjectAssignment with no
+  proposal; a Reviewer gets no Candidate.
+- **(chosen by Claude)** No per-expert cap is applied when the project's `maxPerExpert` is empty. SME places count the
+  SMEs currently assigned against `requiredWorkers`; a person who already holds a place can take more tasks.
+- **(chosen by Claude)** The first direct author assignment moves a Ready for staffing, Staffing or Staffed project to
+  In progress (audited `project.started`, `direct: true`), so Pause and Resume work as today.
+- **(chosen by Claude)** Changing the author (only while Assigned and not started): when the old author holds no other
+  task on the project, their Sourcing entry and project place are released (audited).
+- **(chosen by Claude)** Candidate gate: the new-flow rules apply when the setting is on **and** the SME is assigned by a
+  PM or Admin on that project. Then identity, proposal-acceptance, selection and onboarding checks are skipped, pulling
+  returns `409 PM_ASSIGNS_TASKS`, `canPull` is false and the studio's first open never allocates. An SME from the
+  earlier journey keeps the earlier rules (and can still pull) while the setting is on, so the old journey keeps
+  working until the owner retires it.

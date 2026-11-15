@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * D13 (owner, 15 Nov 2026): Help is a small floating mascot, our own ADI Forge character "Ember": a friendly forge
- * spark standing on a tiny anvil, in the ADI Forge purples with a teal spark (docs/design/brand-forge). Inline SVG (no
+ * D13 (owner, 15 Nov 2026): Help is a small floating mascot, our own ADI Forge character "Ember": a friendly
+ * flame-like forge ember with a face, in the ADI Forge purples with a teal spark (docs/design/brand-forge). Inline SVG (no
  * downloads), a gentle idle bob that stops under prefers-reduced-motion, a "Need help?" bubble on hover or focus,
  * keyboard reachable with a focus ring, hidden in print. Fixed bottom-right, above the sticky Save bar.
  */
@@ -16,10 +16,9 @@ export function EmberMark({ size = 64 }: { size?: number }) {
           <stop offset="1" stopColor="#5B4BD6" />
         </linearGradient>
       </defs>
-      {/* the anvil it stands on */}
-      <path d="M14 50h36c0 3-3 5-7 5H22c-5 0-8-2-8-5z" fill="#2E2A6B" />
-      <rect x="27" y="54" width="10" height="5" rx="1.5" fill="#2E2A6B" />
-      {/* the ember: a rounded spark with a curled tip */}
+      {/* a soft glow it floats over */}
+      <ellipse cx="32" cy="56" rx="13" ry="3.5" fill="#8B6CF0" opacity="0.35" />
+      {/* the ember: a rounded flame with a curled tip */}
       <path d="M32 6c3 7 13 12 13 25 0 9-6 17-13 17S19 40 19 31c0-7 4-11 7-14 0 4 2 6 4 6-1-6 0-12 2-17z" fill="url(#ember-body)" />
       {/* face */}
       <ellipse cx="27" cy="32" rx="3.2" ry="3.8" fill="#FFFFFF" />

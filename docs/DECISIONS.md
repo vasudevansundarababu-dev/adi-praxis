@@ -1916,8 +1916,8 @@ D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos ar
   Submit's checks. The bar shows "Saving…", "Saved at HH:MM" or "Couldn't save, try again", and the button becomes
   Try again. Beside Save is "Check and submit", which goes to the last section. Autosave is unchanged. The bar is
   hidden on read-only tasks and in print.
-- **(owner, D13)** **Help is a floating mascot: "Ember", our own ADI Forge character.** It is a friendly forge spark
-  standing on a tiny anvil, in the ADI Forge purples with a teal spark. It is original, with no terminal face or
+- **(owner, D13)** **Help is a floating mascot: "Ember", our own ADI Forge character.** It is a friendly flame-like
+  forge ember with a face, in the ADI Forge purples with a teal spark, with no anvil (an internal name stays out of sight). It is original, with no terminal face or
   cloud-robot silhouette. It is an inline SVG (64 px) fixed at the bottom right, above the sticky Save bar, so it never
   covers Save, Submit or a field. It has a gentle idle bob (none under `prefers-reduced-motion`) and a "Need help?"
   bubble on hover or focus. `aria-label="Help"` with a focus ring; it is hidden in print and while the drawer is open.

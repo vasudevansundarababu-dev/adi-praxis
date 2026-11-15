@@ -2,7 +2,7 @@
 
 | Item | Value |
 | --- | --- |
-| Status | **Plan only, awaiting the owner's approval.** No code yet. |
+| Status | **Approved by the owner (15 Nov 2026) and built** on `claude/rubric-recommendations`, behind flags that are off by default. What RL Gym doesn't receive: `docs/integrations/RUBRIC-INTERNAL-ONLY.md`. |
 | Requirements | `docs/prd/PRD-RUBRIC-RECOMMENDATIONS.md` and `docs/prd/PRD-SIMPLIFIED-RUBRIC-EDITOR.md` (owner specs, 15 Nov 2026, verbatim). Section 14 reconciles them. |
 | Mockup | `docs/design/mockups/sme-task-form.html`: the whole SME task form on KYC v7 (S1–S8, S4 picker, S7 rubric, declaration). **Owner approval needed before any build.** |
 | Related | QA defects D8 (S7 typed by hand), D9 (technical criterion fields typed with no source) and D6 (S4 picked from the policy library); policy rule annotations plan (PR #81) |

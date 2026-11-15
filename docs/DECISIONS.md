@@ -1761,3 +1761,29 @@ KYC v7 SME task form (plan section 17). It's awaiting the owner's approval; no f
   come from the project policy manifest identities (PR #81: document id, `rs<set>.d<doc>`, "project rule set vN",
   `sha256`), not from the GB-01…GB-07 identities RL Gym supplied with v7. This gives one source of truth. RL Gym
   confirms which identities its v7 grader expects before S4 ships. The mockup's GB-style values are example data.
+
+## Rubric editor and recommendations: build (15 Nov 2026)
+
+The owner approved the SME task-form mockup and the combined plan. This is built on branch
+`claude/rubric-recommendations`, behind `RUBRIC_RECOMMENDATIONS_ENABLED` (off) and `RUBRIC_AI_ENABLED` (off).
+
+- **(chosen by Claude)** The first visit to S7 runs a rules-only derivation (no model) so that every link has a
+  snapshot. "Refresh suggestions" reruns it. The same inputs reuse the earlier run, and the reuse is audited.
+- **(chosen by Claude)** S8 "Sources": the field shows the ticked list read-only, with a one-click "Fill the field
+  below from this list" when the field is empty. It is not filled automatically: that text is agent-visible, so the
+  author does it with one click. Existing text is never overwritten. This refines the earlier "filled when empty".
+- **(chosen by Claude)** Policy rule annotations (PR #81) are read through `RuleAnnotationSource`. Until PR #81 is
+  merged, that returns none: rules show without a marking, and applicability falls back to "Required throughout" when
+  a workflow step supports it, else "Undefined". Wiring PR #81's table in is a one-function change, done after it merges.
+- **(chosen by Claude)** Matching criteria to sources is deterministic: shared word stems with light suffix stripping,
+  at most two links per role and five in all. On KYC v7, which has no default text, some criteria get few links and
+  show "Source link needed". That is deliberate: nothing is invented.
+- **(chosen by Claude)** D8 and D6 submit checks (`rubric.template-criteria`, `policy.library-reference`) and the D9
+  evaluator normalisation on save run only with the flag on. With it off, saving and submitting are exactly as before.
+- **(chosen by Claude)** The Criterion item's "Critical" flag is labelled "Whole-task failure" in our help text. The
+  key and its meaning are unchanged.
+- **(owner, D3)** Before you start and the submit panel use exactly "I won't use real customer, employer or account
+  information." with the flag on. The `syntheticOnly` / `syntheticDeclaration` API fields are unchanged.
+- **(chosen by Claude)** D5 for template text: with the flag on, template help is shown through `publicText()`
+  ("Anvil" becomes "RL Gym", "Praxis" and "ADI-Labs" become "ADI Forge"). The stored template is unchanged, so its
+  hashes are too. The arrival check for new templates (D5 part 1) is not part of this work.

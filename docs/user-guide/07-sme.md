@@ -197,6 +197,38 @@ The task becomes read-only and shows "Submitted · awaiting review".
 
 > On a phone the workbench is read-only. Use a laptop or desktop.
 
+### Rubric, policies and sources (when your administrator has switched on the new rubric editor)
+
+On templates such as KYC v7 the form changes in three places. Nothing here changes how you save or submit.
+
+- **S4 Policies: pick, don't type.** Select **Add policy** and tick the policies this task uses from the project's
+  published library. Policy ID, Version, Publication reference and SHA-256 are filled in for you and are read-only. You
+  write only Applicability, Rationale and Exceptions, which only reviewers see. If the project has no published
+  policies yet, ask your project admin to add them.
+- **S7 Rubric.** The template's criteria are already listed, with the template's default Pass / Partial / Fail text
+  where it has some. Open a criterion to edit it. **Reset to template** puts the default back, and reviewers see which
+  texts you changed.
+  - **Sources used for this task** is a list of checkboxes, ticked from what your task already uses. Untick a source
+    you didn't use, or select **Add another source** and pick one by name.
+  - **Derived from** shows the sources each criterion was linked to. You don't maintain these; select one to read the
+    passage, with its section and version.
+  - **When does this apply?** Select **Change** to say whether the criterion is required throughout, required only
+    when a condition applies, a permitted option, or a human officer's responsibility.
+  - **Make this a whole-task failure when…** needs an explicit condition. In KYC, a Fail on that criterion fails the
+    whole task. A Partial doesn't.
+  - **Technical grading settings · From template** are read-only. You never type evaluator IDs, versions or output
+    fields.
+  - **Source changed — check rubric** means a source changed after the criterion was linked to it. Read it, then edit
+    or select **Reviewed, keep as is**. Nothing is rewritten for you.
+  - **Source link needed** means no ticked source supports the criterion. Tick or add one.
+  - **Evaluation setup needed** marks something RL Gym can't grade yet (for example a suggested addition). It's kept as
+    a note.
+  - **AI suggestion** labels wording a model suggested, when your administrator allows it. You decide what to keep.
+- **Still to finish** lists what is incomplete. You can always save a draft; submit runs the same checks as before.
+- **S8 Sources** shows your ticked sources. If the field is empty, **Fill the field below from this list** writes
+  them in.
+- The declaration you tick before submitting reads "I won't use real customer, employer or account information."
+
 ## 7.11 Rework
 
 If the Validator asks for changes, the task shows **Changes requested**. Open it: a yellow box "The Validator asked for

@@ -23,14 +23,30 @@ export function forgeKit(ctx: () => { app: FastifyInstance; pm: string; admin: s
     return res.json() as { id: string; email: string };
   }
 
-  /** A candidate signed in through the mock Google sign-in (subject `mock-<email>`), with no identity check. */
-  async function signIn(mail: string, subject = `mock-${mail}`, name = 'Grace Hopper') {
+  /**
+   * A candidate signed in through the mock Google sign-in (subject `mock-<email>`), with no identity check. With the
+   * new flow on, they also accept the current terms (step 3's Before you start), unless `terms: false`.
+   */
+  async function signIn(mail: string, subject = `mock-${mail}`, name = 'Grace Hopper', o: { terms?: boolean } = {}) {
     const res = await ctx().app.inject({ method: 'POST', url: '/api/v1/auth/google', payload: { credential: google.mint({ subject, email: mail, name }), adultAttested: true } });
     expect(res.statusCode, res.body).toBe(200);
-    return { smeUserId: res.json().id as string, cookie: `praxis_candidate=${res.cookies.find((x) => x.name === 'praxis_candidate')!.value}` };
+    const me = { smeUserId: res.json().id as string, cookie: `praxis_candidate=${res.cookies.find((x) => x.name === 'praxis_candidate')!.value}` };
+    if (o.terms !== false) await acceptTerms(me.cookie, { ifNewFlow: true });
+    return me;
+  }
+
+  /** Before you start: accept the current terms by their hashes and confirm synthetic data only. */
+  async function acceptTerms(cookie: string, o: { ifNewFlow?: boolean } = {}) {
+    const view = await call(ctx().app, 'GET', cookie, '/me/forge/terms');
+    if (o.ifNewFlow && view.statusCode === 409 && view.json().error === 'NEW_FLOW_OFF') return null;
+    expect(view.statusCode, view.body).toBe(200);
+    const hashes = Object.fromEntries((view.json().terms as { key: string; sha256: string }[]).map((t) => [t.key, t.sha256]));
+    const res = await call(ctx().app, 'POST', cookie, '/me/forge/terms', { hashes, syntheticOnly: true });
+    expect(res.statusCode, res.body).toBe(200);
+    return res;
   }
 
   const assign = (projectId: string, sourcedPersonId: string, taskId: string) => call(ctx().app, 'POST', ctx().pm, `/projects/${projectId}/assignments/direct`, { sourcedPersonId, taskId });
 
-  return { setFlow, source, signIn, assign };
+  return { setFlow, source, signIn, acceptTerms, assign };
 }

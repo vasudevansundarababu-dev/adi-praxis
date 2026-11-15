@@ -1232,3 +1232,42 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
   and flags (as a Validator sees them), never other authors' content (no similar-task texts).
 - **(chosen by Claude)** Task page output: none while Open, the draft read-only while Assigned or In progress, else the
   latest submitted version. "Date" is the latest of created, assigned, started, submitted and decision times.
+
+## MVP1 step 3: candidate app (15 Nov 2026)
+
+- **Routes.** `GET /public/forge-settings` (public: `newFlow`, `candidateSignIn`, for the client sign-in uses),
+  `GET`/`POST /me/forge/terms` (Before you start) and `GET /me/forge/home` (Home). Terms routes need the new flow
+  (`409 NEW_FLOW_OFF`); Home answers `newFlow: false` with empty lists when it is off.
+- **(chosen by Claude)** Account claim. The design makes the email a PM or Admin uploaded in Sourcing the candidate's
+  sign-in, so with the new flow on, a first sign-in whose Google email is verified and matches a sourced SME or
+  Reviewer in the client links the new sign-in identity to the account made for that person (pre-created in step 1,
+  no sign-in identity yet), setting the 18+ time if missing. If no account was made yet, a new one is created and
+  every sourced row with that email points at it. An account that already has a sign-in identity is never taken over
+  (a second Google account with the same email gets a new, empty account), nor is one when the person's rows point
+  at more than one account. Unverified emails never claim. With the new flow off, sign-in never merges by email, as
+  before. Audited `candidate.account_claimed` with ids only.
+- **(chosen by Claude)** Terms. Acceptance is recorded as Consent rows: `terms:<key>` with the document's sha256 as
+  the version (one per current terms document) and `synthetic_data_only` version `1`. Accepting needs the hashes of
+  the current versions (`409 TERMS_CHANGED`), is refused for placeholder terms where onboarding refuses them (live
+  identity required, or a production build other than demo: `409 TERMS_PLACEHOLDER`) and is idempotent (no second
+  set of rows; each call is audited `candidate.terms_accepted`, the repeat with `alreadyAccepted: true`). A newer
+  published version must be accepted again.
+- **(chosen by Claude)** Directly assigned work (step 1's gate) also needs accepted terms: the gate answers step
+  `terms` (`href: /welcome`). The external Reviewer's task page and decision answer `409 TERMS_REQUIRED` until
+  accepted; the Reviewer list on Home is not gated.
+- **(chosen by Claude)** Home: author tasks are the tasks assigned to the person in projects where they are a directly
+  assigned SME (status as `smeTaskStatus`; `reworkComments` counts the latest send-back's comments while in Rework).
+  Review tasks are step 2's Reviewer list. Sorted on screen rework first; the next step is rework, then To review,
+  then In progress, then New. No tasks at all shows "No tasks for this account yet" with the signed-in email.
+- **(chosen by Claude)** Candidate app with the new flow on: the header shows only Home and Sign out (signed out:
+  Sign in); sign-in skips the identity step and goes to Before you start until the terms are accepted, then Home; the
+  task page returns to Home. A failing settings or session read is treated as the earlier journey and signed out, so
+  pages never fail on it. The Online sign-in screen is a later step.
+- **(chosen by Claude)** Review comments: the Review page has one comment box per design group of the form's eight
+  sections (S1, S2, S3-S4, S5, S6-S8, hyphen as stored). The task page places a comment under every section its key
+  covers (a range covers each section in it; an en dash is accepted), highlights those sections, opens on the first
+  one, and lists comments naming no section of the form (for example W04 from the console) at the top. The KYC v1
+  workbench is unchanged.
+- **(chosen by Claude)** The Reviewer's Approve on a task flagged as a likely duplicate needs a tick that it is
+  distinct (sent as `ACCEPT_AS_DISTINCT`; send-back sends `REWORK`), and on an open coverage slot a tick confirming
+  the task's own coverage tags and edge case, because step 2's API requires them.

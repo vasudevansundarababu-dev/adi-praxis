@@ -32,7 +32,10 @@ export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: 
       return {status:200,body:{accepted:true,terms:AUTHORSHIP_TERMS}};
     }); return reply;
   });
-  app.get('/me/tasks/:id/conversation', { config: { access: 'candidate' }, schema: { params: Params } }, async req => conversationView(db, await load(db, req.params.id, req.candidate!.smeUserId)));
+  // One snapshot: the task (pending proposal) and its latest run are read together. Read separately, a run finishing
+  // between the reads showed the run as done without its proposal, so the page stopped polling with no Confirm.
+  app.get('/me/tasks/:id/conversation', { config: { access: 'candidate' }, schema: { params: Params } }, async req =>
+    db.$transaction(async (tx) => conversationView(tx, await load(tx, req.params.id, req.candidate!.smeUserId)), { isolationLevel: 'RepeatableRead' }));
   app.get('/me/tasks/:id/agent-preview', { config: { access: 'candidate' }, schema: { params: Params } }, async req => {
     const t = await load(db, req.params.id, req.candidate!.smeUserId), policy = await effectivePolicy(db, t.clientId, t);
     const output = (t.output ?? {}) as Record<string, unknown>;

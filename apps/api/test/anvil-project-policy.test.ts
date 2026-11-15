@@ -245,10 +245,10 @@ describe('GET /projects/:id/anvil/project-policy', () => {
     expect(manifest.task_bindings.map((b) => `${b.task_id}@${b.task_version}`).sort()).toEqual([`${PRAXIS_STAGED_EXAMPLE.task_id}@${PRAXIS_STAGED_EXAMPLE.task_version}`, `${PRAXIS_SYNTHETIC_EXAMPLE.task_id}@9.0.0`].sort());
   });
 
-  it('both routes are in the generated OpenAPI document', async () => {
+  it('the routes (manifest, annotations, sources) are in the generated OpenAPI document', async () => {
     const doc = (await app.inject({ method: 'GET', url: '/docs/json' })).json();
     const paths = Object.keys(doc.paths).filter((p) => p.includes('/anvil/project-policy'));
-    expect(paths.sort()).toEqual(['/api/v1/projects/{id}/anvil/project-policy', expect.stringMatching(/^\/api\/v1\/projects\/\{id\}\/anvil\/project-policy\/sources\//)]);
+    expect(paths.sort()).toEqual(['/api/v1/projects/{id}/anvil/project-policy', '/api/v1/projects/{id}/anvil/project-policy/annotations', expect.stringMatching(/^\/api\/v1\/projects\/\{id\}\/anvil\/project-policy\/sources\//)]);
     for (const p of paths) expect(doc.paths[p].get.security).toEqual([{ session: [] }, { serviceToken: [] }]);
   });
 });

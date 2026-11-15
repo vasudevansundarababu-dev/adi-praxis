@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { AppError, notFound } from '../lib/errors';
 import { policyProject } from '../policy/access';
 import { buildProjectPolicyManifest } from '../policy/anvil-project-policy';
+import { buildProjectPolicyAnnotations } from '../policy/anvil-policy-annotations';
 
 const Params = z.object({ id: z.string().uuid() });
 const SourceParams = Params.extend({ '*': z.string().min(1).max(240) });
@@ -50,6 +51,31 @@ export const anvilRoutes: FastifyPluginAsyncZod<{ db: Db; storage: ObjectStorage
       .header('content-disposition', `attachment; filename="praxis-project-policy-${p.id}.json"`)
       .header('x-praxis-schema-version', PROJECT_POLICY_SCHEMA_VERSION)
       .header('x-praxis-manifest-sha256', built.sha256)
+      .send(built.bytes);
+  });
+
+  /**
+   * Policy rule annotations (`praxis.anvil.project_policy_annotations.v1`, PROPOSED until RL Gym agrees; change note in
+   * docs/anvil/RL-GYM-POLICY-ANNOTATIONS-CHANGE-NOTE.md). Additive: the v1 manifest above is unchanged, and this
+   * document is bound to its exact bytes by `x-praxis-manifest-sha256`. Same access, audit and 409-on-invalid rules.
+   */
+  app.get('/projects/:id/anvil/project-policy/annotations', {
+    config: { access: READ },
+    schema: { tags: ['anvil'], summary: 'Policy rule annotations for the project policy manifest (praxis.anvil.project_policy_annotations.v1, proposed)', params: Params },
+  }, async (req, reply) => {
+    const p = await project(req, req.params.id);
+    const built = await buildProjectPolicyAnnotations(db, storage, p);
+    if (built.problems.length || !built.bytes || !built.doc) {
+      await audit(req, p, 'anvil.project_policy_annotations_blocked', { codes: [...new Set(built.problems.map((x) => x.code))] });
+      throw new AppError(409, 'PROJECT_POLICY_INVALID', 'The project policy annotations are not valid, so they were not exported.', { problems: built.problems });
+    }
+    const annotated = built.doc.rules.filter((r) => r.annotation_status === 'annotated').length;
+    await audit(req, p, 'anvil.project_policy_annotations_exported', { annotationsSha256: built.sha256, manifestSha256: built.manifest.sha256, rules: built.doc.rules.length, annotated });
+    return reply.header('content-type', 'application/json')
+      .header('content-disposition', `attachment; filename="praxis-project-policy-annotations-${p.id}.json"`)
+      .header('x-praxis-schema-version', built.doc.schema_version)
+      .header('x-praxis-annotations-sha256', built.sha256!)
+      .header('x-praxis-manifest-sha256', built.manifest.sha256)
       .send(built.bytes);
   });
 

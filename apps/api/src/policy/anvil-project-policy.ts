@@ -74,6 +74,20 @@ export interface BuiltProjectPolicy {
   sources: Map<string, Buffer>;
   /** Empty when the manifest is valid. */
   problems: ProjectPolicyProblem[];
+  /**
+   * Where each manifest rule came from, keyed `policy_id@version#rule_id`: its published set and set entry, and the
+   * cited document version. Not part of the manifest bytes (used by the annotations document).
+   */
+  index: Map<string, ManifestRuleSource>;
+}
+
+export interface ManifestRuleSource {
+  set: ProjectRuleSet;
+  rule: RuleSetRule;
+  /** Every rule of the same published set, by rule key (to resolve links to exact versions). */
+  setRules: Map<string, RuleSetRule>;
+  docVersion: DocVersion;
+  source: NonNullable<ReturnType<typeof primarySource>>;
 }
 
 export async function buildProjectPolicyManifest(db: Db, storage: ObjectStorage, project: { id: string; clientId: string; name: string }): Promise<BuiltProjectPolicy> {
@@ -113,6 +127,7 @@ export async function buildProjectPolicyManifest(db: Db, storage: ObjectStorage,
 
   // One Anvil policy per (rule set version, cited document version); each rule sits under its requirement's source.
   const policies = new Map<string, ProjectPolicyManifest['policies'][number]>();
+  const index = new Map<string, ManifestRuleSource>();
   const usedDocs = new Map<string, DocVersion>();
   const policiesOfSet = (set: ProjectRuleSet): AnvilPolicyRef[] => {
     const refs = new Map<string, AnvilPolicyRef>();
@@ -129,6 +144,7 @@ export async function buildProjectPolicyManifest(db: Db, storage: ObjectStorage,
       usedDocs.set(dv.id, dv);
       const policy = policies.get(key) ?? { ...ref, title: dv.document.title, source_id: dv.id, rules: [] };
       if (!policy.rules.some((x) => x.rule_id === ruleIdOf(r))) {
+        index.set(`${key}#${ruleIdOf(r)}`, { set, rule: r, setRules: new Map(contents.get(set.id)!.rules.map((x) => [x.ruleKey, x])), docVersion: dv, source: src });
         policy.rules.push({ rule_id: ruleIdOf(r), requirement: r.body.requirement, source_location: sourceLocation(dv, src.locator), severity: DEFAULT_RULE_SEVERITY, visibility: VISIBILITY[r.body.visibility] });
       }
       policies.set(key, policy);
@@ -190,5 +206,5 @@ export async function buildProjectPolicyManifest(db: Db, storage: ObjectStorage,
   const manifest = { ...body, source_project: { id: projectId, version, name: project.name } } as ProjectPolicyManifest;
   const bytes = Buffer.from(stableStringify(manifest), 'utf8');
   problems.push(...validateProjectPolicyManifest(bytes, sourceBytes, { exports: exported.map((x) => x.export.envelope) }));
-  return { manifest, bytes, sha256: sha256(bytes.toString('utf8')), sources: sourceBytes, problems };
+  return { manifest, bytes, sha256: sha256(bytes.toString('utf8')), sources: sourceBytes, problems, index };
 }

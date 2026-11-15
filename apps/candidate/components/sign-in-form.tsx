@@ -13,13 +13,17 @@ declare global {
   }
 }
 
-/** After sign-in: identity first (FLOW2), then back to where the candidate was going. */
-function destination(me: CandidateMeDto, returnTo: string) {
+/**
+ * After sign-in: identity first (FLOW2), then back to where the candidate was going. MVP1 flow: no identity step;
+ * Before you start until the terms are accepted, then Home.
+ */
+export function destination(me: CandidateMeDto, returnTo: string, forge?: { termsAccepted: boolean } | null) {
+  if (forge) return forge.termsAccepted ? returnTo || '/home' : '/welcome';
   if (me.nextStep === 'VERIFY_IDENTITY') return `/verify${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`;
   return returnTo || '/home';
 }
 
-export function SignInForm({ returnTo, googleClientId, demo = false }: { returnTo: string; googleClientId: string; demo?: boolean }) {
+export function SignInForm({ returnTo, googleClientId, demo = false, newFlow = false }: { returnTo: string; googleClientId: string; demo?: boolean; newFlow?: boolean }) {
   const router = useRouter();
   const [adult, setAdult] = useState(false);
   const [needsAdult, setNeedsAdult] = useState(false);
@@ -35,7 +39,8 @@ export function SignInForm({ returnTo, googleClientId, demo = false }: { returnT
       const res = await call<CandidateMeDto>('POST', '/auth/google', { credential, adultAttested: adultRef.current });
       setPending(false);
       if (res.ok) {
-        router.replace(destination(res.data!, returnTo));
+        const forge = newFlow ? await call<{ newFlow: boolean; termsAccepted: boolean }>('GET', '/me/forge/home') : null;
+        router.replace(destination(res.data!, returnTo, forge?.ok && forge.data?.newFlow ? forge.data : null));
         router.refresh();
       } else if (res.code === 'ADULT_ATTESTATION_REQUIRED') {
         setNeedsAdult(true);
@@ -44,7 +49,7 @@ export function SignInForm({ returnTo, googleClientId, demo = false }: { returnT
         setError(res.error);
       }
     },
-    [returnTo, router],
+    [returnTo, router, newFlow],
   );
 
   // Real Google Identity Services button (only when a client id is configured).

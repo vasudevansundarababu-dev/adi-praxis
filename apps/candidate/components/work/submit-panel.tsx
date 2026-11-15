@@ -11,7 +11,7 @@ const sectionTitle = (id: string) => KYC_SECTIONS.find((s) => s.id === id)?.titl
  * W06 — runs every automated check, shows the closest existing tasks (briefs only) and any likely-real data, and
  * submits after the synthetic-data declaration. Submission is blocked by any failing check or unexplained flag.
  */
-export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolean>; revision: () => number; onSubmitted: () => void; onGoTo?: (section: string) => void; declaration?: string }) {
+export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolean>; revision: () => number; onSubmitted: () => void; onGoTo?: (section: string) => void; declaration?: string; submitLabel?: string }) {
   const [humanOnly,setHumanOnly]=useState(false),[questions,setQuestions]=useState<string[]>([]),[resolutions,setResolutions]=useState<Record<string,string>>({});
   useEffect(()=>{void fetch(`/api/v1/me/tasks/${props.taskId}/conversation`).then(r=>r.ok?r.json():null).then(v=>{setHumanOnly(!!v?.state?.humanOnly);setQuestions(v?.state?.unresolved??[]);}).catch(()=>{});},[props.taskId]);
   const [result, setResult] = useState<CheckResult | null>(null);
@@ -139,7 +139,7 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
         </span>
       </label>
       <button type="button" disabled={pending || !declared || !result || failing.length > 0 || unexplained.length > 0} onClick={submit} className="btn btn-primary disabled:opacity-50">
-        Submit for review
+        {props.submitLabel ?? 'Submit for review'}
       </button>
       {!result && <p className="text-sm text-fg-muted">Run the checks first.</p>}
       {error && <p role="alert" className="text-sm text-error">{error}</p>}

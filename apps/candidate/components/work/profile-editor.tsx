@@ -21,6 +21,7 @@ import {
 } from '@praxis/shared';
 import { useMemo, useState } from 'react';
 import { Req, RequiredNote } from '@/components/required';
+import { placeComments } from '@/lib/forge';
 import type { TaskView } from '@/lib/work-types';
 import { SubmitPanel } from './submit-panel';
 import { SaveIndicator } from './task-page';
@@ -264,13 +265,18 @@ function ArrayControl({ field, value, path, problems, lookup, onChange }: FieldP
   );
 }
 
-export function ProfileEditor({ task, profile, onSubmitted, initialSection = 0 }: { task: TaskView; profile: TemplateProfile; onSubmitted: () => void; initialSection?: number }) {
+export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { task: TaskView; profile: TemplateProfile; onSubmitted: () => void; initialSection?: number }) {
   const initial = useMemo(
     () => withSlotCase(profile, profileApplies(profile, task.output) ? (task.output as Record<string, unknown>) : startProfileOutput(profile, task.output), task.readOnly ? null : task.input.slot?.case),
     [profile, task.output, task.input.slot?.case, task.readOnly],
   );
   const { value, update, currentRevision, state, flush } = useAutosave<Record<string, unknown>>(task.id, initial, task.revision, task.readOnly);
-  const [active, setActive] = useState(Math.min(Math.max(initialSection, 0), profile.sections.length - 1));
+  // Rework opens on the first section with a comment.
+  const [active, setActive] = useState(() => {
+    const flagged = task.status === 'REWORK' ? placeComments(task.review?.comments ?? [], profile.sections.map((s) => s.key)).flagged[0] : undefined;
+    const start = initialSection ?? (flagged ? profile.sections.findIndex((s) => s.key === flagged) : 0);
+    return Math.min(Math.max(start, 0), profile.sections.length - 1);
+  });
   const problems = useMemo(() => profileProblems(profile, value), [profile, value]);
   const progress = useMemo(() => sectionProgress(profile, value), [profile, value]);
   const section = profile.sections[active]!;
@@ -293,6 +299,10 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection = 0 }
     return i >= 0 ? i : key === 'W01' ? 0 : profile.sections.length - 1;
   };
   const setField = (key: string, v: unknown) => update((prev) => setFieldValue(profile, prev, section.key as SectionKey, key, v));
+  // Review comments sit under their own section (S1, or a range such as S3-S4); the rest are listed at the top.
+  const rework = task.status === 'REWORK';
+  const placed = useMemo(() => placeComments(task.review?.comments ?? [], profile.sections.map((s) => s.key)), [task.review, profile.sections]);
+  const here = placed.bySection[section.key] ?? [];
 
   return (
     <div className="max-w-4xl min-w-0 space-y-4">
@@ -305,20 +315,37 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection = 0 }
         {profile.contractStatus === 'requires_confirmation' && ' · field contract awaiting domain-owner confirmation'}
       </p>
       {slot?.brief && <p className="rounded-md border border-line p-3 text-sm">{slot.brief}</p>}
-      {task.review?.comments.map((c, i) => (
-        <p key={i} role="status" className="text-sm text-warning">
-          Reviewer ({c.section}): {c.text}
-        </p>
-      ))}
+      {rework && (
+        <div role="status" className="rounded-md border border-warning p-3 text-sm" data-rework-summary>
+          <p className="font-semibold text-warning">Rework requested</p>
+          {placed.flagged.length > 0 && (
+            <p className="mt-1">
+              Comments on {placed.flagged.join(', ')}, shown under each section. Fix them and resubmit.
+            </p>
+          )}
+          {task.review?.notes && <p className="mt-1">{task.review.notes}</p>}
+        </div>
+      )}
+      {placed.unmatched.length > 0 && (
+        <ul className="space-y-1 text-sm text-warning" data-unplaced-comments>
+          {placed.unmatched.map((c, i) => (
+            <li key={i}>
+              Reviewer ({c.section}): {c.text}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <nav aria-label="Task sections">
         <ol className="flex flex-wrap gap-2">
           {profile.sections.map((s, i) => {
             const p = progress[i]!;
+            const flagged = placed.flagged.includes(s.key);
             return (
               <li key={s.key}>
-                <button type="button" onClick={() => goTo(i)} aria-current={i === active ? 'step' : undefined} className={`rounded-md border px-2 py-1 text-left text-xs ${i === active ? 'border-link font-semibold' : 'border-line'}`}>
+                <button type="button" onClick={() => goTo(i)} aria-current={i === active ? 'step' : undefined} data-flagged={flagged || undefined} className={`rounded-md border px-2 py-1 text-left text-xs ${i === active ? 'border-link font-semibold' : flagged ? 'border-warning' : 'border-line'}`}>
                   {s.key} {s.title}
+                  {flagged && <span className="ml-1 text-warning">· comment</span>}
                   <span className="block text-fg-muted">
                     {p.required ? `${p.done}/${p.required} required done` : 'nothing required'}
                     {p.problems ? ` · ${p.problems} to fix` : ''}
@@ -330,7 +357,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection = 0 }
         </ol>
       </nav>
 
-      <section aria-labelledby="pf-section-h" className="min-w-0 space-y-4">
+      <section aria-labelledby="pf-section-h" data-flagged={here.length > 0 || undefined} className={`min-w-0 space-y-4 ${here.length ? 'rounded-md border-l-4 border-warning pl-3' : ''}`}>
         <div>
           <p className="text-xs text-fg-muted">
             Section {active + 1} of {profile.sections.length}
@@ -339,6 +366,11 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection = 0 }
             {section.key} · {section.title}
           </h2>
           {section.help && <p className="mt-1 text-sm text-fg-muted">{section.help}</p>}
+          {here.map((c, i) => (
+            <p key={i} role="status" data-section-comment={section.key} className="mt-2 rounded-md border border-warning bg-warning/10 px-3 py-2 text-sm">
+              <strong className="text-warning">Reviewer:</strong> {c.text}
+            </p>
+          ))}
         </div>
         {!task.readOnly && <RequiredNote />}
         <fieldset disabled={task.readOnly} className="min-w-0 space-y-4">
@@ -392,7 +424,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection = 0 }
                 ))}
               </ul>
             )}
-            {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(s) => goTo(sectionIndex(s))} />}
+            {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(s) => goTo(sectionIndex(s))} submitLabel={rework ? 'Resubmit for review' : undefined} />}
           </div>
         )}
 

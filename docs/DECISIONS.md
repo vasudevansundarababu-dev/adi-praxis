@@ -1118,3 +1118,8 @@ Owner defects "Issue 1" and "Issue 2" on the project Policy rules page. Requirem
   person to a specific task.
 - Before development, the owner tells Anvil (Keystone) to pause integration testing. The message is in the shared
   outputs folder.
+
+## MVP1 build: one PR, built in one run (15 Nov 2026)
+
+- **(owner)** "One PR for everything." Steps 1 to 9 of the MVP1 build order are built on `feat/mvp1-forge` in one continuous run, committed step by step with tests, and opened as one PR.
+- Push, merge and deploy each still need the owner's yes. QA runs need the owner's yes in the DevOps session.

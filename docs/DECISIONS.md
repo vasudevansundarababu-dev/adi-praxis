@@ -1842,3 +1842,16 @@ Spec: `docs/prd/PRD-POLICY-RULE-ANNOTATIONS.md` (owner, verbatim). Plan: `docs/p
   it, and no screen shows it; the preview's "marked required" count became counts per marking.
 - **(chosen by Claude)** The console user guide has no policy chapter yet, so none was added. The Rules page and the
   rule page explain the annotations in place.
+- **(owner, 15 Nov 2026)** **Policies-page mockup approved.** `docs/design/mockups/policy-rules.html` (PR #81) was
+  approved before release. The build follows it on these points:
+  - **D4:** the rules prompt has a short placeholder, a "Use this example" link, and a "Type what the template needs"
+    hint beside the disabled button.
+  - **D7:** no cost or budget figures on the Policies page, Admin included. Costs are still recorded by the API for
+    the planned Admin "Usage and costs" page; only the "budget is used up" notice remains.
+  - **Suggested rules:** they show Accept and Reject. Accept is the Apply tick ("Define with AI, then accept" when
+    fields are missing). Reject only hides the suggestion in that session, and the rule stays unapplied.
+  - **Filter:** a new "Applied only" filter.
+  - **Published versions:** listed with their rules per marking; `GET /policy/rule-sets` gains `markingCounts`.
+  - **Out of scope here:** the mockup's "Owner decisions" step shows the A1/A5/AI choices for review only and is not a
+    product screen. The S4 picker (step 7) belongs to the SME task form (PR #82), and the rule drawer stays the existing
+    rule page (navigation preserved, spec §0).

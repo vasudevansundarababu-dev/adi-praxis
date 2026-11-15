@@ -5,6 +5,7 @@
 | Status | **Approved by the owner on 15 Nov 2026, as proposed** (section 10: additive annotations document; automatic annotation after extraction plus the backfill button; A1 and A5 confirmed; all other assumptions stand). The RL Gym change note is drafted in `docs/anvil/` for the owner to send; the document stays "proposed" until RL Gym agrees. |
 | Implements | [PRD-POLICY-RULE-ANNOTATIONS.md](../prd/PRD-POLICY-RULE-ANNOTATIONS.md) (owner spec, 15 Nov 2026, copied unchanged) |
 | Builds on | [PRD-POLICY-RULES.md](../prd/PRD-POLICY-RULES.md), [PLAN-POLICY-RULES.md](PLAN-POLICY-RULES.md), [ANVIL-PROJECT-POLICY-V1.md](../integrations/ANVIL-PROJECT-POLICY-V1.md) |
+| Design | Clickable mockup [`docs/design/mockups/policy-rules.html`](../design/mockups/policy-rules.html), approved by the owner on 15 Nov 2026; it adds D4 and D7 and the published-versions list to this build (DECISIONS.md). |
 | Branch | `claude/policy-rule-annotations-3ca355` (draft PR). No merge or deploy from this branch. |
 | Reference data | RL Gym review of project 7e5e96c5 (318 rules, 7 categories, 5 SME questions); synthetic policy texts `00-US-federal` … `05-IL` |
 | Prepared | 15 Nov 2026 |

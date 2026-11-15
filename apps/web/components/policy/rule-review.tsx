@@ -49,7 +49,6 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
   const [body, setBody] = useState<PolicyRuleBody | null>(null);
   const [cites, setCites] = useState<Citation[]>([]);
   const [reason, setReason] = useState('');
-  const [required, setRequired] = useState(true);
   const [pending, setPending] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -61,7 +60,6 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
     setD(x);
     setBody(x.body);
     setCites(x.citations);
-    setRequired(x.required);
   }
   useEffect(() => {
     void load();
@@ -90,7 +88,7 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
   }
   async function decide(kind: 'review' | 'exclude') {
     setPending(true);
-    const r = await mutate('POST', `/projects/${projectId}/policy/rule-versions/${d!.versionId}/${kind}`, kind === 'review' ? { expectedContentHash: d!.contentHash, required } : { expectedContentHash: d!.contentHash, reason });
+    const r = await mutate('POST', `/projects/${projectId}/policy/rule-versions/${d!.versionId}/${kind}`, kind === 'review' ? { expectedContentHash: d!.contentHash } : { expectedContentHash: d!.contentHash, reason });
     setPending(false);
     if (!r.ok) return setMsg({ kind: 'error', text: r.error ?? 'Could not save the decision.' });
     setMsg({ kind: 'ok', text: kind === 'review' ? 'Marked Reviewed.' : 'Excluded.' });
@@ -159,7 +157,9 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
         <fieldset className="mt-2 grid gap-2" disabled={pending}>
           {field('Title', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.title} onChange={(e) => set('title', e.target.value)} />)}
           {field('Requirement', <textarea className="rounded-md border border-line bg-surface px-2 py-1 text-fg min-h-20" value={body.requirement} onChange={(e) => set('requirement', e.target.value)} />)}
-          {field(
+          {body.annotation ? (
+            <p className="text-xs text-fg-muted">Type follows the annotation’s classification (edit it in Annotation above).</p>
+          ) : field(
             'Type',
             <select className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.requirementType} onChange={(e) => set('requirementType', e.target.value as PolicyRuleBody['requirementType'])}>
               <option value="obligation">Obligation (must)</option>
@@ -219,9 +219,6 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
           </button>
           {!locked && !editOnly && (
             <>
-              <label className="inline-flex items-center gap-1">
-                <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} /> Required policy
-              </label>
               <button type="button" disabled={dirty || pending || d.problems.length > 0} onClick={() => decide('review')} className="btn btn-primary disabled:opacity-50" title={dirty ? 'Save your changes first' : undefined}>
                 Mark Reviewed
               </button>

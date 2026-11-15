@@ -31,13 +31,19 @@ export async function templateRef(tx: Db | Tx, templateId: string): Promise<Temp
 export function caseSelectorOf(v: unknown): CaseSelector | null {
   const s = v as Partial<CaseSelector> | null;
   if (!s || typeof s.field !== 'string' || typeof s.source !== 'string' || !Array.isArray(s.values) || !s.values.every((x) => typeof x === 'string') || !s.values.length) return null;
-  return { field: s.field, source: s.source, values: s.values };
+  const labels = s.labels && typeof s.labels === 'object' && !Array.isArray(s.labels) ? Object.fromEntries(Object.entries(s.labels).filter(([k, l]) => typeof l === 'string' && s.values!.includes(k))) : null;
+  return { field: s.field, source: s.source, values: s.values, ...(labels && Object.keys(labels).length ? { labels } : {}) };
 }
 
-/** One slot per case-selector value, labelled from the version's form when it is registered. */
+/** The form field a case selector reads (`S1.applicationType`), when the version's form is registered. */
+export function selectorField(t: { workflowName: string; profileId: string | null }, source: string) {
+  const [sectionKey, fieldKey] = source.split('.');
+  return profileFor({ workflowName: t.workflowName, profileId: t.profileId })?.sections.find((s) => s.key === sectionKey)?.fields.find((f) => f.key === fieldKey);
+}
+
+/** One slot per case-selector value, labelled from the template, then the version's form, then the field name. */
 function selectorSlots(t: { workflowName: string; profileId: string | null }, sel: CaseSelector): SlotSpec[] {
-  const [sectionKey, fieldKey] = sel.source.split('.');
-  const field = profileFor({ workflowName: t.workflowName, profileId: t.profileId })?.sections.find((s) => s.key === sectionKey)?.fields.find((f) => f.key === fieldKey);
+  const field = selectorField(t, sel.source);
   return caseSelectorSlots(sel, { fieldLabel: field?.label, labelOf: (v) => field?.options?.find((o) => o.value === v)?.label });
 }
 

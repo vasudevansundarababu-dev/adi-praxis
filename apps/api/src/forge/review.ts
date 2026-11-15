@@ -9,7 +9,7 @@ import { profileFor } from '../tasks/profile-output';
 import { CHECKLIST, decideOneStep } from '../tasks/review-service';
 import { assertCurrent, contentHash, decideStageFor, lock, passInForce, reviewerNames, TASK_INCLUDE, type StageTask } from '../tasks/stage-review';
 import type { StoredChecks } from '../tasks/submission';
-import { EXPERT_TASK_TYPES, templateRef } from '../tasks/task-service';
+import { caseSelectorOf, EXPERT_TASK_TYPES, templateRef } from '../tasks/task-service';
 import { forgeSettings } from './settings';
 import { tutorialOf } from './tutorial';
 import { sourcingProject, taskLabel } from './sourcing';
@@ -68,14 +68,15 @@ async function consoleTask(tx: Db | Tx, actor: Actor, projectId: string, taskId:
  * field and option labels for a case selector, the dimension labels otherwise (the same labels the slot brief uses).
  */
 async function slotSelectors(tx: Db | Tx, projectId: string): Promise<(slot: SelectorSlot | null | undefined) => ForgeTaskSelector | null> {
-  const p = await tx.project.findUniqueOrThrow({ where: { id: projectId }, select: { template: { select: { workflowName: true, profileId: true, coverageDimensions: true } } } });
+  const p = await tx.project.findUniqueOrThrow({ where: { id: projectId }, select: { template: { select: { workflowName: true, profileId: true, coverageDimensions: true, caseSelector: true } } } });
+  const labels = caseSelectorOf(p.template.caseSelector)?.labels ?? {};
   const profile = profileFor({ workflowName: p.template.workflowName, profileId: p.template.profileId });
   const fieldOf = (source: string) => {
     const [sectionKey, fieldKey] = source.split('.');
     return profile?.sections.find((s) => s.key === sectionKey)?.fields.find((f) => f.key === fieldKey);
   };
   const dimensions = CoverageDimensions.safeParse(p.template.coverageDimensions).data?.dimensions ?? [];
-  return (slot) => forgeSlotSelector(slot, { fieldLabel: (source) => fieldOf(source)?.label, optionLabel: (source, value) => fieldOf(source)?.options?.find((o) => o.value === value)?.label, dimensions });
+  return (slot) => forgeSlotSelector(slot, { fieldLabel: (source) => fieldOf(source)?.label, optionLabel: (source, value) => labels[value] ?? fieldOf(source)?.options?.find((o) => o.value === value)?.label, dimensions });
 }
 
 /** The Tasks tab: one row per task, in slot order. */

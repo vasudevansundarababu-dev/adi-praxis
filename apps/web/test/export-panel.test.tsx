@@ -10,7 +10,7 @@ const base: ExportState = { canValidate: true, canExport: false, reason: 'Export
 describe('project export panel (owner, 12 Nov 2026)', () => {
   it('validate one task now; Export is disabled until the project is complete; says Anvil is not connected', () => {
     const m = html(<ExportPanel projectId={P} initial={base} />);
-    expect(text(m)).toContain('Anvil validation is not connected yet');
+    expect(text(m)).toContain('RL Gym validation is not connected yet');
     expect(text(m)).toContain('1 of 2 required tasks approved');
     expect(m).toMatch(/<button[^>]*disabled=""[^>]*>Export<\/button>/);
     expect(text(m)).toContain('Validate');

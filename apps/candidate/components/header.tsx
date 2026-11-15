@@ -14,7 +14,7 @@ export async function Header() {
       <div className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-3">
         <Link href={me ? '/home' : '/'} className="flex items-center gap-2 font-semibold">
           <Image src={mark} alt="" width={28} height={28} className="rounded" />
-          ADI Praxis
+          ADI Forge
         </Link>
         <nav className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm">
           <Link href="/opportunities" className="text-link hover:underline">

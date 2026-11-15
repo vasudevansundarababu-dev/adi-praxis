@@ -22,7 +22,7 @@ export default async function PartnersPage() {
     <div>
       <h1 className="text-2xl font-semibold">Partners</h1>
       <p className="mt-1 max-w-3xl text-sm text-fg-muted">
-        Staffing partners put candidates forward through the Partner API or the partner portal. Every candidate still goes through sign-in, identity, selection and certification in Praxis.
+        Staffing partners put candidates forward through the Partner API or the partner portal. Every candidate still goes through sign-in, identity, selection and certification in ADI Forge.
       </p>
       {items.length === 0 ? (
         <Empty>No partners yet.{isAdmin ? ' Add the first one below.' : ' An Admin onboards partners.'}</Empty>

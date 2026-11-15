@@ -211,14 +211,14 @@ export function ClusteringScore({ c }: { c: NonNullable<RlReviewData['clustering
   if (!c.available)
     return (
       <p className="mt-2 rounded border border-line p-2 text-fg-muted" role="note">
-        Clustering F1 (Praxis): not available. {c.reason}
+        Clustering F1 (ADI Forge): not available. {c.reason}
       </p>
     );
   const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
   return (
     <div className={`mt-2 rounded border p-2 ${c.passed ? 'border-line' : 'border-warning'}`} role="note">
       <p className="font-medium">
-        Clustering F1 (Praxis): {c.f1.toFixed(4)} {c.passed ? `meets the ${c.threshold} bar` : `below the ${c.threshold} bar`}
+        Clustering F1 (ADI Forge): {c.f1.toFixed(4)} {c.passed ? `meets the ${c.threshold} bar` : `below the ${c.threshold} bar`}
       </p>
       <p className="text-xs text-fg-muted">
         {c.queries} queries · precision {pct(c.precision)} · recall {pct(c.recall)}. Compares which queries the agent grouped together with the reference, whatever it named its clusters. Advice for your verdict, not a verdict.

@@ -65,7 +65,7 @@ describe('theme tokens', () => {
     }
   });
 
-  it('page titles read "<Screen> · ADI Praxis"', () => {
-    expect(pageTitle('Sign in')).toBe('Sign in · ADI Praxis');
+  it('page titles read "<Screen> · ADI Forge"', () => {
+    expect(pageTitle('Sign in')).toBe('Sign in · ADI Forge');
   });
 });

@@ -26,7 +26,7 @@ export function MockPayeeFinish() {
           router.push('/payments?returned=1');
         }}
       >
-        {busy ? 'Finishing…' : 'Finish and return to ADI Praxis →'}
+        {busy ? 'Finishing…' : 'Finish and return to ADI Forge →'}
       </button>
       {error && (
         <p role="alert" className="mt-3 text-sm text-error">

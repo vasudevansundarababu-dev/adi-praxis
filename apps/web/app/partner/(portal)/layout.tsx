@@ -32,7 +32,7 @@ export default async function PartnerPortalLayout({ children }: { children: Reac
       )}
       <header className="sticky top-0 z-20 bg-brand-navy text-white shadow-md">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 pt-3 pb-2">
-          <Link href="/partner" aria-label="ADI Praxis partner portal home" className="flex items-center gap-2">
+          <Link href="/partner" aria-label="ADI Forge partner portal home" className="flex items-center gap-2">
             <NavBrand />
             <span className="rounded-md bg-white/10 px-2 py-0.5 text-xs font-medium text-white/85">Partner portal</span>
           </Link>

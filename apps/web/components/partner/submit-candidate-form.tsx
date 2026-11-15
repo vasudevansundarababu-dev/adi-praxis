@@ -102,7 +102,7 @@ export function SubmitCandidateForm({ requisitionId, requisitionTitle }: { requi
       <div className="card p-5" role="status">
         <h2 className="text-lg font-semibold">Candidate submitted</h2>
         <p className="mt-1 text-sm">
-          {f.name} is submitted for {requisitionTitle}. ADI Praxis has emailed them an invite
+          {f.name} is submitted for {requisitionTitle}. ADI Forge has emailed them an invite
           {result.inviteExpiresAt ? `, valid until ${new Date(result.inviteExpiresAt).toLocaleDateString()}` : ''}. They must accept it to continue.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -149,7 +149,7 @@ export function SubmitCandidateForm({ requisitionId, requisitionTitle }: { requi
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6 text-sm">
       <p className="rounded-md border border-line bg-surface px-3 py-2">
-        This is a <strong>live</strong> submission: ADI Praxis emails the candidate an invite straight away. Use a sandbox API client to test without contacting anyone.
+        This is a <strong>live</strong> submission: ADI Forge emails the candidate an invite straight away. Use a sandbox API client to test without contacting anyone.
       </p>
       <RequiredNote />
 
@@ -256,7 +256,7 @@ export function SubmitCandidateForm({ requisitionId, requisitionTitle }: { requi
         <label className="flex items-start gap-3">
           <input type="checkbox" className="mt-1" checked={consent} onChange={(e) => setConsent(e.target.checked)} aria-required="true" />
           <span>
-            The candidate agreed to be put forward for this requisition and to be contacted by ADI Praxis.
+            The candidate agreed to be put forward for this requisition and to be contacted by ADI Forge.
             <Req />
           </span>
         </label>

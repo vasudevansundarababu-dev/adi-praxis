@@ -20,7 +20,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
       </p>
       <p className="mt-2 text-sm text-fg-muted">
         The check is run by Stripe Identity: you photograph an identity document, and may be asked for a selfie. ADI
-        Praxis never stores your document images, ID number or date of birth; we only keep the result.
+        ADI Forge never stores your document images, ID number or date of birth; we only keep the result.
       </p>
       <IdentityPanel initial={me} returnTo={returnTo} />
     </main>

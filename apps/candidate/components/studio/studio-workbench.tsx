@@ -369,7 +369,7 @@ function JsonPreview({ text, answersText, fileName, stored }: { text: string; an
 /** S4-09: where the task lives. Never a connection string or secret. */
 export function DbMetadata({ config, committed }: { config: StudioConfig; committed: CommitResult | null }) {
   const rows: Array<[string, string]> = [
-    ['Database', 'PostgreSQL · Praxis task store'],
+    ['Database', 'PostgreSQL · ADI Forge task store'],
     ['Task ID', committed?.externalTaskId ?? config.taskInstanceId],
     ['Configuration', `${config.deploymentStatus === 'ACTIVE' ? 'Deployed' : config.deploymentStatus} · template v${config.templateVersion} · ${committed ? 'committed' : `draft revision ${config.revision}`}`],
     ['Repository path', committed ? `tasks/${committed.externalTaskId}/ (bundle sha256 ${committed.bundleSha256.slice(0, 12)}…)` : 'Assigned when you commit'],

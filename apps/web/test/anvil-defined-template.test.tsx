@@ -41,13 +41,13 @@ describe('Anvil-defined templates in the Meta-Compiler', () => {
     const t = text(html(<StageNav problems={problems} active="catalog" onSelect={() => undefined} />));
     expect(t).toMatch(/\d\/6 Valid/);
     expect(t).toMatch(/\d+ to fix/);
-    expect(t).not.toContain('Defined by Anvil');
+    expect(t).not.toContain('Defined by RL Gym');
   });
 
   it('an Anvil template shows "Defined by Anvil" with execution schema, rubric and role ids, and no counter or "to fix" pills', () => {
     const markup = html(<StageNav problems={sectionProblems(anvilBlueprint())} active="catalog" onSelect={() => undefined} anvil={VEYRA} />);
     const t = text(markup);
-    expect(t).toContain('Defined by Anvil');
+    expect(t).toContain('Defined by RL Gym');
     expect(t).toContain('anvil.template-execution.v3');
     expect(t).toContain('0–4 scale, 7 groups, minimum 80');
     expect(t).toContain('orchestrator, intent, performance, brief, policy');
@@ -59,16 +59,16 @@ describe('Anvil-defined templates in the Meta-Compiler', () => {
 
   it('the full Meta-Compiler for an Anvil template hides the stage problems and the "n/6 valid: fix every stage" hint', () => {
     const anvil = text(html(<MetaCompiler {...props(response(anvilBlueprint()), KYC)} />));
-    expect(anvil).toContain('Defined by Anvil');
+    expect(anvil).toContain('Defined by RL Gym');
     expect(anvil).toContain('anvil.template-execution.v2');
     expect(anvil).toContain('analyst');
     expect(anvil).not.toMatch(/to fix|\/6 [Vv]alid|Problems in this stage|fix every stage/);
-    expect(anvil).toContain('Defined by Anvil: Generate is for Meta-Compiler blueprints.');
+    expect(anvil).toContain('Defined by RL Gym: Generate is for Meta-Compiler blueprints.');
 
     const harbor = text(html(<MetaCompiler {...props(response(anvilBlueprint()), null)} />));
     expect(harbor).toMatch(/to fix/);
     expect(harbor).toMatch(/\d\/6 valid: fix every stage to generate/);
-    expect(harbor).not.toContain('Defined by Anvil');
+    expect(harbor).not.toContain('Defined by RL Gym');
   });
 
   it('the directory shows "Defined by Anvil" for an Anvil row and "n/6 valid" only for Harbor rows', async () => {
@@ -83,13 +83,13 @@ describe('Anvil-defined templates in the Meta-Compiler', () => {
     Object.assign(k, { definedByAnvil: true, hasBlueprint: false, validSections: 0 });
     const markup = html(<DirectoryView data={data} />);
     const kycCell = markup.slice(markup.indexOf(`href="/templates/${kyc.id}"`), markup.indexOf('</td>', markup.indexOf(`href="/templates/${kyc.id}"`)));
-    expect(text(kycCell)).toContain('Defined by Anvil');
+    expect(text(kycCell)).toContain('Defined by RL Gym');
     expect(kycCell).not.toMatch(/\/6 valid/);
     const harborCell = markup.slice(markup.indexOf(`href="/templates/${harbor.id}"`), markup.indexOf('</td>', markup.indexOf(`href="/templates/${harbor.id}"`)));
     expect(text(harborCell)).toContain('6/6 valid');
-    expect(harborCell).not.toContain('Defined by Anvil');
+    expect(harborCell).not.toContain('Defined by RL Gym');
     // A PM never sees either label.
-    expect(text(html(<DirectoryView data={{ ...data, view: 'PM' }} />))).not.toContain('Defined by Anvil');
+    expect(text(html(<DirectoryView data={{ ...data, view: 'PM' }} />))).not.toContain('Defined by RL Gym');
   });
 });
 

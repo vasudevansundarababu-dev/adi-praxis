@@ -34,7 +34,7 @@ export function ExportPanel({ projectId, initial }: { projectId: string; initial
     setState((s) => ({ ...s, runs: [res.data!, ...s.runs] }));
   }
 
-  const validatorNote = state.validator.isAnvil ? 'Validated by Anvil.' : 'Anvil validation is not connected yet: Praxis checks each task with its own export checks.';
+  const validatorNote = state.validator.isAnvil ? 'Validated by RL Gym.' : 'RL Gym validation is not connected yet: ADI Forge checks each task with its own export checks.';
   return (
     <section aria-labelledby="export-heading" className="mt-6 rounded-md border border-line p-4">
       <h2 id="export-heading" className="text-lg font-semibold">

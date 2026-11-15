@@ -48,7 +48,7 @@ export const semantic = {
 } as const;
 
 export const TAGLINE = 'Intelligence Beyond Boundaries';
-export const PRODUCT_NAME = 'ADI Praxis';
+export const PRODUCT_NAME = 'ADI Forge';
 
 /** Page titles read "<Screen> · ADI Praxis". */
 export const pageTitle = (screen: string) => `${screen} · ${PRODUCT_NAME}`;

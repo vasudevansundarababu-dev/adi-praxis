@@ -51,7 +51,7 @@ export function validationItem(record: ApprovedTaskRecord, title: string, compil
   if (!hasExecutableContract(record)) {
     const problems = compileBlockers.length
       ? compileBlockers.map((b) => ({ code: b.code, path: b.path, message: b.message }))
-      : [{ code: 'NO_EXECUTABLE_CONTRACT', path: null, message: 'This task has no executable Anvil contract.' }];
+      : [{ code: 'NO_EXECUTABLE_CONTRACT', path: null, message: 'This task has no executable RL Gym contract.' }];
     return { ...base, envelope: null, exportProblems: problems };
   }
   try {
@@ -143,13 +143,13 @@ export class AnvilGatedValidator implements AnvilTaskValidator {
     const local = await this.pre.validate(items);
     const notValidated = (code: string, message: string) => ({ results: local.map((r) => ({ ...r, status: r.status === 'needs_fix' ? ('needs_fix' as const) : ('not_validated' as const), issues: [...r.issues, asIssue(code, message)] })) });
     const c = await this.client.contracts();
-    if (c.kind !== 'business') return { ...notValidated(`ANVIL_${c.kind.toUpperCase()}`, `${c.message}${c.requestId ? ` (Anvil request ${c.requestId})` : ''}`), anvil: { contract: GENERIC_EXPORT_SCHEMA, support: 'unreachable', batchId: null, parts: [], problems: [] } };
+    if (c.kind !== 'business') return { ...notValidated(`ANVIL_${c.kind.toUpperCase()}`, `${c.message}${c.requestId ? ` (RL Gym request ${c.requestId})` : ''}`), anvil: { contract: GENERIC_EXPORT_SCHEMA, support: 'unreachable', batchId: null, parts: [], problems: [] } };
     const support = genericSupport(c.data);
     if (support !== 'enabled') {
-      const msg = support === 'disabled' ? `Anvil lists ${GENERIC_EXPORT_SCHEMA} but has it switched off${c.requestId ? `; Anvil request ${c.requestId}` : ''}.` : `Anvil does not yet support generic Praxis task export (receiver_contract_unavailable)${c.requestId ? `; Anvil request ${c.requestId}` : ''}.`;
+      const msg = support === 'disabled' ? `RL Gym lists ${GENERIC_EXPORT_SCHEMA} but has it switched off${c.requestId ? `; RL Gym request ${c.requestId}` : ''}.` : `RL Gym does not yet support generic ADI Forge task export (receiver_contract_unavailable)${c.requestId ? `; RL Gym request ${c.requestId}` : ''}.`;
       return { ...notValidated(support === 'disabled' ? 'ANVIL_CONTRACT_DISABLED' : 'ANVIL_CONTRACT_UNAVAILABLE', msg), anvil: { contract: GENERIC_EXPORT_SCHEMA, support, batchId: null, parts: [], problems: [] } };
     }
-    if (!ctx) return notValidated('ANVIL_NO_CONTEXT', 'Praxis did not supply the template versions needed to build the package.');
+    if (!ctx) return notValidated('ANVIL_NO_CONTEXT', 'ADI Forge did not supply the template versions needed to build the package.');
 
     // From here Anvil's generic verdict is the result; the per-record Golden pre-check concerns another contract.
     const results = new Map<string, TaskValidationResult>(items.map((i) => [i.record.id, { recordId: i.record.id, taskId: i.taskId, title: i.title, status: 'not_validated', issues: [] }]));
@@ -189,7 +189,7 @@ export class AnvilGatedValidator implements AnvilTaskValidator {
       if (v.kind !== 'business') {
         for (const r of tasks) {
           r.status = 'not_validated';
-          r.issues.push(asIssue(`ANVIL_${v.kind.toUpperCase()}`, `${v.message}${v.requestId ? ` (Anvil request ${v.requestId})` : ''}`));
+          r.issues.push(asIssue(`ANVIL_${v.kind.toUpperCase()}`, `${v.message}${v.requestId ? ` (RL Gym request ${v.requestId})` : ''}`));
         }
         continue;
       }
@@ -206,10 +206,10 @@ export class AnvilGatedValidator implements AnvilTaskValidator {
       const reqs = (Array.isArray(v.data.anvil_requirements) ? v.data.anvil_requirements : []) as { code?: string; task_id?: string }[];
       tasks.forEach((r, i) => {
         const own = [...whole, ...(perTask.get(i) ?? [])];
-        const anvilWork = reqs.filter((q) => !q.task_id || q.task_id === part.taskIds[i]).map((q) => asIssue(String(q.code), 'Anvil’s own work (not a task repair); the source is checked separately.'));
+        const anvilWork = reqs.filter((q) => !q.task_id || q.task_id === part.taskIds[i]).map((q) => asIssue(String(q.code), 'RL Gym’s own work (not a task repair); the source is checked separately.'));
         r.status = v.valid === true ? 'valid' : v.valid === false ? (own.length ? 'needs_fix' : 'valid') : 'not_validated';
         r.issues.push(...own, ...anvilWork);
-        if (v.valid === null && !anvilWork.length) r.issues.push(asIssue('ANVIL_VALIDATION_BLOCKED', `Anvil could not validate this package (${v.status}).`));
+        if (v.valid === null && !anvilWork.length) r.issues.push(asIssue('ANVIL_VALIDATION_BLOCKED', `RL Gym could not validate this package (${v.status}).`));
       });
       // Resolve (export only): the same ZIP once Anvil found it valid; the key is the package hash, so a retry of the
       // same content is the same request, and a changed package is a new one. Resolution never starts a Run.
@@ -217,9 +217,9 @@ export class AnvilGatedValidator implements AnvilTaskValidator {
         const key = `praxis-${part.packageSha256}`;
         const rs = await this.client.resolve(part.zip, key);
         pr.resolve = rs.kind === 'business' ? { kind: rs.kind, httpStatus: rs.httpStatus, status: rs.status, idempotencyKey: key, requestId: rs.requestId } : { kind: rs.kind, httpStatus: rs.httpStatus, status: rs.code, idempotencyKey: key, requestId: rs.requestId };
-        const note = rs.kind === 'business' ? (rs.status === 'import_resolved' ? asIssue('ANVIL_RESOLVED', `Anvil took the package in (${rs.status}); no Run was started.`) : asIssue('ANVIL_RESOLVE_BLOCKED', `Anvil did not take the package in (${rs.status}); this is Anvil’s work, not a task repair.`)) : asIssue(`ANVIL_${rs.kind.toUpperCase()}`, `Resolve: ${rs.message}${rs.requestId ? ` (Anvil request ${rs.requestId})` : ''}`);
+        const note = rs.kind === 'business' ? (rs.status === 'import_resolved' ? asIssue('ANVIL_RESOLVED', `RL Gym took the package in (${rs.status}); no Run was started.`) : asIssue('ANVIL_RESOLVE_BLOCKED', `RL Gym did not take the package in (${rs.status}); this is RL Gym’s work, not a task repair.`)) : asIssue(`ANVIL_${rs.kind.toUpperCase()}`, `Resolve: ${rs.message}${rs.requestId ? ` (RL Gym request ${rs.requestId})` : ''}`);
         for (const r of tasks) r.issues.push(note);
-        if (rs.kind === 'business') for (const q of (Array.isArray(rs.data.anvil_requirements) ? rs.data.anvil_requirements : []) as { code?: string; task_id?: string }[]) for (const [i, r] of tasks.entries()) if (!q.task_id || q.task_id === part.taskIds[i]) r.issues.push(asIssue(String(q.code), 'Anvil’s own work before intake (not a task repair).'));
+        if (rs.kind === 'business') for (const q of (Array.isArray(rs.data.anvil_requirements) ? rs.data.anvil_requirements : []) as { code?: string; task_id?: string }[]) for (const [i, r] of tasks.entries()) if (!q.task_id || q.task_id === part.taskIds[i]) r.issues.push(asIssue(String(q.code), 'RL Gym’s own work before intake (not a task repair).'));
       }
     }
     return { results: items.map((i) => results.get(i.record.id)!), anvil: record, zips };

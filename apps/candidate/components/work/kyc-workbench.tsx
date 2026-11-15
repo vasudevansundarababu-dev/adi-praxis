@@ -522,7 +522,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                       <input type="checkbox" checked={!!c.critical} onChange={(e) => setC({ ...c, critical: e.target.checked })} /> Critical
                     </label>
                     {/* Anvil executes a typed check on output.json; each criterion names the field it checks and the expected value. */}
-                    <Pick label="Output field this criterion checks (for Anvil export)" value={c.outputField} options={['disposition', 'risk_rating']} format={(v) => (v === 'disposition' ? 'Disposition' : 'Risk rating')} onChange={(outputField) => setC({ ...c, outputField, comparison: 'json_equals', expectedValue: undefined })} />
+                    <Pick label="Output field this criterion checks (for RL Gym export)" value={c.outputField} options={['disposition', 'risk_rating']} format={(v) => (v === 'disposition' ? 'Disposition' : 'Risk rating')} onChange={(outputField) => setC({ ...c, outputField, comparison: 'json_equals', expectedValue: undefined })} />
                     {c.outputField && (
                       <Pick label="Expected value" value={c.expectedValue} options={c.outputField === 'disposition' ? KYC_DISPOSITIONS : KYC_RISK} format={(v) => v.replace(/_/g, ' ').toLowerCase()} onChange={(expectedValue) => setC({ ...c, comparison: 'json_equals', expectedValue })} />
                     )}

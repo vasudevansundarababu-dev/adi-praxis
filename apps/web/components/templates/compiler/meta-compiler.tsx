@@ -161,7 +161,7 @@ export function MetaCompiler({ initial, template, switcher, presets, jobDescript
         <div className="ml-auto flex items-center gap-2">
           {!generateReady && (
             <span id="generate-hint" className="text-xs text-fg-muted">
-              {dirty ? 'Save your changes to generate.' : anvil ? 'Defined by Anvil: Generate is for Meta-Compiler blueprints.' : `${validCount}/6 valid: fix every stage to generate.`}
+              {dirty ? 'Save your changes to generate.' : anvil ? 'Defined by RL Gym: Generate is for Meta-Compiler blueprints.' : `${validCount}/6 valid: fix every stage to generate.`}
             </span>
           )}
           {generateReady ? (

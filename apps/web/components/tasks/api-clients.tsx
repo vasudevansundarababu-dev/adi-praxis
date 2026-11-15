@@ -38,7 +38,7 @@ export function ApiClients({ initial }: { initial: ApiClientRow[] }) {
           <select required value={kind} onChange={(e) => setKind(e.target.value)} className="mt-1 block rounded-md border border-line bg-surface px-2 py-1.5">
             <option value="CLIENT_API">Client system (task inputs)</option>
             <option value="RL_GYM">RL Gym</option>
-            <option value="ANVIL">Anvil (template proposals; expires in 30 days)</option>
+            <option value="ANVIL">RL Gym (template proposals; expires in 30 days)</option>
           </select>
         </label>
         <button type="submit" className="btn btn-primary">
@@ -56,7 +56,7 @@ export function ApiClients({ initial }: { initial: ApiClientRow[] }) {
           <li key={c.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
             <span className="font-medium">{c.name}</span>
             <span className="text-fg-muted">
-              {c.kind === 'RL_GYM' ? 'RL Gym' : c.kind === 'ANVIL' ? (c.serviceAccount ? `Anvil · keyless service identity ${c.serviceAccount}` : 'Anvil') : 'Client system'} · created {new Date(c.createdAt).toLocaleDateString()}
+              {c.kind === 'RL_GYM' ? 'RL Gym' : c.kind === 'ANVIL' ? (c.serviceAccount ? `RL Gym · keyless service identity ${c.serviceAccount}` : 'RL Gym') : 'Client system'} · created {new Date(c.createdAt).toLocaleDateString()}
               {c.expiresAt ? ` · ${new Date(c.expiresAt) <= new Date() ? 'expired' : 'expires'} ${new Date(c.expiresAt).toLocaleDateString()}` : ''}
               {c.revokedAt ? ` · revoked ${new Date(c.revokedAt).toLocaleDateString()}` : ''}
             </span>

@@ -251,11 +251,11 @@ export function RequisitionForm({ projects, partners, existing, initialProjectId
           <legend>Who pays the SMEs</legend>
           <label className="mt-1 flex items-center gap-2">
             <input type="radio" name="payRoute" checked={f.payRoute === 'DIRECT'} onChange={() => set('payRoute', 'DIRECT')} />
-            Direct: Praxis pays each SME from the rate card (payee set-up is on their checklist)
+            Direct: ADI Forge pays each SME from the rate card (payee set-up is on their checklist)
           </label>
           <label className="flex items-center gap-2">
             <input type="radio" name="payRoute" checked={f.payRoute === 'VIA_PARTNER'} onChange={() => set('payRoute', 'VIA_PARTNER')} />
-            Via partner: the partner pays its people; Praxis records no earnings
+            Via partner: the partner pays its people; ADI Forge records no earnings
           </label>
         </fieldset>
       </section>

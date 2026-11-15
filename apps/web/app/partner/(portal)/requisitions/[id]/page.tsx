@@ -78,7 +78,7 @@ export default async function PartnerRequisitionPage({ params }: { params: Promi
           <Fact label="Languages">{r.languages.length ? r.languages.join(', ') : '—'}</Fact>
           <Fact label="Submission deadline">{fmtDate(r.submissionDeadline)}</Fact>
           <Fact label="Limit per partner">{r.maxPerPartner ?? 'No limit'}</Fact>
-          <Fact label="Who pays the expert">{r.payRoute === 'VIA_PARTNER' ? 'You pay your people' : 'ADI Praxis pays the expert directly'}</Fact>
+          <Fact label="Who pays the expert">{r.payRoute === 'VIA_PARTNER' ? 'You pay your people' : 'ADI Forge pays the expert directly'}</Fact>
         </dl>
       </section>
 

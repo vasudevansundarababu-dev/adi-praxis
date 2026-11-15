@@ -114,7 +114,7 @@ describe('help bot: authoring v2.1 knowledge for authors, reviewers and approver
       'PROPOSING A POLICY DOCUMENT',
       'cannot be accepted: it is returned for a readable, synthetic copy',
       'POLICY SOURCES ON THE REVIEW PAGE',
-      'Clustering F1 (Praxis)',
+      'Clustering F1 (ADI Forge)',
       'It never writes case facts, answers, rationales or rubric conditions',
     ])
       expect(AUTHORING_GUIDE, phrase).toContain(phrase);

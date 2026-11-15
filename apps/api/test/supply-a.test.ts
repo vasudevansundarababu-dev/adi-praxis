@@ -225,7 +225,7 @@ describe('M10a SME supply: partners, Partner API, requisitions and submissions (
       for (const dup of [person({ email: 'priyaraman@gmail.com', phone: undefined }), person({ email: 'other@example.test', phone: '098765 43210' })]) {
         const res = await api(lb.token, 'POST', `/requisitions/${r1}/candidates`, dup);
         expect(res.statusCode).toBe(409);
-        expect(res.json()).toMatchObject({ error: 'DUPLICATE_CANDIDATE', state: 'DUPLICATE', message: 'This candidate is already registered with ADI Praxis through another submission.' });
+        expect(res.json()).toMatchObject({ error: 'DUPLICATE_CANDIDATE', state: 'DUPLICATE', message: 'This candidate is already registered with ADI Forge through another submission.' });
         expect(res.body).not.toMatch(/Acme|acme/);
         expect(res.body).not.toContain(a.id);
       }

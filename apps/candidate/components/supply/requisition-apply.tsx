@@ -107,7 +107,7 @@ export function RequisitionApply({ requisitionId }: { requisitionId: string }) {
       <label className="flex items-start gap-2">
         <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1" />
         <span>
-          I agree that ADI Praxis may use these details to consider me for this role.
+          I agree that ADI Forge may use these details to consider me for this role.
           <Req />
         </span>
       </label>

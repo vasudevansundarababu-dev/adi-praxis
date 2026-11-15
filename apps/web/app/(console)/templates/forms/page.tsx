@@ -29,7 +29,7 @@ export default async function FormsPage() {
       <h1 className="mt-4 text-2xl font-semibold">Authoring forms and golden packs</h1>
       <p className="mt-1 text-sm text-fg-muted">
         An authoring form is what SMEs fill in for a workflow. Upload a golden task pack to add a form without a code change, then choose it on a template version. Execution,
-        evaluation and reporting stay in Anvil.
+        evaluation and reporting stay in RL Gym.
       </p>
       <GoldenPackUpload />
       <h2 className="mt-8 text-lg font-semibold">Uploaded forms</h2>

@@ -153,7 +153,7 @@ export function Review({ initial, identityLabel, identityEligible, identityBlock
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" aria-required="true" checked={permission} onChange={(e) => setPermission(e.target.checked)} className="mt-1" />
             <span>
-              ADI Praxis may use my answers and uploaded files to review my qualification for this opportunity.
+              ADI Forge may use my answers and uploaded files to review my qualification for this opportunity.
               <Req />
             </span>
           </label>

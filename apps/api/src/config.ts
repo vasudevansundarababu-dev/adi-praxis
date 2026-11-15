@@ -43,7 +43,7 @@ const Env = z.object({
   SMTP_PORT: z.coerce.number().int().default(1025),
   SMTP_USER: z.string().default(''),
   SMTP_PASSWORD: z.string().default(''),
-  EMAIL_FROM: z.string().default('ADI Praxis <no-reply@praxis.local>'),
+  EMAIL_FROM: z.string().default('ADI Forge <no-reply@praxis.local>'),
   /** Near-duplicate detection embeddings on Vertex AI (same project as Claude). Blank project = local hashing mock. */
   EMBEDDING_LOCATION: z.string().default('us-central1'),
   EMBEDDING_MODEL: z.string().default('text-embedding-005'),

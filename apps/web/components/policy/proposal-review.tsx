@@ -53,7 +53,7 @@ export function ProposalReview({ p }: { p: ProposalRow }) {
   async function showText() {
     const res = await fetch(`/api/v1${base}/text`);
     if (res.ok) setText(((await res.json()) as { pages: string[] }).pages);
-    else setError('Praxis could not read text from this file. Open the original.');
+    else setError('ADI Forge could not read text from this file. Open the original.');
   }
   async function decide(e: React.FormEvent) {
     e.preventDefault();
@@ -84,7 +84,7 @@ export function ProposalReview({ p }: { p: ProposalRow }) {
       </dl>
       {p.flags.length > 0 && (
         <div className="mt-3 rounded border border-warning p-3 text-sm" role="note">
-          <p className="font-medium">Check before deciding (Praxis’s advice, not a decision)</p>
+          <p className="font-medium">Check before deciding (ADI Forge’s advice, not a decision)</p>
           <ul className="mt-1 list-disc pl-5">
             {p.flags.map((f) => (
               <li key={f.code}>{f.message}</li>
@@ -96,7 +96,7 @@ export function ProposalReview({ p }: { p: ProposalRow }) {
         <a className="text-link hover:underline" href={`/api/v1${base}/file`}>Download the original</a>
         {p.readable && (
           <button type="button" className="text-link hover:underline" onClick={() => void showText()}>
-            Show Praxis’s reading{sensitive ? ' (redacted)' : ''}
+            Show ADI Forge’s reading{sensitive ? ' (redacted)' : ''}
           </button>
         )}
       </div>
@@ -136,7 +136,7 @@ export function ProposalReview({ p }: { p: ProposalRow }) {
           <span className="font-medium">Reason (the SME sees this)</span>
           <textarea className="mt-1 block w-full rounded border border-line bg-surface p-2" rows={2} required minLength={5} maxLength={2000} value={reason} onChange={(e) => setReason(e.target.value)} />
         </label>
-        {acceptBlocked && <p className="text-sm text-warning">{p.readable ? 'Possible real data was found: return it so the SME can upload a synthetic copy.' : 'Praxis could not read this file: return it so the SME can upload a readable copy.'}</p>}
+        {acceptBlocked && <p className="text-sm text-warning">{p.readable ? 'Possible real data was found: return it so the SME can upload a synthetic copy.' : 'ADI Forge could not read this file: return it so the SME can upload a readable copy.'}</p>}
         {error && (
           <p role="alert" className="text-sm text-danger">
             {error}

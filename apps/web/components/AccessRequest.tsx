@@ -7,8 +7,8 @@ export default function AccessRequest() {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
   const input = useRef<HTMLInputElement>(null);
-  const subject = 'ADI Praxis: access or password assistance request';
-  const body = `Hello ADI Labs,\n\nPlease help me with access to ADI Praxis.\nMy email address: ${email.trim()}\n\nI need a new account or help recovering my existing access.\n\nThank you.`;
+  const subject = 'ADI Forge: access or password assistance request';
+  const body = `Hello ADI Forge team,\n\nPlease help me with access to ADI Forge.\nMy email address: ${email.trim()}\n\nI need a new account or help recovering my existing access.\n\nThank you.`;
   const href = `mailto:admin@adi-labs.ai?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   return (
     <section className={styles.request}>

@@ -18,12 +18,12 @@ export function AnvilReadinessBadge({ r }: { r: AnvilReadiness }) {
   const text = r.anvilReady
     ? `Anvil-ready for benchmarks (receipt ${r.receiptId})`
     : r.qualification === 'revoked'
-      ? 'Anvil revoked its qualification of this version: not ready for benchmarks'
-      : 'Not yet qualified by Anvil for benchmarks';
+      ? 'RL Gym revoked its qualification of this version: not ready for benchmarks'
+      : 'Not yet qualified by RL Gym for benchmarks';
   return (
     <p className={`mt-2 text-sm ${r.anvilReady ? 'text-success' : 'text-fg-muted'}`} role="status">
       {text}
-      {r.proposedByAnvil && r.requirementId ? ` · proposed by Anvil for requirement ${r.requirementId}${r.channel ? ` (${r.channel})` : ''}` : ''}
+      {r.proposedByAnvil && r.requirementId ? ` · proposed by RL Gym for requirement ${r.requirementId}${r.channel ? ` (${r.channel})` : ''}` : ''}
     </p>
   );
 }

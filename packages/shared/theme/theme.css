@@ -1,5 +1,5 @@
 /*
- * ADI Praxis theme: CSS variables + Tailwind v4 theme. Import once from each app's global stylesheet,
+ * ADI Forge theme: CSS variables + Tailwind v4 theme. Import once from each app's global stylesheet,
  * after `@import "tailwindcss";`. Values mirror theme/tokens.ts. `@theme inline` makes utilities reference
  * the --praxis-* variables directly, so a nested .dark subtree re-themes correctly.
  * Light is the default; add class="dark" (or data-theme="dark") on <html>, or on any element to theme a subtree.
@@ -29,6 +29,8 @@
   --background-image-brand-gradient: linear-gradient(90deg, #0a2170 0%, #2a80d0 50%, #3fac95 100%);
 
   --font-sans: var(--font-praxis), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: var(--font-forge-display), var(--font-praxis), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-forge-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-hairline: var(--praxis-hairline);
 }
 
@@ -79,7 +81,14 @@
 body {
   background: var(--praxis-bg);
   color: var(--praxis-text);
+  font-optical-sizing: auto;
 }
+
+/* Typography (owner, 15 Nov 2026): Geist for headings, titles and primary buttons; Geist Mono with tabular figures
+   for numbers, badges, IDs and code. Body text stays Inter (font-sans). */
+h1, h2, h3, h4, .btn-primary { font-family: var(--font-display); letter-spacing: -0.02em; }
+code, kbd, samp, pre, .font-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.tabular-nums { font-family: var(--font-mono); }
 
 :focus-visible {
   outline: 2px solid var(--praxis-focus);
@@ -132,6 +141,8 @@ body {
     line-height: 20px;
     white-space: nowrap;
     background: color-mix(in srgb, var(--pill, var(--praxis-text-muted)) 14%, transparent);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     color: var(--praxis-text);
   }
   .pill::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: var(--pill, var(--praxis-text-muted)); }

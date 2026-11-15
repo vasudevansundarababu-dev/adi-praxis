@@ -18,7 +18,7 @@ export const supplyCandidateRoutes: FastifyPluginAsyncZod<{ db: Db; config: Conf
   app.post('/me/partner-invites/redeem', { config: { access: 'candidate', rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['supply'], body: z.object({ token: z.string().min(20).max(200) }) } }, async (req, reply) => {
     await runCandidateCommand<Record<string, unknown>>(db, req, reply, async ({ tx, actor, audit }) => {
       const r = await redeemInvite(tx, actor.smeUserId, req.body.token, audit, (opportunityId) => startOrResumeEnrollment(tx, { clientId: actor.clientId, smeUserId: actor.smeUserId, opportunityId, requireLiveIdentity: config.requireLiveIdentity }, audit));
-      if (r.duplicate) return { status: 409, body: { error: 'ALREADY_REGISTERED', message: 'You are already registered with ADI Praxis through another submission. Continue from your home page.' } };
+      if (r.duplicate) return { status: 409, body: { error: 'ALREADY_REGISTERED', message: 'You are already registered with ADI Forge through another submission. Continue from your home page.' } };
       return { status: 200, body: { enrollmentId: r.enrollmentId, opportunityId: r.opportunityId } };
     });
     return reply;

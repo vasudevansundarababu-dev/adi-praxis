@@ -16,9 +16,9 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4 py-10">
       <FullLogo />
-      <h1 className="mt-10 text-xl font-semibold">Sign in to ADI Praxis</h1>
+      <h1 className="mt-10 text-xl font-semibold">Sign in to ADI Forge</h1>
       <p className="mt-2 text-sm text-fg-muted">
-        ADI Praxis invites subject-matter experts to write realistic, synthetic tasks. We check your identity to protect
+        ADI Forge invites subject-matter experts to write realistic, synthetic tasks. We check your identity to protect
         the contributor community, and we ask about your relevant experience to match you with suitable work.
       </p>
       <SignInForm returnTo={returnTo} googleClientId={process.env.GOOGLE_OAUTH_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''} demo={process.env.PRAXIS_DEMO === '1'} />

@@ -15,7 +15,7 @@ export default async function TutorialsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Tutorials and user guide</h1>
         <p className="mt-1 max-w-3xl text-sm text-fg-muted">
-          Short captioned videos that follow one story through ADI Praxis, and the user guide with every screen step by step. Start with the videos for your role.
+          Short captioned videos that follow one story through ADI Forge, and the user guide with every screen step by step. Start with the videos for your role.
         </p>
       </div>
       <GuideCard {...TUTORIAL_GUIDES.staff} />

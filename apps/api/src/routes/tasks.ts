@@ -269,12 +269,12 @@ export const taskRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; email: 
         let expiresAt = hours ? new Date(Date.now() + hours * 3_600_000) : null;
         if (req.body.kind === 'ANVIL' && config.ANVIL_CALLER_SERVICE_ACCOUNT && config.ANVIL_CALLER_SUBJECT && config.ANVIL_INBOUND_AUDIENCE) {
           // Owner, 12 Nov 2026 (K6): Anvil signs in keylessly here; no ANVIL key may be issued as a fallback.
-          throw new AppError(409, 'ANVIL_KEYLESS', 'Anvil uses its Google service identity in this environment; Anvil keys are not issued. Revoke the keyless grant to stop Anvil.');
+          throw new AppError(409, 'ANVIL_KEYLESS', 'RL Gym uses its Google service identity in this environment; RL Gym keys are not issued. Revoke the keyless grant to stop RL Gym.');
         }
         if (req.body.kind === 'ANVIL') {
           // Owner, 11 Nov 2026 (Anvil Q7): never past the pilot bound.
           const bound = config.ANVIL_CREDENTIAL_NOT_AFTER ? new Date(config.ANVIL_CREDENTIAL_NOT_AFTER) : null;
-          if (!bound || bound.getTime() <= Date.now() + 60_000) throw new AppError(409, 'ANVIL_CREDENTIAL_BOUND', 'Anvil keys cannot be issued: no pilot end is configured, or it has passed.');
+          if (!bound || bound.getTime() <= Date.now() + 60_000) throw new AppError(409, 'ANVIL_CREDENTIAL_BOUND', 'RL Gym keys cannot be issued: no pilot end is configured, or it has passed.');
           if (expiresAt! > bound) expiresAt = bound;
         }
         const c = await tx.apiClient.create({ data: { clientId: actor.clientId, name: req.body.name, kind: req.body.kind, keyHash: sha256(key), expiresAt, issuedById: actor.userId } });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useSyncExternalStore } from 'react';
-import { AUTHORSHIP_VERSION, exportStatusLine } from '@praxis/shared';
+import { AUTHORSHIP_VERSION, exportStatusLine, EDGE_CASE_LABEL, EDGE_CASE_HELP } from '@praxis/shared';
 import { ProfileDiagnostic, ProfileEditor, profileRouteFor } from './profile-editor';
 import { call } from '@/lib/client';
 import { AuthoringConsent } from './authoring-controls';
@@ -134,9 +134,12 @@ function GenericAuthoring({ task, onSubmitted }: { task: TaskView; onSubmitted: 
               </label>
             ))}
             <label className="block text-sm">
-              Edge case this task tests
+              {EDGE_CASE_LABEL}
               <Req />
-              <input aria-required="true" value={value.header.edgeCase ?? ''} onChange={(e) => update({ ...value, header: { ...value.header, edgeCase: e.target.value } })} className={input} />
+              <input aria-required="true" aria-describedby="edge-case-help" value={value.header.edgeCase ?? ''} onChange={(e) => update({ ...value, header: { ...value.header, edgeCase: e.target.value } })} className={input} />
+              <span id="edge-case-help" className="mt-1 block text-xs text-fg-muted">
+                {EDGE_CASE_HELP}
+              </span>
             </label>
           </div>
         )}

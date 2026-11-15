@@ -190,3 +190,17 @@ describe('task form with and without the flag', () => {
     expect(form(false, 7)).not.toContain('Sources used for this task');
   });
 });
+
+describe('D11: the open-slot edge-case field has its label and help', () => {
+  it('shows "Edge case this task tests" with the help text under it', () => {
+    let out = emptyOutput(PROFILE);
+    out = setFieldValue(PROFILE, out, 'S1', 'applicationType', 'custodial');
+    const view = { id: '00000000-0000-4000-8000-000000000012', status: 'IN_PROGRESS', taskType: 'AUTHORING', brief: null, isOpenSlot: true, assignedAt: null, submittedAt: null, activeSeconds: 0, revision: 1, projectId: 'p', projectName: 'KYC', tptMinutes: 45, definition: 'generic', template: { workflow: PROFILE.catalogWorkflowName, domain: 'Banking', primaryWork: null, verificationCriteria: null, humanGate: null, coverageDimensions: [], edgeCases: [], collectionSchema: null }, input: { slot: { id: 's', brief: 'Open slot', tags: {}, edgeCase: null, isOpen: true } }, output: out, coverageTags: null, checks: null, readOnly: false, review: null } as unknown as TaskView;
+    const html = renderToStaticMarkup(<ProfileEditor task={view} profile={PROFILE} onSubmitted={() => undefined} initialSection={0} />);
+    const t2 = text(html);
+    expect(t2).toContain('Edge case this task tests');
+    expect(t2).toContain('In one line, name the unusual situation this task covers, the twist that makes it harder than a routine case.');
+    expect(t2).toContain("Example: 'Weekly report arrives late; the agent must hold, not guess.'");
+    expect(html).toContain('aria-describedby="edge-case-help"');
+  });
+});

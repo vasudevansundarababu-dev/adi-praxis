@@ -21,7 +21,7 @@ import {
   type ViewLink,
   type ProfileProblem,
   type SectionKey,
-  type TemplateProfile,
+  type TemplateProfile, EDGE_CASE_LABEL, EDGE_CASE_HELP,
 } from '@praxis/shared';
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { Req, RequiredNote } from '@/components/required';
@@ -451,9 +451,12 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
                   </label>
                 ))}
               <label className="block text-sm font-medium">
-                Edge case this task tests
+                {EDGE_CASE_LABEL}
                 <Req />
-                <input aria-required="true" value={header.edgeCase ?? ''} onChange={(e) => update((prev) => ({ ...prev, header: { ...(prev.header as object), edgeCase: e.target.value } }))} className={input} />
+                <input aria-required="true" aria-describedby="edge-case-help" value={header.edgeCase ?? ''} onChange={(e) => update((prev) => ({ ...prev, header: { ...(prev.header as object), edgeCase: e.target.value } }))} className={input} />
+                <span id="edge-case-help" className="mt-1 block text-xs font-normal text-fg-muted">
+                  {EDGE_CASE_HELP}
+                </span>
               </label>
             </div>
           )}

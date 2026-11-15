@@ -1910,3 +1910,4 @@ D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos ar
   - Next is blocked on this step until each needed JD has a wage, and a location unless remote. The problem is shown
     inline. "Use or write my own" needs a chosen JD with a wage.
   - Save itself never asks for a field the PM couldn't see.
+- **(owner, D11)** The open-slot edge-case field reads "Edge case this task tests" everywhere, with the owner's help text (`EDGE_CASE_LABEL` and `EDGE_CASE_HELP` in `packages/shared/src/forge.ts`).

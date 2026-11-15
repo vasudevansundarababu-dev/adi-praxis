@@ -22,7 +22,7 @@ import {
   type KycStep,
   type KycTask,
   type KycToolResponse,
-  publicText,
+  publicText, EDGE_CASE_LABEL, EDGE_CASE_HELP,
 } from '@praxis/shared';
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { Req, RequiredNote } from '@/components/required';
@@ -312,7 +312,7 @@ export function KycWorkbench({ task, onSubmitted }: { task: TaskView; onSubmitte
                     {task.template.coverageDimensions.filter((d) => d.values.length && !slot.tags[d.key]).map((d) => (
                       <Pick key={d.key} label={d.label} value={t.header?.coverageTags?.[d.key]} options={d.values} format={(v) => v} onChange={(v) => set('header', { coverageTags: { ...(t.header?.coverageTags ?? {}), [d.key]: v } })} />
                     ))}
-                    {slot.isOpen && <Field label="Name the edge case this task tests" required value={t.header?.edgeCase} onChange={(v) => set('header', { edgeCase: v })} />}
+                    {slot.isOpen && <Field label={EDGE_CASE_LABEL} hint={EDGE_CASE_HELP} required value={t.header?.edgeCase} onChange={(v) => set('header', { edgeCase: v })} />}
                   </div>
                 </div>
               )}

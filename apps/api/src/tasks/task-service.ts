@@ -1,4 +1,4 @@
-import { Prisma, type TaskInstance } from '@prisma/client';
+import { Prisma, type CoverageSlot, type TaskInstance } from '@prisma/client';
 import { CAPPED_TASK_STATUSES, caseSelectorSlots, effectiveCoverage, CoverageDimensions, CoverageQuotas, generateSlots, OPEN_TASK_STATUSES, pickSlot, type CaseSelector, type SlotCase, type SlotSpec } from '@praxis/shared';
 import type { Db, Tx } from '../db';
 import { AppError, notFound } from '../lib/errors';
@@ -71,6 +71,31 @@ export async function ensureSlots(tx: Tx, projectId: string) {
   return slots.length;
 }
 
+/** A slot task's input ({ slot }) and coverage tags, built from its coverage slot row (shared by every task-creation path). */
+export function slotTaskInput(row: CoverageSlot) {
+  const cov = row.coverageTags as unknown as { tags: Record<string, string>; edgeCase: string | null; case?: SlotCase };
+  const input = { slot: { id: row.id, brief: row.brief, tags: cov.tags, edgeCase: cov.edgeCase, isOpen: row.isOpen, ...(cov.case ? { case: cov.case } : {}) } } as unknown as Prisma.InputJsonValue;
+  return { input, coverageTags: { tags: cov.tags, edgeCase: cov.edgeCase } as Prisma.InputJsonValue };
+}
+
+/**
+ * MVP1 new flow: the project's task rows exist up front, one per coverage slot (status CREATED, nobody assigned), so the
+ * PM or Admin can assign each one. Creates a row only for a slot that has no task yet; idempotent and serialised per
+ * project. allocateTasks reuses these rows (a CREATED unassigned task on a slot). Returns how many rows it created.
+ */
+export async function ensureSlotTasks(tx: Tx, projectId: string) {
+  await tx.$executeRaw`SELECT 1 FROM "Project" WHERE id = ${projectId}::uuid FOR UPDATE`;
+  const p = await tx.project.findUniqueOrThrow({ where: { id: projectId } });
+  if (p.taskMode !== 'AUTHORING') return 0;
+  await ensureSlots(tx, projectId);
+  const slots = await tx.coverageSlot.findMany({ where: { projectId, tasks: { none: {} } }, orderBy: { position: 'asc' } });
+  if (!slots.length) return 0;
+  await tx.taskInstance.createMany({
+    data: slots.map((row) => ({ clientId: p.clientId, projectId, taskType: 'AUTHORING' as const, slotId: row.id, status: 'CREATED' as const, ...slotTaskInput(row) })),
+  });
+  return slots.length;
+}
+
 /** The candidate's accepted place on the project, or null. A direct (stub-gate) assignment counts as accepted. */
 export async function activeAssignment(tx: Db | Tx, projectId: string, candidateId: string) {
   const pa = await tx.projectAssignment.findUnique({ where: { projectId_candidateId: { projectId, candidateId } }, include: { smeAssignment: true } });
@@ -116,7 +141,7 @@ export async function allocateTasks(tx: Tx, args: { projectId: string; candidate
       available.splice(available.indexOf(s), 1);
       held.push({ tags: s.tags, edgeCase: s.edgeCase, isOpen: s.isOpen });
       await tx.coverageSlot.update({ where: { id: s.id }, data: { status: 'OFFERED', assignedToId: args.candidateId } });
-      const input = { slot: { id: s.id, brief: s.row.brief, tags: s.tags, edgeCase: s.edgeCase, isOpen: s.isOpen, ...(s.case ? { case: s.case } : {}) } } as unknown as Prisma.InputJsonValue;
+      const { input } = slotTaskInput(s.row);
       // A reclaimed task on this slot is reused (cleared); otherwise a new one is created.
       const reuse = await tx.taskInstance.findFirst({ where: { slotId: s.id, status: 'CREATED', assignedToId: null } });
       const data = { status: 'ASSIGNED' as const, assignedToId: args.candidateId, projectAssignmentId: pa.id, assignedAt: now, input, output: Prisma.DbNull, checks: Prisma.DbNull, flags: Prisma.DbNull, coverageTags: { tags: s.tags, edgeCase: s.edgeCase } as Prisma.InputJsonValue };

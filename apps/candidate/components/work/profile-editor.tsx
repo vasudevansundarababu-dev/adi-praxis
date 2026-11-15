@@ -14,18 +14,28 @@ import {
   setFieldValue,
   startProfileOutput,
   withSlotCase,
+  publicText,
+  rubricToFinish,
   type ItemField,
+  type RubricView,
+  type ViewLink,
   type ProfileProblem,
   type SectionKey,
   type TemplateProfile,
 } from '@praxis/shared';
-import { useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { Req, RequiredNote } from '@/components/required';
 import { placeComments } from '@/lib/forge';
 import type { TaskView } from '@/lib/work-types';
 import { SubmitPanel } from './submit-panel';
 import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
+import { PolicyPicker, type LibraryView } from './policy-picker';
+import { RubricEditor, SourcePanel, useRubricView } from './rubric-editor';
+
+/** RUBRIC_RECOMMENDATIONS_ENABLED: template help is shown with public names (D5); the S4/S7/S8 controls change. */
+const FormV2 = createContext(false);
+const helpText = (v2: boolean, s: string) => (v2 ? publicText(s) : s);
 
 /**
  * The Classic editor for any registered template profile (handover v2.1 ch. 04/05): eight sections with progress,
@@ -92,6 +102,7 @@ function Messages({ id, problems }: { id: string; problems: ProfileProblem[] }) 
 }
 
 function FieldControl({ field, value, path, problems, lookup, onChange }: FieldProps) {
+  const v2 = useContext(FormV2);
   const id = domId(path);
   const mine = problems.filter((p) => p.path === path);
   const describedBy = [`${id}-help`, mine.length ? `${id}-problems` : ''].filter(Boolean).join(' ');
@@ -104,7 +115,7 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
         {required && <Req />}
       </label>
       <p id={`${id}-help`} className="text-xs text-fg-muted">
-        {field.help}
+        {helpText(v2, field.help)}
       </p>
     </>
   );
@@ -127,7 +138,7 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
             {required && <Req />}
           </legend>
           <p id={`${id}-help`} className="text-xs text-fg-muted">
-            {field.help}
+            {helpText(v2, field.help)}
           </p>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
             {field.options.map((o) => (
@@ -148,7 +159,7 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
           {required && <Req />}
         </legend>
         <p id={`${id}-help`} className="text-xs text-fg-muted">
-          {field.help}
+          {helpText(v2, field.help)}
         </p>
         {list.length === 0 && <p className="mt-1 text-xs text-fg-muted">None yet.</p>}
         {list.map((v, i) => (
@@ -176,7 +187,7 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
           {field.label}
         </label>
         <p id={`${id}-help`} className="text-xs text-fg-muted">
-          {field.help}
+          {helpText(v2, field.help)}
         </p>
       </div>
     );
@@ -209,6 +220,7 @@ function FieldControl({ field, value, path, problems, lookup, onChange }: FieldP
 }
 
 function ArrayControl({ field, value, path, problems, lookup, onChange }: FieldProps) {
+  const v2 = useContext(FormV2);
   const id = domId(path);
   const items = Array.isArray(value) ? (value as Record<string, unknown>[]) : [];
   const noun = field.itemLabel ?? 'item';
@@ -222,7 +234,7 @@ function ArrayControl({ field, value, path, problems, lookup, onChange }: FieldP
         {required && <Req />}
       </legend>
       <p id={`${id}-help`} className="text-xs text-fg-muted">
-        {field.help}
+        {helpText(v2, field.help)}
       </p>
       {field.example && (
         <details className="mt-1 text-xs">
@@ -282,7 +294,16 @@ export function SelectorField({ field, value, label }: { field: TemplateProfile[
   );
 }
 
-export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { task: TaskView; profile: TemplateProfile; onSubmitted: () => void; initialSection?: number }) {
+/** The D3 declaration (owner, 15 Nov 2026): exactly this text, nothing else. */
+export const DECLARATION_V2 = 'I won’t use real customer, employer or account information.';
+const isPolicyReferenceField = (f: ItemField) => f.type === 'repeated_array' && (f.itemFields ?? []).some((x) => /sha256/i.test(x.key));
+const isSourcesField = (f: ItemField) => f.type === 'long_text' && /source/i.test(`${f.key} ${f.label}`) && f.visibility !== 'private_reference' && f.visibility !== 'private_rubric';
+
+export function ProfileEditor({ task, profile, onSubmitted, initialSection, initialRubric = null, initialLibrary = null }: { task: TaskView; profile: TemplateProfile; onSubmitted: () => void; initialSection?: number; initialRubric?: RubricView | null; initialLibrary?: LibraryView | null }) {
+  const v2 = task.formV2 === true;
+  const hasRubric = profile.sections.some((s) => s.fields.some((f) => f.type === 'criterion'));
+  const rubric = useRubricView(task.id, initialRubric, undefined, v2 && hasRubric);
+  const [openLink, setOpenLink] = useState<ViewLink | null>(null);
   const initial = useMemo(
     () => withSlotCase(profile, profileApplies(profile, task.output) ? (task.output as Record<string, unknown>) : startProfileOutput(profile, task.output), task.readOnly ? null : task.input.slot?.case, { lock: true }),
     [profile, task.output, task.input.slot?.case, task.readOnly],
@@ -316,13 +337,31 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
     return i >= 0 ? i : key === 'W01' ? 0 : profile.sections.length - 1;
   };
   const setField = (key: string, v: unknown) => update((prev) => setFieldValue(profile, prev, section.key as SectionKey, key, v));
+  const setRubric = useCallback(
+    (sectionKey: SectionKey, key: string) => (v: unknown) => update((prev) => setFieldValue(profile, prev, sectionKey, key, v)),
+    [update, profile],
+  );
+  const rubricItems = useMemo(() => {
+    const rf = profile.sections.flatMap((s) => s.fields.filter((f) => f.type === 'criterion').map((f) => getFieldValue(profile, value, s.key as SectionKey, f)))[0];
+    return Array.isArray(rf) ? (rf as Record<string, unknown>[]) : [];
+  }, [profile, value]);
+  const rubricTodo = useMemo(() => (v2 && rubric.view ? rubricToFinish(rubric.view, rubricItems) : []), [v2, rubric.view, rubricItems]);
+  const openInForm = (l: ViewLink) => {
+    setOpenLink(null);
+    if (!l.section) return;
+    goTo(sectionIndex(l.section));
+    const target = `pf-${`${l.section}.${l.field ?? ''}`.replace(/[^A-Za-z0-9]+/g, '-')}`;
+    setTimeout(() => document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+  };
   // Review comments sit under their own section (S1, or a range such as S3-S4); the rest are listed at the top.
   const rework = task.status === 'REWORK';
   const placed = useMemo(() => placeComments(task.review?.comments ?? [], profile.sections.map((s) => s.key)), [task.review, profile.sections]);
   const here = placed.bySection[section.key] ?? [];
 
   return (
+    <FormV2.Provider value={v2}>
     <div className="max-w-4xl min-w-0 space-y-4">
+      {openLink && <SourcePanel link={openLink} onClose={() => setOpenLink(null)} onOpenInForm={openInForm} />}
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="min-w-0 break-words text-xl font-semibold">{header.title || 'New task'}</h1>
         <SaveIndicator state={state} readOnly={task.readOnly} />
@@ -422,6 +461,20 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
           {section.fields.map((f) =>
             slot?.case && slot.case.source === `${section.key}.${f.key}` ? (
               <SelectorField key={f.key} field={f} value={slot.case.value} label={slot.case.label} />
+            ) : v2 && f.type === 'criterion' ? (
+              rubric.view ? (
+                <RubricEditor key={f.key} taskId={task.id} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} onChange={setRubric(section.key as SectionKey, f.key)} view={rubric.view} reload={rubric.reload} readOnly={task.readOnly} onOpenSource={setOpenLink} />
+              ) : (
+                <p key={f.key} role="status" className="text-sm text-fg-muted">
+                  {rubric.error ?? 'Loading the rubric…'}
+                </p>
+              )
+            ) : v2 && isPolicyReferenceField(f) ? (
+              <PolicyPicker key={f.key} taskId={task.id} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} onChange={(v) => setField(f.key, v)} readOnly={task.readOnly} initialLibrary={initialLibrary} />
+            ) : v2 && isSourcesField(f) && rubric.view ? (
+              <SourcesUsedField key={f.key} view={rubric.view} value={getFieldValue(profile, value, section.key as SectionKey, f)} onFill={(text) => setField(f.key, text)} readOnly={task.readOnly} onChangeSources={() => goTo(sectionIndex(rubric.view!.rubric.section))}>
+                <FieldControl field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} path={`${section.key}.${f.key}`} problems={problems} lookup={lookup} onChange={(v) => setField(f.key, v)} />
+              </SourcesUsedField>
             ) : (
               <FieldControl key={f.key} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} path={`${section.key}.${f.key}`} problems={problems} lookup={lookup} onChange={(v) => setField(f.key, v)} />
             ),
@@ -431,8 +484,21 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
         {section.key === 'S8' && (
           <div className="space-y-3">
             <h3 className="font-semibold">Still to fix</h3>
+            {rubricTodo.length > 0 && (
+              <ul className="space-y-1 text-sm" data-rubric-to-finish>
+                {rubricTodo.map((t, i) => (
+                  <li key={i}>
+                    <button type="button" className="text-left text-link underline" onClick={() => goTo(sectionIndex(rubric.view!.rubric.section))}>
+                      {rubric.view!.rubric.section}
+                    </button>{' '}
+                    {t.criterionId ? `${t.criterionId}: ` : ''}
+                    {t.message}
+                  </li>
+                ))}
+              </ul>
+            )}
             {problems.length === 0 ? (
-              <p className="text-sm">Every required field is complete. Run the checks, then submit.</p>
+              <p className="text-sm">{rubricTodo.length ? 'Every required field is complete. The rubric items above are still to finish; saving never waits for them.' : 'Every required field is complete. Run the checks, then submit.'}</p>
             ) : (
               <ul className="space-y-1 text-sm">
                 {problems.slice(0, 50).map((p, i) => (
@@ -445,7 +511,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
                 ))}
               </ul>
             )}
-            {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(s) => goTo(sectionIndex(s))} submitLabel={rework ? 'Resubmit for review' : undefined} />}
+            {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(s) => goTo(sectionIndex(s))} submitLabel={rework ? 'Resubmit for review' : undefined} declaration={v2 ? DECLARATION_V2 : undefined} />}
           </div>
         )}
 
@@ -459,6 +525,47 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
         </div>
       </section>
 
+    </div>
+    </FormV2.Provider>
+  );
+}
+
+/**
+ * S8 "Sources" (owner, "make it simple"): the ticked "Sources used for this task", read-only, with a link to change
+ * them in the rubric step. An empty field is filled with one readable line per ticked source; text the author already
+ * wrote is never overwritten.
+ */
+function SourcesUsedField({ view, value, onFill, readOnly, onChangeSources, children }: { view: RubricView; value: unknown; onFill: (text: string) => void; readOnly: boolean; onChangeSources: () => void; children: React.ReactNode }) {
+  const ticked = view.sources.items.filter((s) => s.ticked);
+  const text = ticked.map((s) => `${s.label} (${s.detail})`).join('\n');
+  const empty = typeof value !== 'string' || !value.trim();
+  return (
+    <div className="space-y-2" data-sources-used>
+      <div className="rounded-md border border-dashed border-line p-3 text-sm">
+        <p className="font-medium">Sources used for this task</p>
+        {ticked.length ? (
+          <ul className="mt-1 list-disc pl-5">
+            {ticked.map((s) => (
+              <li key={s.ref}>
+                {s.label} <span className="text-xs text-fg-muted">({s.detail})</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-fg-muted">No sources ticked.</p>
+        )}
+        <div className="mt-2 flex flex-wrap gap-3">
+          <button type="button" className="text-link underline" onClick={onChangeSources}>
+            Change sources
+          </button>
+          {!readOnly && empty && ticked.length > 0 && (
+            <button type="button" className="text-link underline" onClick={() => onFill(text)}>
+              Fill the field below from this list
+            </button>
+          )}
+        </div>
+      </div>
+      {children}
     </div>
   );
 }

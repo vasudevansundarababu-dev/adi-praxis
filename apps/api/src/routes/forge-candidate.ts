@@ -13,7 +13,8 @@ export const forgeCandidateRoutes: FastifyPluginAsyncZod<{ db: Db; config: Confi
 
   app.get('/me/forge/terms', { config: { access: 'candidate' }, schema: { tags: ['candidate'] } }, async (req) => {
     await requireNewFlow(db, req.candidate!.clientId);
-    return forgeTermsView(db, req.candidate!);
+    // D3 wording (RUBRIC_RECOMMENDATIONS_ENABLED; off by default): the declaration's exact owner-approved text.
+    return { ...(await forgeTermsView(db, req.candidate!)), declarationV2: config.RUBRIC_RECOMMENDATIONS_ENABLED };
   });
 
   app.post('/me/forge/terms', { config: { access: 'candidate' }, schema: { tags: ['candidate'], body: ForgeTermsAcceptRequest } }, async (req, reply) => {

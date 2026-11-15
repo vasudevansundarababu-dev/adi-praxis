@@ -301,6 +301,7 @@ export async function rubricView(tx: Db | Tx, ctx: RubricContext, opts: { aiEnab
     coverage: { total: cov.total, covered: cov.covered, gaps: cov.gaps.map((g) => ({ key: g.key, label: g.label })), duplicates: cov.duplicates },
     unused: derived.unused,
     run: run ? { id: run.id, mode: run.mode, model: run.model, createdAt: run.createdAt.toISOString() } : null,
+    history: (await tx.taskSubmission.findMany({ where: { taskInstanceId: ctx.task.id }, orderBy: { version: 'desc' }, select: { version: true, submittedAt: true } })).map((h) => ({ version: h.version, submittedAt: h.submittedAt.toISOString() })),
     internalOnly: RUBRIC_INTERNAL_ONLY,
   };
 }

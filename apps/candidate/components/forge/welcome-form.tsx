@@ -8,7 +8,7 @@ import { call } from '@/lib/client';
 import { welcomeProblem } from '@/lib/forge';
 
 /** Before you start (first sign-in, once): the contributor terms and the synthetic-data-only confirmation. */
-export function WelcomeForm({ terms, initialError = null }: { terms: (ForgeTermsDoc | null)[]; initialError?: string | null }) {
+export function WelcomeForm({ terms, initialError = null, declarationV2 = false }: { terms: (ForgeTermsDoc | null)[]; initialError?: string | null; declarationV2?: boolean }) {
   const router = useRouter();
   const [contributor, setContributor] = useState(false);
   const [synthetic, setSynthetic] = useState(false);
@@ -65,10 +65,18 @@ export function WelcomeForm({ terms, initialError = null }: { terms: (ForgeTerms
       <div className="card p-4">
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" aria-required="true" checked={synthetic} onChange={(e) => setSynthetic(e.target.checked)} className="mt-1" />
-          <span>
-            <strong>Synthetic data only</strong>
-            <Req /> Everything I write is made up. I won&apos;t use real customer, employer or account information.
-          </span>
+          {declarationV2 ? (
+            // D3 (owner, 15 Nov 2026): exactly this text. The rule itself is unchanged.
+            <span>
+              I won&apos;t use real customer, employer or account information.
+              <Req />
+            </span>
+          ) : (
+            <span>
+              <strong>Synthetic data only</strong>
+              <Req /> Everything I write is made up. I won&apos;t use real customer, employer or account information.
+            </span>
+          )}
         </label>
       </div>
       {error && (

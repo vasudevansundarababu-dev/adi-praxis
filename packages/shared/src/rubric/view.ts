@@ -52,6 +52,8 @@ export interface RubricView {
   coverage: { total: number; covered: number; gaps: { key: string; label: string }[]; duplicates: { requirement: string; criteria: string[] }[] };
   unused: { section: string; field: string; label: string; reason: string }[];
   run: { id: string; mode: string; model: string | null; createdAt: string } | null;
+  /** Saved (submitted) versions of the task, for Restore (existing history). */
+  history: { version: number; submittedAt: string }[];
   internalOnly: readonly string[];
 }
 
@@ -90,4 +92,12 @@ export function rubricToFinish(view: RubricView, items: Record<string, unknown>[
   for (const g of view.coverage.gaps) out.push({ kind: 'COVERAGE_GAP', criterionId: null, message: `Not covered by any criterion: ${g.label}` });
   for (const d of view.coverage.duplicates) out.push({ kind: 'DUPLICATE_WEIGHT', criterionId: null, message: `${d.requirement} is weighted by ${d.criteria.join(' and ')}: check for duplicate scoring` });
   return out;
+}
+
+/**
+ * Display-time wording for template text (D5 / legal rule): users never see the internal names. Template data stays
+ * exactly as received (it is hashed); only what is shown changes. Used where RUBRIC_RECOMMENDATIONS_ENABLED is on.
+ */
+export function publicText(s: string): string {
+  return s.replace(/\bADI-Labs\b/g, 'ADI Forge').replace(/\bAnvil\b/g, 'RL Gym').replace(/\bPraxis\b/g, 'ADI Forge');
 }

@@ -35,5 +35,7 @@ export const DOMAIN_EVENTS = [
   // Policy Rules (docs/architecture/ARCH-POLICY-RULES.md section 4): one event per extraction job.
   'policy.extraction_requested',
   'policy.annotation_requested',
+  // D2: one AI tutorial video run for a template version (docs/plan/PLAN-D2-TUTORIAL-VIDEO.md).
+  'template.tutorial_requested',
 ] as const;
 export type DomainEventName = (typeof DOMAIN_EVENTS)[number];

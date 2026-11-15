@@ -265,9 +265,26 @@ function ArrayControl({ field, value, path, problems, lookup, onChange }: FieldP
   );
 }
 
+/**
+ * The task's case-selector field (e.g. Application type): set by the task's slot, shown read-only so the author never
+ * chooses it a second time (15 Nov 2026).
+ */
+export function SelectorField({ field, value, label }: { field: TemplateProfile['sections'][number]['fields'][number]; value: string; label?: string }) {
+  const shown = label ?? field.options?.find((o) => o.value === value)?.label ?? value;
+  return (
+    <div data-selector-field={field.key}>
+      <p className="block text-sm font-medium">{field.label}</p>
+      <p className="mt-1 rounded-md border border-line bg-surface px-3 py-2 text-sm" aria-readonly="true">
+        {shown}
+      </p>
+      <p className="mt-1 text-xs text-fg-muted">Set by this task. It cannot be changed.</p>
+    </div>
+  );
+}
+
 export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { task: TaskView; profile: TemplateProfile; onSubmitted: () => void; initialSection?: number }) {
   const initial = useMemo(
-    () => withSlotCase(profile, profileApplies(profile, task.output) ? (task.output as Record<string, unknown>) : startProfileOutput(profile, task.output), task.readOnly ? null : task.input.slot?.case),
+    () => withSlotCase(profile, profileApplies(profile, task.output) ? (task.output as Record<string, unknown>) : startProfileOutput(profile, task.output), task.readOnly ? null : task.input.slot?.case, { lock: true }),
     [profile, task.output, task.input.slot?.case, task.readOnly],
   );
   const { value, update, currentRevision, state, flush } = useAutosave<Record<string, unknown>>(task.id, initial, task.revision, task.readOnly);
@@ -402,9 +419,13 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection }: { 
               </label>
             </div>
           )}
-          {section.fields.map((f) => (
-            <FieldControl key={f.key} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} path={`${section.key}.${f.key}`} problems={problems} lookup={lookup} onChange={(v) => setField(f.key, v)} />
-          ))}
+          {section.fields.map((f) =>
+            slot?.case && slot.case.source === `${section.key}.${f.key}` ? (
+              <SelectorField key={f.key} field={f} value={slot.case.value} label={slot.case.label} />
+            ) : (
+              <FieldControl key={f.key} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} path={`${section.key}.${f.key}`} problems={problems} lookup={lookup} onChange={(v) => setField(f.key, v)} />
+            ),
+          )}
         </fieldset>
 
         {section.key === 'S8' && (

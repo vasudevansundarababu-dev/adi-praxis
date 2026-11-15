@@ -3,7 +3,7 @@ import '@fastify/multipart';
 import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { CandidateRule, LOCATOR_GRANULARITY, PolicyRuleBody, REVERSE_RELATION, TaskChangeInput, annotationFlags } from '@praxis/shared';
+import { CandidateRule, LOCATOR_GRANULARITY, PolicyRuleBody, REVERSE_RELATION, RuleAnnotationInput, TaskChangeInput, annotationFlags } from '@praxis/shared';
 import type { MalwareScanner, ObjectStorage } from '../candidate/storage';
 import type { Config } from '../config';
 import type { Db } from '../db';
@@ -41,6 +41,7 @@ const CitationIn = z.object({ documentVersionId: z.string().uuid(), fieldPath: z
 const ManualRule = z.object({ documentVersionId: z.string().uuid(), ruleKey: z.string().trim().max(60).nullish(), body: PolicyRuleBody, citations: z.array(CitationIn.omit({ documentVersionId: true })).max(50) });
 const EditBody = z.object({ expectedContentHash: z.string().length(64), body: PolicyRuleBody, citations: z.array(CitationIn).max(50).optional(), annotationBasedOnRevisionId: z.string().uuid().nullish() });
 const AnnotateBody = z.object({ documentId: z.string().uuid() });
+const AnnotationEdit = z.object({ expectedContentHash: z.string().length(64), annotation: RuleAnnotationInput, basedOnRevisionId: z.string().uuid().nullish() });
 /** `required` is deprecated (15 Nov 2026): accepted from older clients and ignored; the annotation's marking replaced it. */
 const Decision = z.object({ expectedContentHash: z.string().length(64), required: z.boolean().optional() });
 const ExcludeBody = z.object({ expectedContentHash: z.string().length(64), reason: z.string().trim().min(1).max(1000) });
@@ -465,6 +466,25 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
       const annotationSave = { source: 'AUTHOR_EDIT' as const, editedById: actor.userId, editedRole: editorRole(actor.roles), basedOnRevisionId: req.body.annotationBasedOnRevisionId ?? null };
       const v = await editRule(tx, { loadText }, { clientId: actor.clientId, projectId: p.id, ruleId: req.params.ruleId, actorId: actor.userId, expectedContentHash: req.body.expectedContentHash, body: req.body.body, citations: req.body.citations as CitationEdit[] | undefined, annotationSave }, audit);
       return { status: 200, body: { versionId: v.id, version: v.version, state: v.state, contentHash: v.contentHash } };
+    });
+    return reply;
+  });
+
+  /**
+   * Edit only the annotation (marking, applies when, why, …) through the same rule edit: new annotation version, a new
+   * draft rule version if the rule is applied (tick it again), the source quotation untouched (spec §4).
+   */
+  app.put('/projects/:projectId/policy/rules/:ruleId/annotation', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ ruleId: z.string().uuid() }), body: AnnotationEdit } }, async (req, reply) => {
+    await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+      const p = await policyProject(tx, actor, req.params.projectId);
+      const latest = await tx.policyRuleVersion.findFirst({ where: { ruleId: req.params.ruleId, clientId: actor.clientId, rule: { projectId: p.id } }, orderBy: { version: 'desc' } });
+      if (!latest) throw notFound('Rule not found');
+      if (req.body.basedOnRevisionId && !(await tx.policyRuleAnnotationRevision.findFirst({ where: { id: req.body.basedOnRevisionId, ruleId: req.params.ruleId, clientId: actor.clientId }, select: { id: true } }))) throw notFound('Annotation revision not found');
+      const body = { ...PolicyRuleBody.parse(latest.body), annotation: { ...req.body.annotation, version: 1 } };
+      const annotationSave = { source: 'AUTHOR_EDIT' as const, editedById: actor.userId, editedRole: editorRole(actor.roles), basedOnRevisionId: req.body.basedOnRevisionId ?? null };
+      const v = await editRule(tx, { loadText }, { clientId: actor.clientId, projectId: p.id, ruleId: req.params.ruleId, actorId: actor.userId, expectedContentHash: req.body.expectedContentHash, body, annotationSave }, audit);
+      const saved = PolicyRuleBody.parse(v.body).annotation!;
+      return { status: 200, body: { versionId: v.id, version: v.version, state: v.state, contentHash: v.contentHash, annotationVersion: saved.version, applied: v.state === 'REVIEWED' } };
     });
     return reply;
   });

@@ -2036,3 +2036,34 @@ that the Author has to rework."
 - **(chosen by Claude, build)** An earning recorded at the first approval is not reversed (earnings are one per task;
   reversal stays a person's decision in the ledger). A project already marked complete keeps its status; its export
   waits for the reworked tasks.
+
+## D19 and D20: SME places and the platform pool on the Assign screen (16 Nov 2026)
+
+- **(owner)** The PM can put one SME on each task: Required workers is never lower than the task count, can be raised
+  from the project, and a full screen says why. The Assign list includes every available person in the platform pool
+  who matches the project's criteria, not only this project's Sourcing profiles.
+- **(chosen by Claude, build)** Required workers is raised to the number of expert task rows at submit and whenever the
+  task rows are checked (the Assign screen, Resource assignments, the Tasks tab, and before each assignment), audited
+  as `project.required_workers_raised`. This fixes existing projects such as QA f7f3cfae with no manual data step. A
+  null Required workers still means no limit. The SME-place check also uses the higher of the two, so a stale value
+  never blocks.
+- **(chosen by Claude, build)** The change control is on the Assign screen (Required workers field and Save), for PMs on
+  their own projects and Admins: `POST /projects/:id/required-workers`, never below the task count or the SMEs already
+  assigned (422 `REQUIRED_WORKERS_TOO_LOW`), only on new or active projects. Audited as
+  `project.required_workers_changed`; the same value again is audited as `project.required_workers_unchanged`.
+- **(chosen by Claude, build)** The platform pool is everyone in the client with a candidate record (onboarding or an
+  earlier assignment), an active account and a contact email. Criteria: the project's `country` filter, its minimum
+  `domain_experience_years`, and the project's JD skills (the template's required skills). Skill evidence is the
+  person's listed skills and specialties plus the assessment answers on any of their Sourcing profiles. A value the
+  person has not stated is shown as "not stated" and does not exclude them; a stated value that misses a required
+  filter, or skill evidence with none of the skills, does. Best match first. Nothing is decided by AI: the PM picks.
+- **(chosen by Claude, build)** Unavailable and left out: at their `concurrentProjectLimit` (open projects elsewhere,
+  counting a place from the earlier flow or a PM assignment), or already on this project in any role or with a
+  Sourcing profile here (that person is listed once, as a Sourcing profile). The concurrent-project limit applies to
+  pool people only; this project's Sourcing profiles are listed as before.
+- **(chosen by Claude, build)** A pool person can be assigned as SME, or as Reviewer on the Reviewer route. The request
+  is `POST /projects/:id/assignments/direct` with `candidateId` and `role` instead of `sourcedPersonId`. It creates
+  their Sourcing profile on the project (linked to their account, `submittedBy` the PM, audited as
+  `sourcing.person_added` with `fromPool: true`, no names or emails), re-checks availability and criteria (409
+  `NOT_AVAILABLE`), then assigns as before: one role per project, never their own task, choosing the task is required.
+

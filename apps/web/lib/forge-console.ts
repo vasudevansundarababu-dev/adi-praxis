@@ -177,43 +177,97 @@ export interface AssignableTask {
   label: string;
   status: string;
 }
+export interface CriterionMatch<T> {
+  value: T | null;
+  /** True met, false missed, null not stated by the person. */
+  matched: boolean | null;
+}
 export interface AssignablePerson {
-  sourcedPersonId: string;
+  /** SOURCING: a profile on this project. POOL: someone in the platform pool (D20), given a record here on assign. */
+  source?: 'SOURCING' | 'POOL';
+  sourcedPersonId: string | null;
+  candidateId?: string | null;
   firstName: string;
   lastName: string;
   email: string;
-  role: 'SME' | 'REVIEWER';
+  /** Null for a pool person: they can be assigned in either role. */
+  role: 'SME' | 'REVIEWER' | null;
   assessed: boolean;
   matchingSkills: { skill: string; matched: boolean | null }[];
+  location?: CriterionMatch<string> | null;
+  experience?: CriterionMatch<number> | null;
+  activeProjects?: number | null;
+  projectLimit?: number | null;
   reviewableTaskIds: string[];
 }
 export interface AssignableData {
   reviewRoute: ReviewRoute;
   requiredWorkers: number | null;
+  /** D19: the project's tasks, and the lowest Required workers the PM may set. */
+  taskCount?: number;
+  minRequiredWorkers?: number;
   smePlacesUsed: number;
   smePlacesFull: boolean;
   projectSkills: string[];
+  criteria?: { countries: string[] | null; countryRequired: boolean; minYears: number | null; yearsRequired: boolean };
   openTasks: AssignableTask[];
   reviewableTasks: AssignableTask[];
   people: AssignablePerson[];
 }
 
+/** A row's stable key: the Sourcing profile, else the pool person. */
+export const personKey = (p: Pick<AssignablePerson, 'sourcedPersonId' | 'candidateId'>) => p.sourcedPersonId ?? `pool:${p.candidateId}`;
+
+const canSme = (p: Pick<AssignablePerson, 'role'>) => p.role === 'SME' || p.role === null;
+const canReview = (d: Pick<AssignableData, 'reviewRoute'>, p: Pick<AssignablePerson, 'role'>) => d.reviewRoute === 'SME_EXPERT_PM' && (p.role === 'REVIEWER' || p.role === null);
+
 /** The Task select's groups: "To author (SME)" open tasks; on the Reviewer route also "To review (Reviewer)". */
 export function assignOptions(d: Pick<AssignableData, 'reviewRoute' | 'openTasks' | 'reviewableTasks'>, person: Pick<AssignablePerson, 'role' | 'reviewableTaskIds'>) {
   const groups: { label: string; role: 'SME' | 'REVIEWER'; tasks: AssignableTask[] }[] = [];
-  if (person.role === 'SME') groups.push({ label: 'To author (SME)', role: 'SME', tasks: d.openTasks });
-  if (d.reviewRoute === 'SME_EXPERT_PM' && person.role === 'REVIEWER')
-    groups.push({ label: 'To review (Reviewer)', role: 'REVIEWER', tasks: d.reviewableTasks.filter((t) => person.reviewableTaskIds.includes(t.taskId)) });
+  if (canSme(person)) groups.push({ label: 'To author (SME)', role: 'SME', tasks: d.openTasks });
+  if (canReview(d, person)) groups.push({ label: 'To review (Reviewer)', role: 'REVIEWER', tasks: d.reviewableTasks.filter((t) => person.reviewableTaskIds.includes(t.taskId)) });
   return groups;
 }
 
 /** Which assign buttons a person gets: Assign as SME unless places are full; Assign as Reviewer on the Reviewer route only. */
 export function assignButtons(d: Pick<AssignableData, 'reviewRoute' | 'smePlacesFull'>, person: Pick<AssignablePerson, 'role'>) {
   return {
-    sme: person.role === 'SME' && !d.smePlacesFull,
-    smeFull: person.role === 'SME' && d.smePlacesFull,
-    reviewer: d.reviewRoute === 'SME_EXPERT_PM' && person.role === 'REVIEWER',
+    sme: canSme(person) && !d.smePlacesFull,
+    smeFull: canSme(person) && d.smePlacesFull,
+    reviewer: canReview(d, person),
   };
+}
+
+/** The assign request: the Sourcing profile, or the pool person with the role chosen (D20). */
+export function assignBody(p: Pick<AssignablePerson, 'sourcedPersonId' | 'candidateId'>, role: 'SME' | 'REVIEWER', taskId: string) {
+  return p.sourcedPersonId ? { sourcedPersonId: p.sourcedPersonId, taskId } : { candidateId: p.candidateId, role, taskId };
+}
+
+/** D19: why SME places are full and how to change it; null while places are left. */
+export function placesFullNote(d: Pick<AssignableData, 'smePlacesFull' | 'smePlacesUsed' | 'requiredWorkers'>): string | null {
+  if (!d.smePlacesFull) return null;
+  return `All ${d.requiredWorkers} SME places are filled (${d.smePlacesUsed} of ${d.requiredWorkers} assigned). Required workers sets how many SMEs this project can have: raise it here to assign another SME.`;
+}
+
+/** A Required workers value the PM typed, checked before it is sent (D19). */
+export function requiredWorkersProblem(value: string, min: number): string | null {
+  const n = Number(value);
+  if (!value.trim() || !Number.isInteger(n)) return 'Enter a whole number.';
+  if (n < min) return `Required workers can't be lower than ${min} (one place per task, and the SMEs already assigned).`;
+  if (n > 10000) return 'Enter 10,000 or fewer.';
+  return null;
+}
+
+const mark = (m: boolean | null) => (m === true ? '✓' : m === false ? '✗' : 'not stated');
+
+/** A pool person's match against the project's criteria, in short words (D20). Empty for Sourcing profiles. */
+export function criteriaLine(p: Pick<AssignablePerson, 'source' | 'location' | 'experience' | 'activeProjects' | 'projectLimit'>): string[] {
+  if (p.source !== 'POOL') return [];
+  const out: string[] = [];
+  if (p.location) out.push(`Location ${p.location.value ?? ''} ${mark(p.location.matched)}`.replace(/\s+/g, ' '));
+  if (p.experience) out.push(`Experience ${p.experience.value === null ? '' : `${p.experience.value} yrs `}${mark(p.experience.matched)}`.replace(/\s+/g, ' '));
+  if (p.activeProjects !== null && p.activeProjects !== undefined && p.projectLimit) out.push(`On ${p.activeProjects} of ${p.projectLimit} projects`);
+  return out;
 }
 
 /** Inline error before anything is sent: a task must be chosen, from the right group. */

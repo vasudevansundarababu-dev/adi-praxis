@@ -152,13 +152,18 @@ The header (back link, name, status, description, Pause, Cancel project) stays a
   - The recruiter returns the filled sheet. In Sourcing, uploading it creates one profile per row, or it is attached
     to a single profile. Content is accepted in good faith; checking it comes later.
 - **Assign** opens a **separate screen**. It lists the Sourcing profiles whose skills match the project's template,
-  with the matching skills shown, and each person gets buttons:
+  with the matching skills shown, and (D20, owner 16 Nov 2026) every available person in the platform pool who matches
+  the project's criteria: location, domain experience and the template's required skills. Pool people show their match
+  per criterion; people at their concurrent-project limit or already on this project are left out. Assigning a pool
+  person creates their profile on this project. Each person gets buttons:
   - **Assign as SME**, always;
   - **Assign as Reviewer**, only when the project's route is Author → Reviewer → PM/Admin. A person is never both on
     one project.
   - On Author → PM/Admin there are no reviewers, so only **Assign as SME** shows.
 - The PM or an Admin does all assigning. Assigning is the selection: there is no separate screening decision.
-- SME places are capped at the project's **Required workers**; when they are full, Assign as SME is not offered.
+- SME places are capped at the project's **Required workers**; when they are full, Assign as SME is not offered and
+  the screen says why. Required workers is never lower than the project's task count (D19, owner 16 Nov 2026), and the
+  PM or an Admin can raise it on the Assign screen (audited).
 
 ## Tasks
 

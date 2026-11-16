@@ -1,13 +1,13 @@
 import '@fastify/multipart';
 import { randomUUID } from 'node:crypto';
-import { DirectAssignRequest, normEmail, SourcedPersonInput, SourcedRole, type SourcingImportResult, type SourcingImportRow } from '@praxis/shared';
+import { DirectAssignRequest, normEmail, RequiredWorkersRequest, SourcedPersonInput, SourcedRole, type SourcingImportResult, type SourcingImportRow } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Actor } from '../auth/actor';
 import type { MalwareScanner, ObjectStorage } from '../candidate/storage';
 import type { Db, Tx } from '../db';
 import { buildAssessmentSheet, buildRecruiterPack, buildRecruiterPdf, COLUMN_KEYS, columnValue, isFixedColumn, packFileName, readAssessmentSheet, type SheetRow } from '../forge/recruiter-pack';
-import { addSourcedPerson, assignable, changeAuthor, createSourcedPerson, directAssign, listSourcedPeople, projectPeople, sourcedWithoutTask, sourcingProject, sourcingProjects, sourcingTarget, toSourcedPersonDto } from '../forge/sourcing';
+import { addSourcedPerson, adoptPoolPerson, assignable, changeAuthor, createSourcedPerson, directAssign, listSourcedPeople, projectPeople, raisePlacesToTaskCount, setRequiredWorkers, sourcedWithoutTask, sourcingProject, sourcingProjects, sourcingTarget, toSourcedPersonDto } from '../forge/sourcing';
 import { resendSetLink, setLinkOnAssign, passwordMode, signInModeError } from '../forge/password';
 import { forgeSettings } from '../forge/settings';
 import type { Config } from '../config';
@@ -30,11 +30,15 @@ function sniff(buf: Buffer): keyof typeof FILE_TYPES | null {
   return null;
 }
 
-/** New flow only: the project's task rows, one per coverage slot, created on first need (audited when any are made). */
+/**
+ * New flow only: the project's task rows, one per coverage slot, created on first need (audited when any are made);
+ * then Required workers is raised to the task count if it is lower (D19, audited).
+ */
 async function ensureTaskRows(tx: Tx, projectId: string, clientId: string, audit: (i: AuditInput) => Promise<void>) {
   if (!(await forgeSettings(tx, clientId)).newFlow) return 0;
   const made = await ensureSlotTasks(tx, projectId);
   if (made) await audit({ entityType: 'Project', entityId: projectId, action: 'project.task_rows_created', after: { tasks: made } });
+  await raisePlacesToTaskCount(tx, projectId, audit);
   return made;
 }
 
@@ -120,16 +124,30 @@ export const forgeSourcingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
   );
 
   app.get('/projects/:id/people', { config: { access: ACCESS }, schema: { tags: ['sourcing'], params: IdParams } }, async (req) => {
+    await withTaskRows(req.actor!, String(req.id), (await sourcingProject(db, req.actor!, req.params.id)).id);
+    // Read after the task rows, so a raised Required workers shows at once.
     const p = await sourcingProject(db, req.actor!, req.params.id);
-    await withTaskRows(req.actor!, String(req.id), p.id);
     return { reviewRoute: p.reviewRoute, requiredWorkers: p.requiredWorkers, items: await projectPeople(db, p.id), withoutTask: await sourcedWithoutTask(db, p.id) };
   });
 
   app.get('/projects/:id/assignable', { config: { access: ACCESS }, schema: { tags: ['sourcing'], params: IdParams } }, async (req) => {
-    const p = await sourcingProject(db, req.actor!, req.params.id);
-    await withTaskRows(req.actor!, String(req.id), p.id);
-    return assignable(db, p);
+    await withTaskRows(req.actor!, String(req.id), (await sourcingProject(db, req.actor!, req.params.id)).id);
+    return assignable(db, await sourcingProject(db, req.actor!, req.params.id));
   });
+
+  /** D19: the PM or Admin changes Required workers (SME places) from the Assign screen. Authorised, idempotent, audited. */
+  app.post(
+    '/projects/:id/required-workers',
+    { config: { access: ACCESS }, schema: { tags: ['sourcing'], params: IdParams, body: RequiredWorkersRequest } },
+    async (req, reply) => {
+      await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+        const p = await sourcingProject(tx, actor, req.params.id);
+        const r = await setRequiredWorkers(tx, p.id, req.body.requiredWorkers, audit);
+        return { status: 200, body: { projectId: p.id, ...r } };
+      });
+      return reply;
+    },
+  );
 
   app.post('/projects/:id/assignments/direct', { config: { access: ACCESS }, schema: { tags: ['sourcing'], params: IdParams, body: DirectAssignRequest } }, async (req, reply) => {
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
@@ -139,10 +157,13 @@ export const forgeSourcingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
       if (!f.newFlow) throw new AppError(409, 'NEW_FLOW_OFF', 'Direct task assignment is not switched on for this platform.');
       if (p.status === 'DRAFT' || p.status === 'COMPLETED' || p.status === 'CANCELLED') throw new AppError(409, 'PROJECT_NOT_OPEN', 'People can be assigned only on new or active projects.');
       await ensureTaskRows(tx, p.id, p.clientId, audit);
-      const t = await directAssign(tx, p, req.body, actor, audit);
+      const fresh = await sourcingProject(tx, actor, p.id);
+      // D20: someone from the platform pool gets their record on this project first.
+      const sourcedPersonId = req.body.sourcedPersonId ?? (await adoptPoolPerson(tx, actor, fresh, { candidateId: req.body.candidateId!, role: req.body.role! }, audit)).id;
+      const t = await directAssign(tx, fresh, { sourcedPersonId, taskId: req.body.taskId }, actor, audit);
       // Online sign-in: a new person gets a set-your-password link (after the database work, as invites do).
-      await setLinkOnAssign(tx, { email, config }, f, req.body.sourcedPersonId, audit);
-      return { status: 200, body: { taskId: t.id, status: t.status, revision: t.revision, people: await projectPeople(tx, p.id) } };
+      await setLinkOnAssign(tx, { email, config }, f, sourcedPersonId, audit);
+      return { status: 200, body: { taskId: t.id, status: t.status, revision: t.revision, sourcedPersonId, people: await projectPeople(tx, p.id) } };
     });
     return reply;
   });

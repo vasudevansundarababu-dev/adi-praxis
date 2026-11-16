@@ -1,7 +1,7 @@
 'use client';
 
 import { chapterTime, TASK_HELP_SUGGESTIONS, tutorialKind, type Tutorial } from '@praxis/shared';
-import { useEffect, useRef, useState } from 'react';
+import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import { call } from '@/lib/client';
 import { HelpMascot } from './help-mascot';
 
@@ -93,7 +93,11 @@ export function HelpDrawer({ endpoint, kind, onClose }: { endpoint: string; kind
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  useEffect(() => end.current?.scrollIntoView?.({ block: 'end' }), [turns, pending]);
+  // D15: an effect must return nothing or a clean-up function. Current Chrome's scrollIntoView returns a Promise, which
+  // React then called as a clean-up when the answer arrived ("destroy is not a function"), taking down the task page.
+  useEffect(() => {
+    void end.current?.scrollIntoView?.({ block: 'end' });
+  }, [turns, pending]);
 
   async function ask(q: string) {
     const text = q.trim();
@@ -168,6 +172,36 @@ export function HelpDrawer({ endpoint, kind, onClose }: { endpoint: string; kind
   );
 }
 
+/**
+ * D15: Help can never take down the task page. Anything that fails while Help renders is caught here: the drawer shows a
+ * short message and Close, and the task form (with its autosaved work) keeps working.
+ */
+export class HelpBoundary extends Component<{ onClose: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Help failed; the task page keeps working.', error, info.componentStack);
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <aside role="dialog" aria-labelledby="task-help-h" data-task-help data-help-failed className="fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-line bg-bg p-4 shadow-xl print:hidden">
+        <h2 id="task-help-h" className="text-base font-semibold">
+          Help for this task
+        </h2>
+        <p role="alert" className="mt-3 rounded-md border border-error px-3 py-2 text-sm">
+          Help ran into a problem. Your task is safe and still saves. Close Help and try again.
+        </p>
+        <button type="button" className="btn btn-secondary mt-3 self-start" onClick={this.props.onClose}>
+          Close
+        </button>
+      </aside>
+    );
+  }
+}
+
 /** The Tutorial button (top of the page) and the floating Help button (D13) for a task or review page, with their card and drawer. */
 export function TaskAids({ taskId, kind, tutorial, initial = null }: { taskId: string; kind: AidsFor; tutorial: Tutorial | null | undefined; initial?: 'tutorial' | 'help' | null }) {
   const [showTutorial, setShowTutorial] = useState(initial === 'tutorial');
@@ -187,7 +221,11 @@ export function TaskAids({ taskId, kind, tutorial, initial = null }: { taskId: s
           <TutorialCard tutorial={tutorial} onClose={() => setShowTutorial(false)} />
         </div>
       )}
-      {showHelp && <HelpDrawer endpoint={endpoint} kind={kind} onClose={() => setShowHelp(false)} />}
+      {showHelp && (
+        <HelpBoundary onClose={() => setShowHelp(false)}>
+          <HelpDrawer endpoint={endpoint} kind={kind} onClose={() => setShowHelp(false)} />
+        </HelpBoundary>
+      )}
     </div>
   );
 }

@@ -42,5 +42,10 @@ export function authoringAgentView(task: Record<string, unknown>) {
     tools: t.environment?.tools ?? [] };
 }
 
-export const AUTHORSHIP_VERSION = 'human-only/1';
-export const AUTHORSHIP_TERMS = 'I will author the task, findings, reference solution, rationale and rubric myself. I will not use the built-in assistant or an external LLM to generate answers. Case data must be synthetic and sources authorised. The assistant may ask task-scoped questions, identify gaps and organise my words. Similarity and browser activity signals may be reviewed by a human; they are not proof of misconduct. I may explain or dispute a flag.';
+/**
+ * Owner decision 1 (15 Nov 2026, docs/DECISIONS.md): suggested text is allowed. The author writes the task or reads,
+ * changes where needed and accepts every suggested text, and confirms it describes the real workflow. Where each
+ * field's text came from is recorded (field-suggestions.ts). A new version asks for consent again.
+ */
+export const AUTHORSHIP_VERSION = 'human-review/2';
+export const AUTHORSHIP_TERMS = 'This task is my work. I write it myself, or I read, change where needed and accept every suggested text in it, and I confirm it describes how this work is really done. I don’t paste answers from outside tools. Case data must be synthetic and sources authorised. Where each field’s text came from (written by me, a suggestion used as it is, or a suggestion I edited) is recorded and shown to the reviewer. Similarity and browser activity signals may be reviewed by a human; they are not proof of misconduct. I may explain or dispute a flag.';

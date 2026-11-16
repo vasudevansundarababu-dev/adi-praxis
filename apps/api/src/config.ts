@@ -140,6 +140,13 @@ const Env = z.object({
   RUBRIC_AI_ENABLED: flag,
   /** Model for rubric wording on Vertex (`gemini:<model>` or a Claude id). Empty = follows AUTHORING_MODEL. */
   RUBRIC_AI_MODEL: z.string().default(''),
+  /**
+   * Suggested text for every field of the SME task form, per-field provenance and per-section confirmation (owner,
+   * 15 Nov 2026; docs/design/SUGGESTED-TEXT-AND-RUBRIC-TABLE.md). Off by default. Mock suggestions without Vertex.
+   */
+  FIELD_SUGGESTIONS_ENABLED: flag,
+  /** Model for field suggestions on Vertex (`gemini:<model>` or a Claude id). Empty = the SME profile chat's model. */
+  FIELD_SUGGESTIONS_MODEL: z.string().default(''),
   /** Harbor verification runner: mock (tests, local), docker (manual local runs), job (Cloud Run sandbox job). */
   HARBOR_RUNNER: z.enum(['mock', 'docker', 'job']).optional(),
   HARBOR_VERIFY_JOB: z.string().default(''),

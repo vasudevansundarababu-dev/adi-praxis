@@ -1,3 +1,5 @@
+import { provenanceSummary } from '@praxis/shared';
+import { sectionsProfile, suggestionStateOf } from '../tasks/suggestions/service';
 import { CoverageDimensions, forgeSlotSelector, normEmail, smeTaskStatus, type ForgeDecisionRequest, type ForgeTaskSelector, type SelectorSlot, type ForgePerson, type ForgeTaskRow, type ReviewerDecisionRequest, type ReviewerTaskStatus } from '@praxis/shared';
 import type { Actor, CandidateActor } from '../auth/actor';
 import type { Db, Tx } from '../db';
@@ -301,7 +303,17 @@ export async function reviewerTaskView(db: Db, actor: CandidateActor, taskId: st
     expectedRevision: t.revision,
     flaggedDuplicate: flaggedDuplicate(t),
     confirmCoverage: (t.slot?.isOpen ?? false) && hasQuotas(t.project.template),
+    // Owner decision 1 (15 Nov 2026): which fields came from a suggestion, and the author's section confirmations.
+    provenance: provenanceFor(t, latest?.output ?? null),
   };
+}
+
+function provenanceFor(t: { drafting: unknown; taskType: string; input: unknown; project: { template: { workflowName: string; profileId: string | null } } }, output: unknown) {
+  const state = suggestionStateOf(t as never);
+  if (!output || (!Object.keys(state.used).length && !Object.keys(state.confirmed).length)) return null;
+  const profile = sectionsProfile(t as never);
+  const selector = (t as { input?: { slot?: { case?: { source?: string } } } }).input?.slot?.case?.source ?? null;
+  return profile ? provenanceSummary(profile, output, state, selector) : null;
 }
 
 /** The Reviewer passes the exact version to the PM or Admin, or sends it back to the author. */

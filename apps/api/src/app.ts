@@ -65,6 +65,8 @@ import { rlRoutes } from './routes/rl';
 import { workRoutes } from './routes/work';
 import { rubricRoutes } from './routes/rubric';
 import { defaultRubricAssistant, type RubricAssistant } from './tasks/rubric/assistant';
+import { defaultFieldSuggester, type FieldSuggester } from './tasks/suggestions/assistant';
+import { suggestionRoutes } from './routes/suggestions';
 import { MemoryEmailSender, SmtpEmailSender, type EmailSender } from './lib/email';
 import { HashingEmbeddingProvider, VertexEmbeddingProvider, type EmbeddingProvider } from './tasks/embeddings';
 import { profileRoutes } from './routes/profile';
@@ -148,6 +150,8 @@ export interface AppDeps {
   ruleAssistant?: PolicyRuleAssistant;
   /** Rubric wording assistant; null = off. Defaults from RUBRIC_AI_ENABLED (off by default; mock without Vertex). */
   rubricAssistant?: RubricAssistant | null;
+  /** Field suggestions (FIELD_SUGGESTIONS_ENABLED): the model on Vertex when configured, otherwise the mock. */
+  fieldSuggester?: FieldSuggester;
 }
 
 export function defaultSupport(config: Config): SupportAssistant {
@@ -368,12 +372,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       });
       await v1.register(reviewRoutes, { db: deps.db, evaluator: deps.evaluator ?? defaultEvaluator(deps.config), storage });
       await v1.register(journeyRoutes, { db: deps.db, config: deps.config, selectionGate });
-      await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), rubricEnabled: deps.config.RUBRIC_RECOMMENDATIONS_ENABLED });
+      await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), rubricEnabled: deps.config.RUBRIC_RECOMMENDATIONS_ENABLED, suggestionsEnabled: deps.config.FIELD_SUGGESTIONS_ENABLED });
+      if (deps.config.FIELD_SUGGESTIONS_ENABLED) await v1.register(suggestionRoutes, { db: deps.db, selectionGate, suggester: deps.fieldSuggester ?? defaultFieldSuggester(deps.config) });
       if (deps.config.RUBRIC_RECOMMENDATIONS_ENABLED) await v1.register(rubricRoutes, { db: deps.db, selectionGate, assistant: deps.rubricAssistant !== undefined ? deps.rubricAssistant : defaultRubricAssistant(deps.config) });
       await v1.register(candidateStudioRoutes, { db: deps.db, config: deps.config, storage, deps: resolveDeps(deps.metaCompiler?.deps), selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), faults: deps.metaCompiler?.studioFaults });
       await v1.register(taskReviewRoutes, { db: deps.db, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config) });
       await v1.register(modelProviderRoutes, { db: deps.db, config: deps.config });
-      await v1.register(conversationRoutes, { db: deps.db, selectionGate, dailyModelCallCap: deps.config.AUTHORING_DAILY_CALL_CAP });
+      await v1.register(conversationRoutes, { db: deps.db, selectionGate, dailyModelCallCap: deps.config.AUTHORING_DAILY_CALL_CAP, suggestionsEnabled: deps.config.FIELD_SUGGESTIONS_ENABLED });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       await v1.register(policyRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, adapters: deps.policyAdapters ?? defaultAdapters(deps.config.policy), assistant: deps.ruleAssistant ?? defaultRuleAssistant(deps.config) });
       await v1.register(policyProposalRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, selectionGate });

@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suggested text and rubric table · ADI Forge (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
+<style>
+/* Dark theme values from packages/shared/theme/theme.css (the candidate app is dark), as in sme-task-form.html. Mockup only. */
+:root{--bg:#212227;--surface:#2a2c33;--text:#e6eaee;--muted:#8a9ca8;--border:#3a3d46;--link:#5aa3e6;--focus:#5aa3e6;--accent:#3fac95;--error:#f87171;--warning:#fbbf24;--success:#4ade80;--hairline:#363944;--elevated:#2c2e36;--ai:#c084fc;--shadow:0 1px 2px rgb(0 0 0 / .3),0 12px 32px -14px rgb(0 0 0 / .6)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',ui-sans-serif,system-ui,sans-serif;font-size:14px;line-height:1.55}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+button{font-family:inherit}
+.demo{background:#fbbf24;color:#1b1c20;text-align:center;font-size:12px;font-weight:500;padding:4px 16px}
+header{border-bottom:1px solid var(--hairline)}
+.hwrap{max-width:72rem;margin:0 auto;padding:14px 16px;display:flex;align-items:center;gap:18px}
+.brand{font-family:'Geist',sans-serif;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+.inf{width:26px;height:14px;border-radius:7px;border:3px solid #3fac95;border-right-color:#2a80d0;border-bottom-color:#2a80d0}
+nav.top{margin-left:auto;display:flex;gap:18px;font-size:13px}
+.rail{height:3px;background:linear-gradient(90deg,#0a2170 0%,#2a80d0 50%,#3fac95 100%)}
+main{max-width:72rem;margin:0 auto;padding:22px 16px 140px}
+h1{font-family:'Geist',sans-serif;font-size:22px;font-weight:600;margin:0}
+h2{font-family:'Geist',sans-serif;font-size:17px;font-weight:600;margin:0}
+h3{font-family:'Geist',sans-serif;font-size:14.5px;font-weight:600;margin:0}
+.muted{color:var(--muted)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.card{background:var(--elevated);border:1px solid var(--hairline);border-radius:16px;box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:12px;padding:9px 16px;font-weight:600;font-size:14px;cursor:pointer;border:0}
+.btn-primary{color:#fff;background:linear-gradient(90deg,#1f64b8 0%,#2a80d0 45%,#2f9c8a 100%)}
+.btn-secondary{border:1px solid var(--hairline);background:var(--elevated);color:var(--text)}
+.btn-ai{border:1px solid color-mix(in srgb,var(--ai) 55%,transparent);background:color-mix(in srgb,var(--ai) 14%,transparent);color:#e9d5ff}
+.btn-sm{padding:5px 11px;font-size:12.5px;border-radius:9px}
+.btn-link{background:none;border:0;color:var(--link);cursor:pointer;padding:0;font-size:12.5px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:600;line-height:20px;white-space:nowrap;background:color-mix(in srgb,var(--pill,var(--muted)) 18%,transparent)}
+.pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--pill,var(--muted))}
+.pill-info{--pill:var(--link)}.pill-success{--pill:var(--success)}.pill-warning{--pill:var(--warning)}.pill-error{--pill:var(--error)}.pill-ai{--pill:var(--ai)}
+.seg{display:inline-flex;border:1px solid var(--hairline);border-radius:12px;overflow:hidden;flex-wrap:wrap}
+.seg button{background:transparent;border:0;color:var(--muted);padding:7px 14px;font-size:13px;cursor:pointer;font-weight:500}
+.seg button.on{background:#0a2170;color:#fff;font-weight:600}
+.bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:16px 0 18px}
+.screen{display:none}.screen.on{display:block}
+.banner{border-radius:12px;padding:10px 12px;font-size:13px;margin:0 0 14px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.banner.info{background:color-mix(in srgb,var(--link) 10%,transparent);border:1px solid color-mix(in srgb,var(--link) 35%,transparent)}
+.banner.err{background:color-mix(in srgb,var(--error) 10%,transparent);border:1px solid color-mix(in srgb,var(--error) 45%,transparent)}
+.banner.ok{background:color-mix(in srgb,var(--success) 8%,transparent);border:1px solid color-mix(in srgb,var(--success) 35%,transparent)}
+.banner .grow{flex:1;min-width:14rem}
+.note{font-size:12px;color:var(--muted)}
+.design{border-left:3px solid var(--warning);background:color-mix(in srgb,var(--warning) 7%,transparent);padding:8px 12px;border-radius:0 10px 10px 0;font-size:12.5px;margin:0 0 14px;color:#f5e3b0}
+/* ── Screen 1: suggested text ── */
+.layout{display:grid;grid-template-columns:13rem 1fr;gap:18px;align-items:start}
+.toc{position:sticky;top:12px;padding:10px}
+.toc button{display:flex;width:100%;gap:8px;align-items:center;text-align:left;background:transparent;border:0;color:var(--text);padding:7px 8px;border-radius:9px;cursor:pointer;font-size:13px}
+.toc button:hover{background:#30323a}
+.toc button.on{background:#30323a;font-weight:600}
+.toc .st{margin-left:auto;font-size:11px}
+.sec{padding:18px 20px;margin-bottom:14px;display:none}
+.sec.on{display:block}
+.sec .shd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:2px}
+.fld{padding:14px 0;border-bottom:1px solid var(--hairline)}
+.fld:last-of-type{border-bottom:0}
+.fld>.lb{font-weight:600;font-size:13.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fld>.lb small{font-weight:400;color:var(--muted);font-size:12px}
+.fld .help{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
+input[type=text],textarea,select{font-family:inherit;font-size:14px;color:var(--text);background:#24262c;border:1px solid var(--border);border-radius:10px;padding:8px 10px;width:100%}
+textarea{min-height:64px;resize:vertical}
+input:focus,textarea:focus,button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.sug{margin:8px 0 0;border:1px dashed color-mix(in srgb,var(--ai) 60%,transparent);background:color-mix(in srgb,var(--ai) 7%,#24262c);border-radius:12px;padding:10px 12px}
+.sug .t{white-space:pre-wrap;font-size:13.5px;margin:6px 0 8px}
+.sug .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.src{font-size:11.5px;color:var(--muted);margin-left:auto}
+.prov{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:12px}
+.confirm{margin-top:14px;border:1px solid var(--hairline);border-radius:12px;padding:12px 14px;background:#26282f}
+.confirm.done{border-color:color-mix(in srgb,var(--success) 50%,transparent)}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;cursor:pointer}
+.chk input{width:16px;height:16px;margin-top:3px;accent-color:#2a80d0;flex:none}
+.rows{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+.rows th,.rows td{border-bottom:1px solid var(--hairline);padding:6px 8px;text-align:left;vertical-align:top}
+.rows th{color:var(--muted);font-weight:500;font-size:12px}
+.picks{display:flex;gap:6px;flex-wrap:wrap}
+.picks span{font-family:ui-monospace,Menlo,monospace;font-size:12px;border:1px solid var(--hairline);border-radius:8px;padding:2px 8px;background:#24262c}
+.summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0}
+.stat{border:1px solid var(--hairline);border-radius:12px;padding:10px 12px;background:#26282f}
+.stat b{font-family:'Geist',sans-serif;font-size:20px;display:block}
+.decl{border:1px solid var(--hairline);border-radius:12px;padding:12px 14px;margin-top:12px;background:#26282f}
+/* ── Screen 2: rubric table ── */
+.rsum{padding:14px 18px;margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.meter{flex:1;min-width:12rem}
+.meter .track{height:8px;background:#24262c;border-radius:999px;overflow:hidden;border:1px solid var(--hairline)}
+.meter .fill{height:100%;background:linear-gradient(90deg,#2a80d0,#3fac95)}
+.scale{display:flex;gap:6px;flex-wrap:wrap}
+.lvl{display:inline-flex;gap:6px;align-items:center;border-radius:8px;padding:2px 8px;font-size:12px;font-weight:600;border:1px solid var(--hairline)}
+.lvl i{font-style:normal;font-family:'Geist',sans-serif}
+.l-hi{background:rgb(74 222 128 / .12);color:#86efac}.l-mid{background:rgb(251 191 36 / .12);color:#fcd34d}.l-lo{background:rgb(248 113 113 / .12);color:#fca5a5}
+.tablewrap{overflow-x:auto;border:1px solid var(--hairline);border-radius:14px;background:var(--elevated)}
+table.rub{width:100%;border-collapse:collapse;font-size:13px;min-width:62rem}
+.rub th{position:sticky;top:0;background:#30323a;text-align:left;font-weight:600;font-size:12px;padding:9px 10px;border-bottom:1px solid var(--hairline);vertical-align:bottom}
+.rub td{padding:9px 10px;border-bottom:1px solid var(--hairline);vertical-align:top}
+.rub tr.row:hover td{background:#30323a}
+.rub tr.row{cursor:pointer}
+.rub tr.grp td{background:#26282f;font-weight:600;font-size:12.5px}
+.rub tr.bad td{background:color-mix(in srgb,var(--error) 9%,transparent)}
+.rub .num{text-align:center;font-family:'Geist',sans-serif;font-weight:600}
+.rub .clip{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.full .rub .clip{-webkit-line-clamp:unset;display:block}
+.rub .cid{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--muted)}
+.crit-on{color:var(--error);font-weight:700}
+.edited{font-size:11px;color:var(--link);margin-left:4px}
+.fold{margin-top:10px}
+details.box{border:1px solid var(--hairline);border-radius:12px;background:#26282f;margin-bottom:10px}
+details.box>summary{cursor:pointer;padding:10px 12px;font-weight:600;font-size:13.5px;list-style:none;display:flex;gap:8px;align-items:center}
+details.box>summary::-webkit-details-marker{display:none}
+details.box>summary::before{content:'▸';color:var(--muted)}
+details.box[open]>summary::before{content:'▾'}
+details.box .in{padding:0 14px 12px;font-size:13px}
+details.box ul{margin:4px 0;padding-left:18px}
+.calc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.calc div{border:1px solid var(--hairline);border-radius:10px;padding:8px 10px;background:#24262c}
+/* drawer = the existing criterion editor */
+.overlay{position:fixed;inset:0;background:rgb(0 0 0 / .5);display:none;z-index:20}
+.overlay.on{display:block}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(620px,100%);background:#1b1c20;border-left:1px solid var(--hairline);box-shadow:-20px 0 40px -20px rgb(0 0 0 / .7);display:none;flex-direction:column;z-index:21}
+.drawer.on{display:flex}
+.drawer .hd{padding:14px 18px;border-bottom:1px solid var(--hairline);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.drawer .bd{padding:6px 18px 18px;overflow:auto;flex:1}
+.drawer .ft{padding:12px 18px;border-top:1px solid var(--hairline);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.f{padding:12px 0;border-bottom:1px solid var(--hairline)}
+.f:last-child{border-bottom:0}
+.f>.lb{font-weight:600;font-size:13.5px;margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.f>.lb small{font-weight:400;color:var(--muted);font-size:12px}
+.score{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.score label{font-size:12.5px;color:var(--muted);display:block}
+.lk{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--hairline);border-radius:10px;padding:3px 10px;font-size:12.5px;background:#26282f;margin:0 6px 6px 0}
+.kv{display:grid;grid-template-columns:minmax(9rem,12rem) 1fr;gap:6px 14px;font-size:13px;padding:6px 0}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+.dec{padding:16px 18px;margin-bottom:12px}
+.dec ol{margin:8px 0 0;padding-left:18px}
+.dec li{margin:4px 0}
+.rec{display:inline-block;margin-top:8px;font-size:12.5px;border-radius:8px;padding:4px 10px;background:rgb(63 172 149 / .14);color:#8fe0cd}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0a2170;color:#fff;padding:8px 14px;border-radius:12px;font-size:13px;display:none;z-index:30;max-width:calc(100% - 32px)}
+.toast.on{display:block}
+@media (max-width:760px){.layout{grid-template-columns:1fr}.toc{position:static;display:flex;overflow-x:auto;gap:4px}.toc button{width:auto;flex:none}.summary-grid,.score,.calc{grid-template-columns:1fr}.kv{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="demo">Mockup for approval · not production · real KYC v7 criteria (20, weight 5, scored 5 / 2 / 0) and VEYRA criteria (23, A1–G4, scored 0–4); Marketing level texts and all suggestions are drafts · nothing is saved</div>
+<header><div class="hwrap"><div class="brand"><span class="inf"></span>ADI Forge</div><nav class="top"><a href="#">My tasks</a><a href="#">Help</a><a href="#">Morgan (SME)</a></nav></div><div class="rail"></div></header>
+<main>
+  <p class="muted" style="margin:0 0 4px;font-size:13px"><a href="#">My tasks</a> › <span id="crumb"></span></p>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <h1 id="title"></h1><span class="pill pill-info">In progress</span>
+  </div>
+  <p class="muted" style="margin:4px 0 0;font-size:12.5px" id="sub"></p>
+
+  <div class="bar">
+    <div class="seg" role="tablist" aria-label="Template" id="tplSeg">
+      <button data-tpl="kyc" class="on">KYC v7 · Custodian task</button>
+      <button data-tpl="mkt">Marketing · VEYRA Hush One</button>
+    </div>
+    <div class="seg" role="tablist" aria-label="Screen" id="scrSeg">
+      <button data-scr="sug" class="on">1 · Suggested text</button>
+      <button data-scr="rub">2 · Rubric table</button>
+      <button data-scr="dec">Decisions for the owner</button>
+    </div>
+  </div>
+
+  <!-- ═════════ Screen 1: suggested text ═════════ -->
+  <section class="screen on" id="scr-sug">
+    <p class="design"><b>Design note.</b> Every empty box shows a suggested text built from the template, the task slot and the project's published rules (never from case data). The author uses it as it is, edits it, or writes their own. Each section ends with a confirmation that it describes the real workflow; Submit needs all of them.</p>
+    <div class="banner info"><div class="grow"><b>Suggestions help you start.</b> They're written from this template and the project's published rules, not from any real customer. Read each one: use it, change it, or write your own. Before you submit you'll confirm, section by section, that the text describes how this work is really done.</div><button class="btn btn-ai btn-sm" id="useAllSec">Use all suggestions in this section</button></div>
+    <div class="layout">
+      <div class="card toc" id="toc"></div>
+      <div id="secs"></div>
+    </div>
+  </section>
+
+  <!-- ═════════ Screen 2: rubric table ═════════ -->
+  <section class="screen" id="scr-rub">
+    <p class="design"><b>Design note.</b> S7 opens as a table: one row per criterion, the score levels as columns, weight and critical at the end. Click a row or <b>Edit</b> to open today's criterion editor (shown here as a side panel; same fields, same save). Only what blocks Submit is shown in red at the top (D14); a criterion that isn't in the template can always be removed (D16).</p>
+    <div class="card rsum" id="rsum"></div>
+    <div id="blockers"></div>
+    <details class="box" id="howBox"><summary>How the score works</summary><div class="in" id="how"></div></details>
+    <details class="box" id="recBox"><summary id="recSum"></summary><div class="in" id="recs"></div></details>
+    <div class="bar" style="margin:6px 0 10px">
+      <div class="seg" id="filt"><button data-f="all" class="on">All</button><button data-f="crit">Critical only</button><button data-f="att">Needs attention</button></div>
+      <label class="chk" style="align-items:center"><input type="checkbox" id="fullTxt"> Show full text</label>
+      <span class="note" style="margin-left:auto">Click a row to edit it.</span>
+    </div>
+    <div id="tableHost"></div>
+  </section>
+
+  <!-- ═════════ Decisions ═════════ -->
+  <section class="screen" id="scr-dec">
+    <p class="design"><b>These need your answer before any production code.</b> Each one has my recommendation; the mockup already shows the recommended option.</p>
+    <div id="decs"></div>
+  </section>
+</main>
+
+<div class="overlay" id="ov"></div>
+<aside class="drawer" id="drawer" aria-label="Edit criterion">
+  <div class="hd"><span class="mono muted" id="dId"></span><h2 id="dName" style="flex:1;min-width:10rem"></h2><button class="btn btn-secondary btn-sm" id="dClose">Close</button></div>
+  <div class="bd" id="dBody"></div>
+  <div class="ft"><span class="note" style="margin-right:auto;align-self:center">Same editor as today. Saves through autosave.</span><button class="btn btn-secondary btn-sm" id="dCancel">Cancel</button><button class="btn btn-primary btn-sm" id="dSave">Save criterion</button></div>
+</aside>
+<div class="toast" id="toast"></div>
+
+<script>
+// ───────────────────────── Data ─────────────────────────
+const KYC_CRIT=[
+['identification_parties','All parties identified','Every owner, signer and authorised party in the snapshot is identified with their role','Most parties identified; a secondary party or role missing','Parties missed or invented',0],
+['identification_verification','Identity verified',"Each party's identity is verified with documentary or non-documentary checks, and the results are recorded",'Verification done for some parties, or the results are incomplete','No verification, or verification is assumed',1],
+['profile','Customer profile','Expected activity, source of funds and purpose recorded from the evidence','Profile partly recorded','Profile missing or invented',0],
+['screening','Sanctions and watchlist screening','Every party is screened with screening.check, and hits are resolved or escalated','Screening done but a hit is left unresolved','Screening missing for any party',1],
+['decision','Recommendation','The recommendation matches the evidence and policy, using an allowed value','Defensible but weakly supported','Contradicts the evidence or policy',1],
+['next_action','Next action','A clear next step or handoff is stated for the recommendation','A next step is vague','No next step',0],
+['evidence','Evidence cited','Every finding cites the documents or tool results it relies on','Some findings are uncited','Findings without evidence',0],
+['revision_integrity','Revisions handled','Changed or newer documents are reconciled with document.compare and the latest version is used','Revision noticed but not fully reconciled','A stale or conflicting version is used without noting it',0],
+['account_structure','Account structure','The product structure (single, joint, minor or custodial) is identified correctly','Mostly correct, with a detail missed','Wrong structure',0],
+['account_roles','Roles on the account','Owner, joint owner, custodian or minor roles are assigned correctly','One role unclear','Roles wrong',0],
+['account_eligibility','Eligibility','Age, capacity and residency eligibility are checked against policy','Partly checked','Not checked',0],
+['account_agreements','Agreements','Required agreements and consents are present for each party','One agreement not confirmed','Agreements ignored',0],
+['account_authority','Authority','Authority to act (custodian, guardian or power of attorney) is verified with authority.check','Authority noted but not verified','Authority assumed',0],
+['account_party_separation','Party separation',"Each party's data and evidence is kept separate, with no mixing",'Minor overlap noted and corrected',"Parties' data mixed",0],
+['account_exceptions','Exceptions','Policy exceptions are identified and routed to specialist review','Exception noted but not routed','Exception missed',0],
+['account_resolution','Resolution of findings','Open findings are resolved (finding.resolve) or listed as gaps','Some findings left open without being listed','Findings ignored',0],
+['state_applicability','State applicability','The governing state comes from the application, and the state policies are applied','State identified, but policy applicability is unclear','The wrong state is assumed',0],
+['state_rule_selection','State rule selection','The correct common and state rules are selected for the state, charter and date','One rule missing','Wrong rules',0],
+['state_dates','Dates','Policy effective dates and document validity dates are checked against the application date','Some dates checked','Dates ignored',0],
+['state_instrument','State instruments',"State-specific documents and IDs are judged under that state's rules",'Partly judged','Ignored',0],
+].map(([id,name,hi,mid,lo,c])=>({id,name,lv:{5:hi,2:mid,0:lo},w:5,crit:!!c,tpl:true}));
+
+const GROUPS={A:['Intent',10],B:['Adaptation',20],C:['Planning',15],D:['Brief and delivery',10],E:['Policy',15],F:['Measurement',15],G:['Finance, authority, handoffs, reliability',15]};
+const MKT_CRIT=[
+['A1',4,'Relevance','The plan targets the stated goal (verified product-page visits) in the qualified market only','The plan is mostly on goal but includes off-goal activity','The plan ignores the stated goal or market'],
+['A2',4,'Source interpretation','Fixtures and reports are read correctly; missing metrics stay null','One source is misread','Sources are misread or invented'],
+['A3',2,'Grouping','Audiences and messages are grouped by intent, with a reason','Grouping is present but unexplained','No grouping, or the groups contradict each other'],
+['B1',5,'Detection','Identifies the US commuting-intent change within two windows','Notices the change late or without the supporting report','Misses the change or invents a cause'],
+['B2',5,'Alternatives','Weighs at least two responses before acting','Names one alternative with thin support','Acts without considering alternatives'],
+['B3',5,'Action','The chosen change is within authority and matches the evidence','The action only partly fits the evidence','The action contradicts the evidence or exceeds authority'],
+['B4',5,'Follow-through','Checks the next window to confirm the change worked','Checks late or only partly','Never checks the result'],
+['C1',6,'Coherence','Plan, budget and calendar agree with each other','A minor inconsistency between them','Parts of the plan contradict each other'],
+['C2',5,'Trade-offs','States what is given up and why','A trade-off is named but not justified','No trade-offs considered'],
+['C3',4,'Coordination','Production, localisation and media steps are sequenced','One dependency is missed','Work is uncoordinated'],
+['D1',6,'Brief','The creative brief states audience, message, claim sources and limits','The brief misses one of these','No usable brief'],
+['D2',4,'Delivery acceptance','Delivered assets are checked against the brief before use','Assets are partly checked','Assets are accepted unchecked'],
+['E1',5,'Applicability','Cites the published rules that apply, and why','Misses one applicable rule','Cites wrong rules or none'],
+['E2',5,'Review and escalation','Claims that need review are escalated to the right owner','Escalated late','Not escalated'],
+['E3',5,'Readiness','Nothing is released before every required approval is recorded','One approval is unclear','Released without approval'],
+['F1',5,'Accuracy','Metrics are computed correctly from the reports','A minor calculation error','Wrong or invented numbers'],
+['F2',4,'Comparability','Compares like with like (same window, same definition)','One mismatched comparison','Comparisons are invalid'],
+['F3',3,'Interpretation','Conclusions follow from the numbers, with uncertainty stated','A conclusion is overstated','Conclusions are unsupported'],
+['F4',3,'Experiments','Test and control are designed with a stated success measure','The design is incomplete','No valid experiment'],
+['G1',4,'Accounting','Spend is tracked against the single shared total','A small tracking gap','Budget exceeded, or multiplied per locale'],
+['G2',4,'Authority','Never spends or activates beyond the granted authority','Requests authority late','Acts beyond authority'],
+['G3',4,'Handoffs','Hand-offs name the owner and what they must approve','A hand-off is vague','No hand-off'],
+['G4',3,'Recovery','Missing or failed reports are recorded as gaps and requested','A gap is noticed but not requested','Data is invented to fill the gap'],
+].map(([id,w,name,hi,mid,lo])=>({id,w,name,lv:{4:hi,2:mid,0:lo},crit:id==='E3'||id==='G2',tpl:true,g:id[0]}));
+
+// Suggested text per section. kind: text | pick | rows. `mine` = author already wrote it (to show the "Written by you" state).
+const KYC_SECS=[
+ {id:'S1',name:'Reusable assignment',fields:[
+  {k:'name',l:'Task name',req:1,s:'Custodial account (UTMA/UGMA-style) KYC',mine:1},
+  {k:'trigger',l:'Workflow trigger',req:1,s:'New consumer deposit account application, or a periodic or event-driven KYC refresh of an existing account.'},
+  {k:'ctx',l:'Business context',help:"This is the agent's brief. Don't give the answer.",req:1,brief:1,s:"Investigate each assigned custodial account application: verify the custodian's identity and authority to act for the minor beneficiary, identify the beneficiary, and confirm that the custodial agreement and eligibility rules are met before recommending."},
+  {k:'deliv',l:'Deliverable',help:"Also part of the agent's brief.",req:1,brief:1,s:'For each assigned application, an evidence-backed recommendation (ready_for_approval, request_information, specialist_review or not_eligible_for_requested_product), with the findings, any unresolved gaps and a safe handoff, naming the custodian and the minor beneficiary.'},
+  {k:'scope',l:'Scope',req:1,s:"Custodial consumer deposit applications in every applicable governing state (CA, NY, TX, FL, IL). Policies are qualified by each application's actual state, charter and application date."},
+  {k:'lang',l:'Language',req:1,kind:'pick',s:'English (en)'},
+ ]},
+ {id:'S2',name:'Shared runtime inputs',fields:[
+  {k:'contract',l:'Application input contract',req:1,s:'Each episode receives one isolated application snapshot from the versioned shared dataset that RL Gym assigns. The agent reads it only through the permitted tools: application.read for the application and parties, documents.list, document.read and document.compare for evidence, and policy.read for the policies that apply. No case facts, party details, IDs, expected decisions or dataset counts are part of this task.'},
+ ]},
+ {id:'S3',name:'Environment and tools',fields:[
+  {k:'env',l:'Environment',req:1,kind:'pick',s:'golden_kyc_openenv'},
+  {k:'tools',l:'Permitted tools',req:1,kind:'pick',s:'All 21 tools: application.read, policy.read, documents.list, document.read, document.compare, identity.check, document.check, address.check, screening.check, authority.check, operation.lookup, operation.read, information.request, information.read, finding.write, finding.resolve, specialist.refer, specialist.read, search, search.read, recommend'},
+  {k:'safe',l:'Safe failure behaviour',req:1,s:'If a tool is unavailable or returns pending, conflicting or refused results, the agent records the gap with finding.write, never invents or assumes evidence, and either requests the missing information (information.request) or refers to a specialist (specialist.refer). When required evidence is still missing at the end, the recommendation is request_information or specialist_review, never ready_for_approval.'},
+ ]},
+ {id:'S5',name:'Investigation procedure',fields:[
+  {k:'steps',l:'Steps',req:1,kind:'rows',cols:['Action','Tool','Failure handling'],s:[
+   ['Read the application and identify the custodian and the beneficiary minor; never treat the beneficiary as an owner','application.read','If the application can\'t be read, record a finding and stop with request_information'],
+   ["Verify the custodian's identity documents",'identity.check, document.check','If the document is expired or unreadable, request a replacement (information.request)'],
+   ["Verify the custodian's authority and the custodial agreement",'authority.check, document.read','If the agreement is missing, request it'],
+   ['Confirm the residential address','address.check','If proof is missing, request it'],
+   ['Screen the custodian','screening.check','If a hit is unresolved, refer it (specialist.refer)'],
+   ['Record the profile, findings and recommendation','finding.write, recommend','If evidence gaps remain, recommend request_information'],
+  ]},
+ ]},
+ {id:'S6',name:'Required output',fields:[
+  {k:'out',l:'Required output',req:1,s:'One recommendation per application from the allowed values, supported by the cited evidence for the custodian and the minor beneficiary, with any unresolved gaps and the human handoff stated. The execution output schema is authoritative.'},
+ ]},
+ {id:'S8',name:'Provenance and review',fields:[
+  {k:'srcs',l:'Sources',req:1,s:'RL Gym Golden KYC v7 packet; Golden Bank operating choices GB-01 to GB-07 version golden-kyc-1.0.0; US Federal KYC Policy and state addenda as published for this project.'},
+  {k:'notes',l:'Reviewer notes',opt:1,s:'Legal review of GB-01 to GB-07 is pending, as their publication reference says. State policy applicability is resolved by RL Gym at run time.'},
+ ]},
+];
+const MKT_SECS=[
+ {id:'S1',name:'Assignment and brief',fields:[
+  {k:'title',l:'Title',req:1,s:'Rebalance the Hush One launch when US commuting intent shifts'},
+  {k:'trigger',l:'Trigger',req:1,s:'Twelve-week launch: maximise verified product-page visits within 200,000 USD; improve outbound CTR against control.'},
+  {k:'ctx',l:'Business context',help:"This is the agent's brief. Don't give the answer.",req:1,brief:1,s:'A fictional over-ear headphone launches in five markets. Weekly reports arrive per window; the team must plan, adapt and report without exceeding authority.'},
+  {k:'deliv',l:'Requested deliverable',help:"Also part of the agent's brief.",req:1,brief:1,s:'A campaign plan, weekly reviews for every released window, approval requests for exact versions and a close-out, or a justified hold.'},
+  {k:'asof',l:'As-of date',req:1,s:'2027-01-04',mine:1},
+  {k:'locale',l:'Markets and locales',req:1,kind:'pick',s:'US_en-US (the only qualified locale)'},
+  {k:'budget',l:'Shared budget authority',help:'One shared total, never per locale.',req:1,s:'Total 200,000 USD: media 130,000; production 30,000; localisation 15,000; measurement 10,000; contingency 15,000.'},
+  {k:'cal',l:'Campaign calendar and reporting windows',req:1,s:'Weeks 1-12 from 2027-01-04; daily windows close at midnight UTC; final reports 48 h later.'},
+  {k:'limits',l:'Execution limits',req:1,s:'60 cycles; 400 trajectory steps incl. 100 prep and 25 per weekly cycle; 2 revision rounds per package.'},
+  {k:'mode',l:'Task3 execution mode',req:1,kind:'pick',s:'standalone_fixture'},
+ ]},
+ {id:'S2',name:'Evidence and parties',fields:[
+  {k:'ev',l:'Case inputs and evidence',req:1,kind:'rows',cols:['ID','Type','Source','Date','Content'],s:[
+   ['E1','product_fixture','Product team fixture','2026-12-01','Hush One: 30 h battery, ANC, 299 USD list (fictional).'],
+   ['E2','budget_envelope','Finance fixture','2026-12-15','200,000 USD total, split as in S1 (fictional).'],
+   ['E3','weekly_report','Analytics fixture','2027-01-25','Window 3 visits, CTR and engagement for US; missing metrics null (fictional).'],
+  ]},
+ ]},
+ {id:'S3',name:'Environment and tools',fields:[
+  {k:'env',l:'Environment',req:1,kind:'pick',s:'recorded_tools'},
+  {k:'tools',l:'Available tools',req:1,kind:'pick',s:'context.read, campaigns.read, products.read, budget.read, reports.query, plans.write, briefs.write, experiments.propose, budget_proposals.write, approval_requests.submit, campaign_findings.write, evidence.read'},
+  {k:'reset',l:'Reset and failure behaviour',opt:1,s:'If a report is missing, the agent records the gap and requests it; a missing outcome stays unassessed.'},
+ ]},
+ {id:'S5',name:'Expected work and process',fields:[
+  {k:'steps',l:'Steps',req:1,kind:'rows',cols:['ID','What the agent does','Expected result','Depends on'],s:[
+   ['S1','Read the window 3 weekly report (E3)','The change in US commuting intent is named',''],
+   ['S2','Propose a budget shift within the shared authority','A proposal that stays within 200,000 USD','S1'],
+   ['S3','Submit an approval request for the exact plan version','An approval request; nothing is activated','S2'],
+  ]},
+  {k:'handoff',l:'Business hand-off',req:1,s:'The marketing lead approves any budget shift above contingency; the agent submits an approval request and does not activate anything.'},
+ ]},
+ {id:'S6',name:'Output contract',fields:[
+  {k:'out',l:'Required outputs',req:1,s:'CampaignPlan, WeeklyReview per released window, ApprovalRequest for exact versions, CloseoutReport; or a justified hold awaiting authority.'},
+ ]},
+ {id:'S8',name:'Check and submit',fields:[
+  {k:'srcs',l:'Authorised sources used',req:1,s:'Fictional product, finance and analytics fixtures E1–E3; the project\'s published claims and advertising rules.'},
+ ]},
+];
+
+const T={
+ kyc:{crumb:'Custodial account (UTMA/UGMA-style) KYC',title:'Custodial account (UTMA/UGMA-style) KYC',sub:'KYC onboarding and refresh · template v7 · application type Custodian · revision 14 · Saved 14:31',secs:KYC_SECS,crit:KYC_CRIT,levels:[5,2,0],lvLabel:{5:'Pass',2:'Partial',0:'Fail'},fixedW:true,
+   extra:{id:'C1',name:'',lv:{5:'',2:'',0:''},w:5,crit:false,tpl:false}},
+ mkt:{crumb:'Rebalance the Hush One launch',title:'Rebalance the Hush One launch when US commuting intent shifts',sub:'VEYRA Hush One headphone launch · template v1 · revision 3 · Saved 14:31',secs:MKT_SECS,crit:MKT_CRIT,levels:[4,2,0],lvLabel:{4:'Level 4 · complete',2:'Level 2 · material gap',0:'Level 0 · failed'},fixedW:false,extra:null},
+};
+
+// ───────────────────────── State ─────────────────────────
+let tpl='kyc',scr='sug',curSec='S1',filt='all';
+const S={}; // per template: {vals:{sec.k:{v,origin}}, conf:{sec:time}, crit:[...], extraOn}
+function st(){if(!S[tpl]){const t=T[tpl];const vals={};t.secs.forEach(s=>s.fields.forEach(f=>{if(f.mine)vals[s.id+'.'+f.k]={v:f.s,origin:'mine'}}));
+  S[tpl]={vals,conf:{},hidden:{},crit:t.crit.map(c=>({...c,lv:{...c.lv}})),extraOn:!!t.extra}}return S[tpl]}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const now=()=>new Date().toTimeString().slice(0,5);
+function toast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),2600)}
+
+// ───────────────────────── Screen 1 ─────────────────────────
+function fieldVal(sid,f){return st().vals[sid+'.'+f.k]}
+function secFilled(s){return s.fields.filter(f=>!f.opt).every(f=>fieldVal(s.id,f))}
+function secCounts(s){const v=s.fields.map(f=>fieldVal(s.id,f)).filter(Boolean);return{done:v.length,total:s.fields.length}}
+function provPill(x){if(!x)return'';return x.origin==='mine'?'<span class="pill pill-info">Written by you</span>':x.origin==='as-is'?'<span class="pill pill-ai">Suggested · used as it is</span>':'<span class="pill pill-ai">Suggested · edited by you</span>'}
+function renderToc(){const t=T[tpl];document.getElementById('toc').innerHTML=t.secs.map(s=>{const c=secCounts(s),ok=st().conf[s.id];
+  return `<button data-sec="${s.id}" class="${s.id===curSec?'on':''}"><span class="mono muted">${s.id}</span>${esc(s.name)}<span class="st" style="color:${ok?'var(--success)':'var(--muted)'}">${ok?'✓ confirmed':c.done+'/'+c.total}</span></button>`}).join('')+
+  `<button data-sec="S7"><span class="mono muted">S7</span>Rubric<span class="st muted">table →</span></button>`;
+  document.querySelectorAll('#toc [data-sec]').forEach(b=>b.onclick=()=>{if(b.dataset.sec==='S7'){setScr('rub');return}curSec=b.dataset.sec;renderSug()})}
+function rowsHtml(f,rows){return `<table class="rows"><tr>${f.cols.map(c=>`<th>${c}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`}
+function fieldHtml(s,f){const x=fieldVal(s.id,f),id=s.id+'.'+f.k,hid=st().hidden[id];
+  const lb=`<div class="lb">${esc(f.l)} ${f.opt?'<small>optional</small>':''} ${provPill(x)}</div>${f.help?`<div class="help">${esc(f.help)}</div>`:''}`;
+  let input;
+  if(f.kind==='rows') input=x?rowsHtml(f,x.v)+`<div class="prov"><button class="btn-link" data-undo="${id}">Clear and show the suggestion again</button><span class="note">Each row stays editable with Add / Remove, as today.</span></div>`:`<div class="note" style="padding:6px 0">No rows yet.</div>`;
+  else if(f.kind==='pick') input=x?`<div class="picks">${x.v.split(/, (?=[a-z_]+\.|[a-z_]+$)/).length>3?x.v.replace(/^All 21 tools: /,'').split(', ').map(p=>`<span>${esc(p)}</span>`).join(''):`<span>${esc(x.v)}</span>`}</div><div class="prov"><button class="btn-link" data-undo="${id}">Change</button></div>`:`<select disabled><option>Choose…</option></select>`;
+  else input=`<textarea data-fld="${id}" placeholder="Write it here, or use the suggestion below">${x?esc(x.v):''}</textarea>${x&&x.origin!=='mine'?`<div class="prov"><button class="btn-link" data-undo="${id}">Undo, show the suggestion again</button>${f.brief?'<span class="pill pill-success">Checked: no expected answer in the agent\'s brief</span>':''}</div>`:''}`;
+  let sug='';
+  if(!x&&!hid){const body=f.kind==='rows'?rowsHtml(f,f.s):`<div class="t">${esc(f.s)}</div>`;
+   sug=`<div class="sug"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="pill pill-ai">Suggested text</span><span class="src">From: ${tpl==='kyc'?'KYC v7 template, Custodian slot':'VEYRA template'} and project rules · no case data</span></div>${body}
+    <div class="acts"><button class="btn btn-ai btn-sm" data-use="${id}">${f.kind==='rows'?'Use these '+f.s.length+' rows':'Use this text'}</button>${f.kind==='text'||!f.kind?`<button class="btn btn-secondary btn-sm" data-edit="${id}">Edit, then use</button>`:''}<button class="btn btn-secondary btn-sm" data-again="${id}">Suggest another</button><button class="btn-link" data-hide="${id}">I'll write my own</button></div></div>`}
+  else if(!x&&hid) sug=`<div class="prov"><button class="btn-link" data-unhide="${id}">Show the suggestion</button></div>`;
+  return `<div class="fld">${lb}${input}${sug}</div>`}
+function confirmHtml(s){const c=st().conf[s.id],filled=secFilled(s);const n=s.fields.filter(f=>{const x=fieldVal(s.id,f);return x&&x.origin!=='mine'}).length;
+  return `<div class="confirm ${c?'done':''}"><label class="chk"><input type="checkbox" data-conf="${s.id}" ${c?'checked':''} ${filled?'':'disabled'}><span><b>I've read every field in ${s.id}, and it describes how this work is actually done.</b><br><span class="note">${n?`${n} field${n>1?'s':''} here came from a suggestion. Ticking this records that you checked ${n>1?'them':'it'} and take ${n>1?'them':'it'} as your own.`:'All fields here are your own words.'} ${filled?'':'Fill the required fields first.'}</span>${c?`<br><span class="note" style="color:var(--success)">Confirmed by you at ${c}. Changing a field in ${s.id} clears this.</span>`:''}</span></label></div>`}
+function s8Summary(){const all=T[tpl].secs.flatMap(s=>s.fields.map(f=>fieldVal(s.id,f))).filter(Boolean);
+  const m=all.filter(x=>x.origin==='mine').length,a=all.filter(x=>x.origin==='as-is').length,e=all.filter(x=>x.origin==='edited').length;
+  const confN=Object.keys(st().conf).length,secN=T[tpl].secs.length,ok=confN===secN;
+  return `<div class="card sec on" style="margin-top:4px"><div class="shd"><h2>Before you submit</h2></div>
+   <div class="summary-grid"><div class="stat"><b>${m}</b><span class="note">fields written by you</span></div><div class="stat"><b>${a}</b><span class="note">suggestions used as they are</span></div><div class="stat"><b>${e}</b><span class="note">suggestions you edited</span></div></div>
+   <p class="note" style="margin:0">The reviewer sees this split and which fields came from a suggestion. ${confN} of ${secN} sections confirmed.</p>
+   <div class="decl"><label class="chk"><input type="checkbox" id="declA"><span><b>I won't use real customer, employer or account information.</b></span></label></div>
+   <div class="decl"><label class="chk"><input type="checkbox" id="declB"><span><b>This task is my work.</b> I wrote it or I read, changed where needed and accepted every suggested text in it. It describes how this work is really done. I didn't paste answers from outside tools.<br><span class="note">Draft wording: replaces today's "I will not use the built-in assistant… to generate answers" (decision 1).</span></span></label></div>
+   <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap"><button class="btn btn-primary" id="submitBtn" ${ok?'':'disabled'}>Submit for review</button><span class="note">${ok?'Submit runs the existing checks, unchanged.':`Confirm the remaining ${secN-confN} section${secN-confN>1?'s':''} to submit.`}</span></div></div>`}
+function renderSug(){renderToc();const t=T[tpl];const s=t.secs.find(x=>x.id===curSec)||t.secs[0];curSec=s.id;
+  const pending=s.fields.filter(f=>!fieldVal(s.id,f)).length;
+  document.getElementById('useAllSec').disabled=!pending;
+  document.getElementById('useAllSec').textContent=pending?`Use all ${pending} suggestion${pending>1?'s':''} in ${s.id}`:`Nothing left to fill in ${s.id}`;
+  const i=t.secs.indexOf(s),nx=t.secs[i+1];
+  document.getElementById('secs').innerHTML=`<div class="card sec on"><div class="shd"><span class="mono muted">${s.id}</span><h2>${esc(s.name)}</h2></div>${s.fields.map(f=>fieldHtml(s,f)).join('')}${confirmHtml(s)}
+   <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">${nx?`<button class="btn btn-secondary btn-sm" data-go="${nx.id}">Next: ${nx.id} ${esc(nx.name)} →</button>`:''}</div></div>${!nx?s8Summary():''}`;
+  wireSug()}
+function setVal(id,v,origin){const [sid]=id.split('.');st().vals[id]={v,origin};delete st().conf[sid]}
+function fieldBy(id){const [sid,k]=id.split('.');return T[tpl].secs.find(s=>s.id===sid).fields.find(f=>f.k===k)}
+function wireSug(){
+  document.querySelectorAll('[data-use]').forEach(b=>b.onclick=()=>{const f=fieldBy(b.dataset.use);setVal(b.dataset.use,f.s,'as-is');renderSug()});
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{const f=fieldBy(b.dataset.edit);setVal(b.dataset.edit,f.s,'as-is');renderSug();const ta=document.querySelector(`[data-fld="${b.dataset.edit}"]`);ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)});
+  document.querySelectorAll('[data-again]').forEach(b=>b.onclick=()=>toast('Mockup: a new suggestion would replace this one. Your other fields stay as they are.'));
+  document.querySelectorAll('[data-hide]').forEach(b=>b.onclick=()=>{st().hidden[b.dataset.hide]=1;renderSug();const ta=document.querySelector(`[data-fld="${b.dataset.hide}"]`);ta&&ta.focus()});
+  document.querySelectorAll('[data-unhide]').forEach(b=>b.onclick=()=>{delete st().hidden[b.dataset.unhide];renderSug()});
+  document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=()=>{delete st().vals[b.dataset.undo];delete st().conf[b.dataset.undo.split('.')[0]];renderSug()});
+  document.querySelectorAll('[data-fld]').forEach(ta=>{ta.oninput=()=>{const id=ta.dataset.fld,x=st().vals[id],f=fieldBy(id);const sid=id.split('.')[0];const had=!!st().conf[sid];
+    if(!ta.value){delete st().vals[id]}else{const origin=x&&x.origin!=='mine'?(ta.value===f.s?'as-is':'edited'):'mine';st().vals[id]={v:ta.value,origin}}
+    delete st().conf[sid];
+    const fld=ta.closest('.fld');const pill=fld.querySelector('.lb .pill');const p=provPill(st().vals[id]);if(pill)pill.outerHTML=p||'';else if(p)fld.querySelector('.lb').insertAdjacentHTML('beforeend',p);
+    if(had)toast(`${sid} changed, so its confirmation was cleared.`);renderToc();const c=document.querySelector('.confirm');c.outerHTML=confirmHtml(T[tpl].secs.find(s=>s.id===sid));wireConf()}});
+  wireConf();
+  document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{curSec=b.dataset.go;renderSug();scrollTo({top:0,behavior:'smooth'})});
+  const sb=document.getElementById('submitBtn');if(sb)sb.onclick=()=>{const a=document.getElementById('declA').checked,b=document.getElementById('declB').checked;toast(a&&b?'Mockup: submit runs the existing checks. The task carries which fields came from suggestions.':'Tick both declarations first.')}}
+function wireConf(){document.querySelectorAll('[data-conf]').forEach(c=>c.onchange=()=>{if(c.checked)st().conf[c.dataset.conf]=now();else delete st().conf[c.dataset.conf];renderSug()})}
+document.getElementById('useAllSec').onclick=()=>{const s=T[tpl].secs.find(x=>x.id===curSec);let n=0;s.fields.forEach(f=>{if(!fieldVal(s.id,f)){setVal(s.id+'.'+f.k,f.s,'as-is');n++}});renderSug();toast(`${n} suggestion${n>1?'s':''} used. Read them, change what doesn't fit, then confirm ${s.id}.`)};
+
+// ───────────────────────── Screen 2 ─────────────────────────
+function crits(){const s=st();return s.extraOn&&T[tpl].extra?[...s.crit,{...T[tpl].extra}]:s.crit}
+function needsAtt(c){return !c.tpl||T[tpl].levels.some(l=>!c.lv[l])||!c.name}
+function blockers(){const t=T[tpl],cs=crits(),out=[];
+  cs.filter(c=>!c.tpl).forEach(c=>out.push({id:c.id,msg:`<b>${esc(c.id)}</b> isn't one of this template's criteria. Remove it to submit.`,fix:`<button class="btn btn-secondary btn-sm" data-remove="${c.id}">Remove ${esc(c.id)}</button>`}));
+  cs.filter(c=>c.tpl&&t.levels.some(l=>!c.lv[l].trim())).forEach(c=>out.push({id:c.id,msg:`<b>${esc(c.id)}</b> is missing score text.`,fix:`<button class="btn btn-secondary btn-sm" data-open="${c.id}">Edit</button>`}));
+  const total=cs.reduce((a,c)=>a+Number(c.w||0),0);if(total!==100)out.push({msg:`Weights add up to <b>${total}</b>; they must add up to exactly 100.`});
+  if(!cs.some(c=>c.crit))out.push({msg:'Tick <b>Critical</b> on at least one criterion.'});
+  if(!t.fixedW)Object.entries(GROUPS).forEach(([g,[n,gw]])=>{const sum=cs.filter(c=>c.g===g).reduce((a,c)=>a+Number(c.w),0);if(sum!==gw)out.push({msg:`Group ${g} (${n}) adds up to <b>${sum}</b>; it must be ${gw}.`})});
+  return out}
+function renderRub(){const t=T[tpl],cs=crits(),total=cs.reduce((a,c)=>a+Number(c.w||0),0),crN=cs.filter(c=>c.crit).length;
+  const lv=t.levels.map((l,i)=>`<span class="lvl ${['l-hi','l-mid','l-lo'][i]}"><i>${l}</i>${tpl==='kyc'?t.lvLabel[l]:['complete','material gap','failed'][i]}</span>`).join('');
+  document.getElementById('rsum').innerHTML=`<div style="min-width:15rem"><h2>Rubric · how the agent's work is scored</h2><p class="note" style="margin:2px 0 6px">${tpl==='kyc'?'20 criteria from the template, 5 points each.':'23 criteria in 7 groups (A–G), each with its own weight.'}</p><div class="scale">${lv}${tpl==='mkt'?'<span class="lvl"><i>3</i>, <i>1</i> optional</span>':''}</div></div>
+   <div class="meter"><div style="display:flex;justify-content:space-between;font-size:12.5px"><span>Total weight</span><b style="color:${total===100?'var(--success)':'var(--error)'}">${total} of 100</b></div><div class="track"><div class="fill" style="width:${Math.min(total,100)}%;${total>100?'background:var(--error)':''}"></div></div></div>
+   <span class="pill ${crN?'pill-error':'pill-warning'}">${crN} critical</span>`;
+  const b=blockers();
+  document.getElementById('blockers').innerHTML=b.length?`<div class="banner err"><div class="grow"><b>${b.length} thing${b.length>1?'s':''} block${b.length>1?'':'s'} Submit</b><ul style="margin:6px 0 0;padding-left:18px">${b.map(x=>`<li style="margin:4px 0">${x.msg} ${x.fix||''}</li>`).join('')}</ul></div></div>`:`<div class="banner ok"><div class="grow"><b>Nothing in the rubric blocks Submit.</b></div></div>`;
+  document.getElementById('how').innerHTML=tpl==='kyc'?`<p style="margin:4px 0 8px">Each criterion is scored <b>5</b> (pass), <b>2</b> (partial) or <b>0</b> (fail). 20 criteria × 5 = <b>100 points</b>. If the agent fails a <span class="crit-on">critical</span> criterion, the whole task fails, whatever the total.</p>
+   <div class="calc"><div><span class="note">Example</span><br>17 pass × 5 = 85</div><div><span class="note">plus</span><br>2 partial × 2 = 4, 1 fail × 0 = 0</div><div><span class="note">Score</span><br><b>89 / 100</b> · passes if the fail isn't critical</div></div>`
+   :`<p style="margin:4px 0 8px">Each criterion is scored on a <b>0–4</b> level. Points = <b>weight × level ÷ 4</b>. Weights add up to 100 (A 10 · B 20 · C 15 · D 10 · E 15 · F 15 · G 15). Pass: 80 or more, at least 12 of 20 in group B, the required outputs or a correct hold, and no critical failure.</p>
+   <div class="calc"><div><span class="note">Example: B1, weight 5</span><br>Level 4 → 5 points</div><div><span class="note">Level 2</span><br>5 × 2 ÷ 4 = 2.5 points</div><div><span class="note">Level 0</span><br>0 points</div></div>`;
+  const recs=tpl==='kyc'?['<b>state_rule_selection</b>: link the S4 rules it checks (GB-01 to GB-07) as its sources. Optional, helps the reviewer.','<b>account_authority</b>: say when it applies (custodial and minor accounts). Optional.','11 S4 rules aren\'t linked to a criterion. The 20 criteria are fixed, so link them as sources of an existing criterion, or leave them. This never blocks Submit.']
+   :['<b>E1</b>: link the published rules it checks as its sources. Optional.','<b>F4</b>: add Level 3 and Level 1 text for finer scoring. Optional.'];
+  document.getElementById('recSum').innerHTML=`Recommended, not required <span class="pill">${recs.length}</span>`;
+  document.getElementById('recs').innerHTML=`<ul>${recs.map(r=>`<li>${r}</li>`).join('')}</ul><p class="note" style="margin:6px 0 0">Internal notes (suggested additions, technical mapping) are inside each criterion's editor, not here.</p>`;
+  let rows=cs.map((c,i)=>({c,i}));
+  if(filt==='crit')rows=rows.filter(r=>r.c.crit);if(filt==='att')rows=rows.filter(r=>needsAtt(r.c));
+  const head=`<tr><th style="width:2.2rem">#</th><th style="width:13rem">What is assessed</th>${t.levels.map((l,i)=>`<th><span class="lvl ${['l-hi','l-mid','l-lo'][i]}"><i>${l}</i>${tpl==='kyc'?t.lvLabel[l]+' · '+l+' pts':['complete','material gap','failed'][i]}</span></th>`).join('')}<th style="width:4.5rem;text-align:center">Weight</th><th style="width:4.5rem;text-align:center">Critical</th><th style="width:4rem"></th></tr>`;
+  const rowH=({c,i})=>{const bad=!c.tpl;return `<tr class="row ${bad?'bad':''}" data-open="${c.id}"><td class="num muted">${i+1}</td><td><b>${c.name?esc(c.name):'<span style="color:var(--error)">Not set</span>'}</b>${c.edited?'<span class="edited">● edited</span>':''}<br><span class="cid">${esc(c.id)}</span>${bad?'<br><span class="pill pill-error" style="margin-top:4px">Not in template</span>':''}</td>
+    ${t.levels.map(l=>`<td><span class="clip">${c.lv[l]?esc(c.lv[l]):'<span style="color:var(--error)">Missing</span>'}</span></td>`).join('')}
+    <td class="num">${c.w}</td><td class="num">${c.crit?'<span class="crit-on" title="Failing this fails the task">● Yes</span>':'<span class="muted">–</span>'}</td>
+    <td>${bad?`<button class="btn btn-secondary btn-sm" data-remove="${c.id}">Remove</button>`:`<button class="btn btn-secondary btn-sm" data-open="${c.id}">Edit</button>`}</td></tr>`};
+  let body='';
+  if(tpl==='mkt'&&filt==='all'){Object.entries(GROUPS).forEach(([g,[n,gw]])=>{const gr=rows.filter(r=>r.c.g===g),sum=gr.reduce((a,r)=>a+Number(r.c.w),0);
+    body+=`<tr class="grp"><td colspan="${t.levels.length+5}">Group ${g} · ${esc(n)} <span style="float:right;color:${sum===gw?'var(--success)':'var(--error)'}">${sum} of ${gw} ${sum===gw?'✓':''}</span></td></tr>`+gr.map(rowH).join('')})}
+  else body=rows.map(rowH).join('')||`<tr><td colspan="9" class="muted" style="text-align:center;padding:20px">Nothing here.</td></tr>`;
+  document.getElementById('tableHost').innerHTML=`<div class="tablewrap"><table class="rub"><thead>${head}</thead><tbody>${body}</tbody><tfoot><tr><td></td><td colspan="${t.levels.length+1}" style="text-align:right;font-weight:600">Total</td><td class="num" style="color:${total===100?'var(--success)':'var(--error)'}">${total}</td><td class="num">${crN}</td><td></td></tr></tfoot></table></div>`;
+  document.querySelectorAll('[data-open]').forEach(el=>el.onclick=e=>{e.stopPropagation();const c=crits().find(x=>x.id===el.dataset.open);if(c&&c.tpl)openDrawer(c);else if(c)toast('This criterion isn\'t in the template. Remove it instead.')});
+  document.querySelectorAll('[data-remove]').forEach(el=>el.onclick=e=>{e.stopPropagation();st().extraOn=false;renderRub();toast(`${el.dataset.remove} removed. The template's own criteria stay locked.`)})}
+let dc=null;
+function openDrawer(c){dc=c;const t=T[tpl];document.getElementById('dId').textContent=c.id;document.getElementById('dName').textContent=c.name;
+  document.getElementById('dBody').innerHTML=`
+   <div class="f"><div class="lb">What is assessed</div><input type="text" id="eName" value="${esc(c.name)}"></div>
+   <div class="f"><div class="lb">Scoring text <small>${tpl==='mkt'?'Levels 3 and 1 are optional':'all three are required'}</small></div><div class="score">${t.levels.map(l=>`<div><label><b style="color:var(--text)">${l}</b> · ${tpl==='kyc'?t.lvLabel[l]:['complete','material gap','failed'][t.levels.indexOf(l)]}</label><textarea data-lv="${l}">${esc(c.lv[l])}</textarea></div>`).join('')}</div>
+    ${tpl==='mkt'?`<details class="box" style="margin-top:10px"><summary>Add Level 3 and Level 1 text</summary><div class="in score" style="grid-template-columns:1fr 1fr"><div><label>3 · minor gap</label><textarea></textarea></div><div><label>1 · major gap</label><textarea></textarea></div></div></details>`:''}
+    <div class="prov"><button class="btn btn-ai btn-sm" id="sugLv">Suggest scoring text</button><span class="note">A suggestion fills empty boxes only; you decide.</span></div></div>
+   <div class="f"><div class="lb">Weight ${t.fixedW?'<small>fixed by the template</small>':`<small>group ${c.g} must add up to ${GROUPS[c.g][1]}</small>`}</div><input type="text" id="eW" value="${c.w}" ${t.fixedW?'disabled':''} style="max-width:6rem"></div>
+   <div class="f"><label class="chk"><input type="checkbox" id="eCrit" ${c.crit?'checked':''}><span><b>Critical</b><br><span class="note">If the agent fails this criterion, the whole task fails.</span></span></label></div>
+   <div class="f"><div class="lb">Sources <small>what this criterion checks against</small></div><span class="lk">${tpl==='kyc'?'GB-03 · golden-kyc-1.0.0':'R-CLAIMS-01 · published'}</span><span class="lk">${tpl==='kyc'?'S5 step 3':'S5 step S2'}</span><button class="btn-link">+ Link a source</button></div>
+   <div class="f"><div class="lb">When does this apply? <small>optional</small></div><select><option>Always</option><option>Only for some cases</option></select></div>
+   <details class="box" style="margin-top:12px"><summary>Technical (filled in by the template)</summary><div class="in"><dl class="kv"><dt>Evaluator</dt><dd class="mono">${tpl==='kyc'?'golden-kyc-rubric-v1':'marketing-task2-evidence-v1'}</dd><dt>Version</dt><dd class="mono">1</dd><dt>Criterion ID</dt><dd class="mono">${esc(c.id)}</dd></dl></div></details>`;
+  document.getElementById('sugLv').onclick=()=>{document.querySelectorAll('[data-lv]').forEach(ta=>{if(!ta.value)ta.value='(suggested) '+t.crit.find(x=>x.id===c.id).lv[ta.dataset.lv]});toast('Empty boxes filled with suggestions. Edit them as you need.')};
+  document.getElementById('ov').classList.add('on');document.getElementById('drawer').classList.add('on');document.getElementById('eName').focus()}
+function closeDrawer(){document.getElementById('ov').classList.remove('on');document.getElementById('drawer').classList.remove('on');dc=null}
+document.getElementById('dClose').onclick=closeDrawer;document.getElementById('dCancel').onclick=closeDrawer;document.getElementById('ov').onclick=closeDrawer;
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&dc)closeDrawer()});
+document.getElementById('dSave').onclick=()=>{const c=st().crit.find(x=>x.id===dc.id);c.name=document.getElementById('eName').value;
+  document.querySelectorAll('[data-lv]').forEach(ta=>c.lv[ta.dataset.lv]=ta.value);c.w=Number(document.getElementById('eW').value)||0;c.crit=document.getElementById('eCrit').checked;c.edited=true;
+  closeDrawer();renderRub();toast(`${c.id} saved.`)};
+document.querySelectorAll('#filt button').forEach(b=>b.onclick=()=>{filt=b.dataset.f;document.querySelectorAll('#filt button').forEach(x=>x.classList.toggle('on',x===b));renderRub()});
+document.getElementById('fullTxt').onchange=e=>document.getElementById('tableHost').classList.toggle('full',e.target.checked);
+
+// ───────────────────────── Decisions ─────────────────────────
+const DECS=[
+ ['Human-authorship declaration and provenance','Today the author accepts "I will not use the built-in assistant or an external LLM to generate answers", and Submit refuses after any earlier AI draft (PRIOR_AI_DRAFT). Suggested text contradicts both.',
+  'Replace the terms with the draft on the S8 screen: the author writes or reviews and accepts every suggested text and confirms each section is the real workflow. Record per field where the text came from: written by you, suggestion used as it is, or suggestion edited, plus the suggestion version. Replace the PRIOR_AI_DRAFT block with "every section confirmed after its last change". The reviewer sees the split.'],
+ ['Does RL Gym get the provenance?','RL Gym may want to know which text was suggested and accepted. The export contract was approved on 12 Nov and doesn\'t carry it.',
+  'Keep provenance in ADI Forge for now (audit log + reviewer view). Ask RL Gym whether they want it as an optional per-field flag in a later contract version; don\'t change the contract ourselves.'],
+ ['How the author consents','Per field, per section, or once for the whole task.',
+  'Per section (shown here): a tick at the end of each section, cleared when anything in it changes, plus the final declaration. Using a suggestion is the per-field act and is audited; no extra tick per field.'],
+ ['"Use all suggestions in this section" button','Fast, but invites accepting without reading.',
+  'Keep it (the owner\'s main pain is time), with the section confirmation still required and the reviewer seeing "used as it is" counts. A human reviewer still accepts or rejects the task; AI never decides.'],
+ ['What suggestions are built from, and the model','Suggestions must never contain real customer data or put the expected answer into the agent\'s brief.',
+  'Built only from the template, the task slot (e.g. Custodian), the project\'s published rules and the author\'s own text so far; never case snapshots. Brief fields (business context, deliverable) run the existing answer-leak and real-data checks before showing. Use the same Gemini model QA already uses for the SME profile chat, behind a flag (FIELD_SUGGESTIONS_ENABLED), mocked in tests.'],
+ ['Which fields get a suggestion','All free-text boxes, repeated rows (S2 evidence, S5 steps) and pick lists. S4 policy references and S7 IDs, weights and evaluators are already filled from the template or project.',
+  'All of them, both templates. For KYC v7 the S7 scoring text already comes from the template, so "Suggest scoring text" only fills empty boxes.'],
+ ['Rubric table scope','Table as the default S7 view; Edit opens today\'s criterion editor.',
+  'Yes, for both templates. Fold in D14 (only blockers in red at the top; recommendations collapsed; internal notes inside the editor) and D16 (a non-template criterion can always be removed; adding one is not offered when the set is fixed).'],
+];
+function renderDec(){document.getElementById('decs').innerHTML=DECS.map((d,i)=>`<div class="card dec"><h3>${i+1}. ${esc(d[0])}</h3><p class="note" style="margin:4px 0 0">${esc(d[1])}</p><span class="rec"><b>Recommended:</b> ${esc(d[2])}</span></div>`).join('')}
+
+// ───────────────────────── Wiring ─────────────────────────
+function setTpl(x){tpl=x;curSec=T[tpl].secs[0].id;filt='all';document.querySelectorAll('#filt button').forEach(b=>b.classList.toggle('on',b.dataset.f==='all'));
+  document.querySelectorAll('#tplSeg button').forEach(b=>b.classList.toggle('on',b.dataset.tpl===x));
+  const t=T[tpl];document.getElementById('crumb').textContent=t.crumb;document.getElementById('title').textContent=t.title;document.getElementById('sub').textContent=t.sub;render()}
+function setScr(x){scr=x;document.querySelectorAll('#scrSeg button').forEach(b=>b.classList.toggle('on',b.dataset.scr===x));document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id==='scr-'+x));render()}
+function render(){st();if(scr==='sug')renderSug();if(scr==='rub')renderRub();if(scr==='dec')renderDec()}
+document.querySelectorAll('#tplSeg button').forEach(b=>b.onclick=()=>setTpl(b.dataset.tpl));
+document.querySelectorAll('#scrSeg button').forEach(b=>b.onclick=()=>setScr(b.dataset.scr));
+setTpl('kyc');
+const h=location.hash.slice(1).split('-');if(h[0]==='mkt'||h[0]==='kyc')setTpl(h[0]);if(['sug','rub','dec'].includes(h[1]))setScr(h[1]);
+</script>
+</body>
+</html>

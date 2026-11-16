@@ -168,6 +168,24 @@ const Env = z.object({
   POLICY_PRICE_LLAMA_USD_PER_PAGE: z.string().default('0.10'),
   POLICY_PRICE_GOOGLE_USD_PER_PAGE: z.string().default('0.03'),
   POLICY_MAX_PAGES: z.coerce.number().int().min(1).max(500).default(20),
+  /**
+   * D2 tutorial videos (docs/plan/PLAN-D2-TUTORIAL-VIDEO.md). Live = real Gemini, Veo and Text-to-Speech calls on
+   * Vertex; off = the deterministic mock pipeline. Never in tests. Blank caps (USD) = live generation is refused.
+   */
+  TUTORIAL_VIDEO_LIVE: flag,
+  TUTORIAL_VIDEO_COST_CAP_USD: z.string().default(''),
+  TUTORIAL_VIDEO_DAILY_CAP_USD: z.string().default(''),
+  TUTORIAL_VEO_MODEL: z.string().regex(/^veo-[a-z0-9.-]+$/).default('veo-3.1-fast-generate-001'),
+  TUTORIAL_VEO_LOCATION: z.string().regex(/^[a-z0-9-]+$/).default('us-central1'),
+  /** Veo price per output second, video only, at 720p (Vertex pricing, Nov 2026). */
+  TUTORIAL_VEO_PRICE_USD_PER_SECOND: z.string().default('0.08'),
+  /** Allowance per chapter for the script (Gemini) and narration (Text-to-Speech) calls; deliberately high. */
+  TUTORIAL_TEXT_PRICE_USD_PER_CHAPTER: z.string().default('0.05'),
+  /** Script model: `gemini:<model>`. Empty follows a Gemini AUTHORING_MODEL, otherwise gemini:gemini-2.5-flash. */
+  TUTORIAL_SCRIPT_MODEL: z.string().default(''),
+  TUTORIAL_TTS_VOICE: z.string().regex(/^[a-z]{2}-[A-Z]{2}-[A-Za-z0-9-]+$/).default('en-US-Chirp3-HD-Achernar'),
+  /** Private bucket for generated tutorial videos. Blank = EVIDENCE_BUCKET (local only; refused when live). */
+  TUTORIAL_BUCKET: z.string().default(''),
 });
 
 export type Config = z.infer<typeof Env> & {
@@ -197,7 +215,24 @@ export type Config = z.infer<typeof Env> & {
   };
   /** Derived Policy Rules extraction settings (ARCH-POLICY-RULES section 10). */
   policy: PolicyConfig;
+  /** Derived D2 tutorial video settings. */
+  tutorial: TutorialConfig;
 };
+
+export interface TutorialConfig {
+  live: boolean;
+  /** Publish starts a run only in staging and production; QA (demo), local and tests never generate on publish. */
+  onPublish: boolean;
+  costCapUsd: number | null;
+  dailyCapUsd: number | null;
+  veoModel: string;
+  veoLocation: string;
+  veoPricePerSecond: number;
+  textPricePerChapter: number;
+  scriptModel: string;
+  ttsVoice: string;
+  bucket: string;
+}
 
 export interface PolicyConfig {
   live: boolean;
@@ -239,7 +274,38 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const appEnv = c.APP_ENV ?? (c.NODE_ENV === 'production' ? 'production' : 'local');
   const metaCompiler = metaCompilerConfig(c, appEnv);
   const policy = policyConfig(c, appEnv);
-  return { ...c, candidateAuthMode, identityMode, assistantMode, emailMode, payoutMode, appEnv, requireLiveIdentity: appEnv === 'production', metaCompiler, policy };
+  const tutorial = tutorialConfig(c, appEnv);
+  return { ...c, candidateAuthMode, identityMode, assistantMode, emailMode, payoutMode, appEnv, requireLiveIdentity: appEnv === 'production', metaCompiler, policy, tutorial };
+}
+
+/** D2: live tutorial generation needs Vertex, both caps and its own bucket, and is never allowed in tests or locally. */
+function tutorialConfig(c: z.infer<typeof Env>, appEnv: Config['appEnv']): TutorialConfig {
+  const costCapUsd = usdOrNull('TUTORIAL_VIDEO_COST_CAP_USD', c.TUTORIAL_VIDEO_COST_CAP_USD);
+  const dailyCapUsd = usdOrNull('TUTORIAL_VIDEO_DAILY_CAP_USD', c.TUTORIAL_VIDEO_DAILY_CAP_USD);
+  const veoPricePerSecond = usdOrNull('TUTORIAL_VEO_PRICE_USD_PER_SECOND', c.TUTORIAL_VEO_PRICE_USD_PER_SECOND) ?? 0.08;
+  const textPricePerChapter = usdOrNull('TUTORIAL_TEXT_PRICE_USD_PER_CHAPTER', c.TUTORIAL_TEXT_PRICE_USD_PER_CHAPTER) ?? 0.05;
+  const authoring = c.AUTHORING_MODEL.startsWith('gemini:') ? c.AUTHORING_MODEL : '';
+  const scriptModel = c.TUTORIAL_SCRIPT_MODEL || authoring || 'gemini:gemini-2.5-flash';
+  if (!/^gemini:[A-Za-z0-9._-]+$/.test(scriptModel)) throw new Error('Invalid configuration: TUTORIAL_SCRIPT_MODEL must be gemini:<model>');
+  if (c.TUTORIAL_VIDEO_LIVE) {
+    if (c.NODE_ENV === 'test' || appEnv === 'local') throw new Error('Invalid configuration: TUTORIAL_VIDEO_LIVE is never allowed in tests or local development (live Veo calls cost money)');
+    if (!c.VERTEX_PROJECT_ID) throw new Error('Invalid configuration: TUTORIAL_VIDEO_LIVE needs VERTEX_PROJECT_ID');
+    if (costCapUsd === null || dailyCapUsd === null) throw new Error('Invalid configuration: TUTORIAL_VIDEO_LIVE needs TUTORIAL_VIDEO_COST_CAP_USD and TUTORIAL_VIDEO_DAILY_CAP_USD');
+    if (!c.TUTORIAL_BUCKET) throw new Error('Invalid configuration: TUTORIAL_VIDEO_LIVE needs TUTORIAL_BUCKET');
+  }
+  return {
+    live: c.TUTORIAL_VIDEO_LIVE,
+    onPublish: appEnv === 'staging' || appEnv === 'production',
+    costCapUsd,
+    dailyCapUsd,
+    veoModel: c.TUTORIAL_VEO_MODEL,
+    veoLocation: c.TUTORIAL_VEO_LOCATION,
+    veoPricePerSecond,
+    textPricePerChapter,
+    scriptModel: scriptModel.slice('gemini:'.length),
+    ttsVoice: c.TUTORIAL_TTS_VOICE,
+    bucket: c.TUTORIAL_BUCKET || c.EVIDENCE_BUCKET,
+  };
 }
 
 /** Live policy extraction only in staging, with both ceilings set (owner D-B1, D-D1; never in tests or production). */

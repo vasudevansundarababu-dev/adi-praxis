@@ -25,6 +25,7 @@ import { createMaintenanceWorker, scheduleMaintenance, scheduleRecurring } from 
 import { secretBox } from './lib/secrets';
 import { processPartnerWebhooks } from './supply/webhooks';
 import { remindAndExpireInvites } from './supply/submissions';
+import { defaultTutorialPipeline, tutorialVideoHandler } from './forge/tutorial-video';
 
 /** praxis-worker: publishes the outbox and runs domain-event handlers. */
 const config = loadConfig();
@@ -37,6 +38,8 @@ const registry = defaultHandlers({ evaluator: defaultEvaluator(config), email: d
 const storage = defaultStorage(config);
 registry.register(policyExtractionHandler({ storage, adapters: defaultAdapters(config.policy) }));
 registry.register(policyAnnotationHandler({ storage, assistant: defaultRuleAssistant(config), dailyCap: config.POLICY_AI_DAILY_CALL_CAP, capActions: POLICY_AI_ACTIONS }));
+// D2: tutorial video runs (mocks unless TUTORIAL_VIDEO_LIVE; never on publish in QA or locally).
+registry.register(tutorialVideoHandler(defaultTutorialPipeline(config)));
 for (const h of metaCompilerHandlers({ config, storage, drafters: defaultDrafterFactory(config), deps: resolveDeps(), runner: defaultRunner(config, storage), judge: defaultJudge(config) })) registry.register(h);
 const worker = createDomainEventsWorker(db, registry, connection);
 const log = (level: string, msg: string, extra: object = {}) =>

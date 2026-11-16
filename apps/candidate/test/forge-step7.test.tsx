@@ -18,6 +18,13 @@ describe('MVP1 step 7: Tutorial card', () => {
     expect(tutorialKind(undefined)).toBe('none');
   });
 
+  it('D2: a generated video carries its English captions track', () => {
+    const html = renderToStaticMarkup(<TutorialCard tutorial={{ videoUrl: 'https://storage.test/t/tutorial.mp4?sig=1', captionsUrl: 'https://storage.test/t/captions.vtt?sig=1', chapters }} />);
+    expect(html).toMatch(/<video[^>]*crossorigin="anonymous"/i);
+    expect(html).toMatch(/<track kind="captions" src="https:\/\/storage\.test\/t\/captions\.vtt\?sig=1" srclang="en" label="English" default=""/i);
+    expect(renderToStaticMarkup(<TutorialCard tutorial={{ videoUrl: 'https://v.example.test/a.mp4', chapters }} />)).not.toContain('<track');
+  });
+
   it('renders an HTML5 video with chapter buttons that seek', () => {
     const html = renderToStaticMarkup(<TutorialCard tutorial={{ videoUrl: 'https://v.example.test/a.mp4', chapters }} />);
     expect(html).toMatch(/<video[^>]*controls/);

@@ -1,7 +1,7 @@
 # praxis-api, praxis-worker and the Cloud Run jobs share this image; the command differs (see infra/terraform).
 # Build from the repository root: docker build -f apps/api/Dockerfile .
 FROM node:22-slim AS base
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/* \
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates ffmpeg fonts-dejavu-core && rm -rf /var/lib/apt/lists/* \
   && corepack enable
 WORKDIR /repo
 

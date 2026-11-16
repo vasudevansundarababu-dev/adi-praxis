@@ -8,6 +8,8 @@ locals {
     "iam.googleapis.com", "iamcredentials.googleapis.com", "sts.googleapis.com", "monitoring.googleapis.com",
     "logging.googleapis.com", "cloudtrace.googleapis.com", "clouderrorreporting.googleapis.com",
     "cloudbilling.googleapis.com", "billingbudgets.googleapis.com", "storage.googleapis.com",
+    # D2 tutorial video narration
+    "texttospeech.googleapis.com",
   ]
 }
 
@@ -52,6 +54,7 @@ module "storage" {
   project_id              = var.project_id
   location                = var.region
   evidence_retention_days = var.evidence_retention_days
+  tutorial_cors_origins   = ["https://${var.domains.console}", "https://${var.domains.candidate}"]
   depends_on              = [google_project_service.api]
 }
 

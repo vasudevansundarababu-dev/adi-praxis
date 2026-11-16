@@ -22,6 +22,7 @@ import { AppError, conflict, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { loadUploadedProfiles } from '../templates/uploaded-profiles';
 import { tutorialOf } from '../forge/tutorial';
+import { requestTutorialRun, type TutorialSettings } from '../forge/tutorial-video/service';
 
 type TemplateWithDomain = Template & { domain: Domain };
 
@@ -146,7 +147,7 @@ function fieldData(body: z.infer<typeof UpdateTemplateRequest>): Prisma.Template
 }
 
 /** Admin template catalog: Domain -> Workflow templates, versioning, publish and retire (SPEC M1). */
-export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db }) => {
+export const templateRoutes: FastifyPluginAsyncZod<{ db: Db; tutorial?: TutorialSettings }> = async (app, { db, tutorial }) => {
   const findTemplate = async (tx: Db | Tx, id: string, clientId: string) =>
     tx.template.findFirst({ where: { id, clientId }, include: { domain: true } });
 
@@ -385,7 +386,7 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
     '/templates/:id/publish',
     { config: { access: ADMIN }, schema: { tags: ['templates'], params: IdParams, response: { 200: TemplateDto } } },
     async (req, reply) => {
-      await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+      await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => {
         const t = await findTemplate(tx, req.params.id, actor.clientId);
         if (!t) throw notFound('Template not found');
         if (t.status !== 'DRAFT') throw new AppError(409, 'NOT_A_DRAFT', `Only drafts can be published (this one is ${t.status}).`);
@@ -410,6 +411,19 @@ export const templateRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { d
           before: { status: 'DRAFT' },
           after: { status: 'PUBLISHED', version: after.version },
         });
+        // D2: in staging and production the tutorial video is part of publish, but it never blocks it: a refusal (caps,
+        // no sections form, generation off) is audited and the publish still succeeds. QA and local never generate here.
+        // A savepoint keeps even an unexpected error in the tutorial request from rolling back the publish.
+        if (tutorial?.tutorial.onPublish) {
+          await tx.$executeRawUnsafe('SAVEPOINT tutorial_on_publish');
+          try {
+            await requestTutorialRun(tx, { clientId: actor.clientId, audit, emit }, tutorial, { template: after, trigger: 'PUBLISH', requestedBy: actor.userId });
+            await tx.$executeRawUnsafe('RELEASE SAVEPOINT tutorial_on_publish');
+          } catch (err) {
+            await tx.$executeRawUnsafe('ROLLBACK TO SAVEPOINT tutorial_on_publish');
+            req.log.warn({ err, templateId: after.id }, 'tutorial video request failed; the template is published without it');
+          }
+        }
         return { status: 200, body: toTemplateDto(after) };
       });
       return reply;

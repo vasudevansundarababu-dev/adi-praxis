@@ -1925,6 +1925,47 @@ D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos ar
   `docs/design/mascot/`.
 - **(chosen by Claude, D13)** Tutorial stays at the top of the page: it opens an inline video card, which would cover
   the form if it floated.
+
+## D2 tutorial videos: plan (15 Nov 2026)
+
+Plan: `docs/plan/PLAN-D2-TUTORIAL-VIDEO.md`. **Built 15 Nov 2026 on the owner's "build all the stuff and start on the video"; no live run and no deploy without the owner's direct yes.**
+
+- **(owner)** AI video with Vertex Veo; a missing video never blocks publish; on publish in staging and production,
+  only an Admin "Generate tutorial" button in QA; a per-video and a daily cost cap; an Admin approves before SMEs or
+  Reviewers see it; generated once per template version.
+- **(chosen by Claude)** **Model and clips:** `veo-3.1-fast-generate-001` (GA), 720p, 16:9, 8 s clips, video only,
+  2 clips per chapter, one retry per clip. Veo's own audio is not used.
+- **(chosen by Claude)** **Narration** is Cloud Text-to-Speech (one Chirp 3 HD English voice), from a script Gemini
+  drafts on Vertex (the existing QA model route). Captions (WebVTT) come from the same script.
+- **(chosen by Claude)** **On-screen text is drawn by ffmpeg** from the validated script, never by Veo. Veo prompts ask
+  for text-free, logo-free scenes with no real likenesses. Every spoken or shown word goes through `publicText()`
+  and a hard check for "Praxis", "Anvil" and "ADI-Labs"; a hit fails the run.
+- **(chosen by Claude)** **Synthetic example:** the template's own golden example where it has one, else a
+  Gemini-drafted one with invented names. Never task, SME or project data.
+- **(chosen by Claude)** **Storage:** a new private `TUTORIAL_BUCKET` (`<project>-tutorials`), objects under
+  `tutorials/<lineageId>/<runId>/`. `tutorial_video_url` stores `storage:<key>`; the API serves a 12 h V4 signed URL.
+  Veo returns bytes (no `storageUri`), so the Vertex service agent needs no bucket access.
+- **(chosen by Claude)** **Caps:** `TUTORIAL_VIDEO_COST_CAP_USD` and `TUTORIAL_VIDEO_DAILY_CAP_USD`, blank = live
+  generation refused. Worst-case reservation at request time, daily total per environment (UTC) under an advisory
+  lock, a per-call check during the run, and an append-only `TutorialSpend` ledger. Suggested values $40 and $100.
+- **(chosen by Claude)** **Cost estimate:** $0.08 per Veo second → about $1.33 per chapter. Every form has 8
+  sections, so 9 chapters: ≈ $12 per template (worst case reserved $23.49); all three ≈ $36 once. **(owner)** The
+  cost is fine: one video per template version.
+- **(chosen by Claude)** **Approval** writes the video to the run's template version and later versions of the
+  workflow; older versions keep theirs. Regenerating keeps the approved video until the new one is approved. One
+  open run per workflow.
+- **(chosen by Claude)** Runs in `praxis-worker` as an outbox handler, with `ffmpeg` added to the API/worker image.
+- **(chosen by Claude)** The mock pipeline runs only locally; deployed environments without `TUTORIAL_VIDEO_LIVE`
+  say generation is off. `TUTORIAL_VIDEO_LIVE` is refused in tests and local development.
+- **(chosen by Claude)** A publish while another version of the workflow has an open run doesn't start a second run
+  (refusal audited); the Admin generates when the open one is decided. A run with no progress for 2 hours is closed
+  as FAILED on the next request.
+- **(chosen by Claude)** A clip refused by Veo's safety filter is retried once with a fixed, safe scene; a second
+  failure fails the run. Billed calls are recorded before they are made (conservative).
+- **(chosen by Claude)** Reject keeps the files (for the audit trail); only Approve changes the template.
+- **(chosen by Claude)** The tutorials bucket has CORS for the console and candidate origins, so the captions track
+  loads from the signed address.
+
 ## Suggested text per field and the rubric table (owner, 15 Nov 2026)
 Design: `docs/design/SUGGESTED-TEXT-AND-RUBRIC-TABLE.md`, mockup `docs/design/mockups/suggested-text-and-rubric-table.html`.
 The owner accepted all seven recommendations:

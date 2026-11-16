@@ -39,7 +39,9 @@ export function TutorialCard({ tutorial, onClose }: { tutorial: Tutorial | null 
       ) : (
         <>
           {kind === 'video' ? (
-            <video ref={video} controls preload="metadata" src={tutorial.videoUrl} className="mt-3 w-full max-w-3xl rounded-md bg-black" aria-label="Tutorial video for this task's template">
+            <video ref={video} controls preload="metadata" src={tutorial.videoUrl} {...(tutorial.captionsUrl ? { crossOrigin: 'anonymous' as const } : {})} className="mt-3 w-full max-w-3xl rounded-md bg-black" aria-label="Tutorial video for this task's template">
+              {/* D2: a generated video carries English captions from its narration. */}
+              {tutorial.captionsUrl && <track kind="captions" src={tutorial.captionsUrl} srcLang="en" label="English" default />}
               <a href={tutorial.videoUrl} target="_blank" rel="noopener noreferrer">
                 Open the tutorial video
               </a>

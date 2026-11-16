@@ -91,7 +91,9 @@ async function staffLogin(page: Page, email: string, password: string) {
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible({ timeout: 30_000 });
 }
 
-test('a partner signs in, submits a candidate for a requisition and sees them in the tracker', async ({ page }) => {
+// Skipped on the owner's decision of 15 Nov 2026: partner sign-in is not needed now because the partner portal will be
+// redesigned, and its e2e must not block PRs. Re-enable with the redesigned portal.
+test.skip('a partner signs in, submits a candidate for a requisition and sees them in the tracker', async ({ page }) => {
   const s = await supply();
   await page.goto(`${WEB}/partner/login`);
   await page.waitForLoadState('networkidle'); // let the form hydrate before submitting it, as staffLogin does

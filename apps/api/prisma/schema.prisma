@@ -505,6 +505,7 @@ model Template {
   generationRuns   CompilerGenerationRun[]
   deployments      StudioDeployment[]
   smeAuthoredTasks SmeAuthoredTask[]
+  tutorialRuns     TemplateTutorialRun[]
 
   @@unique([lineageId, version])
   @@index([clientId, status])
@@ -3547,4 +3548,73 @@ model RubricTaskSources {
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@unique([taskInstanceId, version])
+}
+
+enum TutorialRunStatus {
+  QUEUED
+  SCRIPTING
+  CLIPS
+  NARRATION
+  STITCHING
+  READY_FOR_REVIEW
+  APPROVED
+  REJECTED
+  SUPERSEDED
+  FAILED
+}
+
+enum TutorialRunTrigger {
+  PUBLISH
+  ADMIN
+}
+
+/// D2 (docs/plan/PLAN-D2-TUTORIAL-VIDEO.md): one AI tutorial video generation for a template version. Only an Admin's
+/// approval puts its video on the template; AI never decides. One open run per workflow lineage (partial unique index).
+model TemplateTutorialRun {
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String             @map("client_id") @db.Uuid
+  templateId      String             @map("template_id") @db.Uuid
+  lineageId       String             @map("lineage_id") @db.Uuid
+  trigger         TutorialRunTrigger
+  status          TutorialRunStatus  @default(QUEUED)
+  scriptModel     String             @map("script_model")
+  videoModel      String             @map("video_model")
+  /// Validated narration script: [{ title, narration, cards, scenes }].
+  script          Json?
+  /// [{ title, at }] chapter markers of the stitched video, in seconds.
+  chapters        Json?
+  objectKey       String?            @map("object_key")
+  captionsKey     String?            @map("captions_key")
+  durationSeconds Int?               @map("duration_seconds")
+  estimatedUsd    Decimal            @map("estimated_usd") @db.Decimal(10, 4)
+  actualUsd       Decimal            @default(0) @map("actual_usd") @db.Decimal(10, 4)
+  error           String?
+  requestedBy     String?            @map("requested_by")
+  decidedBy       String?            @map("decided_by") @db.Uuid
+  decidedAt       DateTime?          @map("decided_at")
+  rejectReason    String?            @map("reject_reason")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  template Template        @relation(fields: [templateId], references: [id])
+  spend    TutorialSpend[]
+
+  @@index([lineageId, createdAt])
+  @@index([createdAt])
+}
+
+/// D2 spend ledger for tutorial videos. Append-only (database trigger): reserve at request, actual per billed call,
+/// release of the unused reservation when the run ends.
+model TutorialSpend {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  runId     String   @map("run_id") @db.Uuid
+  kind      String
+  provider  String
+  amountUsd Decimal  @map("amount_usd") @db.Decimal(10, 4)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  run TemplateTutorialRun @relation(fields: [runId], references: [id])
+
+  @@index([createdAt])
 }

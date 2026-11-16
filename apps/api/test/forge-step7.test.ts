@@ -6,7 +6,7 @@ import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MockGoogleVerifier } from '../src/candidate/google';
 import { MockIdentityProvider } from '../src/candidate/identity-provider';
-import { MemoryStorage } from '../src/candidate/storage';
+import { MemorySignedStorage, MemoryStorage } from '../src/candidate/storage';
 import { MemoryEmailSender } from '../src/lib/email';
 import { MockSupportAssistant } from '../src/support/assistant';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
@@ -40,7 +40,7 @@ describe('MVP1 step 7: Tutorial and Help scoped to the task', () => {
   const get = (cookie: string, url: string) => call(app, 'GET', cookie, url);
 
   beforeAll(async () => {
-    app = await buildApp({ config: testConfig(), db, pingRedis: async () => true, google, identity: new MockIdentityProvider(SECRET, 'http://candidate.test'), resolveClientId: async () => clientId, storage: new MemoryStorage(), email: new MemoryEmailSender(), embeddings: new HashingEmbeddingProvider(), support: bot });
+    app = await buildApp({ config: testConfig(), db, pingRedis: async () => true, google, identity: new MockIdentityProvider(SECRET, 'http://candidate.test'), resolveClientId: async () => clientId, storage: new MemoryStorage(), tutorialStorage: new MemorySignedStorage(), email: new MemoryEmailSender(), embeddings: new HashingEmbeddingProvider(), support: bot });
   });
   beforeEach(async () => {
     await resetDb();
@@ -174,6 +174,17 @@ describe('MVP1 step 7: Tutorial and Help scoped to the task', () => {
       const r = await get(s.reviewer.cookie, `/me/reviews/${s.id}`);
       expect(r.statusCode, r.body).toBe(200);
       expect(r.json().tutorial).toEqual(want);
+    });
+
+    it('D2: an approved generated video reaches the author and the Reviewer as a short-lived signed address with captions', async () => {
+      const s = await setup();
+      // What approval writes (tested end to end in tutorial-video.test.ts): a private storage address and chapters.
+      const key = `tutorials/${randomUUID()}/${randomUUID()}/tutorial.mp4`;
+      const t = await db.template.findUniqueOrThrow({ where: { id: s.templateId } });
+      await db.template.updateMany({ where: { lineageId: t.lineageId }, data: { tutorialVideoUrl: `storage:${key}`, tutorialChapters: [{ title: 'Overview', at: 0 }, { title: 'S1 Brief', at: 21 }] } });
+      const want = { videoUrl: `https://storage.test/${key}?action=read&expires=43200`, captionsUrl: `https://storage.test/${key.replace('tutorial.mp4', 'captions.vtt')}?action=read&expires=43200`, chapters: [{ title: 'Overview', at: 0 }, { title: 'S1 Brief', at: 21 }] };
+      expect((await meTask(s.author, s.id)).tutorial).toEqual(want);
+      expect((await get(s.reviewer.cookie, `/me/reviews/${s.id}`)).json().tutorial).toEqual(want);
     });
   });
 

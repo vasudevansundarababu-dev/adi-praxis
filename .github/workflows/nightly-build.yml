@@ -90,6 +90,11 @@ jobs:
           RUBRIC_AI: ${{ vars.QA_RUBRIC_AI || '1' }}
           # Suggested text in every field, rubric table, section confirmation (owner 15 Nov 2026). 0 = off.
           FIELD_SUGGESTIONS: ${{ vars.QA_FIELD_SUGGESTIONS || '1' }}
+          # D2 tutorial videos (owner 16 Nov 2026): Admin-started only in QA, Admin approves before anyone sees one.
+          # Needs infra/demo/setup-tutorial-video.sh once; stays off until its bucket exists. 0 = off.
+          TUTORIAL_VIDEO: ${{ vars.QA_TUTORIAL_VIDEO || '1' }}
+          TUTORIAL_VIDEO_COST_CAP_USD: ${{ vars.QA_TUTORIAL_VIDEO_COST_CAP_USD || '40' }}
+          TUTORIAL_VIDEO_DAILY_CAP_USD: ${{ vars.QA_TUTORIAL_VIDEO_DAILY_CAP_USD || '100' }}
           PRAXIS_BUILD: ${{ env.LABEL }}
           # Keyless Anvil (owner 12 Nov 2026; K6): Anvil's pinned Google account, as repository variables.
           ANVIL_CALLER_SERVICE_ACCOUNT: ${{ vars.ANVIL_CALLER_SERVICE_ACCOUNT }}

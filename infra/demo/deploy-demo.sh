@@ -18,6 +18,9 @@
 #   PRAXIS_SME_SUPPLY=1    Switch on M10 SME supply (partners, certification, payments; docs/SME-SUPPLY.md) in the API,
 #                          worker, console and candidate app, and add its test data (Finance user, a partner with a
 #                          portal login, a rate card and an open requisition).
+#   TUTORIAL_VIDEO=1       With PRAXIS_VERTEX=1: live D2 tutorial videos (Admin-started, Admin-approved). Needs
+#                          TUTORIAL_VIDEO_COST_CAP_USD and TUTORIAL_VIDEO_DAILY_CAP_USD, and the bucket made once by
+#                          infra/demo/setup-tutorial-video.sh (off with a message until it exists).
 #   PRAXIS_ENV_LABEL=...   Banner label, e.g. "Test environment" (default "Demo environment").
 #   PRAXIS_NAME=...        Project display name when the project is created (default "ADI Praxis").
 #   PRAXIS_BUILD=...       Build label shown in the banner and at /api/v1/version (default <commit>-<time>).
@@ -199,6 +202,25 @@ if [ "${RUBRIC_AI:-}" = "1" ]; then echo 'RUBRIC_AI_ENABLED: "true"' >> "$ENVFIL
 # Suggested text for every field of the SME form, with provenance and section confirmation (owner 15 Nov 2026).
 # Uses the SME profile chat's model on Vertex (QA: Gemini) per section opened. Unset = off.
 if [ "${FIELD_SUGGESTIONS:-}" = "1" ]; then echo 'FIELD_SUGGESTIONS_ENABLED: "true"' >> "$ENVFILE"; fi
+# D2 tutorial videos (docs/plan/PLAN-D2-TUTORIAL-VIDEO.md; owner approved 16 Nov 2026). Live Gemini script, Veo clips
+# and Text-to-Speech narration, stitched by ffmpeg in the worker. In QA nothing generates on publish: a video is made
+# only when an Admin presses "Generate tutorial", and SMEs and Reviewers see it only after an Admin approves it.
+# Both caps are required (the API refuses to start live without them). One-time setup:
+# infra/demo/setup-tutorial-video.sh (the bucket must exist). Unset = off. Older builds ignore these settings.
+TUTORIAL_BUCKET_NAME=$PROJECT_ID-demo-tutorials
+WORKER_MEMORY=()
+if [ "${TUTORIAL_VIDEO:-}" = "1" ] && [ -n "$VERTEX" ]; then
+  if exists gcloud storage buckets describe "gs://$TUTORIAL_BUCKET_NAME"; then
+    printf 'TUTORIAL_VIDEO_LIVE: "true"\nTUTORIAL_BUCKET: "%s"\nTUTORIAL_VIDEO_COST_CAP_USD: "%s"\nTUTORIAL_VIDEO_DAILY_CAP_USD: "%s"\nTUTORIAL_VEO_MODEL: "%s"\nTUTORIAL_VEO_LOCATION: "%s"\n' \
+      "$TUTORIAL_BUCKET_NAME" "${TUTORIAL_VIDEO_COST_CAP_USD:?TUTORIAL_VIDEO_COST_CAP_USD is required with TUTORIAL_VIDEO=1}" \
+      "${TUTORIAL_VIDEO_DAILY_CAP_USD:?TUTORIAL_VIDEO_DAILY_CAP_USD is required with TUTORIAL_VIDEO=1}" \
+      "${TUTORIAL_VEO_MODEL:-veo-3.1-fast-generate-001}" "${TUTORIAL_VEO_LOCATION:-$REGION}" >> "$ENVFILE"
+    # ffmpeg stitches the video in the worker's in-memory /tmp.
+    WORKER_MEMORY=(--memory=2Gi)
+  else
+    echo "Tutorial videos stay off: gs://$TUTORIAL_BUCKET_NAME does not exist (run infra/demo/setup-tutorial-video.sh)."
+  fi
+fi
 # Praxis-Anvil integration (docs/anvil/PRAXIS-ANVIL-CONTRACT-FINAL.md; owner decisions 11 Nov 2026 in docs/DECISIONS.md).
 # Praxis ANVIL keys never outlive the pilot end. Older builds ignore it.
 printf 'ANVIL_CREDENTIAL_NOT_AFTER: "%s"\n' "${ANVIL_CREDENTIAL_NOT_AFTER:-2026-12-11T05:48:04Z}" >> "$ENVFILE"
@@ -243,7 +265,7 @@ say "Services"
 gcloud run deploy praxis-api --image="$REPO/api:$TAG" "${COMMON[@]}" --set-secrets="$SECRETS" \
   --no-invoker-iam-check --port=8080 --min-instances=0 --max-instances=3 --timeout=60
 gcloud run deploy praxis-worker --image="$REPO/api:$TAG" "${COMMON[@]}" --set-secrets="$SECRETS" --args=src/worker.ts \
-  --no-allow-unauthenticated --ingress=internal --port=8080 --no-cpu-throttling --min-instances=1 --max-instances=1
+  --no-allow-unauthenticated --ingress=internal --port=8080 --no-cpu-throttling --min-instances=1 --max-instances=1 ${WORKER_MEMORY[@]+"${WORKER_MEMORY[@]}"}
 for app in web candidate; do
   gcloud run deploy "praxis-$app" --image="$REPO/$app:$TAG" --region="$REGION" --service-account="$SA" \
     --set-env-vars="^|^API_BASE_URL=$API_URL|CANDIDATE_APP_URL=$CAND_URL|PRAXIS_DEMO=1|PRAXIS_BUILD=$BUILD|PRAXIS_ENV_LABEL=$ENV_LABEL|SME_SUPPLY_ENABLED=${SME_SUPPLY:+true}" \

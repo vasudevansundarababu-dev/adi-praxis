@@ -23,6 +23,7 @@ import { chatOf, draftingWith } from '../tasks/conversation/service';
 import { authoringPolicyView, effectivePolicy, sidecar } from '../policy/task-policy';
 import { profileSaveProblems } from '../tasks/profile-output';
 import { tutorialOf } from '../forge/tutorial';
+import { servedTutorial } from '../forge/tutorial-video/service';
 import { normaliseRubricOutput, rubricSubmitChecks } from '../tasks/rubric/service';
 
 const IdParams = z.object({ id: z.string().uuid() });
@@ -160,7 +161,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       authoringWorkspace: (t.drafting as { workspace?: unknown } | null)?.workspace ?? null,
       tptMinutes: t.project.tptMinutes,
       // MVP1 step 7: the template's tutorial video, or null.
-      tutorial: tutorialOf(t.project.template),
+      tutorial: await servedTutorial(tutorialOf(t.project.template)),
       // Rubric editor, S4 policy picker and the SME form wording (RUBRIC_RECOMMENDATIONS_ENABLED; off by default).
       formV2: rubricEnabled,
       // Suggested text, provenance and section confirmation (FIELD_SUGGESTIONS_ENABLED; off by default).

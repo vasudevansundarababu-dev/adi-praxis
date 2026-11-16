@@ -1,6 +1,6 @@
 'use client';
 
-import { getFieldValue, isArrayType, itemFieldsOf, PROFILE_SECTIONS, type ForgeComment, type ItemField, type ProjectPersonDto, type RubricView, type SectionKey, type TemplateProfile, type ValidationRunDto, publicText } from '@praxis/shared';
+import { getFieldValue, isArrayType, itemFieldsOf, PROFILE_SECTIONS, scoreKeysFor, type ForgeComment, type ItemField, type ProjectPersonDto, type RubricView, type SectionKey, type TemplateProfile, type ValidationRunDto, publicText } from '@praxis/shared';
 import { RubricReadOnly } from './rubric-readonly';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -69,15 +69,95 @@ function scalar(field: ItemField, value: unknown): string {
   return field.options?.find((o) => o.value === value)?.label ?? String(value);
 }
 
+/**
+ * D17 (owner, 16 Nov 2026): the S7 rubric, read-only, fits the page. Only #, Criterion, What is assessed, the score
+ * levels, Weight and Critical are columns; everything else (group, evidence links, the template's technical evaluator
+ * fields, D9) is in the row's Details. The table scrolls sideways inside its box on narrow screens, never the page.
+ */
+export function CriterionTable({ field, items }: { field: ItemField; items: Record<string, unknown>[] }) {
+  const levels = scoreKeysFor(field.scale ?? 'five_two_zero').filter((k) => k.required);
+  const shown = new Set<string>(['id', 'name', 'weight', 'critical', ...levels.map((k) => k.key)]);
+  const technical = new Set(['evaluatorKind', 'evaluatorVersion', 'outputField', 'comparison', 'expectedValue']);
+  const rest = itemFieldsOf(field).filter((s) => !shown.has(s.key));
+  const plain = rest.filter((s) => !technical.has(s.key));
+  const tech = rest.filter((s) => technical.has(s.key));
+  return (
+    <div className="max-w-full overflow-x-auto rounded-md border border-hairline" data-criterion-table>
+      <table className="w-full min-w-[52rem] table-fixed text-left text-[13px]">
+        <colgroup>
+          <col className="w-10" />
+          <col className="w-44" />
+          {levels.map((k) => (
+            <col key={k.key} />
+          ))}
+          <col className="w-16" />
+          <col className="w-20" />
+        </colgroup>
+        <thead className="border-b border-hairline text-fg-muted">
+          <tr>
+            <th className="px-2 py-1.5 font-semibold">#</th>
+            <th className="px-2 py-1.5 font-semibold">Criterion · what is assessed</th>
+            {levels.map((k) => (
+              <th key={k.key} className="px-2 py-1.5 font-semibold">
+                {k.label} · {k.points}
+              </th>
+            ))}
+            <th className="px-2 py-1.5 text-center font-semibold">Weight</th>
+            <th className="px-2 py-1.5 text-center font-semibold">Critical</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-hairline">
+          {items.map((item, i) => {
+            const details = [...plain, ...tech].filter((s) => !isBlank(item[s.key]));
+            return (
+              <tr key={i} className="align-top" data-criterion-row={String(item.id ?? i)}>
+                <td className="px-2 py-1.5 text-fg-muted">{i + 1}</td>
+                <td className="px-2 py-1.5 break-words">
+                  <strong className="block">{scalar({ key: 'name', type: 'text', label: '', help: '' } as ItemField, item.name)}</strong>
+                  <span className="font-mono text-xs text-fg-muted">{String(item.id ?? '')}</span>
+                  {details.length > 0 && (
+                    <details className="mt-1 text-xs">
+                      <summary className="cursor-pointer text-link">Details</summary>
+                      <dl className="mt-1 space-y-1">
+                        {details.map((s) => (
+                          <div key={s.key}>
+                            <dt className="text-fg-muted">
+                              {s.label}
+                              {technical.has(s.key) ? ' · from the template' : ''}
+                            </dt>
+                            <dd className="break-words">{scalar(s, item[s.key])}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
+                  )}
+                </td>
+                {levels.map((k) => (
+                  <td key={k.key} className="px-2 py-1.5 whitespace-pre-wrap break-words">
+                    {isBlank(item[k.key]) ? <span className="text-error">Missing</span> : String(item[k.key])}
+                  </td>
+                ))}
+                <td className="px-2 py-1.5 text-center font-semibold">{isBlank(item.weight) ? '—' : String(item.weight)}</td>
+                <td className="px-2 py-1.5 text-center">{item.critical === true ? <span className="font-semibold text-error">Yes</span> : <span className="text-fg-muted">–</span>}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /** One authored value, read-only: arrays of records as a table, other arrays as a list, unknown shapes as JSON. */
 export function FieldValue({ field, value }: { field: ItemField; value: unknown }) {
   if (isBlank(value)) return <span className="text-fg-muted">—</span>;
+  if (field.type === 'criterion' && Array.isArray(value) && value.every((x) => x && typeof x === 'object' && !Array.isArray(x))) return <CriterionTable field={field} items={value as Record<string, unknown>[]} />;
   if (isArrayType(field.type) && Array.isArray(value)) {
     const subs = itemFieldsOf(field);
     if (subs.length && value.every((x) => x && typeof x === 'object' && !Array.isArray(x))) {
       return (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-[13px]">
+        <div className="max-w-full overflow-x-auto">
+          <table className="w-full min-w-[40rem] text-left text-[13px]">
             <thead className="border-b border-hairline text-fg-muted">
               <tr>
                 <th className="px-2 py-1.5 font-semibold">#</th>
@@ -93,7 +173,7 @@ export function FieldValue({ field, value }: { field: ItemField; value: unknown 
                 <tr key={i}>
                   <td className="px-2 py-1.5 align-top">{i + 1}</td>
                   {subs.map((s) => (
-                    <td key={s.key} className="px-2 py-1.5 align-top whitespace-pre-wrap break-words">
+                    <td key={s.key} className="min-w-[8rem] px-2 py-1.5 align-top whitespace-pre-wrap break-words">
                       {scalar(s, item[s.key])}
                     </td>
                   ))}
@@ -132,9 +212,10 @@ export function AuthoredForm({ profile, output, rubric = null }: { profile: Temp
     );
   }
   return (
-    <>
+    // D17: room at the end so the floating Help button never sits on the last section's content.
+    <div className="pb-24" data-authored-form>
       {profile.sections.map((s) => (
-        <section key={s.key} className="card mb-4 p-5" data-section={s.key}>
+        <section key={s.key} className="card mb-4 min-w-0 p-5" data-section={s.key}>
           <h3 className="mb-3 font-semibold">
             {s.key} · {publicText(s.title)}
           </h3>
@@ -145,7 +226,7 @@ export function AuthoredForm({ profile, output, rubric = null }: { profile: Temp
               {s.fields.map((f) => (
                 <div key={f.key} className="contents">
                   <dt className="font-medium text-fg-muted">{publicText(f.label)}</dt>
-                  <dd>
+                  <dd className="min-w-0">
                     <FieldValue field={f} value={output ? getFieldValue(profile, output, s.key as SectionKey, f) : undefined} />
                     {rubric && f.type === 'criterion' && <RubricReadOnly view={rubric} items={((output ? getFieldValue(profile, output, s.key as SectionKey, f) : undefined) as Record<string, unknown>[] | undefined) ?? []} />}
                   </dd>
@@ -155,7 +236,7 @@ export function AuthoredForm({ profile, output, rubric = null }: { profile: Temp
           )}
         </section>
       ))}
-    </>
+    </div>
   );
 }
 

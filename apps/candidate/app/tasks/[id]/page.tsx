@@ -24,7 +24,8 @@ export default async function TaskRoute({ params }: { params: Promise<{ id: stri
     if (newFlow && !forge!.termsAccepted) redirect('/welcome');
   }
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6">
+    // D17: room at the end so the floating Help mascot never covers the last content (or the rubric table).
+    <main className="mx-auto max-w-6xl px-4 pt-6 pb-36">
       {/* MVP1 step 7: the task's Tutorial and task-scoped Help replace the general floating Support Bot here. */}
       <TaskAids taskId={data.id} kind="author" tutorial={data.tutorial ?? null} />
       {policy && <TaskRules policy={policy} />}

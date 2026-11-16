@@ -28,7 +28,10 @@ export default async function ReviewRoute({ params }: { params: Promise<{ taskId
       <div className="mx-auto max-w-4xl px-4 pt-6">
         <TaskAids taskId={body.taskId} kind="reviewer" tutorial={body.tutorial ?? null} />
       </div>
-      <ReviewPage initial={body} rubric={rubric} />
+      {/* D17: room at the end so the floating Help mascot never covers the last content. */}
+      <div className="pb-36">
+        <ReviewPage initial={body} rubric={rubric} />
+      </div>
     </>
   );
 }

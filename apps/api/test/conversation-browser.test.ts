@@ -62,7 +62,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
 
   let requestIp=1;
   const post = async (cookie: string, url: string, payload: object = {}) => {
-    if (url.endsWith('/conversation/messages')) await app.inject({method:'POST',url:'/api/v1'+url.replace('/messages','/consent'),headers:{cookie,...idem()},payload:{version:'human-only/1',accepted:true}});
+    if (url.endsWith('/conversation/messages')) await app.inject({method:'POST',url:'/api/v1'+url.replace('/messages','/consent'),headers:{cookie,...idem()},payload:{version:'human-review/2',accepted:true}});
     const body = url.endsWith('/conversation/review') ? {...payload,ownWork:true,noExternalLlm:true,authorisedSources:true} : payload;
     return app.inject({method:'POST',url:`/api/v1${url}`,headers:{cookie,...idem()},payload:body,remoteAddress:'127.0.1.'+(requestIp++%250+1)});
   };

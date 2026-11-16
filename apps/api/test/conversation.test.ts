@@ -60,7 +60,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
   let addressIndex = 1;
   let requestIp=1;
   const post = async (cookie: string, url: string, payload: object = {}) => {
-    if (url.endsWith('/conversation/messages')) await app.inject({method:'POST',url:'/api/v1'+url.replace('/messages','/consent'),headers:{cookie,...idem()},payload:{version:'human-only/1',accepted:true}});
+    if (url.endsWith('/conversation/messages')) await app.inject({method:'POST',url:'/api/v1'+url.replace('/messages','/consent'),headers:{cookie,...idem()},payload:{version:'human-review/2',accepted:true}});
     const body = url.endsWith('/conversation/review') ? {...payload,ownWork:true,noExternalLlm:true,authorisedSources:true} : payload;
     return app.inject({method:'POST',url:`/api/v1${url}`,headers:{cookie,...idem()},payload:body,remoteAddress:'127.0.1.'+(requestIp++%250+1)});
   };
@@ -184,7 +184,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       const inputs: ConversationInput[] = [];
       const assistant: ConversationAssistant = { model: 'test-no-paid-calls', async propose(i) { inputs.push(i); return { reply: 'Identifiers are missing, not necessarily mandatory.', question: 'Which project rule requires an SSN or alternative?', changes: [{ section: 'scenario', value: { trigger: 'NEW_ONBOARDING', customerType: 'individual', businessContext: 'Name mismatch; Tax ID and SSN not supplied.' }, reason: 'Latest SME answer' }, { section: 'solution', value: { findings: [{ id: 'F1', description: 'Requirement unresolved', evidenceRefs: [], severity: 'MEDIUM' }] }, reason: 'Dependent finding' }], ruleLinks: [], unresolved: ['Which identifier rule applies?'] }; } };
       const rev = (await task(a, id)).revision;
-      await post(a.cookie, `/me/tasks/${id}/conversation/consent`, {version:'human-only/1',accepted:true});
+      await post(a.cookie, `/me/tasks/${id}/conversation/consent`, {version:'human-review/2',accepted:true});
       const payload = { content: 'NEW_ONBOARDING individual. Name mismatch; Tax ID and SSN not supplied. Requirement unresolved. MEDIUM.', expectedRevision: rev };
       const key = idem();
       const first = await app.inject({ method: 'POST', url: `/api/v1/me/tasks/${id}/conversation/messages`, headers: { cookie: a.cookie, ...key }, payload });
@@ -233,7 +233,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       const {a,id,projectId}=await kycTask(undefined,mode);
       const initial=(await get(a.cookie,`/me/tasks/${id}`)).json();expect(initial.authoringExperience).toBe(mode);
       const unauth=await put(a.cookie,`/me/tasks/${id}`,{output:{header:{title:'Not saved'}},expectedRevision:0});expect(unauth.statusCode).toBe(mode==='CHATBOT'?403:409);
-      expect((await post(a.cookie,`/me/tasks/${id}/conversation/consent`,{version:'human-only/1',accepted:true})).statusCode).toBe(200);
+      expect((await post(a.cookie,`/me/tasks/${id}/conversation/consent`,{version:'human-review/2',accepted:true})).statusCode).toBe(200);
       const save=await put(a.cookie,`/me/tasks/${id}`,{output:{header:{title:'My own task'}},expectedRevision:0});expect(save.statusCode,save.body).toBe(mode==='CHATBOT'?403:200);
       const before=(await get(a.cookie,`/me/tasks/${id}`)).json();
       const message=await post(a.cookie,`/me/tasks/${id}/conversation/messages`,{content:'The name-change evidence is missing.',expectedRevision:before.revision});expect(message.statusCode,message.body).toBe(mode==='CLASSIC'?403:202);
@@ -260,7 +260,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       const input={slot:v.input.slot,template:{workflow:v.template.workflow,primaryWork:v.template.primaryWork,verificationCriteria:v.template.verificationCriteria,humanGate:v.template.humanGate,coverageDimensions:v.template.coverageDimensions},current:{},sections:[...DRAFT_SECTIONS],sources:[],interview:[],instruction:null,forbidden:[]};
       // Prepared synthetic fixture stands in for SME-entered fields; no drafting/model run is invoked.
       const output=sanitizeDraft((await new MockTaskDrafter().draft(input)).task,input).task;
-      expect((await post(a.cookie,`/me/tasks/${id}/conversation/consent`,{version:'human-only/1',accepted:true})).statusCode).toBe(200);
+      expect((await post(a.cookie,`/me/tasks/${id}/conversation/consent`,{version:'human-review/2',accepted:true})).statusCode).toBe(200);
       const saved=await put(a.cookie,`/me/tasks/${id}`,{output,expectedRevision:v.revision,activeSecondsDelta:0});expect(saved.statusCode,saved.body).toBe(200);
       const checks=(await post(a.cookie,`/me/tasks/${id}/check`)).json();expect(checks.checks.find((c:{id:string})=>c.id==='conversation.authorship').ok).toBe(false);
       expect((await post(a.cookie,`/me/tasks/${id}/conversation/review`,{expectedRevision:saved.json().revision})).statusCode).toBe(200);
@@ -278,7 +278,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       expect(v.startingGraph?.schemaVersion).toBe('praxis.workflow_graph.v1-proposed');
       const input = { slot: v.input.slot, template: { workflow: v.template.workflow, primaryWork: v.template.primaryWork, verificationCriteria: v.template.verificationCriteria, humanGate: v.template.humanGate, coverageDimensions: v.template.coverageDimensions }, current: {}, sections: [...DRAFT_SECTIONS], sources: [], interview: [], instruction: null, forbidden: [] };
       const base = sanitizeDraft((await new MockTaskDrafter().draft(input)).task, input).task;
-      expect((await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-only/1', accepted: true })).statusCode).toBe(200);
+      expect((await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-review/2', accepted: true })).statusCode).toBe(200);
       // A decision with no else route blocks submission with a precise reason.
       const broken = structuredClone(v.startingGraph); broken.edges = broken.edges.filter((e: { port?: string }) => e.port !== 'else');
       let saved = await put(a.cookie, `/me/tasks/${id}`, { output: { ...base, workflowGraph: broken }, expectedRevision: v.revision, activeSecondsDelta: 0 }); expect(saved.statusCode, saved.body).toBe(200);
@@ -318,7 +318,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       expect(JSON.stringify(status.json())).not.toMatch(/key|secret|token/i);
       expect((await get(pm, '/admin/model-providers')).statusCode).toBe(403);
       const { a, id } = await kycTask(); const v = await task(a, id);
-      await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-only/1', accepted: true });
+      await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-review/2', accepted: true });
       const used = (await get(admin, '/admin/model-providers')).json().authoringChatbot.callsToday as number;
       const filler = Array.from({ length: 300 - used }, () => ({ clientId, taskInstanceId: id, section: 'CHAT', status: 'SUCCEEDED' as const, requestedById: a.smeUserId, promptVersion: 'cap-test' }));
       await db.taskDraftRun.createMany({ data: filler });
@@ -333,7 +333,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
     });
     it('authoring v2.1 Wave 2: the chatbot proposes workflow changes in the SME\'s words; they apply only on confirmation', async () => {
       const { a, id } = await kycTask(); const v = await task(a, id);
-      expect((await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-only/1', accepted: true })).statusCode).toBe(200);
+      expect((await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-review/2', accepted: true })).statusCode).toBe(200);
       const saved = await put(a.cookie, `/me/tasks/${id}`, { output: { header: { title: 'Graph chat case' }, workflowGraph: v.startingGraph }, expectedRevision: v.revision, activeSecondsDelta: 0 }); expect(saved.statusCode, saved.body).toBe(200);
       const words = 'After the recommendation, add a step called Screen sanctions lists: Check every party against the sanctions lists before the approver decides.';
       const own = { op: 'add_step_after', nodeId: 'conclude', label: 'Screen sanctions lists', instruction: 'Check every party against the sanctions lists before the approver decides.' };
@@ -362,7 +362,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
       const view = await task(a, id);
       const input = { slot: view.input.slot, template: { workflow: view.template.workflow, primaryWork: view.template.primaryWork, verificationCriteria: view.template.verificationCriteria, humanGate: view.template.humanGate, coverageDimensions: view.template.coverageDimensions }, current: {}, sections: [...DRAFT_SECTIONS], sources: [], interview: [], instruction: null, forbidden: [] };
       const draft = sanitizeDraft((await new MockTaskDrafter().draft(input)).task, input).task;
-      await post(a.cookie, `/me/tasks/${id}/conversation/consent`, {version:'human-only/1',accepted:true});
+      await post(a.cookie, `/me/tasks/${id}/conversation/consent`, {version:'human-review/2',accepted:true});
       await put(a.cookie, `/me/tasks/${id}`, {output:draft,expectedRevision:view.revision,activeSecondsDelta:0});
       const authored = await task(a,id);
       const provider: ConversationAssistant = { model: 'lifecycle-test-mock', async propose(context) { return { reply: 'Review this complete synthetic case.', question: 'Have you reviewed the linked evidence and recommendation?', changes: [], ruleLinks: [], unresolved: [] }; } };
@@ -394,7 +394,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
     });
     it('reads the proposal and its run in one snapshot, so a run finishing mid-read never hides Confirm', async () => {
       const { a, id } = await kycTask();
-      await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-only/1', accepted: true });
+      await post(a.cookie, `/me/tasks/${id}/conversation/consent`, { version: 'human-review/2', accepted: true });
       const m = await post(a.cookie, `/me/tasks/${id}/conversation/messages`, { content: 'A fictional case: identifiers missing, applicability unresolved.', expectedRevision: (await task(a, id)).revision });
       const runId = m.json().runId as string;
       // Block reads of the run table, let the GET read the task first, then finish the run (proposal + SUCCEEDED) and

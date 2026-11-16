@@ -74,3 +74,14 @@ export function compileForSubmission(workflowName: TemplateForm, output: Record<
   if ('blockers' in r) return { output: rest, status: { status: 'blocked', profile, blockers: r.blockers } };
   return { output: { ...rest, praxisContract: r.contract, [COMPILED_MARKER]: { ...profile, revisionId: ids.revisionId } }, status: { status: 'ready', profile, blockers: [] } };
 }
+
+/** The output without the compiled Anvil contract (derived data): what the author wrote. */
+export function authoredContent(output: unknown) {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return output ?? null;
+  const o = output as Record<string, unknown>;
+  if (!o[COMPILED_MARKER]) return o;
+  const { praxisContract: _c, [COMPILED_MARKER]: _m, ...rest } = o;
+  void _c;
+  void _m;
+  return rest;
+}

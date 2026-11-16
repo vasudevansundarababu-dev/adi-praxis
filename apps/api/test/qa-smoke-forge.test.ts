@@ -69,7 +69,7 @@ describe('qa-smoke new-flow pass against the real API in-process (all providers 
   let app: FastifyInstance;
   let clientId: string;
   let admin: string;
-  const config = testConfig({ POLICY_BUDGET_LLAMA_USD: '20', POLICY_BUDGET_GOOGLE_USD: '20', ANVIL_CREDENTIAL_NOT_AFTER: new Date(Date.now() + 60 * 86_400_000).toISOString() });
+  const config = testConfig({ FIELD_SUGGESTIONS_ENABLED: 'true', POLICY_BUDGET_LLAMA_USD: '20', POLICY_BUDGET_GOOGLE_USD: '20', ANVIL_CREDENTIAL_NOT_AFTER: new Date(Date.now() + 60 * 86_400_000).toISOString() });
   const storage = new MemoryStorage();
   const email = new MemoryEmailSender();
   const evaluator = new MockSuitabilityEvaluator();

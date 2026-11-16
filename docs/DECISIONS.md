@@ -1946,3 +1946,17 @@ The owner accepted all seven recommendations:
 7. **(owner)** The rubric table is the default S7 view for both templates; Edit opens the existing criterion editor.
    It includes D14 (only blockers shown in red at the top; recommendations collapsed) and D16 (a non-template
    criterion can always be removed; adding one is not offered with a fixed set).
+- **(chosen by Claude, build)** Behind `FIELD_SUGGESTIONS_ENABLED` (off by default; on in QA deploys via
+  `QA_FIELD_SUGGESTIONS`). Model: `FIELD_SUGGESTIONS_MODEL`, else `PROFILE_MODEL`, else `AUTHORING_MODEL`; the mock
+  (template examples) without Vertex. Suggestions are kept per section so a reload never calls the model again; "Suggest
+  another" asks for one field. Provenance is derived, never claimed: the hash of the suggestion taken is stored, and the
+  saved value is compared with it. A section confirmation stores the digest of the section's saved content.
+- **(chosen by Claude, build)** The task's case selector (set by the slot) gets no suggestion and is not counted as
+  anyone's writing. S8 counts as a section to confirm (its Sources field is the author's).
+- **(chosen by Claude, build)** With the flag on, the conversation review's `PRIOR_AI_DRAFT` block is replaced by
+  `SECTIONS_NOT_CONFIRMED`; with it off the earlier rule stands. The authorship terms version is now `human-review/2`,
+  so authors of in-progress conversational tasks accept the new terms once.
+- **(chosen by Claude, build)** Rubric table: criterion "blocks Submit" = not in a fixed template set, empty name,
+  missing required score text, weights not totalling 100 (or a group not totalling its weight), no critical criterion.
+  Everything else (source links, applicability, coverage gaps, duplicates) is "Recommended, not required", collapsed.
+  The earlier card list stays available as "One card per criterion".

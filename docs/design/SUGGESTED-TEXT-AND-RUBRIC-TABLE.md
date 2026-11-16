@@ -51,7 +51,7 @@ The owner accepted all seven recommendations below on 15 Nov 2026 (logged in `do
 Non-negotiables kept: AI only suggests; the author accepts each text and a human Reviewer decides the task. No real
 customer data. No "ADI-Labs", "Praxis" or "Anvil" in user-facing text.
 
-## Build plan once approved
+## Build (done 15 Nov 2026, flag `FIELD_SUGGESTIONS_ENABLED`)
 1. Shared: suggestion request/response types, provenance per field, section-confirmation state, new authorship terms
    version (`packages/shared`).
 2. API: `POST /me/tasks/:id/suggestions` (section or field; template + slot + published rules + author text; leak and

@@ -196,6 +196,9 @@ fi
 # RUBRIC_AI adds Vertex wording for rubric suggestions (small per-use cost). Unset = off.
 if [ "${RUBRIC_RECOMMENDATIONS:-}" = "1" ]; then echo 'RUBRIC_RECOMMENDATIONS_ENABLED: "true"' >> "$ENVFILE"; fi
 if [ "${RUBRIC_AI:-}" = "1" ]; then echo 'RUBRIC_AI_ENABLED: "true"' >> "$ENVFILE"; fi
+# Suggested text for every field of the SME form, with provenance and section confirmation (owner 15 Nov 2026).
+# Uses the SME profile chat's model on Vertex (QA: Gemini) per section opened. Unset = off.
+if [ "${FIELD_SUGGESTIONS:-}" = "1" ]; then echo 'FIELD_SUGGESTIONS_ENABLED: "true"' >> "$ENVFILE"; fi
 # Praxis-Anvil integration (docs/anvil/PRAXIS-ANVIL-CONTRACT-FINAL.md; owner decisions 11 Nov 2026 in docs/DECISIONS.md).
 # Praxis ANVIL keys never outlive the pilot end. Older builds ignore it.
 printf 'ANVIL_CREDENTIAL_NOT_AFTER: "%s"\n' "${ANVIL_CREDENTIAL_NOT_AFTER:-2026-12-11T05:48:04Z}" >> "$ENVFILE"

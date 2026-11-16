@@ -88,6 +88,8 @@ jobs:
           # Rubric editor + S4 policy picker, and AI wording (owner 15 Nov 2026). Set the variable to 0 to turn off.
           RUBRIC_RECOMMENDATIONS: ${{ vars.QA_RUBRIC_RECOMMENDATIONS || '1' }}
           RUBRIC_AI: ${{ vars.QA_RUBRIC_AI || '1' }}
+          # Suggested text in every field, rubric table, section confirmation (owner 15 Nov 2026). 0 = off.
+          FIELD_SUGGESTIONS: ${{ vars.QA_FIELD_SUGGESTIONS || '1' }}
           PRAXIS_BUILD: ${{ env.LABEL }}
           # Keyless Anvil (owner 12 Nov 2026; K6): Anvil's pinned Google account, as repository variables.
           ANVIL_CALLER_SERVICE_ACCOUNT: ${{ vars.ANVIL_CALLER_SERVICE_ACCOUNT }}

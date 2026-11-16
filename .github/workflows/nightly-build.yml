@@ -85,6 +85,9 @@ jobs:
           PRAXIS_ENV_LABEL: Test environment
           # Fresh QA database (owner 15 Nov 2026): keep QA to the two kept templates; set QA_SKIP_DEMO_SETUP=1 to skip demo data.
           SKIP_DEMO_SETUP: ${{ vars.QA_SKIP_DEMO_SETUP || '0' }}
+          # Rubric editor + S4 policy picker, and AI wording (owner 15 Nov 2026). Set the variable to 0 to turn off.
+          RUBRIC_RECOMMENDATIONS: ${{ vars.QA_RUBRIC_RECOMMENDATIONS || '1' }}
+          RUBRIC_AI: ${{ vars.QA_RUBRIC_AI || '1' }}
           PRAXIS_BUILD: ${{ env.LABEL }}
           # Keyless Anvil (owner 12 Nov 2026; K6): Anvil's pinned Google account, as repository variables.
           ANVIL_CALLER_SERVICE_ACCOUNT: ${{ vars.ANVIL_CALLER_SERVICE_ACCOUNT }}

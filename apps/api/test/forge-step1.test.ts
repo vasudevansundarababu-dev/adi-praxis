@@ -413,22 +413,20 @@ describe('MVP1 step 1: settings, Sourcing, task rows, direct assignment, candida
       expect(await audits('sourcing.account_created')).toHaveLength(0);
     });
 
-    it('stops at Required workers (unless the person already has a place) and at the per-expert cap', async () => {
+    it('keeps SME places at least at the task count (D19), and stops at the per-expert cap', async () => {
       await setFlow(true);
       const pid = await project();
+      // Fewer places than tasks (as on projects made before D19): raised to the 12 tasks, so a third SME still fits.
       await db.project.update({ where: { id: pid }, data: { requiredWorkers: 2 } });
       const a = await source(pid, 'SME');
       const b = await source(pid, 'SME');
       const c = await source(pid, 'SME');
       expect((await assign(pid, a.id, (await openTask(pid)).id)).statusCode).toBe(200);
-      expect((await get(pm, `/projects/${pid}/assignable`)).json().smePlacesFull).toBe(false);
       expect((await assign(pid, b.id, (await openTask(pid)).id)).statusCode).toBe(200);
       const view = (await get(pm, `/projects/${pid}/assignable`)).json();
-      expect(view).toMatchObject({ smePlacesFull: true, smePlacesUsed: 2, requiredWorkers: 2 });
+      expect(view).toMatchObject({ smePlacesFull: false, smePlacesUsed: 2, requiredWorkers: 12 });
       expect(view.people.map((x: { sourcedPersonId: string }) => x.sourcedPersonId)).toEqual([c.id]);
-      const full = await assign(pid, c.id, (await openTask(pid)).id);
-      expect(full.statusCode).toBe(409);
-      expect(full.json().error).toBe('SME_PLACES_FULL');
+      expect((await assign(pid, c.id, (await openTask(pid)).id)).statusCode).toBe(200);
       // Already placed: more tasks, up to the per-expert cap.
       await db.project.update({ where: { id: pid }, data: { maxPerExpert: 2 } });
       expect((await assign(pid, a.id, (await openTask(pid)).id)).statusCode).toBe(200);

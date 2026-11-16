@@ -64,12 +64,26 @@ export interface SourcedPersonDto {
   assigned: boolean;
 }
 
-/** Assign a sourced person to one task: as SME, an open task to author; as Reviewer, an authored task to review. */
-export const DirectAssignRequest = z.object({
-  sourcedPersonId: z.string().uuid(),
-  taskId: z.string().uuid(),
-});
+/**
+ * Assign a person to one task: as SME, an open task to author; as Reviewer, an authored task to review. The person is
+ * a Sourcing profile on the project (sourcedPersonId), or someone from the platform pool (candidateId and role, D20),
+ * for whom the project record is made on assign. Exactly one of the two is sent.
+ */
+export const DirectAssignRequest = z
+  .object({
+    sourcedPersonId: z.string().uuid().optional(),
+    candidateId: z.string().uuid().optional(),
+    role: SourcedRole.optional(),
+    taskId: z.string().uuid(),
+  })
+  .refine((b) => (b.sourcedPersonId ? !b.candidateId : !!b.candidateId && !!b.role), {
+    message: 'Send sourcedPersonId, or candidateId with role (SME or REVIEWER).',
+  });
 export type DirectAssignRequest = z.infer<typeof DirectAssignRequest>;
+
+/** D19: the PM or Admin changes the project's Required workers (SME places). Never below its task count. */
+export const RequiredWorkersRequest = z.object({ requiredWorkers: z.number().int().min(1).max(10000) });
+export type RequiredWorkersRequest = z.infer<typeof RequiredWorkersRequest>;
 
 export interface ProjectPersonDto {
   sourcedPersonId: string;

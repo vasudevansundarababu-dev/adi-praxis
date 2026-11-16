@@ -22,6 +22,7 @@ import type { Actor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { caseSelectorOf, ensureSlots, ensureSlotTasks } from '../tasks/task-service';
 import { forgeSettings } from '../forge/settings';
+import { raisePlacesToTaskCount } from '../forge/sourcing';
 import { AppError, badRequest, conflict, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { toJdDto } from './job-descriptions';
@@ -367,6 +368,8 @@ export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db
         const slots = await ensureSlots(tx, p.id);
         // MVP1 new flow: one task row per slot up front, so the PM or Admin assigns each task (none in the earlier flow).
         const tasks = (await forgeSettings(tx, p.clientId)).newFlow ? await ensureSlotTasks(tx, p.id) : null;
+        // D19: one SME place per task at least, so every task can get its own author (audited when raised).
+        if (tasks !== null) await raisePlacesToTaskCount(tx, p.id, audit);
         await audit({
           entityType: 'Project',
           entityId: p.id,

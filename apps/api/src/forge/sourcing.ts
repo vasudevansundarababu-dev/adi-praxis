@@ -4,6 +4,7 @@ import type { Actor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { AppError, notFound } from '../lib/errors';
 import type { AuditInput } from '../platform/audit';
+import { poolPeople, skillMatch } from './pool';
 import { EXPERT_TASK_TYPES } from '../tasks/task-service';
 
 type Audit = (i: AuditInput) => Promise<void>;
@@ -192,7 +193,56 @@ export async function sourcedWithoutTask(tx: Db | Tx, projectId: string) {
 /** Assigned SMEs on the project (each holds an SME place). */
 export const assignedSmeCount = (tx: Db | Tx, projectId: string) => tx.sourcedPerson.count({ where: { projectId, role: 'SME', assignedAt: { not: null }, releasedAt: null } });
 
-/** The Assign screen: sourced people not yet assigned, with matching skills, and the tasks they can be put on. */
+/** The project's task rows that experts author. */
+export const expertTaskCount = (tx: Db | Tx, projectId: string) => tx.taskInstance.count({ where: { projectId, taskType: EXPERT_TASK_TYPES } });
+
+/**
+ * D19 (owner, 16 Nov 2026): SME places (Required workers) are never fewer than the project's tasks, so the PM can put
+ * one SME on each task. Null stays "no limit".
+ */
+export const smePlaces = (requiredWorkers: number | null, tasks: number) => (requiredWorkers === null ? null : Math.max(requiredWorkers, tasks));
+
+/**
+ * D19: raises a stored Required workers that is below the task count (projects made before the fix, or whose task rows
+ * were made later). Idempotent: nothing changes, and nothing is audited, once it is at or above the count.
+ */
+export async function raisePlacesToTaskCount(tx: Tx, projectId: string, audit: Audit) {
+  const p = await tx.project.findUniqueOrThrow({ where: { id: projectId }, select: { requiredWorkers: true } });
+  if (p.requiredWorkers === null) return null;
+  const tasks = await expertTaskCount(tx, projectId);
+  if (p.requiredWorkers >= tasks) return null;
+  const { count } = await tx.project.updateMany({ where: { id: projectId, requiredWorkers: p.requiredWorkers }, data: { requiredWorkers: tasks } });
+  if (!count) return null;
+  await audit({ entityType: 'Project', entityId: projectId, action: 'project.required_workers_raised', before: { requiredWorkers: p.requiredWorkers }, after: { requiredWorkers: tasks, reason: 'task_count' } });
+  return tasks;
+}
+
+/**
+ * D19: the PM or Admin changes Required workers on a submitted, open project (Assign screen). Never below the task
+ * count or the SMEs already assigned. Setting the current value again changes nothing (audited as unchanged).
+ */
+export async function setRequiredWorkers(tx: Tx, projectId: string, value: number, audit: Audit) {
+  await tx.$executeRaw`SELECT 1 FROM "Project" WHERE id = ${projectId}::uuid FOR UPDATE`;
+  const p = await tx.project.findUniqueOrThrow({ where: { id: projectId } });
+  if (!(SOURCING_OPEN_STATUSES as readonly string[]).includes(p.status)) {
+    throw new AppError(409, 'PROJECT_NOT_OPEN', 'Required workers can be changed here only on new or active projects.');
+  }
+  const [tasks, used] = await Promise.all([expertTaskCount(tx, projectId), assignedSmeCount(tx, projectId)]);
+  const floor = Math.max(tasks, used, 1);
+  if (value < floor) {
+    throw new AppError(422, 'REQUIRED_WORKERS_TOO_LOW', `Required workers can't be lower than ${floor}: the project has ${tasks} task${tasks === 1 ? '' : 's'} and ${used} SME${used === 1 ? '' : 's'} assigned.`, { minimum: floor });
+  }
+  if (p.requiredWorkers === value) {
+    // Every command is audited; the same value again records that nothing changed.
+    await audit({ entityType: 'Project', entityId: projectId, action: 'project.required_workers_unchanged', after: { requiredWorkers: value } });
+    return { requiredWorkers: value, changed: false };
+  }
+  await tx.project.update({ where: { id: projectId }, data: { requiredWorkers: value } });
+  await audit({ entityType: 'Project', entityId: projectId, action: 'project.required_workers_changed', before: { requiredWorkers: p.requiredWorkers }, after: { requiredWorkers: value, tasks, smesAssigned: used } });
+  return { requiredWorkers: value, changed: true };
+}
+
+/** The Assign screen: this project's Sourcing profiles not yet assigned, plus available people from the platform pool (D20). */
 export async function assignable(tx: Db | Tx, p: Project & SkillSource) {
   const skills = projectSkills(p);
   const people = await tx.sourcedPerson.findMany({ where: { projectId: p.id, OR: [{ assignedAt: null }, { releasedAt: { not: null } }] }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] });
@@ -206,35 +256,53 @@ export async function assignable(tx: Db | Tx, p: Project & SkillSource) {
   const open = tasks.filter((t) => t.status === 'CREATED' && !t.assignedToId);
   const reviewable = p.reviewRoute === 'SME_EXPERT_PM' ? tasks.filter((t) => t.assignedToId && !t.reviewerSmeUserId && (REVIEWABLE_STATUSES as readonly string[]).includes(t.status)) : [];
   const placesUsed = await assignedSmeCount(tx, p.id);
+  const places = smePlaces(p.requiredWorkers, tasks.length);
+  // Reviewers are never put on their own task.
+  const reviewableFor = (smeUserId: string | null, email: string) =>
+    reviewable.filter((t) => (!smeUserId || t.assignedTo?.smeUserId !== smeUserId) && normEmail(t.assignedTo?.smeUser.contactEmail ?? '') !== email).map((t) => t.id);
+  const pool = await poolPeople(tx, p, skills);
   return {
     reviewRoute: p.reviewRoute,
-    requiredWorkers: p.requiredWorkers,
+    requiredWorkers: places,
+    taskCount: tasks.length,
+    /** The lowest Required workers the PM may set (D19). */
+    minRequiredWorkers: Math.max(tasks.length, placesUsed, 1),
     smePlacesUsed: placesUsed,
-    smePlacesFull: p.requiredWorkers !== null && placesUsed >= p.requiredWorkers,
+    smePlacesFull: places !== null && placesUsed >= places,
     projectSkills: skills,
+    criteria: pool.criteria,
     openTasks: open.map((t) => ({ taskId: t.id, label: taskLabel(t), status: t.status })),
     reviewableTasks: reviewable.map((t) => ({ taskId: t.id, label: taskLabel(t), status: t.status })),
-    people: people
-      .filter((s) => (s.role === 'SME' || p.reviewRoute === 'SME_EXPERT_PM') && !assignedEmails.has(s.emailNorm))
-      .map((s) => {
-        const values = Object.values((s.assessment ?? {}) as Record<string, unknown>).filter((v): v is string => typeof v === 'string');
-        const text = values.join('\n').toLowerCase();
-        const assessed = values.length > 0;
-        return {
-          sourcedPersonId: s.id,
-          firstName: s.firstName,
-          lastName: s.lastName,
-          email: s.emailNorm,
-          role: s.role,
-          assessed,
-          matchingSkills: skills.map((skill) => ({ skill, matched: assessed ? text.includes(skill.toLowerCase()) : null })),
-          // Reviewers are never put on their own task.
-          reviewableTaskIds:
-            s.role === 'REVIEWER'
-              ? reviewable.filter((t) => t.assignedTo?.smeUserId !== s.smeUserId && normEmail(t.assignedTo?.smeUser.contactEmail ?? '') !== s.emailNorm).map((t) => t.id)
-              : [],
-        };
-      }),
+    people: [
+      ...people
+        .filter((s) => (s.role === 'SME' || p.reviewRoute === 'SME_EXPERT_PM') && !assignedEmails.has(s.emailNorm))
+        .map((s) => {
+          const m = skillMatch(skills, Object.values((s.assessment ?? {}) as Record<string, unknown>));
+          return {
+            source: 'SOURCING' as const,
+            sourcedPersonId: s.id,
+            candidateId: null,
+            firstName: s.firstName,
+            lastName: s.lastName,
+            email: s.emailNorm,
+            role: s.role,
+            assessed: m.assessed,
+            matchingSkills: m.matchingSkills,
+            location: null,
+            experience: null,
+            activeProjects: null,
+            projectLimit: null,
+            reviewableTaskIds: s.role === 'REVIEWER' ? reviewableFor(s.smeUserId, s.emailNorm) : [],
+          };
+        }),
+      ...pool.items.map(({ smeUserId, ...c }) => ({
+        ...c,
+        source: 'POOL' as const,
+        sourcedPersonId: null,
+        role: null,
+        reviewableTaskIds: reviewableFor(smeUserId, c.email),
+      })),
+    ],
   };
 }
 
@@ -314,8 +382,9 @@ async function markStarted(tx: Tx, projectId: string, audit: Audit) {
 
 /** Checks an SME may take one more task on the project: places (Required workers) and the per-expert cap. */
 async function checkSmeCapacity(tx: Tx, p: Project, s: SourcedPerson, candidateId: string | null) {
-  if (!isAssigned(s) && p.requiredWorkers !== null && (await assignedSmeCount(tx, p.id)) >= p.requiredWorkers) {
-    throw new AppError(409, 'SME_PLACES_FULL', `All ${p.requiredWorkers} SME places on this project are filled.`);
+  const places = smePlaces(p.requiredWorkers, await expertTaskCount(tx, p.id));
+  if (!isAssigned(s) && places !== null && (await assignedSmeCount(tx, p.id)) >= places) {
+    throw new AppError(409, 'SME_PLACES_FULL', `All ${places} SME places on this project are filled. Raise Required workers on the Assign people screen to add another SME.`);
   }
   if (p.maxPerExpert !== null && candidateId) {
     const held = await tx.taskInstance.count({ where: { projectId: p.id, assignedToId: candidateId, status: { in: [...CAPPED_TASK_STATUSES] } } });
@@ -343,6 +412,32 @@ async function putAuthorOnTask(tx: Tx, p: Project, s: SourcedPerson, t: TaskInst
   await markAssigned(tx, s, smeUserId, actor, audit, t.id);
   await markStarted(tx, p.id, audit);
   return { smeUserId, candidateId: candidate.id };
+}
+
+/**
+ * D20: the project record for a pool person the PM assigns from the Assign screen — their Sourcing profile on this
+ * project and role, reused if it exists, else created (linked to their account, audited without names or emails).
+ * Refused if they are no longer available or no longer meet the project's criteria.
+ */
+export async function adoptPoolPerson(tx: Tx, actor: Actor, p: Project & SkillSource, args: { candidateId: string; role: 'SME' | 'REVIEWER' }, audit: Audit) {
+  assertCanSource(p, args.role);
+  const c = await tx.candidate.findFirst({ where: { id: args.candidateId, clientId: p.clientId }, include: { smeUser: true } });
+  if (!c) throw notFound('Person not found');
+  const email = c.smeUser.contactEmail ? normEmail(c.smeUser.contactEmail) : null;
+  if (email) {
+    const here = await tx.sourcedPerson.findUnique({ where: { projectId_role_emailNorm: { projectId: p.id, role: args.role, emailNorm: email } } });
+    if (here) return here;
+  }
+  const { items } = await poolPeople(tx, p, projectSkills(p), { onlyCandidateId: c.id, includeOnProject: true });
+  const person = items[0];
+  if (!person || !email) {
+    throw new AppError(409, 'NOT_AVAILABLE', 'This person is no longer available for this project: they are at their project limit, inactive, or outside its criteria. Reload the list.');
+  }
+  const s = await tx.sourcedPerson.create({
+    data: { clientId: p.clientId, projectId: p.id, role: args.role, firstName: person.firstName, lastName: person.lastName, emailNorm: email, submittedById: actor.userId, smeUserId: c.smeUserId },
+  });
+  await audit({ entityType: 'SourcedPerson', entityId: s.id, action: 'sourcing.person_added', after: { projectId: p.id, role: s.role, fromPool: true, candidateId: c.id } });
+  return s;
 }
 
 /** MVP1: the PM or Admin assigns a sourced person to one task, as author (SME) or Reviewer. Assigning is the selection. */

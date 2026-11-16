@@ -5,8 +5,8 @@ import type { Db } from '../db';
 import { forgeDecide, forgeTaskRows, forgeTaskView, requireNewFlow, reviewerDecide, reviewerTaskList, reviewerTaskView } from '../forge/review';
 import { requireForgeTerms } from '../forge/candidate';
 import { forgeSettings } from '../forge/settings';
-import { sourcingProject } from '../forge/sourcing';
-import { writeAudit } from '../platform/audit';
+import { raisePlacesToTaskCount, sourcingProject } from '../forge/sourcing';
+import { writeAudit, type AuditInput } from '../platform/audit';
 import { runCandidateCommand, runCommand } from '../platform/command';
 import { decisionReply } from '../tasks/revalidation';
 import { ensureSlotTasks } from '../tasks/task-service';
@@ -25,7 +25,9 @@ export const forgeReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, 
     await db.$transaction(async (tx) => {
       if (!(await forgeSettings(tx, p.clientId)).newFlow) return;
       const made = await ensureSlotTasks(tx, p.id);
-      if (made) await writeAudit(tx, { clientId: actor.clientId, actorType: 'USER', actorId: actor.userId, requestId: String(req.id) }, { entityType: 'Project', entityId: p.id, action: 'project.task_rows_created', after: { tasks: made } });
+      const audit = (i: AuditInput) => writeAudit(tx, { clientId: actor.clientId, actorType: 'USER', actorId: actor.userId, requestId: String(req.id) }, i);
+      if (made) await audit({ entityType: 'Project', entityId: p.id, action: 'project.task_rows_created', after: { tasks: made } });
+      await raisePlacesToTaskCount(tx, p.id, audit);
     });
     return { reviewRoute: p.reviewRoute, items: await forgeTaskRows(db, actor, p.id) };
   });

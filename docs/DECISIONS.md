@@ -1925,3 +1925,24 @@ D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos ar
   `docs/design/mascot/`.
 - **(chosen by Claude, D13)** Tutorial stays at the top of the page: it opens an inline video card, which would cover
   the form if it floated.
+## Suggested text per field and the rubric table (owner, 15 Nov 2026)
+Design: `docs/design/SUGGESTED-TEXT-AND-RUBRIC-TABLE.md`, mockup `docs/design/mockups/suggested-text-and-rubric-table.html`.
+The owner accepted all seven recommendations:
+1. **(owner)** New human-authorship terms (new `AUTHORSHIP_VERSION`): the author wrote the task or read, changed where
+   needed and accepted every suggested text, and it describes how the work is really done. Each field records where its
+   text came from (written by the author, suggestion used as is, suggestion edited) with the suggestion version.
+   `PRIOR_AI_DRAFT` is replaced by the Submit check "every section confirmed after its last change".
+2. **(owner)** Provenance stays in ADI Forge (audit log and reviewer view). The RL Gym export contract is unchanged;
+   RL Gym is asked whether it wants an optional per-field flag in a later contract version.
+3. **(owner)** Consent is one confirmation per section (cleared when anything in it changes) plus the final declaration;
+   each use of a suggestion is audited per field.
+4. **(owner)** "Use all suggestions in this section" is kept; section confirmation is still required and the reviewer
+   sees the counts. A human Reviewer still accepts or rejects the task.
+5. **(owner)** Suggestions use the Gemini model QA already uses for the SME profile chat, behind
+   `FIELD_SUGGESTIONS_ENABLED`, mocked in tests. Inputs: template, task slot, the project's published rules and the
+   author's own text only, never case snapshots. Agent-brief fields pass the answer-leak and real-data checks first.
+6. **(owner)** Every field in both templates (KYC v6/v7, Marketing VEYRA) gets suggestions. S4 policy identities and
+   S7 IDs, weights and evaluators stay filled from the template or project.
+7. **(owner)** The rubric table is the default S7 view for both templates; Edit opens the existing criterion editor.
+   It includes D14 (only blockers shown in red at the top; recommendations collapsed) and D16 (a non-template
+   criterion can always be removed; adding one is not offered with a fixed set).

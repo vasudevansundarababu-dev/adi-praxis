@@ -1,8 +1,8 @@
-# Suggested text for every field, and a rubric table (proposal, awaiting owner sign-off)
+# Suggested text for every field, and a rubric table (approved by the owner, 15 Nov 2026)
 
 Mockup: [`mockups/suggested-text-and-rubric-table.html`](mockups/suggested-text-and-rubric-table.html). It has both
 templates (KYC v7 Custodian task, Marketing VEYRA) and three screens: Suggested text, Rubric table, Decisions.
-No production code until the owner answers the decisions below.
+The owner accepted all seven recommendations below on 15 Nov 2026 (logged in `docs/DECISIONS.md`).
 
 ## What the owner asked (15–16 Nov 2026)
 1. "First provide Suggestion as text for every input box … He would provide his consent that whats is been suggested
@@ -31,7 +31,7 @@ No production code until the owner answers the decisions below.
   notes live inside the criterion editor. D16: a criterion that is not in the template always shows **Remove**;
   with a fixed set, adding a new criterion is not offered.
 
-## Decisions for the owner (recommendation first)
+## Decisions (all accepted as recommended)
 1. **Human-authorship declaration.** Today's terms say "I will not use the built-in assistant or an external LLM to
    generate answers", and Submit refuses after an earlier AI draft (`PRIOR_AI_DRAFT`, `apps/api/src/routes/conversation.ts`).
    *Recommend:* new wording ("I wrote it or I read, changed where needed and accepted every suggested text in it. It

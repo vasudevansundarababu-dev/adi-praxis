@@ -6,7 +6,10 @@ import {
   coverage,
   derive,
   emptyOutput,
+  GOLDEN_MARKETING_EXAMPLE,
+  isShellCriterion,
   MARKETING_CAMPAIGN_TASK2_PROFILE,
+  MARKETING_T2_GROUPS,
   registerProfile,
   seedCriteria,
   setFieldValue,
@@ -17,6 +20,7 @@ import {
   type TemplateProfile,
 } from '@praxis/shared';
 import { jointHashes, jointTemplateSpec } from '../src/anvil/joint-template';
+import { authoringDefaultsFor } from '../src/tasks/rubric/authoring-defaults';
 
 /**
  * Pure rubric derivation and template reading (no database). Acceptance criteria: recommendations follow each
@@ -78,6 +82,50 @@ describe('template rubric (D8, D9)', () => {
     const r = registerProfile(bad, { alternate: true });
     expect(r.ok).toBe(false);
     expect(!r.ok && r.problems.join(' ')).toMatch(/partial credit.*0-4 field/);
+  });
+});
+
+describe('D22: Marketing criteria arrive filled from the template', () => {
+  const MKT = MARKETING_CAMPAIGN_TASK2_PROFILE as TemplateProfile;
+  const golden = (GOLDEN_MARKETING_EXAMPLE.sections as { S7: { criteria: Record<string, any>[] } }).S7.criteria;
+  const exec = (evaluator: string) => ({ evaluators: golden.map((c) => ({ criterion_id: c.id, capability: { id: evaluator, version: '1' }, evidence_source: 'run_evidence' })) });
+  const rubricFor = (evaluator: string, profileId = MKT.profileId) => templateRubric(MKT, exec(evaluator), authoringDefaultsFor(exec(evaluator), profileId))!;
+
+  it('every mapped criterion gets name, group, weight and Level 4 / 2 / 0 text from the golden example; none fails the whole task', () => {
+    const tr = rubricFor('marketing-task2-evidence-v1');
+    expect(tr.fixedSet).toBe(true);
+    expect(tr.criteria).toHaveLength(golden.length);
+    const seeded = seedCriteria(tr, []);
+    for (const g of golden) expect(seeded.find((c) => c.id === g.id)).toMatchObject({ name: g.name, group: g.group, weight: g.weight, passCondition: g.passCondition, level2: g.level2, failCondition: g.failCondition, critical: false, evaluatorKind: 'marketing-task2-evidence-v1' });
+    // Group weights still total each group's weight (A 10 … G 15).
+    for (const grp of MARKETING_T2_GROUPS) expect(seeded.filter((c) => c.group === grp.id).reduce((n, c) => n + Number(c.weight), 0)).toBe(grp.weight);
+  });
+
+  it('the form’s defaults apply whatever evaluator its template names; another form never gets them', () => {
+    expect(rubricFor('some-other-marketing-evaluator').criteria.every((c) => c.defaults?.name)).toBe(true);
+    expect(authoringDefaultsFor(exec('some-other-marketing-evaluator'), 'golden-kyc-application-type-v1')).toEqual([]);
+  });
+
+  it('a criterion stored with only its ID (seeded before the defaults) is filled; anything the author wrote is kept', () => {
+    const tr = rubricFor('marketing-task2-evidence-v1');
+    const shell = (id: string, weight: unknown = null) => ({ id, name: id, weight, passCondition: '', level3: '', level2: '', level1: '', failCondition: '', critical: false, group: '', evidenceRefs: [], evaluatorKind: 'marketing-task2-evidence-v1', evaluatorVersion: '1' });
+    const edited = { ...shell('A2'), level2: 'My own level 2 text' };
+    const out = seedCriteria(tr, [shell('A1'), shell('B1', 0), edited]);
+    expect(isShellCriterion(tr.scoreKeys, shell('A1'))).toBe(true);
+    expect(out[0]).toMatchObject({ id: 'A1', name: 'Relevance', weight: 4, group: 'A', passCondition: golden[0]!.passCondition });
+    expect(out[1]).toMatchObject({ id: 'B1', name: 'Detection', weight: 5 });
+    expect(out[2]).toEqual(edited);
+    expect(out).toHaveLength(golden.length);
+  });
+
+  it('KYC v7 is unchanged: same defaults, and a filled or partly edited criterion is never rewritten', () => {
+    const tr = templateRubric(form(V7.authoring.profile), V7.execution, authoringDefaultsFor(V7.execution, V7.authoring.profile.profileId))!;
+    expect(tr.criteria).toHaveLength(20);
+    expect(tr.criteria.every((c) => c.defaults?.partialCredit !== undefined && c.defaults.level2 === undefined)).toBe(true);
+    const seeded = seedCriteria(tr, []);
+    expect(seedCriteria(tr, seeded)).toEqual(seeded);
+    const own = seeded.map((c, i) => (i === 0 ? { ...c, passCondition: 'Mine' } : c));
+    expect(seedCriteria(tr, own)).toEqual(own);
   });
 });
 

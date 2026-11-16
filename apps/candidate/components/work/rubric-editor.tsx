@@ -1,8 +1,10 @@
 'use client';
 
 import {
+  isShellCriterion,
   newItem,
   RUBRIC_APPLICABILITY_LABELS,
+  SHELL_FILL_KEYS,
   rubricToFinish,
   type ApplicabilityKind,
   type ItemField,
@@ -88,13 +90,17 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
     // value except the read-only evaluator fields, which come from the template.
     const seed = view.seed;
     const have = new Set(items.map((i) => i.id));
+    // D22: a criterion still empty from before its template had defaults (only its ID) takes the template's text.
     const kept = items.map((i) => {
       const s = seed.find((x) => x.id === i.id);
-      return s && (s.evaluatorKind !== i.evaluatorKind || s.evaluatorVersion !== i.evaluatorVersion) ? { ...i, evaluatorKind: s.evaluatorKind, evaluatorVersion: s.evaluatorVersion } : i;
+      if (!s) return i;
+      const fill = isShellCriterion(view.template.scoreKeys, i) && !isShellCriterion(view.template.scoreKeys, s) ? Object.fromEntries(SHELL_FILL_KEYS.filter((k) => k in s).map((k) => [k, s[k]])) : null;
+      if (!fill && s.evaluatorKind === i.evaluatorKind && s.evaluatorVersion === i.evaluatorVersion) return i;
+      return { ...i, ...(fill ?? {}), evaluatorKind: s.evaluatorKind, evaluatorVersion: s.evaluatorVersion };
     });
     const added = seed.filter((s) => !have.has(s.id));
     if (added.length || kept.some((k, n) => k !== items[n])) onChange([...kept, ...added]);
-  }, [readOnly, view.seed, onChange, items]);
+  }, [readOnly, view.seed, view.template.scoreKeys, onChange, items]);
   // The first visit derives suggestions from the task (no model) so links keep a snapshot of their sources.
   useEffect(() => {
     if (readOnly || ran.current || view.run) return;

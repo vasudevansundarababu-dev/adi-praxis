@@ -66,7 +66,7 @@ export function rubricContext(task: TaskWithTemplate): RubricContext | null {
   const profile = profileFor({ workflowName: template.workflowName, profileId: template.profileId });
   if (!profile || profile.storage !== 'sections') return null;
   const execution = jointParts(template)?.execution ?? null;
-  const rubric = templateRubric(profile, execution, authoringDefaultsFor(execution));
+  const rubric = templateRubric(profile, execution, authoringDefaultsFor(execution, profile.profileId));
   if (!rubric) return null;
   return { task, template, profile, execution, rubric, output: isObj(task.output) ? task.output : {} };
 }
@@ -163,6 +163,15 @@ function pickedDocumentVersions(ctx: RubricContext, docs: LibraryDocument[]): Se
     const d = docs.find((x) => x.sha256 === sha || x.policyId === it.ruleId);
     if (d) picked.add(d.documentVersionId);
   }
+  // Forms that cite rules (the shared `policy_citation` field, e.g. Marketing; D21): a cited rule version ticks the
+  // published document it comes from.
+  for (const s of ctx.profile.sections)
+    for (const f of s.fields) {
+      if (f.type !== 'policy_citation') continue;
+      const cited = sections[s.key]?.[f.key];
+      for (const it of Array.isArray(cited) ? cited.filter(isObj) : [])
+        for (const d of docs) if (d.rules.some((r) => r.ruleVersionId === it.ruleVersion)) picked.add(d.documentVersionId);
+    }
   return picked;
 }
 
@@ -249,6 +258,18 @@ function needsFor(d: Derivation['criteria'][number] | undefined, links: SourceLi
   return out;
 }
 
+/**
+ * D22: an earlier run stored an empty "what should the agent do?" / "evidence required" (the template had no defaults
+ * then). The view shows the current derivation in their place until the author writes one. Read-only: nothing is
+ * written, and a field the author edited (even to empty) is shown as they left it.
+ */
+function withDerivedBlanks(details: AnnotationDetails, derived: AnnotationDetails, edited: string[]): AnnotationDetails {
+  let out = details;
+  for (const f of ['assesses', 'evidenceRequired'] as const)
+    if (!edited.includes(f) && !String(out[f] ?? '').trim() && String(derived[f] ?? '').trim()) out = { ...out, [f]: derived[f] };
+  return out;
+}
+
 /** The whole view: criteria with their derivation, links and states, additions, sources, coverage. Read-only. */
 export async function rubricView(tx: Db | Tx, ctx: RubricContext, opts: { aiEnabled: boolean; notes?: RuleAnnotationSource }): Promise<RubricView> {
   const lib = await policyLibrary(tx, ctx.task.clientId, ctx.task.projectId, opts.notes);
@@ -264,7 +285,7 @@ export async function rubricView(tx: Db | Tx, ctx: RubricContext, opts: { aiEnab
     const a = ann.get(d.id);
     if (a?.status === 'REMOVED' && !items.some((i) => i.id === d.id)) continue;
     const item = items.find((i) => i.id === d.id) ?? { id: d.id };
-    const details = (a?.details as unknown as AnnotationDetails | undefined) ?? d.details;
+    const details = withDerivedBlanks((a?.details as unknown as AnnotationDetails | undefined) ?? d.details, d.details, a?.editedFields ?? []);
     const links = a ? linkStates(input, a.sources as unknown as SourceLink[]) : d.links.map((l) => ({ ...l, state: 'OK' as const }));
     const proposed: RubricCriterionView['proposed'] = {};
     const ranDetails = runResult?.criteria?.find((c) => c.id === d.id)?.details;

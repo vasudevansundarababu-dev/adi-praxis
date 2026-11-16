@@ -133,7 +133,7 @@ export const nameFromId = (id: string) => {
 export function seedCriteria(tr: TemplateRubric, existing: unknown): Record<string, unknown>[] {
   const list = (Array.isArray(existing) ? existing.filter(isObj) : []) as Record<string, unknown>[];
   const have = new Set(list.map((x) => x.id));
-  const out = list.map((x) => withTemplateTechnical(tr, x));
+  const out = list.map((x) => withTemplateTechnical(tr, fillShellCriterion(tr, x)));
   for (const c of tr.criteria) {
     if (have.has(c.id)) continue;
     const item = newItem(tr.field, out);
@@ -147,6 +147,41 @@ export function seedCriteria(tr: TemplateRubric, existing: unknown): Record<stri
     out.push(withTemplateTechnical(tr, item));
   }
   return out;
+}
+
+const blank = (v: unknown) => v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
+
+/**
+ * An untouched template criterion: listed before its template had defaults (D22, Marketing tasks seeded with IDs
+ * only). Its name is still the ID (or empty), it has no scoring text at all, and its weight is unset or 0. Anything
+ * an author has written makes it not a shell.
+ */
+export function isShellCriterion(scoreKeys: readonly { key: string }[], item: Record<string, unknown>): boolean {
+  const id = typeof item.id === 'string' ? item.id : '';
+  if (!id) return false;
+  const name = typeof item.name === 'string' ? item.name.trim() : item.name;
+  if (!(blank(name) || name === id || name === nameFromId(id))) return false;
+  if (scoreKeys.some((k) => !blank(item[k.key]))) return false;
+  return blank(item.weight) || item.weight === 0;
+}
+
+/** The item keys template defaults fill on a shell criterion (the client merges exactly these from the seed). */
+export const SHELL_FILL_KEYS = ['name', 'weight', 'critical', 'group', 'passCondition', 'partialCredit', 'level3', 'level2', 'level1', 'failCondition'] as const;
+
+/**
+ * D22: a shell criterion gets its template defaults (name, weight, scoring text, whole-task failure, group). Items
+ * with any author content are returned unchanged, so an edited criterion is never overwritten.
+ */
+export function fillShellCriterion(tr: TemplateRubric, item: Record<string, unknown>): Record<string, unknown> {
+  const d = tr.criteria.find((c) => c.id === item.id)?.defaults;
+  if (!d || !isShellCriterion(tr.scoreKeys, item)) return item;
+  const next: Record<string, unknown> = { ...item };
+  if (d.name !== undefined) next.name = d.name;
+  if (d.weight !== undefined) next.weight = d.weight;
+  for (const k of tr.scoreKeys) if (d[k.key] !== undefined) next[k.key] = d[k.key];
+  if (d.critical !== undefined && next.critical !== true) next.critical = d.critical === true;
+  if (d.group !== undefined && blank(next.group)) next.group = d.group;
+  return next;
 }
 
 /** D9: a mapped criterion's evaluator kind and version always come from the template (read-only to the author). */

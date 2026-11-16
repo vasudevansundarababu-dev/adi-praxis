@@ -242,8 +242,32 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
     const rv = (await get(s.sme, `/me/tasks/${s.taskId}/rubric`)).json();
     expect(rv.template).toMatchObject({ scale: 'zero_to_four', criterionFailureSupported: false, fixedSet: true });
     expect(rv.template.scoreKeys.map((k: { points: number }) => k.points)).toEqual([4, 3, 2, 1, 0]);
-    expect(rv.criteria.every((c: { defaults: unknown }) => c.defaults === null)).toBe(true);
     expect(JSON.stringify(rv)).not.toMatch(/partialCredit|golden-kyc/);
+    // D22: every criterion arrives filled from the template (name, group, weight, Level 4 / 2 / 0), never KYC's 5/2/0,
+    // and "what should the agent do?" explains it.
+    const golden = (GOLDEN_MARKETING_EXAMPLE.sections as { S7: { criteria: Record<string, unknown>[] } }).S7.criteria;
+    expect(rv.template.weightsFromTemplate).toBe(true);
+    for (const g of golden) {
+      expect(rv.seed.find((x: { id: string }) => x.id === g.id)).toMatchObject({ name: g.name, group: g.group, weight: g.weight, passCondition: g.passCondition, level2: g.level2, failCondition: g.failCondition, critical: false });
+      expect(rv.criteria.find((x: { id: string }) => x.id === g.id)).toMatchObject({ origin: 'TEMPLATE_DEFAULT', defaults: { name: g.name }, details: { assesses: g.passCondition } });
+    }
+    // A task opened before the defaults existed holds criteria with only their IDs: opening it offers the template text.
+    const shells = golden.map((g) => ({ id: g.id, name: g.id, weight: null, passCondition: '', level3: '', level2: '', level1: '', failCondition: '', critical: false, group: '', evaluatorKind: 'marketing-task2-evidence-v1', evaluatorVersion: '1' }));
+    const early = structuredClone(withRuleVersions(GOLDEN_MARKETING_EXAMPLE, s.versions)) as unknown as { sections: { S7: { criteria: unknown[] } } };
+    early.sections.S7.criteria = shells;
+    const savedEarly = await save(s.sme, s.taskId, early);
+    expect(savedEarly.statusCode, savedEarly.body).toBe(200);
+    const reopened = (await get(s.sme, `/me/tasks/${s.taskId}/rubric`)).json();
+    expect(reopened.seed).toHaveLength(golden.length);
+    expect(reopened.seed[0]).toMatchObject({ id: golden[0]!.id, name: golden[0]!.name, weight: golden[0]!.weight, passCondition: golden[0]!.passCondition });
+
+    // D21: S4 picks the project's published rules: each library rule carries its exact version, quotation and locator.
+    const lib = (await get(s.sme, `/me/tasks/${s.taskId}/policy-library`)).json();
+    const libRules = lib.documents.flatMap((d: { rules: unknown[] }) => d.rules) as { ruleKey: string; ruleVersionId: string; quote: string | null; locator: unknown }[];
+    // Rule keys are stored with an `R-` prefix; the bound-versions check accepts either form.
+    expect(libRules.map((r) => r.ruleKey).sort()).toEqual(RULES.map((r) => `R-${r.key}`).sort());
+    for (const r of libRules) expect(r.ruleVersionId).toBe(s.versions[r.ruleKey.replace(/^R-/, '')]);
+    expect(libRules.every((r) => !!r.quote)).toBe(true);
     // The worked case plus the workflow, with the project's published rule versions, passes every check.
     const output = { ...withRuleVersions(GOLDEN_MARKETING_EXAMPLE, s.versions), workflowGraph: marketingTask2Graph(1) };
     const saved = await save(s.sme, s.taskId, output);

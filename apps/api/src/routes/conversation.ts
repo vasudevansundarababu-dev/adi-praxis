@@ -14,8 +14,10 @@ import { conversationInputProblems } from '../tasks/conversation/guards';
 import { appendTurn, chatOf, CONVERSATION_VERSION, conversationView, decideProposal, draftingWith, editable } from '../tasks/conversation/service';
 import { ownTask, outstanding, workContext } from './work';
 import { profileAgentView } from '../tasks/profile-output';
+import { unconfirmedSections } from '@praxis/shared';
+import { sectionsProfile, suggestionStateOf } from '../tasks/suggestions/service';
 const Params = z.object({ id: z.string().uuid() });
-export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: SelectionGate; dailyModelCallCap?: number }> = async (app, { db, selectionGate, dailyModelCallCap }) => {
+export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: SelectionGate; dailyModelCallCap?: number; suggestionsEnabled?: boolean }> = async (app, { db, selectionGate, dailyModelCallCap, suggestionsEnabled = false }) => {
   const load = async (tx: Parameters<typeof ownTask>[0], id: string, sme: string) => {
     const t = await ownTask(tx, id, sme);
     const ctx = await workContext(tx, selectionGate, sme, t.projectId); if (!ctx.ok) outstanding(ctx);
@@ -91,7 +93,13 @@ export const conversationRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: 
         chat.unresolved=[];
       }
       if (t.revision !== req.body.expectedRevision || chat.pending || chat.unresolved?.length) throw new AppError(409, 'REVIEW_INCOMPLETE', 'Resolve pending changes and follow-up questions before reviewing this revision.');
-      if (await tx.taskDraftRun.count({where:{taskInstanceId:t.id,status:'SUCCEEDED',promptVersion:{not: 'authoring-facilitator/2'}}})) throw new AppError(409,'PRIOR_AI_DRAFT','Prior generative drafting requires a human-authorship review; no automatic declaration is allowed.');
+      // Owner decision 1 (15 Nov 2026): with suggested text on, earlier AI text is allowed once the author has confirmed
+      // every section for its current content; without it, any earlier generative draft still blocks the declaration.
+      const profile = suggestionsEnabled ? sectionsProfile(t) : null;
+      if (profile) {
+        const open = unconfirmedSections(profile, t.output ?? {}, suggestionStateOf(t));
+        if (open.length) throw new AppError(409,'SECTIONS_NOT_CONFIRMED',`Confirm ${open.join(', ')} first: tick that you’ve read every field and it describes how this work is really done.`);
+      } else if (await tx.taskDraftRun.count({where:{taskInstanceId:t.id,status:'SUCCEEDED',promptVersion:{not: 'authoring-facilitator/2'}}})) throw new AppError(409,'PRIOR_AI_DRAFT','Prior generative drafting requires a human-authorship review; no automatic declaration is allowed.');
       chat.declaration={revision:t.revision,at:new Date().toISOString(),smeUserId:actor.smeUserId};
       chat.policyDigest = (await effectivePolicy(tx,t.clientId,t))?.digest ?? 'none';
       chat.needsReview = false; chat.reviewedRevision = t.revision;

@@ -89,7 +89,7 @@ const taskSummary = (t: { id: string; status: string; taskType: string; input: u
 });
 
 /** FLOW 3 for candidates: invite, project task list, pull, autosave, check and submit. */
-export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: SelectionGate; embeddings: EmbeddingProvider; rubricEnabled?: boolean }> = async (app, { db, selectionGate, embeddings, rubricEnabled = false }) => {
+export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: SelectionGate; embeddings: EmbeddingProvider; rubricEnabled?: boolean; suggestionsEnabled?: boolean }> = async (app, { db, selectionGate, embeddings, rubricEnabled = false, suggestionsEnabled = false }) => {
   app.post('/me/invites/redeem', { config: { access: 'candidate', rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['work'], body: z.object({ token: z.string().min(20).max(200) }) } }, async (req, reply) => {
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => ({ status: 200, body: await redeemInvite(tx, req.body.token, actor.smeUserId, audit) }));
     return reply;
@@ -163,6 +163,8 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       tutorial: tutorialOf(t.project.template),
       // Rubric editor, S4 policy picker and the SME form wording (RUBRIC_RECOMMENDATIONS_ENABLED; off by default).
       formV2: rubricEnabled,
+      // Suggested text, provenance and section confirmation (FIELD_SUGGESTIONS_ENABLED; off by default).
+      fieldSuggestions: suggestionsEnabled,
       definition: definitionFor(template).key,
       template: {
         workflow: template.workflowName,
@@ -273,7 +275,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
   // W06: run every automated check now (no state change) and show the closest existing tasks' briefs.
   app.post('/me/tasks/:id/check', { config: { access: 'candidate', rateLimit: { max: 30, timeWindow: '1 minute' } }, schema: { tags: ['work'], params: IdParams } }, async (req) => {
     const t = await ownTask(db, req.params.id, req.candidate!.smeUserId);
-    const ev = await evaluateTask(db, t, { rubricChecks: rubricEnabled });
+    const ev = await evaluateTask(db, t, { rubricChecks: rubricEnabled, suggestionChecks: suggestionsEnabled });
     let similar: { brief: string | null; score: number; flagged: boolean }[] = [];
     if (t.taskType === 'AUTHORING' && t.output) {
       const matches = await findSimilar(db, { taskId: t.id, lineageId: ev.lineageId, embedding: await embeddings.embed(ev.text), coverage: ev.coverage, keyInputs: ev.keyInputs, threshold: ev.threshold, limit: 3 });
@@ -299,7 +301,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       const ctx = await workContext(tx, selectionGate, actor.smeUserId, t.projectId);
       if (!ctx.ok) outstanding(ctx);
       if (t.project.status === 'PAUSED') throw new AppError(409, 'PROJECT_PAUSED', 'This project is paused. Your work is saved; you can submit when it resumes.');
-      const r = await submitTask(tx, { task: t, body: req.body, embedding, embeddingModel: embedding ? embeddings.model : null, rubricChecks: rubricEnabled }, audit, emit);
+      const r = await submitTask(tx, { task: t, body: req.body, embedding, embeddingModel: embedding ? embeddings.model : null, rubricChecks: rubricEnabled, suggestionChecks: suggestionsEnabled }, audit, emit);
       return { status: 200, body: { status: 'SUBMITTED', version: r.version } };
     });
     return reply;

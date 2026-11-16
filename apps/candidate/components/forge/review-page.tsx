@@ -2,6 +2,8 @@
 
 import { getFieldValue, isArrayType, itemFieldsOf, type ForgeComment, type ItemField, type ReviewerTaskStatus, type RubricView, type SectionKey, type TemplateProfile, publicText } from '@praxis/shared';
 import { RubricReadOnly } from './rubric-readonly';
+import { ProvenanceCounts } from '@/components/work/field-suggestions';
+import type { ProvenanceSummary } from '@praxis/shared';
 import Link from 'next/link';
 import { useState } from 'react';
 import { call } from '@/lib/client';
@@ -28,6 +30,8 @@ export interface ReviewView {
   expectedRevision: number;
   flaggedDuplicate: boolean;
   confirmCoverage: boolean;
+  /** Which fields came from a suggestion, and the author's section confirmations (null when not used). */
+  provenance?: ProvenanceSummary | null;
 }
 
 /** One authored value, read-only: text as written, lists one per line, repeated records with their own fields. */
@@ -178,6 +182,16 @@ export function ReviewPage({ initial, rubric = null }: { initial: ReviewView; ru
             </section>
           ))}
         </div>
+      )}
+
+      {view.provenance && (
+        <section aria-labelledby="prov-h" className="card mt-6 space-y-2 p-4" data-review-provenance>
+          <h2 id="prov-h" className="text-lg font-semibold">
+            Where the text came from
+          </h2>
+          <p className="text-sm text-fg-muted">The author could start from suggested text. They used it as it was, edited it, or wrote their own, and confirmed each section. You decide whether the task is accepted.</p>
+          <ProvenanceCounts summary={view.provenance} reviewer />
+        </section>
       )}
 
       {view.canDecide && view.output !== null && (

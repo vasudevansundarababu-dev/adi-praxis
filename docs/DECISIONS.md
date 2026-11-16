@@ -1925,3 +1925,38 @@ D1 and D3–D9. D2 (tutorial video) is out: it needs a decision on how videos ar
   `docs/design/mascot/`.
 - **(chosen by Claude, D13)** Tutorial stays at the top of the page: it opens an inline video card, which would cover
   the form if it floated.
+## Suggested text per field and the rubric table (owner, 15 Nov 2026)
+Design: `docs/design/SUGGESTED-TEXT-AND-RUBRIC-TABLE.md`, mockup `docs/design/mockups/suggested-text-and-rubric-table.html`.
+The owner accepted all seven recommendations:
+1. **(owner)** New human-authorship terms (new `AUTHORSHIP_VERSION`): the author wrote the task or read, changed where
+   needed and accepted every suggested text, and it describes how the work is really done. Each field records where its
+   text came from (written by the author, suggestion used as is, suggestion edited) with the suggestion version.
+   `PRIOR_AI_DRAFT` is replaced by the Submit check "every section confirmed after its last change".
+2. **(owner)** Provenance stays in ADI Forge (audit log and reviewer view). The RL Gym export contract is unchanged;
+   RL Gym is asked whether it wants an optional per-field flag in a later contract version.
+3. **(owner)** Consent is one confirmation per section (cleared when anything in it changes) plus the final declaration;
+   each use of a suggestion is audited per field.
+4. **(owner)** "Use all suggestions in this section" is kept; section confirmation is still required and the reviewer
+   sees the counts. A human Reviewer still accepts or rejects the task.
+5. **(owner)** Suggestions use the Gemini model QA already uses for the SME profile chat, behind
+   `FIELD_SUGGESTIONS_ENABLED`, mocked in tests. Inputs: template, task slot, the project's published rules and the
+   author's own text only, never case snapshots. Agent-brief fields pass the answer-leak and real-data checks first.
+6. **(owner)** Every field in both templates (KYC v6/v7, Marketing VEYRA) gets suggestions. S4 policy identities and
+   S7 IDs, weights and evaluators stay filled from the template or project.
+7. **(owner)** The rubric table is the default S7 view for both templates; Edit opens the existing criterion editor.
+   It includes D14 (only blockers shown in red at the top; recommendations collapsed) and D16 (a non-template
+   criterion can always be removed; adding one is not offered with a fixed set).
+- **(chosen by Claude, build)** Behind `FIELD_SUGGESTIONS_ENABLED` (off by default; on in QA deploys via
+  `QA_FIELD_SUGGESTIONS`). Model: `FIELD_SUGGESTIONS_MODEL`, else `PROFILE_MODEL`, else `AUTHORING_MODEL`; the mock
+  (template examples) without Vertex. Suggestions are kept per section so a reload never calls the model again; "Suggest
+  another" asks for one field. Provenance is derived, never claimed: the hash of the suggestion taken is stored, and the
+  saved value is compared with it. A section confirmation stores the digest of the section's saved content.
+- **(chosen by Claude, build)** The task's case selector (set by the slot) gets no suggestion and is not counted as
+  anyone's writing. S8 counts as a section to confirm (its Sources field is the author's).
+- **(chosen by Claude, build)** With the flag on, the conversation review's `PRIOR_AI_DRAFT` block is replaced by
+  `SECTIONS_NOT_CONFIRMED`; with it off the earlier rule stands. The authorship terms version is now `human-review/2`,
+  so authors of in-progress conversational tasks accept the new terms once.
+- **(chosen by Claude, build)** Rubric table: criterion "blocks Submit" = not in a fixed template set, empty name,
+  missing required score text, weights not totalling 100 (or a group not totalling its weight), no critical criterion.
+  Everything else (source links, applicability, coverage gaps, duplicates) is "Recommended, not required", collapsed.
+  The earlier card list stays available as "One card per criterion".

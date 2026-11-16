@@ -15,15 +15,23 @@ import {
   startProfileOutput,
   withSlotCase,
   publicText,
-  rubricToFinish,
   type ItemField,
   type RubricView,
   type ViewLink,
   type ProfileProblem,
   type SectionKey,
   type TemplateProfile, EDGE_CASE_LABEL, EDGE_CASE_HELP,
+  isBlankValue,
+  provenanceSummary,
+  sectionsToConfirm,
+  suggestibleFields,
+  isConfirmed,
+  AUTHORSHIP_DECLARATION,
+  type FieldSuggestion,
+  type SuggestionState,
 } from '@praxis/shared';
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { FieldSuggestionBox, ProvenanceCounts, SectionConfirm, UseAllSuggestions, useSuggestions } from './field-suggestions';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Req, RequiredNote } from '@/components/required';
 import { placeComments } from '@/lib/forge';
 import type { TaskView } from '@/lib/work-types';
@@ -32,7 +40,7 @@ import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
 import { SaveBar } from './save-bar';
 import { PolicyPicker, type LibraryView } from './policy-picker';
-import { RubricEditor, SourcePanel, useRubricView } from './rubric-editor';
+import { RubricEditor, SourcePanel, rubricBlockers, useRubricView } from './rubric-editor';
 
 /** RUBRIC_RECOMMENDATIONS_ENABLED: the S4/S7/S8 controls change. Template text always shows public names (D5). */
 const FormV2 = createContext(false);
@@ -299,8 +307,10 @@ export const DECLARATION_V2 = 'I won’t use real customer, employer or account 
 const isPolicyReferenceField = (f: ItemField) => f.type === 'repeated_array' && (f.itemFields ?? []).some((x) => /sha256/i.test(x.key));
 const isSourcesField = (f: ItemField) => f.type === 'long_text' && /source/i.test(`${f.key} ${f.label}`) && f.visibility !== 'private_reference' && f.visibility !== 'private_rubric';
 
-export function ProfileEditor({ task, profile, onSubmitted, initialSection, initialRubric = null, initialLibrary = null }: { task: TaskView; profile: TemplateProfile; onSubmitted: () => void; initialSection?: number; initialRubric?: RubricView | null; initialLibrary?: LibraryView | null }) {
+export function ProfileEditor({ task, profile, onSubmitted, initialSection, initialRubric = null, initialLibrary = null, initialSuggestions = null }: { task: TaskView; profile: TemplateProfile; onSubmitted: () => void; initialSection?: number; initialRubric?: RubricView | null; initialLibrary?: LibraryView | null; initialSuggestions?: SuggestionState | null }) {
   const v2 = task.formV2 === true;
+  const sugOn = task.fieldSuggestions === true;
+  const sug = useSuggestions(task.id, sugOn, initialSuggestions);
   const hasRubric = profile.sections.some((s) => s.fields.some((f) => f.type === 'criterion'));
   const rubric = useRubricView(task.id, initialRubric, undefined, v2 && hasRubric);
   const [openLink, setOpenLink] = useState<ViewLink | null>(null);
@@ -320,6 +330,29 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
   const section = profile.sections[active]!;
   const slot = task.input.slot;
   const header = (value.header ?? {}) as { title?: string; coverageTags?: Record<string, string>; edgeCase?: string };
+  // Suggested text (FIELD_SUGGESTIONS_ENABLED): the section's empty fields get a suggestion when the section opens.
+  const sugFields = useMemo(() => (sugOn ? suggestibleFields(profile, section.key, slot?.case?.source ?? null) : []), [sugOn, profile, section.key, slot?.case?.source]);
+  const sugKeys = useMemo(() => new Set(sugFields.map((f) => f.key)), [sugFields]);
+  const needsSuggestions = sugFields.some((f) => isBlankValue(getFieldValue(profile, value, section.key as SectionKey, f)));
+  const { load: loadSuggestions } = sug;
+  useEffect(() => {
+    if (sugOn && !task.readOnly && needsSuggestions) void loadSuggestions(section.key);
+  }, [sugOn, task.readOnly, needsSuggestions, loadSuggestions, section.key]);
+  const pendingSuggestions = sugFields
+    .filter((f) => isBlankValue(getFieldValue(profile, value, section.key as SectionKey, f)))
+    .map((f) => sug.offeredFor(section.key, f.key))
+    .filter((x): x is FieldSuggestion => !!x);
+  const useAll = (items: FieldSuggestion[]) => update((prev) => items.reduce((acc, i) => setFieldValue(profile, acc, section.key as SectionKey, i.key, i.value), prev));
+  const confirmable = sugOn && sectionsToConfirm(profile).includes(section.key);
+  const withSuggestion = (f: TemplateProfile["sections"][number]["fields"][number], node: React.ReactNode) =>
+    sugOn && sugKeys.has(f.key) ? (
+      <div key={f.key} className="min-w-0">
+        {node}
+        <FieldSuggestionBox field={f} section={section.key} value={getFieldValue(profile, value, section.key as SectionKey, f)} s={sug} inputId={domId(`${section.key}.${f.key}`)} readOnly={task.readOnly} onUse={(v) => setField(f.key, v)} />
+      </div>
+    ) : (
+      node
+    );
   const lookup: Lookup = (ref) => {
     const [sk, key] = ref.split('.');
     return getFieldValue(profile, value, sk as SectionKey, { key: key! });
@@ -345,7 +378,9 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
     const rf = profile.sections.flatMap((s) => s.fields.filter((f) => f.type === 'criterion').map((f) => getFieldValue(profile, value, s.key as SectionKey, f)))[0];
     return Array.isArray(rf) ? (rf as Record<string, unknown>[]) : [];
   }, [profile, value]);
-  const rubricTodo = useMemo(() => (v2 && rubric.view ? rubricToFinish(rubric.view, rubricItems) : []), [v2, rubric.view, rubricItems]);
+  const rubricField = useMemo(() => profile.sections.flatMap((s) => s.fields.filter((f) => f.type === 'criterion'))[0] ?? null, [profile]);
+  // D14: S8 lists only what blocks Submit in the rubric; recommendations stay in S7, collapsed.
+  const rubricTodo = useMemo(() => (v2 && rubric.view && rubricField ? rubricBlockers(rubric.view, rubricField, rubricItems) : []), [v2, rubric.view, rubricField, rubricItems]);
   const openInForm = (l: ViewLink) => {
     setOpenLink(null);
     if (!l.section) return;
@@ -402,6 +437,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
                 <button type="button" onClick={() => goTo(i)} aria-current={i === active ? 'step' : undefined} data-flagged={flagged || undefined} className={`rounded-md border px-2 py-1 text-left text-xs ${i === active ? 'border-link font-semibold' : flagged ? 'border-warning' : 'border-line'}`}>
                   {s.key} {s.title}
                   {flagged && <span className="ml-1 text-warning">· comment</span>}
+                  {sugOn && isConfirmed(profile, value, sug.state, s.key) && <span className="ml-1 text-success" data-confirmed-section={s.key}>· ✓ confirmed</span>}
                   <span className="block text-fg-muted">
                     {p.required ? `${p.done}/${p.required} required done` : 'nothing required'}
                     {p.problems ? ` · ${p.problems} to fix` : ''}
@@ -429,6 +465,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
           ))}
         </div>
         {!task.readOnly && <RequiredNote />}
+        {sugOn && !task.readOnly && sugFields.length > 0 && <UseAllSuggestions section={section.key} pending={pendingSuggestions} s={sug} onUseAll={useAll} />}
         <fieldset disabled={task.readOnly} className="min-w-0 space-y-4">
           {section.key === 'S1' && slot?.isOpen && (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -475,14 +512,25 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
             ) : v2 && isPolicyReferenceField(f) ? (
               <PolicyPicker key={f.key} taskId={task.id} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} onChange={(v) => setField(f.key, v)} readOnly={task.readOnly} initialLibrary={initialLibrary} />
             ) : v2 && isSourcesField(f) && rubric.view ? (
-              <SourcesUsedField key={f.key} view={rubric.view} value={getFieldValue(profile, value, section.key as SectionKey, f)} onFill={(text) => setField(f.key, text)} readOnly={task.readOnly} onChangeSources={() => goTo(sectionIndex(rubric.view!.rubric.section))}>
+              withSuggestion(f, <SourcesUsedField key={f.key} view={rubric.view} value={getFieldValue(profile, value, section.key as SectionKey, f)} onFill={(text) => setField(f.key, text)} readOnly={task.readOnly} onChangeSources={() => goTo(sectionIndex(rubric.view!.rubric.section))}>
                 <FieldControl field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} path={`${section.key}.${f.key}`} problems={problems} lookup={lookup} onChange={(v) => setField(f.key, v)} />
-              </SourcesUsedField>
+              </SourcesUsedField>)
             ) : (
-              <FieldControl key={f.key} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} path={`${section.key}.${f.key}`} problems={problems} lookup={lookup} onChange={(v) => setField(f.key, v)} />
+              withSuggestion(f, <FieldControl key={f.key} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} path={`${section.key}.${f.key}`} problems={problems} lookup={lookup} onChange={(v) => setField(f.key, v)} />)
             ),
           )}
         </fieldset>
+
+        {confirmable && (
+          <SectionConfirm profile={profile} output={value} section={section.key} s={sug} ready={progress[active]!.done >= progress[active]!.required && !progress[active]!.problems} flush={flush} readOnly={task.readOnly} />
+        )}
+
+        {section.key === 'S8' && sugOn && (
+          <div className="space-y-2">
+            <h3 className="font-semibold">Where the text came from</h3>
+            <ProvenanceCounts summary={provenanceSummary(profile, value, sug.state, slot?.case?.source ?? null)} />
+          </div>
+        )}
 
         {section.key === 'S8' && (
           <div className="space-y-3">
@@ -494,14 +542,13 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
                     <button type="button" className="text-left text-link underline" onClick={() => goTo(sectionIndex(rubric.view!.rubric.section))}>
                       {rubric.view!.rubric.section}
                     </button>{' '}
-                    {t.criterionId ? `${t.criterionId}: ` : ''}
                     {t.message}
                   </li>
                 ))}
               </ul>
             )}
             {problems.length === 0 ? (
-              <p className="text-sm">{rubricTodo.length ? 'Every required field is complete. The rubric items above are still to finish; saving never waits for them.' : 'Every required field is complete. Run the checks, then submit.'}</p>
+              <p className="text-sm">{rubricTodo.length ? 'Every required field is complete. Fix the rubric items above, then submit.' : 'Every required field is complete. Run the checks, then submit.'}</p>
             ) : (
               <ul className="space-y-1 text-sm">
                 {problems.slice(0, 50).map((p, i) => (
@@ -514,7 +561,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
                 ))}
               </ul>
             )}
-            {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(s) => goTo(sectionIndex(s))} submitLabel={rework ? 'Resubmit for review' : undefined} declaration={DECLARATION_V2} />}
+            {!task.readOnly && <SubmitPanel taskId={task.id} flush={flush} revision={currentRevision} onSubmitted={onSubmitted} onGoTo={(s) => goTo(sectionIndex(s))} submitLabel={rework ? 'Resubmit for review' : undefined} declaration={DECLARATION_V2} authorship={sugOn ? AUTHORSHIP_DECLARATION : undefined} />}
           </div>
         )}
 

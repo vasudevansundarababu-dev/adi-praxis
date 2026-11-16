@@ -11,12 +11,14 @@ const sectionTitle = (id: string) => KYC_SECTIONS.find((s) => s.id === id)?.titl
  * W06 — runs every automated check, shows the closest existing tasks (briefs only) and any likely-real data, and
  * submits after the synthetic-data declaration. Submission is blocked by any failing check or unexplained flag.
  */
-export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolean>; revision: () => number; onSubmitted: () => void; onGoTo?: (section: string) => void; declaration?: string; submitLabel?: string }) {
+export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolean>; revision: () => number; onSubmitted: () => void; onGoTo?: (section: string) => void; declaration?: string; submitLabel?: string; authorship?: string }) {
   const [humanOnly,setHumanOnly]=useState(false),[questions,setQuestions]=useState<string[]>([]),[resolutions,setResolutions]=useState<Record<string,string>>({});
   useEffect(()=>{void fetch(`/api/v1/me/tasks/${props.taskId}/conversation`).then(r=>r.ok?r.json():null).then(v=>{setHumanOnly(!!v?.state?.humanOnly);setQuestions(v?.state?.unresolved??[]);}).catch(()=>{});},[props.taskId]);
   const [result, setResult] = useState<CheckResult | null>(null);
   const [explanations, setExplanations] = useState<Record<string, string>>({});
   const [declared, setDeclared] = useState(false);
+  const [authored, setAuthored] = useState(false);
+  const signed = declared && (!props.authorship || authored);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,8 +63,8 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
     <section aria-labelledby="w06-h" className="space-y-4">
       <h2 id="w06-h" className="text-lg font-semibold">Check and submit</h2>
       <RequiredNote />
-      {humanOnly&&<p className="text-sm">By submitting, I confirm this revision is my own work, no external LLM wrote the substantive answers, and all sources are authorised. Similarity signals require human review and do not prove authorship.</p>}
-      {humanOnly&&<div className="space-y-3">{questions.map(q=><label key={q} className="block text-sm">{q}<textarea value={resolutions[q]??''} onChange={e=>setResolutions(r=>({...r,[q]:e.target.value}))} className="mt-1 w-full rounded border border-line bg-surface p-2" placeholder="Explain how the saved task resolves this question…"/></label>)}<button type="button" disabled={pending||!declared} className="rounded border border-line p-2 disabled:opacity-50" onClick={async()=>{setPending(true);setError(null);if(!await props.flush()){setPending(false);setError('Save changes first.');return;}const r=await fetch(`/api/v1/me/tasks/${props.taskId}/conversation/review`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':crypto.randomUUID()},body:JSON.stringify({expectedRevision:props.revision(),ownWork:true,noExternalLlm:true,authorisedSources:true,resolutions:questions.map(question=>({question,answer:resolutions[question]??''}))})});setPending(false);if(!r.ok){const b=await r.json().catch(()=>null);setError(b?.message??'Resolve questions first.');}else{setQuestions([]);setResult(null);}}}>Confirm authorship and reconciliation</button></div>}
+      {humanOnly&&<p className="text-sm">By submitting, I confirm this revision is my work: I wrote it, or I read, changed where needed and accepted every suggested text in it; I didn’t paste answers from outside tools; and all sources are authorised. Similarity signals require human review and do not prove authorship.</p>}
+      {humanOnly&&<div className="space-y-3">{questions.map(q=><label key={q} className="block text-sm">{q}<textarea value={resolutions[q]??''} onChange={e=>setResolutions(r=>({...r,[q]:e.target.value}))} className="mt-1 w-full rounded border border-line bg-surface p-2" placeholder="Explain how the saved task resolves this question…"/></label>)}<button type="button" disabled={pending||!signed} className="rounded border border-line p-2 disabled:opacity-50" onClick={async()=>{setPending(true);setError(null);if(!await props.flush()){setPending(false);setError('Save changes first.');return;}const r=await fetch(`/api/v1/me/tasks/${props.taskId}/conversation/review`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':crypto.randomUUID()},body:JSON.stringify({expectedRevision:props.revision(),ownWork:true,noExternalLlm:true,authorisedSources:true,resolutions:questions.map(question=>({question,answer:resolutions[question]??''}))})});setPending(false);if(!r.ok){const b=await r.json().catch(()=>null);setError(b?.message??'Resolve questions first.');}else{setQuestions([]);setResult(null);}}}>Confirm authorship and reconciliation</button></div>}
       <button type="button" disabled={pending} onClick={check} className="btn btn-secondary disabled:opacity-60">
         {pending ? 'Checking…' : 'Run checks'}
       </button>
@@ -134,11 +136,20 @@ export function SubmitPanel(props: { taskId: string; flush: () => Promise<boolea
       <label className="flex items-start gap-2 text-sm">
         <input type="checkbox" aria-required="true" checked={declared} onChange={(e) => setDeclared(e.target.checked)} className="mt-1" />
         <span>
-          {humanOnly ? 'This revision is my own work; no external LLM wrote the answers; all sources are authorised and the case contains no real personal or confidential data.' : props.declaration ?? 'I won’t use real customer, employer or account information.'}
+          {humanOnly ? 'This revision is my work; I wrote it or accepted every suggested text in it after reading it; I didn’t paste answers from outside tools; all sources are authorised and the case contains no real personal or confidential data.' : props.declaration ?? 'I won’t use real customer, employer or account information.'}
           <Req />
         </span>
       </label>
-      <button type="button" disabled={pending || !declared || !result || failing.length > 0 || unexplained.length > 0} onClick={submit} className="btn btn-primary disabled:opacity-50">
+      {props.authorship && (
+        <label className="flex items-start gap-2 text-sm" data-authorship-declaration>
+          <input type="checkbox" aria-required="true" checked={authored} onChange={(e) => setAuthored(e.target.checked)} className="mt-1" />
+          <span>
+            {props.authorship}
+            <Req />
+          </span>
+        </label>
+      )}
+      <button type="button" disabled={pending || !signed || !result || failing.length > 0 || unexplained.length > 0} onClick={submit} className="btn btn-primary disabled:opacity-50">
         {props.submitLabel ?? 'Submit for review'}
       </button>
       {!result && <p className="text-sm text-fg-muted">Run the checks first.</p>}

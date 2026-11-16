@@ -17,6 +17,9 @@ export interface LibraryRuleView {
   requirement: string;
   marking: string | null;
   appliesWhen: string | null;
+  /** The rule's quotation and source locator in this document (the API sends them; used by the S4 rule picker). */
+  quote?: string | null;
+  locator?: unknown;
 }
 export interface LibraryDocumentView {
   documentVersionId: string;

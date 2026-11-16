@@ -163,6 +163,15 @@ function pickedDocumentVersions(ctx: RubricContext, docs: LibraryDocument[]): Se
     const d = docs.find((x) => x.sha256 === sha || x.policyId === it.ruleId);
     if (d) picked.add(d.documentVersionId);
   }
+  // Forms that cite rules (the shared `policy_citation` field, e.g. Marketing; D21): a cited rule version ticks the
+  // published document it comes from.
+  for (const s of ctx.profile.sections)
+    for (const f of s.fields) {
+      if (f.type !== 'policy_citation') continue;
+      const cited = sections[s.key]?.[f.key];
+      for (const it of Array.isArray(cited) ? cited.filter(isObj) : [])
+        for (const d of docs) if (d.rules.some((r) => r.ruleVersionId === it.ruleVersion)) picked.add(d.documentVersionId);
+    }
   return picked;
 }
 

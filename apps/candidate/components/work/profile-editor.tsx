@@ -40,6 +40,7 @@ import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
 import { SaveBar } from './save-bar';
 import { PolicyPicker, type LibraryView } from './policy-picker';
+import { RuleCitationPicker } from './rule-citation-picker';
 import { RubricEditor, SourcePanel, rubricBlockers, useRubricView } from './rubric-editor';
 
 /** RUBRIC_RECOMMENDATIONS_ENABLED: the S4/S7/S8 controls change. Template text always shows public names (D5). */
@@ -511,6 +512,17 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
               )
             ) : v2 && isPolicyReferenceField(f) ? (
               <PolicyPicker key={f.key} taskId={task.id} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} onChange={(v) => setField(f.key, v)} readOnly={task.readOnly} initialLibrary={initialLibrary} />
+            ) : v2 && f.type === 'policy_citation' ? (
+              <RuleCitationPicker
+                key={f.key}
+                taskId={task.id}
+                field={f}
+                value={getFieldValue(profile, value, section.key as SectionKey, f)}
+                onChange={(v) => setField(f.key, v)}
+                readOnly={task.readOnly}
+                initialLibrary={initialLibrary}
+                renderNote={(sub, item, i, set) => <FieldControl field={sub} value={item[sub.key]} path={`${section.key}.${f.key}[${i}].${sub.key}`} problems={problems} lookup={(ref) => (ref.includes('.') ? lookup(ref) : item[ref])} onChange={set} />}
+              />
             ) : v2 && isSourcesField(f) && rubric.view ? (
               withSuggestion(f, <SourcesUsedField key={f.key} view={rubric.view} value={getFieldValue(profile, value, section.key as SectionKey, f)} onFill={(text) => setField(f.key, text)} readOnly={task.readOnly} onChangeSources={() => goTo(sectionIndex(rubric.view!.rubric.section))}>
                 <FieldControl field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} path={`${section.key}.${f.key}`} problems={problems} lookup={lookup} onChange={(v) => setField(f.key, v)} />

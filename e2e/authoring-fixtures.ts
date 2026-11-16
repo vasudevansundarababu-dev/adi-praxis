@@ -35,7 +35,7 @@ export async function gatedBackend(page: Page, taskId: string) {
   });
   await page.route(`**/api/v1/me/tasks/${taskId}/authoring-workspace`, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: route.request().postData() ?? '{}' }));
   await page.route(`**/api/v1/me/tasks/${taskId}/conversation`, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: state.revision ?? 0, output: state.output ?? {}, state: { humanOnly: true, consent: { version: 'human-only/1' } }, messages: [], run: null, policy: null }) }),
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ revision: state.revision ?? 0, output: state.output ?? {}, state: { humanOnly: true, consent: { version: 'human-review/2' } }, messages: [], run: null, policy: null }) }),
   );
   return state;
 }

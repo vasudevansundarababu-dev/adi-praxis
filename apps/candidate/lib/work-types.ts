@@ -73,6 +73,8 @@ export interface TaskView extends TaskSummary {
   readOnly: boolean;
   /** Rubric editor, S4 policy picker and SME form wording (RUBRIC_RECOMMENDATIONS_ENABLED; off by default). */
   formV2?: boolean;
+  /** FIELD_SUGGESTIONS_ENABLED: suggested text, field origin and section confirmation. */
+  fieldSuggestions?: boolean;
   review: { decision: string; comments: { section: string; text: string }[]; notes: string | null; rejectReason: string | null; at: string } | null;
 }
 

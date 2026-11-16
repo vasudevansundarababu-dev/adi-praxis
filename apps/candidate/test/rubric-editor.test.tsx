@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { PolicyPicker, identityKeys, type LibraryView } from '@/components/work/policy-picker';
 import { DECLARATION_V2, ProfileEditor } from '@/components/work/profile-editor';
-import { RubricEditor } from '@/components/work/rubric-editor';
+import { RubricEditor, rubricBlockers, recommendedOnly } from '@/components/work/rubric-editor';
 import type { TaskView } from '@/lib/work-types';
 import { a11yProblems } from './a11y';
 
@@ -72,7 +72,7 @@ const ITEMS = [
 ];
 
 const editor = (over: Partial<Parameters<typeof RubricEditor>[0]> = {}) =>
-  renderToStaticMarkup(<RubricEditor taskId="task" field={S7.fields[0]!} value={ITEMS} onChange={() => undefined} view={VIEW} reload={async () => undefined} readOnly={false} onOpenSource={() => undefined} initialOpen={['identification_verification', 'revision_integrity', 'account_authority']} {...over} />);
+  renderToStaticMarkup(<RubricEditor taskId="task" field={S7.fields[0]!} value={ITEMS} onChange={() => undefined} view={VIEW} reload={async () => undefined} readOnly={false} onOpenSource={() => undefined} initialOpen={['identification_verification', 'revision_integrity', 'account_authority']} initialView="cards" {...over} />);
 
 describe('simplified rubric editor (S7)', () => {
   it('shows the nine fields in the owner’s order, with template defaults, automatic links and read-only technical settings', () => {
@@ -105,7 +105,7 @@ describe('simplified rubric editor (S7)', () => {
     expect(t).toContain('AI suggestion');
   });
 
-  it('flags Source changed, Source link needed, Evaluation setup needed and the to-finish list', () => {
+  it('flags Source changed, Source link needed and Evaluation setup inside the criterion; blockers apart from recommendations (D14)', () => {
     const t = text(editor());
     expect(t).toContain('Source changed — check rubric');
     expect(t).toContain('Reviewed, keep as is');
@@ -113,9 +113,18 @@ describe('simplified rubric editor (S7)', () => {
     expect(t).toContain('Source link needed · Policy rule');
     expect(t).toContain('Evaluation setup needed');
     expect(t).toContain('Internal only · not sent to RL Gym');
-    expect(t).toMatch(/Still to finish \(\d+\)/);
-    expect(t).toContain('Fail description missing');
-    expect(t).toContain('Not covered by any criterion: S4 · Policy rules · R-SC-1');
+    // D14: what blocks Submit is red and first; the rest is collapsed and never blocks.
+    expect(t).toContain('2 things block Submit');
+    expect(t).toContain('identification_verification: Fail text is missing.');
+    expect(t).toContain('Weights add up to 15; they must add up to exactly 100.');
+    expect(t).toMatch(/Recommended, not required \(3\)\. These never block Submit\./);
+    expect(t).toContain('S4 · Policy rules · R-SC-1 isn’t linked to a criterion. The criteria are fixed, so link it as a source of an existing criterion, or leave it.');
+    expect(t).not.toContain('Still to finish');
+    expect(t).not.toContain('no technical mapping');
+    // Internal notes (suggested additions) are collapsed and say they never block.
+    expect(t).toContain('Internal notes: suggested additions (1). Optional; never blocks Submit.');
+    // Fewer badges per criterion: no applicability, template-default or internal-only badges in the headers.
+    expect(editor({ initialOpen: [] })).not.toMatch(/Template default<\/span><span class="ml-auto/);
   });
 
   it('conditional applicability shows Not applicable / Unknown wording; read-only mode has no edit controls', () => {
@@ -186,7 +195,9 @@ describe('task form with and without the flag', () => {
     const on = form(true, 7);
     expect(on).toContain('Sources used for this task Golden Bank custodial policy');
     expect(DECLARATION_V2).toBe('I won’t use real customer, employer or account information.');
-    expect(on).toContain('Not covered by any criterion');
+    // D14: S8 lists only what blocks Submit in the rubric (no coverage or source-link noise).
+    expect(on).not.toContain('Not covered by any criterion');
+    expect(on).toContain('identification_verification: Pass, Partial, Fail text is missing.');
     expect(form(false, 7)).not.toContain('Sources used for this task');
   });
 });
@@ -205,5 +216,83 @@ describe('D11: the open-slot edge-case field has its label and help', () => {
     // D12: the sections form has the always-visible Save bar, with a way to Check and submit.
     expect(html).toContain('data-save-bar');
     expect(text(html)).toContain('Check and submit');
+  });
+});
+
+// ───────────────────────── Rubric table (owner, 15 Nov 2026), D14 blockers, D16 remove ─────────────────────────
+describe('rubric table (S7 default view)', () => {
+  const table = (over: Partial<Parameters<typeof RubricEditor>[0]> = {}) =>
+    renderToStaticMarkup(<RubricEditor taskId="task" field={S7.fields[0]!} value={ITEMS} onChange={() => undefined} view={VIEW} reload={async () => undefined} readOnly={false} onOpenSource={() => undefined} {...over} />);
+
+  it('shows one row per criterion with the score levels as columns, weight and critical; the total and critical count', () => {
+    const html = table();
+    const t = text(html);
+    expect(html).toContain('data-rubric-table');
+    expect(t).toContain('What is assessed Pass · 5 pts Partial · 2 pts Fail · 0 pts Weight Critical');
+    for (const id of ['identification_verification', 'revision_integrity', 'account_authority']) expect(html).toContain(`data-rubric-row="${id}"`);
+    expect(t).toContain('1 Identity verified identification_verification Each party verified Some parties verified Missing 5 Yes Edit');
+    expect(t).toContain('Total weight 15 of 100');
+    expect(t).toContain('1 critical');
+    expect(t).toContain('How the score works');
+    expect(t).toContain('17 pass × 5 = 85');
+    // Nothing is open until a row is clicked.
+    expect(html).not.toContain('data-criterion-panel');
+  });
+
+  it('Edit opens the existing criterion editor in a side panel', () => {
+    const html = table({ initialOpen: ['revision_integrity'] });
+    expect(html).toContain('data-criterion-panel="revision_integrity"');
+    const t = text(html);
+    expect(t).toContain('Criterion name');
+    expect(t).toContain('How should we score it?');
+    expect(t).toContain('Technical grading settings · From template');
+  });
+
+  it('D16: a criterion not in the template is a blocker with Remove, in the table and in its editor', () => {
+    const items = [...ITEMS, { id: 'C1', name: '', weight: 5, passCondition: '', partialCredit: '', failCondition: '', critical: false }];
+    const html = table({ value: items });
+    const t = text(html);
+    expect(t).toContain('C1 isn’t one of this template’s criteria. Remove it to submit. Remove C1');
+    expect(html).toContain('data-rubric-row="C1"');
+    expect(t).toContain('Not in this template');
+    expect(t).toContain('Weights add up to 20; they must add up to exactly 100.');
+    // Template criteria have no Remove; the non-template one does.
+    const view = { ...VIEW, criteria: [...VIEW.criteria, criterion('C1', { exportable: false, defaults: null })] };
+    const cards = renderToStaticMarkup(<RubricEditor taskId="task" field={S7.fields[0]!} value={items} onChange={() => undefined} view={view} reload={async () => undefined} readOnly={false} onOpenSource={() => undefined} initialOpen={['C1', 'revision_integrity']} initialView="cards" />);
+    expect(text(cards)).toContain('Remove criterion');
+    expect(text(cards).match(/Remove criterion/g)!.length).toBe(1);
+  });
+
+  it('rubricBlockers / recommendedOnly: only real blockers block; coverage and source links are recommendations', () => {
+    const blockers = rubricBlockers(VIEW, S7.fields[0]!, ITEMS);
+    expect(blockers.map((b) => b.message)).toEqual(['identification_verification: Fail text is missing.', 'Weights add up to 15; they must add up to exactly 100.']);
+    expect(rubricBlockers(VIEW, S7.fields[0]!, ITEMS.map((i) => ({ ...i, critical: false }))).map((b) => b.message)).toContain('Tick Critical on at least one criterion.');
+    const rec = recommendedOnly(VIEW, [
+      { kind: 'SCORE_MISSING', criterionId: 'identification_verification', message: 'x' },
+      { kind: 'EVALUATION_SETUP', criterionId: 'x-1', message: 'no technical mapping' },
+      { kind: 'SOURCE_NEEDED', criterionId: 'account_authority', message: 'Source link needed' },
+    ]);
+    expect(rec.map((r) => r.kind)).toEqual(['SOURCE_NEEDED']);
+  });
+
+  it('Marketing: the 0-4 levels with optional 3 and 1, rows grouped A-G with each group’s total', () => {
+    const field = { key: 'criteria', type: 'criterion', label: 'Rubric', help: '', scale: 'zero_to_four', groups: [{ id: 'A', label: 'Intent', weight: 10 }, { id: 'B', label: 'Adaptation', weight: 20 }], weightTotal: 100, requireCritical: true } as unknown as Parameters<typeof RubricEditor>[0]['field'];
+    const view: RubricView = { ...VIEW, template: { ...VIEW.template, scale: 'zero_to_four', scoreKeys: scoreKeysFor('zero_to_four'), fixedSet: false }, criteria: [criterion('A1'), criterion('A2'), criterion('B1')], additions: [], coverage: { ...VIEW.coverage, gaps: [] } };
+    const items = [
+      { id: 'A1', group: 'A', name: 'Relevance', weight: 4, passCondition: 'On goal', level2: 'Mostly', failCondition: 'Off goal', critical: false },
+      { id: 'A2', group: 'A', name: 'Source interpretation', weight: 4, passCondition: 'Read right', level2: 'One misread', failCondition: 'Invented', critical: false },
+      { id: 'B1', group: 'B', name: 'Detection', weight: 5, passCondition: 'Within two windows', level2: 'Late', failCondition: 'Missed', critical: true },
+    ];
+    const html = renderToStaticMarkup(<RubricEditor taskId="task" field={field} value={items} onChange={() => undefined} view={view} reload={async () => undefined} readOnly={false} onOpenSource={() => undefined} />);
+    const t = text(html);
+    expect(t).toContain('Level 4 · 4 pts Level 2 · 2 pts Level 0 · 0 pts');
+    expect(t).toContain('Group A · Intent 8 of 10');
+    expect(t).toContain('Group B · Adaptation 5 of 20');
+    expect(t).toContain('Levels 3 and 1 are optional; add them with Edit.');
+    expect(t).toContain('Points = weight × level ÷ 4');
+    expect(t).toContain('Group A (Intent) adds up to 8; it must be 10.');
+    // Not a fixed set: no "not in template" blockers and custom criteria can still be added.
+    expect(t).not.toContain('isn’t one of this template’s criteria');
+    expect(t).toContain('Add a custom criterion');
   });
 });

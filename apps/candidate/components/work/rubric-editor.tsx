@@ -57,18 +57,22 @@ interface Props {
   reload: () => Promise<void>;
   readOnly: boolean;
   onOpenSource: (link: ViewLink) => void;
-  /** Criteria shown expanded at first (tests and deep links). */
+  /** Criteria shown expanded at first (tests and deep links); in the table view the first opens in the side panel. */
   initialOpen?: string[];
+  /** The table (owner, 15 Nov 2026) is the default; the card list is the earlier view. */
+  initialView?: 'table' | 'cards';
 }
 
 const asItems = (v: unknown) => (Array.isArray(v) ? (v.filter((x) => x && typeof x === 'object') as Record<string, unknown>[]) : []);
 
-export function RubricEditor({ taskId, field, value, onChange, view, reload, readOnly, onOpenSource, initialOpen = [] }: Props) {
+export function RubricEditor({ taskId, field, value, onChange, view, reload, readOnly, onOpenSource, initialOpen = [], initialView = 'table' }: Props) {
   const items = asItems(value);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>(() => Object.fromEntries(initialOpen.map((id) => [id, true])));
   const [appl, setAppl] = useState<RubricCriterionView | null>(null);
+  const [mode, setMode] = useState<'table' | 'cards'>(initialView);
+  const [panel, setPanel] = useState<string | null>(initialView === 'table' ? (initialOpen[0] ?? null) : null);
   const [aiScoring, setAiScoring] = useState<Record<string, Record<string, string>>>({});
   const todo = useMemo(() => rubricToFinish(view, items), [view, items]);
   const seeded = useRef(false);
@@ -117,6 +121,45 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
     await reload();
   };
 
+  const blockers = useMemo(() => rubricBlockers(view, field, items), [view, field, items]);
+  const recommended = useMemo(() => recommendedOnly(view, todo), [view, todo]);
+  const notInTemplate = (id: string) => isNotInTemplate(view, id);
+  const removeItem = (id: string) => {
+    onChange(items.filter((i) => i.id !== id));
+    setPanel((p) => (p === id ? null : p));
+    setMsg(`${id} removed. The template’s own criteria stay as they are.`);
+  };
+  const body = (c: RubricCriterionView) => {
+    const item = items.find((i) => i.id === c.id) ?? { id: c.id };
+    return (
+      <CriterionBody
+        field={field}
+        c={c}
+        item={item}
+        view={view}
+        readOnly={readOnly}
+        aiScoring={aiScoring[c.id] ?? {}}
+        setItem={(p) => setItem(c.id, p)}
+        saveDetail={(b) => saveDetail(c, b)}
+        keep={async () => {
+          const r = await send('POST', `${base}/criteria/${encodeURIComponent(c.id)}/keep`, { expectedVersion: c.annotationVersion });
+          if (!r.ok) setMsg(r.message);
+          await reload();
+        }}
+        restore={async (version) => {
+          const r = await send<{ item: Record<string, unknown> | null }>('POST', `${base}/criteria/${encodeURIComponent(c.id)}/restore`, { submissionVersion: version });
+          if (!r.ok) return setMsg(r.message);
+          if (r.data?.item) setItem(c.id, r.data.item);
+          setMsg(`Restored ${c.id} as saved in version ${version}.`);
+          await reload();
+        }}
+        // D16: a criterion that is not in the template can always be removed; the template's own stay.
+        remove={!view.template.fixedSet || notInTemplate(c.id) ? () => removeItem(c.id) : null}
+        onChangeApplicability={() => setAppl(c)}
+        onOpenSource={onOpenSource}
+      />
+    );
+  };
   const covered = `${view.coverage.covered} of ${view.coverage.total} required items covered`;
   const scale = view.template.scoreKeys.map((k) => `${k.label} ${k.points}`).join(' · ');
   return (
@@ -129,8 +172,8 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
           </p>
         </div>
         <span className={view.coverage.gaps.length ? PILL.warn : PILL.ok}>Coverage: {covered}</span>
-        <span className={todo.length ? PILL.warn : PILL.ok} data-to-finish-count>
-          {todo.length} to finish
+        <span className={blockers.length ? PILL.err : PILL.ok} data-to-finish-count>
+          {blockers.length ? `${blockers.length} blocking Submit` : 'Nothing blocking'}
         </span>
         {!readOnly && (
           <>
@@ -154,9 +197,36 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
 
       <SourcesCard taskId={taskId} view={view} readOnly={readOnly} reload={reload} onOpenSource={onOpenSource} />
 
-      {todo.length > 0 && <ToFinishList todo={todo} onJump={(id) => setOpen((o) => ({ ...o, [id]: true }))} />}
+      <RubricBlockers blockers={blockers} readOnly={readOnly} onRemove={removeItem} onEdit={(id) => (mode === 'table' ? setPanel(id) : setOpen((o) => ({ ...o, [id]: true })))} />
+      {recommended.length > 0 && <ToFinishList todo={recommended} onJump={(id) => (mode === 'table' ? setPanel(id) : setOpen((o) => ({ ...o, [id]: true })))} />}
+      <HowScoreWorks view={view} field={field} />
 
-      <ol className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Rubric view">
+        {(['table', 'cards'] as const).map((m) => (
+          <button key={m} type="button" className={`${btn} ${mode === m ? 'border-link font-semibold' : ''}`} aria-pressed={mode === m} onClick={() => setMode(m)}>
+            {m === 'table' ? 'Table' : 'One card per criterion'}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'table' && <RubricTable view={view} field={field} items={items} readOnly={readOnly} onEdit={setPanel} onRemove={removeItem} />}
+      {mode === 'table' && panel && view.criteria.some((c) => c.id === panel) && (
+        <aside role="dialog" aria-modal="true" aria-labelledby="crit-panel-h" className="fixed inset-y-0 right-0 z-30 flex w-full max-w-2xl flex-col border-l border-line bg-surface shadow-xl" data-criterion-panel={panel}>
+          <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
+            <span className="font-mono text-xs text-fg-muted">{panel}</span>
+            <h3 id="crit-panel-h" className="min-w-0 flex-1 text-base font-semibold">
+              {String(items.find((i) => i.id === panel)?.name ?? '') || panel}
+            </h3>
+            <button type="button" className={btn} onClick={() => setPanel(null)}>
+              Close
+            </button>
+          </div>
+          <div className="overflow-auto">{body(view.criteria.find((c) => c.id === panel)!)}</div>
+          <p className="border-t border-line px-4 py-2 text-xs text-fg-muted">Changes save automatically, as everywhere on this form.</p>
+        </aside>
+      )}
+
+      {mode === 'cards' && <ol className="space-y-3">
         {view.criteria.map((c) => {
           const item = items.find((i) => i.id === c.id) ?? { id: c.id };
           const isOpen = open[c.id] ?? false;
@@ -165,45 +235,17 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
               <button type="button" className="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-left" aria-expanded={isOpen} onClick={() => setOpen((o) => ({ ...o, [c.id]: !isOpen }))}>
                 <span className="font-mono text-xs text-fg-muted">{c.id}</span>
                 <strong className="text-sm">{String(item.name ?? '') || c.id}</strong>
-                <ApplicabilityPill kind={c.details.applicability.kind} />
-                {item.critical === true && <span className={PILL.err}>Whole-task failure</span>}
+                {/* D14: only what needs the SME's action shows here; the rest is inside the criterion. */}
+                {notInTemplate(c.id) && <span className={PILL.err}>Not in this template · remove it</span>}
+                {item.critical === true && <span className={PILL.err}>Critical</span>}
                 {c.sourceChanged && <span className={PILL.warn}>Source changed — check rubric</span>}
-                {c.needs.length > 0 && <span className={PILL.warn}>Source link needed</span>}
-                {!c.exportable && <span className={PILL.mute}>Internal only · not sent to RL Gym</span>}
-                {c.defaults ? c.changedFromDefault.length ? <span className={PILL.info}>Edited</span> : <span className={PILL.mute}>Template default</span> : null}
                 <span className="ml-auto text-xs text-fg-muted">{isOpen ? 'Close' : 'Open'}</span>
               </button>
-              {isOpen && (
-                <CriterionBody
-                  field={field}
-                  c={c}
-                  item={item}
-                  view={view}
-                  readOnly={readOnly}
-                  aiScoring={aiScoring[c.id] ?? {}}
-                  setItem={(p) => setItem(c.id, p)}
-                  saveDetail={(b) => saveDetail(c, b)}
-                  keep={async () => {
-                    const r = await send('POST', `${base}/criteria/${encodeURIComponent(c.id)}/keep`, { expectedVersion: c.annotationVersion });
-                    if (!r.ok) setMsg(r.message);
-                    await reload();
-                  }}
-                  restore={async (version) => {
-                    const r = await send<{ item: Record<string, unknown> | null }>('POST', `${base}/criteria/${encodeURIComponent(c.id)}/restore`, { submissionVersion: version });
-                    if (!r.ok) return setMsg(r.message);
-                    if (r.data?.item) setItem(c.id, r.data.item);
-                    setMsg(`Restored ${c.id} as saved in version ${version}.`);
-                    await reload();
-                  }}
-                  remove={!view.template.fixedSet ? () => onChange(items.filter((i) => i.id !== c.id)) : null}
-                  onChangeApplicability={() => setAppl(c)}
-                  onOpenSource={onOpenSource}
-                />
-              )}
+              {isOpen && body(c)}
             </li>
           );
         })}
-      </ol>
+      </ol>}
 
       {!readOnly && !view.template.fixedSet && (
         <button type="button" className={btn} onClick={() => onChange([...items, newItem(field, items)])}>
@@ -212,10 +254,10 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
       )}
 
       {view.additions.length > 0 && (
-        <section className="space-y-2" aria-labelledby="rubric-additions-h">
-          <h3 id="rubric-additions-h" className="text-sm font-semibold">
-            Suggested additions
-          </h3>
+        <details className="space-y-2 rounded-md border border-line p-3" data-rubric-internal-notes>
+          <summary className="cursor-pointer text-sm font-semibold" id="rubric-additions-h">
+            Internal notes: suggested additions ({view.additions.length}). Optional; never blocks Submit.
+          </summary>
           {view.additions.map((a) => (
             <div key={a.id} className="rounded-md border border-dashed border-line p-3 text-sm" data-addition={a.id}>
               <div className="flex flex-wrap items-center gap-2">
@@ -252,7 +294,7 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
               )}
             </div>
           ))}
-        </section>
+        </details>
       )}
 
       {appl && (
@@ -265,6 +307,226 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ───────────────────────── Rubric table, blockers and recommendations (owner, 15 Nov 2026; D14, D16) ─────────────────────────
+
+/** With a fixed set (KYC v7), a criterion RL Gym can't score is not one of the template's: it must go (D16). */
+export function isNotInTemplate(view: RubricView, id: string): boolean {
+  return view.template.fixedSet && !view.criteria.find((c) => c.id === id)?.exportable;
+}
+
+export interface RubricBlocker {
+  criterionId: string | null;
+  message: string;
+  fix: 'REMOVE' | 'EDIT' | null;
+}
+
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+const filled = (v: unknown) => typeof v === 'string' && v.trim() !== '';
+
+/** What blocks Submit in the rubric, in plain words (D14). Everything else is a recommendation. */
+export function rubricBlockers(view: RubricView, field: ItemField, items: Record<string, unknown>[]): RubricBlocker[] {
+  const out: RubricBlocker[] = [];
+  const required = view.template.scoreKeys.filter((k) => k.required);
+  const ids = [...view.criteria.map((c) => c.id), ...items.map((i) => String(i.id ?? '')).filter((id) => id && !view.criteria.some((c) => c.id === id))];
+  for (const id of ids) {
+    if (isNotInTemplate(view, id)) {
+      out.push({ criterionId: id, message: `${id} isn’t one of this template’s criteria. Remove it to submit.`, fix: 'REMOVE' });
+      continue;
+    }
+    const item = items.find((i) => i.id === id) ?? {};
+    if (!filled(item.name)) out.push({ criterionId: id, message: `${id}: “What is assessed” is empty.`, fix: 'EDIT' });
+    const missing = required.filter((k) => !filled(item[k.key])).map((k) => k.label);
+    if (missing.length) out.push({ criterionId: id, message: `${id}: ${missing.join(', ')} text is missing.`, fix: 'EDIT' });
+  }
+  const total = field.weightTotal ?? 100;
+  const sum = items.reduce((a, i) => a + num(i.weight), 0);
+  if (items.length && sum !== total) out.push({ criterionId: null, message: `Weights add up to ${sum}; they must add up to exactly ${total}.`, fix: null });
+  for (const g of field.groups ?? []) {
+    const gs = items.filter((i) => i.group === g.id).reduce((a, i) => a + num(i.weight), 0);
+    if (gs !== g.weight) out.push({ criterionId: null, message: `Group ${g.id} (${g.label}) adds up to ${gs}; it must be ${g.weight}.`, fix: null });
+  }
+  if ((field.requireCritical || view.template.fixedSet) && items.length && !items.some((i) => i.critical === true)) out.push({ criterionId: null, message: 'Tick Critical on at least one criterion.', fix: null });
+  return out;
+}
+
+/** The to-finish items that never block Submit, in plain words; internal notes and technical jargon are left out (D14). */
+export function recommendedOnly(view: RubricView, todo: ToFinish[]): ToFinish[] {
+  return todo
+    .filter((t) => t.kind !== 'SCORE_MISSING' && t.kind !== 'EVALUATION_SETUP' && !(t.criterionId && isNotInTemplate(view, t.criterionId)) && !(t.criterionId?.startsWith('x-')))
+    .map((t) => (t.kind === 'COVERAGE_GAP' && view.template.fixedSet ? { ...t, message: `${t.message.replace(/^Not covered by any criterion: /, '')} isn’t linked to a criterion. The criteria are fixed, so link it as a source of an existing criterion, or leave it.` } : t));
+}
+
+function RubricBlockers({ blockers, readOnly, onRemove, onEdit }: { blockers: RubricBlocker[]; readOnly: boolean; onRemove: (id: string) => void; onEdit: (id: string) => void }) {
+  if (!blockers.length)
+    return (
+      <p role="status" className="rounded-md border border-success/50 p-3 text-sm" data-rubric-blockers="0">
+        Nothing in the rubric blocks Submit.
+      </p>
+    );
+  return (
+    <div role="alert" className="rounded-md border border-error p-3 text-sm" data-rubric-blockers={blockers.length}>
+      <p className="font-semibold text-error">
+        {blockers.length} thing{blockers.length > 1 ? 's' : ''} block{blockers.length > 1 ? '' : 's'} Submit
+      </p>
+      <ul className="mt-1 space-y-1">
+        {blockers.map((b, i) => (
+          <li key={i} className="flex flex-wrap items-center gap-2">
+            <span>{b.message}</span>
+            {!readOnly && b.criterionId && b.fix === 'REMOVE' && (
+              <button type="button" className={btn} onClick={() => onRemove(b.criterionId!)}>
+                Remove {b.criterionId}
+              </button>
+            )}
+            {b.criterionId && b.fix === 'EDIT' && (
+              <button type="button" className={btn} onClick={() => onEdit(b.criterionId!)}>
+                Edit {b.criterionId}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function HowScoreWorks({ view, field }: { view: RubricView; field: ItemField }) {
+  const four = view.template.scale === 'zero_to_four';
+  return (
+    <details className="rounded-md border border-line p-3 text-sm" data-how-score>
+      <summary className="cursor-pointer font-medium">How the score works</summary>
+      {four ? (
+        <div className="mt-2 space-y-1">
+          <p>
+            Each criterion is scored on a level from <strong>0 to 4</strong>. Points = <strong>weight × level ÷ 4</strong>. Weights add up to {field.weightTotal ?? 100}
+            {field.groups?.length ? ` (${field.groups.map((g) => `${g.id} ${g.weight}`).join(' · ')})` : ''}.
+          </p>
+          <p className="text-fg-muted">Example: a criterion with weight 5 at Level 4 earns 5 points; at Level 2 it earns 2.5; at Level 0, nothing. Failing a critical criterion fails the task.</p>
+        </div>
+      ) : (
+        <div className="mt-2 space-y-1">
+          <p>
+            Each criterion is scored <strong>{view.template.scoreKeys.map((k) => `${k.points} (${k.label.toLowerCase()})`).join(', ')}</strong>. The points add up to {field.weightTotal ?? 100}.
+          </p>
+          <p className="text-fg-muted">Example: 17 pass × 5 = 85, 2 partial × 2 = 4, 1 fail × 0 = 0, so 89 of 100. {view.template.wholeTaskRule}</p>
+        </div>
+      )}
+    </details>
+  );
+}
+
+/** One row per criterion: what is assessed, the score levels, weight, critical; Edit opens the criterion editor. */
+export function RubricTable({ view, field, items, readOnly, onEdit, onRemove }: { view: RubricView; field: ItemField; items: Record<string, unknown>[]; readOnly: boolean; onEdit: (id: string) => void; onRemove: (id: string) => void }) {
+  const [filter, setFilter] = useState<'all' | 'critical' | 'attention'>('all');
+  const [full, setFull] = useState(false);
+  const keys = view.template.scoreKeys.filter((k) => k.required);
+  const rows = [...view.criteria.map((c) => c.id), ...items.map((i) => String(i.id ?? '')).filter((id) => id && !view.criteria.some((c) => c.id === id))].map((id) => ({ id, item: items.find((i) => i.id === id) ?? { id } }));
+  const attention = (id: string, item: Record<string, unknown>) => isNotInTemplate(view, id) || !filled(item.name) || keys.some((k) => !filled(item[k.key]));
+  const shown = rows.filter((r) => (filter === 'critical' ? r.item.critical === true : filter === 'attention' ? attention(r.id, r.item) : true));
+  const total = items.reduce((a, i) => a + num(i.weight), 0);
+  const target = field.weightTotal ?? 100;
+  const critical = items.filter((i) => i.critical === true).length;
+  const groups = filter === 'all' && field.groups?.length ? field.groups : null;
+  const clip = full ? '' : 'line-clamp-2';
+  const row = ({ id, item }: { id: string; item: Record<string, unknown> }, n: number) => {
+    const bad = isNotInTemplate(view, id);
+    const editable = view.criteria.some((c) => c.id === id) && !bad;
+    return (
+      <tr key={id} className={`border-b border-line align-top ${bad ? 'bg-error/10' : 'cursor-pointer hover:bg-line/30'}`} data-rubric-row={id} onClick={() => editable && onEdit(id)}>
+        <td className="px-2 py-2 text-center text-xs text-fg-muted">{n}</td>
+        <td className="px-2 py-2">
+          <strong className="block">{filled(item.name) ? String(item.name) : <span className="text-error">Not set</span>}</strong>
+          <span className="font-mono text-xs text-fg-muted">{id}</span>
+          {bad && <span className={`${PILL.err} mt-1`}>Not in this template</span>}
+        </td>
+        {keys.map((k) => (
+          <td key={k.key} className="px-2 py-2">
+            <span className={clip}>{filled(item[k.key]) ? String(item[k.key]) : <span className="text-error">Missing</span>}</span>
+          </td>
+        ))}
+        <td className="px-2 py-2 text-center font-semibold">{num(item.weight)}</td>
+        <td className="px-2 py-2 text-center">{item.critical === true ? <span className="font-semibold text-error">Yes</span> : <span className="text-fg-muted">–</span>}</td>
+        <td className="px-2 py-2">
+          {bad
+            ? !readOnly && (
+                <button type="button" className={btn} onClick={(e) => (e.stopPropagation(), onRemove(id))}>
+                  Remove
+                </button>
+              )
+            : editable && (
+                <button type="button" className={btn} aria-label={`Edit ${id}`} onClick={(e) => (e.stopPropagation(), onEdit(id))}>
+                  {readOnly ? 'Open' : 'Edit'}
+                </button>
+              )}
+        </td>
+      </tr>
+    );
+  };
+  let n = 0;
+  return (
+    <div className="space-y-2" data-rubric-table>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span className={total === target ? PILL.ok : PILL.err}>
+          Total weight {total} of {target}
+        </span>
+        <span className={critical ? PILL.err : PILL.warn}>{critical} critical</span>
+        <span className="flex flex-wrap gap-1" role="group" aria-label="Show">
+          {(['all', 'critical', 'attention'] as const).map((f) => (
+            <button key={f} type="button" className={`${btn} ${filter === f ? 'border-link font-semibold' : ''}`} aria-pressed={filter === f} onClick={() => setFilter(f)}>
+              {f === 'all' ? 'All' : f === 'critical' ? 'Critical only' : 'Needs attention'}
+            </button>
+          ))}
+        </span>
+        <label className="flex items-center gap-1.5 text-xs">
+          <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} /> Show full text
+        </label>
+      </div>
+      <div className="overflow-x-auto rounded-md border border-line">
+        <table className="w-full min-w-[56rem] text-left text-sm">
+          <thead className="bg-line/40 text-xs">
+            <tr>
+              <th className="w-8 px-2 py-2">#</th>
+              <th className="w-56 px-2 py-2">What is assessed</th>
+              {keys.map((k) => (
+                <th key={k.key} className="px-2 py-2">
+                  {k.label} · {k.points} {k.points === 1 ? 'pt' : 'pts'}
+                </th>
+              ))}
+              <th className="w-16 px-2 py-2 text-center">Weight</th>
+              <th className="w-16 px-2 py-2 text-center">Critical</th>
+              <th className="w-20 px-2 py-2">
+                <span className="sr-only">Action</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups
+              ? [
+                  ...groups.flatMap((g) => {
+                    const gr = shown.filter((r) => r.item.group === g.id);
+                    const sum = gr.reduce((a, r) => a + num(r.item.weight), 0);
+                    return [
+                      <tr key={`g-${g.id}`} className="border-b border-line bg-line/20 text-xs font-semibold" data-rubric-group={g.id}>
+                        <td colSpan={keys.length + 5} className="px-2 py-1.5">
+                          Group {g.id} · {g.label}{' '}
+                          <span className={sum === g.weight ? 'text-success' : 'text-error'}>
+                            {sum} of {g.weight}
+                          </span>
+                        </td>
+                      </tr>,
+                      ...gr.map((r) => row(r, ++n)),
+                    ];
+                  }),
+                  ...shown.filter((r) => !groups.some((g) => g.id === r.item.group)).map((r) => row(r, ++n)),
+                ]
+              : shown.map((r) => row(r, ++n))}
+          </tbody>
+        </table>
+      </div>
+      {view.template.scoreKeys.some((k) => !k.required) && <p className="text-xs text-fg-muted">Levels {view.template.scoreKeys.filter((k) => !k.required).map((k) => k.points).join(' and ')} are optional; add them with Edit.</p>}
     </div>
   );
 }
@@ -286,8 +548,8 @@ export function LinkChip({ link, onOpen }: { link: ViewLink; onOpen: (l: ViewLin
 
 function ToFinishList({ todo, onJump }: { todo: ToFinish[]; onJump: (id: string) => void }) {
   return (
-    <details className="rounded-md border border-warning/60 p-3 text-sm" data-to-finish>
-      <summary className="cursor-pointer font-medium">Still to finish ({todo.length}). Saving never waits for these; submit runs the same checks as before.</summary>
+    <details className="rounded-md border border-line p-3 text-sm" data-to-finish>
+      <summary className="cursor-pointer font-medium">Recommended, not required ({todo.length}). These never block Submit.</summary>
       <ul className="mt-2 space-y-1">
         {todo.map((t, i) => (
           <li key={i}>

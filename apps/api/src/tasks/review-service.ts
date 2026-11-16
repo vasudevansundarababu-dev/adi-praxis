@@ -1,6 +1,6 @@
 import { hasQuotas } from './definitions';
 import { Prisma } from '@prisma/client';
-import { praxisContractChecks, EXECUTABLE_WORKFLOW, coverageStatus, CoverageDimensions, CoverageQuotas, effectiveCoverage, mayApprove, type CoverageTags } from '@praxis/shared';
+import { coverageStatus, CoverageDimensions, CoverageQuotas, effectiveCoverage, mayApprove, type CoverageTags } from '@praxis/shared';
 import { z } from 'zod';
 import type { InternalActor } from '../auth/actor';
 import type { Db, Tx } from '../db';
@@ -9,6 +9,7 @@ import { AppError, forbidden, notFound } from '../lib/errors';
 import type { writeAudit } from '../platform/audit';
 import type { OutboxInput } from '../outbox/outbox';
 import type { StoredChecks } from './submission';
+import { revalidateTask, reworkForValidation, type ApprovalBlocked } from './revalidation';
 
 type Audit = (i: Parameters<typeof writeAudit>[2]) => Promise<void>;
 
@@ -119,15 +120,19 @@ export async function decideOneStep(
   if (flaggedDuplicate && expectedDup && body.duplicateDecision !== expectedDup) {
     throw new AppError(400, 'DUPLICATE_DECISION_REQUIRED', 'This task was flagged as a likely duplicate: confirm your duplicate decision.');
   }
-  if (body.decision === 'ACCEPT') {
-    const issues = praxisContractChecks((t.output ?? {}) as Record<string, unknown>, t.project.template.workflowName === EXECUTABLE_WORKFLOW).filter((c) => !c.ok);
-    if (issues.length) throw new AppError(422, 'CONTRACT_INVALID', 'Executable contract needs attention before acceptance.', { checks: issues });
-  }
   const version = opts.version;
   const extra = opts.auditExtra ?? {};
   const now = new Date();
   const isOpen = t.slot?.isOpen ?? false;
   if (body.decision === 'ACCEPT' && isOpen && hasQuotas(t.project.template) && !body.confirmedCoverage) throw new AppError(400, 'CONFIRM_TAGS', 'Open slot: confirm (or correct) the author’s coverage tags and edge case before accepting.');
+  if (body.decision === 'ACCEPT') {
+    // D18: the approval re-runs the submit and export checks; a blocking failure sends the task back to its author.
+    const rv = await revalidateTask(tx, t);
+    if (rv.failing.length) {
+      await reworkForValidation(tx, t, { trigger: 'approval', actorId: reviewer.id, byUser: reviewer.kind === 'USER', version, checks: rv.checks, failing: rv.failing, ...(opts.contentHash ? { contentHash: opts.contentHash } : {}), auditExtra: extra }, audit);
+      return { status: 'REWORK', approvalBlocked: true, version, checks: rv.failing } satisfies ApprovalBlocked;
+    }
+  }
   const coverage = body.decision === 'ACCEPT' && isOpen && body.confirmedCoverage ? { tags: body.confirmedCoverage.tags, edgeCase: body.confirmedCoverage.edgeCase } : null;
 
   await tx.taskReview.create({

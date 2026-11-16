@@ -27,6 +27,10 @@ export interface StoredChecks {
   embeddingModel: string | null;
   /** Anvil export readiness of a profile-driven task (compiled at submission); absent for other tasks. */
   export?: ExportStatus;
+  /** The optional check families that ran at submission (D18: approval and export re-run the same ones). */
+  options?: { rubricChecks: boolean; suggestionChecks: boolean };
+  /** D18: the latest re-validation at approval or export that sent the task back to its author. */
+  revalidation?: { trigger: 'approval' | 'export'; at: string; failing: string[] };
 }
 
 export const blocking = (c: TaskCheck) => !c.ok && c.severity !== 'warning';
@@ -93,7 +97,7 @@ export async function submitTask(
   // Export readiness is separate from authoring: a blocked compile never blocks the submission.
   const compiled = t.taskType === 'AUTHORING' ? compileForSubmission(ev.template, t.output as Record<string, unknown>, { taskId: t.id, revisionId: `${t.id}-r${t.revision}` }) : null;
   const output = (compiled?.output ?? t.output) as Prisma.InputJsonValue;
-  const stored: StoredChecks = { results: ev.checks, keyInputs: ev.keyInputs, similar, embeddingModel: args.embeddingModel, ...(compiled ? { export: compiled.status } : {}) };
+  const stored: StoredChecks = { results: ev.checks, keyInputs: ev.keyInputs, similar, embeddingModel: args.embeddingModel, ...(compiled ? { export: compiled.status } : {}), options: { rubricChecks: !!args.rubricChecks, suggestionChecks: !!args.suggestionChecks } };
   const flags = ev.flags.map((f) => ({ ...f, explanation: args.body.flagExplanations[f.id] }));
   const now = new Date();
   const { count } = await tx.taskInstance.updateMany({

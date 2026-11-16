@@ -1960,3 +1960,38 @@ The owner accepted all seven recommendations:
   missing required score text, weights not totalling 100 (or a group not totalling its weight), no critical criterion.
   Everything else (source links, applicability, coverage gaps, duplicates) is "Recommended, not required", collapsed.
   The earlier card list stays available as "One card per criterion".
+
+## D18: a task that fails validation goes back to its author, at approval and at export (16 Nov 2026)
+
+Owner (QA defect D18): "If validation fails even if its approved then we need make the task needed for re work. So
+that the Author has to rework."
+
+- **(owner)** Every approval re-runs the task's checks first: the one-step accept (Reviews screen and Tasks tab), the
+  Reviewer's pass (console Expert and candidate-app Reviewer) and the PM's final approval. Any blocking failure stops
+  the approval and moves the task to Rework; warnings never block. The same re-check runs before an RL Gym export; a
+  task that fails there goes to Rework instead of being exported.
+- **(owner)** The append-only dataset is never edited: a task whose approved record fails at export goes back to
+  Rework as a new revision, its record stays, and the record of its next approval is the one exported.
+- **(chosen by Claude, build)** What is re-run: the submit checks (coverage and case selector, profile, bound rules,
+  RL Gym spec, rubric checks when they ran at submission) on the authored content, the executable contract checks, and
+  the per-task export checks: the contract compile of a profile-driven task and, for a template with an RL Gym joint
+  spec, the generic package entry. Contract compile blockers are shown as warnings, not blockers: the earlier owner
+  decision that a blocked compile never blocks the task (golden KYC, `MISSING_BINDING`) stands. Not re-run: checks that attest what the author did at submission (consent,
+  authorship declaration, conversation review, field-suggestion section confirmations), and package problems the author
+  cannot fix in the task (template not joint or not published, form version or private-field exposure); those stay in
+  the export report as before. The optional check families follow what ran at submission (`checks.options`, inferred
+  for tasks submitted before this change).
+- **(chosen by Claude, build)** A blocked approval is a REWORK `TaskReview` by the person whose approval or export
+  triggered it, with each failing check as a comment under its section (the author's form already places comments by
+  section) and the notes "Approval blocked …" / "Export blocked …". The task stores the re-run checks; the audit event
+  is `task.rework_validation_failed` (trigger, version, failing check IDs, and on export the kept record ID); the export
+  also writes `project.export_blocked`. The move happens only from SUBMITTED (approval) or ACCEPTED (export) at the
+  revision read, so a retry changes nothing; the request's Idempotency-Key replays the same answer.
+- **(chosen by Claude, build)** The Reviewer's request is answered 422 `APPROVAL_BLOCKED` with the reasons in the
+  message and `details.checks`, but the move to Rework is committed (it is the decision's outcome, not a failed
+  request). The export answers 422 `EXPORT_BLOCKED_REWORK` with the tasks sent back; no export run is written, and the
+  project can export again once those tasks are approved. The earlier `CONTRACT_INVALID` refusal on accept is now part
+  of this re-check (Rework, not a bare refusal).
+- **(chosen by Claude, build)** An earning recorded at the first approval is not reversed (earnings are one per task;
+  reversal stays a person's decision in the ledger). A project already marked complete keeps its status; its export
+  waits for the reworked tasks.

@@ -11,17 +11,46 @@ import { forgeSettings } from '../forge/settings';
 import { validationItem, type AnvilRunRecord, type AnvilTaskValidator, type ValidationItem } from '../anvil/validator';
 import { toRecordDto } from './dataset';
 import { loadProject } from './projects';
+import type { AuditInput } from '../platform/audit';
+import { revalidateTask, reworkForValidation } from '../tasks/revalidation';
+import type { TaskCheck } from '@praxis/shared';
 
 const Params = z.object({ id: z.string().uuid() });
 const ACCESS = ['ADMIN', 'PM'] as const;
 const today = () => new Date().toISOString().slice(0, 10);
 const titleOf = (r: ApprovedTaskRecord) => String((r.output as { header?: { title?: unknown } } | null)?.header?.title ?? '') || `Task ${r.taskInstanceId.slice(0, 8)}`;
 
-/** The project's approved tasks as they stand: a corrected record is replaced by its correction. */
+/**
+ * The project's approved tasks as they stand: a corrected record is replaced by its correction. D18: a task sent back
+ * to Rework after approval keeps its earlier record (append-only) but is not exported until it is approved again, and
+ * then only its latest record is.
+ */
 async function currentRecords(tx: Db | Tx, clientId: string, projectId: string) {
   const rows = await tx.approvedTaskRecord.findMany({ where: { clientId, projectId }, orderBy: { seq: 'asc' } });
   const superseded = new Set(rows.map((r) => r.supersedesId).filter(Boolean));
-  return rows.filter((r) => !superseded.has(r.id));
+  const accepted = new Set((await tx.taskInstance.findMany({ where: { clientId, projectId, id: { in: [...new Set(rows.map((r) => r.taskInstanceId))] }, status: 'ACCEPTED' }, select: { id: true } })).map((t) => t.id));
+  const latest = new Map<string, string>();
+  for (const r of rows) if (!superseded.has(r.id)) latest.set(r.taskInstanceId, r.id);
+  return rows.filter((r) => !superseded.has(r.id) && accepted.has(r.taskInstanceId) && latest.get(r.taskInstanceId) === r.id);
+}
+
+/**
+ * D18: before an export, every approved task is re-checked (submit checks and export package checks) on its approved
+ * content. A task that fails goes back to Rework; its approved record stays. Returns the tasks sent back.
+ */
+async function revalidateForExport(tx: Tx, actorId: string, records: ApprovedTaskRecord[], audit: (i: AuditInput) => Promise<void>) {
+  const tasks = await tx.taskInstance.findMany({ where: { id: { in: records.map((r) => r.taskInstanceId) } }, include: { project: { include: { template: true } }, submissions: { orderBy: { version: 'desc' }, take: 1, select: { version: true } } } });
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const sent: { recordId: string; taskId: string; title: string; checks: TaskCheck[] }[] = [];
+  for (const r of records) {
+    const t = byId.get(r.taskInstanceId);
+    if (!t || t.status !== 'ACCEPTED') continue;
+    const rv = await revalidateTask(tx, t, r.output, r);
+    if (!rv.failing.length) continue;
+    await reworkForValidation(tx, t, { trigger: 'export', actorId, byUser: true, version: t.submissions[0]?.version ?? 1, checks: rv.checks, failing: rv.failing, recordId: r.id }, audit);
+    sent.push({ recordId: r.id, taskId: t.id, title: titleOf(r), checks: rv.failing });
+  }
+  return sent;
 }
 
 /**
@@ -103,6 +132,13 @@ export const projectExportRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Objec
       const p = await loadProject(tx, req.params.id, actor);
       const e = await eligibility(tx, actor.clientId, p);
       if (!e.canExport) throw new AppError(409, 'NOT_EXPORTABLE', e.reason ?? 'The project cannot be exported yet.');
+      // D18: re-check every approved task first; any that fail go back to Rework and nothing is exported.
+      const sent = await revalidateForExport(tx, actor.userId, e.records, audit);
+      if (sent.length) {
+        await audit({ entityType: 'Project', entityId: p.id, action: 'project.export_blocked', after: { reworked: sent.map((x) => ({ taskId: x.taskId, recordId: x.recordId, failingChecks: x.checks.map((c) => c.id) })) } });
+        const problems = sent.flatMap((x) => x.checks.map((c) => `${x.title} · ${c.section}: ${c.message}`));
+        return { status: 422, body: { error: 'EXPORT_BLOCKED_REWORK', message: `Export blocked: ${sent.length} approved task${sent.length === 1 ? '' : 's'} now fail${sent.length === 1 ? 's' : ''} validation and went back to the author for rework. Export again once ${sent.length === 1 ? 'it is' : 'they are'} approved.`, details: { tasks: sent, problems } } as unknown as ValidationRunDto };
+      }
       const { items, results, anvil, zips } = await validate(tx, validator, e.records, p.id, true);
       const byRecord = new Map(results.map((r) => [r.recordId, r]));
       // One line per approved task: the dataset record, its Anvil export envelope (when it has one) and the verdict.

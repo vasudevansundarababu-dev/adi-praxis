@@ -13,6 +13,7 @@ import { CHECKLIST, completionStatus, decideTask, TaskDecisionRequest } from '..
 import type { StoredChecks } from '../tasks/submission';
 import { EXPERT_TASK_TYPES, templateRef } from '../tasks/task-service';
 import { loadProject } from './projects';
+import { decisionReply } from '../tasks/revalidation';
 import { reviewPolicySources } from '../policy/review-sources';
 
 const IdParams = z.object({ id: z.string().uuid() });
@@ -126,13 +127,13 @@ export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db; embeddings?: Embe
 
   // R03: accept (writes the ApprovedTaskRecord in the same transaction), rework with pinned comments, or reject.
   app.post('/review/tasks/:id/decision', { config: { access: REVIEW }, schema: { tags: ['review'], params: IdParams, body: TaskDecisionRequest } }, async (req, reply) => {
-    await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => ({ status: 200, body: await decideTask(tx, actor, req.params.id, req.body, audit, emit) }));
+    await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => decisionReply(await decideTask(tx, actor, req.params.id, req.body, audit, emit)));
     return reply;
   });
 
   // Wave 2 stage decision (SME -> Expert -> PM): Expert PASS / REWORK / REJECT, PM APPROVE / REWORK, bound to a version.
   app.post('/review/tasks/:id/stage-decision', { config: { access: STAGED }, schema: { tags: ['review'], params: IdParams, body: StageDecisionRequest } }, async (req, reply) => {
-    await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => ({ status: 200, body: await decideStage(tx, actor, req.params.id, req.body, audit, emit) }));
+    await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => decisionReply(await decideStage(tx, actor, req.params.id, req.body, audit, emit)));
     return reply;
   });
 

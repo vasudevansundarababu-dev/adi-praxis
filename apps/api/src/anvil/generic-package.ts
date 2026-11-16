@@ -151,6 +151,15 @@ function selectorBlock(input: PackageInput, authored: Record<string, unknown>): 
   return { fields: { case_selector: { field: sel.field, value }, ...(example ? { coverage: { example_governing_state: example } } : {}) } };
 }
 
+/**
+ * D18: the per-task package checks for one task, before or after it has an approved record (the record's identity
+ * only labels the entry). Null when the task packages cleanly.
+ */
+export function taskPackageProblem(input: PackageInput): PackageProblem | null {
+  const t = taskFiles(input);
+  return 'code' in t ? t : null;
+}
+
 function taskFiles(input: PackageInput): TaskFiles | PackageProblem {
   const { record, template } = input;
   const base = { recordId: record.id, taskId: record.taskInstanceId };

@@ -1,15 +1,16 @@
 import { caseLockProblem, hasQuotas } from './definitions';
 import { Prisma } from '@prisma/client';
-import { EXECUTABLE_WORKFLOW, jsonDiff, materialPaths, praxisContractChecks, STAGE_LABELS, type ExpertEditRequest, type PendingStage, type StageDecisionRequest } from '@praxis/shared';
+import { jsonDiff, materialPaths, STAGE_LABELS, type ExpertEditRequest, type PendingStage, type StageDecisionRequest } from '@praxis/shared';
 import type { InternalActor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, forbidden, notFound } from '../lib/errors';
 import type { writeAudit } from '../platform/audit';
 import type { OutboxInput } from '../outbox/outbox';
-import { compileForSubmission, COMPILED_MARKER, profileSaveProblems } from './profile-output';
+import { authoredContent, compileForSubmission, profileSaveProblems } from './profile-output';
 import { acceptTask, rejectTask, reviewableTask, type ReviewerIdentity } from './review-service';
 import { blocking, evaluateTask, refreshSimilarity, type StoredChecks } from './submission';
+import { revalidateTask, reworkForValidation, type ApprovalBlocked } from './revalidation';
 import type { SimilarMatch } from './similarity';
 
 /**
@@ -35,15 +36,7 @@ export const contentHash = (output: unknown) => sha256(stableStringify(output ??
 const AUTHOR_ATTESTATION = (id: string) => id.startsWith('authoring.') || id.startsWith('conversation.');
 
 /** The compiled Anvil contract is derived data; diffs compare what people wrote. */
-export function authoredContent(output: unknown) {
-  if (!output || typeof output !== 'object' || Array.isArray(output)) return output ?? null;
-  const o = output as Record<string, unknown>;
-  if (!o[COMPILED_MARKER]) return o;
-  const { praxisContract: _c, [COMPILED_MARKER]: _m, ...rest } = o;
-  void _c;
-  void _m;
-  return rest;
-}
+export { authoredContent };
 
 export const TASK_INCLUDE = {
   project: { include: { template: true } },
@@ -185,15 +178,19 @@ export async function decideStageFor(tx: Tx, t: StageTask, reviewer: ReviewerIde
     const expectedDup = body.decision === 'PASS' ? 'ACCEPT_AS_DISTINCT' : body.decision === 'REWORK' ? 'REWORK' : body.rejectReason === 'DUPLICATE' ? 'REJECT_DUPLICATE' : null;
     if (expectedDup && body.duplicateDecision !== expectedDup) throw new AppError(400, 'DUPLICATE_DECISION_REQUIRED', 'This task was flagged as a likely duplicate: confirm your duplicate decision.');
   }
-  const contractIssues = () => {
-    const issues = praxisContractChecks((t.output ?? {}) as Record<string, unknown>, t.project.template.workflowName === EXECUTABLE_WORKFLOW).filter((c) => !c.ok);
-    if (issues.length) throw new AppError(422, 'CONTRACT_INVALID', 'Executable contract needs attention before acceptance.', { checks: issues });
+  // D18: a pass or an approval re-runs the submit and export checks; a blocking failure sends the task back to its author.
+  const revalidated = async (): Promise<ApprovalBlocked | null> => {
+    const rv = await revalidateTask(tx, t);
+    if (!rv.failing.length) return null;
+    await reworkForValidation(tx, t, { trigger: 'approval', actorId: reviewer.id, byUser: reviewer.kind === 'USER', version: v.version, checks: rv.checks, failing: rv.failing, stage: body.stage, contentHash: hash, auditExtra: { responsibility, ...auditExtra } }, audit);
+    return { status: 'REWORK', approvalBlocked: true, version: v.version, checks: rv.failing };
   };
 
   if (body.decision === 'PASS') {
-    contractIssues();
     const isOpen = t.slot?.isOpen ?? false;
     if (isOpen && hasQuotas(t.project.template) && !body.confirmedCoverage) throw new AppError(400, 'CONFIRM_TAGS', 'Open slot: confirm (or correct) the author’s coverage tags and edge case before passing to PM approval.');
+    const blocked = await revalidated();
+    if (blocked) return blocked;
     await record('PASS', { duplicateDecision: flaggedDuplicate ? 'ACCEPT_AS_DISTINCT' : null });
     await tx.taskInstance.update({
       where: { id: t.id },
@@ -206,7 +203,8 @@ export async function decideStageFor(tx: Tx, t: StageTask, reviewer: ReviewerIde
   if (body.decision === 'APPROVE') {
     const pass = passInForce(t);
     if (!pass) throw new AppError(409, 'STALE_STAGE_DECISION', `No Expert review is in force for version ${v.version}; it needs Expert review again.`, { currentVersion: v.version });
-    contractIssues();
+    const blocked = await revalidated();
+    if (blocked) return blocked;
     await record('ACCEPT');
     const samePerson = pass.reviewerId === reviewer.id;
     const r = await acceptTask(
@@ -283,7 +281,7 @@ export async function expertEdit(tx: Tx, actor: InternalActor, taskId: string, b
   if (sim.embedding && t.taskType === 'AUTHORING') similar = await refreshSimilarity(tx, t, ev, sim.embedding);
   const compiled = t.taskType === 'AUTHORING' ? compileForSubmission(t.project.template, body.output, { taskId: t.id, revisionId: `${t.id}-r${t.revision}` }) : null;
   const output = (compiled?.output ?? body.output) as Prisma.InputJsonValue;
-  const stored: StoredChecks = { results: ev.checks, keyInputs: ev.keyInputs, similar, embeddingModel: sim.embeddingModel ?? (t.checks as StoredChecks | null)?.embeddingModel ?? null, ...(compiled ? { export: compiled.status } : {}) };
+  const stored: StoredChecks = { results: ev.checks, keyInputs: ev.keyInputs, similar, embeddingModel: sim.embeddingModel ?? (t.checks as StoredChecks | null)?.embeddingModel ?? null, ...(compiled ? { export: compiled.status } : {}), ...((t.checks as StoredChecks | null)?.options ? { options: (t.checks as unknown as StoredChecks).options } : {}) };
   const version = v.version + 1;
   const hash = contentHash(output);
   const voided = t.reviews.filter((r) => r.stage && r.submissionVersion === v.version && r.decision === 'PASS').map((r) => r.id);

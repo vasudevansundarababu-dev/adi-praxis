@@ -111,6 +111,12 @@ export function ReviewPage({ initial, rubric = null }: { initial: ReviewView; ru
       ...(decision === 'PASS' && needsCoverage ? { confirmedCoverage: { tags: view.coverageTags!.tags, edgeCase: view.coverageTags!.edgeCase! } } : {}),
     });
     if (!res.ok) {
+      // D18: the pass was blocked by a failing check and the task went back to the author; show why, and the new state.
+      if (res.code === 'APPROVAL_BLOCKED') {
+        const fresh = await call<ReviewView>('GET', `/me/reviews/${view.taskId}`);
+        if (fresh.ok && fresh.data) setView(fresh.data);
+        setBoxes({});
+      }
       setPending(false);
       return setError(res.code === 'STALE_STAGE_DECISION' || res.code === 'STALE_REVISION' ? 'This task changed since you opened it. Reload the page to see the latest version.' : res.error);
     }

@@ -8,6 +8,7 @@ import { forgeSettings } from '../forge/settings';
 import { sourcingProject } from '../forge/sourcing';
 import { writeAudit } from '../platform/audit';
 import { runCandidateCommand, runCommand } from '../platform/command';
+import { decisionReply } from '../tasks/revalidation';
 import { ensureSlotTasks } from '../tasks/task-service';
 
 const ACCESS = ['ADMIN', 'PM'] as const;
@@ -35,7 +36,7 @@ export const forgeReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, 
   });
 
   app.post('/projects/:id/tasks/:taskId/decision', { config: { access: ACCESS }, schema: { tags: ['tasks'], params: TaskParams, body: ForgeDecisionRequest } }, async (req, reply) => {
-    await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => ({ status: 200, body: await forgeDecide(tx, actor, req.params.id, req.params.taskId, req.body, audit, emit) }));
+    await runCommand(db, req, reply, async ({ tx, actor, audit, emit }) => decisionReply(await forgeDecide(tx, actor, req.params.id, req.params.taskId, req.body, audit, emit)));
     return reply;
   });
 
@@ -53,7 +54,7 @@ export const forgeReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, 
   app.post('/me/reviews/:taskId/decision', { config: { access: 'candidate' }, schema: { tags: ['work'], params: z.object({ taskId: z.string().uuid() }), body: ReviewerDecisionRequest } }, async (req, reply) => {
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit, emit }) => {
       await requireForgeTerms(tx, actor);
-      return { status: 200, body: await reviewerDecide(tx, actor, req.params.taskId, req.body, audit, emit) };
+      return decisionReply(await reviewerDecide(tx, actor, req.params.taskId, req.body, audit, emit));
     });
     return reply;
   });

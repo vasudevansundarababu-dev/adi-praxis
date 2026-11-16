@@ -37,3 +37,4 @@ export * from './project-export';
 export * from './anvil-definition';
 export * from './forge';
 export * from "./rubric";
+export * from "./field-suggestions";

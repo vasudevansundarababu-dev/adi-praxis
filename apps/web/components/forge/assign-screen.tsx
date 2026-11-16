@@ -4,9 +4,28 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
-import { assignButtons, assignOptions, assignProblem, tabHref, taskName, type AssignableData, type AssignablePerson } from '@/lib/forge-console';
+import {
+  assignBody,
+  assignButtons,
+  assignOptions,
+  assignProblem,
+  criteriaLine,
+  personKey,
+  placesFullNote,
+  requiredWorkersProblem,
+  tabHref,
+  taskName,
+  type AssignableData,
+  type AssignablePerson,
+} from '@/lib/forge-console';
 
 const TH = 'px-4 py-2.5 text-xs font-semibold text-fg-muted';
+
+/** The project's location and experience criteria in words, for the intro line (D20). */
+function locationText(d: AssignableData) {
+  const parts = [d.criteria?.countries ? `location ${d.criteria.countries.join(', ')}` : '', d.criteria?.minYears ? `${d.criteria.minYears}+ years' domain experience` : ''].filter(Boolean);
+  return parts.length ? ` (${parts.join(', ')})` : '';
+}
 const TD = 'px-4 py-3 align-top';
 
 function Row({ projectId, d, p, codes }: { projectId: string; d: AssignableData; p: AssignablePerson; codes: Record<string, string> }) {
@@ -22,21 +41,24 @@ function Row({ projectId, d, p, codes }: { projectId: string; d: AssignableData;
     if (problem) return setError(problem);
     setPending(true);
     setError(null);
-    const res = await mutate('POST', `/projects/${projectId}/assignments/direct`, { sourcedPersonId: p.sourcedPersonId, taskId });
+    const res = await mutate('POST', `/projects/${projectId}/assignments/direct`, assignBody(p, role, taskId));
     setPending(false);
     if (!res.ok) return setError(res.error);
     router.refresh();
   }
 
   const matched = p.matchingSkills.filter((s) => s.matched === true).map((s) => s.skill);
+  const criteria = criteriaLine(p);
   return (
-    <tr data-person={p.sourcedPersonId}>
+    <tr data-person={personKey(p)} data-source={p.source ?? 'SOURCING'}>
       <td className={TD}>{p.firstName}</td>
       <td className={TD}>{p.lastName}</td>
       <td className={`${TD} font-mono text-xs`}>{p.email}</td>
       <td className={`${TD} text-[13px] text-fg-muted`}>
         {p.assessed ? matched.join(', ') || 'None stated' : 'Not assessed yet'}
         {p.role === 'REVIEWER' && <span className="ml-2 pill pill-brand">Reviewer</span>}
+        {p.source === 'POOL' && <span className="ml-2 pill pill-info">Platform pool</span>}
+        {criteria.length > 0 && <span className="mt-1 block text-xs">{criteria.join(' · ')}</span>}
       </td>
       <td className={TD}>
         <select
@@ -67,7 +89,7 @@ function Row({ projectId, d, p, codes }: { projectId: string; d: AssignableData;
         )}
       </td>
       <td className={`${TD} text-right whitespace-nowrap`}>
-        {buttons.smeFull && <span className="text-xs text-fg-muted">SME places full</span>}
+        {buttons.smeFull && <span className="text-xs text-fg-muted">SME places full: raise Required workers above</span>}
         {buttons.sme && (
           <button type="button" disabled={pending} onClick={() => void assign('SME')} className="btn btn-primary disabled:opacity-60">
             Assign as SME
@@ -80,6 +102,69 @@ function Row({ projectId, d, p, codes }: { projectId: string; d: AssignableData;
         )}
       </td>
     </tr>
+  );
+}
+
+/** D19: SME places used, why they are full, and Required workers the PM or Admin can raise here (audited). */
+function Places({ projectId, d }: { projectId: string; d: AssignableData }) {
+  const router = useRouter();
+  const min = d.minRequiredWorkers ?? 1;
+  const [value, setValue] = useState(String(d.requiredWorkers ?? min));
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const note = placesFullNote(d);
+
+  async function save() {
+    const problem = requiredWorkersProblem(value, min);
+    if (problem) return setError(problem);
+    setPending(true);
+    setError(null);
+    const res = await mutate('POST', `/projects/${projectId}/required-workers`, { requiredWorkers: Number(value) });
+    setPending(false);
+    if (!res.ok) return setError(res.error);
+    router.refresh();
+  }
+
+  return (
+    <div className="mb-5 text-sm text-fg-muted" data-places>
+      <p>
+        SME places: {d.smePlacesUsed} of {d.requiredWorkers ?? '—'} used{d.smePlacesFull ? ' (full)' : ''}
+        {d.taskCount !== undefined ? ` · ${d.taskCount} task${d.taskCount === 1 ? '' : 's'}` : ''}.
+      </p>
+      {note && (
+        <p role="status" className="mt-1 text-fg">
+          {note}
+        </p>
+      )}
+      {d.requiredWorkers !== null && (
+        <div className="mt-2 flex items-center gap-2">
+          <label htmlFor="required-workers" className="text-xs font-semibold">
+            Required workers
+          </label>
+          <input
+            id="required-workers"
+            type="number"
+            min={min}
+            step={1}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setError(null);
+            }}
+            className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-[13px]"
+          />
+          <button type="button" disabled={pending} onClick={() => void save()} className="btn btn-secondary disabled:opacity-60">
+            Save
+          </button>
+          <span className="text-xs">At least {min}: one place per task.</span>
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="mt-1 text-xs text-error">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -96,16 +181,15 @@ export function AssignScreen({ projectId, projectName, data: d, codes }: { proje
       </Link>
       <h1 className="mt-2 mb-1 text-2xl font-semibold">Assign people</h1>
       <p className="mb-1.5 text-sm text-fg-muted">
-        Choose the task each person works on. Profiles from Sourcing whose skills match this project&apos;s template: <strong className="text-fg">{d.projectSkills.join(', ') || 'none listed'}</strong>.
+        Choose the task each person works on. This project&apos;s Sourcing profiles, and available people from the platform pool who match its criteria
+        {locationText(d)}. Template skills: <strong className="text-fg">{d.projectSkills.join(', ') || 'none listed'}</strong>.
       </p>
       <p className="mb-1.5 text-sm text-fg-muted">
         {two
           ? 'As SME, pick an unassigned task to author. As Reviewer, pick an authored task to review (never their own). A person is never both on one project.'
           : "This project's route is Author → PM/Admin, so people can be assigned as SME only, to an unassigned task."}
       </p>
-      <p className="mb-5 text-sm text-fg-muted" data-places>
-        SME places: {d.smePlacesUsed} of {d.requiredWorkers ?? '—'} used{d.smePlacesFull ? ' (full)' : ''}.
-      </p>
+      <Places key={d.requiredWorkers ?? 'none'} projectId={projectId} d={d} />
       <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-hairline">
@@ -124,12 +208,12 @@ export function AssignScreen({ projectId, projectName, data: d, codes }: { proje
           </thead>
           <tbody className="divide-y divide-hairline">
             {d.people.map((p) => (
-              <Row key={p.sourcedPersonId} projectId={projectId} d={d} p={p} codes={codes} />
+              <Row key={personKey(p)} projectId={projectId} d={d} p={p} codes={codes} />
             ))}
             {d.people.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-fg-muted">
-                  No more matching profiles. Upload more in{' '}
+                  No one available matches this project. Upload more profiles in{' '}
                   <Link href="/sourcing" className="text-link hover:underline">
                     Sourcing
                   </Link>

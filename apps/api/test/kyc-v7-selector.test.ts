@@ -211,7 +211,8 @@ describe('KYC v7 and the generic case selector', () => {
     expect(tasks[1]!.slot!.brief).toBe('Application type: Joint. Write this reusable task for Joint only; set Application type to Joint.');
     const rows = await rowsOf(pid);
     expect(rows.map((r) => r.selector)).toEqual(V7_VALUES.map((value, i) => ({ field: 'Application type', value, label: V7_LABELS[i] })));
-    expect((await db.project.findUniqueOrThrow({ where: { id: pid } })).requiredWorkers).toBe(1);
+    // D19: one SME place per task at least (the figures alone gave 1, which let only one SME be assigned).
+    expect((await db.project.findUniqueOrThrow({ where: { id: pid } })).requiredWorkers).toBe(4);
   });
 
   it('the author cannot change the application type: a different value is refused, the slot value is kept', async () => {

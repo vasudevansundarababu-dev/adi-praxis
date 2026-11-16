@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { AUTHORSHIP_VERSION, CONTRIBUTION_ROLES, GOLDEN_KYC_EXAMPLE, OpportunityBrief, sampleProfileOutput, type ContributionRole } from '@praxis/shared';
+import { AUTHORSHIP_VERSION, CONTRIBUTION_ROLES, GOLDEN_KYC_EXAMPLE, OpportunityBrief, profileForTemplate, sampleProfileOutput, sectionDigest, sectionsToConfirm, type ContributionRole, type TemplateProfile } from '@praxis/shared';
 import { answerFor, type Http, type HttpForm, type HttpResponse } from './qa-users';
 
 /**
@@ -506,6 +506,7 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
     if (run.state?.pending) await call(sme, 'POST', `/me/tasks/${taskId}/conversation/decision`, { runId: msg.runId, accept: false });
 
     // The author's declaration for this revision, then submit.
+    await confirmSections((m, u, b) => call(sme, m, u, b), taskId);
     const conv = (await call(sme, 'GET', `/me/tasks/${taskId}/conversation`)).body;
     const resolutions = ((conv.state?.unresolved ?? []) as string[]).map((question) => ({ question, answer: 'Synthetic QA smoke: the author confirms this in their own words; every fact in the case is invented.' }));
     await call(sme, 'POST', `/me/tasks/${taskId}/conversation/review`, { expectedRevision: conv.revision, ownWork: true, noExternalLlm: true, authorisedSources: true, ...(resolutions.length ? { resolutions } : {}) });
@@ -1077,6 +1078,7 @@ export async function draftTask(api: ApiSession, who: string, id: string, citedR
 /** The author's declaration for the current revision, then submit (explaining possible-real-data flags). Returns the version. */
 export async function submitTask(api: ApiSession, who: string, id: string, a: AuthorOptions): Promise<number> {
   const note = a.note ?? 'Synthetic QA smoke';
+  await confirmSections((m, u, b) => api.call(who, m, u, b), id);
   const conv = (await api.call(who, 'GET', `/me/tasks/${id}/conversation`)).body;
   const resolutions = ((conv.state?.unresolved ?? []) as string[]).map((question) => ({ question, answer: `${note}: the author confirms this in their own words; every fact in the case is invented.` }));
   await api.call(who, 'POST', `/me/tasks/${id}/conversation/review`, { expectedRevision: conv.revision, ownWork: true, noExternalLlm: true, authorisedSources: true, ...(resolutions.length ? { resolutions } : {}) });
@@ -1112,6 +1114,28 @@ export async function cancelForgeProject(api: ApiSession, id: string, waitMs: nu
   if (p.status === 'IN_PROGRESS') await api.call('pm', 'POST', `/projects/${id}/pause`);
   const c = (await api.call('pm', 'POST', `/projects/${id}/cancel`)).body;
   return { from: p.status, status: c.status, cancelled: true };
+}
+
+/**
+ * FIELD_SUGGESTIONS_ENABLED (PR #87): the author confirms each section ("I've read every field … it describes how this
+ * work is actually done") for its saved content before the declaration and Submit. No-op when the flag is off or the
+ * form has no sections profile.
+ */
+export async function confirmSections(call: (method: string, url: string, body?: unknown) => Promise<{ body: Json }>, taskId: string): Promise<string[]> {
+  const t = (await call('GET', `/me/tasks/${taskId}`)).body;
+  if (!t?.fieldSuggestions || !t.output) return [];
+  let profile = (t.template?.profile ?? null) as TemplateProfile | null;
+  if (!profile && t.template?.workflow) {
+    const found = profileForTemplate({ workflowName: t.template.workflow, profileId: t.template.profileId });
+    profile = found.status === 'ok' ? found.profile : null;
+  }
+  if (!profile || profile.storage !== 'sections') return [];
+  const done: string[] = [];
+  for (const section of sectionsToConfirm(profile)) {
+    await call('POST', `/me/tasks/${taskId}/suggestions/confirm`, { section, confirmed: true, digest: sectionDigest(profile, t.output, section) });
+    done.push(section);
+  }
+  return done;
 }
 
 /**

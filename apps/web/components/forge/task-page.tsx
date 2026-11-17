@@ -269,7 +269,7 @@ export function AuthoredForm({ profile, output, rubric = null }: { profile: Temp
           {s.fields.length === 0 ? (
             <p className="text-sm text-fg-muted">Checks and submission only.</p>
           ) : (
-            <dl className="grid gap-x-4 gap-y-2.5 text-sm sm:grid-cols-[12rem_1fr]">
+            <dl className="grid gap-x-4 gap-y-2.5 text-sm sm:grid-cols-[12rem_minmax(0,1fr)]">
               {s.fields.map((f) => {
                 const v = output ? getFieldValue(profile, output, s.key as SectionKey, f) : undefined;
                 // D29: a table takes the card's full width, under its label, so it isn't squeezed into the value column.

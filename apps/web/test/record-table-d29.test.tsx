@@ -43,6 +43,14 @@ describe('D29: record tables on the task approval page fit the card', () => {
     expect(a11yProblems(m)).toEqual([]);
   });
 
+  it('one label column for every section: a fixed 12rem track the value column can never widen or shrink', () => {
+    for (const m of [mk, renderToStaticMarkup(<AuthoredForm profile={KYC_ACCOUNT_OPENING_PROFILE} output={GOLDEN_KYC_EXAMPLE as Record<string, unknown>} />)]) {
+      const grids = [...m.matchAll(/<dl class="grid gap-x-4[^"]*"/g)].map((x) => x[0]);
+      expect(grids.length).toBeGreaterThan(5);
+      for (const g of grids) expect(g).toBe('<dl class="grid gap-x-4 gap-y-2.5 text-sm sm:grid-cols-[12rem_minmax(0,1fr)]"');
+    }
+  });
+
   it('Marketing S2: the checksum wraps anywhere; dates never wrap; ordinary text wraps between words', () => {
     const refs = table(mk, 'sourceRefs');
     expect(refs).toMatch(/\[overflow-wrap:anywhere\][^>]*>1d2efdaa4dcd3f9d1f0818959c4b683590a67bc4e1d3c7b74fc33cd2e195c75c</);

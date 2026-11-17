@@ -3,7 +3,9 @@
 import type { SourcedRole, SourcingImportResult, SourcingProjectDto } from '@praxis/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { Req } from '@/components/required';
 import { upload } from '@/lib/client-api';
 import { projectsForRole } from './new-person-form';
@@ -15,7 +17,9 @@ const TD = 'px-3 py-2 align-top';
 
 /** The preview of a dry run: one line per row, OK or its problems. */
 export function ImportPreview({ result }: { result: SourcingImportResult }) {
+  const paged = usePagedRows(result.rows);
   return (
+    <>
     <div className="card mt-4 overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead className="border-b border-line text-fg-muted">
@@ -28,7 +32,7 @@ export function ImportPreview({ result }: { result: SourcingImportResult }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
-          {result.rows.map((r) => (
+          {paged.items.map((r) => (
             <tr key={r.row}>
               <td className={`${TD} font-mono text-xs tabular-nums`}>{r.row}</td>
               <td className={TD}>{r.firstName || '—'}</td>
@@ -40,6 +44,8 @@ export function ImportPreview({ result }: { result: SourcingImportResult }) {
         </tbody>
       </table>
     </div>
+    <ClientPager paged={paged} noun="rows" singular="row" />
+    </>
   );
 }
 

@@ -1,13 +1,17 @@
+import { parsePage, slicePage } from '@praxis/shared';
 import type { Metadata } from 'next';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import Link from 'next/link';
 import { fmtDate, StatePill } from '@/components/partner/labels';
 import { partnerGet, type PartnerRequisition } from '@/lib/partner-api';
 
 export const metadata: Metadata = { title: 'Requisitions' };
 
-export default async function PartnerRequisitionsPage() {
+export default async function PartnerRequisitionsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const { data, status } = await partnerGet<{ items: PartnerRequisition[] }>('/requisitions');
   const items = data?.items ?? [];
+  const paged = slicePage(items, parsePage(sp.page));
   return (
     <div>
       <h1 className="text-2xl font-semibold">Requisitions</h1>
@@ -33,7 +37,7 @@ export default async function PartnerRequisitionsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((r) => (
+              {paged.items.map((r) => (
                 <tr key={r.id} className="border-b border-hairline last:border-0">
                   <td className="px-4 py-2">
                     <Link href={`/partner/requisitions/${r.id}`} className="font-medium text-link">
@@ -55,6 +59,7 @@ export default async function PartnerRequisitionsPage() {
               ))}
             </tbody>
           </table>
+          <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="requisitions" singular="requisition" className="px-4 pb-3" />
         </div>
       )}
     </div>

@@ -1,6 +1,8 @@
 'use client';
 
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { Req, RequiredNote } from '@/components/required';
 import { TemporaryPassword } from '@/components/users/temporary-password';
 import { ActionMessages, input, useAction } from './action';
@@ -17,6 +19,7 @@ export function PortalUsers({ partnerId, users }: { partnerId: string; users: Pa
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [confirmReset, setConfirmReset] = useState<string | null>(null);
+  const paged = usePagedRows(users);
   const signInAt = typeof window === 'undefined' ? '/partner/login' : `${window.location.origin}/partner/login`;
 
   return (
@@ -39,7 +42,7 @@ export function PortalUsers({ partnerId, users }: { partnerId: string; users: Pa
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {users.map((u) => (
+              {paged.items.map((u) => (
                 <tr key={u.id}>
                   <td className={TD}>{u.name}</td>
                   <td className={TD}>{u.email}</td>
@@ -90,6 +93,7 @@ export function PortalUsers({ partnerId, users }: { partnerId: string; users: Pa
               ))}
             </tbody>
           </table>
+          <ClientPager paged={paged} noun="users" singular="user" />
         </div>
       )}
       <form

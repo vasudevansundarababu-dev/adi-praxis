@@ -1,13 +1,17 @@
+import { parsePage, slicePage } from '@praxis/shared';
 import type { Metadata } from 'next';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import Link from 'next/link';
 import { fmtDate, fmtMoney, fmtPeriod, StatePill } from '@/components/partner/labels';
 import { partnerGet, type PartnerStatement } from '@/lib/partner-api';
 
 export const metadata: Metadata = { title: 'Statements' };
 
-export default async function PartnerStatementsPage() {
+export default async function PartnerStatementsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const { data, status } = await partnerGet<{ items: PartnerStatement[] }>('/statements');
   const items = data?.items ?? [];
+  const paged = slicePage(items, parsePage(sp.page));
   return (
     <div className="space-y-6">
       <div>
@@ -23,7 +27,7 @@ export default async function PartnerStatementsPage() {
         </p>
       )}
       {status === 200 && items.length === 0 && <p className="card p-5 text-sm text-fg-muted">No statements yet. The first one is issued after the month in which one of your candidates is certified.</p>}
-      {items.map((s) => {
+      {paged.items.map((s) => {
         const totals = Object.entries(s.totals ?? {});
         return (
           <section key={s.id} aria-labelledby={`st-${s.id}`} className="card overflow-hidden">
@@ -86,6 +90,7 @@ export default async function PartnerStatementsPage() {
           </section>
         );
       })}
+      {items.length > 0 && <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="statements" singular="statement" />}
     </div>
   );
 }

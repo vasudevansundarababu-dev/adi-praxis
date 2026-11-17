@@ -1,4 +1,6 @@
+import { parsePage, slicePage } from '@praxis/shared';
 import type { Metadata } from 'next';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import Link from 'next/link';
 import { KnowledgeMap } from '@/components/cert/knowledge-map';
 import type { VersionDetail } from '@/components/cert/types';
@@ -12,7 +14,8 @@ export const metadata: Metadata = { title: 'Guidelines version' };
 const tokens = (n?: number) => (n === undefined ? '—' : n.toLocaleString());
 
 /** Section 7.6: generation run status → knowledge map → per-tier course, blueprint and families → publish. */
-export default async function VersionPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function VersionPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const user = (await getCurrentUser())!;
   if (!user.roles.some((r) => r === 'ADMIN' || r === 'REVIEWER')) return <NoAccess need="Admins and Validators" />;
   const isAdmin = user.roles.includes('ADMIN');
@@ -20,6 +23,7 @@ export default async function VersionPage({ params }: { params: Promise<{ id: st
   const { data: v } = await apiGet<VersionDetail>(`/guidelines/versions/${id}`);
   if (!v) return <NotFoundCard what="guidelines version" back="/guidelines" backLabel="Back to guidelines" />;
   const running = v.runs.some((r) => r.status === 'QUEUED' || r.status === 'RUNNING');
+  const runs = slicePage(v.runs, parsePage(sp.runsPage));
 
   return (
     <div className="space-y-8">
@@ -131,7 +135,7 @@ export default async function VersionPage({ params }: { params: Promise<{ id: st
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {v.runs.map((r) => (
+              {runs.items.map((r) => (
                 <tr key={r.id}>
                   <td className={TD}>{fmtDateTime(r.createdAt)}</td>
                   <td className={TD}>
@@ -161,6 +165,7 @@ export default async function VersionPage({ params }: { params: Promise<{ id: st
               )}
             </tbody>
           </table>
+          {v.runs.length > 0 && <UrlPager searchParams={sp} param="runsPage" page={runs.page} total={runs.total} shown={runs.items.length} noun="generation runs" singular="generation run" className="px-3 pb-3" />}
         </div>
         {isAdmin && <RegenerateForm versionId={v.id} publishedTiers={v.tiers.filter((t) => t.published).map((t) => t.tier)} disabled={running} />}
       </section>

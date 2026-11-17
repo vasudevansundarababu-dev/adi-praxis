@@ -81,6 +81,7 @@ import { projectExportRoutes } from './routes/project-export';
 import { AnvilGatedValidator, PraxisPrecheckValidator, type AnvilTaskValidator } from './anvil/validator';
 import { AnvilExportClient } from './anvil/export-client';
 import { SearchService } from './search/service';
+import type { IdSearch } from './lib/paging';
 import { projectRoutes } from './routes/projects';
 import { staffingRoutes } from './routes/staffing';
 import { OfflineGeocoder, type Geocoder } from './staffing/geocoder';
@@ -335,7 +336,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       v1.get('/version', { config: { access: 'public' }, schema: { tags: ['health'] } }, async () => ({ build: process.env.PRAXIS_BUILD || 'local', commit: process.env.PRAXIS_COMMIT || null, env: deps.config.appEnv, ai: deps.config.assistantMode }));
       v1.get('/openapi.json', { config: { access: 'public' }, schema: { hide: true } }, async () => app.swagger());
       await v1.register(authRoutes, { db: deps.db, config: deps.config });
-      await v1.register(userRoutes, { db: deps.db });
+      const searchService = new SearchService(deps.db, deps.embeddings ?? defaultEmbeddings(deps.config));
+      const idSearch: IdSearch = async (actor, type, q) => (await searchService.search(actor, type, q, 1)).ids;
+      await v1.register(userRoutes, { db: deps.db, search: idSearch });
       await v1.register(templateRoutes, { db: deps.db, tutorial: tutorialSettings(deps.config) });
       await v1.register(tutorialVideoRoutes, { db: deps.db, settings: tutorialSettings(deps.config), storage: tutorialStorage });
       await v1.register(projectExportRoutes, { db: deps.db, storage, validator: deps.anvilValidator ?? (deps.config.ANVIL_EXPORT_BASE_URL ? new AnvilGatedValidator(new AnvilExportClient(deps.config.ANVIL_EXPORT_BASE_URL, deps.anvilIdTokenProvider ?? googleIdTokenProvider(anvilAudience(deps.config.ANVIL_EXPORT_BASE_URL, deps.config.ANVIL_OUTBOUND_AUDIENCE)))) : new PraxisPrecheckValidator()) });
@@ -351,7 +354,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(metaCompilerTestSetupRoutes, { db: deps.db, config: deps.config, storage, drafters, deps: mcDeps, runner });
       await v1.register(taxonomyRoutes, { db: deps.db });
       await v1.register(jobDescriptionRoutes, { db: deps.db });
-      await v1.register(projectRoutes, { db: deps.db });
+      await v1.register(projectRoutes, { db: deps.db, search: idSearch });
       await v1.register(staffingRoutes, {
         db: deps.db,
         config: deps.config,
@@ -361,7 +364,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(candidateRoutes, { db: deps.db });
       await v1.register(opportunityRoutes, { db: deps.db, config: deps.config });
       await v1.register(reviewerRecruitmentRoutes, { db: deps.db });
-      await v1.register(searchRoutes, { service: new SearchService(deps.db, deps.embeddings ?? defaultEmbeddings(deps.config)) });
+      await v1.register(searchRoutes, { service: searchService });
       await v1.register(campaignRoutes, { db: deps.db, config: deps.config });
       await v1.register(profileRoutes, {
         db: deps.db,

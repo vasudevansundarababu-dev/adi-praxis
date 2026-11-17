@@ -2,15 +2,21 @@ import type { ProjectDto } from '@praxis/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProjectStatusBadge } from '@/components/projects/project-status';
+import { UrlPager } from '@/components/pager';
 import { TableSearch } from '@/components/search/table-search';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { pageParam, queryParam, type SearchParams } from '@/lib/paging';
 
 export const metadata: Metadata = { title: 'Projects' };
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const user = (await getCurrentUser())!;
-  const { data } = await apiGet<{ items: ProjectDto[] }>('/projects');
+  // D24: paged by the API (10 a page), filtered by the search bar's `?q=` across every project.
+  const q = queryParam(sp);
+  const { data } = await apiGet<{ items: ProjectDto[]; page?: number; total?: number }>(`/projects?page=${pageParam(sp)}${q ? `&q=${encodeURIComponent(q)}` : ''}`);
   const items = data?.items ?? [];
+  const total = data?.total ?? items.length;
   const isAdmin = user.roles.includes('ADMIN');
   return (
     <div>
@@ -23,11 +29,11 @@ export default async function ProjectsPage() {
         )}
       </div>
       <p className="mt-1 text-sm text-fg-muted">{isAdmin ? 'All projects.' : 'Projects you own.'}</p>
-      {items.length === 0 ? (
+      {items.length === 0 && !q ? (
         <p className="mt-8 text-fg-muted">No projects yet.</p>
       ) : (
         <div className="mt-6">
-        <TableSearch type="projects" label="Search projects" placeholder="Search projects by name, workflow or what they are about" />
+        <TableSearch type="projects" label="Search projects" placeholder="Search projects by name, workflow or what they are about" syncUrl initialQuery={q} />
         <div className="overflow-x-auto card" data-search-scope="projects">
           <table className="w-full text-left text-sm">
             <thead className="bg-surface">
@@ -59,9 +65,17 @@ export default async function ProjectsPage() {
                   <td className="px-4 py-2">{new Date(p.updatedAt).toLocaleDateString()}</td>
                 </tr>
               ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={isAdmin ? 6 : 5} role="status" className="px-4 py-6 text-center text-fg-muted">
+                    No projects match &ldquo;{q}&rdquo;.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+        <UrlPager searchParams={sp} page={data?.page ?? 1} total={total} shown={items.length} noun="projects" singular="project" />
         </div>
       )}
     </div>

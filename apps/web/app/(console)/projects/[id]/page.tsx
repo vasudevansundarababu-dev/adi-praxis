@@ -13,12 +13,15 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: data?.name ?? 'Project' };
 }
 
-export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string | string[] }> }) {
+export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { id } = await params;
   const { data: project } = await apiGet<ProjectDto>(`/projects/${id}`);
   if (!project) notFound();
   // MVP1 (owner, 15 Nov): with the new flow on, a submitted project opens on the four-tab page.
-  if (project.status !== 'DRAFT' && (await newFlowOn())) return <ForgeProjectPage project={project} tab={projectTab((await searchParams).tab)} />;
+  if (project.status !== 'DRAFT' && (await newFlowOn())) {
+    const sp = await searchParams;
+    return <ForgeProjectPage project={project} tab={projectTab(sp.tab)} searchParams={sp} />;
+  }
 
   const [t, a, j, own] = await Promise.all([
     apiGet<{ items: TemplateDto[] }>('/templates?view=offerable'),

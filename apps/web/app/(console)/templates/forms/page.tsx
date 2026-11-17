@@ -1,4 +1,6 @@
+import { parsePage, slicePage } from '@praxis/shared';
 import type { Metadata } from 'next';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import { notFound } from 'next/navigation';
 import { GoldenPackUpload } from '@/components/templates/golden-pack-upload';
 import { McHeader } from '@/components/templates/mc-header';
@@ -18,11 +20,13 @@ interface Form {
 }
 
 /** Authoring forms and golden task packs (owner, 12 Nov 2026). Admin only. */
-export default async function FormsPage() {
+export default async function FormsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const user = (await getCurrentUser())!;
   if (!user.roles.includes('ADMIN')) notFound();
   const forms = (await apiGet<{ items: Form[] }>('/template-profiles')).data?.items ?? [];
   const uploaded = forms.filter((f) => f.source === 'uploaded');
+  const paged = slicePage(uploaded, parsePage(sp.page));
   return (
     <div>
       <McHeader isAdmin />
@@ -36,6 +40,7 @@ export default async function FormsPage() {
       {uploaded.length === 0 ? (
         <p className="mt-2 text-sm text-fg-muted">No packs uploaded yet.</p>
       ) : (
+        <>
         <table className="mt-2 w-full text-left text-sm">
           <thead>
             <tr>
@@ -47,7 +52,7 @@ export default async function FormsPage() {
             </tr>
           </thead>
           <tbody>
-            {uploaded.map((f) => (
+            {paged.items.map((f) => (
               <tr key={f.profileId}>
                 <td>
                   {f.name} <span className="text-fg-muted">({f.profileId})</span>
@@ -60,6 +65,8 @@ export default async function FormsPage() {
             ))}
           </tbody>
         </table>
+        <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="uploaded forms" singular="uploaded form" />
+        </>
       )}
       <p className="mt-6 text-sm text-fg-muted">{forms.length - uploaded.length} built-in forms are also available.</p>
     </div>

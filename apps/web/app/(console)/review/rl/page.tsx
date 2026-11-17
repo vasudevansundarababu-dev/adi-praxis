@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { parsePage, slicePage } from '@praxis/shared';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import { apiGet, getCurrentUser } from '@/lib/api';
 import { NoAccess } from '@/components/no-access';
 
@@ -8,12 +10,14 @@ export const metadata: Metadata = { title: 'RL reviews' };
 type Item = { id: string; rlRunId: string; rlTaskId: string; workflow: string; projectName: string; priority: number; dueBy: string | null; failedEvals: number; status: string; claimedBy: string | null; receivedAt: string };
 
 /** FLOW 4 queue: one review per RL task, highest priority and earliest due first. */
-export default async function RlQueue({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+export default async function RlQueue({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = (await getCurrentUser())!;
   if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Validators and Admins" />;
-  const done = (await searchParams).status === 'DONE';
+  const sp = await searchParams;
+  const done = sp.status === 'DONE';
   const { data } = await apiGet<{ items: Item[] }>(`/review/rl?status=${done ? 'DONE' : 'OPEN'}`);
   const items = data?.items ?? [];
+  const paged = slicePage(items, parsePage(sp.page));
   return (
     <div>
       <h1 className="text-2xl font-semibold">RL reviews</h1>
@@ -38,7 +42,7 @@ export default async function RlQueue({ searchParams }: { searchParams: Promise<
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {items.map((t) => (
+              {paged.items.map((t) => (
                 <tr key={t.id}>
                   <td className="px-2 py-2">
                     <Link href={`/review/rl/${t.id}`} className="font-medium text-link hover:underline">{t.rlRunId} / {t.rlTaskId}</Link>
@@ -52,6 +56,7 @@ export default async function RlQueue({ searchParams }: { searchParams: Promise<
               ))}
             </tbody>
           </table>
+          <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="RL reviews" singular="RL review" />
         </div>
       )}
     </div>

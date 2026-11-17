@@ -213,6 +213,12 @@ export interface AssignableData {
   openTasks: AssignableTask[];
   reviewableTasks: AssignableTask[];
   people: AssignablePerson[];
+  /** D23 + D24, when asked for a page: everyone before the search, then the page and the filtered total. */
+  peopleAvailable?: number;
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  pageCount?: number;
 }
 
 /** A row's stable key: the Sourcing profile, else the pool person. */

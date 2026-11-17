@@ -1,9 +1,11 @@
 'use client';
 
 import type { MatchesResponse, MatchItemDto } from '@praxis/shared';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { ClientPager } from '@/components/pager';
 import { Req, RequiredNote } from '@/components/required';
 import { projectStatusLabel } from '../projects/project-status';
 
@@ -67,6 +69,7 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
     );
     return sort === 'score' ? list : [...list].sort((a, b) => a.name.localeCompare(b.name));
   }, [data.items, query, minScore, sort]);
+  const paged = usePagedRows(items, { resetKey: `${query.trim()}|${minScore}|${sort}` });
 
   const staffing = data.status === 'STAFFING';
   const toggle = (id: string) => setSelected((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set([...s, id])));
@@ -168,7 +171,8 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
       {data.items.length === 0 ? (
         <p className="mt-6 text-fg-muted">No eligible experts yet. Experts appear here after they apply to this project’s opportunity, a Validator selects them, and they finish onboarding. You can also launch a sourcing campaign below.</p>
       ) : (
-        <div className="mt-3 overflow-x-auto card">
+        <>
+          <div className="mt-3 overflow-x-auto card">
           <table className="w-full text-left text-sm">
             <thead className="bg-surface">
               <tr>
@@ -186,7 +190,7 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
               </tr>
             </thead>
             <tbody>
-              {items.map((i) => (
+              {paged.items.map((i) => (
                 <Row
                   key={i.candidateId}
                   item={i}
@@ -213,7 +217,9 @@ export function StaffingBoard({ projectId, initial }: { projectId: string; initi
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+          <ClientPager paged={paged} noun="experts" singular="expert" />
+        </>
       )}
     </div>
   );

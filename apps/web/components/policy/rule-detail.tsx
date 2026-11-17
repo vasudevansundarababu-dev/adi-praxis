@@ -1,8 +1,10 @@
 'use client';
 
 import { ACTOR_LABEL, CLASSIFICATION_LABEL, MARKING_LABEL, annotationText, type AnnotationFlag, type PolicyRuleBody, type RuleAnnotation, type ScopeList } from '@praxis/shared';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { mutate } from '@/lib/client-api';
 import { setRuleApplied, type ApplyTarget } from './apply-rule';
 import { locatorText } from './locator';
@@ -124,6 +126,8 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
   const [stage, setStage] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ target: ApplyTarget; problems: string[] } | null>(null);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const historyPaged = usePagedRows(d.history, { param: 'historyPage' });
+  const annotationHistory = usePagedRows(d.annotationHistory ?? [], { param: 'annotationsPage' });
   const b = d.body;
   const a = b.applicability;
   const target: ApplyTarget = { ruleId: d.ruleId, contentHash: d.contentHash, definitionProblems: d.definitionProblems, evidenceProblems: d.evidenceProblems };
@@ -393,7 +397,7 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
             </tr>
           </thead>
           <tbody>
-            {d.history.map((h) => (
+            {historyPaged.items.map((h) => (
               <tr key={h.id} className="border-t border-line">
                 <td className="py-1">v{h.version}</td>
                 <td>{STATE[h.state as RuleDetailData['state']] ?? h.state}</td>
@@ -403,6 +407,7 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
             ))}
           </tbody>
         </table>
+        <ClientPager paged={historyPaged} noun="versions" singular="version" />
       </section>
 
       {(d.annotationHistory ?? []).length > 0 && (
@@ -424,7 +429,7 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
               </tr>
             </thead>
             <tbody>
-              {(d.annotationHistory ?? []).map((h) => (
+              {annotationHistory.items.map((h) => (
                 <tr key={h.id} className="border-t border-line align-top">
                   <td className="py-1">v{h.annotationVersion}</td>
                   <td>{h.source === 'AI_SUGGESTION' ? `AI suggestion (${h.model ?? 'assistant'})` : `Edit by ${h.editedRole === 'ADMIN' ? 'Admin' : (h.editedRole ?? 'author')}`}</td>
@@ -435,6 +440,7 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
               ))}
             </tbody>
           </table>
+          <ClientPager paged={annotationHistory} noun="annotations" singular="annotation" />
         </section>
       )}
 

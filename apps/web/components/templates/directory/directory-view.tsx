@@ -1,13 +1,30 @@
 import type { DirectoryRowDto, TemplateDirectoryResponse } from '@praxis/shared';
-import { BLUEPRINT_SECTIONS } from '@praxis/shared';
+import { BLUEPRINT_SECTIONS, PAGE_SIZE, parsePage, slicePage } from '@praxis/shared';
 import Link from 'next/link';
+import { UrlPager, type SearchParams } from '@/components/pager';
 import { TableSearch } from '@/components/search/table-search';
 import { directoryHref, filterDomains, modesText, STATUS_PILLS, tptText, versionLabel } from '@/lib/mc/format';
 
-/** Screen 1: Templates & Active SME Applications Directory (S1-01 to S1-15). Server-rendered; filters live in the URL. */
-export function DirectoryView({ data, domainFilter }: { data: TemplateDirectoryResponse; domainFilter?: string }) {
+/**
+ * Screen 1: Templates & Active SME Applications Directory (S1-01 to S1-15). Server-rendered; filters live in the URL.
+ * D24: the workflows of the chosen domain(s), filtered by the search (`?q=`, ids in `matchIds`), are paged 10 at a time
+ * across all sections (`?page=`); each page shows its rows under their domain headers. An empty domain's header shows
+ * on the page where it falls in order, and is hidden while searching.
+ */
+export function DirectoryView({ data, domainFilter, searchParams = {}, query = '', matchIds = null }: { data: TemplateDirectoryResponse; domainFilter?: string; searchParams?: SearchParams; query?: string; matchIds?: Set<string> | null }) {
   const isAdmin = data.view === 'ADMIN';
-  const { selected, domains } = filterDomains(data, domainFilter);
+  const { selected, domains: chosen } = filterDomains(data, domainFilter);
+  const matched = chosen.map((d) => ({ domain: d, rows: matchIds ? d.rows.filter((r) => matchIds.has(r.templateId)) : d.rows }));
+  const paged = slicePage(matched.flatMap((m) => m.rows), parsePage(searchParams.page));
+  let offset = 0;
+  const domains = matched.flatMap(({ domain, rows }) => {
+    const start = offset;
+    offset += rows.length;
+    const onPage = rows.filter((r) => paged.items.includes(r));
+    if (onPage.length > 0) return [{ ...domain, rows: onPage, total: rows.length }];
+    const pageOfSlot = Math.min(Math.floor(start / PAGE_SIZE) + 1, paged.pageCount);
+    return domain.rows.length === 0 && !matchIds && pageOfSlot === paged.page ? [{ ...domain, rows: [], total: 0 }] : [];
+  });
   const s = data.summary;
   const cards: Array<[string, string]> = isAdmin
     ? [
@@ -52,14 +69,14 @@ export function DirectoryView({ data, domainFilter }: { data: TemplateDirectoryR
         </ul>
       </nav>
 
-      <div className="mt-6"><TableSearch type="templates" label="Search templates" placeholder="Search templates by workflow, domain or skills" /></div>
+      <div className="mt-6"><TableSearch type="templates" label="Search templates" placeholder="Search templates by workflow, domain or skills" syncUrl initialQuery={query} /></div>
       <div data-search-scope="templates">
       {domains.map((d) => (
         <section key={d.domainId} aria-labelledby={`domain-${d.domainId}`} className="mt-8">
           <h2 id={`domain-${d.domainId}`} className="flex items-center gap-2 text-lg font-semibold">
             {d.domainName}
-            <span className="pill" aria-label={`${d.rows.length} workflows`}>
-              {d.rows.length}
+            <span className="pill" aria-label={`${d.total} workflows`}>
+              {d.total}
             </span>
           </h2>
           {d.rows.length === 0 ? (
@@ -90,6 +107,8 @@ export function DirectoryView({ data, domainFilter }: { data: TemplateDirectoryR
         </section>
       ))}
       </div>
+      {matchIds && paged.total === 0 && <p className="mt-8 text-fg-muted">No templates match “{query}”.</p>}
+      {paged.total > 0 && <UrlPager searchParams={searchParams} page={paged.page} total={paged.total} shown={paged.items.length} noun="workflows" singular="workflow" />}
 
       {data.domains.length === 0 && <p className="mt-8 text-fg-muted">{isAdmin ? 'No domains yet. Domains and workflows come from the seed.' : 'No published templates yet.'}</p>}
     </div>

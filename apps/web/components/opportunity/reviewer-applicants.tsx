@@ -1,6 +1,8 @@
 'use client';
 
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { mutate } from '@/lib/client-api';
 
 export interface ReviewerApplicant {
@@ -20,6 +22,7 @@ export function ReviewerApplicants({ projectId, initial }: { projectId: string; 
   const [items, setItems] = useState(initial);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const paged = usePagedRows(items);
 
   async function makeExpert(a: ReviewerApplicant) {
     setPending(a.enrollmentId);
@@ -50,6 +53,7 @@ export function ReviewerApplicants({ projectId, initial }: { projectId: string; 
       {items.length === 0 ? (
         <p className="mt-3 text-sm">No reviewer applications yet.</p>
       ) : (
+        <>
         <table className="mt-3 w-full text-left text-sm">
           <thead>
             <tr className="border-b border-line">
@@ -62,7 +66,7 @@ export function ReviewerApplicants({ projectId, initial }: { projectId: string; 
             </tr>
           </thead>
           <tbody>
-            {items.map((a) => (
+            {paged.items.map((a) => (
               <tr key={a.enrollmentId} className="border-b border-line">
                 <td className="py-2">
                   {a.name}
@@ -83,6 +87,8 @@ export function ReviewerApplicants({ projectId, initial }: { projectId: string; 
             ))}
           </tbody>
         </table>
+        <ClientPager paged={paged} noun="applicants" singular="applicant" />
+        </>
       )}
     </section>
   );

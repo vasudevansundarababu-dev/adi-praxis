@@ -1,7 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, useAction } from '@/components/supply/action';
 import { fmtDate, humanize, shortId, TD, TH } from '@/components/supply/ui';
@@ -69,6 +71,7 @@ function ReverseButton({ e, reversed }: { e: EarningDto; reversed: boolean }) {
 
 export function EarningsTable({ items }: { items: EarningDto[] }) {
   const reversed = new Set(items.filter((e) => e.reversesId).map((e) => e.reversesId!));
+  const paged = usePagedRows(items);
   if (!items.length) return <p className="card mt-3 p-4 text-sm text-fg-muted">No earnings found.</p>;
   return (
     <div className="card mt-3 overflow-x-auto">
@@ -87,7 +90,7 @@ export function EarningsTable({ items }: { items: EarningDto[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
-          {items.map((e) => (
+          {paged.items.map((e) => (
             <tr key={e.id}>
               <td className={TD}>{fmtDate(e.earnedAt)}</td>
               <td className={`${TD} font-mono text-xs`} title={e.smeUserId}>
@@ -109,6 +112,7 @@ export function EarningsTable({ items }: { items: EarningDto[] }) {
           ))}
         </tbody>
       </table>
+      <ClientPager paged={paged} noun="earnings" singular="earning" className="px-3 pb-3" />
     </div>
   );
 }

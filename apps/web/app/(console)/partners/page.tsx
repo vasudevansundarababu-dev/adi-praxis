@@ -2,22 +2,27 @@ import { TIER_LABELS } from '@praxis/shared';
 import { TableSearch } from '@/components/search/table-search';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import { NoAccess } from '@/components/no-access';
 import { NewPartnerForm } from '@/components/supply/partner-forms';
 import type { PartnerRow } from '@/components/supply/types';
 import { Empty, StatePill, SupplyOff, TD, TH } from '@/components/supply/ui';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { pageOf, queryParam, searchIds } from '@/lib/paging';
 
 export const metadata: Metadata = { title: 'Partners' };
 
 /** Staffing partners who supply candidates (docs/SME-SUPPLY.md section 5). Admins onboard them. */
-export default async function PartnersPage() {
+export default async function PartnersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const user = (await getCurrentUser())!;
   if (!user.roles.some((r) => r === 'ADMIN' || r === 'PM')) return <NoAccess need="Admins and PMs" />;
   const isAdmin = user.roles.includes('ADMIN');
   const { status, data } = await apiGet<{ items: PartnerRow[] }>('/partners');
   if (status === 404) return <SupplyOff title="Partners" />;
   const items = data?.items ?? [];
+  const q = queryParam(sp);
+  const paged = pageOf(items, sp, await searchIds('partners', q));
   return (
     <div>
       <h1 className="text-2xl font-semibold">Partners</h1>
@@ -28,7 +33,7 @@ export default async function PartnersPage() {
         <Empty>No partners yet.{isAdmin ? ' Add the first one below.' : ' An Admin onboards partners.'}</Empty>
       ) : (
         <>
-        <TableSearch type="partners" label="Search partners" placeholder="Search partners by name" />
+        <TableSearch type="partners" label="Search partners" placeholder="Search partners by name" syncUrl initialQuery={q} />
         <div data-search-scope="partners" className="card mt-6 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-line text-fg-muted">
@@ -42,7 +47,7 @@ export default async function PartnersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {items.map((p) => (
+              {paged.items.map((p) => (
                 <tr data-search-id={p.id} key={p.id}>
                   <td className={TD}>
                     {isAdmin ? (
@@ -66,6 +71,7 @@ export default async function PartnersPage() {
               ))}
             </tbody>
           </table>
+          <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="partners" singular="partner" className="px-3 pb-3" />
         </div>
         </>
       )}

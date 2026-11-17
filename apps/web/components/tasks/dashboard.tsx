@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useEffect, useState } from 'react';
+import { ClientPager } from '@/components/pager';
 
 type Cell = { tags: Record<string, string>; quota: number; required: boolean; filled: number; working: number; state: 'EMPTY' | 'IN_PROGRESS' | 'FILLED' };
 type Edge = { name: string; quota: number; required: boolean; filled: number; working: number; state: Cell['state'] };
@@ -35,6 +37,7 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
     }, 15_000);
     return () => clearInterval(t);
   }, [initial.project.id]);
+  const experts = usePagedRows(d.experts);
   const label = (k: string) => d.coverage?.dimensions.find((x) => x.key === k)?.label ?? k;
   const pct = d.target ? Math.min(100, Math.round((d.accepted / d.target) * 100)) : 0;
   const cards: [string, React.ReactNode][] = [
@@ -121,7 +124,7 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {d.experts.map((e, i) => (
+              {experts.items.map((e, i) => (
                 <tr key={i}>
                   <td className="px-2 py-2">{e.name ?? 'Expert'}</td>
                   <td className="px-2 py-2 tabular-nums">{e.accepted}</td>
@@ -131,7 +134,7 @@ export function Dashboard({ initial }: { initial: DashboardData }) {
               ))}
             </tbody>
           </table>
-          {d.experts.length === 0 && <p className="mt-2 text-sm text-fg-muted">No expert has tasks yet.</p>}
+          {d.experts.length === 0 ? <p className="mt-2 text-sm text-fg-muted">No expert has tasks yet.</p> : <ClientPager paged={experts} noun="experts" singular="expert" />}
         </div>
       </section>
     </div>

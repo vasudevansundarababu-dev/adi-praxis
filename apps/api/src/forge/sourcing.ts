@@ -1,5 +1,5 @@
 import { Prisma, type Project, type SourcedPerson, type TaskInstance } from '@prisma/client';
-import { CAPPED_TASK_STATUSES, normEmail, type ProjectPersonDto, type SourcedPersonDto, type SourcedPersonInput } from '@praxis/shared';
+import { CAPPED_TASK_STATUSES, matchesQuery, normEmail, slicePage, type ProjectPersonDto, type SourcedPersonDto, type SourcedPersonInput } from '@praxis/shared';
 import type { Actor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { AppError, notFound } from '../lib/errors';
@@ -304,6 +304,23 @@ export async function assignable(tx: Db | Tx, p: Project & SkillSource) {
       })),
     ],
   };
+}
+
+/** The words a PM can search Assign people by (D23): first name, last name, email and the matching skills shown. */
+export function assignSearchFields(p: { firstName: string; lastName: string; email: string; matchingSkills: { skill: string; matched: boolean | null }[] }) {
+  return [p.firstName, p.lastName, `${p.firstName} ${p.lastName}`, p.email, ...p.matchingSkills.filter((s) => s.matched === true).map((s) => s.skill)];
+}
+
+/**
+ * Assign people filtered by `q` and paged (D23, D24). `peopleAvailable` is everyone before the search, so the screen
+ * can tell "no one matches this project" from "no one matches your search"; `total` is the filtered total.
+ */
+export function pageAssignable<T extends { people: Parameters<typeof assignSearchFields>[0][] }>(data: T, query: { q?: string; page?: number; pageSize?: number }) {
+  const q = query.q?.trim();
+  const people = q ? data.people.filter((p) => matchesQuery(assignSearchFields(p), q)) : data.people;
+  if (!q && !query.page) return data;
+  const paged = query.page ? slicePage(people, query.page, query.pageSize) : { items: people, page: 1, pageSize: people.length, total: people.length, pageCount: 1 };
+  return { ...data, people: paged.items as T['people'], peopleAvailable: data.people.length, page: paged.page, pageSize: paged.pageSize, total: paged.total, pageCount: paged.pageCount };
 }
 
 /**

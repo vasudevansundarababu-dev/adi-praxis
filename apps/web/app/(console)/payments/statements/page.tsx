@@ -1,4 +1,6 @@
+import { parsePage, slicePage } from '@praxis/shared';
 import type { Metadata } from 'next';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import { BuildStatementsForm } from '@/components/payments/statements';
 import { type StatementDto, totalsText } from '@/components/payments/types';
 import { NoAccess } from '@/components/no-access';
@@ -9,7 +11,8 @@ import { apiGet, getCurrentUser } from '@/lib/api';
 export const metadata: Metadata = { title: 'Partner statements' };
 
 /** Monthly certified-candidate fee statements per partner. Invoices are paid outside Praxis. */
-export default async function StatementsPage() {
+export default async function StatementsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const user = (await getCurrentUser())!;
   if (!user.roles.some((r) => r === 'ADMIN' || r === 'FINANCE')) return <NoAccess need="Finance and Admins" />;
   const [{ status, data }, partners] = await Promise.all([
@@ -19,6 +22,7 @@ export default async function StatementsPage() {
   if (status === 404) return <SupplyOff title="Partner statements" />;
   const name = new Map((partners.data?.items ?? []).map((p) => [p.id, p.name]));
   const items = data?.items ?? [];
+  const paged = slicePage(items, parsePage(sp.page));
   return (
     <div className="space-y-6">
       <div>
@@ -31,8 +35,9 @@ export default async function StatementsPage() {
       {items.length === 0 ? (
         <Empty>No statements yet.</Empty>
       ) : (
+        <div>
         <ul className="space-y-4">
-          {items.map((s) => (
+          {paged.items.map((s) => (
             <li key={s.id} className="card p-4 text-sm">
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="font-semibold">{name.get(s.partnerId) ?? `Partner ${shortId(s.partnerId)}`}</h2>
@@ -76,6 +81,8 @@ export default async function StatementsPage() {
             </li>
           ))}
         </ul>
+        <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="statements" singular="statement" />
+        </div>
       )}
     </div>
   );

@@ -5,13 +5,14 @@ import { ForgeProjectShell } from '@/components/forge/project-shell';
 import { ForgeTasksTab } from '@/components/forge/tasks-tab';
 import { PolicyWorkspace, type DocumentsData, type ExtractionData, type PreviewData, type RuleRow } from '@/components/policy/policy-workspace';
 import type { ExportState } from '@/components/projects/export-panel';
+import type { SearchParams } from '@/components/pager';
 import { apiGet, getCurrentUser } from '@/lib/api';
 import { smesOf, type ProjectTab, type ReviewRoute } from '@/lib/forge-console';
 
 type People = { reviewRoute: ReviewRoute; requiredWorkers: number | null; items: ProjectPersonDto[]; withoutTask?: WithoutTask };
 
 /** The MVP1 project page: header and tabs Dashboard, Resource assignments, Tasks, Policies (`?tab=`). */
-export async function ForgeProjectPage({ project, tab }: { project: ProjectDto; tab: ProjectTab }) {
+export async function ForgeProjectPage({ project, tab, searchParams = {} }: { project: ProjectDto; tab: ProjectTab; searchParams?: SearchParams }) {
   const id = project.id;
   const [peopleRes, tasksRes, setsRes] = await Promise.all([
     apiGet<People>(`/projects/${id}/people`),
@@ -28,7 +29,7 @@ export async function ForgeProjectPage({ project, tab }: { project: ProjectDto; 
 
   let body: React.ReactNode;
   if (tab === 'people') {
-    body = <ForgePeopleTab projectId={id} reviewRoute={reviewRoute} requiredWorkers={requiredWorkers} people={people} tasks={tasks} withoutTask={peopleRes.data?.withoutTask} />;
+    body = <ForgePeopleTab projectId={id} reviewRoute={reviewRoute} requiredWorkers={requiredWorkers} people={people} tasks={tasks} withoutTask={peopleRes.data?.withoutTask} searchParams={searchParams} />;
   } else if (tab === 'tasks') {
     const { data: exportState } = await apiGet<ExportState>(`/projects/${id}/export`);
     body = <ForgeTasksTab projectId={id} tasks={tasks} people={people} exportState={exportState} />;
@@ -74,6 +75,7 @@ export async function ForgeProjectPage({ project, tab }: { project: ProjectDto; 
         exportState={exp.data}
         attributes={a.data?.items ?? []}
         jobDescriptions={j.data?.items ?? []}
+        searchParams={searchParams}
       />
     );
   }

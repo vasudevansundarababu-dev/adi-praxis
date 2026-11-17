@@ -21,6 +21,30 @@ async function signIn(page: Page, email: string, password: string) {
   await page.getByRole('button', { name: /sign in/i }).click();
 }
 
+/**
+ * D24: the directory shows 10 workflows a page. Find one the way a user does: type its name in the search bar, which
+ * filters the whole directory (`?q=`), not just the page on screen.
+ */
+async function searchDirectory(page: Page, name: string) {
+  const box = page.getByRole('combobox', { name: 'Search templates' });
+  await box.fill(name);
+  await expect(page).toHaveURL(/[?&]q=/, { timeout: 30_000 });
+  // Leave the box (Escape would clear a search input) so the suggestions close and don't cover the table.
+  await page.getByRole('heading', { level: 1 }).click();
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+}
+
+/** Every page of the directory, in turn (D24): runs `check` on page 1, then follows Next until the last page. */
+async function eachDirectoryPage(page: Page, check: () => Promise<void>) {
+  for (let n = 1; n <= 50; n++) {
+    await check();
+    const next = page.getByRole('navigation', { name: 'Workflows pages' }).getByRole('link', { name: 'Next page' });
+    if ((await next.count()) === 0) return;
+    await next.click();
+    await expect(page).toHaveURL(new RegExp(`[?&]page=${n + 1}`), { timeout: 30_000 });
+  }
+}
+
 test('an Admin takes a template from the directory to a deployed studio; the SME commits a task; a separate Reviewer approves it', async ({ browser }) => {
   test.setTimeout(240_000);
   const adminCtx = await browser.newContext();
@@ -36,6 +60,7 @@ test('an Admin takes a template from the directory to a deployed studio; the SME
   await expect(admin.getByRole('heading', { level: 1 })).toHaveText('Harbor Templates Directory', { timeout: 30_000 });
   await expect(admin.getByRole('button', { name: /new template/i })).toHaveCount(0);
   await expect(admin.getByRole('link', { name: /new template/i })).toHaveCount(0);
+  await searchDirectory(admin, WORKFLOW);
   const row = admin.getByRole('row').filter({ has: admin.getByRole('link', { name: WORKFLOW, exact: true }) });
   await expect(row.getByText('Active')).toBeVisible();
   await expect(row.getByRole('cell', { name: `v${s.templateVersion}`, exact: true })).toBeVisible(); // S1-06
@@ -61,8 +86,8 @@ test('an Admin takes a template from the directory to a deployed studio; the SME
   await expect(deployed).toContainText('Studio deployed');
   await expect(deployed.locator('code')).toHaveText(s.studioUrl);
 
-  // Back on Screen 1 the deployment shows its SME studio link.
-  await admin.goto(`${WEB}/templates`);
+  // Back on Screen 1 the deployment shows its SME studio link (the search is kept in the URL, so a reload keeps it).
+  await admin.goto(`${WEB}/templates?q=${encodeURIComponent(WORKFLOW)}`);
   await expect(row.getByRole('link', { name: /SME UI/ })).toHaveAttribute('href', s.studioUrl);
 
   // Screen 4: the assigned SME signs in (mock Google), authors and commits a task.
@@ -165,10 +190,15 @@ test('a PM sees published workflows read-only: no Meta-Compiler, no Screen 3, no
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible({ timeout: 30_000 });
   await page.goto(`${WEB}/templates`);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Harbor Templates Directory', { timeout: 30_000 });
-  await expect(page.getByRole('columnheader', { name: 'Project & Assigned SME' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /SME UI/ })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Tasks DB & JSON' })).toHaveCount(0);
-  await expect(page.getByText(/Draft/)).toHaveCount(0);
+  // On every page of the directory: no project or SME column, no studio links, no drafts.
+  await eachDirectoryPage(page, async () => {
+    await expect(page.getByRole('columnheader', { name: 'Project & Assigned SME' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /SME UI/ })).toHaveCount(0);
+    await expect(page.getByText(/Draft/)).toHaveCount(0);
+  });
+  await page.goto(`${WEB}/templates`);
+  await searchDirectory(page, 'Launch of Noise Cancelling Phone');
   await page.getByRole('link', { name: 'Launch of Noise Cancelling Phone', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Launch of Noise Cancelling Phone', { timeout: 30_000 });
   await expect(page.getByRole('toolbar', { name: 'Meta-Compiler actions' })).toHaveCount(0);

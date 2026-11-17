@@ -1,3 +1,5 @@
+import { parsePage, slicePage } from '@praxis/shared';
+import { UrlPager, type SearchParams } from '@/components/pager';
 import type { EarningsView } from '@/lib/supply-types';
 import { fmtDate } from '@/lib/supply-types';
 
@@ -21,7 +23,9 @@ const PAYOUT_STATUS: Record<EarningsView['payouts'][number]['status'], [string, 
 };
 
 /** Balances per currency, weekly payouts (with hold reasons and currency conversion) and the earning entries. */
-export function Earnings({ data }: { data: EarningsView }) {
+export function Earnings({ data, searchParams = {} }: { data: EarningsView; /** D24: `?payoutsPage=` and `?page=`. */ searchParams?: SearchParams }) {
+  const payouts = slicePage(data.payouts, parsePage(searchParams.payoutsPage));
+  const entries = slicePage(data.entries, parsePage(searchParams.page));
   const currencies = Object.entries(data.balance);
   return (
     <>
@@ -77,7 +81,7 @@ export function Earnings({ data }: { data: EarningsView }) {
                 </tr>
               </thead>
               <tbody>
-                {data.payouts.map((p) => (
+                {payouts.items.map((p) => (
                   <tr key={p.id} className="border-t border-hairline align-top">
                     <td className="p-3">{fmtDate(`${p.week}T00:00:00Z`)}</td>
                     <td className="p-3 font-medium">{money(p.amount, p.currency)}</td>
@@ -98,6 +102,7 @@ export function Earnings({ data }: { data: EarningsView }) {
               </tbody>
             </table>
           </div>
+          <UrlPager searchParams={searchParams} param="payoutsPage" page={payouts.page} total={payouts.total} shown={payouts.items.length} noun="payouts" singular="payout" />
         </section>
       )}
 
@@ -117,7 +122,7 @@ export function Earnings({ data }: { data: EarningsView }) {
                 </tr>
               </thead>
               <tbody>
-                {data.entries.map((e) => (
+                {entries.items.map((e) => (
                   <tr key={e.id} className="border-t border-hairline align-top">
                     <td className="p-3">{fmtDate(e.earnedAt)}</td>
                     <td className="p-3">
@@ -133,6 +138,7 @@ export function Earnings({ data }: { data: EarningsView }) {
               </tbody>
             </table>
           </div>
+          <UrlPager searchParams={searchParams} page={entries.page} total={entries.total} shown={entries.items.length} noun="earnings" singular="earning" />
         </section>
       )}
     </>

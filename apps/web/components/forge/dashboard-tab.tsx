@@ -1,5 +1,7 @@
 import type { DemographicAttributeDto, ForgeTaskRow, JobDescriptionDto, ProjectDto, ProjectPersonDto } from '@praxis/shared';
+import { parsePage, slicePage } from '@praxis/shared';
 import Link from 'next/link';
+import { UrlPager, type SearchParams } from '@/components/pager';
 import type { ExportState } from '@/components/projects/export-panel';
 import { projectDetailRows } from '@/components/projects/summary';
 import { exportStatusLine, fullName, nextStep, reviewersOf, routeLabel, rowSelector, selectorName, smesOf, taskCode, taskName, taskStatusLabel, taskStatusTone, type ReviewRoute } from '@/lib/forge-console';
@@ -27,6 +29,7 @@ export function ForgeDashboardTab({
   exportState,
   attributes,
   jobDescriptions,
+  searchParams = {},
 }: {
   project: ProjectDto;
   reviewRoute: ReviewRoute;
@@ -38,7 +41,11 @@ export function ForgeDashboardTab({
   exportState: ExportState | null;
   attributes: DemographicAttributeDto[];
   jobDescriptions: JobDescriptionDto[];
+  /** D24: the URL's `?page=` for the coverage table. */
+  searchParams?: SearchParams;
 }) {
+  // D24: the coverage table, 10 tasks a page; task codes keep their place in the whole list.
+  const coverage = slicePage(tasks.map((t, i) => ({ t, i })), parsePage(searchParams.page));
   const smes = smesOf(people).length;
   const approved = tasks.filter((t) => t.status === 'ACCEPTED').length;
   const waiting = tasks.filter((t) => t.status === 'SUBMITTED').length;
@@ -110,7 +117,7 @@ export function ForgeDashboardTab({
             </tr>
           </thead>
           <tbody className="divide-y divide-hairline">
-            {tasks.map((t, i) => (
+            {coverage.items.map(({ t, i }) => (
               <tr key={t.taskId} data-coverage-row>
                 <td className={`${TD} font-semibold`}>{rowSelector(t)?.value ?? taskName(t.label)}</td>
                 <td className={`${TD} font-mono text-xs`}>{taskCode(i)}</td>
@@ -130,6 +137,7 @@ export function ForgeDashboardTab({
           </tbody>
         </table>
       </div>
+      {tasks.length > 0 && <UrlPager searchParams={searchParams} page={coverage.page} total={coverage.total} shown={coverage.items.length} noun="tasks" singular="task" />}
       <p className="mt-2.5 text-xs text-fg-muted">
         {covered} of {tasks.length} covered by an approved task.
       </p>

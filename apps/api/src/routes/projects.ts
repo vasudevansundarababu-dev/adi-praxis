@@ -25,6 +25,7 @@ import { forgeSettings } from '../forge/settings';
 import { raisePlacesToTaskCount } from '../forge/sourcing';
 import { AppError, badRequest, conflict, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
+import { PageInfoFields, PagedQuery, pageArgs, type IdSearch } from '../lib/paging';
 import { toJdDto } from './job-descriptions';
 import { syncGeneratedJds } from '../projects/generated-jd';
 
@@ -175,26 +176,28 @@ function scalarData(body: z.infer<typeof UpdateProjectRequest>): Prisma.ProjectU
 }
 
 const IdParams = z.object({ id: z.string().uuid() });
-const ListQuery = z.object({ status: z.enum(['DRAFT', 'READY_FOR_STAFFING', 'STAFFING', 'STAFFED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'CANCELLED']).optional() });
+const ListQuery = PagedQuery.extend({ status: z.enum(['DRAFT', 'READY_FOR_STAFFING', 'STAFFING', 'STAFFED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'CANCELLED']).optional() });
 const ACCESS = ['PM', 'ADMIN'] as const;
 
 /** FLOW 1: project creation (SPEC). */
-export const projectRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db }) => {
+export const projectRoutes: FastifyPluginAsyncZod<{ db: Db; search?: IdSearch }> = async (app, { db, search }) => {
+  // D24: optional `page` / `pageSize` (10 a page by default) and `q` (the console search); every row without `page`.
   app.get(
     '/projects',
-    { config: { access: ACCESS }, schema: { tags: ['projects'], querystring: ListQuery, response: { 200: z.object({ items: z.array(ProjectDto) }) } } },
+    { config: { access: ACCESS }, schema: { tags: ['projects'], querystring: ListQuery, response: { 200: z.object({ items: z.array(ProjectDto), ...PageInfoFields }) } } },
     async (req) => {
       const actor = req.actor!;
-      const items = await db.project.findMany({
-        where: {
-          clientId: actor.clientId,
-          ...(isAdmin(actor) ? {} : { ownerId: actor.userId }),
-          ...(req.query.status ? { status: req.query.status } : {}),
-        },
-        include: INCLUDE,
-        orderBy: { updatedAt: 'desc' },
-      });
-      return { items: items.map(toProjectDto) };
+      const q = req.query.q?.trim();
+      const ids = q && search ? await search(actor, 'projects', q) : null;
+      const where: Prisma.ProjectWhereInput = {
+        clientId: actor.clientId,
+        ...(isAdmin(actor) ? {} : { ownerId: actor.userId }),
+        ...(req.query.status ? { status: req.query.status } : {}),
+        ...(ids ? { id: { in: ids } } : {}),
+      };
+      const { skip, take, info } = pageArgs(req.query, req.query.page ? await db.project.count({ where }) : 0);
+      const items = await db.project.findMany({ where, include: INCLUDE, orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }], skip, take });
+      return { items: items.map(toProjectDto), ...info };
     },
   );
 

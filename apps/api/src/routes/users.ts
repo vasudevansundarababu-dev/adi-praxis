@@ -7,6 +7,7 @@ import { revokeAllUserSessions } from '../auth/sessions';
 import type { Db } from '../db';
 import { conflict, notFound } from '../lib/errors';
 import { runCommand } from '../platform/command';
+import { PageInfoFields, PagedQuery, pageArgs, type IdSearch } from '../lib/paging';
 
 export const toUserDto = (u: User): z.infer<typeof InternalUserDto> => ({
   id: u.id,
@@ -23,16 +24,21 @@ const IdParams = z.object({ id: z.string().uuid() });
 const ADMIN = ['ADMIN'] as const;
 
 /** Admin: manage internal users and roles (SPEC: Personas and roles). */
-export const userRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db }) => {
+export const userRoutes: FastifyPluginAsyncZod<{ db: Db; search?: IdSearch }> = async (app, { db, search }) => {
+  // D24: optional `page` / `pageSize` and `q` (the console search); every user without `page`.
   app.get(
     '/users',
     {
       config: { access: ADMIN },
-      schema: { tags: ['users'], response: { 200: z.object({ items: z.array(InternalUserDto) }) } },
+      schema: { tags: ['users'], querystring: PagedQuery, response: { 200: z.object({ items: z.array(InternalUserDto), ...PageInfoFields }) } },
     },
     async (req) => {
-      const users = await db.user.findMany({ where: { clientId: req.actor!.clientId }, orderBy: { email: 'asc' } });
-      return { items: users.map(toUserDto) };
+      const q = req.query.q?.trim();
+      const ids = q && search ? await search(req.actor!, 'users', q) : null;
+      const where = { clientId: req.actor!.clientId, ...(ids ? { id: { in: ids } } : {}) };
+      const { skip, take, info } = pageArgs(req.query, req.query.page ? await db.user.count({ where }) : 0);
+      const users = await db.user.findMany({ where, orderBy: [{ email: 'asc' }, { id: 'asc' }], skip, take });
+      return { items: users.map(toUserDto), ...info };
     },
   );
 

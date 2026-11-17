@@ -7,7 +7,8 @@ import type { Actor } from '../auth/actor';
 import type { MalwareScanner, ObjectStorage } from '../candidate/storage';
 import type { Db, Tx } from '../db';
 import { buildAssessmentSheet, buildRecruiterPack, buildRecruiterPdf, COLUMN_KEYS, columnValue, isFixedColumn, packFileName, readAssessmentSheet, type SheetRow } from '../forge/recruiter-pack';
-import { addSourcedPerson, adoptPoolPerson, assignable, changeAuthor, createSourcedPerson, directAssign, listSourcedPeople, projectPeople, raisePlacesToTaskCount, setRequiredWorkers, sourcedWithoutTask, sourcingProject, sourcingProjects, sourcingTarget, toSourcedPersonDto } from '../forge/sourcing';
+import { PagedQuery } from '../lib/paging';
+import { addSourcedPerson, adoptPoolPerson, assignable, pageAssignable, changeAuthor, createSourcedPerson, directAssign, listSourcedPeople, projectPeople, raisePlacesToTaskCount, setRequiredWorkers, sourcedWithoutTask, sourcingProject, sourcingProjects, sourcingTarget, toSourcedPersonDto } from '../forge/sourcing';
 import { resendSetLink, setLinkOnAssign, passwordMode, signInModeError } from '../forge/password';
 import { forgeSettings } from '../forge/settings';
 import type { Config } from '../config';
@@ -130,9 +131,11 @@ export const forgeSourcingRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config
     return { reviewRoute: p.reviewRoute, requiredWorkers: p.requiredWorkers, items: await projectPeople(db, p.id), withoutTask: await sourcedWithoutTask(db, p.id) };
   });
 
-  app.get('/projects/:id/assignable', { config: { access: ACCESS }, schema: { tags: ['sourcing'], params: IdParams } }, async (req) => {
+  // D23 + D24: optional `q` (first name, last name, email, matching skills) and `page` / `pageSize`. Without them every
+  // person is returned, as before.
+  app.get('/projects/:id/assignable', { config: { access: ACCESS }, schema: { tags: ['sourcing'], params: IdParams, querystring: PagedQuery } }, async (req) => {
     await withTaskRows(req.actor!, String(req.id), (await sourcingProject(db, req.actor!, req.params.id)).id);
-    return assignable(db, await sourcingProject(db, req.actor!, req.params.id));
+    return pageAssignable(await assignable(db, await sourcingProject(db, req.actor!, req.params.id)), req.query);
   });
 
   /** D19: the PM or Admin changes Required workers (SME places) from the Assign screen. Authorised, idempotent, audited. */

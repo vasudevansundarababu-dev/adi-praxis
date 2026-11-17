@@ -148,39 +148,51 @@ export function CriterionTable({ field, items }: { field: ItemField; items: Reco
   );
 }
 
+/** D29: a long unbroken value (a checksum, an ID) may wrap anywhere; a date never wraps; other text wraps between words. */
+export const wrapClass = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? 'whitespace-nowrap' : /\S{25,}/.test(v) ? 'whitespace-pre-wrap [overflow-wrap:anywhere]' : 'whitespace-pre-wrap break-words');
+
 /** One authored value, read-only: arrays of records as a table, other arrays as a list, unknown shapes as JSON. */
 export function FieldValue({ field, value }: { field: ItemField; value: unknown }) {
   if (isBlank(value)) return <span className="text-fg-muted">—</span>;
   if (field.type === 'criterion' && Array.isArray(value) && value.every((x) => x && typeof x === 'object' && !Array.isArray(x))) return <CriterionTable field={field} items={value as Record<string, unknown>[]} />;
   if (isArrayType(field.type) && Array.isArray(value)) {
-    const subs = itemFieldsOf(field);
-    if (subs.length && value.every((x) => x && typeof x === 'object' && !Array.isArray(x))) {
+    const all = itemFieldsOf(field);
+    if (all.length && value.every((x) => x && typeof x === 'object' && !Array.isArray(x))) {
+      const rows = value as Record<string, unknown>[];
+      // D29: a column that is empty in every row is left out (and named below), so wide record tables such as the
+      // Marketing policy rules fit the card instead of running past its right edge. Long unbroken values (checksums,
+      // IDs) wrap anywhere, so they can't push the other columns out either.
+      const subs = all.filter((s) => rows.some((r) => !isBlank(r[s.key])));
+      const empty = all.filter((s) => !subs.includes(s));
       return (
-        <div className="max-w-full overflow-x-auto">
-          <table className="w-full min-w-[40rem] text-left text-[13px]">
-            <thead className="border-b border-hairline text-fg-muted">
-              <tr>
-                <th className="px-2 py-1.5 font-semibold">#</th>
-                {subs.map((s) => (
-                  <th key={s.key} className="px-2 py-1.5 font-semibold">
-                    {s.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hairline">
-              {(value as Record<string, unknown>[]).map((item, i) => (
-                <tr key={i}>
-                  <td className="px-2 py-1.5 align-top">{i + 1}</td>
+        <div className="min-w-0" data-record-table={field.key}>
+          <div className="max-w-full overflow-x-auto rounded-md border border-hairline">
+            <table className="w-full min-w-[40rem] text-left text-[13px]">
+              <thead className="border-b border-hairline text-fg-muted">
+                <tr>
+                  <th className="w-8 px-2 py-1.5 align-bottom font-semibold">#</th>
                   {subs.map((s) => (
-                    <td key={s.key} className="min-w-[8rem] px-2 py-1.5 align-top whitespace-pre-wrap break-words">
-                      {scalar(s, item[s.key])}
-                    </td>
+                    <th key={s.key} className="px-2 py-1.5 align-bottom font-semibold">
+                      {s.label}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-hairline">
+                {rows.map((item, i) => (
+                  <tr key={i}>
+                    <td className="px-2 py-1.5 align-top text-fg-muted">{i + 1}</td>
+                    {subs.map((s) => (
+                      <td key={s.key} className={`min-w-[5rem] px-2 py-1.5 align-top ${wrapClass(scalar(s, item[s.key]))}`}>
+                        {scalar(s, item[s.key])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {empty.length > 0 && <p className="mt-1 text-xs text-fg-muted">Empty in every row, not shown: {empty.map((s) => s.label).join(', ')}.</p>}
         </div>
       );
     }

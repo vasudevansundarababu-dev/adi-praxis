@@ -1,1 +1,5 @@
-{ "extends": "../../tsconfig.base.json", "include": ["src", "theme", "test"] }
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "jsx": "react-jsx", "lib": ["DOM", "DOM.Iterable", "ES2023"] },
+  "include": ["src", "theme", "test"]
+}

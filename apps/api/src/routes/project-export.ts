@@ -81,8 +81,8 @@ function runDto(r: { id: string; projectId: string; kind: string; validator: str
 async function validate(tx: Db | Tx, validator: AnvilTaskValidator, records: ApprovedTaskRecord[], projectId: string, resolve = false): Promise<{ items: ValidationItem[]; results: TaskValidationResult[]; anvil?: AnvilRunRecord; zips?: Map<number, Buffer> }> {
   const tasks = await tx.taskInstance.findMany({ where: { id: { in: records.map((r) => r.taskInstanceId) } }, select: { id: true, checks: true } });
   const blockers = new Map(tasks.map((t) => [t.id, ((t.checks as { export?: { blockers?: { code: string; path: string; message: string }[] } } | null)?.export?.blockers ?? [])]));
-  const items = records.map((r) => validationItem(r, titleOf(r), blockers.get(r.taskInstanceId) ?? []));
   const templates = new Map((await tx.template.findMany({ where: { id: { in: [...new Set(records.map((r) => r.templateId))] } } })).map((t) => [t.id, t]));
+  const items = records.map((r) => validationItem(r, titleOf(r), blockers.get(r.taskInstanceId) ?? [], templates.get(r.templateId)));
   try {
     if (validator.run) return { items, ...(await validator.run(items, { projectId, templates }, { resolve })) };
     return { items, results: await validator.validate(items, { projectId, templates }) };
@@ -142,7 +142,7 @@ export const projectExportRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Objec
       const { items, results, anvil, zips } = await validate(tx, validator, e.records, p.id, true);
       const byRecord = new Map(results.map((r) => [r.recordId, r]));
       // One line per approved task: the dataset record, its Anvil export envelope (when it has one) and the verdict.
-      const file = items.map((i) => JSON.stringify({ record: toRecordDto(i.record), anvilExport: i.envelope, validation: byRecord.get(i.record.id) ?? null })).join('\n') + '\n';
+      const file = items.map((i) => JSON.stringify({ record: toRecordDto(i.record), exportContract: i.exportContract, anvilExport: i.envelope, validation: byRecord.get(i.record.id) ?? null })).join('\n') + '\n';
       const id = crypto.randomUUID();
       const key = `exports/${actor.clientId}/${p.id}/${id}.ndjson`;
       await storage.put(key, Buffer.from(file, 'utf8'), 'application/x-ndjson');

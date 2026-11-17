@@ -26,7 +26,21 @@ describe('D29: record tables on the task approval page fit the card', () => {
     expect(rows.length).toBe(8);
     const h = heads(table(mk, 'policies'));
     expect(h).toEqual(['#', 'Rule ID', 'Rule version', 'Source page / clause', 'Quotation', 'Applies to step / role', 'Applicability rationale']);
-    expect(text(mk)).toContain('Empty in every row, not shown: Conflict or exception, Output field, Comparison, Expected value, Hard failure.');
+    expect(text(mk)).toContain('Empty in every row, not shown: Conflict or exception.');
+  });
+
+  it('as in QA: grading settings go in the row’s Details, rule-version UUIDs are shortened, tables span the card', () => {
+    const live = structuredClone(GOLDEN_MARKETING_EXAMPLE) as unknown as { sections: { S4: { policies: Record<string, unknown>[] } } };
+    live.sections.S4.policies.forEach((r, i) => Object.assign(r, { ruleVersion: `3f2a9c1${i}-6b4e-4d2a-9f1c-0a7e5b8c4d2${i}`, hardFailure: false, outputField: 'case_outcome', comparison: '', expectedValue: '' }));
+    const m = renderToStaticMarkup(<AuthoredForm profile={MARKETING_CAMPAIGN_TASK2_PROFILE} output={live as unknown as Record<string, unknown>} />);
+    const t = table(m, 'policies');
+    expect(heads(t)).toEqual(['#', 'Rule ID', 'Rule version', 'Source page / clause', 'Quotation', 'Applies to step / role', 'Applicability rationale']);
+    expect(t).toContain('<span class="font-mono" title="3f2a9c10-6b4e-4d2a-9f1c-0a7e5b8c4d20">3f2a9c10…</span>');
+    expect(text(t)).toContain('POL-01 Details Output field · grading setting case_outcome Hard failure · grading setting No');
+    // The table's label and value span both grid columns; a plain value keeps the 12rem label column.
+    expect(m).toMatch(/<dt class="font-medium text-fg-muted sm:col-span-2">Applicable rules<\/dt><dd class="min-w-0 sm:col-span-2"><div class="min-w-0" data-record-table="policies">/);
+    expect(m).toMatch(/<dt class="font-medium text-fg-muted">Title<\/dt><dd class="min-w-0">/);
+    expect(a11yProblems(m)).toEqual([]);
   });
 
   it('Marketing S2: the checksum wraps anywhere; dates never wrap; ordinary text wraps between words', () => {

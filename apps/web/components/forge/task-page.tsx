@@ -148,6 +148,24 @@ export function CriterionTable({ field, items }: { field: ItemField; items: Reco
   );
 }
 
+/** D29: the technical grading fields of a cited rule (D9) go in the row's Details, not in columns. */
+const RECORD_TECHNICAL = new Set(['outputField', 'comparison', 'expectedValue', 'hardFailure']);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** D29: a table of records (shown across the full card width, under its label). */
+export const isRecordTable = (field: ItemField, value: unknown) => (isArrayType(field.type) || (field.type as string) === 'criterion') && Array.isArray(value) && value.length > 0 && value.every((x) => x && typeof x === 'object' && !Array.isArray(x)) && itemFieldsOf(field).length > 0;
+
+/** D29: a cell, with a version UUID shortened to its first 8 characters (the full value on hover). */
+function Cell({ v }: { v: string }) {
+  return UUID.test(v) ? (
+    <span className="font-mono" title={v}>
+      {v.slice(0, 8)}…
+    </span>
+  ) : (
+    <>{v}</>
+  );
+}
+
 /** D29: a long unbroken value (a checksum, an ID) may wrap anywhere; a date never wraps; other text wraps between words. */
 export const wrapClass = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? 'whitespace-nowrap' : /\S{25,}/.test(v) ? 'whitespace-pre-wrap [overflow-wrap:anywhere]' : 'whitespace-pre-wrap break-words');
 
@@ -162,8 +180,10 @@ export function FieldValue({ field, value }: { field: ItemField; value: unknown 
       // D29: a column that is empty in every row is left out (and named below), so wide record tables such as the
       // Marketing policy rules fit the card instead of running past its right edge. Long unbroken values (checksums,
       // IDs) wrap anywhere, so they can't push the other columns out either.
-      const subs = all.filter((s) => rows.some((r) => !isBlank(r[s.key])));
-      const empty = all.filter((s) => !subs.includes(s));
+      const filled = all.filter((s) => rows.some((r) => !isBlank(r[s.key])));
+      const subs = filled.filter((s) => !RECORD_TECHNICAL.has(s.key));
+      const tech = filled.filter((s) => RECORD_TECHNICAL.has(s.key));
+      const empty = all.filter((s) => !filled.includes(s) && !RECORD_TECHNICAL.has(s.key));
       return (
         <div className="min-w-0" data-record-table={field.key}>
           <div className="max-w-full overflow-x-auto rounded-md border border-hairline">
@@ -182,9 +202,24 @@ export function FieldValue({ field, value }: { field: ItemField; value: unknown 
                 {rows.map((item, i) => (
                   <tr key={i}>
                     <td className="px-2 py-1.5 align-top text-fg-muted">{i + 1}</td>
-                    {subs.map((s) => (
+                    {subs.map((s, j) => (
                       <td key={s.key} className={`min-w-[5rem] px-2 py-1.5 align-top ${wrapClass(scalar(s, item[s.key]))}`}>
-                        {scalar(s, item[s.key])}
+                        <Cell v={scalar(s, item[s.key])} />
+                        {j === 0 && tech.some((t) => !isBlank(item[t.key])) && (
+                          <details className="mt-1 text-xs" data-record-details>
+                            <summary className="cursor-pointer text-link">Details</summary>
+                            <dl className="mt-1 space-y-1">
+                              {tech
+                                .filter((t) => !isBlank(item[t.key]))
+                                .map((t) => (
+                                  <div key={t.key}>
+                                    <dt className="text-fg-muted">{t.label} · grading setting</dt>
+                                    <dd className="break-words">{scalar(t, item[t.key])}</dd>
+                                  </div>
+                                ))}
+                            </dl>
+                          </details>
+                        )}
                       </td>
                     ))}
                   </tr>
@@ -235,15 +270,20 @@ export function AuthoredForm({ profile, output, rubric = null }: { profile: Temp
             <p className="text-sm text-fg-muted">Checks and submission only.</p>
           ) : (
             <dl className="grid gap-x-4 gap-y-2.5 text-sm sm:grid-cols-[12rem_1fr]">
-              {s.fields.map((f) => (
+              {s.fields.map((f) => {
+                const v = output ? getFieldValue(profile, output, s.key as SectionKey, f) : undefined;
+                // D29: a table takes the card's full width, under its label, so it isn't squeezed into the value column.
+                const wide = isRecordTable(f, v);
+                return (
                 <div key={f.key} className="contents">
-                  <dt className="font-medium text-fg-muted">{publicText(f.label)}</dt>
-                  <dd className="min-w-0">
-                    <FieldValue field={f} value={output ? getFieldValue(profile, output, s.key as SectionKey, f) : undefined} />
-                    {rubric && f.type === 'criterion' && <RubricReadOnly view={rubric} items={((output ? getFieldValue(profile, output, s.key as SectionKey, f) : undefined) as Record<string, unknown>[] | undefined) ?? []} />}
+                  <dt className={wide ? 'font-medium text-fg-muted sm:col-span-2' : 'font-medium text-fg-muted'}>{publicText(f.label)}</dt>
+                  <dd className={wide ? 'min-w-0 sm:col-span-2' : 'min-w-0'}>
+                    <FieldValue field={f} value={v} />
+                    {rubric && f.type === 'criterion' && <RubricReadOnly view={rubric} items={(v as Record<string, unknown>[] | undefined) ?? []} />}
                   </dd>
                 </div>
-              ))}
+                );
+              })}
             </dl>
           )}
         </section>

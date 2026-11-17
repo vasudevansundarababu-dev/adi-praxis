@@ -1,6 +1,8 @@
 'use client';
 
+import { withQuery } from '@praxis/shared';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 
 export type SearchType = 'projects' | 'templates' | 'candidates' | 'requisitions' | 'users' | 'partners';
@@ -33,14 +35,49 @@ export function filterRows(root: ParentNode, scope: string, ids: string[] | null
   return shown;
 }
 
+/** A paged table: puts the query in the URL (`?q=`, back to page 1) so the server filters the whole list (D24). */
+function UrlQuerySync({ q, initialQuery }: { q: string; initialQuery: string }) {
+  const router = useRouter();
+  const last = useRef(initialQuery.trim());
+  useEffect(() => {
+    const query = q.trim();
+    if (query === last.current) return;
+    const t = setTimeout(() => {
+      last.current = query;
+      const search = withQuery(window.location.search, query);
+      router.replace(`${window.location.pathname}${search === '?' ? '' : search}`, { scroll: false });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, router]);
+  return null;
+}
+
 /**
  * Search bar above a console table (owner, 12 Nov 2026). Matches as you type: a few letters find a record by name
  * (typo-tolerant); longer queries also match by meaning. The table filters to the matches, and the best matches are
  * offered as links. Wrap the table in an element with data-search-scope={scope} and give each row data-search-id.
+ *
+ * Paged tables (D24) pass `syncUrl`: the query goes into the URL (`?q=`, back to page 1) and the server page filters
+ * and pages the whole list, so the count is the filtered total; rows are not hidden in the browser.
  */
-export function TableSearch({ type, scope = type, label, placeholder }: { type: SearchType; scope?: string; label: string; placeholder?: string }) {
+export function TableSearch({
+  type,
+  scope = type,
+  label,
+  placeholder,
+  syncUrl = false,
+  initialQuery = '',
+}: {
+  type: SearchType;
+  scope?: string;
+  label: string;
+  placeholder?: string;
+  syncUrl?: boolean;
+  /** The `?q=` the server page was rendered with (syncUrl). */
+  initialQuery?: string;
+}) {
   const listId = useId();
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(initialQuery);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -52,7 +89,7 @@ export function TableSearch({ type, scope = type, label, placeholder }: { type: 
     if (!query) {
       setResult(null);
       setError(null);
-      filterRows(document, scope, null);
+      if (!syncUrl) filterRows(document, scope, null);
       return;
     }
     const n = ++seq.current;
@@ -65,17 +102,18 @@ export function TableSearch({ type, scope = type, label, placeholder }: { type: 
         setResult(data);
         setError(null);
         setActive(-1);
-        filterRows(document, scope, data.ids);
+        if (!syncUrl) filterRows(document, scope, data.ids);
       } catch {
         if (n === seq.current) setError('Search is not available right now.');
       }
     }, 200);
     return () => clearTimeout(t);
-  }, [q, type, scope]);
+  }, [q, type, scope, syncUrl]);
 
   const items = result?.items ?? [];
   return (
     <div className="relative mb-3 max-w-xl" role="search">
+      {syncUrl && <UrlQuerySync q={q} initialQuery={initialQuery} />}
       <label htmlFor={`${listId}-input`} className="sr-only">
         {label}
       </label>

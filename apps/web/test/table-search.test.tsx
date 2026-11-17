@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: () => undefined }) }));
+
 import { filterRows, TableSearch } from '../components/search/table-search';
 import { html } from './helpers';
 

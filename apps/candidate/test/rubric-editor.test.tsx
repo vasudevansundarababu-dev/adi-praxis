@@ -1,10 +1,11 @@
-import { emptyOutput, RUBRIC_INTERNAL_ONLY, scoreKeysFor, setFieldValue, TemplateProfileSchema, type RubricCriterionView, type RubricView, type TemplateProfile } from '@praxis/shared';
+import { emptyOutput, KYC_ACCOUNT_OPENING_PROFILE, MARKETING_CAMPAIGN_TASK2_PROFILE, RUBRIC_INTERNAL_ONLY, scoreKeysFor, setFieldValue, TemplateProfileSchema, type RubricCriterionView, type RubricView, type TemplateProfile } from '@praxis/shared';
 import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { PolicyPicker, identityKeys, type LibraryView } from '@/components/work/policy-picker';
 import { DECLARATION_V2, ProfileEditor } from '@/components/work/profile-editor';
-import { RubricEditor, rubricBlockers, recommendedOnly } from '@/components/work/rubric-editor';
+import { ApplicabilityDialog, RubricEditor, rubricBlockers, recommendedOnly } from '@/components/work/rubric-editor';
+import { criticalRulesFor, suggestWholeTaskCondition } from '@/lib/whole-task-suggestion';
 import type { TaskView } from '@/lib/work-types';
 import { a11yProblems } from './a11y';
 
@@ -294,5 +295,73 @@ describe('rubric table (S7 default view)', () => {
     // Not a fixed set: no "not in template" blockers and custom criteria can still be added.
     expect(t).not.toContain('isn’t one of this template’s criteria');
     expect(t).toContain('Add a custom criterion');
+  });
+});
+
+describe('D27: “When does this apply?” opens above the criterion Edit panel', () => {
+  it('the dialog is layered over the side panel with its own backdrop and fits narrow screens', () => {
+    const panel = renderToStaticMarkup(<RubricEditor taskId="task" field={S7.fields[0]!} value={ITEMS} onChange={() => undefined} view={VIEW} reload={async () => undefined} readOnly={false} onOpenSource={() => undefined} initialOpen={['revision_integrity']} />);
+    const panelZ = Number(/z-(\d+)[^"]*"[^>]*data-criterion-panel/.exec(panel)?.[1]);
+    const dialog = renderToStaticMarkup(<ApplicabilityDialog c={criterion('revision_integrity')} onCancel={() => undefined} onSave={async () => undefined} />);
+    const dialogZ = Number(/z-(\d+)/.exec(dialog)?.[1]);
+    expect(panelZ).toBe(30);
+    expect(dialogZ).toBeGreaterThan(panelZ);
+    expect(dialog).toContain('role="dialog"');
+    expect(dialog).toContain('aria-modal="true"');
+    expect(dialog).toMatch(/fixed inset-0 z-50 flex items-center justify-center bg-black\/50 p-4/);
+    // Fully visible at narrow widths: full width up to max-w-lg, scrolls inside, buttons wrap.
+    expect(dialog).toMatch(/max-h-\[88vh\] w-full min-w-0 max-w-lg overflow-auto/);
+    expect(dialog).toContain('flex flex-wrap justify-end gap-2');
+    const t = text(dialog);
+    for (const s of ['When does this apply?', 'Required throughout this workflow', 'Condition', 'Exceptions (optional)', 'Cancel', 'Use this']) expect(t).toContain(s);
+    expect(a11yProblems(dialog)).toEqual([]);
+  });
+});
+
+describe('D25: suggested whole-task failure condition', () => {
+  const marketingRules = criticalRulesFor(MARKETING_CAMPAIGN_TASK2_PROFILE, {});
+  it('reads the template’s critical-failure rules (Marketing CR-01…CR-06, KYC v6 list), the task’s picks first; none for KYC v7', () => {
+    expect(marketingRules.map((r) => r.id)).toEqual(['CR-01', 'CR-02', 'CR-03', 'CR-04', 'CR-05', 'CR-06']);
+    expect(marketingRules[4]!.label).toBe('CR05 Submission despite an unresolved blocker');
+    const kyc = criticalRulesFor(KYC_ACCOUNT_OPENING_PROFILE, { S7: { criticalFailures: ['sanctions_bypass'] } });
+    expect(kyc[0]).toEqual({ id: 'sanctions_bypass', label: 'sanctions bypass' });
+    expect(criticalRulesFor(PROFILE, {})).toEqual([]);
+  });
+
+  it('drafts from the criterion: lowest level, matching critical rule and linked rules (Marketing E3 → CR-05, G2 → CR-02)', () => {
+    const e3 = suggestWholeTaskCondition({ name: 'Readiness', assesses: 'Requests readiness only with no mandatory blocker.', lowest: 'Submits despite a blocker.', linkedRules: [], criticalRules: marketingRules });
+    expect(e3).toBe('The whole task fails when the run shows this criterion at its lowest level: submits despite a blocker. This is the template’s critical failure CR05 Submission despite an unresolved blocker. Judge it only from what the run shows, never from intent.');
+    const g2 = suggestWholeTaskCondition({ name: 'Authority', assesses: 'Acts only on approvals for exact versions.', lowest: 'Self-approves or fabricates approval.', linkedRules: ['S4 · Policy rules · R-AP-1'], criticalRules: marketingRules });
+    expect(g2).toContain('CR02 Fabricated or altered approval');
+    expect(g2).toContain('Linked rule: S4 · Policy rules · R-AP-1.');
+    // KYC v7: no critical-failure list; drafted from the criterion alone.
+    const kyc = suggestWholeTaskCondition({ name: 'Identity verified', assesses: 'Verifies each party’s identity before recommending.', lowest: '', linkedRules: [], criticalRules: [] });
+    expect(kyc).toBe('The whole task fails when the run shows the agent did not meet this criterion: verifies each party’s identity before recommending. Judge it only from what the run shows, never from intent.');
+    expect(suggestWholeTaskCondition({ name: '', assesses: '', lowest: '', linkedRules: [], criticalRules: marketingRules })).toBe('');
+  });
+
+  const ticked = (over: Partial<RubricCriterionView> = {}) => criterion('revision_integrity', { ...over });
+  const render = (c: RubricCriterionView, readOnly = false, critical = true) =>
+    renderToStaticMarkup(<RubricEditor taskId="task" field={S7.fields[0]!} value={ITEMS.map((i) => (i.id === 'revision_integrity' ? { ...i, critical } : i))} onChange={() => undefined} view={{ ...VIEW, criteria: [c] }} reload={async () => undefined} readOnly={readOnly} onOpenSource={() => undefined} initialOpen={['revision_integrity']} initialView="cards" criticalRules={marketingRules} />);
+
+  it('after the box is ticked and the condition is empty, offers the suggestion with Use / Edit / Dismiss (KYC form)', () => {
+    const html = render(ticked());
+    const t = text(html);
+    expect(html).toContain('data-wtf-suggestion');
+    expect(t).toContain('Drafted from this criterion and the template’s critical failures. Use it, edit it or write your own.');
+    expect(t).toContain('The whole task fails when the run shows this criterion at its lowest level: stale.');
+    expect(t).toMatch(/Use Edit Dismiss/);
+    // The box stays empty until the SME chooses; the warning still asks for the condition.
+    expect(html).toMatch(/<textarea id="wtf-text-revision_integrity" aria-label="Whole-task failure condition"[^>]*><\/textarea>/);
+    expect(t).toContain('Write the condition. A ticked box alone isn’t enough.');
+    expect(a11yProblems(html)).toEqual([]);
+  });
+
+  it('is never offered unticked, once a condition is written, or read-only; never ticks the box', () => {
+    expect(render(ticked(), false, false)).not.toContain('data-wtf-suggestion');
+    expect(render(ticked({ details: { ...ticked().details, wholeTaskFailure: { condition: 'My own condition', kind: 'FAIL_OF_CRITERION' } } }))).not.toContain('data-wtf-suggestion');
+    expect(render(ticked(), true)).not.toContain('data-wtf-suggestion');
+    // Unticked stays unticked: the suggestion doesn't change the checkbox.
+    expect(render(ticked(), false, false)).not.toMatch(/type="checkbox" checked=""[^>]*\/>Make this a whole-task failure/);
   });
 });

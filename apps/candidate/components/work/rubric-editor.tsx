@@ -1,11 +1,10 @@
 'use client';
 
 import {
-  isShellCriterion,
   newItem,
   RUBRIC_APPLICABILITY_LABELS,
-  SHELL_FILL_KEYS,
   rubricToFinish,
+  templateFill,
   type ApplicabilityKind,
   type ItemField,
   type RubricCriterionView,
@@ -94,7 +93,8 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
     const kept = items.map((i) => {
       const s = seed.find((x) => x.id === i.id);
       if (!s) return i;
-      const fill = isShellCriterion(view.template.scoreKeys, i) && !isShellCriterion(view.template.scoreKeys, s) ? Object.fromEntries(SHELL_FILL_KEYS.filter((k) => k in s).map((k) => [k, s[k]])) : null;
+      // D28: so does a criterion left exactly as an earlier revision of the template defaults filled it.
+      const fill = templateFill(view.template.scoreKeys, i, s, view.criteria.find((c) => c.id === i.id)?.defaults);
       if (!fill && s.evaluatorKind === i.evaluatorKind && s.evaluatorVersion === i.evaluatorVersion) return i;
       return { ...i, ...(fill ?? {}), evaluatorKind: s.evaluatorKind, evaluatorVersion: s.evaluatorVersion };
     });

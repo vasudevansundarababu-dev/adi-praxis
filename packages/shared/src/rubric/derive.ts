@@ -200,11 +200,21 @@ export function collectAtoms(input: DeriveInput): { atoms: Atom[]; roles: Deriva
     const mandatory = r.marking ? /^mandatory$/i.test(r.marking.trim()) : r.required !== false;
     atoms.push({ target: `rule:${r.ruleVersionId}`, kind: 'POLICY_RULE', label: `S4 · Policy rules · ${r.ruleKey}`, role: 'policies', text: `${r.title} ${r.requirement} ${r.appliesWhen ?? ''}`, value: { title: r.title, requirement: r.requirement }, rule: r, mandatory });
   }
+  // D28: a template criterion whose defaults name their source links to the template itself (used only when no task
+  // source links to it; never ranked against task sources).
+  for (const c of input.rubric.criteria)
+    if (c.defaults?.source) {
+      const { earlier: _e, ...value } = c.defaults;
+      void _e;
+      atoms.push({ target: templateTarget(input, c.id), kind: 'TEMPLATE_REFERENCE', label: `Template rubric · ${short(c.defaults.source, 60)}`, role: 'rubric', text: [c.defaults.name, c.defaults.passCondition].filter(Boolean).join(': '), value, mandatory: false });
+    }
   for (const p of input.rubric.outputSchema.properties)
     atoms.push({ target: `output:${p}`, kind: 'OUTPUT_FIELD', label: `Output · ${p}`, role: 'outputs', text: `${p.replace(/_/g, ' ')} ${(input.rubric.outputSchema.enums[p] ?? []).join(' ').replace(/_/g, ' ')}`, value: { property: p, enum: input.rubric.outputSchema.enums[p] ?? null }, mandatory: false });
   void task;
   return { atoms, roles, unused };
 }
+
+const templateTarget = (input: DeriveInput, id: string) => `template:${input.template.id}:criterion:${id}`;
 
 export function linkOf(input: DeriveInput, a: Atom): SourceLink {
   const r = a.rule;
@@ -276,7 +286,8 @@ export function derive(input: DeriveInput): Derivation {
   const { atoms: all, roles, unused } = collectAtoms(input);
   // Only ticked policy documents count as sources; a rule from an unticked document is not linked.
   const ticked = new Set(input.sources.filter((s) => s.ticked && s.kind === 'POLICY_DOCUMENT').map((s) => s.ref));
-  const atoms = all.filter((a) => !a.rule || !a.rule.documentVersionId || ticked.has(a.rule.documentVersionId));
+  const atoms = all.filter((a) => a.kind !== 'TEMPLATE_REFERENCE' && (!a.rule || !a.rule.documentVersionId || ticked.has(a.rule.documentVersionId)));
+  const templateAtoms = new Map(all.filter((a) => a.kind === 'TEMPLATE_REFERENCE').map((a) => [a.target, a]));
   const value = isObj(input.output.sections) ? (input.output.sections as Record<string, Record<string, unknown>>)[rubric.section]?.[rubric.fieldKey] : undefined;
   const items = (Array.isArray(value) ? value.filter(isObj) : []) as Record<string, unknown>[];
   const ids = [...new Set([...rubric.criteria.map((c) => c.id), ...items.map((i) => str(i.id)).filter(Boolean)])];
@@ -285,7 +296,10 @@ export function derive(input: DeriveInput): Derivation {
     const item = items.find((i) => i.id === id);
     const d = rubric.criteria.find((c) => c.id === id)?.defaults ?? null;
     const text = criterionText(input, id, item);
-    const picked = pick(atoms, text);
+    const fromTask = pick(atoms, text);
+    // D28: with no task source, the criterion links to the template rubric it comes from (when the template says so).
+    const fallback = fromTask.length ? undefined : templateAtoms.get(templateTarget(input, id));
+    const picked = fallback ? [fallback] : fromTask;
     const needs: string[] = [];
     const mentionsPolicy = /\bpolic(y|ies)\b|\brules?\b/i.test(text);
     if (mentionsPolicy && !picked.some((a) => a.kind === 'POLICY_RULE')) needs.push('Policy rule');
@@ -293,7 +307,9 @@ export function derive(input: DeriveInput): Derivation {
     const step = picked.find((a) => a.kind === 'WORKFLOW_STEP');
     const role = picked.find((a) => a.kind === 'WORKFLOW_ROLE');
     const tools = picked.filter((a) => a.role === 'tools').map((a) => str(a.value));
-    const app = applicabilityFrom(input, picked);
+    const read = applicabilityFrom(input, picked);
+    // D28: when the task does not say, the template's stated applicability applies.
+    const app = read.kind === 'UNSET' && d?.applicability ? d.applicability : read;
     const unresolved: string[] = [];
     if (needs.includes('Policy rule')) unresolved.push('No policy rule among the ticked sources covers this criterion. Tick or add a source; nothing is invented.');
     if (app.kind === 'UNSET') unresolved.push('When this applies could not be read from the task. Set it with Change.');

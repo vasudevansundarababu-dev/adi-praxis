@@ -131,6 +131,15 @@ export interface CriterionDefault {
   /** The exact whole-task failure condition the template approves for this criterion. */
   criticalCondition?: string;
   group?: string;
+  /** D28: when the criterion applies, as the template states it (used when the task itself does not say). */
+  applicability?: { kind: 'REQUIRED' | 'REQUIRED_WHEN' | 'PERMITTED_OPTION' | 'OTHER_ROLE'; condition: string };
+  /** D28: where the template's criterion comes from (shown as its "Derived from" link when the task has none). */
+  source?: string;
+  /**
+   * D28, Authoring defaults only (not template data): the values an earlier revision of these defaults filled in. A
+   * criterion still exactly so, untouched by its author, takes the current defaults when the task is opened.
+   */
+  earlier?: Partial<Omit<CriterionDefault, 'id' | 'earlier'>>[];
 }
 
 export const CRITERION_SCALES = ['five_two_zero', 'zero_to_four'] as const;
@@ -161,6 +170,8 @@ export const CriterionDefaultSchema: z.ZodType<CriterionDefault> = z
     critical: z.boolean().optional(),
     criticalCondition: anchor.optional(),
     group: z.string().optional(),
+    applicability: z.object({ kind: z.enum(['REQUIRED', 'REQUIRED_WHEN', 'PERMITTED_OPTION', 'OTHER_ROLE']), condition: z.string().min(1).max(2000) }).strict().optional(),
+    source: z.string().min(1).max(200).optional(),
   })
   .strict();
 

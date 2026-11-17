@@ -267,7 +267,15 @@ function withDerivedBlanks(details: AnnotationDetails, derived: AnnotationDetail
   let out = details;
   for (const f of ['assesses', 'evidenceRequired'] as const)
     if (!edited.includes(f) && !String(out[f] ?? '').trim() && String(derived[f] ?? '').trim()) out = { ...out, [f]: derived[f] };
+  // D28: likewise an applicability stored as Undefined, and a missing whole-task failure condition, take the template's.
+  if (!edited.includes('applicability') && out.applicability?.kind === 'UNSET' && derived.applicability?.kind !== 'UNSET') out = { ...out, applicability: derived.applicability };
+  if (!edited.includes('wholeTaskFailure') && !out.wholeTaskFailure && derived.wholeTaskFailure) out = { ...out, wholeTaskFailure: derived.wholeTaskFailure };
   return out;
+}
+
+/** D28: a criterion stored with no source link shows the template rubric link the derivation now gives it. */
+function withTemplateLink(stored: SourceLink[], derived: SourceLink[]): SourceLink[] {
+  return !stored.length && derived.length && derived.every((l) => l.kind === 'TEMPLATE_REFERENCE') ? derived : stored;
 }
 
 /** The whole view: criteria with their derivation, links and states, additions, sources, coverage. Read-only. */
@@ -286,7 +294,7 @@ export async function rubricView(tx: Db | Tx, ctx: RubricContext, opts: { aiEnab
     if (a?.status === 'REMOVED' && !items.some((i) => i.id === d.id)) continue;
     const item = items.find((i) => i.id === d.id) ?? { id: d.id };
     const details = withDerivedBlanks((a?.details as unknown as AnnotationDetails | undefined) ?? d.details, d.details, a?.editedFields ?? []);
-    const links = a ? linkStates(input, a.sources as unknown as SourceLink[]) : d.links.map((l) => ({ ...l, state: 'OK' as const }));
+    const links = a ? linkStates(input, withTemplateLink(a.sources as unknown as SourceLink[], d.links)) : d.links.map((l) => ({ ...l, state: 'OK' as const }));
     const proposed: RubricCriterionView['proposed'] = {};
     const ranDetails = runResult?.criteria?.find((c) => c.id === d.id)?.details;
     for (const f of (a?.editedFields ?? []) as EditableDetail[]) if (ranDetails && stableStringify(ranDetails[f]) !== stableStringify(details[f])) proposed[f] = ranDetails[f];

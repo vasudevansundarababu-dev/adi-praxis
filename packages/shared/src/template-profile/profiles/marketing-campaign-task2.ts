@@ -1,5 +1,6 @@
 import { MARKETING_T2_TOOLS } from '../../workflow-graph/marketing-task2-graph';
 import { field, options, sectionsProfile } from '../common';
+import { withDeclaredCitationVisibility } from '../helpers';
 import type { TemplateProfile, TemplateProfileField } from '../schema';
 
 /**
@@ -38,6 +39,10 @@ export const MARKETING_T2_CRITICAL_LABELS: Record<(typeof MARKETING_T2_CRITICAL_
 export const MARKETING_T2_ROLE_IDS = ['orchestrator', 'intent', 'performance', 'brief', 'policy'] as const;
 /** Identity of the form and the new workflow (owner: the VEYRA Hush One headphone launch, not the old Phone template). */
 export const MARKETING_T2_PROFILE_ID = 'veyra-hush-one-launch-v1';
+/** D26 follow-up: v1 with its S4 citation sub-field visibility declared for RL Gym (no private exposure). */
+export const MARKETING_T2_PROFILE_ID_V2 = 'veyra-hush-one-launch-v2';
+/** Both Marketing Task2 forms (same fields, rubric and workflow). */
+export const MARKETING_T2_PROFILE_IDS: readonly string[] = [MARKETING_T2_PROFILE_ID, MARKETING_T2_PROFILE_ID_V2];
 export const MARKETING_T2_WORKFLOW = 'VEYRA Hush One headphone launch';
 /** Rubric groups (handoff rubric v2.0): weights total 100; a pass needs at least 12 of B's 20. */
 export const MARKETING_T2_GROUPS = [
@@ -194,3 +199,4 @@ function reusable(p: TemplateProfile): TemplateProfile {
 }
 
 export const MARKETING_CAMPAIGN_TASK2_PROFILE: TemplateProfile = reusable(task2(base));
+export const MARKETING_CAMPAIGN_TASK2_PROFILE_V2: TemplateProfile = withDeclaredCitationVisibility(MARKETING_CAMPAIGN_TASK2_PROFILE, MARKETING_T2_PROFILE_ID_V2);

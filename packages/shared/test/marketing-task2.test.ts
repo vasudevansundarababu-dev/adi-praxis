@@ -6,6 +6,7 @@ import {
   checkWorkflowGraph,
   GOLDEN_MARKETING_EXAMPLE,
   MARKETING_CAMPAIGN_TASK2_PROFILE,
+  MARKETING_CAMPAIGN_TASK2_PROFILE_V2,
   MARKETING_T2_TOOLS,
   marketingTask2Graph,
   NOISE_CANCELLING_PROFILE,
@@ -146,5 +147,45 @@ describe('Marketing Task2 starting workflow', () => {
 
   it('every tool a role holds is in the form catalogue', () => {
     for (const r of graph.roles) for (const t of r.tools ?? []) expect(MARKETING_T2_TOOLS).toContain(t);
+  });
+});
+
+describe('D26 follow-up: Marketing form v2 declares S4 citation visibility for RL Gym', () => {
+  const V2 = MARKETING_CAMPAIGN_TASK2_PROFILE_V2;
+  const s4 = (p: TemplateProfile) => p.sections.find((s) => s.key === 'S4')!.fields.find((x) => x.key === 'policies')!;
+  const withS4 = (itemFields: unknown) => ({ ...V2, sections: V2.sections.map((s) => (s.key === 'S4' ? { ...s, fields: s.fields.map((x) => (x.key === 'policies' ? { ...x, itemFields } : x)) } : s)) }) as TemplateProfile;
+
+  it('is v1 with only the citation visibility declared, under a new form ID; it registers', () => {
+    expect(V2.profileId).toBe('veyra-hush-one-launch-v2');
+    const { itemFields, ...rest } = s4(V2);
+    expect(rest).toEqual(s4(P));
+    expect(itemFields!.map((x) => [x.key, x.visibility ?? 'author_and_agent'])).toEqual([
+      ['ruleId', 'author_and_agent'], ['ruleVersion', 'author_and_agent'], ['locator', 'author_and_agent'], ['quote', 'author_and_agent'],
+      ['appliesTo', 'private_reference'], ['rationale', 'private_reference'], ['exception', 'private_reference'],
+    ]);
+    expect(JSON.stringify({ ...V2, profileId: P.profileId, sections: V2.sections.map((s) => ({ ...s, fields: s.fields.map((x) => (x.key === 'policies' ? s4(P) : x)) })) })).toBe(JSON.stringify(P));
+    expect(checkProfile(V2)).toEqual([]);
+    expect(templateStartingGraph(WORKFLOW, 1, V2.profileId)).toEqual(marketingTask2Graph(1));
+  });
+
+  it('authoring, checks and the agent view are unchanged (the declaration is RL Gym projection metadata only)', () => {
+    const out = { ...clone(), profile: { id: V2.profileId, version: 1 } } as unknown as Record<string, unknown>;
+    expect(profileShapeProblems(V2, out)).toEqual([]);
+    expect(profileProblems(V2, out)).toEqual([]);
+    const v1View = agentProjection(P, { ...out, profile: { id: P.profileId, version: 1 } }) as { sections: unknown };
+    expect((agentProjection(V2, out) as { sections: unknown }).sections).toEqual(v1View.sections);
+  });
+
+  it('a declaration may never expose a private sub-field, hide an agent-visible one, rename or retype one', () => {
+    const decl = s4(V2).itemFields!;
+    const loosened = decl.map((x) => (x.key === 'rationale' ? { ...x, visibility: 'author_and_agent' } : x));
+    expect(checkProfile(withS4(loosened)).join(' ')).toMatch(/rationale: is private in ADI Forge and must stay private/);
+    expect(checkProfile(withS4(decl.filter((x) => x.key !== 'quote'))).join(' ')).toMatch(/declare the agent-visible sub-field quote/);
+    expect(checkProfile(withS4(decl.map((x) => (x.key === 'quote' ? { ...x, visibility: 'private_reference' } : x)))).join(' ')).toMatch(/quote: is shown to the agent/);
+    expect(checkProfile(withS4([...decl, { key: 'secret', type: 'text', label: 'S', help: 'S' }])).join(' ')).toMatch(/secret: not a policy citation sub-field/);
+    expect(checkProfile(withS4(decl.map((x) => (x.key === 'locator' ? { ...x, type: 'long_text' } : x)))).join(' ')).toMatch(/locator: must keep its type text/);
+    // Other non-repeated fields still may not declare item fields.
+    const bad = { ...V2, sections: V2.sections.map((s) => (s.key === 'S2' ? { ...s, fields: s.fields.map((x) => (x.type === 'evidence_record' ? { ...x, itemFields: decl } : x)) } : s)) } as TemplateProfile;
+    expect(checkProfile(bad).join(' ')).toMatch(/only repeated arrays declare item fields/);
   });
 });

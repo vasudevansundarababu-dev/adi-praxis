@@ -1,4 +1,4 @@
-import { itemFieldsOf, type ItemField } from './helpers';
+import { builtInItemFields, itemFieldsOf, type ItemField } from './helpers';
 import { FIELD_TYPES, SECTION_KEYS, TemplateProfileSchema, type ProfileCondition, type RequiredRule, type TemplateProfile } from './schema';
 
 /**
@@ -80,7 +80,8 @@ export function checkProfile(raw: unknown): string[] {
     if (f.type === 'tool_call' && !f.options?.length && !f.allowCustom) out.push(`${path}: tool call has no tool catalogue`);
     if (f.options && new Set(f.options.map((o) => o.value)).size !== f.options.length) out.push(`${path}: duplicate option values`);
     if (f.type === 'repeated_array' && !f.itemFields?.length) out.push(`${path}: repeated array has no item fields`);
-    if (f.type !== 'repeated_array' && f.itemFields) out.push(`${path}: only repeated arrays declare item fields`);
+    if (f.type === 'policy_citation' && f.itemFields) out.push(...citationVisibilityProblems(f, path));
+    else if (f.type !== 'repeated_array' && f.itemFields) out.push(`${path}: only repeated arrays declare item fields`);
     if ((f.weightTotal !== undefined || f.requireCritical || f.scale || f.groups) && f.type !== 'criterion') out.push(`${path}: weight rules apply to criterion fields only`);
     if (f.criterionDefaults) {
       if (f.type !== 'criterion') out.push(`${path}: criterion defaults apply to criterion fields only`);
@@ -214,3 +215,28 @@ export function registerUploadedProfile(raw: unknown): string[] {
 
 /** Whether a form came from an uploaded pack (as opposed to a built-in form). */
 export const isUploadedProfile = (id: string) => uploaded.has(id);
+
+/**
+ * D26 follow-up (owner, 17 Nov 2026): a policy citation field may declare `itemFields` so RL Gym's projection, which
+ * copies whole items of a field without `itemFields` (four confirmations, still-incompatible item 2), keeps the same
+ * sub-fields private as ADI Forge does. The declaration is visibility metadata only: authoring, checks and the agent
+ * view keep the built-in citation fields. It may only name built-in sub-fields with their built-in type, must declare
+ * every agent-visible one as agent-visible, and never makes a private one visible.
+ */
+function citationVisibilityProblems(f: ItemField, path: string): string[] {
+  const out: string[] = [];
+  const builtIn = new Map(builtInItemFields(f).map((x) => [x.key, x]));
+  const isPrivate = (x: { visibility?: string }) => (x.visibility ?? 'author_and_agent') !== 'author_and_agent';
+  const declared = new Map<string, ItemField>();
+  for (const d of f.itemFields ?? []) {
+    const b = builtIn.get(d.key);
+    if (!b) out.push(`${path}.${d.key}: not a policy citation sub-field`);
+    else if (b.type !== d.type) out.push(`${path}.${d.key}: must keep its type ${b.type}`);
+    else if (isPrivate(b) && !isPrivate(d)) out.push(`${path}.${d.key}: is private in ADI Forge and must stay private`);
+    else if (!isPrivate(b) && isPrivate(d)) out.push(`${path}.${d.key}: is shown to the agent in ADI Forge and must stay agent-visible`);
+    if (declared.has(d.key)) out.push(`${path}.${d.key}: duplicate field key`);
+    declared.set(d.key, d);
+  }
+  for (const b of builtIn.values()) if (!isPrivate(b) && !declared.has(b.key)) out.push(`${path}: declare the agent-visible sub-field ${b.key}`);
+  return out;
+}

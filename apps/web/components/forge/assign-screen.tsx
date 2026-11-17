@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { withQuery } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { UrlPager, type SearchParams } from '@/components/pager';
 import { mutate } from '@/lib/client-api';
 import {
   assignBody,
@@ -28,9 +30,23 @@ function locationText(d: AssignableData) {
 }
 const TD = 'px-4 py-3 align-top';
 
-function Row({ projectId, d, p, codes }: { projectId: string; d: AssignableData; p: AssignablePerson; codes: Record<string, string> }) {
+function Row({
+  projectId,
+  d,
+  p,
+  codes,
+  taskId,
+  setTaskId,
+}: {
+  projectId: string;
+  d: AssignableData;
+  p: AssignablePerson;
+  codes: Record<string, string>;
+  /** The task chosen in this row, kept by the screen so a search or page change does not lose it (D23). */
+  taskId: string;
+  setTaskId: (taskId: string) => void;
+}) {
   const router = useRouter();
-  const [taskId, setTaskId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const groups = assignOptions(d, p);
@@ -169,11 +185,90 @@ function Places({ projectId, d }: { projectId: string; d: AssignableData }) {
 }
 
 /**
+ * D23: search Assign people as you type, by first name, last name, email and skills, across Sourcing profiles and the
+ * pool. The query goes into the URL (`?q=`, back to page 1); the API filters and pages the whole list.
+ */
+export function AssignSearch({ initialQuery }: { initialQuery: string }) {
+  const id = useId();
+  const router = useRouter();
+  const [q, setQ] = useState(initialQuery);
+  const last = useRef(initialQuery.trim());
+
+  const go = (value: string) => {
+    const query = value.trim();
+    if (query === last.current) return;
+    last.current = query;
+    const search = withQuery(window.location.search, query);
+    router.replace(`${window.location.pathname}${search === '?' ? '' : search}`, { scroll: false });
+  };
+  useEffect(() => {
+    const t = setTimeout(() => go(q), 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  return (
+    <div role="search" className="mb-3 flex max-w-xl items-center gap-2">
+      <label htmlFor={`${id}-q`} className="sr-only">
+        Search people
+      </label>
+      <input
+        id={`${id}-q`}
+        type="search"
+        value={q}
+        autoComplete="off"
+        placeholder="Search by first name, last name, email or skill"
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && q) {
+            e.preventDefault();
+            setQ('');
+            go('');
+          }
+        }}
+        className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
+      />
+      {q && (
+        <button
+          type="button"
+          onClick={() => {
+            setQ('');
+            go('');
+          }}
+          className="btn btn-secondary"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
  * MVP1 Assign screen (owner, 15 Nov): Sourcing profiles for this project, with the matching skills. Assigning always
  * includes choosing the task; assigning is the selection.
  */
-export function AssignScreen({ projectId, projectName, data: d, codes }: { projectId: string; projectName: string; data: AssignableData; codes: Record<string, string> }) {
+export function AssignScreen({
+  projectId,
+  projectName,
+  data: d,
+  codes,
+  query = '',
+  searchParams = {},
+}: {
+  projectId: string;
+  projectName: string;
+  data: AssignableData;
+  codes: Record<string, string>;
+  /** The `?q=` search the page was rendered with (D23). */
+  query?: string;
+  searchParams?: SearchParams;
+}) {
   const two = d.reviewRoute === 'SME_EXPERT_PM';
+  // Tasks chosen per person, kept across searches and pages (the screen stays mounted when only the URL query changes).
+  const [chosen, setChosen] = useState<Record<string, string>>({});
+  const total = d.total ?? d.people.length;
+  const available = d.peopleAvailable ?? total;
+  const noMatches = available > 0 && d.people.length === 0 && query.trim() !== '';
   return (
     <div>
       <Link href={tabHref(projectId, 'people')} className="text-sm text-link hover:underline">
@@ -190,6 +285,7 @@ export function AssignScreen({ projectId, projectName, data: d, codes }: { proje
           : "This project's route is Author → PM/Admin, so people can be assigned as SME only, to an unassigned task."}
       </p>
       <Places key={d.requiredWorkers ?? 'none'} projectId={projectId} d={d} />
+      <AssignSearch initialQuery={query} />
       <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-hairline">
@@ -208,9 +304,24 @@ export function AssignScreen({ projectId, projectName, data: d, codes }: { proje
           </thead>
           <tbody className="divide-y divide-hairline">
             {d.people.map((p) => (
-              <Row key={personKey(p)} projectId={projectId} d={d} p={p} codes={codes} />
+              <Row
+                key={personKey(p)}
+                projectId={projectId}
+                d={d}
+                p={p}
+                codes={codes}
+                taskId={chosen[personKey(p)] ?? ''}
+                setTaskId={(taskId) => setChosen((c) => ({ ...c, [personKey(p)]: taskId }))}
+              />
             ))}
-            {d.people.length === 0 && (
+            {noMatches && (
+              <tr>
+                <td colSpan={6} role="status" className="px-4 py-6 text-center text-fg-muted">
+                  No matches for &ldquo;{query.trim()}&rdquo;. Try another name, email or skill, or clear the search.
+                </td>
+              </tr>
+            )}
+            {d.people.length === 0 && !noMatches && (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-fg-muted">
                   No one available matches this project. Upload more profiles in{' '}
@@ -224,6 +335,7 @@ export function AssignScreen({ projectId, projectName, data: d, codes }: { proje
           </tbody>
         </table>
       </div>
+      {total > 0 && <UrlPager searchParams={searchParams} page={d.page ?? 1} total={total} shown={d.people.length} pageSize={d.pageSize || undefined} noun="people" singular="person" />}
     </div>
   );
 }

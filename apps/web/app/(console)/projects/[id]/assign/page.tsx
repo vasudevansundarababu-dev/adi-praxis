@@ -6,12 +6,17 @@ import { AssignScreen } from '@/components/forge/assign-screen';
 import { NoAccess } from '@/components/no-access';
 import { apiGet, newFlowOn } from '@/lib/api';
 import { taskCodes, type AssignableData } from '@/lib/forge-console';
+import { pageParam, queryParam, type SearchParams } from '@/lib/paging';
 
 export const metadata: Metadata = { title: 'Assign people' };
 
 /** MVP1 Assign screen (owner, 15 Nov): a separate screen opened from Resource assignments. */
-export default async function AssignPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AssignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SearchParams> }) {
   const { id } = await params;
+  const sp = await searchParams;
+  // D23 + D24: the search (`?q=`) and the page (`?page=`) are applied by the API, over Sourcing profiles and the pool.
+  const q = queryParam(sp);
+  const query = `?page=${pageParam(sp)}${q ? `&q=${encodeURIComponent(q)}` : ''}`;
   const { status, data: project } = await apiGet<ProjectDto>(`/projects/${id}`);
   if (status === 403) return <NoAccess need="PMs and Admins" />;
   if (!project) notFound();
@@ -24,8 +29,8 @@ export default async function AssignPage({ params }: { params: Promise<{ id: str
         </Link>
       </div>
     );
-  const [a, t] = await Promise.all([apiGet<AssignableData>(`/projects/${id}/assignable`), apiGet<{ items: ForgeTaskRow[] }>(`/projects/${id}/forge-tasks`)]);
+  const [a, t] = await Promise.all([apiGet<AssignableData>(`/projects/${id}/assignable${query}`), apiGet<{ items: ForgeTaskRow[] }>(`/projects/${id}/forge-tasks`)]);
   if (a.status === 403) return <NoAccess need="PMs and Admins" />;
   if (!a.data) return <p className="card p-4 text-sm text-error">The people for this project could not be loaded. Try again.</p>;
-  return <AssignScreen projectId={id} projectName={project.name} data={a.data} codes={Object.fromEntries(taskCodes(t.data?.items ?? []))} />;
+  return <AssignScreen projectId={id} projectName={project.name} data={a.data} codes={Object.fromEntries(taskCodes(t.data?.items ?? []))} query={q} searchParams={sp} />;
 }

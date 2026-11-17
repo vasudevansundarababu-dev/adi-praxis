@@ -1,7 +1,9 @@
 'use client';
 
 import type { SmeAuthoredTaskDto } from '@praxis/shared';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { Modal } from '@/components/templates/compiler/custom-field-dialog';
 import { JudgePanel } from '@/components/templates/tasks/judge-panel';
 import { mcBrowser } from '@/lib/mc/browser';
@@ -20,6 +22,7 @@ const score = (n: number | null) => (n === null ? '—' : n.toFixed(2));
 /** Task store (Mock S4): every studio-authored task for the client, with JSON and Harbor bundle (S4-11, S4-12). */
 export function TaskStore({ tasks }: { tasks: SmeAuthoredTaskDto[] }) {
   const [inspect, setInspect] = useState<{ task: SmeAuthoredTaskDto; json: string | null; error: string | null } | null>(null);
+  const paged = usePagedRows(tasks);
 
   async function open(task: SmeAuthoredTaskDto) {
     setInspect({ task, json: null, error: null });
@@ -54,7 +57,7 @@ export function TaskStore({ tasks }: { tasks: SmeAuthoredTaskDto[] }) {
               </tr>
             </thead>
             <tbody>
-              {tasks.map((t) => {
+              {paged.items.map((t) => {
                 const [label, tone] = reviewPill(t.reviewStatus);
                 return (
                   <tr key={t.id} className="border-t border-line align-top">
@@ -94,6 +97,7 @@ export function TaskStore({ tasks }: { tasks: SmeAuthoredTaskDto[] }) {
           </table>
         </div>
       )}
+      {tasks.length > 0 && <ClientPager paged={paged} noun="tasks" singular="task" />}
       <Modal open={inspect !== null} onClose={() => setInspect(null)} label="Task JSON">
         {inspect && (
           <div className="space-y-3">

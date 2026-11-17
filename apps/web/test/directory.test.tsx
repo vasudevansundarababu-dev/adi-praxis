@@ -1,10 +1,12 @@
 import { TemplateDirectoryResponse } from '@praxis/shared';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DirectoryView } from '@/components/templates/directory/directory-view';
 import { McHeader } from '@/components/templates/mc-header';
 import { filterDomains, tptText } from '@/lib/mc/format';
 import { handleMock, mockStore, resetMockStore } from '@/lib/mc/mock-backend';
 import { ctx, DOMAIN_BANK, DOMAIN_EMPTY, DOMAIN_MKTG, fixtureSource, html, project, template, text } from './helpers';
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: () => undefined, push: () => undefined, refresh: () => undefined }) }));
 
 const published = template({ status: 'PUBLISHED', workflowName: 'KYB and beneficial ownership', domainId: DOMAIN_BANK, domainName: 'Banking' });
 const draft = template({ workflowName: 'Launch of Noise Cancelling Phone' });

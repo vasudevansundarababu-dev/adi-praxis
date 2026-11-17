@@ -1,5 +1,7 @@
 import type { DemographicAttributeDto } from '@praxis/shared';
 import type { Metadata } from 'next';
+import { parsePage, slicePage } from '@praxis/shared';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import { NewAttributeForm } from '@/components/taxonomy/new-attribute-form';
 import { apiGet, getCurrentUser } from '@/lib/api';
 import { NoAccess } from '@/components/no-access';
@@ -33,10 +35,12 @@ const TYPE_LABELS = {
   LANGUAGE_PROFICIENCY: 'Language and level',
 } as const;
 
-export default async function TaxonomyPage() {
+export default async function TaxonomyPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const user = (await getCurrentUser())!;
   if (!user.roles.includes('ADMIN')) return <NoAccess need="Admins" />;
   const { data } = await apiGet<{ items: DemographicAttributeDto[] }>('/demographic-attributes');
+  const paged = slicePage(data?.items ?? [], parsePage(sp.page));
   return (
     <div className="max-w-4xl">
       <h1 className="text-2xl font-semibold">Demographic taxonomy</h1>
@@ -52,7 +56,7 @@ export default async function TaxonomyPage() {
             </tr>
           </thead>
           <tbody>
-            {(data?.items ?? []).map((a) => (
+            {paged.items.map((a) => (
               <tr key={a.id} className="border-t border-line">
                 <td className="px-4 py-2">{a.label}</td>
                 <td className="px-4 py-2 font-mono text-xs">{a.key}</td>
@@ -62,6 +66,7 @@ export default async function TaxonomyPage() {
             ))}
           </tbody>
         </table>
+        <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="attributes" singular="attribute" className="px-4 pb-3" />
       </div>
       <NewAttributeForm />
     </div>

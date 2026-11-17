@@ -1,4 +1,6 @@
+import { parsePage, slicePage } from '@praxis/shared';
 import type { Metadata } from 'next';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import { RateCardForm } from '@/components/payments/rate-card-form';
 import type { RateCardRow } from '@/components/supply/types';
 import { Empty, fmtDate, SupplyOff, TD, TH } from '@/components/supply/ui';
@@ -9,13 +11,15 @@ export const metadata: Metadata = { title: 'Rate cards' };
 const TASK = { AUTHORING: 'Authoring', ANNOTATION: 'Annotation', RL_REVIEW: 'RL review' } as const;
 
 /** Versioned rate cards: never edited; a change is a new version of the same name. */
-export default async function RateCardsPage() {
+export default async function RateCardsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const user = (await getCurrentUser())!;
   const canCreate = user.roles.some((r) => r === 'ADMIN' || r === 'FINANCE');
   const { status, data } = await apiGet<{ items: RateCardRow[] }>('/rate-cards');
   if (status === 404) return <SupplyOff title="Rate cards" />;
   const items = data?.items ?? [];
   const names = [...new Set(items.map((c) => c.name))];
+  const paged = slicePage(names, parsePage(sp.page));
   return (
     <div>
       <h1 className="text-2xl font-semibold">Rate cards</h1>
@@ -26,7 +30,7 @@ export default async function RateCardsPage() {
         <Empty>No rate cards yet.{canCreate ? ' Create the first one below.' : ' Finance creates them.'}</Empty>
       ) : (
         <div className="mt-6 space-y-4">
-          {names.map((n) => (
+          {paged.items.map((n) => (
             <section key={n} className="card overflow-x-auto">
               <h2 className="px-3 pt-3 font-semibold">{n}</h2>
               <table className="mt-2 w-full text-left text-sm">
@@ -63,6 +67,7 @@ export default async function RateCardsPage() {
               </table>
             </section>
           ))}
+          <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="rate cards" singular="rate card" />
         </div>
       )}
       {canCreate && <RateCardForm names={names} />}

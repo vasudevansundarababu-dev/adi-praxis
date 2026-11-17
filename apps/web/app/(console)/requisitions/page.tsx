@@ -2,22 +2,27 @@ import { REQUISITION_STATES } from '@praxis/shared';
 import { TableSearch } from '@/components/search/table-search';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import { NoAccess } from '@/components/no-access';
 import type { RequisitionDto } from '@/components/supply/types';
 import { Empty, FilterLinks, fmtDate, humanize, StatePill, SupplyOff, TD, TH } from '@/components/supply/ui';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { pageOf, queryParam, searchIds } from '@/lib/paging';
 
 export const metadata: Metadata = { title: 'Requisitions' };
 
-export default async function RequisitionsPage({ searchParams }: { searchParams: Promise<{ state?: string }> }) {
+export default async function RequisitionsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = (await getCurrentUser())!;
   if (!user.roles.some((r) => r === 'ADMIN' || r === 'PM' || r === 'REVIEWER')) return <NoAccess need="Admins, PMs and Validators" />;
   const canPlan = user.roles.some((r) => r === 'ADMIN' || r === 'PM');
-  const { state } = await searchParams;
+  const sp = await searchParams;
+  const state = typeof sp.state === 'string' ? sp.state : undefined;
   const filter = (REQUISITION_STATES as readonly string[]).includes(state ?? '') ? state! : '';
   const { status, data } = await apiGet<{ items: RequisitionDto[] }>(`/requisitions${filter ? `?state=${filter}` : ''}`);
   if (status === 404) return <SupplyOff title="Requisitions" />;
   const items = data?.items ?? [];
+  const q = queryParam(sp);
+  const paged = pageOf(items, sp, await searchIds('requisitions', q));
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3">
@@ -40,7 +45,7 @@ export default async function RequisitionsPage({ searchParams }: { searchParams:
         <Empty>{filter ? 'No requisitions in this state.' : canPlan ? 'No requisitions yet. Switch on SME supply for a project, then create one.' : 'No requisitions yet.'}</Empty>
       ) : (
         <>
-        <TableSearch type="requisitions" label="Search requisitions" placeholder="Search requisitions by title, project, domain or skills" />
+        <TableSearch type="requisitions" label="Search requisitions" placeholder="Search requisitions by title, project, domain or skills" syncUrl initialQuery={q} />
         <div data-search-scope="requisitions" className="card mt-6 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-line text-fg-muted">
@@ -55,7 +60,7 @@ export default async function RequisitionsPage({ searchParams }: { searchParams:
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {items.map((r) => (
+              {paged.items.map((r) => (
                 <tr data-search-id={r.id} key={r.id}>
                   <td className={TD}>
                     <Link href={`/requisitions/${r.id}`} className="font-medium text-link hover:underline">
@@ -75,6 +80,7 @@ export default async function RequisitionsPage({ searchParams }: { searchParams:
               ))}
             </tbody>
           </table>
+          <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="requisitions" singular="requisition" className="px-3 pb-3" />
         </div>
         </>
       )}

@@ -3,7 +3,9 @@
 import { PARTNER_WEBHOOK_EVENTS } from '@praxis/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { Req, RequiredNote } from '@/components/required';
 import type { PartnerWebhook, PartnerWebhookDelivery } from '@/lib/partner-api';
 import { EnvPill, fmtDate, fmtDateTime, StatePill } from './labels';
@@ -156,6 +158,7 @@ const DELIVERY_LABEL: Record<string, string> = { PENDING: 'Retrying', SENDING: '
 export function PartnerDeliveries({ initial, filter }: { initial: PartnerWebhookDelivery[]; filter: string | null }) {
   const router = useRouter();
   const [replayed, setReplayed] = useState<Record<string, boolean>>({});
+  const paged = usePagedRows(initial, { param: 'deliveriesPage', resetKey: filter ?? '' });
   const [error, setError] = useState<string | null>(null);
 
   async function replay(id: string) {
@@ -197,7 +200,7 @@ export function PartnerDeliveries({ initial, filter }: { initial: PartnerWebhook
               </tr>
             </thead>
             <tbody>
-              {initial.map((d) => (
+              {paged.items.map((d) => (
                 <tr key={d.id} className="border-b border-hairline align-top last:border-0">
                   <td className="px-4 py-2">
                     <span className="font-mono text-xs">{d.eventType}</span>
@@ -228,6 +231,7 @@ export function PartnerDeliveries({ initial, filter }: { initial: PartnerWebhook
               ))}
             </tbody>
           </table>
+          <ClientPager paged={paged} noun="deliveries" singular="delivery" className="px-4 pb-3" />
         </div>
       )}
       {error && (

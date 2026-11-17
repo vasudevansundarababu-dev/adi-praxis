@@ -1,9 +1,11 @@
 'use client';
 
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { mutate } from '@/lib/client-api';
 import { elapsed, isActive, pollExtraction, stageLabel } from './extraction-progress';
+import { ClientPager } from '@/components/pager';
 import { RulesTable } from './rules-table';
 import type { AnnotatedRow } from './annotation-logic';
 import { MARKING_LABEL, type AnnotationFlag, type MandatoryMarking } from '@praxis/shared';
@@ -114,6 +116,7 @@ function Documents({ projectId, data }: { projectId: string; data: DocumentsData
   const [paste, setPaste] = useState({ open: false, title: '', text: '', granularity: 'line' });
   const [pending, setPending] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const docsPaged = usePagedRows(data.items, { param: 'docsPage' });
 
   async function upload() {
     if (!file) return;
@@ -149,6 +152,7 @@ function Documents({ projectId, data }: { projectId: string; data: DocumentsData
       </h2>
       <p className="text-fg-muted">PDF, Word (.docx), plain text or Markdown, up to {data.maxPages} pages and 10 MB. Each upload is kept as an immutable version; a new upload never changes earlier versions.</p>
       {data.items.length > 0 && (
+        <>
         <table className="mt-3 w-full text-left">
           <thead className="text-xs text-fg-muted">
             <tr>
@@ -159,7 +163,7 @@ function Documents({ projectId, data }: { projectId: string; data: DocumentsData
             </tr>
           </thead>
           <tbody>
-            {data.items.map((d) => {
+            {docsPaged.items.map((d) => {
               const v = d.versions[0]!;
               return (
                 <tr key={d.id} className="border-t border-line">
@@ -182,6 +186,8 @@ function Documents({ projectId, data }: { projectId: string; data: DocumentsData
             })}
           </tbody>
         </table>
+        <ClientPager paged={docsPaged} noun="documents" singular="document" />
+        </>
       )}
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="flex flex-col">
@@ -276,6 +282,7 @@ function Extraction({ projectId, isAdmin, data: initial, documents }: { projectI
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const live = useLiveExtraction(projectId, initial);
   const data = live.data;
+  const receipts = usePagedRows((data?.batches ?? []).flatMap((b) => b.jobs.map((j) => ({ b, j }))), { param: 'receiptsPage' });
   if (!data) return null;
   const latest = documents.items.map((d) => ({ doc: d, v: d.versions[0]! }));
 
@@ -335,7 +342,8 @@ function Extraction({ projectId, isAdmin, data: initial, documents }: { projectI
           Extraction in progress — this page updates by itself.
         </p>
       )}
-      {data.batches.length > 0 && (
+      {receipts.total > 0 && (
+        <>
         <table className="mt-4 w-full text-left">
           <caption className="text-left text-xs font-medium text-fg-muted">Receipts</caption>
           <thead className="text-xs text-fg-muted">
@@ -349,8 +357,7 @@ function Extraction({ projectId, isAdmin, data: initial, documents }: { projectI
             </tr>
           </thead>
           <tbody>
-            {data.batches.flatMap((b) =>
-              b.jobs.map((j) => (
+            {receipts.items.map(({ b, j }) => (
                 <tr key={j.id} className="border-t border-line align-top">
                   <td className="py-1">
                     {j.document} v{j.documentVersion}
@@ -373,10 +380,11 @@ function Extraction({ projectId, isAdmin, data: initial, documents }: { projectI
                     )}
                   </td>
                 </tr>
-              )),
-            )}
+            ))}
           </tbody>
         </table>
+        <ClientPager paged={receipts} noun="receipts" singular="receipt" />
+        </>
       )}
       {isAdmin && data.profiles && (
         <details className="mt-4">
@@ -419,6 +427,7 @@ const markingText = (c: Record<string, number> | undefined) =>
 
 /** Published rule-set versions with their rules per marking (mockup step 6, approved 15 Nov 2026). */
 export function PublishedVersions({ items }: { items: PublishedSet[] }) {
+  const paged = usePagedRows(items, { param: 'versionsPage' });
   if (!items.length) return <p className="mt-3 text-fg-muted">No rule set published yet.</p>;
   return (
     <div className="mt-4">
@@ -434,11 +443,11 @@ export function PublishedVersions({ items }: { items: PublishedSet[] }) {
           </tr>
         </thead>
         <tbody>
-          {items.map((s, i) => (
+          {paged.items.map((s, i) => (
             <tr key={s.id} className="border-t border-line align-top">
               <td className="py-1 font-mono">
                 v{s.version}
-                {i > 0 && <span className="ml-1 text-xs text-fg-muted">(superseded)</span>}
+                {(paged.page - 1) * paged.pageSize + i > 0 && <span className="ml-1 text-xs text-fg-muted">(superseded)</span>}
               </td>
               <td>{s.ruleCount}</td>
               <td className="text-xs">{markingText(s.markingCounts)}</td>
@@ -448,6 +457,7 @@ export function PublishedVersions({ items }: { items: PublishedSet[] }) {
           ))}
         </tbody>
       </table>
+      <ClientPager paged={paged} noun="versions" singular="version" />
       <p className="mt-1 text-xs text-fg-muted">RL Gym reads the published set through the unchanged policy manifest. The annotations document (marking, applies when, why, links, provenance) is ready but proposed: it is not sent until RL Gym agrees to the versioned change.</p>
     </div>
   );

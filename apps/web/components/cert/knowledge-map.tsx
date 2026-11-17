@@ -1,6 +1,8 @@
 'use client';
 
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { ActionMessages, input, useAction } from '@/components/supply/action';
 import { StatePill, TD, TH } from '@/components/supply/ui';
 import type { KnowledgeRow } from './types';
@@ -82,6 +84,7 @@ export function KnowledgeMap({ items, sections, canEdit }: { items: KnowledgeRow
   const [status, setStatus] = useState<'ALL' | KnowledgeRow['status']>('ALL');
   const heading = new Map(sections.map((s) => [s.anchor, s.heading]));
   const shown = items.filter((k) => (kind === 'ALL' || k.kind === kind) && (status === 'ALL' || k.status === status));
+  const paged = usePagedRows(shown, { resetKey: `${kind}|${status}` });
   const counts = { DRAFT: 0, APPROVED: 0, REJECTED: 0 };
   for (const k of items) counts[k.status]++;
   const kinds = KINDS.filter((x) => x === 'ALL' || items.some((k) => k.kind === x)).concat([...new Set(items.map((k) => k.kind))].filter((x) => !KINDS.includes(x)));
@@ -124,7 +127,7 @@ export function KnowledgeMap({ items, sections, canEdit }: { items: KnowledgeRow
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {shown.map((k) => (
+            {paged.items.map((k) => (
               <Row key={`${k.id}:${k.status}:${k.text}:${k.critical}`} k={k} section={heading.get(k.citation)} canEdit={canEdit} />
             ))}
             {shown.length === 0 && (
@@ -136,6 +139,7 @@ export function KnowledgeMap({ items, sections, canEdit }: { items: KnowledgeRow
             )}
           </tbody>
         </table>
+        {shown.length > 0 && <ClientPager paged={paged} noun="knowledge items" singular="knowledge item" className="px-3 pb-3" />}
       </div>
     </div>
   );

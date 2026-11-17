@@ -2,7 +2,9 @@
 
 import type { SourcedPersonDto, SourcedRole } from '@praxis/shared';
 import Link from 'next/link';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 
 const TH = 'px-3 py-2 font-medium';
 const TD = 'px-3 py-2 align-top';
@@ -27,6 +29,8 @@ export function SourcingList({ items, initialTab = 'SME', initialQuery = '' }: {
   const [tab, setTab] = useState<SourcedRole>(initialTab);
   const [q, setQ] = useState(initialQuery);
   const rows = filterSourced(items, tab, q);
+  // D24: 10 people a page, the page in the URL; a new search or tab goes back to page 1.
+  const paged = usePagedRows(rows, { resetKey: `${tab}|${q.trim()}` });
   const searching = q.trim().length > 0;
   const kind = ROLE_LABEL[tab];
 
@@ -88,7 +92,7 @@ export function SourcingList({ items, initialTab = 'SME', initialQuery = '' }: {
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {rows.map((p) => (
+            {paged.items.map((p) => (
               <tr key={p.id} data-person={p.id}>
                 <td className={TD}>{p.firstName}</td>
                 <td className={TD}>{p.lastName}</td>
@@ -112,6 +116,7 @@ export function SourcingList({ items, initialTab = 'SME', initialQuery = '' }: {
           </tbody>
         </table>
       </div>
+      {rows.length > 0 && <ClientPager paged={paged} noun="people" singular="person" />}
       <p className="mt-3 text-xs text-fg-muted">
         Each upload creates a profile in the {kind} table. The email is the person&apos;s Google sign-in to the candidate app, for SMEs and Reviewers alike. A duplicate email
         on the same project is flagged, not added.

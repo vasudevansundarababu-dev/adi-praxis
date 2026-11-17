@@ -1,4 +1,6 @@
+import { parsePage, slicePage } from '@praxis/shared';
 import type { Metadata } from 'next';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import Link from 'next/link';
 import { fmtDate, StatePill } from '@/components/partner/labels';
 import { partnerGet, type PartnerCandidate } from '@/lib/partner-api';
@@ -14,11 +16,13 @@ const COLUMNS = [
   { key: 'standing', label: 'Standing' },
 ];
 
-export default async function PartnerCandidatesPage({ searchParams }: { searchParams: Promise<{ requisitionId?: string }> }) {
-  const { requisitionId } = await searchParams;
+export default async function PartnerCandidatesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
+  const requisitionId = typeof sp.requisitionId === 'string' ? sp.requisitionId : undefined;
   const qs = requisitionId && /^[0-9a-f-]{36}$/i.test(requisitionId) ? `?requisitionId=${requisitionId}` : '';
   const { data, status } = await partnerGet<{ items: PartnerCandidate[] }>(`/candidates${qs}`);
   const items = data?.items ?? [];
+  const paged = slicePage(items, parsePage(sp.page));
   return (
     <div>
       <h1 className="text-2xl font-semibold">Candidates</h1>
@@ -64,7 +68,7 @@ export default async function PartnerCandidatesPage({ searchParams }: { searchPa
               </tr>
             </thead>
             <tbody>
-              {items.map((c) => (
+              {paged.items.map((c) => (
                 <tr key={c.candidateId} className="border-b border-hairline align-top last:border-0">
                   <td className="px-4 py-2">
                     <Link href={`/partner/candidates/${c.candidateId}`} className="font-medium text-link">
@@ -83,6 +87,7 @@ export default async function PartnerCandidatesPage({ searchParams }: { searchPa
               ))}
             </tbody>
           </table>
+          <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="candidates" singular="candidate" className="px-4 pb-3" />
         </div>
       )}
     </div>

@@ -9,7 +9,7 @@ import type { EarningsView, PayeeView } from '@/lib/supply-types';
 export const metadata: Metadata = { title: { absolute: pageTitle('Payments') } };
 
 /** M10c: payment set-up with the payout provider (hosted by them) and what you have earned and been paid. */
-export default async function PaymentsPage({ searchParams }: { searchParams: Promise<{ returned?: string }> }) {
+export default async function PaymentsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   if (!(await getMe())) redirect(`/sign-in?returnTo=${encodeURIComponent('/payments')}`);
   const { returned } = await searchParams;
   const [payee, earnings] = await Promise.all([api<PayeeView>('/me/payee'), api<EarningsView>('/me/earnings')]);
@@ -21,7 +21,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         <p className="muted mt-2">Set up how you are paid, and follow what you’ve earned. Payments go out weekly for accepted work.</p>
       </section>
       {payee.data ? <PayeeSetup initial={payee.data} returned={returned === '1'} /> : <p role="alert" className="card p-4 text-sm text-error">We couldn’t load your payment set-up. Refresh the page to try again.</p>}
-      {earnings.data ? <Earnings data={earnings.data} /> : <p role="alert" className="card p-4 text-sm text-error">We couldn’t load your earnings. Refresh the page to try again.</p>}
+      {earnings.data ? <Earnings data={earnings.data} searchParams={await searchParams} /> : <p role="alert" className="card p-4 text-sm text-error">We couldn’t load your earnings. Refresh the page to try again.</p>}
     </main>
   );
 }

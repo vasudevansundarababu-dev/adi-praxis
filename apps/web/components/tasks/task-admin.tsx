@@ -1,7 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { mutate } from '@/lib/client-api';
 import { Req, RequiredNote } from '@/components/required';
 import Link from 'next/link';
@@ -20,6 +22,7 @@ export function TaskTable({ projectId, tptMinutes, initial }: { projectId: strin
   const [reason, setReason] = useState('STALLED');
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const rows = initial.filter((t) => !filter || t.status === filter);
+  const paged = usePagedRows(rows, { resetKey: filter });
   const counts = initial.reduce<Record<string, number>>((m, t) => ({ ...m, [t.status]: (m[t.status] ?? 0) + 1 }), {});
 
   async function reclaim(id: string) {
@@ -60,7 +63,7 @@ export function TaskTable({ projectId, tptMinutes, initial }: { projectId: strin
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {rows.map((t) => {
+            {paged.items.map((t) => {
               const mins = Math.round(t.activeSeconds / 60);
               return (
                 <tr key={t.id}>
@@ -111,7 +114,7 @@ export function TaskTable({ projectId, tptMinutes, initial }: { projectId: strin
             })}
           </tbody>
         </table>
-        {rows.length === 0 && <p className="mt-3 text-sm text-fg-muted">No tasks yet. Tasks are issued when experts accept their assignment.</p>}
+        {rows.length === 0 ? <p className="mt-3 text-sm text-fg-muted">No tasks yet. Tasks are issued when experts accept their assignment.</p> : <ClientPager paged={paged} noun="tasks" singular="task" />}
       </div>
     </section>
   );

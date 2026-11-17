@@ -1,5 +1,6 @@
 'use client';
 
+import { UrlPager, type SearchParams } from '@/components/pager';
 import { TableSearch } from '@/components/search/table-search';
 import { INTERNAL_ROLES, roleLabel, type InternalRole, type InternalUserDto } from '@praxis/shared';
 import { useState } from 'react';
@@ -24,7 +25,18 @@ function RoleBoxes({ value, onChange, idPrefix }: { value: InternalRole[]; onCha
 }
 
 /** Admin → Users: add console users with a temporary password, change roles, disable, and reset passwords. */
-export function UserAdmin({ users, meId, signInAt }: { users: InternalUserDto[]; meId: string; signInAt: string }) {
+export function UserAdmin({
+  users,
+  meId,
+  signInAt,
+  paging,
+}: {
+  users: InternalUserDto[];
+  meId: string;
+  signInAt: string;
+  /** D24: the page of users the API returned, the filtered total and the URL's search. */
+  paging?: { page: number; total: number; searchParams: SearchParams; query: string };
+}) {
   const a = useAction();
   const [issued, setIssued] = useState<Issued | null>(null);
   const [name, setName] = useState('');
@@ -56,7 +68,8 @@ export function UserAdmin({ users, meId, signInAt }: { users: InternalUserDto[];
       {issued && <TemporaryPassword email={issued.email} password={issued.password} signInAt={signInAt} onDone={() => setIssued(null)} />}
       <ActionMessages error={a.error} problems={a.problems} notice={a.notice} />
 
-      <TableSearch type="users" label="Search users" placeholder="Search users by name, email or role" />
+      <div>
+      <TableSearch type="users" label="Search users" placeholder="Search users by name, email or role" syncUrl={!!paging} initialQuery={paging?.query ?? ''} />
         <div data-search-scope="users" className="overflow-x-auto card">
         <table className="w-full text-left text-sm">
           <thead className="bg-surface">
@@ -160,6 +173,8 @@ export function UserAdmin({ users, meId, signInAt }: { users: InternalUserDto[];
             })}
           </tbody>
         </table>
+      </div>
+      {paging && <UrlPager searchParams={paging.searchParams} page={paging.page} total={paging.total} shown={users.length} noun="users" singular="user" />}
       </div>
 
       <section aria-labelledby="add-user-h" className="card p-4">

@@ -1,6 +1,8 @@
 'use client';
 
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, inputInline, useAction } from '@/components/supply/action';
 import { humanize, StatePill, TD, TH } from '@/components/supply/ui';
@@ -70,6 +72,7 @@ function Resolve({ id }: { id: string }) {
 }
 
 export function ExceptionsTable({ items }: { items: PayoutExceptionDto[] }) {
+  const paged = usePagedRows(items);
   if (!items.length) return <p className="card p-4 text-sm text-fg-muted">No exceptions here.</p>;
   return (
     <div className="card overflow-x-auto">
@@ -84,7 +87,7 @@ export function ExceptionsTable({ items }: { items: PayoutExceptionDto[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
-          {items.map((x) => (
+          {paged.items.map((x) => (
             <tr key={x.id}>
               <td className={TD}>{x.reportDate}</td>
               <td className={TD}>{humanize(x.kind)}</td>
@@ -100,6 +103,7 @@ export function ExceptionsTable({ items }: { items: PayoutExceptionDto[] }) {
           ))}
         </tbody>
       </table>
+      <ClientPager paged={paged} noun="exceptions" singular="exception" className="px-3 pb-3" />
     </div>
   );
 }

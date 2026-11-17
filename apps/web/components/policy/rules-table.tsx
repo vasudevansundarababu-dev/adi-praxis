@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MANDATORY_MARKINGS, MARKING_LABEL, type MandatoryMarking, type RuleAnnotationInput } from '@praxis/shared';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
+import { ClientPager } from '@/components/pager';
 import { mutate } from '@/lib/client-api';
 import { MARKING_FILTERS, OUTCOME_LABEL, applicationTypeOptions, byMarking, forApplication, sourceLabel, withMarking, type AnnotatedRow, type MarkingFilter } from './annotation-logic';
 import { setRuleApplied, type ApplyTarget } from './apply-rule';
@@ -55,6 +57,8 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
     return forApplication(byMarking(visible, markingFilter), { applicationType: appType, governingState: govState.trim() });
   }, [docRules, suggestions, showAll, markingFilter, appType, govState, appliedOnly, rejected]);
   const appTypes = useMemo(() => applicationTypeOptions(rules), [rules]);
+  // D24: 10 rules per page (?rulesPage=); a new document, prompt or filter returns to page 1.
+  const paged = usePagedRows(rows, { param: 'rulesPage', resetKey: [docId, ranPrompt, showAll, markingFilter, appType, govState.trim(), appliedOnly].join('|') });
   const filtering = !!appType || !!govState.trim();
 
   // The AI annotation run for the chosen document: polled while it runs, then the rules reload.
@@ -346,7 +350,7 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {paged.items.map((r) => {
                 const s = suggestions?.get(r.ruleKey);
                 const steps = applySteps(r);
                 const stage = rowStage[r.ruleId];
@@ -443,6 +447,7 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
               })}
             </tbody>
           </table>
+          <ClientPager paged={paged} noun="rules" singular="rule" />
         </div>
       )}
     </div>

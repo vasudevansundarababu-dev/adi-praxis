@@ -2,7 +2,9 @@
 
 import { STAGE_LABELS, type PendingStage } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { mutate } from '@/lib/client-api';
 import { Req } from '@/components/required';
 
@@ -55,6 +57,7 @@ const short = (v: unknown) => {
 
 /** Current stage, who holds it, the stage history (void decisions marked) and what changed since the last version. */
 export function StageSummary({ d, status }: { d: StageData; status: string }) {
+  const changes = usePagedRows(d.diff?.changes ?? [], { param: 'changesPage' });
   return (
     <section aria-labelledby="stage-h" className="card space-y-3 p-4 text-sm">
       <h2 id="stage-h" className="font-semibold">Review route: SME → Expert review → PM approval</h2>
@@ -115,7 +118,7 @@ export function StageSummary({ d, status }: { d: StageData; status: string }) {
                 </tr>
               </thead>
               <tbody>
-                {d.diff.changes.map((c) => (
+                {changes.items.map((c) => (
                   <tr key={c.path} className="align-top">
                     <td className="pr-2 font-mono">{c.path}</td>
                     <td className="pr-2">{short(c.before)}</td>
@@ -125,6 +128,7 @@ export function StageSummary({ d, status }: { d: StageData; status: string }) {
               </tbody>
             </table>
           )}
+          {d.diff.changes.length > 0 && <ClientPager paged={changes} noun="changes" singular="change" />}
         </details>
       )}
     </section>

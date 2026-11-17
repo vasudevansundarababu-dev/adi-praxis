@@ -1,6 +1,8 @@
 'use client';
 
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { Req, RequiredNote } from '@/components/required';
 import { ActionMessages, input, useAction } from './action';
 import type { SubmissionRow } from './types';
@@ -14,6 +16,7 @@ export function SubmissionsTable({ items, canDecide }: { items: SubmissionRow[];
   const a = useAction();
   const [selected, setSelected] = useState<string[]>([]);
   const [note, setNote] = useState('');
+  const paged = usePagedRows(items);
   const decidable = items.filter((s) => s.screen !== 'CONFIRMED_NOT_MET');
   const recommendedNotMet = decidable.filter((s) => s.screen === 'DOES_NOT_MEET_RECOMMENDED').map((s) => s.id);
   const toggle = (id: string, on: boolean) => setSelected((x) => (on ? [...x, id] : x.filter((y) => y !== id)));
@@ -67,7 +70,7 @@ export function SubmissionsTable({ items, canDecide }: { items: SubmissionRow[];
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {items.map((s) => (
+            {paged.items.map((s) => (
               <tr key={s.id}>
                 {canDecide && (
                   <td className={TD}>
@@ -105,6 +108,7 @@ export function SubmissionsTable({ items, canDecide }: { items: SubmissionRow[];
             ))}
           </tbody>
         </table>
+        <ClientPager paged={paged} noun="submissions" singular="submission" className="px-3 pb-3" />
       </div>
       {canDecide && decidable.length !== items.length && <p className="text-xs text-fg-muted">Rows already confirmed “not met” cannot be changed here.</p>}
     </div>

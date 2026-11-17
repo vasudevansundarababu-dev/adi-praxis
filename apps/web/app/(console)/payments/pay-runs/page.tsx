@@ -1,5 +1,7 @@
+import { parsePage, slicePage } from '@praxis/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import { BuildPayRunForm } from '@/components/payments/pay-run-actions';
 import { type PayRunDto, totalsText } from '@/components/payments/types';
 import { Empty, fmtDate, StatePill, SupplyOff, TD, TH } from '@/components/supply/ui';
@@ -17,10 +19,12 @@ const NEXT_STEP: Record<string, string> = {
 };
 
 /** Weekly pay runs (Monday to Monday): build → PM confirm → Finance approve → submit → provider → reconcile. */
-export default async function PayRunsPage() {
+export default async function PayRunsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const { status, data } = await apiGet<{ items: PayRunDto[] }>('/pay-runs');
   if (status === 404) return <SupplyOff title="Pay runs" />;
   const items = data?.items ?? [];
+  const paged = slicePage(items, parsePage(sp.page));
   return (
     <div>
       <h1 className="text-2xl font-semibold">Pay runs</h1>
@@ -43,7 +47,7 @@ export default async function PayRunsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {items.map((r) => (
+              {paged.items.map((r) => (
                 <tr key={r.id}>
                   <td className={TD}>
                     <Link href={`/payments/pay-runs/${r.id}`} className="font-medium text-link hover:underline">
@@ -60,6 +64,7 @@ export default async function PayRunsPage() {
               ))}
             </tbody>
           </table>
+          <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="pay runs" singular="pay run" className="px-3 pb-3" />
         </div>
       )}
     </div>

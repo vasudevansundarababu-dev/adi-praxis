@@ -3,7 +3,9 @@
 import type { ForgeTaskRow, ProjectPersonDto } from '@praxis/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { ExportPanel, type ExportState } from '@/components/projects/export-panel';
 import { mutate } from '@/lib/client-api';
 import { canPickAuthor, fmtDate, fullName, smesOf, taskCode, taskName, tasksSummary, taskStatusLabel, taskStatusTone } from '@/lib/forge-console';
@@ -60,6 +62,8 @@ export function ForgeTasksTab({ projectId, tasks, people, exportState }: { proje
   const [filter, setFilter] = useState('');
   const smes = smesOf(people);
   const rows = tasks.map((t, i) => ({ t, code: taskCode(i) })).filter(({ t }) => !filter || t.status === filter);
+  // D24: 10 tasks a page, the page in the URL; a new status filter goes back to page 1.
+  const paged = usePagedRows(rows, { resetKey: filter });
   return (
     <section aria-label="Tasks">
       <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
@@ -89,7 +93,7 @@ export function ForgeTasksTab({ projectId, tasks, people, exportState }: { proje
             </tr>
           </thead>
           <tbody className="divide-y divide-hairline">
-            {rows.map(({ t, code }) => (
+            {paged.items.map(({ t, code }) => (
               <tr key={t.taskId} data-task={t.taskId}>
                 <td className={`${TD} font-mono text-xs whitespace-nowrap`}>{code}</td>
                 <td className={TD}>
@@ -116,6 +120,7 @@ export function ForgeTasksTab({ projectId, tasks, people, exportState }: { proje
           </tbody>
         </table>
       </div>
+      {rows.length > 0 && <ClientPager paged={paged} noun="tasks" singular="task" />}
       <p className="mt-2.5 text-xs text-fg-muted">
         One row per task set on the project. The PM or Admin picks the SME for each task from the assigned experts; until then &quot;Authored by&quot; offers &quot;Assign SME…&quot;. An author
         can be changed only before they start.

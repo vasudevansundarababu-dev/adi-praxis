@@ -1,4 +1,6 @@
+import { parsePage, slicePage } from '@praxis/shared';
 import type { Metadata } from 'next';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import { PayRunActions } from '@/components/payments/pay-run-actions';
 import { type PayRunDto, type ReportLine, totalsText } from '@/components/payments/types';
 import { BackLink, Facts, fmtDate, fmtDateTime, NotFoundCard, shortId, StatePill, TD, TH } from '@/components/supply/ui';
@@ -6,8 +8,9 @@ import { apiGet, getCurrentUser } from '@/lib/api';
 
 export const metadata: Metadata = { title: 'Pay run' };
 
-function ReportTable({ rows, empty }: { rows: ReportLine[]; empty: string }) {
+function ReportTable({ rows, empty, sp, param }: { rows: ReportLine[]; empty: string; sp: SearchParams; param: string }) {
   if (!rows.length) return <p className="card mt-3 p-4 text-sm text-fg-muted">{empty}</p>;
+  const paged = slicePage(rows, parsePage(sp[param]));
   return (
     <div className="card mt-3 overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -19,7 +22,7 @@ function ReportTable({ rows, empty }: { rows: ReportLine[]; empty: string }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
-          {rows.map((r) => (
+          {paged.items.map((r) => (
             <tr key={`${r.smeUserId}${r.currency}`}>
               <td className={`${TD} font-mono`}>{shortId(r.smeUserId)}</td>
               <td className={`${TD} tabular-nums`}>
@@ -30,11 +33,13 @@ function ReportTable({ rows, empty }: { rows: ReportLine[]; empty: string }) {
           ))}
         </tbody>
       </table>
+      <UrlPager searchParams={sp} param={param} page={paged.page} total={paged.total} shown={paged.items.length} noun="SMEs" singular="SME" className="px-3 pb-3" />
     </div>
   );
 }
 
-export default async function PayRunPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PayRunPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const user = (await getCurrentUser())!;
   const { id } = await params;
   const { data: r } = await apiGet<PayRunDto>(`/pay-runs/${id}`);
@@ -44,6 +49,7 @@ export default async function PayRunPage({ params }: { params: Promise<{ id: str
   const items = r.items ?? [];
   const payable = items.filter((i) => i.status !== 'HELD');
   const heldItems = items.filter((i) => i.status === 'HELD');
+  const payPage = slicePage(payable, parsePage(sp.page));
   const lastDay = new Date(new Date(r.periodEnd).getTime() - 86_400_000).toISOString();
 
   return (
@@ -105,7 +111,7 @@ export default async function PayRunPage({ params }: { params: Promise<{ id: str
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {payable.map((i) => (
+                {payPage.items.map((i) => (
                   <tr key={i.id}>
                     <td className={`${TD} font-mono`}>{shortId(i.smeUserId)}</td>
                     <td className={`${TD} tabular-nums`}>
@@ -122,6 +128,7 @@ export default async function PayRunPage({ params }: { params: Promise<{ id: str
                 ))}
               </tbody>
             </table>
+            <UrlPager searchParams={sp} page={payPage.page} total={payPage.total} shown={payPage.items.length} noun="payments" singular="payment" className="px-3 pb-3" />
           </div>
         )}
       </section>
@@ -129,13 +136,13 @@ export default async function PayRunPage({ params }: { params: Promise<{ id: str
       <section>
         <h2 className="text-lg font-semibold">Held ({heldItems.length})</h2>
         <p className="mt-1 text-sm text-fg-muted">Not submitted. Held amounts carry into the next run once the reason is cleared.</p>
-        <ReportTable rows={heldItems.map((i) => ({ smeUserId: i.smeUserId, currency: i.currency, amount: i.amount, reason: i.holdReason ?? 'Held' }))} empty="Nothing is held in this run." />
+        <ReportTable rows={heldItems.map((i) => ({ smeUserId: i.smeUserId, currency: i.currency, amount: i.amount, reason: i.holdReason ?? 'Held' }))} empty="Nothing is held in this run." sp={sp} param="heldPage" />
       </section>
 
       <section>
         <h2 className="text-lg font-semibold">Carried forward ({r.report?.carried?.length ?? 0})</h2>
         <p className="mt-1 text-sm text-fg-muted">Balances under USD 10 or INR 500, or with nothing to pay, wait for the next run.</p>
-        <ReportTable rows={r.report?.carried ?? []} empty="Nothing was carried forward." />
+        <ReportTable rows={r.report?.carried ?? []} empty="Nothing was carried forward." sp={sp} param="carriedPage" />
       </section>
     </div>
   );

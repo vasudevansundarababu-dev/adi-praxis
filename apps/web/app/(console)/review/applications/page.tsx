@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import { TableSearch } from '@/components/search/table-search';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import { recommendationLabel, statusLabel } from '@/components/review/labels';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { pageOf, queryParam, searchIds } from '@/lib/paging';
 import { NoAccess } from '@/components/no-access';
 
 export const metadata: Metadata = { title: 'Applications' };
@@ -17,14 +19,17 @@ const FILTERS = [
   ['NOT_SELECTED', 'Not selected'],
 ] as const;
 
-export default async function ApplicationsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+export default async function ApplicationsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
   if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN')) return <NoAccess need="Validators and Admins" />;
-  const { status } = await searchParams;
+  const sp = await searchParams;
+  const status = typeof sp.status === 'string' ? sp.status : undefined;
   const filter = FILTERS.some(([v]) => v === status) ? status! : '';
   const { data } = await apiGet<{ items: Item[] }>(`/review/enrollments${filter ? `?status=${filter}` : ''}`);
   const items = data?.items ?? [];
+  const q = queryParam(sp);
+  const paged = pageOf(items, sp, await searchIds('candidates', q));
   return (
     <div>
       <h1 className="text-2xl font-semibold">Applications</h1>
@@ -42,7 +47,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
         <p className="mt-6 text-fg-muted">No applications here.</p>
       ) : (
         <>
-        <TableSearch type="candidates" label="Search candidates" placeholder="Search candidates by name, project or expertise" />
+        <TableSearch type="candidates" label="Search candidates" placeholder="Search candidates by name, project or expertise" syncUrl initialQuery={q} />
         <div data-search-scope="candidates" className="mt-6 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-line text-fg-muted">
@@ -55,7 +60,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {items.map((i) => (
+              {paged.items.map((i) => (
                 <tr data-search-id={i.id} key={i.id}>
                   <td className="px-3 py-2">
                     <Link href={`/review/applications/${i.id}`} className="font-medium text-link hover:underline">
@@ -73,6 +78,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
               ))}
             </tbody>
           </table>
+          <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="applications" singular="application" />
         </div>
         </>
       )}

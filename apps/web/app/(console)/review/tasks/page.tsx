@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { parsePage, slicePage } from '@praxis/shared';
+import { type SearchParams, UrlPager } from '@/components/pager';
 import { apiGet, getCurrentUser } from '@/lib/api';
 import { NoAccess } from '@/components/no-access';
 
@@ -8,11 +10,13 @@ export const metadata: Metadata = { title: 'Task reviews' };
 type Item = { id: string; projectName: string; workflow: string; taskType: string; brief: string | null; author: string | null; submittedAt: string | null; reworkCount: number; flaggedDuplicate: boolean; dataFlags: number; reviewRoute?: 'SME_PM' | 'SME_EXPERT_PM'; stage?: 'EXPERT_REVIEW' | 'PM_APPROVAL' | null };
 
 /** TASK-KYC R01: tasks awaiting review, flagged items first. */
-export default async function TaskReviewQueue() {
+export default async function TaskReviewQueue({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
   const user = (await getCurrentUser())!;
   if (!user.roles.some((r) => r === 'REVIEWER' || r === 'ADMIN' || r === 'PM')) return <NoAccess need="Validators, PMs and Admins" />;
   const { data } = await apiGet<{ items: Item[] }>('/review/tasks');
   const items = data?.items ?? [];
+  const paged = slicePage(items, parsePage(sp.page));
   return (
     <div>
       <h1 className="text-2xl font-semibold">Task reviews</h1>
@@ -23,8 +27,9 @@ export default async function TaskReviewQueue() {
       {items.length === 0 ? (
         <p className="mt-6 text-fg-muted">Nothing is waiting for review.</p>
       ) : (
+        <>
         <ul className="mt-6 space-y-2">
-          {items.map((t) => (
+          {paged.items.map((t) => (
             <li key={t.id} className="rounded-md border border-line p-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <Link href={`/review/tasks/${t.id}`} className="font-medium text-link hover:underline">
@@ -41,6 +46,8 @@ export default async function TaskReviewQueue() {
             </li>
           ))}
         </ul>
+        <UrlPager searchParams={sp} page={paged.page} total={paged.total} shown={paged.items.length} noun="tasks" singular="task" />
+        </>
       )}
     </div>
   );

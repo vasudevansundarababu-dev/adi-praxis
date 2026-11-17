@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { GOLDEN_MARKETING_EXAMPLE, MARKETING_CAMPAIGN_TASK2_PROFILE, MARKETING_T2_TOOLS, marketingTask2Graph, withRuleVersions, type CandidateRule } from '@praxis/shared';
+import { GOLDEN_MARKETING_EXAMPLE, MARKETING_CAMPAIGN_TASK2_PROFILE, MARKETING_CAMPAIGN_TASK2_PROFILE_V2, MARKETING_T2_TOOLS, marketingTask2Graph, withRuleVersions, type CandidateRule } from '@praxis/shared';
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MockGoogleVerifier } from '../src/candidate/google';
@@ -16,6 +16,7 @@ import { publishRuleSet } from '../src/policy/rule-sets';
 import { createRuleFromCandidate, markReviewed } from '../src/policy/rules';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
+import { marketingFormV2 } from '../src/jobs/marketing-form-v2';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
 /**
@@ -335,6 +336,48 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
     const review = (await get(s.pm, `/review/tasks/${s.taskId}`)).json();
     expect(review.id).toBe(s.taskId);
     expect(review.exportStatus).toBeNull();
+  });
+
+  it('D26 follow-up: form v2 declares S4 citation visibility; its draft keeps every RL Gym part; a task approved on v2 validates', async () => {
+    const v1 = await published();
+    const before = await db.template.findUniqueOrThrow({ where: { id: v1.id } });
+    // Dry run: nothing is created; the report names the form change and the unchanged parts.
+    const dry = await marketingFormV2(db, { templateId: v1.id, requestedBy: 'admin@test.local', apply: false });
+    expect(dry).toMatchObject({ outcome: 'would_create', source: { version: 1, profileId: PROFILE_ID } });
+    expect(dry.formChanges).toEqual([`profileId: ${PROFILE_ID} -> veyra-hush-one-launch-v2`, 'S4.policies.itemFields: ruleId, ruleVersion, locator, quote, appliesTo (private), rationale (private), exception (private)']);
+    expect(await db.template.count({ where: { lineageId: before.lineageId } })).toBe(1);
+    // Only an active Admin may ask for it.
+    expect(await marketingFormV2(db, { templateId: v1.id, requestedBy: 'nobody@test.local', apply: true })).toMatchObject({ outcome: 'refused' });
+
+    const made = await marketingFormV2(db, { templateId: v1.id, requestedBy: 'admin@test.local', apply: true });
+    expect(made).toMatchObject({ outcome: 'created', draft: { version: 2, profileId: 'veyra-hush-one-launch-v2' } });
+    const draft = await db.template.findUniqueOrThrow({ where: { id: made.draft!.templateId } });
+    expect(draft).toMatchObject({ status: 'DRAFT', lineageId: before.lineageId, workflowName: WORKFLOW, agentMode: 'MULTI' });
+    // RL Gym's parts travel verbatim; only the form differs, and it differs only in the declared citation visibility.
+    const a = before.anvilSpec as Record<string, any>;
+    const b = draft.anvilSpec as Record<string, any>;
+    for (const k of ['anvil_template_key', 'requirement', 'execution', 'skills']) expect(b[k], k).toEqual(a[k]);
+    expect(b.authoring.profile).toEqual(JSON.parse(JSON.stringify(MARKETING_CAMPAIGN_TASK2_PROFILE_V2)));
+    expect(await db.auditEvent.count({ where: { entityId: draft.id, action: 'template.form_revised' } })).toBe(1);
+    // A second run is refused (v2 is the newest version now); the published v1 is untouched.
+    expect(await marketingFormV2(db, { templateId: v1.id, requestedBy: 'admin@test.local', apply: true })).toMatchObject({ outcome: 'refused' });
+    expect(await db.template.findUniqueOrThrow({ where: { id: v1.id } })).toMatchObject({ status: 'PUBLISHED', profileId: PROFILE_ID });
+
+    // An Admin publishes v2; a task authored and approved on it is exportable: no private exposure.
+    expect((await post(admin, `/templates/${draft.id}/publish`)).statusCode).toBe(200);
+    const s = await staffedProject(draft.id);
+    expect((await view(s.sme, s.taskId)).template).toMatchObject({ profileId: 'veyra-hush-one-launch-v2' });
+    const worked = withRuleVersions(GOLDEN_MARKETING_EXAMPLE, s.versions) as unknown as Record<string, any>;
+    const output = { ...worked, profile: { ...worked.profile, id: 'veyra-hush-one-launch-v2' }, workflowGraph: marketingTask2Graph(1) };
+    expect((await save(s.sme, s.taskId, output)).statusCode).toBe(200);
+    const sub = await submit(s.sme, s.taskId);
+    expect(sub.statusCode, sub.body).toBe(200);
+    expect((await stage(s.expert, s.taskId, { stage: 'EXPERT_REVIEW', decision: 'PASS', checklist: allTrue })).statusCode).toBe(200);
+    expect((await stage(s.pm, s.taskId, { stage: 'PM_APPROVAL', decision: 'APPROVE' })).statusCode).toBe(200);
+    const record = await db.approvedTaskRecord.findFirstOrThrow({ where: { taskInstanceId: s.taskId } });
+    const run = await post(s.pm, `/projects/${s.projectId}/validate`, { recordIds: [record.id] });
+    expect(run.statusCode, run.body).toBe(201);
+    expect(run.json().results[0]).toMatchObject({ status: 'valid', issues: [] });
   });
 
   it('a single-agent workflow on the five-agent version, or a rubric group that does not add up, blocks submission', async () => {

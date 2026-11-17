@@ -31,11 +31,19 @@ const BINDING_FIELDS = (help: string): ItemField[] => [
   { key: 'expectedValue', type: 'text', label: 'Expected value', help: 'The value the output field must have (or the bound for a number).', required: { anyOf: [{ field: 'outputField', filled: true }] }, visibility: 'private_reference' },
 ];
 
-/** Built-in item fields of the structured primitives. A repeated_array declares its own. */
+/**
+ * Built-in item fields of the structured primitives. A repeated_array declares its own. A policy citation's declared
+ * `itemFields` only state sub-field visibility for RL Gym's projection; ADI Forge always uses the built-in ones.
+ */
 export function itemFieldsOf(field: ItemField): ItemField[] {
+  return field.type === 'repeated_array' ? (field.itemFields ?? []) : builtInItemFields(field);
+}
+
+/** The built-in item fields of a structured primitive (none for other types). */
+export function builtInItemFields(field: ItemField): ItemField[] {
   switch (field.type) {
     case 'repeated_array':
-      return field.itemFields ?? [];
+      return [];
     case 'evidence_record':
       return [
         { key: 'id', type: 'text', label: 'Evidence ID', help: 'Stable ID that findings and steps cite.', required: true },
@@ -484,3 +492,22 @@ export function withSlotCase(profile: TemplateProfile, output: Record<string, un
 }
 
 export const opts = (...values: string[]): PickOption[] => values.map((v) => opt(v));
+
+/** Sub-fields a declared citation visibility names (the binding fields and flags stay ADI Forge-only and private). */
+const CITATION_DECLARED = ['ruleId', 'ruleVersion', 'locator', 'quote', 'appliesTo', 'rationale', 'exception'];
+
+/**
+ * D26 follow-up (owner, 17 Nov 2026): the same form with every policy citation's sub-field visibility declared for
+ * RL Gym's projection (`itemFields`: rule ID, version, locator and quotation agent-visible; applies-to, rationale and
+ * exception private), under a new form ID. Nothing else changes, so a task's agent view is identical.
+ */
+export function withDeclaredCitationVisibility(profile: TemplateProfile, profileId: string): TemplateProfile {
+  const declare = (f: TemplateProfileField): TemplateProfileField => {
+    if (f.type !== 'policy_citation') return f;
+    const itemFields = builtInItemFields(f)
+      .filter((x) => CITATION_DECLARED.includes(x.key))
+      .map(({ required, ...x }) => ({ ...x, ...(required === true ? { required } : {}) }) as TemplateProfileField);
+    return { ...f, itemFields };
+  };
+  return { ...profile, profileId, sections: profile.sections.map((s) => ({ ...s, fields: s.fields.map(declare) })) };
+}

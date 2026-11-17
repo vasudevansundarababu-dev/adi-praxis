@@ -2104,3 +2104,41 @@ that the Author has to rework."
   - A criterion still exactly as the D22 defaults filled it (no author change) takes the new defaults when the task is
     opened; once filled, an author's change (for example unticking E3) is kept. Stored suggestions from before the fix
     show the template's applicability, condition and link until the author edits them.
+
+## Marketing form v2: S4 citation visibility declared for RL Gym (17 Nov 2026)
+
+- **(owner, 17 Nov, via the DevOps session)** "ok, do the new Marketing template version too", for isolated RL Gym
+  testing while RL Gym is not integrated. Closes the Open item of D26 above (`GENERIC_PRIVATE_EXPOSURE`).
+- **(chosen by Claude, from the docs)** **How the visibility is declared.** The four confirmations (still incompatible,
+  item 2) record that RL Gym's projection copies whole items of a field without `itemFields`, and that a form can avoid
+  the exposure by declaring the citation's `itemFields` with the private ones marked. ADI Forge's mirror of that
+  projection (`actorProjection`, verified against RL Gym's fixture) applies declared `itemFields` whatever the field
+  type. The documented example names a `repeated_array`; ADI Forge keeps the type `policy_citation` instead, because the
+  rule picker, the bound-versions check, D21 source ticks and the policy role all key on it. So:
+  - a `policy_citation` field may now declare `itemFields`, as **visibility metadata for RL Gym only**. ADI Forge's
+    authoring, checks and agent view keep using the built-in citation sub-fields;
+  - a declaration may name only built-in sub-fields with their built-in type, must declare every agent-visible one
+    (rule ID, version, locator, quotation) as agent-visible, and never makes a private one visible;
+  - **to confirm with RL Gym at integration:** that its projection applies `itemFields` on a `policy_citation` field as
+    on a `repeated_array`. Until then this is ADI Forge's documented reading, checked only by ADI Forge's mirror.
+- **(chosen by Claude)** **Form `veyra-hush-one-launch-v2`** = v1 plus the S4 declaration (rule ID, version, locator,
+  quotation visible; applies-to, rationale, exception private). The binding sub-fields and the hard-failure flag are
+  not declared, so RL Gym drops them, as ADI Forge does. Same fields, rubric defaults (D28), starting workflow and
+  agent view as v1. A new form ID because form IDs are never reused.
+- **(chosen by Claude)** **How QA gets it.** RL Gym starts template changes, but cannot send proposals to QA yet. The job
+  `marketing-form-v2 <v1 templateId> --requested-by <admin email> [--apply]` builds the next version from the
+  published v1: RL Gym's parts (template key, requirement, execution, skills) and the template block verbatim, only
+  the form replaced, worked examples re-pointed to v2. It runs the exact proposal checks and creates a **DRAFT**
+  through the same path as a proposal (`storePack`), audited as `template.form_revised` (actor SYSTEM, with the
+  requesting Admin). Dry run by default. A Praxis Admin publishes the draft in the console. No migration, no seed.
+  When RL Gym integrates it should adopt this form (or propose its own) for its Marketing template.
+- **(chosen by Claude)** **The approved v1 task (project 9b9092cf, task a664416f) is not made exportable by v2.** Its
+  `ApprovedTaskRecord` names template v1 and form v1, and the package is built from the record's own template version,
+  so it stays "not validated". Options considered:
+  - *Re-pin the project or task to v2:* rejected. A project cannot change template version, and the record would still
+    name v1 (changing it would break append-only); a v2 form against a v1-authored record is `GENERIC_FORM_MISMATCH`.
+  - *Export-time visibility override from the newer version:* rejected. The package would send form v2's hash for a
+    task authored on v1: a statement RL Gym never agreed to, i.e. invented cross-version behaviour.
+  - ***Re-author on v2 (chosen):*** a new Marketing project on the published v2 (target 1); the SME authors the task
+    (they may reuse their v1 text: the fields are identical) and people review and approve it as usual. The v1 record
+    stays as it is, append-only. Nothing is decided by AI and RL Gym sees one consistent form.

@@ -12,7 +12,8 @@ import { MARKETING_TASK2_RUBRIC_V1_DEFAULTS } from './defaults/marketing-task2-r
  */
 interface DefaultsFile {
   evaluator: { id: string; version: string };
-  profileId?: string;
+  /** The forms these defaults belong to. */
+  profileIds?: readonly string[];
   scale: 'five_two_zero' | 'zero_to_four';
   criteria: CriterionDefault[];
 }
@@ -26,7 +27,7 @@ export function authoringDefaultsFor(execution: unknown, profileId?: string | nu
     for (const c of f.criteria) {
       const ev = map.get(c.id);
       if (!ev || seen.has(c.id)) continue;
-      if ((ev.id === f.evaluator.id && ev.version === f.evaluator.version) || (!!f.profileId && f.profileId === profileId)) {
+      if ((ev.id === f.evaluator.id && ev.version === f.evaluator.version) || (!!profileId && !!f.profileIds?.includes(profileId))) {
         out.push(c);
         seen.add(c.id);
       }

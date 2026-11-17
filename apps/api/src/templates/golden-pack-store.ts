@@ -29,7 +29,7 @@ export async function checkPack(db: Db | Tx, body: unknown): Promise<GoldenPackC
  */
 export async function storePack(
   tx: Tx,
-  input: { clientId: string; uploaderId: string; body: unknown; audit: (a: AuditInput) => Promise<void>; anvilSpec?: Prisma.InputJsonValue; newVersionOfExisting?: boolean; from: 'golden_pack' | 'anvil_proposal' },
+  input: { clientId: string; uploaderId: string; body: unknown; audit: (a: AuditInput) => Promise<void>; anvilSpec?: Prisma.InputJsonValue; newVersionOfExisting?: boolean; from: 'golden_pack' | 'anvil_proposal' | 'praxis_form_revision' },
 ) {
   const r = await checkPack(tx, input.body);
   if (!r.ok || !r.profile) throw new AppError(422, 'INVALID_GOLDEN_PACK', 'The pack has problems; nothing was stored.', { problems: r.problems, examples: r.examples });

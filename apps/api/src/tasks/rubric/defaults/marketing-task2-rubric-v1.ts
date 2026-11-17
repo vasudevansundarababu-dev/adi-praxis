@@ -1,4 +1,4 @@
-import { GOLDEN_MARKETING_EXAMPLE, MARKETING_T2_CRITICAL_LABELS, MARKETING_T2_PROFILE_ID, type CriterionDefault } from '@praxis/shared';
+import { GOLDEN_MARKETING_EXAMPLE, MARKETING_T2_CRITICAL_LABELS, MARKETING_T2_PROFILE_IDS, type CriterionDefault } from '@praxis/shared';
 
 /**
  * D22 (QA, 16 Nov 2026; D8 'template default, SME edits'): default criteria for the Marketing Task2 rubric evaluator,
@@ -28,8 +28,8 @@ const CRITICAL_CONDITION: Partial<Record<keyof typeof MARKETING_T2_CRITICAL_LABE
 
 export const MARKETING_TASK2_RUBRIC_V1_DEFAULTS = {
   evaluator: { id: 'marketing-task2-evidence-v1', version: '1' },
-  /** The form these defaults belong to: they also apply when its template maps the criteria to another evaluator. */
-  profileId: MARKETING_T2_PROFILE_ID,
+  /** The forms these defaults belong to (v1 and v2): they also apply when the template maps another evaluator. */
+  profileIds: MARKETING_T2_PROFILE_IDS,
   scale: 'zero_to_four' as const,
   criteria: golden.map((c): CriterionDefault => {
     const id = String(c.id);

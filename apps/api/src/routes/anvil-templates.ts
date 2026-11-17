@@ -75,7 +75,7 @@ function packIssues(problems: string[], pointer: string) {
  * Authorability check of a proposal in either format: the joint `praxis.anvil.template-spec.v1` (Anvil's four
  * confirmations, 11 Nov 2026) or the earlier `praxis.template_spec.v1-proposed`, kept for proposals already made.
  */
-async function check(db: Db | Tx, clientId: string, body: unknown): Promise<Checked> {
+export async function check(db: Db | Tx, clientId: string, body: unknown): Promise<Checked> {
   await loadUploadedProfiles(db as Db);
   let r: TemplateSpecCheck;
   let spec: TemplateSpec | null = null;

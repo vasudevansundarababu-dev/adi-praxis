@@ -36,6 +36,9 @@ import { grantAppRole } from './grant-app-role';
  *   --apply also needs QA_TEMPLATE_CLEANUP_CONFIRM=delete-other-templates. Never production.
  * - `case-selector-slots <projectId> [--apply]`: replaces a case-selector project's generic slots with one slot per
  *   value, only while no task has been issued. Dry run by default.
+ * - `marketing-form-v2 <templateId> --requested-by <admin email> [--apply]`: creates the next DRAFT version of the
+ *   published VEYRA Hush One template with form veyra-hush-one-launch-v2 (S4 citation visibility declared for RL Gym;
+ *   everything else unchanged). An Admin publishes it in the console. Dry run by default.
  * Exits non-zero on failure so Cloud Run retries and alerts.
  */
 const job = process.argv[2];
@@ -164,11 +167,21 @@ try {
     const r = await rebuildCaseSelectorSlots(db, { projectId: ids[0]!, apply });
     console.log(JSON.stringify({ report: 'case-selector-slots', apply, ...r }));
     if (r.outcome === 'refused') process.exitCode = 3;
+  } else if (job === 'marketing-form-v2') {
+    const rest = process.argv.slice(3);
+    const apply = rest.includes('--apply');
+    const by = rest[rest.indexOf('--requested-by') + 1];
+    const ids = rest.filter((a, i) => a !== '--apply' && a !== '--requested-by' && rest[i - 1] !== '--requested-by');
+    if (ids.length !== 1 || !/^[0-9a-f-]{36}$/i.test(ids[0]!) || !rest.includes('--requested-by') || !by) throw new Error('Use: marketing-form-v2 <templateId> --requested-by <admin email> [--apply]');
+    const { marketingFormV2 } = await import('./marketing-form-v2');
+    const r = await marketingFormV2(db, { templateId: ids[0]!, requestedBy: by, apply });
+    console.log(JSON.stringify({ report: 'marketing-form-v2', apply, ...r }));
+    if (r.outcome === 'refused') process.exitCode = 3;
   } else if (job === 'catalog-import') {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots | marketing-form-v2`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

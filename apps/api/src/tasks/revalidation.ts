@@ -1,7 +1,7 @@
 import type { ApprovedTaskRecord, Prisma, TaskInstance, Template } from '@prisma/client';
 import { EXECUTABLE_WORKFLOW, praxisContractChecks, type TaskCheck } from '@praxis/shared';
 import { jointTemplateSpec } from '../anvil/joint-template';
-import { taskPackageProblem } from '../anvil/generic-package';
+import { AUTHOR_FIXABLE_PACKAGE, taskPackageProblem } from '../anvil/generic-package';
 import type { Tx } from '../db';
 import type { AuditInput } from '../platform/audit';
 import { authoredContent, compileForSubmission } from './profile-output';
@@ -25,8 +25,6 @@ type Audit = (i: AuditInput) => Promise<void>;
 /** Checks that attest the author's own actions at submission (consent, declarations, section confirmations). */
 const AUTHOR_ATTESTATION = (id: string) => id.startsWith('authoring.') || id.startsWith('conversation.') || id.startsWith('suggestions.confirmed.');
 
-/** Package problems the author can fix in the task itself; template or form problems are left to the export report. */
-const AUTHOR_FIXABLE_PACKAGE = new Set(['GENERIC_GRAPH_INVALID', 'GENERIC_CASE_SELECTOR_MISSING', 'GENERIC_CASE_SELECTOR_MISMATCH', 'GENERIC_CASE_SELECTOR_UNKNOWN', 'GENERIC_NOT_CANONICAL', 'GENERIC_PROJECTION_FAILED']);
 
 export type RevalidationTask = Pick<TaskInstance, 'id' | 'clientId' | 'projectId' | 'taskType' | 'output' | 'input' | 'drafting' | 'revision' | 'checks'> & { project: { template: Template } };
 

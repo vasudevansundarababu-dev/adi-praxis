@@ -248,9 +248,21 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
     const golden = (GOLDEN_MARKETING_EXAMPLE.sections as { S7: { criteria: Record<string, unknown>[] } }).S7.criteria;
     expect(rv.template.weightsFromTemplate).toBe(true);
     for (const g of golden) {
-      expect(rv.seed.find((x: { id: string }) => x.id === g.id)).toMatchObject({ name: g.name, group: g.group, weight: g.weight, passCondition: g.passCondition, level2: g.level2, failCondition: g.failCondition, critical: false });
+      expect(rv.seed.find((x: { id: string }) => x.id === g.id)).toMatchObject({ name: g.name, group: g.group, weight: g.weight, passCondition: g.passCondition, level2: g.level2, failCondition: g.failCondition, critical: g.id === 'E3' });
       expect(rv.criteria.find((x: { id: string }) => x.id === g.id)).toMatchObject({ origin: 'TEMPLATE_DEFAULT', defaults: { name: g.name }, details: { assesses: g.passCondition } });
     }
+    // D28: when it applies and where it comes from arrive from the template; E3 arrives critical with CR-05's condition.
+    const a1 = rv.criteria.find((x: { id: string }) => x.id === 'A1');
+    expect(a1.details.applicability).toMatchObject({ kind: 'REQUIRED', condition: 'Required throughout this workflow.' });
+    expect(a1.needs).toEqual([]);
+    expect(a1.links[0]).toMatchObject({ kind: 'TEMPLATE_REFERENCE', label: 'Template rubric · A1 Relevance', state: 'OK' });
+    expect(rv.criteria.find((x: { id: string }) => x.id === 'E3').details.wholeTaskFailure.condition).toMatch(/CR-05/);
+    expect(rv.seed.find((x: { id: string }) => x.id === 'A1')).toMatchObject({ level3: expect.stringMatching(/^Between Level 4 and Level 2/), level1: expect.stringMatching(/^Between Level 2 and Level 0/) });
+    // A criterion whose suggestions were stored before D28 (Undefined, no source, no condition) shows the template's.
+    await db.rubricCriterionAnnotation.create({ data: { clientId, taskInstanceId: s.taskId, criterionId: 'E3', version: 1, origin: 'TEMPLATE_DEFAULT', status: 'ACTIVE', exportable: true, details: { ...rv.criteria.find((x: { id: string }) => x.id === 'E3').details, applicability: { kind: 'UNSET', condition: '', exceptions: '' }, wholeTaskFailure: null }, sources: [], editedFields: [], aiFields: [], createdById: randomUUID() } });
+    const e3 = (await get(s.sme, `/me/tasks/${s.taskId}/rubric`)).json().criteria.find((x: { id: string }) => x.id === 'E3');
+    expect(e3).toMatchObject({ annotationVersion: 1, needs: [], details: { applicability: { kind: 'REQUIRED' }, wholeTaskFailure: { condition: expect.stringMatching(/CR-05/) } } });
+    expect(e3.links.map((l: { kind: string }) => l.kind)).toEqual(['TEMPLATE_REFERENCE']);
     // A task opened before the defaults existed holds criteria with only their IDs: opening it offers the template text.
     const shells = golden.map((g) => ({ id: g.id, name: g.id, weight: null, passCondition: '', level3: '', level2: '', level1: '', failCondition: '', critical: false, group: '', evaluatorKind: 'marketing-task2-evidence-v1', evaluatorVersion: '1' }));
     const early = structuredClone(withRuleVersions(GOLDEN_MARKETING_EXAMPLE, s.versions)) as unknown as { sections: { S7: { criteria: unknown[] } } };
@@ -293,6 +305,36 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
     expect(rec.sections.S7.criticalFailures).toEqual(['CR-01', 'CR-02', 'CR-03', 'CR-04', 'CR-05', 'CR-06']);
     // Source data travels by reference only.
     expect(rec.sections.S2.sourceRefs.every((r) => /^[0-9a-f]{64}$/.test(r.checksum))).toBe(true);
+
+    // D26: the template's evaluators grade this form, so no per-task bound contract is compiled and the export
+    // pre-check is the generic package entry: no "Name the output field…" blocker the author or PM cannot fix.
+    const stored = (await db.taskInstance.findUniqueOrThrow({ where: { id: s.taskId } })).checks as { export?: unknown };
+    expect(stored.export).toBeUndefined();
+    expect(JSON.stringify(record.output)).not.toMatch(/praxisContract/);
+    const validate = async () => {
+      const r = await post(s.pm, `/projects/${s.projectId}/validate`, { recordIds: [record.id] });
+      expect(r.statusCode, r.body).toBe(201);
+      return r.json() as { validator: string; counts: { valid: number; needsFix: number; notValidated: number }; results: { status: string; issues: { code: string; message: string }[] }[] };
+    };
+    const run = await validate();
+    expect(run.validator).toBe('praxis-precheck');
+    expect(JSON.stringify(run)).not.toMatch(/Name the output field|MISSING_BINDING|NO_EXECUTABLE_CONTRACT/);
+    // The one remaining problem is the published form's, not the task's: its S4 policy citations do not declare the
+    // sub-fields ADI Forge keeps from agents (appliesTo, rationale) as private. Reported as "not validated", never as
+    // something the author or PM must fix.
+    expect(run.counts).toMatchObject({ valid: 0, needsFix: 0, notValidated: 1 });
+    expect(run.results[0]!.status).toBe('not_validated');
+    expect(run.results[0]!.issues.map((i) => i.code)).toEqual(['GENERIC_PRIVATE_EXPOSURE']);
+    // A task submitted before the fix keeps the old compile blockers in its stored checks: never shown, never used.
+    const old = { status: 'blocked', profile: { id: PROFILE_ID, version: 1 }, blockers: Array.from({ length: 25 }, (_, i) => ({ code: 'MISSING_BINDING', path: `S7.criteria[${i}].outputField`, message: 'Name the output field this rule or criterion checks' })) };
+    await db.taskInstance.update({ where: { id: s.taskId }, data: { checks: { ...(stored as object), export: old } } });
+    const again = await validate();
+    expect(again.results).toEqual(run.results);
+    expect(JSON.stringify(again)).not.toMatch(/Name the output field/);
+    expect((await view(s.sme, s.taskId)).exportStatus).toBeNull();
+    const review = (await get(s.pm, `/review/tasks/${s.taskId}`)).json();
+    expect(review.id).toBe(s.taskId);
+    expect(review.exportStatus).toBeNull();
   });
 
   it('a single-agent workflow on the five-agent version, or a rubric group that does not add up, blocks submission', async () => {

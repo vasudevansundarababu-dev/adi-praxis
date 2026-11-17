@@ -1,4 +1,4 @@
-import { agentProjection, compilePraxisContract, profileApplies, profileForTemplate, profileProblems, profileShapeProblems, type ContractBlocker, type TaskCheck, type TemplateProfile } from '@praxis/shared';
+import { agentProjection, compilePraxisContract, profileApplies, profileForTemplate, profileProblems, profileShapeProblems, usesTemplateExecution, type ContractBlocker, type TaskCheck, type TemplateProfile } from '@praxis/shared';
 
 /**
  * Server side of the template profile registry (handover v2.1 ch. 05): save-time shape checks, submission checks,
@@ -64,6 +64,8 @@ export const COMPILED_MARKER = 'praxisContractCompiled';
 export function compileForSubmission(workflowName: TemplateForm, output: Record<string, unknown>, ids: { taskId: string; revisionId: string }): { output: Record<string, unknown>; status: ExportStatus } | null {
   const p = profileFor(workflowName);
   if (!p || !profileApplies(p, output)) return null;
+  // D26: graded by the template's evaluators and exported in the generic package; no per-task contract to compile.
+  if (usesTemplateExecution(p)) return null;
   // A hand-written executable contract (generic legacy editor) is never replaced.
   if (Object.hasOwn(output, 'praxisContract') && !isObj(output[COMPILED_MARKER])) return null;
   const { praxisContract: _old, [COMPILED_MARKER]: _marker, ...rest } = output;
@@ -73,6 +75,20 @@ export function compileForSubmission(workflowName: TemplateForm, output: Record<
   const profile = { id: p.profileId, version: p.version };
   if ('blockers' in r) return { output: rest, status: { status: 'blocked', profile, blockers: r.blockers } };
   return { output: { ...rest, praxisContract: r.contract, [COMPILED_MARKER]: { ...profile, revisionId: ids.revisionId } }, status: { status: 'ready', profile, blockers: [] } };
+}
+
+/**
+ * D26: whether a template version's form is graded by the template's evaluators (no per-task bound contract). Tasks
+ * of such a form submitted before the fix still carry the bound-contract blockers in their stored checks; these are
+ * not theirs to fix, so they are never shown or used.
+ */
+export function gradedByTemplate(form: TemplateForm): boolean {
+  return usesTemplateExecution(profileFor(form));
+}
+
+/** The stored export status of a task as shown to authors and reviewers (null when it does not apply, D26). */
+export function shownExportStatus(form: TemplateForm, stored: ExportStatus | null | undefined): ExportStatus | null {
+  return stored && !gradedByTemplate(form) ? stored : null;
 }
 
 /** The output without the compiled Anvil contract (derived data): what the author wrote. */

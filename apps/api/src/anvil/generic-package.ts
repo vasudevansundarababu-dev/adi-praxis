@@ -152,6 +152,12 @@ function selectorBlock(input: PackageInput, authored: Record<string, unknown>): 
 }
 
 /**
+ * Package problems the author can fix in the task itself (D18). Any other package problem is the template's or RL
+ * Gym's (form, publication, private exposure, size): it is reported as "not validated", never as a task repair.
+ */
+export const AUTHOR_FIXABLE_PACKAGE: ReadonlySet<string> = new Set(['GENERIC_GRAPH_INVALID', 'GENERIC_CASE_SELECTOR_MISSING', 'GENERIC_CASE_SELECTOR_MISMATCH', 'GENERIC_CASE_SELECTOR_UNKNOWN', 'GENERIC_NOT_CANONICAL', 'GENERIC_PROJECTION_FAILED']);
+
+/**
  * D18: the per-task package checks for one task, before or after it has an approved record (the record's identity
  * only labels the entry). Null when the task packages cleanly.
  */

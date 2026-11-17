@@ -14,6 +14,7 @@ import type { StoredChecks } from '../tasks/submission';
 import { EXPERT_TASK_TYPES, templateRef } from '../tasks/task-service';
 import { loadProject } from './projects';
 import { decisionReply } from '../tasks/revalidation';
+import { shownExportStatus } from '../tasks/profile-output';
 import { reviewPolicySources } from '../policy/review-sources';
 
 const IdParams = z.object({ id: z.string().uuid() });
@@ -106,7 +107,7 @@ export const taskReviewRoutes: FastifyPluginAsyncZod<{ db: Db; embeddings?: Embe
       submittedAt: t.submittedAt?.toISOString() ?? null,
       reworkCount: t.reworkCount,
       checks: checks?.results ?? [],
-      exportStatus: checks?.export ?? null,
+      exportStatus: shownExportStatus({ workflowName: template.workflowName, profileId: template.profileId }, checks?.export),
       flags: t.flags ?? [],
       embeddingModel: checks?.embeddingModel ?? null,
       similar: similar.map((m) => {

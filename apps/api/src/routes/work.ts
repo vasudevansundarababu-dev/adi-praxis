@@ -21,7 +21,7 @@ import { allowEditor, experienceOf } from '../tasks/authoring-experience';
 import { AUTHORSHIP_VERSION } from '../tasks/conversation/authorship';
 import { chatOf, draftingWith } from '../tasks/conversation/service';
 import { authoringPolicyView, effectivePolicy, sidecar } from '../policy/task-policy';
-import { profileSaveProblems } from '../tasks/profile-output';
+import { profileSaveProblems, shownExportStatus } from '../tasks/profile-output';
 import { tutorialOf } from '../forge/tutorial';
 import { servedTutorial } from '../forge/tutorial-video/service';
 import { normaliseRubricOutput, rubricSubmitChecks } from '../tasks/rubric/service';
@@ -184,7 +184,7 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
       output: t.quarantinedAt ? null : t.output,
       coverageTags: t.coverageTags,
       checks: checks?.results ?? null,
-      exportStatus: checks?.export ?? null,
+      exportStatus: shownExportStatus({ workflowName: template.workflowName, profileId: template.profileId }, checks?.export),
       // Authors see only the closest tasks' briefs, never other authors' content.
       readOnly: !['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(t.status),
       review: review ? { decision: review.decision, comments: review.comments, notes: review.notes, rejectReason: review.rejectReason, at: review.createdAt.toISOString(), stage: review.stage, editReason: review.editReason, version: review.submissionVersion } : null,

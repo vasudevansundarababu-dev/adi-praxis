@@ -16,6 +16,7 @@ import {
   templateRubric,
   TemplateProfileSchema,
   technicalSettings,
+  templateFill,
   type DeriveInput,
   type TemplateProfile,
 } from '@praxis/shared';
@@ -91,12 +92,12 @@ describe('D22: Marketing criteria arrive filled from the template', () => {
   const exec = (evaluator: string) => ({ evaluators: golden.map((c) => ({ criterion_id: c.id, capability: { id: evaluator, version: '1' }, evidence_source: 'run_evidence' })) });
   const rubricFor = (evaluator: string, profileId = MKT.profileId) => templateRubric(MKT, exec(evaluator), authoringDefaultsFor(exec(evaluator), profileId))!;
 
-  it('every mapped criterion gets name, group, weight and Level 4 / 2 / 0 text from the golden example; none fails the whole task', () => {
+  it('every mapped criterion gets name, group, weight and Level 4 / 2 / 0 text from the golden example; only E3 fails the whole task (D28)', () => {
     const tr = rubricFor('marketing-task2-evidence-v1');
     expect(tr.fixedSet).toBe(true);
     expect(tr.criteria).toHaveLength(golden.length);
     const seeded = seedCriteria(tr, []);
-    for (const g of golden) expect(seeded.find((c) => c.id === g.id)).toMatchObject({ name: g.name, group: g.group, weight: g.weight, passCondition: g.passCondition, level2: g.level2, failCondition: g.failCondition, critical: false, evaluatorKind: 'marketing-task2-evidence-v1' });
+    for (const g of golden) expect(seeded.find((c) => c.id === g.id)).toMatchObject({ name: g.name, group: g.group, weight: g.weight, passCondition: g.passCondition, level2: g.level2, failCondition: g.failCondition, critical: g.id === 'E3', evaluatorKind: 'marketing-task2-evidence-v1' });
     // Group weights still total each group's weight (A 10 … G 15).
     for (const grp of MARKETING_T2_GROUPS) expect(seeded.filter((c) => c.group === grp.id).reduce((n, c) => n + Number(c.weight), 0)).toBe(grp.weight);
   });
@@ -126,6 +127,78 @@ describe('D22: Marketing criteria arrive filled from the template', () => {
     expect(seedCriteria(tr, seeded)).toEqual(seeded);
     const own = seeded.map((c, i) => (i === 0 ? { ...c, passCondition: 'Mine' } : c));
     expect(seedCriteria(tr, own)).toEqual(own);
+  });
+});
+
+describe('D28: Marketing criteria arrive complete', () => {
+  const MKT = MARKETING_CAMPAIGN_TASK2_PROFILE as TemplateProfile;
+  const golden = (GOLDEN_MARKETING_EXAMPLE.sections as { S7: { criteria: Record<string, any>[] } }).S7.criteria;
+  const exec = { evaluators: golden.map((c) => ({ criterion_id: c.id, capability: { id: 'marketing-task2-evidence-v1', version: '1' }, evidence_source: 'run_evidence' })) };
+  const tr = () => templateRubric(MKT, exec, authoringDefaultsFor(exec, MKT.profileId))!;
+  // What PR #91 (D22) filled in: Levels 4, 2 and 0, nothing critical.
+  const d22 = (g: Record<string, any>) => ({ id: g.id, name: g.name, group: g.group, weight: g.weight, passCondition: g.passCondition, level3: '', level2: g.level2, level1: '', failCondition: g.failCondition, critical: false, evidenceRefs: [], evaluatorKind: 'marketing-task2-evidence-v1', evaluatorVersion: '1' });
+
+  it('every level of the 0-4 scale has text: Levels 3 and 1 are the in-between levels, quoting their neighbours', () => {
+    const seeded = seedCriteria(tr(), []);
+    for (const g of golden) {
+      const c = seeded.find((x) => x.id === g.id)!;
+      for (const k of tr().scoreKeys) expect(String(c[k.key] ?? '').trim(), `${g.id} ${k.label}`).not.toBe('');
+      expect(c.level3).toContain(g.passCondition.replace(/\.$/, ''));
+      expect(c.level3).toContain(g.level2.replace(/\.$/, ''));
+      expect(c.level1).toContain(g.failCondition.replace(/\.$/, ''));
+    }
+    expect(tr().scoreKeys.map((k) => k.points)).toEqual([4, 3, 2, 1, 0]);
+  });
+
+  it('E3 Readiness arrives critical with its whole-task failure condition from CR-05; no other criterion is critical', () => {
+    const t = tr();
+    const e3 = t.criteria.find((c) => c.id === 'E3')!.defaults!;
+    expect(e3).toMatchObject({ critical: true });
+    expect(e3.criticalCondition).toMatch(/CR-05/);
+    expect(e3.criticalCondition).toMatch(/unresolved blocker/);
+    expect(t.criteria.filter((c) => c.defaults?.critical).map((c) => c.id)).toEqual(['E3']);
+  });
+
+  it('when it applies defaults to the template’s "required throughout", and "Derived from" links to the template rubric', () => {
+    const out = setFieldValue(MKT, emptyOutput(MKT), 'S7', 'criteria', seedCriteria(tr(), []));
+    const d = derive({ profile: MKT, output: out, rubric: tr(), template: { id: 'mkt', version: 1 }, task: { id: 'task1', revision: 1 }, policies: [], sources: [], hash });
+    for (const c of d.criteria) {
+      expect(c.details.applicability, c.id).toEqual({ kind: 'REQUIRED', condition: 'Required throughout this workflow.', exceptions: '' });
+      expect(c.details.unresolved.join(' '), c.id).not.toMatch(/When this applies could not be read/);
+      expect(c.needs, c.id).not.toContain('Source');
+      expect(c.links.length, c.id).toBeGreaterThan(0);
+    }
+    const a1 = d.criteria.find((c) => c.id === 'A1')!;
+    expect(a1.links[0]).toMatchObject({ kind: 'TEMPLATE_REFERENCE', target: 'template:mkt:criterion:A1', label: 'Template rubric · A1 Relevance', templateId: 'mkt' });
+    expect(d.criteria.find((c) => c.id === 'E3')!.details.wholeTaskFailure).toMatchObject({ condition: expect.stringMatching(/CR-05/) });
+    // The template link is a fallback: it never counts as covering a requirement or becomes a suggested addition.
+    expect(d.additions.some((x) => x.requirement.startsWith('template:'))).toBe(false);
+  });
+
+  it('a criterion left exactly as PR #91 filled it takes Levels 3 and 1 and E3’s critical flag; anything an author changed is kept', () => {
+    const t = tr();
+    const before = golden.map(d22);
+    const edited = { ...d22(golden.find((g) => g.id === 'A2')!), level2: 'My own level 2 text' };
+    const out = seedCriteria(t, before.map((c) => (c.id === 'A2' ? edited : c)));
+    const e3 = out.find((c) => c.id === 'E3')!;
+    expect(e3).toMatchObject({ critical: true, level3: expect.stringContaining('Between Level 4 and Level 2'), level1: expect.stringContaining('Between Level 2 and Level 0') });
+    expect(out.find((c) => c.id === 'A1')).toMatchObject({ critical: false, level3: expect.stringContaining('Between') });
+    expect(out.find((c) => c.id === 'A2')).toEqual(edited);
+    // Once filled, an author's choice sticks: unticking E3 is never reverted on the next open.
+    const unticked = out.map((c) => (c.id === 'E3' ? { ...c, critical: false } : c));
+    expect(seedCriteria(t, unticked)).toEqual(unticked);
+    // The editor merges exactly what the server seed fills (and nothing for an edited criterion).
+    const d = t.criteria.find((c) => c.id === 'E3')!.defaults;
+    expect(templateFill(t.scoreKeys, d22(golden.find((g) => g.id === 'E3')!), e3, d)).toMatchObject({ critical: true, level3: e3.level3, level1: e3.level1 });
+    expect(templateFill(t.scoreKeys, edited, out.find((c) => c.id === 'A2')!, t.criteria.find((c) => c.id === 'A2')!.defaults)).toBeNull();
+  });
+
+  it('KYC v7 defaults have no earlier revision, applicability or template source: KYC derivation is unchanged', () => {
+    const k = templateRubric(form(V7.authoring.profile), V7.execution, authoringDefaultsFor(V7.execution, V7.authoring.profile.profileId))!;
+    expect(k.criteria.every((c) => !c.defaults?.earlier && !c.defaults?.applicability && !c.defaults?.source)).toBe(true);
+    const p = form(V7.authoring.profile);
+    const d = derive(input(p, v7Output(p), { rubric: k }));
+    expect(d.criteria.flatMap((c) => c.links).some((l) => l.kind === 'TEMPLATE_REFERENCE')).toBe(false);
   });
 });
 

@@ -392,9 +392,20 @@ export function exportStatusLine(statusLabel: string, s: ExportStatusView | null
   return `${statusLabel}; export adapter blocked: ${first ? `${first.message} (${first.path})` : 'unknown reason'}${rest.length ? ` and ${rest.length} more` : ''}`;
 }
 
+/**
+ * D26 (QA, 17 Nov 2026): a form whose answer schema is the template's execution part (`contract.outputsFrom:
+ * "template_execution"`: KYC v7, Marketing Task2) has no per-task output field. Its criteria are graded by the
+ * template's evaluators (`execution.evaluators[]`) on the recorded run, and its tasks reach RL Gym in the generic
+ * package (`praxis.authored-task-export.v1`). The per-task bound contract (`praxis.anvil.task.v1`) does not apply to
+ * it, so its compile blockers (e.g. "Name the output field…") are never shown or checked for these tasks. Owner,
+ * 11 Nov 2026: Praxis never turns evaluator-graded checks into agent-output bindings.
+ */
+export const usesTemplateExecution = (profile: Pick<TemplateProfile, 'contract'> | null | undefined) => profile?.contract?.outputsFrom === 'template_execution';
+
 /** Compiles a task output for its profile. KYC (canonical storage) uses the KYC compiler. */
 export function compilePraxisContract(profile: TemplateProfile, output: unknown, ids: CompileIds): CompileResult {
   if (!profileApplies(profile, output)) return { blockers: [{ code: 'PROFILE_NOT_APPLICABLE', path: 'profile', message: `This output was not authored with the ${profile.profileId} profile` }] };
+  if (usesTemplateExecution(profile)) return { blockers: [{ code: 'CONTRACT_NOT_APPLICABLE', path: 'profile', message: `${profile.profileId} is graded by its template's evaluators and exported in the generic package; it has no per-task bound contract` }] };
   if (profile.storage === 'canonical') {
     if (profile.profileId === 'kyc-onboarding-and-refresh') return compileKycContract(output as KycTask, ids, profile.version);
     return { blockers: [{ code: 'NO_COMPILER', path: 'profile', message: `No contract compiler for ${profile.profileId}` }] };

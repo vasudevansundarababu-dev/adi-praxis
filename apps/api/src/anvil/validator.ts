@@ -1,5 +1,7 @@
 import type { ApprovedTaskRecord, Template } from '@prisma/client';
-import { buildGenericPackages, GENERIC_EXPORT_SCHEMA, type PackagePart, type PackageProblem } from './generic-package';
+import { AUTHOR_FIXABLE_PACKAGE, buildGenericPackages, GENERIC_EXPORT_SCHEMA, taskPackageProblem, type PackagePart, type PackageProblem } from './generic-package';
+import { jointTemplateSpec } from './joint-template';
+import { gradedByTemplate } from '../tasks/profile-output';
 import type { TaskValidationResult } from '@praxis/shared';
 import { AppError } from '../lib/errors';
 import { hasExecutableContract, praxisExport } from '../dataset/praxis-export';
@@ -13,6 +15,12 @@ export interface ValidationItem {
   envelope: Record<string, unknown> | null;
   /** Why the envelope is missing or blocked (Praxis export errors and compile blockers). */
   exportProblems: { code: string; path: string | null; message: string }[];
+  /**
+   * The RL Gym export the task takes: the per-record bound contract (`praxis.anvil.export.v1`), or, for a task whose
+   * template grades it with its own evaluators (D26: KYC v7, Marketing Task2), the generic package
+   * (`praxis.authored-task-export.v1`), which carries no per-record envelope.
+   */
+  exportContract: 'praxis.anvil.export.v1' | typeof GENERIC_EXPORT_SCHEMA;
 }
 
 /**
@@ -30,6 +38,16 @@ export interface AnvilTaskValidator {
   run?(items: ValidationItem[], ctx: ValidationContext | undefined, opts: { resolve: boolean }): Promise<ValidationOutcome>;
 }
 
+/**
+ * A pre-check verdict. Generic package entries (D26) follow the gated validator: a template or RL Gym package problem
+ * is "not validated" (nothing in the task to fix), and only a problem the author can fix is "needs fix".
+ */
+function precheckStatus(i: ValidationItem): TaskValidationResult['status'] {
+  if (i.exportContract !== GENERIC_EXPORT_SCHEMA) return i.envelope && !i.exportProblems.length ? 'valid' : 'needs_fix';
+  if (!i.exportProblems.length) return 'valid';
+  return i.exportProblems.some((p) => AUTHOR_FIXABLE_PACKAGE.has(p.code)) ? 'needs_fix' : 'not_validated';
+}
+
 /** Praxis's own export checks: the same checks the per-record Anvil export runs. Not Anvil's validation. */
 export class PraxisPrecheckValidator implements AnvilTaskValidator {
   readonly name = 'praxis-precheck';
@@ -39,15 +57,32 @@ export class PraxisPrecheckValidator implements AnvilTaskValidator {
       recordId: i.record.id,
       taskId: i.taskId,
       title: i.title,
-      status: i.envelope && !i.exportProblems.length ? 'valid' : 'needs_fix',
+      status: precheckStatus(i),
       issues: i.exportProblems,
     }));
   }
 }
 
-/** Builds the validation item for one record: the export envelope, or the reasons it cannot be built. */
-export function validationItem(record: ApprovedTaskRecord, title: string, compileBlockers: { code: string; path: string; message: string }[]): ValidationItem {
-  const base = { record, taskId: record.taskInstanceId, title };
+/**
+ * Whether a record exports in the generic package rather than as a per-record bound contract (D26): it has no bound
+ * contract and its template grades it with the template's own evaluators (a joint template, or a form whose answer
+ * schema is the template execution).
+ */
+export function exportsAsGenericPackage(record: Pick<ApprovedTaskRecord, 'output'>, template: Template | null | undefined): template is Template {
+  return !!template && !hasExecutableContract(record) && (!!jointTemplateSpec(template) || gradedByTemplate(template));
+}
+
+/**
+ * Builds the validation item for one record: the export envelope, or the reasons it cannot be built. A record of an
+ * evaluator-graded template (D26) is checked as its generic package entry instead: the same per-task checks the
+ * package builder runs. The bound-contract compile blockers stored at its submission never apply to it.
+ */
+export function validationItem(record: ApprovedTaskRecord, title: string, compileBlockers: { code: string; path: string; message: string }[], template?: Template | null): ValidationItem {
+  const base = { record, taskId: record.taskInstanceId, title, exportContract: 'praxis.anvil.export.v1' as const };
+  if (exportsAsGenericPackage(record, template)) {
+    const p = taskPackageProblem({ record, template });
+    return { ...base, exportContract: GENERIC_EXPORT_SCHEMA, envelope: null, exportProblems: p ? [{ code: p.code, path: null, message: p.message }] : [] };
+  }
   if (!hasExecutableContract(record)) {
     const problems = compileBlockers.length
       ? compileBlockers.map((b) => ({ code: b.code, path: b.path, message: b.message }))

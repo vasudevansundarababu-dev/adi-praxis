@@ -2067,3 +2067,40 @@ that the Author has to rework."
   `sourcing.person_added` with `fromPool: true`, no names or emails), re-checks availability and criteria (409
   `NOT_AVAILABLE`), then assigns as before: one role per project, never their own task, choosing the task is required.
 
+
+## D26 and D28: export of evaluator-graded tasks, complete Marketing criteria (17 Nov 2026)
+
+- **(owner, 17 Nov)** Fix D26 and D28. Evaluator-graded templates validate and export on their own path; no author or
+  PM sees a blocker they cannot fix in the UI; Marketing criteria arrive complete from the template.
+- **(chosen by Claude, from the docs)** **D26 path.** A form with `contract.outputsFrom: "template_execution"` (KYC v7
+  `golden-kyc-application-type-v1`, Marketing `veyra-hush-one-launch-v1`) has no per-task output field. Its criteria
+  are graded by the template's evaluators (`execution.evaluators[]`, `run_evidence`), and its tasks reach RL Gym in the
+  generic package (`praxis.authored-task-export.v1`, four confirmations). The per-task bound contract
+  (`praxis.anvil.task.v1`) does not apply to it, and the owner's 11 Nov decision forbids turning evaluator-graded
+  checks into agent-output bindings, so no binding is supplied or invented:
+  - submission no longer compiles a bound contract for such a form (no "Name the output field…" status stored);
+  - a stored status from before the fix is never shown (author task page, review page);
+  - project validation and export check such a record as its generic package entry (`taskPackageProblem`, the same
+    checks the package builder runs), whatever compile blockers its stored checks still hold. The export file line
+    names its `exportContract`; `anvilExport` stays null (there is no per-record envelope on this path).
+- **(chosen by Claude)** **Verdicts on the generic path follow the gated validator.** No problem → valid (Praxis's
+  pre-check). A problem the author can fix in the task (the D18 list, now shared as `AUTHOR_FIXABLE_PACKAGE`) → needs
+  fix. Any other package problem (form, publication, private exposure, size) is the template's or RL Gym's → not
+  validated, with the reason. Nothing is reported as a task repair the author cannot make.
+- **Open (owner / RL Gym), found while fixing D26.** The published Marketing form's S4 policy citations do not declare
+  the sub-fields ADI Forge keeps from agents (`appliesTo`, `rationale`) as private, so RL Gym's public view would differ
+  from the agent view and the package refuses the task (`GENERIC_PRIVATE_EXPOSURE`, four confirmations). Marketing
+  tasks therefore show "not validated" until a new Marketing template version declares those item fields private. That
+  is a form (template hash) change on RL Gym's proposal; not changed here.
+- **(chosen by Claude)** **D28 Marketing defaults** (Authoring defaults file, template data unchanged):
+  - Levels 3 and 1 are the 0-4 scale's in-between levels and say so, quoting the neighbouring levels' own text
+    ("Between Level 4 and Level 2: better than "…", but short of "…""). Nothing new is assessed.
+  - When it applies: "Required throughout this workflow." (one reusable task; every criterion is scored on every run),
+    used only when the task itself gives none.
+  - Derived from: the template rubric criterion ("Template rubric · A1 Relevance"), used only when no task source
+    links to the criterion. KYC defaults name no source, so KYC links are unchanged.
+  - E3 Readiness arrives critical, with its whole-task failure condition from CR-05. The golden example also marks G2
+    critical; the owner asked for E3 only, so G2 stays as before.
+  - A criterion still exactly as the D22 defaults filled it (no author change) takes the new defaults when the task is
+    opened; once filled, an author's change (for example unticking E3) is kept. Stored suggestions from before the fix
+    show the template's applicability, condition and link until the author edits them.

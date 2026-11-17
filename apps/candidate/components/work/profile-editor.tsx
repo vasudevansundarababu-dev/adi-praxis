@@ -42,6 +42,7 @@ import { SaveBar } from './save-bar';
 import { PolicyPicker, type LibraryView } from './policy-picker';
 import { RuleCitationPicker } from './rule-citation-picker';
 import { RubricEditor, SourcePanel, rubricBlockers, useRubricView } from './rubric-editor';
+import { criticalRulesFor } from '@/lib/whole-task-suggestion';
 
 /** RUBRIC_RECOMMENDATIONS_ENABLED: the S4/S7/S8 controls change. Template text always shows public names (D5). */
 const FormV2 = createContext(false);
@@ -504,7 +505,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
               <SelectorField key={f.key} field={f} value={slot.case.value} label={slot.case.label} />
             ) : v2 && f.type === 'criterion' ? (
               rubric.view ? (
-                <RubricEditor key={f.key} taskId={task.id} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} onChange={setRubric(section.key as SectionKey, f.key)} view={rubric.view} reload={rubric.reload} readOnly={task.readOnly} onOpenSource={setOpenLink} />
+                <RubricEditor key={f.key} taskId={task.id} field={f} value={getFieldValue(profile, value, section.key as SectionKey, f)} onChange={setRubric(section.key as SectionKey, f.key)} view={rubric.view} reload={rubric.reload} readOnly={task.readOnly} onOpenSource={setOpenLink} criticalRules={criticalRulesFor(profile, value)} />
               ) : (
                 <p key={f.key} role="status" className="text-sm text-fg-muted">
                   {rubric.error ?? 'Loading the rubric…'}

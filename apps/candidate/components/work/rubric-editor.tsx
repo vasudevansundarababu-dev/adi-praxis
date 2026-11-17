@@ -15,6 +15,7 @@ import {
   type ViewLink,
 } from '@praxis/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { suggestWholeTaskCondition, type CriticalRule } from '@/lib/whole-task-suggestion';
 
 /**
  * The simplified rubric editor (owner specs "Simplified Rubric Editor" and "Rubric recommendations", D8, D9; mockup
@@ -63,11 +64,13 @@ interface Props {
   initialOpen?: string[];
   /** The table (owner, 15 Nov 2026) is the default; the card list is the earlier view. */
   initialView?: 'table' | 'cards';
+  /** D25: the template's critical-failure rules (e.g. Marketing CR-01 to CR-06), for the suggested whole-task condition. */
+  criticalRules?: CriticalRule[];
 }
 
 const asItems = (v: unknown) => (Array.isArray(v) ? (v.filter((x) => x && typeof x === 'object') as Record<string, unknown>[]) : []);
 
-export function RubricEditor({ taskId, field, value, onChange, view, reload, readOnly, onOpenSource, initialOpen = [], initialView = 'table' }: Props) {
+export function RubricEditor({ taskId, field, value, onChange, view, reload, readOnly, onOpenSource, initialOpen = [], initialView = 'table', criticalRules = [] }: Props) {
   const items = asItems(value);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -145,6 +148,7 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
         view={view}
         readOnly={readOnly}
         aiScoring={aiScoring[c.id] ?? {}}
+        criticalRules={criticalRules}
         setItem={(p) => setItem(c.id, p)}
         saveDetail={(b) => saveDetail(c, b)}
         keep={async () => {
@@ -585,6 +589,7 @@ function CriterionBody(p: {
   view: RubricView;
   readOnly: boolean;
   aiScoring: Record<string, string>;
+  criticalRules: CriticalRule[];
   setItem: (patch: Record<string, unknown>) => void;
   saveDetail: (b: Omit<SaveCriterionRequest, 'expectedVersion'>) => Promise<void>;
   keep: () => Promise<void>;
@@ -748,7 +753,21 @@ function CriterionBody(p: {
         </label>
         {item.critical === true && (
           <div className="mt-2 space-y-1">
-            <BlurText disabled={readOnly} value={wtf?.condition ?? ''} onCommit={(v) => p.saveDetail({ wholeTaskFailure: { condition: v, kind: wtf?.kind ?? 'FAIL_OF_CRITERION' } })} label="Whole-task failure condition" placeholder="Describe exactly what fails the whole task" />
+            <BlurText id={`wtf-text-${c.id}`} disabled={readOnly} value={wtf?.condition ?? ''} onCommit={(v) => p.saveDetail({ wholeTaskFailure: { condition: v, kind: wtf?.kind ?? 'FAIL_OF_CRITERION' } })} label="Whole-task failure condition" placeholder="Describe exactly what fails the whole task" />
+            {!readOnly && !(wtf?.condition ?? '').trim() && (
+              <ConditionSuggestion
+                key={c.id}
+                inputId={`wtf-text-${c.id}`}
+                text={suggestWholeTaskCondition({
+                  name: String(item.name ?? ''),
+                  assesses: c.details.assesses,
+                  lowest: String(item.failCondition ?? d?.failCondition ?? ''),
+                  linkedRules: c.links.filter((l) => l.kind === 'POLICY_RULE').map((l) => l.label),
+                  criticalRules: p.criticalRules,
+                })}
+                onUse={(v) => p.saveDetail({ wholeTaskFailure: { condition: v, kind: wtf?.kind ?? (view.template.criterionFailureSupported ? 'FAIL_OF_CRITERION' : 'OTHER_BEHAVIOUR') } })}
+              />
+            )}
             {!(wtf?.condition ?? '').trim() && <p className="text-xs text-warning">Write the condition. A ticked box alone isn’t enough.</p>}
             {(['FAIL_OF_CRITERION', 'OTHER_BEHAVIOUR'] as const).map((k) => (
               <label key={k} className="flex items-start gap-2 text-xs">
@@ -839,13 +858,54 @@ function Field({ label, note, extra, children }: { label: string; note?: string;
 }
 
 /** A textarea that saves when it loses focus (the internal fields save through the rubric API, not autosave). */
-function BlurText({ value, onCommit, disabled, label, placeholder }: { value: string; onCommit: (v: string) => void; disabled: boolean; label: string; placeholder?: string }) {
+function BlurText({ id, value, onCommit, disabled, label, placeholder }: { id?: string; value: string; onCommit: (v: string) => void; disabled: boolean; label: string; placeholder?: string }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
-  return <textarea aria-label={label} className={input} rows={2} disabled={disabled} value={v} placeholder={placeholder} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onCommit(v)} />;
+  return <textarea id={id} aria-label={label} className={input} rows={2} disabled={disabled} value={v} placeholder={placeholder} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onCommit(v)} />;
 }
 
-function ApplicabilityDialog({ c, onCancel, onSave }: { c: RubricCriterionView; onCancel: () => void; onSave: (a: RubricCriterionView['details']['applicability']) => Promise<void> }) {
+/**
+ * D25: the suggested whole-task failure condition, shown while the condition is empty, as for the other fields
+ * (Use / Edit / Dismiss). The SME chooses; nothing is filled in, and the box is never ticked, for them.
+ */
+function ConditionSuggestion({ text, inputId, onUse }: { text: string; inputId: string; onUse: (v: string) => Promise<void> }) {
+  const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!text) return null;
+  if (hidden)
+    return (
+      <button type="button" className="text-xs text-link underline" onClick={() => setHidden(false)}>
+        Show the suggested condition
+      </button>
+    );
+  const use = async (edit: boolean) => {
+    setBusy(true);
+    await onUse(text);
+    setBusy(false);
+    if (edit) setTimeout(() => (document.getElementById(inputId) as HTMLTextAreaElement | null)?.focus(), 30);
+  };
+  return (
+    <div className="rounded-md border border-dashed border-purple-400/60 bg-purple-500/5 p-3" data-wtf-suggestion>
+      <p className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+        <span className={PILL.ai}>Suggestion</span> Drafted from this criterion and the template’s critical failures. Use it, edit it or write your own.
+      </p>
+      <p className="mt-1 whitespace-pre-wrap break-words">{text}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" className={btn} disabled={busy} onClick={() => use(false)}>
+          Use
+        </button>
+        <button type="button" className={btn} disabled={busy} onClick={() => use(true)}>
+          Edit
+        </button>
+        <button type="button" className={btn} disabled={busy} onClick={() => setHidden(true)}>
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function ApplicabilityDialog({ c, onCancel, onSave }: { c: RubricCriterionView; onCancel: () => void; onSave: (a: RubricCriterionView['details']['applicability']) => Promise<void> }) {
   const [kind, setKind] = useState<ApplicabilityKind>(c.details.applicability.kind === 'UNSET' || c.details.applicability.kind === 'UNKNOWN' ? 'REQUIRED' : c.details.applicability.kind);
   const [condition, setCondition] = useState(c.details.applicability.condition);
   const [exceptions, setExceptions] = useState(c.details.applicability.exceptions);
@@ -855,9 +915,29 @@ function ApplicabilityDialog({ c, onCancel, onSave }: { c: RubricCriterionView; 
     ['PERMITTED_OPTION', 'A permitted option', 'The agent may choose this route. Its conditions are assessed only when it’s chosen; it’s never compulsory.'],
     ['OTHER_ROLE', 'Belongs to a human officer or another role', 'Assessed as “the agent routes it correctly”, never as the agent exercising that authority.'],
   ];
+  // D27: focus moves into the dialog; Esc (like Cancel) closes it and focus goes back to what opened it (the panel's
+  // Change button), so the SME is returned to the criterion panel.
+  const boxRef = useRef<HTMLDivElement>(null);
+  const cancel = useRef(onCancel);
+  cancel.current = onCancel;
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    boxRef.current?.querySelector<HTMLInputElement>('input[name="appl-kind"]:checked')?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      cancel.current();
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="appl-h" className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[88vh] w-full max-w-lg overflow-auto rounded-xl border border-line bg-surface p-5 text-sm">
+    // D27: above the criterion side panel (z-30), with its own backdrop; scrolls inside on short or narrow screens.
+    <div role="dialog" aria-modal="true" aria-labelledby="appl-h" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" data-applicability-dialog>
+      <div ref={boxRef} className="max-h-[88vh] w-full min-w-0 max-w-lg overflow-auto rounded-xl border border-line bg-surface p-5 text-sm">
         <h2 id="appl-h" className="text-lg font-semibold">
           When does this apply?
         </h2>
@@ -883,7 +963,7 @@ function ApplicabilityDialog({ c, onCancel, onSave }: { c: RubricCriterionView; 
           <textarea className={input} rows={2} value={exceptions} onChange={(e) => setExceptions(e.target.value)} />
         </label>
         <p className="mt-2 text-xs text-fg-muted">Product and state come from each application RL Gym runs, never from the example state.</p>
-        <div className="mt-4 flex justify-end gap-2">
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button type="button" className={btn} onClick={onCancel}>
             Cancel
           </button>

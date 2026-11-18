@@ -2,6 +2,7 @@ import { AUTHORSHIP_DECLARATION, emptyOutput, getFieldValue, hashValue, sectionD
 import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import { failureMessage, SUGGESTION_TIMEOUT_MESSAGE } from '@/components/work/field-suggestions';
 import { ProfileEditor } from '@/components/work/profile-editor';
 import type { TaskView } from '@/lib/work-types';
 import { a11yProblems } from './a11y';
@@ -98,5 +99,14 @@ describe('suggested text on the task form (FIELD_SUGGESTIONS_ENABLED)', () => {
   it('the suggestion box and confirmation are accessible', () => {
     expect(a11yProblems(render())).toEqual([]);
     expect(getFieldValue(PROFILE, out, 'S1', { key: 'scope' }) || '').toBe('');
+  });
+
+  it('D31: a slow suggestion says it took too long (API or proxy timeout), not that the service is unreachable', () => {
+    expect(failureMessage({ error: 'SUGGESTIONS_TIMEOUT', message: 'The suggestion took too long. Try again.' }, true)).toBe(SUGGESTION_TIMEOUT_MESSAGE);
+    expect(failureMessage({ error: 'UPSTREAM_TIMEOUT', message: 'The service took too long to answer. Please try again.' }, true)).toBe(SUGGESTION_TIMEOUT_MESSAGE);
+    expect(SUGGESTION_TIMEOUT_MESSAGE).toBe('The suggestion took too long. Try again.');
+    expect(failureMessage({ error: 'SUGGESTIONS_UNAVAILABLE', message: 'Suggestions are not available right now.' }, true)).toBe('Suggestions are not available right now.');
+    expect(failureMessage(null, true)).toBe('Something went wrong. Try again.');
+    expect(failureMessage({ error: 'UPSTREAM_TIMEOUT', message: 'The service took too long to answer. Please try again.' })).toMatch(/took too long to answer/);
   });
 });

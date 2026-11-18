@@ -28,10 +28,18 @@ const btn = 'rounded-md border border-line px-3 py-1.5 text-sm disabled:opacity-
 const aiBtn = 'rounded-md border border-purple-400/60 bg-purple-500/10 px-3 py-1.5 text-sm font-semibold text-purple-200 disabled:opacity-50';
 const pill = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold';
 
-async function send<T>(url: string, body: unknown): Promise<{ ok: boolean; data: T | null; message: string | null }> {
+export const SUGGESTION_TIMEOUT_MESSAGE = 'The suggestion took too long. Try again.';
+
+/** The message for a failed request; a slow model (API) or a slow answer (proxy) both read as "took too long" (D31). */
+export function failureMessage(data: { error?: string; message?: string } | null, suggesting = false): string {
+  if (suggesting && (data?.error === 'SUGGESTIONS_TIMEOUT' || data?.error === 'UPSTREAM_TIMEOUT')) return SUGGESTION_TIMEOUT_MESSAGE;
+  return data?.message ?? 'Something went wrong. Try again.';
+}
+
+async function send<T>(url: string, body: unknown, suggesting = false): Promise<{ ok: boolean; data: T | null; message: string | null }> {
   const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() }, body: JSON.stringify(body) });
-  const data = (await res.json().catch(() => null)) as (T & { message?: string }) | null;
-  return { ok: res.ok, data: res.ok ? data : null, message: res.ok ? null : (data?.message ?? 'Something went wrong. Try again.') };
+  const data = (await res.json().catch(() => null)) as (T & { error?: string; message?: string }) | null;
+  return { ok: res.ok, data: res.ok ? data : null, message: res.ok ? null : failureMessage(data, suggesting) };
 }
 
 export interface Suggestions {
@@ -65,7 +73,7 @@ export function useSuggestions(taskId: string, enabled: boolean, initial: Sugges
       if (!opts.again && !opts.keys && asked.current[section]) return;
       asked.current[section] = true;
       setLoading((l) => ({ ...l, [section]: true }));
-      const r = await send<SuggestionsResponse>(base, { section, ...(opts.keys ? { keys: opts.keys } : {}), ...(opts.again ? { again: true } : {}) });
+      const r = await send<SuggestionsResponse>(base, { section, ...(opts.keys ? { keys: opts.keys } : {}), ...(opts.again ? { again: true } : {}) }, true);
       setLoading((l) => ({ ...l, [section]: false }));
       if (!r.ok || !r.data) {
         asked.current[section] = false;

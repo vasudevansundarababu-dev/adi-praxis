@@ -55,5 +55,9 @@ export async function proxyApi(request: Request, apiBase: string, fetcher: typeo
     out.set('x-request-id', response.headers.get('x-request-id') || requestId);
     out.set('cache-control', 'no-store');
     return new Response(response.body, { status: response.status, headers: out });
-  } catch { return error(502, 'SERVICE_UNAVAILABLE', 'Could not reach the service. Please try again later.'); }
+  } catch (err) {
+    // The API did not answer within 30 s: say so, rather than suggesting the service is down (D31).
+    if (err instanceof Error && err.name === 'TimeoutError') return error(504, 'UPSTREAM_TIMEOUT', 'The service took too long to answer. Please try again.');
+    return error(502, 'SERVICE_UNAVAILABLE', 'Could not reach the service. Please try again later.');
+  }
 }

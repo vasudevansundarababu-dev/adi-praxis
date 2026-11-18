@@ -11,7 +11,7 @@ import { MockIdentityProvider } from '../src/candidate/identity-provider';
 import { MemoryStorage } from '../src/candidate/storage';
 import { MemoryEmailSender } from '../src/lib/email';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
-import { FieldSuggesterUnavailableError, MockFieldSuggester, type FieldSuggester } from '../src/tasks/suggestions/assistant';
+import { FieldSuggesterTimeoutError, FieldSuggesterUnavailableError, MockFieldSuggester, type FieldSuggester } from '../src/tasks/suggestions/assistant';
 import { call, forgeKit } from './forge-helpers';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
@@ -28,8 +28,10 @@ class ScriptedSuggester implements FieldSuggester {
   readonly modelVersion = 'scripted-1';
   calls = 0;
   next: { key: string; value: unknown }[] | Error = [];
+  delayMs = 0;
   async suggest() {
     this.calls++;
+    if (this.delayMs) await new Promise((r) => setTimeout(r, this.delayMs));
     if (this.next instanceof Error) throw this.next;
     return this.next;
   }
@@ -79,6 +81,7 @@ describe('field suggestions (FIELD_SUGGESTIONS_ENABLED)', () => {
     anvilKey = (await post(admin, '/api-clients', { name: 'RL Gym QA', kind: 'ANVIL' })).json().key;
     script.next = [];
     script.calls = 0;
+    script.delayMs = 0;
   });
   afterAll(async () => {
     await app.close();
@@ -186,6 +189,37 @@ describe('field suggestions (FIELD_SUGGESTIONS_ENABLED)', () => {
     const down = await post(s.me.cookie, `/me/tasks/${s.task.id}/suggestions`, { section: 'S2' }, scripted);
     expect(down.statusCode).toBe(503);
     expect(down.json().message).toMatch(/Write the text yourself/);
+  });
+
+  it('D31: a model slower than the 15 s transaction limit still saves its suggestions (no transaction error)', async () => {
+    const s = await setup();
+    script.next = [{ key: 'scope', value: 'Custodial applications in every applicable governing state.' }];
+    script.delayMs = 16_000;
+    const r = await post(s.me.cookie, `/me/tasks/${s.task.id}/suggestions`, { section: 'S1' }, scripted);
+    expect(r.statusCode, r.body).toBe(200);
+    expect((r.json() as SuggestionsResponse).items.map((i) => i.key)).toEqual(['scope']);
+    const t = await db.taskInstance.findUniqueOrThrow({ where: { id: s.task.id } });
+    expect((t.drafting as unknown as { suggestions: SuggestionState }).suggestions.offered?.S1?.items.map((i) => i.key)).toEqual(['scope']);
+    expect(await db.auditEvent.count({ where: { action: 'task.suggestions.generated', entityId: s.task.id } })).toBe(1);
+  }, 40_000);
+
+  it('D31: a model timeout is a distinct, clear error; a replayed request never calls the model again', async () => {
+    const s = await setup();
+    script.next = new FieldSuggesterTimeoutError('Gemini call timed out');
+    const slow = await post(s.me.cookie, `/me/tasks/${s.task.id}/suggestions`, { section: 'S1' }, scripted);
+    expect(slow.statusCode).toBe(503);
+    expect(slow.json()).toMatchObject({ error: 'SUGGESTIONS_TIMEOUT', message: 'The suggestion took too long. Try again.' });
+    expect(await db.auditEvent.count({ where: { action: 'task.suggestions.generated', entityId: s.task.id } })).toBe(0);
+    script.next = [{ key: 'scope', value: 'Custodial applications in every applicable governing state.' }];
+    const headers = { cookie: s.me.cookie, ...idem() };
+    const send = () => scripted.inject({ method: 'POST', url: `/api/v1/me/tasks/${s.task.id}/suggestions`, headers, payload: { section: 'S1', again: true } });
+    const first = await send();
+    expect(first.statusCode, first.body).toBe(200);
+    const calls = script.calls;
+    const replay = await send();
+    expect(replay.headers['idempotent-replayed']).toBe('true');
+    expect(replay.json()).toEqual(first.json());
+    expect(script.calls).toBe(calls);
   });
 
   it('use, edit and undo: the origin is derived from the saved value; only offered suggestions can be recorded', async () => {

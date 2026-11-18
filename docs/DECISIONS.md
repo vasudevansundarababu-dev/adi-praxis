@@ -2142,3 +2142,25 @@ that the Author has to rework."
   - ***Re-author on v2 (chosen):*** a new Marketing project on the published v2 (target 1); the SME authors the task
     (they may reuse their v1 text: the fields are identical) and people review and approve it as usual. The v1 record
     stays as it is, append-only. Nothing is decided by AI and RL Gym sees one consistent form.
+
+## D31: field suggestions time out on large sections (18 Nov 2026)
+
+QA (Marketing, VEYRA Hush One v2, S2): `POST /me/tasks/:id/suggestions` often failed and the box said "Could not reach
+the service". Two causes: the model call ran inside the command's database transaction (15 s limit, so a slower answer
+was a Prisma P2028 500), and one model call for up to 30 fields with a 45 s limit outlived the candidate app's 30 s
+proxy limit.
+
+- **(chosen by Claude)** **Model call outside the transaction.** New `runCandidateCommandPrepared`: after the
+  idempotency check (so a replay never calls the model again) and before the transaction, a read-only `prepare` step
+  runs the same task checks on a plain read and calls the model. The transaction then locks the row, checks again
+  (owner, editable, still on the work), merges into the latest suggestion state, saves and writes the audit event, as
+  before. Authorised, idempotent and audited exactly as today.
+- **(chosen by Claude)** **Small parallel batches.** A section's fields (still at most 30) go to the model in batches
+  of 8, all at once, each with a 22 s limit, an 8,000-token output cap and short thinking (`quick`, as the policy rule
+  suggestions do). Simplest change that keeps the request inside 30 s whatever the section size; no queue or polling.
+  A batch that fails or is slow only leaves its own fields without a suggestion; the request fails only when no batch
+  answered.
+- **(chosen by Claude)** **A clear timeout.** A model timeout is `503 SUGGESTIONS_TIMEOUT` "The suggestion took too
+  long. Try again." (other failures stay `SUGGESTIONS_UNAVAILABLE`). The web and candidate proxies now answer a 30 s
+  timeout with `504 UPSTREAM_TIMEOUT` instead of "Could not reach the service"; the suggestion box shows the same
+  "took too long" message for both. The AI still only suggests: nothing is filled in or confirmed for the author.

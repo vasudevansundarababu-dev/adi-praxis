@@ -150,14 +150,18 @@ describe('KYC v7 and the generic case selector', () => {
     expect(draft.coverageDimensions).toEqual({ dimensions: [], cells: [] });
   });
 
-  it('v6 then v7 on the same lineage: both accepted (different forms); a repeated v7 form is TP_FORM_ID_TAKEN', async () => {
+  it('v6 then v7 on the same lineage: both accepted (different forms); a changed form under the v7 ID is TP_FORM_ID_TAKEN', async () => {
     await kycWorkflow();
     const v6 = await publishedFrom(structuredClone(V6));
     expect(v6.caseSelector).toMatchObject({ field: 'governing_state' });
     const v7 = await publishedFrom(clone());
     expect(v7.version).toBe(v6.version + 1);
     expect(v7.caseSelector).toMatchObject({ field: 'product' });
-    const again = await anvil('validate', clone());
+    // TS-24: the identical published form may be kept by a successor version; a changed form needs a new ID.
+    expect((await anvil('validate', clone())).statusCode).toBe(200);
+    const changed = clone();
+    changed.authoring.profile.sections[0].fields[0].help = 'Changed.';
+    const again = await anvil('validate', changed);
     expect(again.statusCode).toBe(422);
     expect(again.json().data.errors.map((e: { code: string }) => e.code)).toContain('TP_FORM_ID_TAKEN');
   });

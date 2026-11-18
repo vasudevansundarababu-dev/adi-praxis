@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { checkGoldenPack, GoldenPack, packTarget, type GoldenPackCheck } from '@praxis/shared';
 import { Prisma } from '@prisma/client';
 import type { Db, Tx } from '../db';
+import { jcsSha256 } from '../anvil/jcs';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError } from '../lib/errors';
 import type { AuditInput } from '../platform/audit';
@@ -13,10 +14,38 @@ export const packProfileId = (body: unknown): string | null => {
   return typeof p?.profileId === 'string' ? p.profileId : null;
 };
 
-/** Checks a pack against the forms already in use (built-in and stored). Read-only. */
-export async function checkPack(db: Db | Tx, body: unknown): Promise<GoldenPackCheck> {
+/** Canonical (RFC 8785) SHA-256 of a form as the registry stores it (JSON values only). */
+export const formSha256 = (profile: unknown) => jcsSha256(JSON.parse(JSON.stringify(profile)));
+
+/**
+ * TS-24 successor-version path (owner, 18 Nov 2026; RL Gym's v8 review: resolve TP_FORM_ID_TAKEN through the successor
+ * path). A new version of a published template may keep its form ID when its form is byte-identical (same canonical
+ * hash) to the form registered under that ID, for the same workflow, and that form is used by a PUBLISHED version of
+ * this client. Returns the registered row to reuse, else null. A changed form never matches, so it still needs a new ID.
+ */
+export async function successorFormMatch(db: Db | Tx, clientId: string, body: unknown) {
+  const probe = checkGoldenPack(body, () => false);
+  if (!probe.profile) return null;
+  const row = await db.uploadedProfile.findUnique({ where: { profileId: probe.profile.profileId } });
+  if (!row || row.clientId !== clientId || row.workflowName.toLowerCase() !== probe.profile.catalogWorkflowName.toLowerCase()) return null;
+  if (formSha256(row.profile) !== formSha256(probe.profile)) return null;
+  const published = await db.template.count({ where: { clientId, profileId: row.profileId, status: 'PUBLISHED' } });
+  return published ? row : null;
+}
+
+/**
+ * Whether the pack's form ID is taken (built-in or stored; IDs are never reused). With `successorOf` (a new version of
+ * an existing workflow), an identical registered form is not taken: the successor keeps its ID (TS-24).
+ */
+export async function formIdTaken(db: Db | Tx, body: unknown, successorOf?: { clientId: string }) {
   const id = packProfileId(body);
-  const taken = id ? await profileIdTaken(db as Db, id) : false;
+  if (!id || !(await profileIdTaken(db as Db, id))) return false;
+  return !(successorOf && (await successorFormMatch(db, successorOf.clientId, body)));
+}
+
+/** Checks a pack against the forms already in use (built-in and stored). Read-only. */
+export async function checkPack(db: Db | Tx, body: unknown, successorOf?: { clientId: string }): Promise<GoldenPackCheck> {
+  const taken = await formIdTaken(db, body, successorOf);
   return checkGoldenPack(body, () => taken);
 }
 
@@ -29,19 +58,26 @@ export async function checkPack(db: Db | Tx, body: unknown): Promise<GoldenPackC
  */
 export async function storePack(
   tx: Tx,
-  input: { clientId: string; uploaderId: string; body: unknown; audit: (a: AuditInput) => Promise<void>; anvilSpec?: Prisma.InputJsonValue; newVersionOfExisting?: boolean; from: 'golden_pack' | 'anvil_proposal' | 'praxis_form_revision' },
+  input: { clientId: string; uploaderId: string; body: unknown; audit: (a: AuditInput) => Promise<void>; anvilSpec?: Prisma.InputJsonValue; newVersionOfExisting?: boolean; from: 'golden_pack' | 'anvil_proposal' | 'praxis_form_revision' | 'praxis_successor_version' },
 ) {
-  const r = await checkPack(tx, input.body);
+  const successorOf = input.newVersionOfExisting ? { clientId: input.clientId } : undefined;
+  const r = await checkPack(tx, input.body, successorOf);
   if (!r.ok || !r.profile) throw new AppError(422, 'INVALID_GOLDEN_PACK', 'The pack has problems; nothing was stored.', { problems: r.problems, examples: r.examples });
   const pack = GoldenPack.parse(input.body);
   const hash = sha256(stableStringify(input.body));
-  const row = await tx.uploadedProfile.create({
-    data: { clientId: input.clientId, profileId: r.profile.profileId, workflowName: r.profile.catalogWorkflowName, source: pack.source, profile: r.profile as object, examples: pack.examples as object[], contentHash: hash, uploadedById: input.uploaderId },
-  });
-  await input.audit({ entityType: 'UploadedProfile', entityId: row.id, action: 'template_profile.uploaded', after: { profileId: row.profileId, workflowName: row.workflowName, source: row.source, examples: r.examples.length, contentHash: hash, from: input.from } });
+  // TS-24: a successor version with the identical registered form keeps it (the form registry is append-only by ID).
+  const reused = successorOf ? await successorFormMatch(tx, input.clientId, input.body) : null;
+  const row =
+    reused ??
+    (await tx.uploadedProfile.create({
+      data: { clientId: input.clientId, profileId: r.profile.profileId, workflowName: r.profile.catalogWorkflowName, source: pack.source, profile: r.profile as object, examples: pack.examples as object[], contentHash: hash, uploadedById: input.uploaderId },
+    }));
+  if (reused) await input.audit({ entityType: 'UploadedProfile', entityId: row.id, action: 'template_profile.reused', after: { profileId: row.profileId, workflowName: row.workflowName, formSha256: formSha256(row.profile), from: input.from } });
+  else await input.audit({ entityType: 'UploadedProfile', entityId: row.id, action: 'template_profile.uploaded', after: { profileId: row.profileId, workflowName: row.workflowName, source: row.source, examples: r.examples.length, contentHash: hash, from: input.from } });
 
   const latest = await tx.template.findFirst({ where: { clientId: input.clientId, workflowName: { equals: r.profile.catalogWorkflowName, mode: 'insensitive' } }, orderBy: { version: 'desc' } });
   let createdTemplateId: string | null = null;
+  if (reused && !(latest && input.newVersionOfExisting)) throw new AppError(409, 'FORM_REUSE_NEEDS_SUCCESSOR', 'An existing form can be kept only by a new version of its published template.');
   if (!latest && pack.template) {
     const tpl = pack.template;
     const domain =

@@ -8,8 +8,8 @@ import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, notFound } from '../lib/errors';
 import type { AuditInput } from '../platform/audit';
 import { runStaffOrServiceCommand } from '../platform/command';
-import { packProfileId, storePack } from '../templates/golden-pack-store';
-import { loadUploadedProfiles, profileIdTaken } from '../templates/uploaded-profiles';
+import { formIdTaken, storePack } from '../templates/golden-pack-store';
+import { loadUploadedProfiles } from '../templates/uploaded-profiles';
 import { jcsSha256 } from '../anvil/jcs';
 import { checkJointProposal, EXECUTION_SCHEMAS, isJointProposal, JOINT_KEYS, JOINT_TEMPLATE_SPEC, jointHashes, jointTemplateSpec, jointToolIds, type StoredJointParts } from '../anvil/joint-template';
 
@@ -66,7 +66,7 @@ const CASE_SELECTOR_FIX = 'Use caseSelector {field, source, values[, labels]}: s
 function packIssues(problems: string[], pointer: string) {
   return problems.map((p) => {
     const code = /unsupported field type/.test(p) ? 'TP_FIELD_TYPE_UNSUPPORTED' : /^example/.test(p) ? 'TP_EXAMPLE_INVALID' : /weight/i.test(p) ? 'TP_CRITERIA_WEIGHTS' : /already in use/.test(p) ? 'TP_FORM_ID_TAKEN' : CASE_SELECTOR_PROBLEM.test(p) ? 'TP_CASE_SELECTOR_UNSUPPORTED' : 'TP_FORM_INVALID';
-    const fix = code === 'TP_FORM_ID_TAKEN' ? 'Give a changed form a new ID; IDs are never reused.' : code === 'TP_CASE_SELECTOR_UNSUPPORTED' ? CASE_SELECTOR_FIX : 'Repair the authoring part as described.';
+    const fix = code === 'TP_FORM_ID_TAKEN' ? 'Give a changed form a new ID; IDs are never reused. A new version of a published template may keep its form ID only when the form is byte-identical (same canonical hash) to the registered form.' : code === 'TP_CASE_SELECTOR_UNSUPPORTED' ? CASE_SELECTOR_FIX : 'Repair the authoring part as described.';
     return { code, owner: 'anvil' as const, file: 'template-spec.json', pointer, message: p, fix };
   });
 }
@@ -85,8 +85,8 @@ export async function check(db: Db | Tx, clientId: string, body: unknown): Promi
   if (isJointProposal(body)) {
     const j = checkJointProposal(body as Record<string, unknown>);
     if (!j.parts) return { valid: false, errors: j.issues, praxisRequirements: [], pack: null, spec: null, joint: null, packBody: null };
-    const id = packProfileId(j.pack);
-    const taken = id ? await profileIdTaken(db as Db, id) : false;
+    // TS-24: a new version of a published template keeps an identical registered form's ID.
+    const taken = await formIdTaken(db, j.pack, { clientId });
     const pack = checkGoldenPack(j.pack, () => taken);
     const errors = [...j.issues, ...packIssues(pack.problems, '/authoring')];
     if (pack.profile) {
@@ -101,8 +101,7 @@ export async function check(db: Db | Tx, clientId: string, body: unknown): Promi
     skills = j.parts.skills as unknown as NonNullable<typeof skills>;
   } else {
     const parsed = TemplateSpec.safeParse(body);
-    const id = parsed.success ? packProfileId(parsed.data.pack) : null;
-    const taken = id ? await profileIdTaken(db as Db, id) : false;
+    const taken = parsed.success ? await formIdTaken(db, parsed.data.pack, { clientId }) : false;
     r = checkTemplateSpec(body, () => taken);
     if (parsed.success) {
       spec = parsed.data;

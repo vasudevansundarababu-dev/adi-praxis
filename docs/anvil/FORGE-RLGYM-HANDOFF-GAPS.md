@@ -51,8 +51,11 @@ So the owner's understanding is half right. The manual *transport* is because li
 3. **Separate synthetic practice documents from public policy.** A project policy document should be marked
    `synthetic` or `official`, with source location and effective dates for official ones. Never bind a synthetic
    document as public policy.
-4. **Let a project or template bind an input population.** Record the case dataset manifest (hash, count,
-   provenance, rights statement, review status) and the population used (for example, individual product, 50 cases).
+4. **Declare the input contract, never the input data.** A task already says which kind of case it is written for
+   (the template's case selector, for example `product = individual`). That is all ADI Forge should state. The
+   benchmark dataset, the population drawn from it, its rights and review, and which cases run against which task
+   belong to RL Gym. Authors must not see or choose the evaluation population, so tasks cannot be fitted to it
+   (owner decision, 18 Nov 2026). Worked examples shown to authors stay separate from any evaluation set.
 5. **Show the qualification state before export.** Block or warn on export when the template version has no RL Gym
    qualification receipt, instead of sending tasks that RL Gym will reject as not registered.
 6. **Keep exports offline-capable.** Keep a supported "download package" path (what was built by hand on 18 Nov)
@@ -69,7 +72,10 @@ So the owner's understanding is half right. The manual *transport* is because li
    status, and the rule that decides which state and charter applies to a case.
 4. **The approvals RL Gym relies on**, with reviewer, scope, expiry and revocation, so ADI Forge can show them and
    never claim one that does not exist.
-5. **The input dataset reference**: manifest hash, population definition, approval and rights record.
+5. **RL Gym owns input data binding.** RL Gym keeps the dataset, its population, approval and rights record, and binds
+   cases to a task at run time using the task's declared case selector. ADI Forge does not need and should not receive
+   the evaluation population. (On 18 Nov a population file was built by hand only because RL Gym asked for it; that
+   is not the intended flow.)
 6. **A project-scoped export credential for QA**, plus its rotation and revocation rules (contract open question 7).
 7. **New material means a new version.** Adding policy text, state modules or receipts to a published template
    changes its hash, so it arrives as a successor version (for example v8). A published version is never changed
@@ -81,4 +87,5 @@ So the owner's understanding is half right. The manual *transport* is because li
 2. RL Gym issues the QA export credential; the owner stores it in Secret Manager.
 3. ADI Forge adds the policy binding to the task export (section 4, item 1).
 4. Run one KYC and one Marketing export end to end in QA; compare with the files sent by hand on 18 Nov.
-5. Then decide which of the remaining items (approvals, state modules, dataset binding) block real benchmark use.
+5. Then decide which of the remaining items (approvals, state modules) block real benchmark use. Dataset binding
+   is RL Gym's (section 5, item 5).

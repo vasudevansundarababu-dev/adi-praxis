@@ -3,6 +3,8 @@
 Status: draft for the owner and RL Gym (Anvil). Written by the QA DevOps session, 18 Nov 2026.
 It builds on `docs/anvil/PRAXIS-ANVIL-CONTRACT-FINAL.md` (the agreed contract) and
 `docs/integrations/ANVIL-PROJECT-POLICY-V1.md` (the project policy manifest). It changes neither of them.
+Every gap here is also recorded as a numbered requirement for Template Studio in
+`docs/design/TEMPLATE-STUDIO-REQUIREMENTS-LOG.md`, which is the living list going forward.
 
 ## 1. Why we did it by hand
 

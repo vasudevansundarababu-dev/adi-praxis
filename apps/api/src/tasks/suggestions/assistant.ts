@@ -29,7 +29,22 @@ export interface FieldSuggester {
   suggest(fields: SuggestField[], ctx: SuggestContext): Promise<{ key: string; value?: unknown }[]>;
 }
 export class FieldSuggesterUnavailableError extends Error {}
+/** The model did not answer in time (shown to the author as "took too long, try again"). */
+export class FieldSuggesterTimeoutError extends FieldSuggesterUnavailableError {}
 export const SUGGEST_PROMPT_VERSION = 'field-suggestions/1';
+
+/**
+ * D31 (18 Nov 2026): the candidate app's proxy gives up after 30 s. A section's fields are asked for in batches of
+ * SUGGEST_BATCH, all in parallel, each with a SUGGEST_TIMEOUT_MS limit and a small output cap, so even a large Marketing
+ * section answers well inside that window. At most SUGGEST_MAX_FIELDS fields per request (as before).
+ */
+export const SUGGEST_MAX_FIELDS = 30;
+export const SUGGEST_BATCH = 8;
+export const SUGGEST_TIMEOUT_MS = 22_000;
+export const SUGGEST_MAX_OUTPUT = 8000;
+
+const isTimeout = (err: unknown) =>
+  err instanceof Error && (['TimeoutError', 'AbortError', 'APIConnectionTimeoutError'].includes(err.name) || /timed? ?out/i.test(err.message));
 
 const MAX_TEXT = 4000;
 const trim = (v: unknown, max = MAX_TEXT) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
@@ -126,11 +141,26 @@ export class ModelFieldSuggester implements FieldSuggester {
   constructor(readonly modelVersion: string, private readonly llm: Completer) {}
   async suggest(fields: SuggestField[], ctx: SuggestContext) {
     if (!fields.length) return [];
+    const batches: SuggestField[][] = [];
+    const capped = fields.slice(0, SUGGEST_MAX_FIELDS);
+    for (let i = 0; i < capped.length; i += SUGGEST_BATCH) batches.push(capped.slice(i, i + SUGGEST_BATCH));
+    const results = await Promise.allSettled(batches.map((b) => this.batch(b, ctx)));
+    const ok = results.filter((r): r is PromiseFulfilledResult<{ key: string; value?: unknown }[]> => r.status === 'fulfilled');
+    // A batch that failed only leaves its fields without a suggestion; the request fails when none answered.
+    if (!ok.length) {
+      const errors = results.map((r) => (r as PromiseRejectedResult).reason);
+      throw errors.find((e) => e instanceof FieldSuggesterTimeoutError) ?? errors[0];
+    }
+    return ok.flatMap((r) => r.value);
+  }
+
+  private async batch(fields: SuggestField[], ctx: SuggestContext) {
     let text: string;
     try {
-      text = await this.llm.complete(SYSTEM, suggestUser(fields.slice(0, 30), ctx), 12000, { timeoutMs: 45_000 });
+      text = await this.llm.complete(SYSTEM, suggestUser(fields, ctx), SUGGEST_MAX_OUTPUT, { quick: true, timeoutMs: SUGGEST_TIMEOUT_MS });
     } catch (err) {
-      throw new FieldSuggesterUnavailableError(err instanceof Error ? err.message : 'Model call failed');
+      const msg = err instanceof Error ? err.message : 'Model call failed';
+      throw isTimeout(err) ? new FieldSuggesterTimeoutError(msg) : new FieldSuggesterUnavailableError(msg);
     }
     let json: unknown;
     try {
@@ -140,7 +170,8 @@ export class ModelFieldSuggester implements FieldSuggester {
     }
     const r = Out.safeParse(json);
     if (!r.success) throw new FieldSuggesterUnavailableError('The model output failed validation.');
-    return r.data.items;
+    const keys = new Set(fields.map((f) => f.key));
+    return r.data.items.filter((i) => keys.has(i.key));
   }
 }
 

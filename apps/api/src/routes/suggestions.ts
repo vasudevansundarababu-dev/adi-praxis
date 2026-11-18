@@ -4,7 +4,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db, Tx } from '../db';
 import { AppError } from '../lib/errors';
-import { runCandidateCommand } from '../platform/command';
+import { runCandidateCommand, runCandidateCommandPrepared } from '../platform/command';
 import type { SelectionGate } from '../staffing/selection-gate';
 import type { FieldSuggester } from '../tasks/suggestions/assistant';
 import { draftingWithSuggestions, generateSuggestions, recordUse, sectionsProfile, suggestionStateOf } from '../tasks/suggestions/service';
@@ -18,7 +18,7 @@ const IdParams = z.object({ id: z.string().uuid() });
  * (authorised, idempotent, audited). Suggestions never change the task: the author's form saves through autosave.
  */
 export const suggestionRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: SelectionGate; suggester: FieldSuggester }> = async (app, { db, selectionGate, suggester }) => {
-  async function editable(tx: Tx, taskId: string, smeUserId: string, lock = true) {
+  async function editable(tx: Db | Tx, taskId: string, smeUserId: string, lock = true) {
     if (lock) await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${taskId}::uuid FOR UPDATE`;
     const t = await ownTask(tx, taskId, smeUserId);
     const w = await workContext(tx, selectionGate, smeUserId, t.projectId);
@@ -47,21 +47,29 @@ export const suggestionRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Se
       const kept = suggestionStateOf(await ownTask(db, req.params.id, req.candidate!.smeUserId)).offered?.[req.body.section];
       if (kept) return reply.send(kept);
     }
-    await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => {
-      const { t } = await editable(tx, req.params.id, actor.smeUserId, false);
-      // The model call runs before the row is locked; the result is merged into the latest state.
-      const fresh = await generateSuggestions(tx, t, req.body, suggester);
-      await tx.$executeRaw`SELECT 1 FROM "TaskInstance" WHERE id = ${t.id}::uuid FOR UPDATE`;
-      const now = await ownTask(tx, t.id, actor.smeUserId);
-      const state = suggestionStateOf(now);
-      const prev = state.offered?.[req.body.section];
-      // Asking for specific fields keeps the other fields' current suggestions.
-      const merged = req.body.keys?.length && prev ? { ...fresh, items: [...prev.items.filter((i) => !fresh.items.some((f) => f.key === i.key)), ...fresh.items] } : fresh;
-      state.offered = { ...(state.offered ?? {}), [req.body.section]: merged };
-      await save(tx, now, state);
-      await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.suggestions.generated', after: { section: req.body.section, fields: fresh.items.map((i) => i.key), model: fresh.model, again: !!req.body.again } });
-      return { status: 200, body: merged };
-    });
+    await runCandidateCommandPrepared(
+      db,
+      req,
+      reply,
+      // D31: the model call runs outside the transaction (it can take longer than the transaction's 15 s limit). The
+      // same checks run first on a plain read, so nobody else's or a read-only task ever reaches the model.
+      async (actor) => {
+        const { t } = await editable(db, req.params.id, actor.smeUserId, false);
+        return generateSuggestions(db, t, req.body, suggester);
+      },
+      async ({ tx, actor, audit }, fresh) => {
+        // Short write: lock the row, check again (the task may have changed meanwhile) and merge into the latest state.
+        const { t: now } = await editable(tx, req.params.id, actor.smeUserId);
+        const state = suggestionStateOf(now);
+        const prev = state.offered?.[req.body.section];
+        // Asking for specific fields keeps the other fields' current suggestions.
+        const merged = req.body.keys?.length && prev ? { ...fresh, items: [...prev.items.filter((i) => !fresh.items.some((f) => f.key === i.key)), ...fresh.items] } : fresh;
+        state.offered = { ...(state.offered ?? {}), [req.body.section]: merged };
+        await save(tx, now, state);
+        await audit({ entityType: 'TaskInstance', entityId: now.id, action: 'task.suggestions.generated', after: { section: req.body.section, fields: fresh.items.map((i) => i.key), model: fresh.model, again: !!req.body.again } });
+        return { status: 200, body: merged };
+      },
+    );
     return reply;
   });
 

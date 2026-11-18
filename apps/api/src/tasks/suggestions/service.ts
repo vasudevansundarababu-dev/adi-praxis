@@ -19,7 +19,7 @@ import { AppError } from '../../lib/errors';
 import { authoringPolicyView, effectivePolicy } from '../../policy/task-policy';
 import { profileFor } from '../profile-output';
 import { scanForRealData } from '../synthetic-scan';
-import { FieldSuggesterUnavailableError, sanitizeValue, type FieldSuggester, type SuggestContext } from './assistant';
+import { FieldSuggesterTimeoutError, FieldSuggesterUnavailableError, sanitizeValue, type FieldSuggester, type SuggestContext } from './assistant';
 
 type TaskLike = Pick<TaskInstance, 'id' | 'clientId' | 'projectId' | 'drafting' | 'output' | 'input' | 'taskType'> & { project: { template: Pick<Template, 'workflowName' | 'profileId'> } };
 
@@ -82,6 +82,7 @@ export async function generateSuggestions(db: Db | Tx, t: TaskLike, args: { sect
     try {
       raw = await suggester.suggest(fields, ctx);
     } catch (err) {
+      if (err instanceof FieldSuggesterTimeoutError) throw new AppError(503, 'SUGGESTIONS_TIMEOUT', 'The suggestion took too long. Try again.');
       if (err instanceof FieldSuggesterUnavailableError) throw new AppError(503, 'SUGGESTIONS_UNAVAILABLE', 'Suggestions are not available right now. Write the text yourself, or try again in a minute.');
       throw err;
     }

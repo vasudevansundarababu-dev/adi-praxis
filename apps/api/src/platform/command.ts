@@ -63,9 +63,24 @@ export async function runCandidateCommand<T>(
   reply: FastifyReply,
   handler: (ctx: CommandContext<CandidateActor>) => Promise<CommandResult<T>>,
 ): Promise<void> {
+  return runCandidateCommandPrepared(db, req, reply, async () => undefined, (ctx) => handler(ctx));
+}
+
+/**
+ * A candidate command with a slow, read-only step (e.g. a model call) that must not run inside the database transaction
+ * (D31: the transaction has a 15 s limit). `prepare` runs after the idempotency check (a replay never repeats it) and
+ * before the transaction; the handler then re-checks and writes in a short transaction, with the same guarantees.
+ */
+export async function runCandidateCommandPrepared<P, T>(
+  db: Db,
+  req: FastifyRequest,
+  reply: FastifyReply,
+  prepare: (actor: CandidateActor) => Promise<P>,
+  handler: (ctx: CommandContext<CandidateActor>, prepared: P) => Promise<CommandResult<T>>,
+): Promise<void> {
   const actor = req.candidate;
   if (!actor) throw unauthorized();
-  return execute(db, req, reply, { actor, actorId: `candidate:${actor.smeUserId}`, actorType: 'CANDIDATE', clientId: actor.clientId }, handler);
+  return execute(db, req, reply, { actor, actorId: `candidate:${actor.smeUserId}`, actorType: 'CANDIDATE', clientId: actor.clientId }, handler, prepare);
 }
 
 /** For routes open to staff or a machine client (e.g. client API task-input push). Machine clients audit as SERVICE. */
@@ -117,12 +132,13 @@ export async function runJobCommand<T>(
   return { replayed: false, status: out.status, body: out.body };
 }
 
-async function execute<A, T>(
+async function execute<A, T, P = undefined>(
   db: Db,
   req: FastifyRequest,
   reply: FastifyReply,
   principal: { actor: A; actorId: string; actorType: 'USER' | 'CANDIDATE' | 'SERVICE' | 'PARTNER'; clientId: string },
-  handler: (ctx: CommandContext<A>) => Promise<CommandResult<T>>,
+  handler: (ctx: CommandContext<A>, prepared: P) => Promise<CommandResult<T>>,
+  prepare?: (actor: A) => Promise<P>,
 ): Promise<void> {
   const { actor, actorId, actorType, clientId } = principal;
   const rawKey = req.headers[IDEMPOTENCY_HEADER];
@@ -139,6 +155,9 @@ async function execute<A, T>(
     sendReplay(reply, replay);
     return;
   }
+
+  // Outside the transaction: a slow read-only step (its errors reach the caller unchanged).
+  const prepared = (prepare ? await prepare(actor) : undefined) as P;
 
   try {
     const result = await db.$transaction(async (tx) => {
@@ -161,7 +180,7 @@ async function execute<A, T>(
         },
       };
 
-      const out = await handler(ctx);
+      const out = await handler(ctx, prepared);
       if (audits === 0) {
         throw new Error(`Command ${req.method} ${path} changed state without writing an AuditEvent`);
       }

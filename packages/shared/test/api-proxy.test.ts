@@ -51,4 +51,11 @@ describe('tester #160: bounded same-origin proxy', () => {
     expect((await proxyApi(new Request('https://web.example/api/v1/projects/%00'), 'https://api.example', async () => { called = true; return new Response(); })).status).toBe(400);
     expect(called).toBe(false);
   });
+
+  it('a slow API is a distinct timeout, not "could not reach the service" (D31)', async () => {
+    const slow = async () => { throw new DOMException('The operation was aborted due to timeout', 'TimeoutError'); };
+    const response = await proxyApi(new Request('https://web.example/api/v1/me/tasks/x/suggestions', { method: 'POST' }), 'https://api.example', slow);
+    expect(response.status).toBe(504);
+    expect(await response.json()).toMatchObject({ error: 'UPSTREAM_TIMEOUT', message: 'The service took too long to answer. Please try again.' });
+  });
 });

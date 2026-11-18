@@ -7,6 +7,7 @@ import type { Db, Tx } from '../../db';
 import { AppError } from '../../lib/errors';
 import { writeAudit, type AuditInput } from '../../platform/audit';
 import type { OutboxInput } from '../../outbox/outbox';
+import { loadUploadedProfiles } from '../../templates/uploaded-profiles';
 import { capProblem, clipCost, estimateUsd, lockSpend, recordSpend, spentTodayUsd, textCost } from './cost';
 import { chapterPlan, finalizeScript, profileOf, type ChapterPlan } from './plan';
 import type { TutorialScriptDrafter } from './script';
@@ -197,7 +198,8 @@ export async function executeTutorialRun(db: Db, p: TutorialPipeline, runId: str
   const run = (await db.templateTutorialRun.findUnique({ where: { id: runId }, include: { template: true } }))!;
   const cfg = p.settings.tutorial;
   try {
-    const profile = profileOf(run.template);
+    // D30: a stored (uploaded) form saved after this process last loaded them is not registered yet; load once more.
+    const profile = profileOf(run.template) ?? (await loadUploadedProfiles(db), profileOf(run.template));
     if (!profile) throw new Error('This template has no sections form.');
     const plan = chapterPlan(run.template, profile);
 

@@ -443,6 +443,22 @@ describe('D2 tutorial video runs through the API', () => {
     expect(clips.prompts).toHaveLength(chapters * 2 + 1);
   });
 
+  it('D30: a run for a template on a stored form saved after the worker started loads the form and completes', async () => {
+    const id = await template();
+    const runId = (await post(admin, `/templates/${id}/tutorial/generate`)).json().run.id;
+    // A stored pack written straight to the database, as another API instance would: this process never registered it.
+    const formId = `d30-stored-${randomUUID().slice(0, 8)}`;
+    const form = { ...PROFILE, profileId: formId, handoverName: 'D30 stored form' };
+    const adminUser = await db.user.findFirstOrThrow({ where: { email: 'admin@test.local' } });
+    await db.uploadedProfile.create({ data: { clientId, profileId: formId, workflowName: PROFILE.catalogWorkflowName, source: 'upload', profile: form as object, examples: [], contentHash: formId, uploadedById: adminUser.id } });
+    await db.template.update({ where: { id }, data: { profileId: formId } });
+    const { profileById } = await import('@praxis/shared');
+    expect(profileById(formId)).toBeUndefined();
+    await runAll();
+    expect(await db.templateTutorialRun.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({ status: 'READY_FOR_REVIEW', error: null });
+    expect(profileById(formId)?.handoverName).toBe('D30 stored form');
+  });
+
   it('a script that names an internal system fails the run; nothing is made from it', async () => {
     const id = await template();
     const runId = (await post(admin, `/templates/${id}/tutorial/generate`)).json().run.id;

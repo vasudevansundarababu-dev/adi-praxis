@@ -1,0 +1,439 @@
+{
+  "schema": "adi-forge.successor-task-revision.v1 (offline candidate)",
+  "successor_of_record_id": "9fb80bad-399d-460d-9508-f44d1cd1d125",
+  "successor_of_task_id": "acea991a-3383-482f-b29c-3a27c6a25262",
+  "template": {
+    "template_id": "6d8f9cae-7c06-4c36-a207-522978d5486b",
+    "version": 8,
+    "template_sha256": "8449adb008b6ecea7858b594dd5765f60b9b9596b57568d25f5e0598a334f7d5",
+    "status": "candidate"
+  },
+  "title": "Joint KYC Onboarding and Refresh",
+  "input": {
+    "slot": {
+      "id": "60585180-d036-4034-b601-cc6693994823",
+      "case": {
+        "field": "product",
+        "label": "Joint",
+        "value": "adult_joint",
+        "source": "S1.applicationType"
+      },
+      "tags": {
+        "product": "adult_joint"
+      },
+      "brief": "Application type: Joint. Write this reusable task for Joint only; set Application type to Joint.",
+      "isOpen": false,
+      "edgeCase": null
+    }
+  },
+  "output": {
+    "header": {
+      "title": "Joint KYC Onboarding and Refresh"
+    },
+    "profile": {
+      "id": "golden-kyc-application-type-v1",
+      "version": 3
+    },
+    "sections": {
+      "S1": {
+        "scope": "Joint account applications across all applicable governing jurisdictions. Specific policy requirements must be qualified by the governing state, banking charter, and application date applicable at runtime.",
+        "title": "Joint KYC Onboarding and Refresh",
+        "trigger": "Receipt of a new joint account application or scheduled periodic KYC refresh",
+        "language": "English",
+        "deliverable": "A structured KYC assessment report for each co-applicant, documenting verified identifying information, status of TIN application confirmation where applicable, identification of any unresolved data gaps or discrepancies, and an evidence-backed recommendation for approval, escalation, or safe handoff.",
+        "applicationType": "adult_joint",
+        "businessContext": "Conduct identity verification and customer due diligence for all parties associated with joint account applications. For each co-applicant, ensure the collection of customer name (R-COLLECT-CUSTOMER-NAME) and physical address (R-COLLECT-ADDRESS) prior to account opening. In cases where an applicant has applied for but not yet received a Taxpayer Identification Number, ensure procedures confirm that an application for a TIN has been filed (R-CONFIRM-PENDING-TIN-APPLICATION). Evaluate records systematically across joint applicants to maintain full compliance without predetermining individual eligibility.",
+        "exampleGoverningState": ""
+      },
+      "S2": {
+        "inputContract": "At runtime, the agent receives an isolated snapshot of a joint account application or refresh case. The input record contains application metadata (including submission date and governing jurisdiction) along with submitted profiles for each co-applicant, encompassing identifying particulars such as full legal name, residential address, and Taxpayer Identification Number details or pending TIN application records. Additional documentary evidence and verification history must be retrieved dynamically through permitted tools."
+      },
+      "S3": {
+        "tools": [
+          "application.read",
+          "policy.read",
+          "documents.list",
+          "document.read",
+          "document.compare",
+          "identity.check",
+          "document.check",
+          "address.check",
+          "screening.check",
+          "authority.check",
+          "operation.lookup",
+          "operation.read",
+          "information.request",
+          "information.read",
+          "finding.write",
+          "finding.resolve",
+          "specialist.refer",
+          "specialist.read",
+          "search",
+          "search.read",
+          "recommend"
+        ],
+        "environment": "golden_kyc_openenv",
+        "failureBehaviour": "When a tool execution fails, times out, or returns an error, retry if permitted by system limits. If verification or screening services are unavailable or return inconclusive or conflicting data across co-applicants, record the issue as a formal finding using finding.write rather than fabricating or assuming verification outcomes. If critical identifying information—such as a co-applicant's name, physical address, or confirmation of a pending TIN application—remains missing or cannot be validated through available documentation, initiate an information request or refer the case to a compliance specialist for manual intervention. Never extrapolate or invent identifying evidence."
+      },
+      "S4": {
+        "statePolicies": [
+          {
+            "ruleId": "us-31-cfr-1020.220",
+            "ruleVersion": "ecfr-2026-11-12",
+            "locator": "31 CFR 1020.220(a)(2)(i)(A)(1),(3); (a)(2)(i)(B)",
+            "appliesTo": "",
+            "exception": "",
+            "rationale": "",
+            "contentSha256": "07069b7552403b5b99097a9249d1ed45d940253df1bafa860154e52a097bf1f4"
+          }
+        ],
+        "bankPolicyDocument": {
+          "ruleId": "40377d7f-f4ef-4b3d-aede-5db27f671df1",
+          "locator": "project rule set v1",
+          "appliesTo": "",
+          "exception": "",
+          "rationale": "",
+          "ruleVersion": "rs1.d1",
+          "contentSha256": "a5c0aa26ed48ceda91c4cc8238bb8fde588342626e9e27f1c04bfb0c5be51aea"
+        }
+      },
+      "S5": {
+        "steps": [
+          {
+            "tool": "finding.write",
+            "action": "Retrieve and parse the joint application snapshot. For each co-applicant, verify that customer name and address have been collected as required by R-COLLECT-CUSTOMER-NAME and R-COLLECT-ADDRESS.",
+            "failureBehaviour": "If any co-applicant's name or address is absent from the application payload, record a finding and flag the missing profile information for outreach or escalation."
+          },
+          {
+            "tool": "finding.write",
+            "action": "Examine Taxpayer Identification Number details provided for each co-applicant. If an applicant indicates they have applied for but not yet received a TIN, review submitted records or query documentary evidence to confirm that a TIN application was filed pursuant to R-CONFIRM-PENDING-TIN-APPLICATION.",
+            "failureBehaviour": "If confirmation of a pending TIN application cannot be established from provided records or verification tools, log a discrepancy finding via finding.write and route for follow-up or safe escalation."
+          },
+          {
+            "tool": "finding.write",
+            "action": "Reconcile identity documentation and corroborating evidence across all co-applicants against joint application profile data, ensuring no unaddressed discrepancies remain.",
+            "failureBehaviour": "When conflicting or inconclusive data across co-applicants cannot be resolved through available records, record the specific unresolved gaps and initiate an information request or escalate to compliance review."
+          },
+          {
+            "tool": "finding.write",
+            "action": "Compile and output the final structured KYC assessment report detailing verification findings for all co-applicants, confirming compliance with name, address, and pending TIN application rules.",
+            "failureBehaviour": "If report compilation fails or schema validation errors occur, retry the output generation. If failure persists, trigger safe escalation without approving the application."
+          }
+        ]
+      },
+      "S6": {
+        "outputContract": "Produce a structured KYC assessment report compliant with the authoritative execution output schema for the joint application. The report must include:\n\n1. Co-Applicant Profiles & Evidence: Dedicated sections for each co-applicant detailing the verification status of all required identifying data, specifically confirming the collection of customer name (R-COLLECT-CUSTOMER-NAME) and physical address (R-COLLECT-ADDRESS), alongside corresponding documentary or database evidence.\n2. TIN Status & Verification: Documented Taxpayer Identification Number details or formal confirmation of a filed pending TIN application where a TIN has not yet been issued (R-CONFIRM-PENDING-TIN-APPLICATION).\n3. Findings & Discrepancies: Formal record of all system findings, verification anomalies, tool errors, or discrepancies observed between co-applicant files.\n4. Unresolved Gaps & Human Handoff: Clear inventory of missing documentation or inconclusive identity checks, providing actionable escalation summaries and routing instructions for human compliance review when automated resolution criteria are not met.\n5. Case Recommendation: An evidence-backed recommendation (e.g., ready for approval, additional information required, or compliance escalation) grounded strictly in verified findings without predetermining the final case outcome."
+      },
+      "S7": {
+        "criteria": [
+          {
+            "id": "identification_parties",
+            "name": "All parties identified",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Parties missed or invented",
+            "partialCredit": "Most parties identified; a secondary party or role missing",
+            "passCondition": "Every owner, signer and authorised party in the snapshot is identified with their role",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "identification_verification",
+            "name": "Identity verified",
+            "weight": 5,
+            "critical": true,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "No verification, or verification is assumed",
+            "partialCredit": "Verification done for some parties, or the results are incomplete",
+            "passCondition": "Each party's identity is verified with documentary or non-documentary checks, and the results are recorded",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "profile",
+            "name": "Customer profile",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Profile missing or invented",
+            "partialCredit": "Profile partly recorded",
+            "passCondition": "Expected activity, source of funds and purpose recorded from the evidence",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "screening",
+            "name": "Sanctions and watchlist screening",
+            "weight": 5,
+            "critical": true,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Screening missing for any party",
+            "partialCredit": "Screening done but a hit is left unresolved",
+            "passCondition": "Every party is screened with screening.check, and hits are resolved or escalated",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "decision",
+            "name": "Recommendation",
+            "weight": 5,
+            "critical": true,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Contradicts the evidence or policy",
+            "partialCredit": "Defensible but weakly supported",
+            "passCondition": "The recommendation matches the evidence and policy, using an allowed value",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "next_action",
+            "name": "Next action",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "No next step",
+            "partialCredit": "A next step is vague",
+            "passCondition": "A clear next step or handoff is stated for the recommendation",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "evidence",
+            "name": "Evidence cited",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Findings without evidence",
+            "partialCredit": "Some findings are uncited",
+            "passCondition": "Every finding cites the documents or tool results it relies on",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "revision_integrity",
+            "name": "Revisions handled",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "A stale or conflicting version is used without noting it",
+            "partialCredit": "Revision noticed but not fully reconciled",
+            "passCondition": "Changed or newer documents are reconciled with document.compare and the latest version is used",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_structure",
+            "name": "Account structure",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Wrong structure",
+            "partialCredit": "Mostly correct, with a detail missed",
+            "passCondition": "The product structure (single, joint, minor or custodial) is identified correctly",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_roles",
+            "name": "Roles on the account",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Roles wrong",
+            "partialCredit": "One role unclear",
+            "passCondition": "Owner, joint owner, custodian or minor roles are assigned correctly",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_eligibility",
+            "name": "Eligibility",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Not checked",
+            "partialCredit": "Partly checked",
+            "passCondition": "Age, capacity and residency eligibility are checked against policy",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_agreements",
+            "name": "Agreements",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Agreements ignored",
+            "partialCredit": "One agreement not confirmed",
+            "passCondition": "Required agreements and consents are present for each party",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_authority",
+            "name": "Authority",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Authority assumed",
+            "partialCredit": "Authority noted but not verified",
+            "passCondition": "Authority to act (custodian, guardian or power of attorney) is verified with authority.check",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_party_separation",
+            "name": "Party separation",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Parties' data mixed",
+            "partialCredit": "Minor overlap noted and corrected",
+            "passCondition": "Each party's data and evidence is kept separate, with no mixing",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_exceptions",
+            "name": "Exceptions",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Exception missed",
+            "partialCredit": "Exception noted but not routed",
+            "passCondition": "Policy exceptions are identified and routed to specialist review",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_resolution",
+            "name": "Resolution of findings",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Findings ignored",
+            "partialCredit": "Some findings left open without being listed",
+            "passCondition": "Open findings are resolved (finding.resolve) or listed as gaps",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "state_applicability",
+            "name": "State applicability",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "The wrong state is assumed",
+            "partialCredit": "State identified, but policy applicability is unclear",
+            "passCondition": "The governing state comes from the application, and the state policies are applied",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "state_rule_selection",
+            "name": "State rule selection",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Wrong rules",
+            "partialCredit": "One rule missing",
+            "passCondition": "The correct common and state rules are selected for the state, charter and date",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "state_dates",
+            "name": "Dates",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Dates ignored",
+            "partialCredit": "Some dates checked",
+            "passCondition": "Policy effective dates and document validity dates are checked against the application date",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "state_instrument",
+            "name": "State instruments",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Ignored",
+            "partialCredit": "Partly judged",
+            "passCondition": "State-specific documents and IDs are judged under that state's rules",
+            "evaluatorVersion": "1"
+          }
+        ],
+        "scoringRule": "The evaluation is scored on a standard 100-point denominator distributed across core compliance categories:\n\n1. Collection of Customer Name (R-COLLECT-CUSTOMER-NAME) [25 points]: Full credit requires verifying and documenting that customer legal names are collected for all co-applicants on the joint application prior to account opening.\n2. Collection of Physical Address (R-COLLECT-ADDRESS) [25 points]: Full credit requires verifying and documenting the collection of physical residential addresses for all co-applicants prior to account opening.\n3. Confirmation of Pending TIN Application (R-CONFIRM-PENDING-TIN-APPLICATION) [25 points]: Full credit requires confirming that procedures establish an application for a TIN was filed when any co-applicant has applied for but not yet received a TIN, or verifying provided TINs appropriately.\n4. Joint File Quality, Evidence Logging, and Safe Failure Compliance [25 points]: Full credit requires complete documentation for each co-applicant, proper recording of discrepancies or missing records via formal findings, and adherence to safe failure protocols.\n\nCritical Failure Override:\nA critical failure (resulting in an overall score of 0) is triggered if the agent fabricates verification results, fails to flag missing applicant names (R-COLLECT-CUSTOMER-NAME) or addresses (R-COLLECT-ADDRESS), or ignores required confirmation of pending TIN applications (R-CONFIRM-PENDING-TIN-APPLICATION).\n\nPolicy-Dependent Checks:\nAny evaluation criteria contingent on specific runtime governing jurisdictions, banking charters, or regulatory variations that cannot be definitively resolved from provided data remain unscored and must be logged as open findings."
+      },
+      "S8": {
+        "sourcesUsed": "Bank Customer Identification Program (CIP) and Customer Due Diligence (CDD) onboarding guidelines for joint accounts; institutional compliance specifications incorporating rules R-COLLECT-CUSTOMER-NAME, R-COLLECT-ADDRESS, and R-CONFIRM-PENDING-TIN-APPLICATION.",
+        "reviewerNotes": "Draft specification for Joint KYC onboarding and periodic refresh. Incorporates verification requirements across all co-applicants for customer name, address, and confirmation of pending TIN applications where applicable. Full SME review and compliance sign-off are pending; operational testing in golden_kyc_openenv and multi-jurisdictional edge case validations remain required prior to approval."
+      }
+    }
+  },
+  "status": "candidate; not created in ADI Forge QA"
+}

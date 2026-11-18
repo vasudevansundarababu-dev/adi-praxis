@@ -1,0 +1,109 @@
+{
+  "records": [
+    {
+      "title": "Single KYC Onboarding and Refresh",
+      "v7_record_id": "e3e49e8e-b2b0-432d-b7c8-3186de4c52ec",
+      "seq": "42",
+      "content_hash": "be41142403423c1d2fcac35d3daad0a651e0e41f2f0d4fe43df0df7869a5cfe9",
+      "prev_hash": "d639dc62f40758dadafaa9d0782214f87d33f094eef714e2276395dd991dec71",
+      "sme_user_id": "bdee3ef7-b324-4b4d-9eda-9383833d2324",
+      "submitted_at": "2026-11-17T14:44:55.920Z",
+      "reviewer_user_id": "5000eab0-cdf5-43ef-b46d-8f2e4077ebad",
+      "review_decision_at": "2026-11-17T14:59:15.489Z",
+      "rework_count": 0,
+      "carries_to_successor": {
+        "sections": [
+          "S1",
+          "S2",
+          "S3",
+          "S5",
+          "S6",
+          "S7",
+          "S8"
+        ],
+        "not_carried": [
+          "S4"
+        ]
+      }
+    },
+    {
+      "title": "Joint KYC Onboarding and Refresh",
+      "v7_record_id": "9fb80bad-399d-460d-9508-f44d1cd1d125",
+      "seq": "43",
+      "content_hash": "b2247740e10e80f742fbb7f93a30bc442341977f9a138e2d3727030d35cebd28",
+      "prev_hash": "be41142403423c1d2fcac35d3daad0a651e0e41f2f0d4fe43df0df7869a5cfe9",
+      "sme_user_id": "e13e6e97-025d-4233-858e-24572104b426",
+      "submitted_at": "2026-11-17T14:50:12.784Z",
+      "reviewer_user_id": "5000eab0-cdf5-43ef-b46d-8f2e4077ebad",
+      "review_decision_at": "2026-11-17T14:59:38.414Z",
+      "rework_count": 0,
+      "carries_to_successor": {
+        "sections": [
+          "S1",
+          "S2",
+          "S3",
+          "S5",
+          "S6",
+          "S7",
+          "S8"
+        ],
+        "not_carried": [
+          "S4"
+        ]
+      }
+    },
+    {
+      "title": "Minor (joint with adult) KYC",
+      "v7_record_id": "93bca016-bd65-4274-8ffe-f75ee8b25e5d",
+      "seq": "44",
+      "content_hash": "5f6d482438c7130f22de99d7828871c651f7a103ed302dd0b727fc101577702f",
+      "prev_hash": "b2247740e10e80f742fbb7f93a30bc442341977f9a138e2d3727030d35cebd28",
+      "sme_user_id": "ecc54623-3196-4717-a441-c78cf9040733",
+      "submitted_at": "2026-11-17T14:54:24.301Z",
+      "reviewer_user_id": "5000eab0-cdf5-43ef-b46d-8f2e4077ebad",
+      "review_decision_at": "2026-11-17T14:59:58.281Z",
+      "rework_count": 0,
+      "carries_to_successor": {
+        "sections": [
+          "S1",
+          "S2",
+          "S3",
+          "S5",
+          "S6",
+          "S7",
+          "S8"
+        ],
+        "not_carried": [
+          "S4"
+        ]
+      }
+    },
+    {
+      "title": "Custodian KYC Onboarding and Refresh",
+      "v7_record_id": "63e63881-b356-48cd-8c9f-776058a771e7",
+      "seq": "45",
+      "content_hash": "6fe1180ae3ccffef85a8a66d2d5697c42796e269fe3d81c55d9b0174768d530a",
+      "prev_hash": "5f6d482438c7130f22de99d7828871c651f7a103ed302dd0b727fc101577702f",
+      "sme_user_id": "29b3b6cf-caec-4091-b80a-b707029c6dc8",
+      "submitted_at": "2026-11-17T14:58:38.674Z",
+      "reviewer_user_id": "5000eab0-cdf5-43ef-b46d-8f2e4077ebad",
+      "review_decision_at": "2026-11-17T15:00:18.761Z",
+      "rework_count": 0,
+      "carries_to_successor": {
+        "sections": [
+          "S1",
+          "S2",
+          "S3",
+          "S5",
+          "S6",
+          "S7",
+          "S8"
+        ],
+        "not_carried": [
+          "S4"
+        ]
+      }
+    }
+  ],
+  "note": "IDs are ADI Forge internal user IDs. v7 records are append-only and unchanged."
+}

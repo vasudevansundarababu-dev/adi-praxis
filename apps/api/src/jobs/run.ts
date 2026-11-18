@@ -39,6 +39,16 @@ import { grantAppRole } from './grant-app-role';
  * - `marketing-form-v2 <templateId> --requested-by <admin email> [--apply]`: creates the next DRAFT version of the
  *   published VEYRA Hush One template with form veyra-hush-one-launch-v2 (S4 citation visibility declared for RL Gym;
  *   everything else unchanged). An Admin publishes it in the console. Dry run by default.
+ * - `kyc-v8-successor template|project|tasks --requested-by <admin email> [--apply] [--v7-template <id>] [--v7-project <id>]`:
+ *   the KYC v8 successor of the published v7 (kyc-v8-successor.ts): the v8 DRAFT (form kept, TS-24); then, once v8 is
+ *   published, its project with the v7 project's policy documents, the official 31 CFR 1020.220 text and DRAFT rules;
+ *   then, once that rule set is published, the four successor task revisions as submitted work. A person publishes,
+ *   reviews and approves each step in the console. Dry run by default.
+ * - `kyc-v8-readback [--v7-template <id>] [--v7-project <id>]`: read-only IDs, hashes, audit events, actor user IDs and
+ *   roles, receipts and predecessor mapping for the v8 publication and approval records (no names or e-mails).
+ * - `authored-export <projectId> [--apply] [--out <dir>]`: TS-17 offline export of the project's approved tasks as RL
+ *   Gym import ZIPs (praxis.authored-task-export.v1), checked against the archive bounds; never calls RL Gym. Writes to
+ *   <dir>, else to object storage under exports/offline/<projectId>/. Dry run by default.
  * Exits non-zero on failure so Cloud Run retries and alerts.
  */
 const job = process.argv[2];
@@ -177,11 +187,63 @@ try {
     const r = await marketingFormV2(db, { templateId: ids[0]!, requestedBy: by, apply });
     console.log(JSON.stringify({ report: 'marketing-form-v2', apply, ...r }));
     if (r.outcome === 'refused') process.exitCode = 3;
+  } else if (job === 'kyc-v8-successor') {
+    const { parseKycV8Args, successorTemplate, successorProject, successorTasks } = await import('./kyc-v8-successor');
+    const a = parseKycV8Args(process.argv.slice(3));
+    const base = { v7TemplateId: a.v7TemplateId, v7ProjectId: a.v7ProjectId, requestedBy: a.requestedBy, apply: a.apply };
+    let r: { outcome: string };
+    if (a.phase === 'template') r = await successorTemplate(db, base);
+    else if (a.phase === 'project') {
+      const { defaultStorage } = await import('../app');
+      r = await successorProject(db, { storage: defaultStorage(config) }, base);
+    } else r = await successorTasks(db, base);
+    console.log(JSON.stringify({ report: 'kyc-v8-successor', phase: a.phase, apply: a.apply, ...r }));
+    if (r.outcome === 'refused') process.exitCode = 3;
+  } else if (job === 'kyc-v8-readback') {
+    const { KYC_V8_DEFAULTS } = await import('./kyc-v8-successor');
+    const rest = process.argv.slice(3);
+    const opt = (name: string, fallback: string) => (rest.includes(name) ? rest[rest.indexOf(name) + 1]! : fallback);
+    const extra = rest.filter((x, i) => !['--v7-template', '--v7-project'].includes(x) && !['--v7-template', '--v7-project'].includes(rest[i - 1] ?? ''));
+    if (extra.length) throw new Error('Use: kyc-v8-readback [--v7-template <id>] [--v7-project <id>]');
+    const { kycV8Readback } = await import('./kyc-v8-readback');
+    const r = await kycV8Readback(db, { v7TemplateId: opt('--v7-template', KYC_V8_DEFAULTS.v7TemplateId), v7ProjectId: opt('--v7-project', KYC_V8_DEFAULTS.v7ProjectId) });
+    console.log(JSON.stringify(r));
+    if (!r.ok) process.exitCode = 3;
+  } else if (job === 'authored-export') {
+    const rest = process.argv.slice(3);
+    const apply = rest.includes('--apply');
+    const out = rest.includes('--out') ? rest[rest.indexOf('--out') + 1] : undefined;
+    const ids = rest.filter((x, i) => x !== '--apply' && x !== '--out' && rest[i - 1] !== '--out');
+    if (ids.length !== 1 || !/^[0-9a-f-]{36}$/i.test(ids[0]!) || (rest.includes('--out') && !out)) throw new Error('Use: authored-export <projectId> [--apply] [--out <dir>]');
+    const { offlineExport } = await import('./authored-export');
+    const projectId = ids[0]!;
+    let write: (file: string, zip: Buffer) => Promise<string>;
+    if (out) {
+      const { mkdir, writeFile } = await import('node:fs/promises');
+      const { join, resolve } = await import('node:path');
+      write = async (file, zip) => {
+        await mkdir(resolve(out), { recursive: true });
+        const path = join(resolve(out), file);
+        await writeFile(path, zip, { flag: 'wx' });
+        return path;
+      };
+    } else {
+      const { defaultStorage } = await import('../app');
+      const storage = defaultStorage(config);
+      write = async (file, zip) => {
+        const key = `exports/offline/${projectId}/${file}`;
+        await storage.put(key, zip, 'application/zip');
+        return key;
+      };
+    }
+    const r = await offlineExport(db, { projectId, apply, write });
+    console.log(JSON.stringify({ report: 'authored-export', apply, ...r }));
+    if (r.outcome === 'refused') process.exitCode = 3;
   } else if (job === 'catalog-import') {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots | marketing-form-v2`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots | marketing-form-v2 | kyc-v8-successor | kyc-v8-readback | authored-export`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

@@ -1,0 +1,229 @@
+{
+  "changes": [
+    {
+      "title": "Single KYC Onboarding and Refresh",
+      "v7_record_id": "e3e49e8e-b2b0-432d-b7c8-3186de4c52ec",
+      "unchanged_sections": [
+        "S1",
+        "S2",
+        "S3",
+        "S5",
+        "S6",
+        "S7",
+        "S8"
+      ],
+      "changed_sections": [
+        "S4"
+      ],
+      "S4": {
+        "before": {
+          "statePolicies": [
+            {
+              "ruleId": "40377d7f-f4ef-4b3d-aede-5db27f671df1",
+              "locator": "project rule set v1",
+              "appliesTo": "",
+              "exception": "",
+              "rationale": "",
+              "ruleVersion": "rs1.d1",
+              "contentSha256": "a5c0aa26ed48ceda91c4cc8238bb8fde588342626e9e27f1c04bfb0c5be51aea"
+            }
+          ]
+        },
+        "after": {
+          "statePolicies": [
+            {
+              "ruleId": "us-31-cfr-1020.220",
+              "ruleVersion": "ecfr-2026-11-12",
+              "locator": "31 CFR 1020.220(a)(2)(i)(A)(1),(3); (a)(2)(i)(B)",
+              "appliesTo": "",
+              "exception": "",
+              "rationale": "",
+              "contentSha256": "07069b7552403b5b99097a9249d1ed45d940253df1bafa860154e52a097bf1f4"
+            }
+          ],
+          "bankPolicyDocument": {
+            "ruleId": "40377d7f-f4ef-4b3d-aede-5db27f671df1",
+            "locator": "project rule set v1",
+            "appliesTo": "",
+            "exception": "",
+            "rationale": "",
+            "ruleVersion": "rs1.d1",
+            "contentSha256": "a5c0aa26ed48ceda91c4cc8238bb8fde588342626e9e27f1c04bfb0c5be51aea"
+          }
+        },
+        "what": "The policy reference now binds the official 31 CFR 1020.220 text (hash 07069b755240…). The bank policy document it cited before is kept as bankPolicyDocument."
+      },
+      "affects_required_decision_or_outcome": "No. Policy owner assessment 2026-11-18 (APR-11): only the cited source changed; the rules (name, address, pending TIN) and all other sections, including expected outcomes and rubric, are unchanged.",
+      "affects_business_meaning": "Policy basis changed. Original SME approval is NOT extended to S4; S4 approved separately by the policy owner (APR-05)."
+    },
+    {
+      "title": "Joint KYC Onboarding and Refresh",
+      "v7_record_id": "9fb80bad-399d-460d-9508-f44d1cd1d125",
+      "unchanged_sections": [
+        "S1",
+        "S2",
+        "S3",
+        "S5",
+        "S6",
+        "S7",
+        "S8"
+      ],
+      "changed_sections": [
+        "S4"
+      ],
+      "S4": {
+        "before": {
+          "statePolicies": [
+            {
+              "ruleId": "40377d7f-f4ef-4b3d-aede-5db27f671df1",
+              "locator": "project rule set v1",
+              "appliesTo": "",
+              "exception": "",
+              "rationale": "",
+              "ruleVersion": "rs1.d1",
+              "contentSha256": "a5c0aa26ed48ceda91c4cc8238bb8fde588342626e9e27f1c04bfb0c5be51aea"
+            }
+          ]
+        },
+        "after": {
+          "statePolicies": [
+            {
+              "ruleId": "us-31-cfr-1020.220",
+              "ruleVersion": "ecfr-2026-11-12",
+              "locator": "31 CFR 1020.220(a)(2)(i)(A)(1),(3); (a)(2)(i)(B)",
+              "appliesTo": "",
+              "exception": "",
+              "rationale": "",
+              "contentSha256": "07069b7552403b5b99097a9249d1ed45d940253df1bafa860154e52a097bf1f4"
+            }
+          ],
+          "bankPolicyDocument": {
+            "ruleId": "40377d7f-f4ef-4b3d-aede-5db27f671df1",
+            "locator": "project rule set v1",
+            "appliesTo": "",
+            "exception": "",
+            "rationale": "",
+            "ruleVersion": "rs1.d1",
+            "contentSha256": "a5c0aa26ed48ceda91c4cc8238bb8fde588342626e9e27f1c04bfb0c5be51aea"
+          }
+        },
+        "what": "The policy reference now binds the official 31 CFR 1020.220 text (hash 07069b755240…). The bank policy document it cited before is kept as bankPolicyDocument."
+      },
+      "affects_required_decision_or_outcome": "No. Policy owner assessment 2026-11-18 (APR-11): only the cited source changed; the rules (name, address, pending TIN) and all other sections, including expected outcomes and rubric, are unchanged.",
+      "affects_business_meaning": "Policy basis changed. Original SME approval is NOT extended to S4; S4 approved separately by the policy owner (APR-05)."
+    },
+    {
+      "title": "Minor (joint with adult) KYC",
+      "v7_record_id": "93bca016-bd65-4274-8ffe-f75ee8b25e5d",
+      "unchanged_sections": [
+        "S1",
+        "S2",
+        "S3",
+        "S5",
+        "S6",
+        "S7",
+        "S8"
+      ],
+      "changed_sections": [
+        "S4"
+      ],
+      "S4": {
+        "before": {
+          "statePolicies": [
+            {
+              "ruleId": "40377d7f-f4ef-4b3d-aede-5db27f671df1",
+              "locator": "project rule set v1",
+              "appliesTo": "",
+              "exception": "",
+              "rationale": "",
+              "ruleVersion": "rs1.d1",
+              "contentSha256": "a5c0aa26ed48ceda91c4cc8238bb8fde588342626e9e27f1c04bfb0c5be51aea"
+            }
+          ]
+        },
+        "after": {
+          "statePolicies": [
+            {
+              "ruleId": "us-31-cfr-1020.220",
+              "ruleVersion": "ecfr-2026-11-12",
+              "locator": "31 CFR 1020.220(a)(2)(i)(A)(1),(3); (a)(2)(i)(B)",
+              "appliesTo": "",
+              "exception": "",
+              "rationale": "",
+              "contentSha256": "07069b7552403b5b99097a9249d1ed45d940253df1bafa860154e52a097bf1f4"
+            }
+          ],
+          "bankPolicyDocument": {
+            "ruleId": "40377d7f-f4ef-4b3d-aede-5db27f671df1",
+            "locator": "project rule set v1",
+            "appliesTo": "",
+            "exception": "",
+            "rationale": "",
+            "ruleVersion": "rs1.d1",
+            "contentSha256": "a5c0aa26ed48ceda91c4cc8238bb8fde588342626e9e27f1c04bfb0c5be51aea"
+          }
+        },
+        "what": "The policy reference now binds the official 31 CFR 1020.220 text (hash 07069b755240…). The bank policy document it cited before is kept as bankPolicyDocument."
+      },
+      "affects_required_decision_or_outcome": "No. Policy owner assessment 2026-11-18 (APR-11): only the cited source changed; the rules (name, address, pending TIN) and all other sections, including expected outcomes and rubric, are unchanged.",
+      "affects_business_meaning": "Policy basis changed. Original SME approval is NOT extended to S4; S4 approved separately by the policy owner (APR-05)."
+    },
+    {
+      "title": "Custodian KYC Onboarding and Refresh",
+      "v7_record_id": "63e63881-b356-48cd-8c9f-776058a771e7",
+      "unchanged_sections": [
+        "S1",
+        "S2",
+        "S3",
+        "S5",
+        "S6",
+        "S7",
+        "S8"
+      ],
+      "changed_sections": [
+        "S4"
+      ],
+      "S4": {
+        "before": {
+          "statePolicies": [
+            {
+              "ruleId": "40377d7f-f4ef-4b3d-aede-5db27f671df1",
+              "locator": "project rule set v1",
+              "appliesTo": "",
+              "exception": "",
+              "rationale": "",
+              "ruleVersion": "rs1.d1",
+              "contentSha256": "a5c0aa26ed48ceda91c4cc8238bb8fde588342626e9e27f1c04bfb0c5be51aea"
+            }
+          ]
+        },
+        "after": {
+          "statePolicies": [
+            {
+              "ruleId": "us-31-cfr-1020.220",
+              "ruleVersion": "ecfr-2026-11-12",
+              "locator": "31 CFR 1020.220(a)(2)(i)(A)(1),(3); (a)(2)(i)(B)",
+              "appliesTo": "",
+              "exception": "",
+              "rationale": "",
+              "contentSha256": "07069b7552403b5b99097a9249d1ed45d940253df1bafa860154e52a097bf1f4"
+            }
+          ],
+          "bankPolicyDocument": {
+            "ruleId": "40377d7f-f4ef-4b3d-aede-5db27f671df1",
+            "locator": "project rule set v1",
+            "appliesTo": "",
+            "exception": "",
+            "rationale": "",
+            "ruleVersion": "rs1.d1",
+            "contentSha256": "a5c0aa26ed48ceda91c4cc8238bb8fde588342626e9e27f1c04bfb0c5be51aea"
+          }
+        },
+        "what": "The policy reference now binds the official 31 CFR 1020.220 text (hash 07069b755240…). The bank policy document it cited before is kept as bankPolicyDocument."
+      },
+      "affects_required_decision_or_outcome": "No. Policy owner assessment 2026-11-18 (APR-11): only the cited source changed; the rules (name, address, pending TIN) and all other sections, including expected outcomes and rubric, are unchanged.",
+      "affects_business_meaning": "Policy basis changed. Original SME approval is NOT extended to S4; S4 approved separately by the policy owner (APR-05)."
+    }
+  ],
+  "convention": "section hashes are SHA-256 of RFC 8785 JSON of each section"
+}

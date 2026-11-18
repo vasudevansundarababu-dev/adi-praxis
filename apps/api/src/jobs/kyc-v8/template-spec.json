@@ -1,0 +1,2118 @@
+{
+  "schemaVersion": "praxis.anvil.template-spec.v1",
+  "anvil_template_key": "golden-kyc-openenv-v2",
+  "template_id": "6d8f9cae-7c06-4c36-a207-522978d5486b",
+  "version": 8,
+  "requirement": {
+    "summary": "One reusable task per application type: Single, Joint, Minor (joint with adult), Custodian. Shared data, environment and20 evaluators; each application's actual product selects its workflow, and governing state/charter/date select qualified policies. Optional example state never filters cases. Anvil owns immutable selected dataset binding and counts; no per-application tasks or additive coverage quotas.",
+    "reference": "golden-kyc-reusable-application-types-v7",
+    "policy_bindings": {
+      "file": "02-policy/policy-sources.json",
+      "sha256": "f42120545bc2504cc9092b391c7fade06eebc712cf55a6dc1342fd6bcf0cbd66",
+      "applicability": {
+        "file": "02-policy/applicability-decisions.json",
+        "sha256": "94059c9e1a344ace5cc3c75feebf3389bd17a28edb42a2b4d717490d89061f3c",
+        "status": "decided (20 of 20, APR-03a, APR-03)"
+      },
+      "rule_clause_map": {
+        "file": "02-policy/rule-clause-map.json",
+        "sha256": "e4ee8f20e47bb8b51e40372863d1f3d21753b6704604947985195b3271fa3b95",
+        "status": "approved (APR-04)"
+      }
+    },
+    "successor_of": {
+      "template_id": "6d8f9cae-7c06-4c36-a207-522978d5486b",
+      "version": 7,
+      "template_sha256": "c8c4eddfed5d018f69a739bc0280538dd5011ce79d4e52ede77f6e101f248a8d"
+    }
+  },
+  "authoring": {
+    "profile": {
+      "storage": "sections",
+      "version": 3,
+      "contract": {
+        "criteria": "S7.criteria",
+        "policies": null,
+        "objective": [
+          "S1.businessContext",
+          "S1.deliverable"
+        ],
+        "outputsFrom": "template_execution",
+        "actorEvidence": [
+          "S2.inputContract"
+        ],
+        "decisionFields": null,
+        "privateEvidence": [
+          "S8.reviewerNotes"
+        ]
+      },
+      "sections": [
+        {
+          "key": "S1",
+          "help": "Reusable workflow; application cases are runtime inputs.",
+          "title": "Reusable assignment",
+          "fields": [
+            {
+              "key": "title",
+              "help": "One reusable application-type workflow, e.g. Joint KYC. Application count does not create more tasks.",
+              "type": "text",
+              "label": "Task name",
+              "required": true
+            },
+            {
+              "key": "trigger",
+              "help": "New application or refresh; not one application identifier.",
+              "type": "text",
+              "label": "Workflow trigger",
+              "required": true
+            },
+            {
+              "key": "businessContext",
+              "help": "Describe investigation responsibilities across assigned applications, not an individual case answer.",
+              "type": "long_text",
+              "label": "Business context",
+              "required": true
+            },
+            {
+              "key": "deliverable",
+              "help": "Evidence-backed recommendation, findings, unresolved gaps and safe handoff for each assigned application.",
+              "type": "long_text",
+              "label": "Deliverable",
+              "required": true
+            },
+            {
+              "key": "applicationType",
+              "help": "Reusable workflow applicability. Export generates case_selector from this selection; runtime routing uses the application's actual product.",
+              "type": "pick_list",
+              "label": "Application type",
+              "options": [
+                {
+                  "label": "Single",
+                  "value": "individual"
+                },
+                {
+                  "label": "Joint",
+                  "value": "adult_joint"
+                },
+                {
+                  "label": "Minor (joint with adult)",
+                  "value": "teen_joint"
+                },
+                {
+                  "label": "Custodian",
+                  "value": "custodial"
+                }
+              ],
+              "required": true
+            },
+            {
+              "key": "exampleGoverningState",
+              "help": "Optional example/coverage metadata only. It never selects applications or supplies governing law.",
+              "type": "pick_list",
+              "label": "Example governing state",
+              "options": [
+                {
+                  "label": "California",
+                  "value": "CA"
+                },
+                {
+                  "label": "New York",
+                  "value": "NY"
+                },
+                {
+                  "label": "Texas",
+                  "value": "TX"
+                },
+                {
+                  "label": "Florida",
+                  "value": "FL"
+                },
+                {
+                  "label": "Illinois",
+                  "value": "IL"
+                }
+              ],
+              "required": false
+            },
+            {
+              "key": "scope",
+              "help": "The selected application type across all applicable governing states; qualify policies per actual state, charter and application date.",
+              "type": "long_text",
+              "label": "Scope",
+              "required": true
+            },
+            {
+              "key": "language",
+              "help": "Language of the reusable workflow.",
+              "type": "text",
+              "label": "Language",
+              "required": true
+            }
+          ]
+        },
+        {
+          "key": "S2",
+          "help": "Reusable workflow; application cases are runtime inputs.",
+          "title": "Shared runtime inputs",
+          "fields": [
+            {
+              "key": "inputContract",
+              "help": "Anvil assigns one isolated application snapshot per episode from a versioned shared dataset. Retrieve evidence through permitted tools. Do not copy case facts, parties, IDs, expected decisions or dataset counts into this task.",
+              "type": "long_text",
+              "label": "Application input contract",
+              "required": true
+            }
+          ]
+        },
+        {
+          "key": "S3",
+          "help": "Reusable workflow; application cases are runtime inputs.",
+          "title": "Shared environment and tools",
+          "fields": [
+            {
+              "key": "environment",
+              "help": "Anvil provisions the shared environment; every application gets an isolated episode.",
+              "type": "pick_list",
+              "label": "Environment",
+              "options": [
+                {
+                  "label": "Golden KYC OpenEnv",
+                  "value": "golden_kyc_openenv"
+                }
+              ],
+              "required": true
+            },
+            {
+              "key": "tools",
+              "help": "Use the 21 versioned tools from execution.tools. No author-recorded responses are required.",
+              "type": "multi_select",
+              "label": "Permitted tools",
+              "options": [
+                {
+                  "label": "application.read",
+                  "value": "application.read"
+                },
+                {
+                  "label": "policy.read",
+                  "value": "policy.read"
+                },
+                {
+                  "label": "documents.list",
+                  "value": "documents.list"
+                },
+                {
+                  "label": "document.read",
+                  "value": "document.read"
+                },
+                {
+                  "label": "document.compare",
+                  "value": "document.compare"
+                },
+                {
+                  "label": "identity.check",
+                  "value": "identity.check"
+                },
+                {
+                  "label": "document.check",
+                  "value": "document.check"
+                },
+                {
+                  "label": "address.check",
+                  "value": "address.check"
+                },
+                {
+                  "label": "screening.check",
+                  "value": "screening.check"
+                },
+                {
+                  "label": "authority.check",
+                  "value": "authority.check"
+                },
+                {
+                  "label": "operation.lookup",
+                  "value": "operation.lookup"
+                },
+                {
+                  "label": "operation.read",
+                  "value": "operation.read"
+                },
+                {
+                  "label": "information.request",
+                  "value": "information.request"
+                },
+                {
+                  "label": "information.read",
+                  "value": "information.read"
+                },
+                {
+                  "label": "finding.write",
+                  "value": "finding.write"
+                },
+                {
+                  "label": "finding.resolve",
+                  "value": "finding.resolve"
+                },
+                {
+                  "label": "specialist.refer",
+                  "value": "specialist.refer"
+                },
+                {
+                  "label": "specialist.read",
+                  "value": "specialist.read"
+                },
+                {
+                  "label": "search",
+                  "value": "search"
+                },
+                {
+                  "label": "search.read",
+                  "value": "search.read"
+                },
+                {
+                  "label": "recommend",
+                  "value": "recommend"
+                }
+              ],
+              "required": true
+            },
+            {
+              "key": "failureBehaviour",
+              "help": "Handle unavailable, pending, conflicting and refused tool results without invented evidence.",
+              "type": "long_text",
+              "label": "Safe failure behaviour",
+              "required": true
+            }
+          ]
+        },
+        {
+          "key": "S4",
+          "help": "Reusable workflow; application cases are runtime inputs.",
+          "title": "Task policy references and applicability",
+          "fields": [
+            {
+              "key": "statePolicies",
+              "help": "Preserve exact immutable policy identities, versions, content hashes and publication references across this application type's applicable states. No single authored-state restriction applies. Anvil selects common plus state policies for the actual application's governing state, charter and date; missing content or applicability is an Anvil provisioning/review blocker. Do not invent policies or approvals.",
+              "type": "repeated_array",
+              "label": "State policy references",
+              "required": true,
+              "itemFields": [
+                {
+                  "key": "ruleId",
+                  "help": "Stable published policy identity.",
+                  "type": "text",
+                  "label": "Policy ID",
+                  "required": true
+                },
+                {
+                  "key": "ruleVersion",
+                  "help": "Exact immutable source version.",
+                  "type": "text",
+                  "label": "Version",
+                  "required": true
+                },
+                {
+                  "key": "locator",
+                  "help": "Exact published source or clause locator.",
+                  "type": "text",
+                  "label": "Publication reference",
+                  "required": true
+                },
+                {
+                  "key": "contentSha256",
+                  "help": "Hash of the exact versioned policy content supplied by its publisher; never invent one.",
+                  "type": "text",
+                  "label": "Content SHA-256",
+                  "required": true
+                },
+                {
+                  "key": "appliesTo",
+                  "help": "Private reviewer context; never supplied to the actor.",
+                  "type": "long_text",
+                  "label": "Applicability",
+                  "visibility": "private_reference"
+                },
+                {
+                  "key": "rationale",
+                  "help": "Private reviewer context; never supplied to the actor.",
+                  "type": "long_text",
+                  "label": "Rationale",
+                  "visibility": "private_reference"
+                },
+                {
+                  "key": "exception",
+                  "help": "Private reviewer context; never supplied to the actor.",
+                  "type": "long_text",
+                  "label": "Exceptions",
+                  "visibility": "private_reference"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "S5",
+          "help": "Reusable workflow; application cases are runtime inputs.",
+          "title": "Reusable procedure",
+          "fields": [
+            {
+              "key": "steps",
+              "help": "Describe reusable steps and declared tool names, including pending work, follow-up, evidence reconciliation and safe escalation. No case findings or expected answers.",
+              "type": "repeated_array",
+              "label": "Investigation procedure",
+              "required": true,
+              "itemFields": [
+                {
+                  "key": "action",
+                  "help": "Reusable investigation step.",
+                  "type": "long_text",
+                  "label": "Action",
+                  "required": true
+                },
+                {
+                  "key": "tool",
+                  "help": "Declared native tool name where relevant.",
+                  "type": "text",
+                  "label": "Tool"
+                },
+                {
+                  "key": "failureBehaviour",
+                  "help": "What to do when evidence or a tool result is missing.",
+                  "type": "long_text",
+                  "label": "Failure handling"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "S6",
+          "help": "Reusable workflow; application cases are runtime inputs.",
+          "title": "Output contract",
+          "fields": [
+            {
+              "key": "outputContract",
+              "help": "Describe the recommendation and supporting evidence format, unresolved gaps and human handoff. The execution output schema is authoritative. Do not enter an expected recommendation.",
+              "type": "long_text",
+              "label": "Required output",
+              "required": true
+            }
+          ]
+        },
+        {
+          "key": "S7",
+          "help": "Reusable workflow; application cases are runtime inputs.",
+          "title": "Shared evaluator rubric",
+          "fields": [
+            {
+              "key": "criteria",
+              "help": "Use the accompanying exact criterion map: weight 5 each, pass 5 / partial 2 / fail 0. Run-evidence evaluators grade actual executions; no per-case reference answers belong in this task. Each criterion carries evidenceRefs (empty array is permitted for runtime-derived evidence).",
+              "type": "criterion",
+              "label": "Twenty shared criteria",
+              "required": true,
+              "visibility": "private_rubric"
+            },
+            {
+              "key": "scoringRule",
+              "help": "Full 100-point denominator, existing critical-failure override, unresolved policy-dependent checks unscored. Do not replace the evaluator contract.",
+              "type": "long_text",
+              "label": "Scoring rule",
+              "required": true,
+              "visibility": "private_rubric"
+            }
+          ]
+        },
+        {
+          "key": "S8",
+          "help": "Reusable workflow; application cases are runtime inputs.",
+          "title": "Provenance and review",
+          "fields": [
+            {
+              "key": "sourcesUsed",
+              "help": "Versioned public sources and provenance for the reusable workflow.",
+              "type": "long_text",
+              "label": "Sources",
+              "required": true
+            },
+            {
+              "key": "reviewerNotes",
+              "help": "Record real review status, limitations and unresolved applicability. Never fabricate approval.",
+              "type": "long_text",
+              "label": "Reviewer notes",
+              "visibility": "private_reference"
+            }
+          ]
+        }
+      ],
+      "agentMode": "SINGLE",
+      "profileId": "golden-kyc-application-type-v1",
+      "templateId": "BK14",
+      "titleField": "title",
+      "domainPlugin": null,
+      "handoverName": "Reusable application-type KYC workflow with shared application cases",
+      "schemaVersion": "praxis.template_profile.v1",
+      "contractStatus": "requires_confirmation",
+      "exportCapabilities": {
+        "formats": [
+          "praxis.authored-task-export.v1"
+        ],
+        "blockers": [
+          "Exact published template and Anvil runtime/policy qualification required"
+        ],
+        "executable": false
+      },
+      "catalogWorkflowName": "KYC onboarding and refresh"
+    },
+    "examples": [],
+    "template": {
+      "skills": [
+        "Consumer deposit KYC",
+        "Evidence based investigation",
+        "Policy interpretation",
+        "Rubric design"
+      ],
+      "humanGate": "Authoring PM/Admin approves task revisions; an optional external Reviewer may precede final approval. Every task in a project must be approved for project export. Template publication does not approve tasks, qualify Anvil execution, or resolve policy applicability/data-rights review.",
+      "taskModes": [
+        "AUTHORING"
+      ],
+      "domainName": "Banking",
+      "primaryWork": "Investigate each application assigned to this reusable application-type KYC workflow through the shared isolated environment; produce one evidence-backed recommendation per application.",
+      "caseSelector": {
+        "field": "product",
+        "source": "S1.applicationType",
+        "values": [
+          "individual",
+          "adult_joint",
+          "teen_joint",
+          "custodial"
+        ]
+      },
+      "edgeCaseCatalog": [],
+      "defaultTptMinutes": 45,
+      "coverageDimensions": {},
+      "verificationCriteria": "20 checks at5points each, explicit5/2/0anchors, full100pointdenominator, critical failure override. Anvil evaluates sealed state, recommendation, policy, trace and independent expectations; missing legal/human qualification stays unscored."
+    }
+  },
+  "execution": {
+    "reset": "new_episode",
+    "rules": [
+      {
+        "id": "GB-01",
+        "version": "golden-kyc-1.0.0",
+        "content_sha256": "a2a57b1a029f043341b3aaaa8d6f423f79e8cb4bd73dfcd258a433063893670e",
+        "publication_ref": "Golden Bank approved operating choices; separate legal review pending"
+      },
+      {
+        "id": "GB-02",
+        "version": "golden-kyc-1.0.0",
+        "content_sha256": "a99b6a2ef148f8369993a2854140e5cd3284224a01c5167c97bd39cd1d824336",
+        "publication_ref": "Golden Bank approved operating choices; separate legal review pending"
+      },
+      {
+        "id": "GB-03",
+        "version": "golden-kyc-1.0.0",
+        "content_sha256": "f7e06ef20d3404a24be036f174902ce47ce7d898aeec2cdcd6631b81be975172",
+        "publication_ref": "Golden Bank approved operating choices; separate legal review pending"
+      },
+      {
+        "id": "GB-04",
+        "version": "golden-kyc-1.0.0",
+        "content_sha256": "7c61bb9474d8763e7b4b1b12d1e37708c4f3ee9701204726264b54c9124af766",
+        "publication_ref": "Golden Bank approved operating choices; separate legal review pending"
+      },
+      {
+        "id": "GB-05",
+        "version": "golden-kyc-1.0.0",
+        "content_sha256": "e5b8d9938ea07e1645ddb988d5e0a267af90cfa0ff262b5ac59241d0e784f3cb",
+        "publication_ref": "Golden Bank approved operating choices; separate legal review pending"
+      },
+      {
+        "id": "GB-06",
+        "version": "golden-kyc-1.0.0",
+        "content_sha256": "c49aa8959e9f5fe8c416f26307bfd320247d4175b62d942b9b99bf248d175847",
+        "publication_ref": "Golden Bank approved operating choices; separate legal review pending"
+      },
+      {
+        "id": "GB-07",
+        "version": "golden-kyc-1.0.0",
+        "content_sha256": "e48e61600265288e1e68fcd51616e1233495ef9583f576744183d3c48dc2ffe9",
+        "publication_ref": "Golden Bank approved operating choices; separate legal review pending"
+      }
+    ],
+    "tools": [
+      {
+        "id": "application.read",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "revision": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "policy.read",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {},
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "documents.list",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {},
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "document.read",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "document.compare",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "document_ids"
+          ],
+          "properties": {
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 10
+            },
+            "document_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 10
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "identity.check",
+        "reset": "new_episode",
+        "pending": true,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "idempotency_key",
+            "party_id",
+            "input_revision"
+          ],
+          "properties": {
+            "party_id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            },
+            "document_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 10
+            },
+            "input_revision": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "idempotency_key": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": [
+          429,
+          503
+        ]
+      },
+      {
+        "id": "document.check",
+        "reset": "new_episode",
+        "pending": true,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "idempotency_key",
+            "party_id",
+            "input_revision"
+          ],
+          "properties": {
+            "party_id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            },
+            "document_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 10
+            },
+            "input_revision": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "idempotency_key": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": [
+          429,
+          503
+        ]
+      },
+      {
+        "id": "address.check",
+        "reset": "new_episode",
+        "pending": true,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "idempotency_key",
+            "party_id",
+            "input_revision"
+          ],
+          "properties": {
+            "party_id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            },
+            "document_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 10
+            },
+            "input_revision": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "idempotency_key": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": [
+          429,
+          503
+        ]
+      },
+      {
+        "id": "screening.check",
+        "reset": "new_episode",
+        "pending": true,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "idempotency_key",
+            "party_id",
+            "input_revision"
+          ],
+          "properties": {
+            "party_id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            },
+            "document_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 10
+            },
+            "input_revision": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "idempotency_key": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": [
+          429,
+          503
+        ]
+      },
+      {
+        "id": "authority.check",
+        "reset": "new_episode",
+        "pending": true,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "idempotency_key",
+            "party_id",
+            "input_revision"
+          ],
+          "properties": {
+            "party_id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            },
+            "document_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 10
+            },
+            "input_revision": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "idempotency_key": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": [
+          429,
+          503
+        ]
+      },
+      {
+        "id": "operation.lookup",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "idempotency_key"
+          ],
+          "properties": {
+            "idempotency_key": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "operation.read",
+        "reset": "new_episode",
+        "pending": true,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "information.request",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "party_id",
+            "items",
+            "reason"
+          ],
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 4
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 10
+            },
+            "party_id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            },
+            "round_key": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "information.read",
+        "reset": "new_episode",
+        "pending": true,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "finding.write",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "issue",
+            "evidence_ids"
+          ],
+          "properties": {
+            "issue": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 5
+            },
+            "evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 100
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "finding.resolve",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "id",
+            "reason",
+            "evidence_ids"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 10
+            },
+            "evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 100
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "specialist.refer",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "question",
+            "evidence_ids"
+          ],
+          "properties": {
+            "question": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 10
+            },
+            "evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 100
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "specialist.read",
+        "reset": "new_episode",
+        "pending": true,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "search",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "query",
+            "purpose",
+            "source"
+          ],
+          "properties": {
+            "query": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            },
+            "purpose": {
+              "type": "string",
+              "maxLength": 300,
+              "minLength": 5
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "search.read",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "resource_id"
+          ],
+          "properties": {
+            "resource_id": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      },
+      {
+        "id": "recommend",
+        "reset": "new_episode",
+        "pending": false,
+        "isolation": "per_episode",
+        "error_schema": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "status": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "input_schema": {
+          "type": "object",
+          "required": [
+            "decision",
+            "assessed_revision",
+            "evidence_ids",
+            "party_assessments",
+            "reason",
+            "policy_bundle"
+          ],
+          "properties": {
+            "reason": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 10
+            },
+            "decision": {
+              "enum": [
+                "ready_for_approval",
+                "request_information",
+                "specialist_review",
+                "not_eligible_for_requested_product"
+              ],
+              "type": "string"
+            },
+            "account_type": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            },
+            "evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 100
+            },
+            "policy_bundle": {
+              "type": "string",
+              "const": "golden-kyc-1.0.0"
+            },
+            "assessed_revision": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "party_assessments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "party_id",
+                  "role",
+                  "status"
+                ],
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "minLength": 1
+                  },
+                  "status": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "minLength": 1
+                  },
+                  "party_id": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "minLength": 1
+                  },
+                  "verification_evidence_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000,
+                      "minLength": 1
+                    },
+                    "maxItems": 100
+                  }
+                },
+                "additionalProperties": true
+              },
+              "maxItems": 10
+            },
+            "outstanding_actions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              "maxItems": 100
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "completed",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "response_mode": "environment",
+        "error_statuses": []
+      }
+    ],
+    "limits": {
+      "tool_calls": 100,
+      "transitions": 100,
+      "output_bytes": 32768,
+      "wall_seconds": 900
+    },
+    "network": "none",
+    "isolation": "per_episode",
+    "evaluators": [
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "identification_parties",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "identification_verification",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "profile",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "screening",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "decision",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "next_action",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "evidence",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "revision_integrity",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "account_structure",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "account_roles",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "account_eligibility",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "account_agreements",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "account_authority",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "account_party_separation",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "account_exceptions",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "account_resolution",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "state_applicability",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "state_rule_selection",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "state_dates",
+        "evidence_source": "run_evidence"
+      },
+      {
+        "capability": {
+          "id": "golden-kyc-rubric-v1",
+          "version": "1"
+        },
+        "criterion_id": "state_instrument",
+        "evidence_source": "run_evidence"
+      }
+    ],
+    "paid_calls": false,
+    "environment": {
+      "id": "golden-kyc-openenv-v2",
+      "version": "2"
+    },
+    "output_schema": {
+      "type": "object",
+      "required": [
+        "recommendation"
+      ],
+      "properties": {
+        "recommendation": {
+          "enum": [
+            "ready_for_approval",
+            "request_information",
+            "specialist_review",
+            "not_eligible_for_requested_product"
+          ],
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "schema_version": "anvil.template-execution.v2",
+    "federalPolicies": [
+      {
+        "id": "federal-cip-source-reference",
+        "version": "reference-2026-11-12",
+        "content_sha256": "0c05f57ab53f1e4dcc382a291909bcb8f2a068e924d9dd5c750221ff606af3fe",
+        "publication_ref": "https://www.ecfr.gov/current/title-31/subtitle-B/chapter-X/part-1020/subpart-B/section-1020.220"
+      },
+      {
+        "id": "us-31-cfr-1020.220",
+        "version": "ecfr-2026-11-12",
+        "content_sha256": "07069b7552403b5b99097a9249d1ed45d940253df1bafa860154e52a097bf1f4",
+        "publication_ref": "https://www.ecfr.gov/current/title-31/subtitle-B/chapter-X/part-1020/subpart-B/section-1020.220"
+      }
+    ],
+    "graph_node_types": [],
+    "catalogue_version": "1.2.0",
+    "conformance_output": {
+      "recommendation": "request_information"
+    }
+  },
+  "skills": {
+    "authoring": {
+      "languages": [
+        "en"
+      ],
+      "mandatory": [
+        "Consumer deposit KYC",
+        "Evidence based investigation"
+      ],
+      "preferred": [
+        "Consumer account ownership and capacity"
+      ],
+      "specialties": [
+        "Individual, joint, teen and custodial deposit applications"
+      ],
+      "jurisdictions": [
+        "US-CA",
+        "US-NY",
+        "US-TX",
+        "US-FL",
+        "US-IL"
+      ],
+      "certifications": []
+    },
+    "reviewing": {
+      "languages": [
+        "en"
+      ],
+      "mandatory": [
+        "Consumer deposit KYC",
+        "Independent rubric review"
+      ],
+      "preferred": [
+        "State law and charter applicability review"
+      ],
+      "specialties": [
+        "Evidence provenance and agent safety"
+      ],
+      "jurisdictions": [
+        "US-CA",
+        "US-NY",
+        "US-TX",
+        "US-FL",
+        "US-IL"
+      ],
+      "certifications": []
+    },
+    "schema_version": "anvil.template-skills.v1"
+  }
+}

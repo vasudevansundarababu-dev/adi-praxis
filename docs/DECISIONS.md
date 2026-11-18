@@ -2164,3 +2164,77 @@ proxy limit.
   long. Try again." (other failures stay `SUGGESTIONS_UNAVAILABLE`). The web and candidate proxies now answer a 30 s
   timeout with `504 UPSTREAM_TIMEOUT` instead of "Could not reach the service"; the suggestion box shows the same
   "took too long" message for both. The AI still only suggests: nothing is filled in or confirmed for the author.
+
+## KYC v8: successor of the published v7, successor task revisions, offline export (18 Nov 2026)
+
+RL Gym asked (18 Nov) for a KYC v8 successor of the published v7 with complete policy bindings, and reviewed the
+offline candidate package. Its findings: v8 must really be published, `TP_FORM_ID_TAKEN` resolved through a successor
+or version path, the four successor revisions really created with review provenance, and the export must be the real
+import ZIP. The owner (Product Owner and policy owner) approved a one-time migration exception (APR-01) and every policy
+decision (APR-02 to APR-06, APR-09). Code: `apps/api/src/jobs/kyc-v8-successor.ts`, `authored-export.ts`,
+`kyc-v8-readback.ts`; inputs embedded in `apps/api/src/jobs/kyc-v8/`.
+
+- **(chosen by Claude)** **TS-24: a successor version keeps an identical form's ID.** A new version of an existing
+  workflow (proposal, validate, the Marketing and KYC jobs) may reuse a form ID when its form has the same RFC 8785
+  SHA-256 as the form registered under that ID, for the same workflow and client, and a PUBLISHED version of that client
+  uses it. The registered form row is reused (audited `template_profile.reused`); no second row is written. A changed
+  form, an unpublished one, another workflow's or a built-in form is still `TP_FORM_ID_TAKEN`. Console pack uploads
+  keep the old rule. v7 is never edited.
+- **(chosen by Claude)** **Inputs embedded, not uploaded.** The v8 spec from the offline package (rev 2, JCS SHA-256
+  `8449adb0…`), the four successor candidates, ID map, approvals, change report and the official text of
+  31 CFR 1020.220 (eCFR as of 12 Nov 2026, SHA-256 `07069b75…`, public domain) are files in the job directory, so the
+  Cloud Run job needs no upload. The job checks every identity it relies on (template ID, version, predecessor hash,
+  anvil key, record and task IDs, content hashes) and refuses on any difference.
+- **(owner, 18 Nov, via the DevOps session)** **Package rev 2 replaces the hash RL Gym reviewed.** Rev 1 (`fb9a4aa7…`)
+  carried stale labels in `requirement.policy_bindings` (applicability `pending`, rule map `draft`). Rev 2 says
+  applicability decided 20 of 20 (APR-03a, APR-03) and the rule map approved (APR-04), so v8 hashes to `8449adb0…`.
+  Publishing v8 in QA is the decision now; RL Gym asked for every hash to be recomputed at publication. Rev 2 also
+  records APR-11 (the policy owner's assessment: the S4 change has no impact on required decision, outcome or business
+  meaning) and APR-12 (the owner's approval to create v8 and the successors in QA).
+- **(chosen by Claude)** **Three phases, a person between each.** `kyc-v8-successor template` creates the v8 DRAFT
+  (the exact spec hash is verified after creation, else rolled back) → an Admin publishes v8 in the console →
+  `kyc-v8-successor project` creates the v8 project → an Admin reviews the rules and publishes the rule set →
+  `kyc-v8-successor tasks` creates the successor revisions as submitted work → an Admin approves each in the console.
+  Every phase: dry run by default, `--apply`, `--requested-by <active Admin>`, idempotent, audited (actor SYSTEM
+  `kyc-v8-successor`, with the requesting Admin's user ID).
+- **(chosen by Claude)** **How S4 binds the official text: the native policy library.** Today S4 references are checked
+  against the project policy library (`policy.library-reference`: document ID as `ruleId`, `rsN.dM` version,
+  `project rule set vN` locator and the document version's SHA-256; a warning) and the export accepts any S4 the form
+  allows. The candidate's `ruleId: us-31-cfr-1020.220` would fail that check, and its extra `bankPolicyDocument` field is
+  not a field of the (unchanged) form. So the v8 project holds the official text as a project policy document (the
+  exact bytes, so its SHA-256 is `07069b75…`), and the successor's S4 `statePolicies` lists two library references:
+  the official text first, then the bank policy document the v7 task cited (same SHA-256 `a5c0aa…` as v7, its new
+  document ID in the v8 project). Same hashes as the candidate; identities are the project's own; private notes kept.
+- **(chosen by Claude)** **Rules are re-reviewed, never carried as reviewed.** Projects are isolated, so the v7
+  project's published rules are copied to the v8 project as DRAFT rules on byte-identical copies of their documents.
+  The three rules the policy owner mapped to the regulation (APR-04: R-COLLECT-CUSTOMER-NAME → (a)(2)(i)(A)(1),
+  R-COLLECT-ADDRESS → (A)(3), R-CONFIRM-PENDING-TIN-APPLICATION → (B)) also cite a verbatim passage of the official
+  text. A person reviews them and publishes the rule set; the successor tasks wait for that.
+- **(chosen by Claude)** **The v8 project mirrors the v7 project with two differences.** Same owner, JDs, dates, target,
+  per-task cap and demographic filters; one task per application type. The review route is SME → PM/Admin (the console
+  approval is the human decision RL Gym asked for; the original Reviewer's pass is lineage), and no authoring experience
+  is set (nobody authors in this project).
+- **(chosen by Claude)** **Successor revisions arrive as submitted work, never as approvals.** Sections S1–S3 and S5–S8
+  are taken from the approved v7 record and must equal the candidate's verbatim (else refused); only S4 changes. The
+  task is assigned to the original SME's candidate record (their content), status SUBMITTED, with one submission,
+  a frozen policy snapshot and the input field `successorOf`: predecessor record, task, project, template version and
+  content hash, original SME (candidate and SME user IDs) and reviewer IDs and times, carried and changed sections, the
+  approvals APR-01, APR-04, APR-05, APR-11 and APR-12 by reference (the job refuses if any is missing from the approval
+  records), and the candidate file's hash. The checks an approval re-runs (D18, author
+  attestations excepted: those belong to the predecessor's submission) must pass before anything is written. The job
+  never writes an `ApprovedTaskRecord` and never extends an old approval: a person approves each revision in the
+  console, which writes the record with their user ID, and that record's opaque review receipt is what the export
+  carries. The change report's "decision/outcome impact: not assessed" entries are resolved by APR-11 (no impact;
+  citation source changed only); the console approval is still the decision on each complete revision.
+- **(chosen by Claude)** **TS-17 offline export: `authored-export <projectId> [--apply] [--out <dir>]`.** Builds the
+  project's current approved tasks with the same `buildGenericPackages` as the online export (root
+  `praxis-export.json`, declared form, actor and private files, exact template and record references,
+  `execution {location: anvil_only, paid_calls: false}`), then checks every ZIP against RL Gym's archive bounds (1 MiB
+  compressed, 30 MiB expanded, 10 MiB per file, 1200 entries, safe unique paths, STORE or DEFLATE, no encryption) and
+  against its own manifest (every declared file present with its JCS SHA-256, nothing undeclared). Writes to a
+  directory (never overwriting) or to object storage under `exports/offline/<projectId>/`. Never calls RL Gym.
+- **(chosen by Claude)** **Readback: `kyc-v8-readback`.** Read-only JSON for the DevOps publication and approval
+  records: v7 and v8 IDs, status, publication time, template and part hashes, form ID; the v8 project's policy
+  documents and rule sets; for each successor its predecessor mapping, submissions, reviews and approved records
+  (record ID, sequence, content and previous hash, receipt reference) and audit events, with actor user IDs and roles
+  only (no names or e-mails).

@@ -1,0 +1,444 @@
+{
+  "schema": "adi-forge.successor-task-revision.v1 (offline candidate)",
+  "successor_of_record_id": "e3e49e8e-b2b0-432d-b7c8-3186de4c52ec",
+  "successor_of_task_id": "c4f7ada2-d15e-45c1-8532-7c88b57e98d9",
+  "template": {
+    "template_id": "6d8f9cae-7c06-4c36-a207-522978d5486b",
+    "version": 8,
+    "template_sha256": "8449adb008b6ecea7858b594dd5765f60b9b9596b57568d25f5e0598a334f7d5",
+    "status": "candidate"
+  },
+  "title": "Single KYC Onboarding and Refresh",
+  "input": {
+    "slot": {
+      "id": "1e97c15a-6be8-44c7-ad45-ec2f6149b788",
+      "case": {
+        "field": "product",
+        "label": "Single",
+        "value": "individual",
+        "source": "S1.applicationType"
+      },
+      "tags": {
+        "product": "individual"
+      },
+      "brief": "Application type: Single. Write this reusable task for Single only; set Application type to Single.",
+      "isOpen": false,
+      "edgeCase": null
+    }
+  },
+  "output": {
+    "header": {
+      "title": "Single KYC Onboarding and Refresh"
+    },
+    "profile": {
+      "id": "golden-kyc-application-type-v1",
+      "version": 3
+    },
+    "sections": {
+      "S1": {
+        "scope": "All individual single-applicant accounts undergoing initial onboarding or periodic refresh across applicable jurisdictions, applying relevant jurisdictional compliance standards, organizational charter mandates, and policy versions effective on the application or review date.",
+        "title": "Single KYC Onboarding and Refresh",
+        "trigger": "Receipt of a new single-applicant account application or scheduled periodic KYC refresh trigger.",
+        "language": "English",
+        "deliverable": "A structured KYC assessment report for each assigned single application, containing verified identity attributes, screening results, documented risk indicators, identified information gaps, and an evidence-backed onboarding or refresh recommendation with handoff notes for compliance review.",
+        "applicationType": "individual",
+        "businessContext": "Investigate and verify individual customer identity documentation, perform required screening checks (sanctions, PEP, and adverse media), assess customer risk profiles, and reconcile customer-provided data against authoritative data sources across all assigned single-applicant applications.",
+        "exampleGoverningState": ""
+      },
+      "S2": {
+        "inputContract": "Each episode provides an isolated single-applicant case record containing customer-submitted identity attributes (full legal name, date of birth, residential address, nationality, and tax/government identification details), submitted identity verification documents (such as government-issued photo identification and proof of address records), and application metadata specifying the jurisdiction, channel, and review type (initial onboarding or periodic refresh). Access authoritative registry records, electronic identity verification (eIDV) data, and sanctions/PEP/adverse media screening feeds exclusively via assigned workflow retrieval tools."
+      },
+      "S3": {
+        "tools": [
+          "application.read",
+          "policy.read",
+          "documents.list",
+          "document.read",
+          "document.compare",
+          "identity.check",
+          "operation.read",
+          "specialist.read",
+          "search",
+          "operation.lookup",
+          "specialist.refer",
+          "authority.check",
+          "finding.resolve",
+          "finding.write",
+          "screening.check",
+          "address.check",
+          "information.read",
+          "recommend",
+          "search.read",
+          "information.request",
+          "document.check"
+        ],
+        "environment": "golden_kyc_openenv",
+        "failureBehaviour": "If any tool, registry lookup, or external check is unavailable, times out, or returns an error, do not fabricate or infer missing data. Record the failure explicitly as an open finding detailing which verification step could not be completed. For pending asynchronous responses, check back via lookup operations; if still unresolved, document the incomplete status rather than concluding verification. When encountering conflicting records between customer submissions and verification sources, log the discrepancy as an evidence conflict without guessing the correct value. Where verification checks refuse execution, fail, or produce inconclusive results, issue an information request for supplementary documentation or refer the case to a compliance specialist for manual review, highlighting the specific unverified attributes."
+      },
+      "S4": {
+        "statePolicies": [
+          {
+            "ruleId": "us-31-cfr-1020.220",
+            "ruleVersion": "ecfr-2026-11-12",
+            "locator": "31 CFR 1020.220(a)(2)(i)(A)(1),(3); (a)(2)(i)(B)",
+            "appliesTo": "",
+            "exception": "",
+            "rationale": "",
+            "contentSha256": "07069b7552403b5b99097a9249d1ed45d940253df1bafa860154e52a097bf1f4"
+          }
+        ],
+        "bankPolicyDocument": {
+          "ruleId": "40377d7f-f4ef-4b3d-aede-5db27f671df1",
+          "locator": "project rule set v1",
+          "appliesTo": "",
+          "exception": "",
+          "rationale": "",
+          "ruleVersion": "rs1.d1",
+          "contentSha256": "a5c0aa26ed48ceda91c4cc8238bb8fde588342626e9e27f1c04bfb0c5be51aea"
+        }
+      },
+      "S5": {
+        "steps": [
+          {
+            "tool": "get_application_record",
+            "action": "Retrieve customer application record, metadata, and customer-provided documentation (such as government-issued photo identification and proof of address) from the case repository.",
+            "failureBehaviour": "If case records or identity documents are inaccessible or missing, record an intake data gap and flag the case for document re-solicitation."
+          },
+          {
+            "tool": "verify_identity_documents",
+            "action": "Perform document authenticity validation and attribute extraction on submitted identity documents to verify document integrity, expiration status, and baseline customer attributes.",
+            "failureBehaviour": "If document verification times out or indicates potential tampering or unreadable formatting, log the document anomaly as an open verification issue without inferring data."
+          },
+          {
+            "tool": "lookup_identity_registry",
+            "action": "Cross-reference customer identity attributes (full legal name, date of birth, residential address, and tax/government identification numbers) against authoritative identity registries and electronic identity verification (eIDV) data sources.",
+            "failureBehaviour": "If the registry service is unavailable or returns no match, record the lookup failure and note the specific unverified attributes as open evidence gaps."
+          },
+          {
+            "tool": "screen_watchlists_and_pep",
+            "action": "Execute screening checks against sanctions lists, Politically Exposed Persons (PEP) registries, and adverse media databases using customer identifiers and known aliases.",
+            "failureBehaviour": "If screening services are unreachable or return pending asynchronous statuses, re-check via status lookup; if unresolved, log the screening check as incomplete and flag for manual compliance review."
+          },
+          {
+            "tool": "submit_kyc_assessment",
+            "action": "Reconcile collected verification records against customer-provided data, identify any discrepancies or risk indicators, and compile the structured KYC assessment report with an evidence-backed recommendation and handoff notes.",
+            "failureBehaviour": "If discrepancies or incomplete verification checks remain, document all conflicting evidence and unresolved items clearly in the report rather than guessing a resolution, and route for escalation."
+          }
+        ]
+      },
+      "S6": {
+        "outputContract": "Provide a structured KYC assessment report conforming to the authoritative execution output schema for the individual applicant. The deliverable must contain:\n\n1. Applicant Verification Summary: Reconciled legal identity attributes (full legal name, date of birth, residential address, nationality, and tax/national ID) alongside document validation findings and authoritative registry/eIDV match results.\n2. Watchlist & Screening Findings: Detailed results from sanctions, PEP, and adverse media screenings, including query parameters, match confidence, clearing rationales, or potential match summaries.\n3. Risk Evaluation & Evidence Base: Identified customer risk factors, jurisdictional/geographic risk ratings, and corroborated source of wealth/funds data with citations to supporting documentation.\n4. Information Gaps & Discrepancies: An explicit log of any unverified fields, document validation anomalies, conflicting data points across sources, or unavailable third-party services encountered during the review.\n5. Case Recommendation & Compliance Handoff: A documented, evidence-backed onboarding or refresh recommendation based strictly on policy rules, accompanied by concise handoff notes outlining high-risk triggers, open flags, or specific areas requiring manual compliance adjudication."
+      },
+      "S7": {
+        "criteria": [
+          {
+            "id": "identification_parties",
+            "name": "All parties identified",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Parties missed or invented",
+            "partialCredit": "Most parties identified; a secondary party or role missing",
+            "passCondition": "Every owner, signer and authorised party in the snapshot is identified with their role",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "identification_verification",
+            "name": "Identity verified",
+            "weight": 5,
+            "critical": true,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "No verification, or verification is assumed",
+            "partialCredit": "Verification done for some parties, or the results are incomplete",
+            "passCondition": "Each party's identity is verified with documentary or non-documentary checks, and the results are recorded",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "profile",
+            "name": "Customer profile",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Profile missing or invented",
+            "partialCredit": "Profile partly recorded",
+            "passCondition": "Expected activity, source of funds and purpose recorded from the evidence",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "screening",
+            "name": "Sanctions and watchlist screening",
+            "weight": 5,
+            "critical": true,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Screening missing for any party",
+            "partialCredit": "Screening done but a hit is left unresolved",
+            "passCondition": "Every party is screened with screening.check, and hits are resolved or escalated",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "decision",
+            "name": "Recommendation",
+            "weight": 5,
+            "critical": true,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Contradicts the evidence or policy",
+            "partialCredit": "Defensible but weakly supported",
+            "passCondition": "The recommendation matches the evidence and policy, using an allowed value",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "next_action",
+            "name": "Next action",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "No next step",
+            "partialCredit": "A next step is vague",
+            "passCondition": "A clear next step or handoff is stated for the recommendation",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "evidence",
+            "name": "Evidence cited",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Findings without evidence",
+            "partialCredit": "Some findings are uncited",
+            "passCondition": "Every finding cites the documents or tool results it relies on",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "revision_integrity",
+            "name": "Revisions handled",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "A stale or conflicting version is used without noting it",
+            "partialCredit": "Revision noticed but not fully reconciled",
+            "passCondition": "Changed or newer documents are reconciled with document.compare and the latest version is used",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_structure",
+            "name": "Account structure",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Wrong structure",
+            "partialCredit": "Mostly correct, with a detail missed",
+            "passCondition": "The product structure (single, joint, minor or custodial) is identified correctly",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_roles",
+            "name": "Roles on the account",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Roles wrong",
+            "partialCredit": "One role unclear",
+            "passCondition": "Owner, joint owner, custodian or minor roles are assigned correctly",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_eligibility",
+            "name": "Eligibility",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Not checked",
+            "partialCredit": "Partly checked",
+            "passCondition": "Age, capacity and residency eligibility are checked against policy",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_agreements",
+            "name": "Agreements",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Agreements ignored",
+            "partialCredit": "One agreement not confirmed",
+            "passCondition": "Required agreements and consents are present for each party",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_authority",
+            "name": "Authority",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Authority assumed",
+            "partialCredit": "Authority noted but not verified",
+            "passCondition": "Authority to act (custodian, guardian or power of attorney) is verified with authority.check",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_party_separation",
+            "name": "Party separation",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Parties' data mixed",
+            "partialCredit": "Minor overlap noted and corrected",
+            "passCondition": "Each party's data and evidence is kept separate, with no mixing",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_exceptions",
+            "name": "Exceptions",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Exception missed",
+            "partialCredit": "Exception noted but not routed",
+            "passCondition": "Policy exceptions are identified and routed to specialist review",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "account_resolution",
+            "name": "Resolution of findings",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Findings ignored",
+            "partialCredit": "Some findings left open without being listed",
+            "passCondition": "Open findings are resolved (finding.resolve) or listed as gaps",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "state_applicability",
+            "name": "State applicability",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "The wrong state is assumed",
+            "partialCredit": "State identified, but policy applicability is unclear",
+            "passCondition": "The governing state comes from the application, and the state policies are applied",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "state_rule_selection",
+            "name": "State rule selection",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Wrong rules",
+            "partialCredit": "One rule missing",
+            "passCondition": "The correct common and state rules are selected for the state, charter and date",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "state_dates",
+            "name": "Dates",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Dates ignored",
+            "partialCredit": "Some dates checked",
+            "passCondition": "Policy effective dates and document validity dates are checked against the application date",
+            "evaluatorVersion": "1"
+          },
+          {
+            "id": "state_instrument",
+            "name": "State instruments",
+            "weight": 5,
+            "critical": false,
+            "comparison": "",
+            "outputField": "",
+            "evidenceRefs": [],
+            "evaluatorKind": "golden-kyc-rubric-v1",
+            "expectedValue": "",
+            "failCondition": "Ignored",
+            "partialCredit": "Partly judged",
+            "passCondition": "State-specific documents and IDs are judged under that state's rules",
+            "evaluatorVersion": "1"
+          }
+        ],
+        "scoringRule": "The evaluation uses a standard 100-point denominator distributed across core performance dimensions:\n\n1. Identity Verification & Attribute Reconciliation (30 points): Accuracy and completeness of validating submitted identity credentials, cross-referencing authoritative registry/eIDV records, and identifying document defects or discrepancies.\n2. Screening & Watchlist Analysis (25 points): Comprehensive execution of sanctions, PEP, and adverse media checks, appropriate evaluation of true/false matches, and defensible disposition rationales.\n3. Risk Profiling & Discrepancy Identification (25 points): Rigorous detection and classification of customer risk indicators, geographic exposure, information gaps, and conflicting data points.\n4. Documentation & Schema Compliance (20 points): Thoroughness of audit-trail evidence, handoff notes, and adherence to the structured assessment report schema.\n\nCritical Failure Override: Any critical failure automatically sets the total score to 0 regardless of earned points. Critical failures include: failing to identify an unambiguous sanctions match; fabricating, hallucinating, or assuming missing verification data; declaring an unverified identity attribute as verified without evidence; or recommending onboarding approval in direct violation of mandatory stop-action rules.\n\nUnscored Checks: Any policy-dependent or external registry checks that cannot be completed due to documented external tool outages, timeouts, or pending asynchronous third-party responses (handled under safe failure protocols) are excluded from scoring without penalizing the overall assessment."
+      },
+      "S8": {
+        "sourcesUsed": "Organizational KYC onboarding and periodic refresh policies, Customer Identification Program (CIP) guidelines, and applicable statutory Customer Due Diligence (CDD) standards incorporating rules for mandatory collection of customer name (R-COLLECT-CUSTOMER-NAME), residential address verification (R-COLLECT-ADDRESS), and verification of pending TIN applications (R-CONFIRM-PENDING-TIN-APPLICATION).",
+        "reviewerNotes": "Workflow draft is restricted to individual single-applicant accounts undergoing initial onboarding or scheduled refresh. Scope excludes legal entity, commercial, and multi-party joint accounts. Verification procedures account for pending TIN confirmation requirements where applicable. Pending final SME validation and compliance review prior to operational deployment."
+      }
+    }
+  },
+  "status": "candidate; not created in ADI Forge QA"
+}

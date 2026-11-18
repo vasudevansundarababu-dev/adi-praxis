@@ -1,0 +1,36 @@
+{
+  "map": [
+    {
+      "title": "Single KYC Onboarding and Refresh",
+      "v7_record_id": "e3e49e8e-b2b0-432d-b7c8-3186de4c52ec",
+      "v7_task_id": "c4f7ada2-d15e-45c1-8532-7c88b57e98d9",
+      "v7_content_hash": "be41142403423c1d2fcac35d3daad0a651e0e41f2f0d4fe43df0df7869a5cfe9",
+      "successor_file": "03-tasks/successors/c4f7ada2-d15e-45c1-8532-7c88b57e98d9.v8-candidate.json",
+      "successor_output_sha256": "8e93b26ff3b4651535272e15ae893d4f34ca27b967a99061c6b9228c1b5615bc"
+    },
+    {
+      "title": "Joint KYC Onboarding and Refresh",
+      "v7_record_id": "9fb80bad-399d-460d-9508-f44d1cd1d125",
+      "v7_task_id": "acea991a-3383-482f-b29c-3a27c6a25262",
+      "v7_content_hash": "b2247740e10e80f742fbb7f93a30bc442341977f9a138e2d3727030d35cebd28",
+      "successor_file": "03-tasks/successors/acea991a-3383-482f-b29c-3a27c6a25262.v8-candidate.json",
+      "successor_output_sha256": "cabc337e3a27defd3e007ef0ae5a03b2c87ca48903091b16edd2fead4a3719a2"
+    },
+    {
+      "title": "Minor (joint with adult) KYC",
+      "v7_record_id": "93bca016-bd65-4274-8ffe-f75ee8b25e5d",
+      "v7_task_id": "ce5cd309-2336-4b36-8f34-b9648c277569",
+      "v7_content_hash": "5f6d482438c7130f22de99d7828871c651f7a103ed302dd0b727fc101577702f",
+      "successor_file": "03-tasks/successors/ce5cd309-2336-4b36-8f34-b9648c277569.v8-candidate.json",
+      "successor_output_sha256": "5231ae75a14602a9d222882b2ba7aa12fe9d3ef8b9e51f4d36a5893f698f6935"
+    },
+    {
+      "title": "Custodian KYC Onboarding and Refresh",
+      "v7_record_id": "63e63881-b356-48cd-8c9f-776058a771e7",
+      "v7_task_id": "c0e37214-0ba8-4f25-a158-77c2011a4611",
+      "v7_content_hash": "6fe1180ae3ccffef85a8a66d2d5697c42796e269fe3d81c55d9b0174768d530a",
+      "successor_file": "03-tasks/successors/c0e37214-0ba8-4f25-a158-77c2011a4611.v8-candidate.json",
+      "successor_output_sha256": "dec901d49982e0d86beff1c87c736589ce55b0d546b1a49adf82b139ff578e93"
+    }
+  ]
+}

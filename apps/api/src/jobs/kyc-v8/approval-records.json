@@ -85,6 +85,22 @@
       "status": "decided"
     },
     {
+      "id": "APR-12",
+      "what": "Create v8 and the 4 successor revisions in ADI Forge QA after RL Gym's offline review (supersedes the waiting condition in APR-10): merge and QA deploy of the successor change, owner's own QA Admin role, v8 job dry run then apply",
+      "approved_by": "Product Owner",
+      "approved_at": "2026-11-18",
+      "status": "approved",
+      "conditions": "QA only; CI green; dry run must match plan; owner publishes v8 and approves the successor tasks in the console"
+    },
+    {
+      "id": "APR-11",
+      "what": "Impact assessment of the S4 change in the 4 successor tasks",
+      "decision": "No impact on required decision, outcome or business meaning; citation source changed only",
+      "approved_by": "Policy owner (Product Owner)",
+      "approved_at": "2026-11-18",
+      "status": "decided"
+    },
+    {
       "id": "APR-07",
       "what": "Original SME authoring and reviewer approvals of the 4 v7 tasks",
       "status": "existing (see 03-tasks/original-approval-provenance.json)"

@@ -12,12 +12,12 @@
       "applicability": {
         "file": "02-policy/applicability-decisions.json",
         "sha256": "94059c9e1a344ace5cc3c75feebf3389bd17a28edb42a2b4d717490d89061f3c",
-        "status": "pending"
+        "status": "decided (20 of 20, APR-03a, APR-03)"
       },
       "rule_clause_map": {
         "file": "02-policy/rule-clause-map.json",
         "sha256": "e4ee8f20e47bb8b51e40372863d1f3d21753b6704604947985195b3271fa3b95",
-        "status": "draft"
+        "status": "approved (APR-04)"
       }
     },
     "successor_of": {

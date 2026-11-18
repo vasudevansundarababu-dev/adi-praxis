@@ -44,8 +44,11 @@ import { loadUploadedProfiles } from '../templates/uploaded-profiles';
 export const KYC_V8_DEFAULTS = {
   v7TemplateId: '40713870-6421-4d20-b727-eb862927ec72',
   v7ProjectId: 'f7f3cfae-d6a2-450b-9748-1485047ef4c3',
-  /** Approvals each successor revision carries by reference (owner's brief, 18 Nov 2026). */
-  approvalIds: ['APR-01', 'APR-04', 'APR-05', 'APR-11'],
+  /**
+   * Approvals each successor revision carries by reference (owner's brief, 18 Nov 2026; package rev 2): the migration
+   * exception, the rule-to-clause map, the S4 change, the S4 impact assessment and the approval to create v8 in QA.
+   */
+  approvalIds: ['APR-01', 'APR-04', 'APR-05', 'APR-11', 'APR-12'],
 } as const;
 
 const ACTOR = 'kyc-v8-successor';
@@ -67,7 +70,7 @@ export interface KycV8Inputs {
   spec: JointTemplateSpec;
   idMap: { title: string; v7_record_id: string; v7_task_id: string; v7_content_hash: string; successor_output_sha256: string }[];
   successors: Map<string, { candidate: SuccessorCandidate; fileSha256: string }>;
-  approvals: { id: string; what?: string; approved_by?: string; approved_at?: string; status?: string; statement?: string }[];
+  approvals: { id: string; what?: string; decision?: string; approved_by?: string; approved_at?: string; status?: string; statement?: string }[];
   officialText: { fileName: string; bytes: Buffer; sha256: string };
 }
 
@@ -372,7 +375,6 @@ export interface TasksReport {
   projectId?: string;
   ruleSetVersion?: number;
   tasks: TaskReport[];
-  approvalsNotInPackage?: string[];
 }
 
 const S4_ITEM_PRIVATE = ['appliesTo', 'rationale', 'exception'] as const;
@@ -418,7 +420,8 @@ export async function successorTasks(db: Db, args: { v7TemplateId: string; v7Pro
       const admin = await requireAdmin(tx, p7.clientId, args.requestedBy);
       if (!admin) return { outcome: 'refused', reason: 'The requester must be an active Admin of this client.', projectId: p8.id, tasks: [] };
       const approvals = approvalIds.map((id) => inputs.approvals.find((a) => a.id === id) ?? null);
-      const approvalsNotInPackage = approvalIds.filter((_, i) => !approvals[i]);
+      const missingApprovals = approvalIds.filter((_, i) => !approvals[i]);
+      if (missingApprovals.length) return { outcome: 'refused', reason: `The approval records lack ${missingApprovals.join(', ')}; every approval a successor carries must be recorded.`, projectId: p8.id, tasks: [] };
       const audit = auditAs(tx, p8.clientId);
       const tasks: TaskReport[] = [];
 
@@ -462,7 +465,7 @@ export async function successorTasks(db: Db, args: { v7TemplateId: string; v7Pro
           predecessor: { recordId: r.id, taskId: r.taskInstanceId, projectId: r.projectId, templateId: r.templateId, templateVersion: r.templateVersion, contentHash: r.contentHash, candidateId: r.candidateId, smeUserId: candidate.smeUserId, submittedAt: r.submittedAt.toISOString(), reviewerId: r.reviewerId, reviewDecisionAt: r.reviewDecisionAt.toISOString() },
           carriedSections: Object.keys(authored.sections).filter((k) => k !== 'S4').sort(),
           changedSections: ['S4'],
-          approvals: approvalIds.map((id, i) => ({ id, ...(approvals[i] ? { what: approvals[i]!.what ?? null, approvedAt: approvals[i]!.approved_at ?? null, status: approvals[i]!.status ?? null } : { recordedInPackage: false }) })),
+          approvals: approvalIds.map((id, i) => ({ id, what: approvals[i]!.what ?? null, ...(approvals[i]!.decision ? { decision: approvals[i]!.decision } : {}), approvedAt: approvals[i]!.approved_at ?? null, status: approvals[i]!.status ?? null })),
           candidate: { fileSha256: cand!.fileSha256, outputSha256: m.successor_output_sha256 },
           s4Binding: 'S4 cites the v8 project policy library (official 31 CFR 1020.220 text, then the bank policy document the predecessor cited); same content hashes as the candidate',
           note: 'One-time successor migration (APR-01). The predecessor’s approval is not extended: a person approves this revision.',
@@ -495,7 +498,7 @@ export async function successorTasks(db: Db, args: { v7TemplateId: string; v7Pro
         await emitEvent(tx, p8.clientId, { name: 'task.submitted', aggregateType: 'TaskInstance', aggregateId: task.id, payload: { taskId: task.id, projectId: p8.id, version: 1, flaggedDuplicate: false } });
         Object.assign(out, { outcome: 'created', taskId: task.id });
       }
-      return { outcome: tasks.some((t) => t.outcome === 'refused') ? 'refused' : 'ok', projectId: p8.id, ruleSetVersion: lib.setVersion, tasks, ...(approvalsNotInPackage.length ? { approvalsNotInPackage } : {}) };
+      return { outcome: tasks.some((t) => t.outcome === 'refused') ? 'refused' : 'ok', projectId: p8.id, ruleSetVersion: lib.setVersion, tasks };
     },
     { timeout: 120_000 },
   );

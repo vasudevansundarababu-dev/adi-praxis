@@ -2180,13 +2180,17 @@ decision (APR-02 to APR-06, APR-09). Code: `apps/api/src/jobs/kyc-v8-successor.t
   uses it. The registered form row is reused (audited `template_profile.reused`); no second row is written. A changed
   form, an unpublished one, another workflow's or a built-in form is still `TP_FORM_ID_TAKEN`. Console pack uploads
   keep the old rule. v7 is never edited.
-- **(chosen by Claude)** **Inputs embedded, not uploaded.** The candidate spec RL Gym reviewed (JCS SHA-256
-  `fb9a4aa7…`, unchanged), the four successor candidates, ID map, approvals, change report and the official text of
+- **(chosen by Claude)** **Inputs embedded, not uploaded.** The v8 spec from the offline package (rev 2, JCS SHA-256
+  `8449adb0…`), the four successor candidates, ID map, approvals, change report and the official text of
   31 CFR 1020.220 (eCFR as of 12 Nov 2026, SHA-256 `07069b75…`, public domain) are files in the job directory, so the
   Cloud Run job needs no upload. The job checks every identity it relies on (template ID, version, predecessor hash,
-  anvil key, record and task IDs, content hashes) and refuses on any difference. The spec's
-  `requirement.policy_bindings` still says applicability `pending` and rule map `draft` (the state when the package was
-  hashed); it is kept byte-for-byte so the hash RL Gym reviewed holds. The current decisions are APR-03 and APR-04.
+  anvil key, record and task IDs, content hashes) and refuses on any difference.
+- **(owner, 18 Nov, via the DevOps session)** **Package rev 2 replaces the hash RL Gym reviewed.** Rev 1 (`fb9a4aa7…`)
+  carried stale labels in `requirement.policy_bindings` (applicability `pending`, rule map `draft`). Rev 2 says
+  applicability decided 20 of 20 (APR-03a, APR-03) and the rule map approved (APR-04), so v8 hashes to `8449adb0…`.
+  Publishing v8 in QA is the decision now; RL Gym asked for every hash to be recomputed at publication. Rev 2 also
+  records APR-11 (the policy owner's assessment: the S4 change has no impact on required decision, outcome or business
+  meaning) and APR-12 (the owner's approval to create v8 and the successors in QA).
 - **(chosen by Claude)** **Three phases, a person between each.** `kyc-v8-successor template` creates the v8 DRAFT
   (the exact spec hash is verified after creation, else rolled back) → an Admin publishes v8 in the console →
   `kyc-v8-successor project` creates the v8 project → an Admin reviews the rules and publishes the rule set →
@@ -2215,13 +2219,13 @@ decision (APR-02 to APR-06, APR-09). Code: `apps/api/src/jobs/kyc-v8-successor.t
   task is assigned to the original SME's candidate record (their content), status SUBMITTED, with one submission,
   a frozen policy snapshot and the input field `successorOf`: predecessor record, task, project, template version and
   content hash, original SME (candidate and SME user IDs) and reviewer IDs and times, carried and changed sections, the
-  approvals APR-01, APR-04, APR-05, APR-11 by reference (APR-11 is not in the package's approval file; the job reports
-  it as `approvalsNotInPackage`), and the candidate file's hash. The checks an approval re-runs (D18, author
+  approvals APR-01, APR-04, APR-05, APR-11 and APR-12 by reference (the job refuses if any is missing from the approval
+  records), and the candidate file's hash. The checks an approval re-runs (D18, author
   attestations excepted: those belong to the predecessor's submission) must pass before anything is written. The job
   never writes an `ApprovedTaskRecord` and never extends an old approval: a person approves each revision in the
   console, which writes the record with their user ID, and that record's opaque review receipt is what the export
-  carries. The change report's open "decision/outcome impact: not assessed" item is the policy owner's to settle in
-  that review (or as APR-11); nothing here asserts it.
+  carries. The change report's "decision/outcome impact: not assessed" entries are resolved by APR-11 (no impact;
+  citation source changed only); the console approval is still the decision on each complete revision.
 - **(chosen by Claude)** **TS-17 offline export: `authored-export <projectId> [--apply] [--out <dir>]`.** Builds the
   project's current approved tasks with the same `buildGenericPackages` as the online export (root
   `praxis-export.json`, declared form, actor and private files, exact template and record references,

@@ -294,7 +294,7 @@ describe('KYC v8 successor', () => {
     const tdry = await successorTasks(db, { ...args, apply: false, inputs: h.inputs });
     expect(tdry.outcome, JSON.stringify(tdry)).toBe('ok');
     expect(tdry.tasks.map((x) => x.outcome)).toEqual(['would_create', 'would_create', 'would_create', 'would_create']);
-    expect(tdry.approvalsNotInPackage).toEqual(['APR-11']);
+    expect((await successorTasks(db, { ...args, apply: false, inputs: { ...h.inputs, approvals: h.inputs.approvals.filter((a) => a.id !== 'APR-11') } })).reason).toMatch(/lack APR-11/);
     const tr = await successorTasks(db, { ...args, apply: true, inputs: h.inputs });
     expect(tr.tasks.map((x) => x.outcome)).toEqual(['created', 'created', 'created', 'created']);
     expect(await db.approvedTaskRecord.count()).toBe(recordsBefore);
@@ -310,9 +310,10 @@ describe('KYC v8 successor', () => {
       expect(s4.map((x) => x.contentSha256)).toEqual([EMBEDDED.officialText.sha256, h.bankSha]);
       expect(s4[0]!.ruleId).toBe(official.documentId);
       expect(s4[0]!.ruleVersion).toMatch(/^rs1\.d1$/);
-      const so = (task.input as { successorOf: { predecessor: Record<string, unknown>; approvals: { id: string }[] } }).successorOf;
+      const so = (task.input as { successorOf: { predecessor: Record<string, unknown>; approvals: { id: string; decision?: string }[] } }).successorOf;
       expect(so.predecessor).toMatchObject({ recordId: rec.id, taskId: rec.taskInstanceId, contentHash: rec.contentHash, candidateId: rec.candidateId, reviewerId: rec.reviewerId });
-      expect(so.approvals.map((a) => a.id)).toEqual(['APR-01', 'APR-04', 'APR-05', 'APR-11']);
+      expect(so.approvals.map((a) => a.id)).toEqual(['APR-01', 'APR-04', 'APR-05', 'APR-11', 'APR-12']);
+      expect(so.approvals.find((a) => a.id === 'APR-11')).toMatchObject({ decision: expect.stringMatching(/No impact/) });
       const checks = task.checks as { results: { id: string; ok: boolean; severity?: string }[] };
       expect(checks.results.filter((c) => !c.ok && c.severity !== 'warning')).toEqual([]);
     }
@@ -402,8 +403,9 @@ describe('KYC v8 successor', () => {
     expect(successorS4({ predecessorS4: {}, candidateS4: {}, library: [], officialSha256: 'f'.repeat(64) }).problems[0]).toMatch(/official text/);
   });
 
-  it('embedded inputs: the v8 spec is the one RL Gym reviewed; the official text hash; four successors mapped', () => {
-    expect(jcsSha256(EMBEDDED.spec)).toBe('fb9a4aa75baa4dc4490141063a3a2221d21531fb266d636694bf7389b500f92c');
+  it('embedded inputs: the v8 spec (package rev 2); the official text hash; four successors mapped', () => {
+    expect(jcsSha256(EMBEDDED.spec)).toBe('8449adb008b6ecea7858b594dd5765f60b9b9596b57568d25f5e0598a334f7d5');
+    for (const id of ['APR-11', 'APR-12']) expect(EMBEDDED.approvals.map((a) => a.id)).toContain(id);
     expect(EMBEDDED.officialText.sha256).toBe('07069b7552403b5b99097a9249d1ed45d940253df1bafa860154e52a097bf1f4');
     expect(EMBEDDED.idMap.length).toBe(4);
     for (const m of EMBEDDED.idMap) expect(EMBEDDED.successors.get(m.v7_record_id)?.candidate.successor_of_task_id).toBe(m.v7_task_id);

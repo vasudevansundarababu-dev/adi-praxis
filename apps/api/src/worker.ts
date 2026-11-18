@@ -26,6 +26,7 @@ import { secretBox } from './lib/secrets';
 import { processPartnerWebhooks } from './supply/webhooks';
 import { remindAndExpireInvites } from './supply/submissions';
 import { defaultTutorialPipeline, tutorialVideoHandler } from './forge/tutorial-video';
+import { loadUploadedProfiles } from './templates/uploaded-profiles';
 
 /** praxis-worker: publishes the outbox and runs domain-event handlers. */
 const config = loadConfig();
@@ -41,9 +42,17 @@ registry.register(policyAnnotationHandler({ storage, assistant: defaultRuleAssis
 // D2: tutorial video runs (mocks unless TUTORIAL_VIDEO_LIVE; never on publish in QA or locally).
 registry.register(tutorialVideoHandler(defaultTutorialPipeline(config)));
 for (const h of metaCompilerHandlers({ config, storage, drafters: defaultDrafterFactory(config), deps: resolveDeps(), runner: defaultRunner(config, storage), judge: defaultJudge(config) })) registry.register(h);
-const worker = createDomainEventsWorker(db, registry, connection);
 const log = (level: string, msg: string, extra: object = {}) =>
   console.log(JSON.stringify({ level, severity: level.toUpperCase(), message: msg, msg, service: 'praxis-worker', time: new Date().toISOString(), ...extra }));
+// D30: stored (uploaded) authoring forms are registered per process. Handlers here (tutorial video, conversation,
+// drafting) look forms up by ID, so load them before taking jobs and refresh every minute like the API does.
+const loadForms = () =>
+  loadUploadedProfiles(db)
+    .then((r) => r.problems.length && log('warn', 'some stored forms could not be loaded', { problems: r.problems }))
+    .catch((err) => log('error', 'loading stored forms failed', { err: String(err) }));
+await loadForms();
+const formsTimer = setInterval(() => void loadForms(), 60_000);
+const worker = createDomainEventsWorker(db, registry, connection);
 
 worker.on('failed', (job, err) => log('warn', 'domain event handler failed', { jobId: job?.id, err: String(err) }));
 // In GCP the nightly verification runs as a Cloud Run job from Cloud Scheduler (DATASET_VERIFY_CRON=off).
@@ -102,6 +111,7 @@ async function shutdown() {
   await supplyQueue?.close();
   await sweepQueue.close();
   clearInterval(depthTimer);
+  clearInterval(formsTimer);
   health?.close();
   await queue.close();
   await db.$disconnect();

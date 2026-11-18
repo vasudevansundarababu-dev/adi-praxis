@@ -76,6 +76,15 @@ After R2, this log becomes the input for the Studio's requirements spec.
 | TS-19 | All | AI calls never run inside a database transaction; each call has a time budget; large forms are sent in batches; a timeout says "try again" plainly. | D31: field suggestions failed on large Marketing sections (15 s transaction limit, 45 s model limit). Fixed in PR #98. Applies to the Studio's own AI drafting. | built (Forge) |
 | TS-20 | Studio | Paid generation (videos, long drafts) runs only on published versions, shows its cost estimate and caps first, and is started by a person. | The tutorial flow already does this; keep it for anything the Studio generates. | open |
 
+### F. Template revisions and migration
+
+| ID | Owner | Requirement | Why (evidence) | Status |
+|---|---|---|---|---|
+| TS-21 | All | **Migrating approved tasks to a successor template version.** A defined process: successor task revisions point to the new version; the originals stay unchanged; unchanged content carries its original SME approval; a change report lists exactly what changed; any change to the required decision, outcome or business meaning goes for separate approval and is never covered by the old one. Allowed only with a recorded Product Owner migration exception. | RL Gym asked on 18 Nov for KYC v7 tasks to be moved to a v8 with policy bindings without asking the SMEs to re-author unchanged content. No such process exists today. ApprovedTaskRecord is append-only, so successors must be new records. | open |
+| TS-22 | Studio | **Named policy owner and decision records for applicability.** For each jurisdiction × product × charter × effective period, a person with the policy-owner role records either the applicable sources or a reviewed "not applicable" decision with rationale. AI may draft research notes and rule-to-clause mappings, marked as drafts; it never records the decision. | RL Gym asked for applicability to be resolved for CA, NY, TX, FL and IL. That is a legal or policy judgement, and no policy-owner role or decision record exists today. | open |
+| TS-23 | All | **Rule-to-clause mapping that separates regulation from bank choice.** Each task rule links to its supporting clauses, and each link says whether it is a regulatory requirement or a bank operating choice, with the clause's source hash. | Requested by RL Gym on 18 Nov. Today GB-01 to GB-07 are bank choices with no clause links, and federal rules link only to synthetic summaries. | open |
+
 ## Change log
 
+- 18 Nov 2026: added TS-21 to TS-23 from RL Gym's v8 successor-package request.
 - 18 Nov 2026: started with TS-01 to TS-20 from the manual hand-off of KYC v7 and Marketing VEYRA to RL Gym (H0).

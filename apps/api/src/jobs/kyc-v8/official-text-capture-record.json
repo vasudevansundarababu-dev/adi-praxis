@@ -1,0 +1,31 @@
+{
+  "schema": "adi-forge.public-policy-capture.v1",
+  "citation": "31 CFR 1020.220",
+  "heading": "\u00a7 1020.220 Customer identification program requirements for banks.",
+  "publisher": "Office of the Federal Register / GPO, Electronic Code of Federal Regulations (eCFR)",
+  "source_location": "https://www.ecfr.gov/current/title-31/subtitle-B/chapter-X/part-1020/subpart-B/section-1020.220",
+  "retrieved_from": "https://www.ecfr.gov/api/versioner/v1/full/2026-11-12/title-31.xml?part=1020&section=1020.220",
+  "point_in_time_date": "2026-11-12",
+  "captured_at_utc": "2026-11-18T13:53Z",
+  "file": "31cfr1020.220-asof-2026-11-12.xml",
+  "media_type": "text/xml",
+  "bytes": 13216,
+  "content_sha256": "07069b7552403b5b99097a9249d1ed45d940253df1bafa860154e52a097bf1f4",
+  "identical_capture_as_of_2026-11-16": true,
+  "ecfr_title31_status_at_capture": {
+    "latest_amended_on": "2026-11-06",
+    "latest_issue_date": "2026-11-06",
+    "up_to_date_as_of": "2026-11-16"
+  },
+  "effective_version": {
+    "amendment_date": "2020-11-16",
+    "source_citation": "[75 FR 65812, Oct. 26, 2010, as amended at 85 FR 57138, Sept. 16, 2020]",
+    "last_substantive_change": "2020-11-16",
+    "later_non_substantive_issue": "2023-04-10",
+    "effective_from": "2020-11-16",
+    "effective_to": null
+  },
+  "not_the_descriptor_hash": "v7 execution.federalPolicies[0].content_sha256 = 0c05f57ab53f1e4dcc382a291909bcb8f2a068e924d9dd5c750221ff606af3fe is the hash of federal-source-reference.json (a descriptor). It is NOT the hash of this text.",
+  "binding_status": "Captured only. v7 does not reference this hash; binding it would change v7 execution and needs a successor version (v8).",
+  "legal_review": "pending: capturing the text is not an applicability or legal review."
+}

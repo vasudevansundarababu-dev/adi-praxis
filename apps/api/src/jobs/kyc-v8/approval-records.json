@@ -1,0 +1,98 @@
+{
+  "records": [
+    {
+      "id": "APR-01",
+      "what": "One-time migration exception: 4 approved KYC v7 tasks get successor revisions on v8; originals unchanged; unchanged content keeps original SME approval; changed business meaning needs separate approval.",
+      "scope": {
+        "records": [
+          "e3e49e8e-b2b0-432d-b7c8-3186de4c52ec",
+          "9fb80bad-399d-460d-9508-f44d1cd1d125",
+          "93bca016-bd65-4274-8ffe-f75ee8b25e5d",
+          "63e63881-b356-48cd-8c9f-776058a771e7"
+        ],
+        "template_id": "6d8f9cae-7c06-4c36-a207-522978d5486b",
+        "from_version": 7,
+        "to_version": 8
+      },
+      "approved_by": "Product Owner (ADI Forge owner)",
+      "statement": "I approve the exception, I'm the policy owner",
+      "approved_at": "2026-11-18",
+      "status": "approved",
+      "expiry": null,
+      "revocation": null
+    },
+    {
+      "id": "APR-02",
+      "what": "Designation of policy owner for KYC policy applicability",
+      "approved_by": "Product Owner (ADI Forge owner)",
+      "designee": "Product Owner (same person)",
+      "approved_at": "2026-11-18",
+      "status": "recorded",
+      "independence_note": "The policy owner is also the Product Owner who approved the migration; this is not an independent review."
+    },
+    {
+      "id": "APR-03a",
+      "what": "Bank profile: national bank (OCC), home state NY, policies judged as of 2026-11-12",
+      "approved_by": "Policy owner (Product Owner)",
+      "approved_at": "2026-11-18",
+      "status": "decided"
+    },
+    {
+      "id": "APR-03",
+      "what": "Applicability decisions, 20 cells: individual x5 not applicable; custodial x5 applicable (state UTMA); adult joint x5 applicable (joint-account law); teen joint x5 applicable (minors deposit statute + joint-account law)",
+      "approved_by": "Policy owner (Product Owner)",
+      "approved_at": "2026-11-18",
+      "status": "all 20 decided (14 earlier; teen joint x5 with national-bank caveat for TX and IL, and IL adult joint added later the same day)"
+    },
+    {
+      "id": "APR-04",
+      "what": "Rule-to-clause mapping: R-COLLECT-CUSTOMER-NAME, R-COLLECT-ADDRESS, R-CONFIRM-PENDING-TIN-APPLICATION -> 31 CFR 1020.220(a)(2)(i)(A)(1), (A)(3), (B); GB-01..GB-07 = bank operating choices",
+      "approved_by": "Policy owner (Product Owner)",
+      "statement": "Yes",
+      "approved_at": "2026-11-18",
+      "status": "approved"
+    },
+    {
+      "id": "APR-05",
+      "what": "S4 change in each of the 4 successor tasks: policy reference now binds official 31 CFR 1020.220 text; previous bank policy document reference kept as bankPolicyDocument",
+      "approved_by": "Policy owner (Product Owner)",
+      "statement": "Yes",
+      "approved_at": "2026-11-18",
+      "status": "approved",
+      "note": "Approves the policy-basis change only; it does not re-approve any other content."
+    },
+    {
+      "id": "APR-06",
+      "what": "Bank policy documents: classification (owner says real; documents label themselves synthetic, fictional bank, law summaries)",
+      "approved_by": "Product Owner (policy owner)",
+      "statement": "Federal and state policy we uploaded are real. Its not synthetic",
+      "approved_at": "2026-11-18",
+      "status": "confirmed: bound as bank policy documents with law summaries; the official law is bound separately from its linked sources",
+      "confirmed_at": "2026-11-18"
+    },
+    {
+      "id": "APR-09",
+      "what": "Independence limitation accepted for this QA/benchmark version: one person is Product Owner and policy owner; one Admin account reviewed tasks and rules",
+      "approved_by": "Product Owner",
+      "approved_at": "2026-11-18",
+      "status": "accepted, noted"
+    },
+    {
+      "id": "APR-10",
+      "what": "v8 stays an offline candidate; not created or published in ADI Forge QA until RL Gym has validated this package",
+      "approved_by": "Product Owner",
+      "approved_at": "2026-11-18",
+      "status": "decided"
+    },
+    {
+      "id": "APR-07",
+      "what": "Original SME authoring and reviewer approvals of the 4 v7 tasks",
+      "status": "existing (see 03-tasks/original-approval-provenance.json)"
+    },
+    {
+      "id": "APR-08",
+      "what": "RL Gym registration / runtime qualification of v8",
+      "status": "NOT REQUESTED and NOT DECLARED here; RL Gym performs it"
+    }
+  ]
+}

@@ -26,7 +26,7 @@ Related: `docs/anvil/FORGE-RLGYM-HANDOFF-GAPS.md` (the 18 Nov hand-off) and `doc
 | H0: manual hand-off | KYC v7, Marketing VEYRA v1/v2 | Off: files sent by hand | Done 18 Nov 2026 | Rows TS-01 to TS-20 below |
 | R1: benchmark run | KYC (one task) | Off | Planned (owner) | *to be added* |
 | R2: benchmark run | Marketing | **On** (live integration) | Planned (owner) | *to be added* |
-| P1: target flow | All | n/a | Proposed by owner 20 Nov 2026 | Rows TS-26 to TS-44 |
+| P1: target flow | All | n/a | Proposed by owner 20 Nov 2026 | Rows TS-26 to TS-46 |
 
 After R2, this log becomes the input for the Studio's requirements spec.
 
@@ -140,8 +140,16 @@ registers the release, binds evaluators and model keys at run time, and runs iso
 | TS-43 | All | **Neither ADI Forge nor RL Gym changes a template.** Both only consume Studio releases. ADI Forge sends enhancement requests (TS-42). RL Gym raises its needs the same way. **Contract impact:** the agreed contract has RL Gym (Anvil) proposing new and changed templates (`PRAXIS-ANVIL-CONTRACT-FINAL.md`, sections 1 to 3) and ADI Forge creating drafts from those proposals. Both roles move to the Studio, so the contract needs a change agreed with RL Gym. | Owner decision, 20 Nov 2026; extends TS-39 to RL Gym. | agreed (owner); contract change open |
 | TS-44 | All | **Real enterprise data (future).** Not in current scope (owner, 20 Nov 2026): all data stays synthetic until this row is taken up. Later, the owner plans to buy enterprise data, actual records rather than generated ones, so the data covers real scenarios. This **conflicts with a non-negotiable** (CLAUDE.md, SPEC.md): *task content is synthetic only; no real customer or employer data*, and *identity images and ID numbers are never stored in this platform*. Before anything is built, the owner must decide and record in `docs/`: (a) where real data may live (only in Studio or RL Gym environments, or also in ADI Forge); (b) whether SMEs and reviewers may see it, or author only against schema, case types and de-identified views; (c) how it is de-identified, especially identity numbers and images; (d) licence and data-rights terms and retention per supplier; (e) a separate GCP project and access controls; (f) how tasks and exports are labelled (`content_classification` is `synthetic` today). | Owner direction, 20 Nov 2026. Conflicts with the current non-negotiables and the QA/staging rule "synthetic only". | future (needs owner decision + spec change before work starts) |
 
+### L. Domain packs: how the schema grows (owner decision, 20 Nov 2026)
+
+| ID | Owner | Requirement | Why (evidence) | Status |
+|---|---|---|---|---|
+| TS-45 | Studio | **Layered domain packs.** The data model is built in layers. (1) A **domain core** per domain: e.g. Banking core with party, account, product, relationship (owner, joint, custodian, minor), document and case or decision. (2) **Region packs** on top: e.g. US with SSN/ITIN, CIP (31 CFR 1020.220), OCC or state charter and state modules; India with PAN, a masked Aadhaar reference only, CKYC and the RBI KYC Direction. (3) **Process packs**: e.g. KYC onboarding and refresh, AML alert review, loan origination. A template is a slice, core + one region + one process, plus its seed data. Packs grow only when a template needs them: a new process reuses the core and region; a new region reuses the core and process; a new domain gets its own core. Packs define identity-number *formats* only, and seed values are clearly synthetic. Packs name rule references, but the rules stay hashed policy artifacts (TS-07). Prefer existing vocabularies (BIAN, ISO 20022, FIBO) over inventing new ones. A core change is checked against every template that uses it. | Owner decision, 20 Nov 2026: build schemas for US banking, India banking and others. Start with the US pack from KYC v7/v8, and make India the second pack so the layering is proven early. | agreed (owner) |
+| TS-46 | Studio | **Each release records its pack versions.** Every pack has its own version and content SHA-256. The release manifest (TS-26) lists the exact core, region and process pack versions it was built on. Changing a pack creates a new pack version and, through the Studio, new template releases (TS-39). An existing release never changes when a pack grows. | Follows from TS-45 and TS-26. Without it, the same template hash could mean different data models over time. | agreed (owner) |
+
 ## Change log
 
+- 20 Nov 2026: added TS-45 (layered domain packs: core, region, process) and TS-46 (pack versions in the release manifest).
 - 20 Nov 2026: added TS-41 to TS-43 (SME scope, PM/Admin enhancement requests, no template changes in ADI Forge or RL Gym) and TS-44 (real enterprise data; future, not current scope; conflicts with the synthetic-only rule).
 - 20 Nov 2026: owner decided every template change goes through the Studio (TS-39). Added TS-40, dropped TS-34.
 - 20 Nov 2026: added TS-26 to TS-38 from the owner's target release flow and inspection checklist. TS-34 needs an owner decision.

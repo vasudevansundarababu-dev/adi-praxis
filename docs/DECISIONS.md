@@ -2280,3 +2280,38 @@ untouched; the owner approves each revision in the console; a recurrence check. 
   reference hashes before and after, each pointer's old and new value and justification, approvals and capability gaps.
 - **(chosen by Claude)** The PR #99 test fixture now binds the embedded v8 candidates' tools as APR-13a/b did, since
   approval refuses the original values.
+
+## KYC v8 pending-TIN exclusion (APR-14, 21 Nov 2026)
+
+RL Gym has no TIN capability (CG-01), so after APR-13 the Teen joint and Custodial tasks kept a pending-TIN step with
+a blank tool. The owner (Product Owner) decided in chat (APR-14): remove pending-TIN verification from those 2 tasks
+entirely (S5 step 3 and every dependent instruction, output, rubric, reference and failure-handling text); no
+substitute tool; no claim that TIN was verified; record the limitation; v8 unchanged (its contract does not require
+TIN); originals append-only; the owner approves each revision in the console. Code:
+`apps/api/src/jobs/kyc-v8-tin-exclusion.ts`, `authored-export.ts`.
+
+- **(owner, 21 Nov)** **APR-14** as above, with the field-by-field change list (shared notes
+  `kyc-v8-tin-exclusion-changes.md`) embedded in the job (`KYC_V8_TIN_EXCLUSION`) as exact find/replace edits. The
+  limitation sentence is appended verbatim to S1.scope and S8.reviewerNotes: "Pending-TIN verification is excluded
+  from this benchmark; results do not establish TIN verification or complete regulatory compliance."
+- **(chosen by Claude)** **Same revision path as APR-13 (D18).** `kyc-v8-tin-exclusion --requested-by <active Admin>
+  [--apply]` moves each task from Accepted (or Rework) to Submitted with an optimistic update, a new `TaskSubmission`,
+  the slot back to in progress, audit `task.tin_exclusion_revision_submitted` (actor SYSTEM); it never writes an
+  `ApprovedTaskRecord`. Lineage goes in task input `tinExclusion` (`adi-forge.tin-exclusion-revision.v1`); the APR-13
+  `toolBindingCorrection` lineage is kept as history. Re-runs report `already_submitted` and, once approved,
+  `successorRecordId`.
+- **(chosen by Claude)** **Guards.** Each edit's old text must occur exactly once in the current value; the removed
+  step must be S5 step index 2 with `tool: ""` citing R-CONFIRM-PENDING-TIN-APPLICATION; S3.tools, S4 and S7.criteria
+  may not be listed; the predecessor must be the task's latest record and carry the APR-13 lineage; afterwards the rule
+  must no longer be cited anywhere in the task; reverting the edits and re-inserting the step must give the approved
+  bytes exactly. Any failure refuses (exit 3) and writes nothing. The unchanged tasks (Individual `7b588c33…`, matched by
+  ID prefix as the change list gives it, and Adult joint `a7bd89e2…`) must be accepted on that latest record.
+- **(chosen by Claude)** **Change record: a sibling schema `adi-forge.task-change-record.v1`**, written as
+  `<packageId>.task-change-record.json` next to the ZIP, rather than a new version of the tool-binding record: APR-14
+  edits whole text fields and removes a step, which the pointer/old/new-tool shape of APR-13 does not describe. It lists
+  the decision (APR-14, limitation, CG-01); per revised task the predecessor and successor record IDs, content hashes and
+  actor/reference hashes, every change (`replace` with pointer, successor pointer if moved, whole old and new value; or
+  `remove` with the removed step), and both records' approval receipts (approver user ID and roles, time, record ID,
+  receipt ref); and the package's other tasks as `unchanged`. The tool-binding change record skips records carrying
+  `tinExclusion`, so in the 4-task export it covers only Individual (still the APR-13 revision). The APR-13d
+  declared-tool and actor/private conformance checks are unchanged and run on the same ZIP.

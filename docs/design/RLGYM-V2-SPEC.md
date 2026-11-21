@@ -74,7 +74,7 @@ registry/
   packs/<pack_sha256>.json              # domain packs: core / region / process (Studio)
   receipts/<release_sha256>/<receipt_id>.json     # qualification receipts (RL Gym)
   revocations/<release_sha256>/<id>.json          # revocations (Studio or RL Gym)
-  datasets/<dataset_sha256>.json        # evaluation dataset manifests (RL Gym; contents stay private)
+  datasets/<dataset_sha256>.json        # evaluation dataset manifests (Studio; contents hidden from authors)
   runs/<run_id>.json                    # run manifests (RL Gym)
 ```
 
@@ -111,7 +111,7 @@ together in it**, so nothing can pair a template with a different environment.
 |---|---|---|---|---|
 | 1 | **Qualify a release** | A new release appears in the registry | The release manifest; pulls the image by digest | `receipts/…` (pass or fail, checks run, expiry) or `revocations/…` |
 | 2 | **Accept tasks** | ADI Forge export (`praxis.authored-task-export.v1`) | The package, plus the release it pins | Accepted or rejected with reasons; refuses unqualified or revoked releases |
-| 3 | **Hold datasets** | An RL Gym operator adds a case set | Synthetic cases per case-selector value | `datasets/…` manifest (the hash covers the case records; contents stay private) |
+| 3 | **Select datasets** | The Studio publishes a dataset with a release | Studio-made synthetic cases per case-selector value | Selection recorded in the run manifest; RL Gym never edits datasets |
 | 4 | **Run rollouts** | Run request: release, task, cases, model | Release image by digest; task actor file | Trajectory, final DB snapshot, API trace (immutable, hashed) |
 | 5 | **Grade and report** | Rollout finished | Snapshot plus the evaluators pinned in the release | Scores plus `runs/<run_id>.json` |
 
@@ -120,11 +120,14 @@ together in it**, so nothing can pair a template with a different environment.
 ```json
 { "schema": "adi.qualification-receipt.v1", "release_sha256": "…", "result": "qualified",
   "checks": ["image_pulls_by_digest", "contract_gate", "evaluators_resolve", "smoke_rollout"],
-  "rlgym_version": "2.0.0", "issued_at": "…", "expires_at": "…", "issued_by": "rlgym-qualifier" }
+  "rlgym_version": "2.0.0",
+  "evaluators": [ { "kind": "promptfoo", "image": "…@sha256:…" }, { "kind": "trulens", "vendor_api_version": "…" } ],
+  "issued_at": "…", "expires_at": "<issued_at + 90 days>", "issued_by": "rlgym-qualifier" }
 ```
 
-The receipt binds the **release**, not RL Gym's source code. An RL Gym upgrade does not invalidate receipts, but
-it may trigger re-qualification by policy.
+The receipt binds the **release** plus the exact runner and evaluator versions, not RL Gym's source code. It is
+re-qualified automatically when any of those change, and every 90 days. Before each official run batch, a canary of
+fixed reference tasks must reproduce its known scores, or the batch stops (section 8, Q6).
 
 **Run manifest** (job 5): `run_id`, `release_sha256`, `task_revision_id`, `dataset_sha256` and the case IDs used,
 model ID and version, every image digest (environment and evaluators), each evaluator `config_sha256`, the
@@ -176,12 +179,15 @@ There are no template, proposal, environment-build, policy or authoring endpoint
 ADI Forge changes almost nothing. It keeps the same export format and reads receipts from the registry instead of
 receiving pushed calls.
 
-## 8. Open questions
+## 8. Owner decisions (20 Nov 2026) and open questions
 
-1. Does Harbor 0.25 stay as the rollout engine, or is a thinner runner enough?
-2. Is the RL Gym web app needed beyond run results and dataset admin? Most of today's ~40k lines are authoring and
-   environment UI.
-3. Who may add datasets (an RL Gym operator role), and who approves them?
-4. When does a receipt expire, and does an RL Gym upgrade force re-qualification?
-5. Are the external evaluator vendors in `evaluator_catalog.py` (Arthur, Openlayer, TruLens, Phoenix, Fiddler, LLM
-   Guard) in scope for v2, or only Promptfoo, OPA and custom Python?
+| # | Question | Decision |
+|---|---|---|
+| 1 | Studio and RL Gym: one app or two? | **Two separate apps.** They share only the registry. |
+| 2 | Who approves a Studio release? | **The Product Owner**, as the single release-approver role for now. The AI never approves. |
+| 3 | What stays in the RL Gym web app? | **Results, operations and model admin:** qualification status, export intake, run launch, results and reports, dataset view, and model providers and versions. No template, environment, policy or authoring screens. |
+| 4 | Which evaluators are in v2? | **All of today's catalogue:** Promptfoo, OPA, custom Python, NeMo, and the external vendors (Arthur, Openlayer, TruLens, Phoenix, Fiddler, LLM Guard). Each is pinned (image digest, or vendor plus API version) and config-hashed in the run manifest. External vendors receive synthetic data only. Vendor accounts and keys are set up by the owner. |
+| 5 | Who makes evaluation datasets? | **The Studio produces them** with the release (a synthetic generator per domain pack). RL Gym stores and selects them, and never edits them. This **changes the 18 Nov decision** that RL Gym owns datasets: RL Gym still decides which cases a run uses, but the Studio makes the data. Authors still never see evaluation data. |
+| 6 | When must a release be re-qualified? | **On any change, every 90 days, and a canary before each official batch.** (a) Automatically, whenever the RL Gym runner version or any evaluator digest or vendor API version recorded in the receipt changes. (b) Every 90 days even without changes, to catch drift in external vendor evaluators. (c) Before each official run batch, a short canary of fixed reference tasks with known scores; if they do not reproduce, the batch stops. Every official score is published with its run manifest so outsiders can verify it. Goal: benchmark results credible enough to become an industry standard. |
+| 7 | Does Harbor 0.25 stay as the rollout engine? | Open (RL Gym team) |
+

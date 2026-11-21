@@ -19,7 +19,7 @@ hand-offs. The detailed, numbered requirements (TS-01 to TS-46), each with its e
 | D3 | **Releases are immutable and shared.** One registry, read by both. A release pins the template hash, the environment image digest, the policy content hashes and the domain-pack versions. Changes are successor releases; bad ones are revoked, never deleted. | TS-26, TS-31, TS-46 |
 | D4 | **SMEs author only what a release supports.** If a scenario is not supported, only a PM or Admin may send the Studio an enhancement request. The Studio decides how to implement it: a new release, new data, or both. | TS-41, TS-42 |
 | D5 | **SMEs never write seed data or SQL/API assertions.** | TS-34 (dropped) |
-| D6 | **RL Gym owns evaluation datasets and populations.** A template only declares the case selector, and authors never see or choose evaluation data. | TS-05 |
+| D6 | **The Studio produces evaluation datasets** with each release (a synthetic generator per domain pack). RL Gym stores them, selects cases for runs and never edits them. Authors never see or choose evaluation data, and a template declares only the case selector. (Changed 20 Nov 2026 from "RL Gym owns datasets".) | TS-05, TS-47 |
 | D7 | **The schema grows as layered domain packs:** domain core → region pack (US, India, …) → process pack (KYC, AML, …), each versioned and hashed, and grown only when a template needs it. | TS-45, TS-46 |
 | D8 | **Real (purchased) enterprise data is future scope.** Everything stays synthetic until the owner decides and the spec is changed. | TS-44 |
 
@@ -64,9 +64,9 @@ hand-offs. The detailed, numbered requirements (TS-01 to TS-46), each with its e
 |---|---|---|---|
 | Template proposals | Anvil drafts proposals and calls `POST /templates/proposals` | **Anvil no longer proposes or edits templates.** Its needs go to the Studio as enhancement requests. | TS-43 |
 | Execution part | Owned and edited by Anvil inside the template | Defined **in the Studio** together with Anvil. Anvil still owns runtime behaviour, scoring and evaluators, but changes ship as Studio releases. | TS-43, TS-01 |
-| Qualification | Defined in the contract, never done | **Required:** register the release, qualify it, and post a receipt (hash, result, expiry) or a revocation back | TS-12, TS-31 |
+| Qualification | Defined in the contract, never done | **Required:** register the release, qualify it, and post a receipt (hash, runner and evaluator versions, expiry) or a revocation. Re-qualify on any runner or evaluator change, and every 90 days. A canary must pass before each official run batch. | TS-12, TS-31, TS-48 |
 | Evaluators | "Evaluator kind" only | Evaluators (Promptfoo, Gozen, OPA, …) are **images pinned by digest**, with hashed configs, run outside the task container, and recorded in a **run manifest** per grading run | TS-35, TS-36 |
-| Data | Datasets and populations | Unchanged owner (RL Gym). Datasets are versioned and hashed, and authors never see them. Gaps are filled on request. | TS-05, TS-42 |
+| Data | Datasets and populations made by RL Gym | **Made by the Studio** with each release, versioned and hashed. RL Gym selects cases and never edits them. Authors never see them. | TS-05, TS-47 |
 | Runtime hygiene | Findings from the owner's review | Single-claim runners that fail loudly; symmetric health gates; `mem_limit` on every service; Gym container with `--network none` and `--cap-drop ALL`, and no LLM keys | TS-36, TS-37, TS-38 |
 | Policy artifacts | Bounded public-text projection | Gym builds a hash-preserving projection of captured XML, HTML and text within its bounds | (KYC v8 findings) |
 

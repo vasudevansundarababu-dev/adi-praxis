@@ -26,7 +26,7 @@ Related: `docs/anvil/FORGE-RLGYM-HANDOFF-GAPS.md` (the 18 Nov hand-off) and `doc
 | H0: manual hand-off | KYC v7, Marketing VEYRA v1/v2 | Off: files sent by hand | Done 18 Nov 2026 | Rows TS-01 to TS-20 below |
 | R1: benchmark run | KYC (one task) | Off | Planned (owner) | *to be added* |
 | R2: benchmark run | Marketing | **On** (live integration) | Planned (owner) | *to be added* |
-| P1: target flow | All | n/a | Proposed by owner 20 Nov 2026 | Rows TS-26 to TS-38 |
+| P1: target flow | All | n/a | Proposed by owner 20 Nov 2026 | Rows TS-26 to TS-40 |
 
 After R2, this log becomes the input for the Studio's requirements spec.
 
@@ -113,7 +113,7 @@ registers the release, binds evaluators and model keys at run time, and runs iso
 |---|---|---|---|---|
 | TS-32 | Forge | **Tasks pin the release.** Every authored task records the release it was written against (`template_sha256`, and through the release manifest the `env_image_digest`). Export is blocked if that digest is not confirmed present in Artifact Registry, or if the release is revoked. | Owner checklist B. Today tasks record only the template version and hash. | open |
 | TS-33 | Forge | **Pre-export scrub for secrets and host paths.** Before export, check that no local host path (`/Users/…`), `.env` value or model API key appears in the payload. Any hit blocks the export. | Owner checklist B. ADI Forge already blocks private-field exposure (`GENERIC_PRIVATE_EXPOSURE`), but has no secret or path scan. | open |
-| TS-34 | All | **Seed and assertion dry-run: decision needed.** The checklist asks ADI Forge to validate SME-added seed rows and SQL/API assertions against the template's `schema.sql` and API schema before export. This conflicts with today's principle that SMEs write no technical interfaces; tasks carry no SQL or API assertions. Decide first whether SMEs may add seed data or assertions at all. If yes, the dry-run is required. If no, the Studio owns seeds and the row is dropped. | Owner checklist B, compared with the current task design. | open (owner decision) |
+| TS-34 | All | ~~Seed and assertion dry-run in ADI Forge.~~ Dropped: SMEs add no seed data or SQL/API assertions. The Studio owns the schema and seed (TS-39); RL Gym owns evaluation data (TS-05). | Follows from the owner decision of 20 Nov 2026 (TS-39) and the decision of 18 Nov 2026 that RL Gym owns input data. | dropped |
 
 ### I. Execution and evaluation (RL Gym)
 
@@ -124,8 +124,16 @@ registers the release, binds evaluators and model keys at run time, and runs iso
 | TS-37 | RL Gym | **Fail loudly, with single claim ownership.** A single-attempt runner never exits 0 when `request.json` is missing or already claimed. One active coordinator per bridge directory. | Owner checklist C: a silent exit 0 led to an empty syscall trace downstream. | open |
 | TS-38 | RL Gym | **Symmetric health gates and memory limits.** Every container that `deploy.sh` checks must also be verified healthy by `startup.sh` before it exits 0. Every compose service has an explicit `mem_limit`, so parallel rollouts cannot trigger the OOM killer. | Owner checklist C: an OOM risk to PostgreSQL during parallel rollouts. | open |
 
+### J. Template versioning (owner decision, 20 Nov 2026)
+
+| ID | Owner | Requirement | Why (evidence) | Status |
+|---|---|---|---|---|
+| TS-39 | All | **Every template change goes through the Studio.** This covers requirement, form, execution, skills, schema, seed, policy bindings and image, and even a wording-only form fix. Each change is a new Studio release with `successor_of`, a part diff and a person's approval (TS-26, TS-31). ADI Forge no longer creates template versions. It can only send a **change request** to the Studio, naming the template and the change wanted. Projects move to a new release only through the successor process (TS-21). | Owner decision, 20 Nov 2026: one place for versioning, so every release RL Gym qualifies is the one ADI Forge authors against. Today ADI Forge creates versions itself (e.g. Marketing v2 form, KYC v8). | agreed (owner) |
+| TS-40 | Forge | **Retire in-tool template versioning when the Studio ships.** Remove or disable "create new version" for templates in ADI Forge (the console and the SME app), and the draft-version editing that goes with it. Keep read-only views of releases and the change-request form. Versions already published stay unchanged and readable. | Follows from TS-39. Until the Studio exists, today's in-tool versioning stays, so QA and RL Gym runs are not blocked. | open |
+
 ## Change log
 
+- 20 Nov 2026: owner decided every template change goes through the Studio (TS-39). Added TS-40, dropped TS-34.
 - 20 Nov 2026: added TS-26 to TS-38 from the owner's target release flow and inspection checklist. TS-34 needs an owner decision.
 
 - 18 Nov 2026: added TS-24 and TS-25 from building the KYC v8 successor package.

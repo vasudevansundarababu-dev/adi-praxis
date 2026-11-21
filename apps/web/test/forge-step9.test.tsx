@@ -50,7 +50,7 @@ const row = (n: number, o: Partial<ForgeTaskRow> = {}): ForgeTaskRow => ({
 });
 const TASKS = [1, 2, 3, 4].map((n) => row(n));
 const P = project({ id: PID, name: 'KYC v7', status: 'IN_PROGRESS', requiredWorkers: 2 });
-const run = (results: ValidationRunDto['results']): ValidationRunDto => ({ id: 'r1', projectId: PID, kind: 'VALIDATE', validator: 'praxis-precheck', validatorVersion: '1', results, counts: { valid: 0, needsFix: results.length, notValidated: 0 }, requestedById: 'u1', createdAt: '2026-11-15T10:00:00.000Z', downloadPath: null });
+const run = (results: ValidationRunDto['results']): ValidationRunDto => ({ id: 'r1', projectId: PID, kind: 'VALIDATE', validator: 'praxis-precheck', validatorVersion: '1', results, counts: { valid: 0, needsFix: results.length, notValidated: 0 }, requestedById: 'u1', createdAt: '2026-11-15T10:00:00.000Z', downloadPath: null, anvil: null });
 const EXPORT: ExportState = {
   canValidate: true,
   canExport: false,

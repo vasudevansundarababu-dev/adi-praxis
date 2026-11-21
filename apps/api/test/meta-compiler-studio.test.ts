@@ -230,7 +230,7 @@ describe('A8 candidate studio: config, autosave, atomic Save & Commit, own tasks
     const rev = (await saveDraft(author.cookie, studioKey, bad, open.revision)).json().revision;
     const res = await commit(author.cookie, studioKey, rev);
     expect(res.statusCode).toBe(422);
-    expect(res.json()).toMatchObject({ error: 'STUDIO_INCOMPLETE', details: { problems: { data_oracle: ['Tag "NOT-A-TAG" is not allowed'] } } });
+    expect(res.json()).toMatchObject({ error: 'STUDIO_INCOMPLETE', details: { problems: { data_oracle: [expect.stringMatching(/tag "NOT-A-TAG" is not one of/)] } } });
     expect((await commit(author.cookie, studioKey, rev - 1)).json().error).toBe('STALE_REVISION');
   });
 

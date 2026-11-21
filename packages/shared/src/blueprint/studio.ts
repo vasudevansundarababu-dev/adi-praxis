@@ -25,13 +25,21 @@ export const STAGE_STEP: Record<keyof HarborBlueprint['custom_fields_by_stage'],
 
 const fieldControls = (fields: CustomField[]): StudioControl[] => fields.map((field) => ({ kind: 'custom_field', field }));
 
+/**
+ * The studio's own "Task title" control (step 1) is stored in `answers.fields` under this key, next to the blueprint's
+ * custom fields (apps/candidate/lib/studio/steps.ts TITLE_KEY). It is not a custom field: generators ignore it and the API
+ * uses it as the task's display title. The validator must therefore accept it rather than report it as unknown.
+ */
+export const STUDIO_TITLE_KEY = 'title';
+const MAX_TITLE_CHARS = 200;
+
 /** C2: the 6 SME steps and their controls, rendered by the studio from the blueprint alone (S4-03 to S4-07). */
 export const studioSteps: StudioSteps = (bp) => {
   const cf = bp.custom_fields_by_stage;
   const o = bp.step_2_data_panels.oracle_annotator;
   const controls: Record<StudioStepId, StudioControl[]> = {
     scenario: [
-      { kind: 'text', key: 'title', label: 'Task title / scenario name', multiline: false, required: true },
+      { kind: 'text', key: STUDIO_TITLE_KEY, label: 'Task title / scenario name', multiline: false, required: true },
       ...fieldControls(cf.stage_1),
       { kind: 'text', key: 'instructionNotes', label: 'Business instructions / brand guidelines', multiline: true, required: false },
     ],
@@ -95,7 +103,12 @@ export const studioAnswerProblems: StudioAnswerProblems = (bp, answers) => {
   }
   const known = (ids: string[]) => new Set(ids);
   const fieldIds = known(Object.keys(r.fields));
-  for (const id of Object.keys(answers.fields)) if (!fieldIds.has(id)) out.scenario.push(`Unknown field "${id}"`);
+  for (const id of Object.keys(answers.fields)) if (!fieldIds.has(id) && id !== STUDIO_TITLE_KEY) out.scenario.push(`Unknown field "${id}"`);
+  if (Object.hasOwn(answers.fields, STUDIO_TITLE_KEY) && !fieldIds.has(STUDIO_TITLE_KEY)) {
+    const t = answers.fields[STUDIO_TITLE_KEY];
+    if (typeof t !== 'string') out.scenario.push('"Task title" must be text');
+    else if (t.trim().length > MAX_TITLE_CHARS) out.scenario.push(`"Task title" must be at most ${MAX_TITLE_CHARS} characters`);
+  }
 
   const d = out.data_oracle;
   const zones = known(bp.step_2_data_panels.public_dropzones.map((z) => z.id));

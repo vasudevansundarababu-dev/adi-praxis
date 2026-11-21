@@ -1,3 +1,4 @@
+import { readTarGz } from '../harbor/tar';
 import type { Prisma } from '@prisma/client';
 import { CommitStudioTaskRequest, SaveStudioDraftRequest, SmeAuthoredTaskDto, StudioConfigResponse, STUDIO_STEP_IDS } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -134,7 +135,11 @@ export const candidateStudioRoutes: FastifyPluginAsyncZod<StudioRouteOptions> = 
       const bundleRef = `bundles/${actor.clientId}/${bundle.sha256}.tar.gz`;
       await storage.put(bundleRef, Buffer.from(bundle.bytes), 'application/gzip');
       await faults?.afterUpload?.();
-      const taskJson = JSON.parse(deps.generate(bp, saved.answers)['task.json']) as Prisma.InputJsonValue;
+      // S4-08: the stored task.json is the bundle's own file, so the two can never differ (regenerating it without the
+      // bundle's task metadata used to store `task: null`).
+      const bundledTaskJson = readTarGz(bundle.bytes).find((e) => e.path === 'task.json');
+      if (!bundledTaskJson) throw new Error('The bundle has no task.json');
+      const taskJson = JSON.parse(new TextDecoder().decode(bundledTaskJson.data)) as Prisma.InputJsonValue;
       // The duplicate check's embedding is a model call: computed before the transaction, like the existing submit.
       const embedding = await embeddings.embed((await evaluateTask(db, pre)).text).catch(() => {
         throw new AppError(503, 'SIMILARITY_UNAVAILABLE', 'The duplicate check is unavailable right now. Your work is saved; try again shortly.');

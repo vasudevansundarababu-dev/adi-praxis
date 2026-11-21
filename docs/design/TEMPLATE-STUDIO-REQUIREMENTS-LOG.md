@@ -26,7 +26,7 @@ Related: `docs/anvil/FORGE-RLGYM-HANDOFF-GAPS.md` (the 18 Nov hand-off) and `doc
 | H0: manual hand-off | KYC v7, Marketing VEYRA v1/v2 | Off: files sent by hand | Done 18 Nov 2026 | Rows TS-01 to TS-20 below |
 | R1: benchmark run | KYC (one task) | Off | Planned (owner) | *to be added* |
 | R2: benchmark run | Marketing | **On** (live integration) | Planned (owner) | *to be added* |
-| P1: target flow | All | n/a | Proposed by owner 20 Nov 2026 | Rows TS-26 to TS-40 |
+| P1: target flow | All | n/a | Proposed by owner 20 Nov 2026 | Rows TS-26 to TS-44 |
 
 After R2, this log becomes the input for the Studio's requirements spec.
 
@@ -131,8 +131,18 @@ registers the release, binds evaluators and model keys at run time, and runs iso
 | TS-39 | All | **Every template change goes through the Studio.** This covers requirement, form, execution, skills, schema, seed, policy bindings and image, and even a wording-only form fix. Each change is a new Studio release with `successor_of`, a part diff and a person's approval (TS-26, TS-31). ADI Forge no longer creates template versions. It can only send a **change request** to the Studio, naming the template and the change wanted. Projects move to a new release only through the successor process (TS-21). | Owner decision, 20 Nov 2026: one place for versioning, so every release RL Gym qualifies is the one ADI Forge authors against. Today ADI Forge creates versions itself (e.g. Marketing v2 form, KYC v8). | agreed (owner) |
 | TS-40 | Forge | **Retire in-tool template versioning when the Studio ships.** Remove or disable "create new version" for templates in ADI Forge (the console and the SME app), and the draft-version editing that goes with it. Keep read-only views of releases and the change-request form. Versions already published stay unchanged and readable. | Follows from TS-39. Until the Studio exists, today's in-tool versioning stays, so QA and RL Gym runs are not blocked. | open |
 
+### K. Who may change templates and data (owner decisions, 20 Nov 2026)
+
+| ID | Owner | Requirement | Why (evidence) | Status |
+|---|---|---|---|---|
+| TS-41 | Forge | **SMEs author only what the release supports.** An SME can write a task only for a scenario the release's schema and data can represent. ADI Forge offers only the case-selector values and rules the release declares. If a scenario is not supported, the SME cannot write it; there is no SME path to request it. | Owner decision, 20 Nov 2026. | agreed (owner) |
+| TS-42 | Studio | **Only a PM or Admin requests enhancements, and the Studio decides how.** A PM or Admin sends the Studio an enhancement request: the scenario wanted, the reason, and the projects affected. The Studio decides how to implement it: a new release (schema, seed, tools, form), new data, or both. It records that decision on the request. | Owner decision, 20 Nov 2026. | agreed (owner) |
+| TS-43 | All | **Neither ADI Forge nor RL Gym changes a template.** Both only consume Studio releases. ADI Forge sends enhancement requests (TS-42). RL Gym raises its needs the same way. **Contract impact:** the agreed contract has RL Gym (Anvil) proposing new and changed templates (`PRAXIS-ANVIL-CONTRACT-FINAL.md`, sections 1 to 3) and ADI Forge creating drafts from those proposals. Both roles move to the Studio, so the contract needs a change agreed with RL Gym. | Owner decision, 20 Nov 2026; extends TS-39 to RL Gym. | agreed (owner); contract change open |
+| TS-44 | All | **Real enterprise data: decision and spec change needed.** The owner plans to buy enterprise data, actual records rather than generated ones, so the data covers real scenarios. This **conflicts with a non-negotiable** (CLAUDE.md, SPEC.md): *task content is synthetic only; no real customer or employer data*, and *identity images and ID numbers are never stored in this platform*. Before anything is built, the owner must decide and record in `docs/`: (a) where real data may live (only in Studio or RL Gym environments, or also in ADI Forge); (b) whether SMEs and reviewers may see it, or author only against schema, case types and de-identified views; (c) how it is de-identified, especially identity numbers and images; (d) licence and data-rights terms and retention per supplier; (e) a separate GCP project and access controls; (f) how tasks and exports are labelled (`content_classification` is `synthetic` today). | Owner direction, 20 Nov 2026. Conflicts with the current non-negotiables and the QA/staging rule "synthetic only". | open (owner decision + spec change) |
+
 ## Change log
 
+- 20 Nov 2026: added TS-41 to TS-43 (SME scope, PM/Admin enhancement requests, no template changes in ADI Forge or RL Gym) and TS-44 (real enterprise data; conflicts with the synthetic-only rule; open).
 - 20 Nov 2026: owner decided every template change goes through the Studio (TS-39). Added TS-40, dropped TS-34.
 - 20 Nov 2026: added TS-26 to TS-38 from the owner's target release flow and inspection checklist. TS-34 needs an owner decision.
 

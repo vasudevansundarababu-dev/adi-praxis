@@ -2,7 +2,7 @@ import type { RunnerMode, RunnerResult } from '@praxis/shared';
 import { GoogleAuth } from 'google-auth-library';
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
@@ -88,16 +88,6 @@ function mockOracleOutputs(files: Map<string, Buffer>): Record<string, string> {
   return out;
 }
 
-const OUTPUTS_MARKER = '@@PRAXIS_OUTPUTS@@';
-
-/** Splits the grading script's stdout into the pytest part and the JSON map of output files after the marker. */
-export function splitOutputs(stdout: string): { text: string; outputs: Record<string, string> | undefined } {
-  const at = stdout.lastIndexOf(OUTPUTS_MARKER);
-  if (at < 0) return { text: stdout, outputs: undefined };
-  const parsed = z.record(z.string(), z.string()).safeParse((() => { try { return JSON.parse(stdout.slice(at + OUTPUTS_MARKER.length).trim()); } catch { return null; } })());
-  return { text: stdout.slice(0, at), outputs: parsed.success ? parsed.data : undefined };
-}
-
 export type Exec = (cmd: string, args: string[], opts: { timeoutMs: number }) => Promise<{ code: number | null; stdout: string; stderr: string }>;
 
 const execFile: Exec = (cmd, args, opts) =>
@@ -112,104 +102,73 @@ const execFile: Exec = (cmd, args, opts) =>
     child.on('close', (code) => (clearTimeout(timer), resolve({ code, stdout, stderr })));
   });
 
-const REWARD_MARKER = '@@PRAXIS_REWARD@@';
+/** grade.py prints the result JSON on the line after this marker in local mode (infra/harbor-verify/grade.py). */
+export const RESULT_MARKER = '@@PRAXIS_RESULT@@';
 
 /**
- * Inside the container: copy the read-only task to /tmp, run the oracle, then grade. Mirrors
- * infra/harbor-verify/grade.py so a local score equals the production score:
- *  - `bash solution/solve.sh` (the runtime contract; `sh` is dash and breaks bash-isms),
- *  - any reward the solution left behind is deleted before the verifiers run (it must not decide the score),
- *  - pytest with -P -s --noconftest and the image's own ini, so bundle files cannot replace the verifiers,
- *  - the score is the reward the verifiers write ($HARBOR_REWARD_PATH), not a pass ratio.
+ * The root capabilities grade.py uses, and nothing else: CHOWN to hand the writable dirs to nobody, SETUID/SETGID to
+ * drop to nobody, DAC_OVERRIDE/FOWNER so root can empty nobody's 0700 home and reset files between phases (the sandbox
+ * job's root has these too). Task code never holds any of them: it runs as nobody with no_new_privs.
  */
-const GRADE = `set -u
-cp -r /task /tmp/work && cd /tmp/work
-export HARBOR_ROOT=/tmp/work HARBOR_REWARD_PATH=/tmp/work/logs/verifier/reward.txt HOME=/tmp/home PYTHONNOUSERSITE=1
-mkdir -p /tmp/home workspace/outputs var/lib/harbor logs/verifier
-if [ "$1" = "oracle" ]; then bash solution/solve.sh || echo "solve.sh exited with $?"; fi
-rm -rf logs/verifier/reward.txt logs/verifier/reward.json
-python3 -P -s -m pytest -q -p no:cacheprovider --noconftest -c /opt/grade/pytest.ini --rootdir /tmp/work eval/test_verifiers.py 2>&1 | tail -n 200
-echo "${REWARD_MARKER}"
-[ -f logs/verifier/reward.txt ] && [ ! -L logs/verifier/reward.txt ] && head -c 64 logs/verifier/reward.txt
-echo
-echo "${OUTPUTS_MARKER}"
-python3 - <<'PY'
-import json, os
-root, out, left = "/tmp/work/workspace/outputs", {}, ${MAX_RUNNER_OUTPUT_CHARS}
-for d, dirs, names in os.walk(root, followlinks=False):
-    dirs[:] = sorted(x for x in dirs if not os.path.islink(os.path.join(d, x)))
-    for n in sorted(names):
-        p = os.path.join(d, n)
-        if os.path.islink(p) or left <= 0:
-            continue
-        try:
-            text = open(p, encoding="utf-8").read()[:left]
-        except (OSError, UnicodeDecodeError):
-            continue
-        out[os.path.relpath(p, root).replace(os.sep, "/")] = text
-        left -= len(text)
-print(json.dumps(out))
-PY`;
+export const GRADER_CAPS = ['CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'SETGID', 'SETUID'] as const;
+
+/** Seconds grade.py gives one run (both phases); the container is killed a minute after that. */
+const LOCAL_GRADE_SECONDS = 120;
+
+/** The result line grade.py printed after RESULT_MARKER, validated like the sandbox job's result object. */
+export function parseLocalResult(stdout: string): z.infer<typeof JobResult> | null {
+  const at = stdout.lastIndexOf(`${RESULT_MARKER}\n`);
+  if (at < 0) return null;
+  const line = stdout.slice(at + RESULT_MARKER.length + 1).split('\n', 1)[0] ?? '';
+  const parsed = JobResult.safeParse((() => { try { return JSON.parse(line); } catch { return null; } })());
+  return parsed.success ? parsed.data : null;
+}
 
 /**
- * Splits the pytest text from the reward the verifiers wrote. Same rule as grade.py read_score: a missing,
- * unparsable or out-of-range reward (a guardrail fired) scores 0.00; otherwise rounded to two places.
+ * Local development: runs the grading image's own entrypoint (infra/harbor-verify/grade.py) on the bundle file, the
+ * same code the sandbox job runs, so local and production scores come from one grading path: task code as nobody,
+ * root-owned read-only task files, three writable directories, reward reset and process kill between phases, per-run
+ * time limit, scoring from the verifiers' reward file.
+ *
+ * Container: no network, read-only root, /tmp as tmpfs (exec allowed, as on Cloud Run), memory/CPU/pid limits, all
+ * capabilities dropped except the few grade.py itself needs (GRADER_CAPS).
+ * Without CAP_SYS_ADMIN grade.py cannot make its own network namespace; --network=none already gives task code no
+ * network, so local mode sets HARBOR_REQUIRE_NETNS=0 (the sandbox job ignores that switch).
  */
-export function splitReward(text: string): { text: string; score: number; why: string } {
-  const at = text.lastIndexOf(REWARD_MARKER);
-  if (at < 0) return { text, score: 0, why: 'no reward was written: score 0.00' };
-  const raw = text.slice(at + REWARD_MARKER.length).trim();
-  const reward = raw === '' ? Number.NaN : Number(raw);
-  const ok = Number.isFinite(reward) && reward >= 0 && reward <= 1;
-  const score = ok ? Math.round(reward * 100) / 100 : 0;
-  const why = ok ? `reward ${score.toFixed(2)}` : raw === '' ? 'no reward was written: score 0.00' : `reward ${JSON.stringify(raw)} is outside 0..1: score 0.00`;
-  return { text: text.slice(0, at), score, why };
-}
-
-/** Score from pytest's summary line: passed / (passed + failed + errors). No tests collected scores 0. Diagnostic only. */
-export function pytestScore(output: string): number {
-  const n = (k: string) => Number(output.match(new RegExp(`(\\d+) ${k}`))?.[1] ?? 0);
-  const passed = n('passed');
-  const total = passed + n('failed') + n('error') + n('errors');
-  return total === 0 ? 0 : Math.round((passed / total) * 100) / 100;
-}
-
-/** Local development only: the same grading image (infra/harbor-verify/Dockerfile) with no network, a read-only root file system and resource limits. */
 export class DockerRunner implements HarborRunner {
   readonly kind = 'docker' as const;
   constructor(private readonly opts: { storage: ObjectStorage; image?: string; exec?: Exec; timeoutMs?: number }) {}
-  dockerArgs(dir: string, mode: RunnerMode, name: string): string[] {
+  dockerArgs(bundleFile: string, bundleRef: string, mode: RunnerMode, name: string): string[] {
     return [
       'run', '--rm', '--name', name,
-      '--network=none', '--read-only', '--tmpfs', '/tmp:rw,size=64m',
-      '--memory', '1g', '--cpus', '1', '--pids-limit', '256', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
-      '-v', `${dir}:/task:ro`,
-      '--entrypoint', 'sh',
+      '--network=none', '--read-only', '--tmpfs', '/tmp:rw,exec,nosuid,size=256m',
+      '--memory', '1g', '--cpus', '1', '--pids-limit', '512',
+      '--cap-drop', 'ALL', ...GRADER_CAPS.flatMap((c) => ['--cap-add', c]),
+      '--security-opt', 'no-new-privileges',
+      '-v', `${bundleFile}:/in/bundle.tar.gz:ro`,
+      '-e', 'PRAXIS_BUNDLE_FILE=/in/bundle.tar.gz', '-e', 'HARBOR_REQUIRE_NETNS=0', '-e', `HARBOR_GRADE_SECONDS=${LOCAL_GRADE_SECONDS}`,
       this.opts.image ?? 'praxis-harbor-verify:local',
-      '-c', GRADE, 'grade', mode,
+      bundleRef, mode, 'local',
     ];
   }
   async run(bundleRef: string, mode: RunnerMode): Promise<RunnerRun> {
-    const files = readTarGz(await this.opts.storage.get(bundleRef));
+    const bytes = await this.opts.storage.get(bundleRef);
+    readTarGz(bytes); // refuse unsafe paths before anything starts (grade.py checks again inside)
     const dir = await mkdtemp(path.join(tmpdir(), 'praxis-bundle-'));
-    // The container runs with --cap-drop ALL, so its root cannot read a 0700 directory owned by another user.
+    // The container drops CAP_DAC_OVERRIDE, so its root needs world-readable access to the mounted file.
     await chmod(dir, 0o755);
+    const file = path.join(dir, 'bundle.tar.gz');
+    const name = `praxis-verify-${randomUUID().slice(0, 12)}`;
+    const exec = this.opts.exec ?? execFile;
     try {
-      for (const [p, data] of files) {
-        // As in grade.py: the judge's checklists hold the answer key and are graded by Praxis after the run.
-        if (p.startsWith('eval/judge/')) continue;
-        const target = path.join(dir, p);
-        if (!target.startsWith(dir + path.sep)) throw new RunnerError(`Unsafe path in bundle: ${p}`);
-        await mkdir(path.dirname(target), { recursive: true });
-        await writeFile(target, data);
-      }
-      const name = `praxis-verify-${randomUUID().slice(0, 12)}`;
-      const r = await (this.opts.exec ?? execFile)('docker', this.dockerArgs(dir, mode, name), { timeoutMs: this.opts.timeoutMs ?? 120_000 });
-      const { text: graded, outputs } = splitOutputs(r.stdout);
-      const { text, score, why } = splitReward(graded);
-      const log = `${text}\n${r.stderr}\n${why}`.trim();
-      return { score, log, runnerRef: `docker:${name}`, outputs };
+      await writeFile(file, bytes, { mode: 0o644 });
+      const r = await exec('docker', this.dockerArgs(file, bundleRef, mode, name), { timeoutMs: this.opts.timeoutMs ?? (LOCAL_GRADE_SECONDS + 60) * 1000 });
+      const result = parseLocalResult(r.stdout);
+      if (!result) throw new RunnerError(`The local grader returned no result (exit ${r.code}): ${r.stderr.trim().slice(-2000) || r.stdout.trim().slice(-2000)}`);
+      return { score: result.score, log: result.log, runnerRef: `docker:${name}`, outputs: result.outputs };
     } finally {
+      // A timeout kills only the docker client; make sure the container goes too (no-op if it already exited).
+      if (!this.opts.exec) await exec('docker', ['rm', '-f', name], { timeoutMs: 15_000 }).catch(() => undefined);
       await rm(dir, { recursive: true, force: true });
     }
   }

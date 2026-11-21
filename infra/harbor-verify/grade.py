@@ -1,6 +1,11 @@
-"""Grades one Harbor bundle inside the praxis-harbor-verify Cloud Run job.
+"""Grades one Harbor bundle inside the praxis-harbor-verify Cloud Run job, and locally (DockerRunner).
 
     grade.py <bundle-ref> <null-agent|oracle> <result-key>
+
+Two ways in, one grading path, so a local score is the production score:
+  sandbox job  PRAXIS_BUNDLE_URL + PRAXIS_RESULT_URL (signed GET / PUT). Network isolation of task code is mandatory.
+  local        PRAXIS_BUNDLE_FILE (a read-only mounted .tar.gz) and the result printed to stdout after RESULT_MARKER.
+               The container itself runs with --network=none, so the in-process network namespace is optional there.
 
 The job's service account has no storage access. The worker passes a short-lived signed GET URL for the bundle and a
 signed PUT URL for the result (PRAXIS_BUNDLE_URL, PRAXIS_RESULT_URL). This process (root) downloads and unpacks the
@@ -10,7 +15,6 @@ task code can reach neither the network nor the signed URLs. The score is the re
 """
 
 import fcntl
-import gzip
 import io
 import json
 import os
@@ -24,11 +28,15 @@ import sys
 import tarfile
 import time
 import urllib.request
+import zlib
 
 NOBODY = 65534
 TASK = "/tmp/task"
 HOME = "/tmp/home"
 MAX_BUNDLE_BYTES = 50 * 1024 * 1024
+# Decompressed size cap: a 50 MB gzip can expand to many GB and exhaust the job's 1 GiB of memory.
+MAX_TAR_BYTES = 200 * 1024 * 1024
+RESULT_MARKER = "@@PRAXIS_RESULT@@"
 MAX_FILES = 2000
 MAX_OUTPUT_CHARS = 150_000
 MAX_LOG_CHARS = 200_000
@@ -45,11 +53,37 @@ class GradeError(Exception):
 
 
 def fetch(url):
-    with urllib.request.urlopen(url, timeout=30) as r:
-        data = r.read(MAX_BUNDLE_BYTES + 1)
+    try:
+        with urllib.request.urlopen(url, timeout=30) as r:
+            data = r.read(MAX_BUNDLE_BYTES + 1)
+    except OSError as e:  # URLError, HTTPError and timeouts are all OSError
+        raise GradeError("cannot download the bundle (%s)" % e)
     if len(data) > MAX_BUNDLE_BYTES:
         raise GradeError("bundle is larger than %d bytes" % MAX_BUNDLE_BYTES)
     return data
+
+
+def read_file(path):
+    try:
+        with open(path, "rb") as f:
+            data = f.read(MAX_BUNDLE_BYTES + 1)
+    except OSError as e:
+        raise GradeError("cannot read the bundle file (%s)" % e)
+    if len(data) > MAX_BUNDLE_BYTES:
+        raise GradeError("bundle is larger than %d bytes" % MAX_BUNDLE_BYTES)
+    return data
+
+
+def gunzip_capped(data):
+    """gzip -> tar bytes, refusing anything that expands past MAX_TAR_BYTES (decompression bomb)."""
+    d = zlib.decompressobj(16 + zlib.MAX_WBITS)
+    try:
+        out = d.decompress(data, MAX_TAR_BYTES + 1)
+    except zlib.error as e:
+        raise GradeError("bundle is not valid gzip (%s)" % e)
+    if len(out) > MAX_TAR_BYTES or d.unconsumed_tail:
+        raise GradeError("bundle expands past %d bytes" % MAX_TAR_BYTES)
+    return out
 
 
 def safe_member_path(name):
@@ -63,23 +97,34 @@ def unpack(data, root):
     """Regular files only; no links, devices or paths outside root. Directories are root-owned and read-only."""
     os.makedirs(root, mode=0o755)
     count = 0
-    with tarfile.open(fileobj=io.BytesIO(gzip.decompress(data)), mode="r:") as tar:
-        for m in tar:
-            if m.isdir():
-                continue
-            if not m.isreg():
-                raise GradeError("bundle entry is not a regular file: %r" % m.name)
-            name = safe_member_path(m.name)
-            if name.startswith(DROPPED_PREFIXES):
-                continue
-            count += 1
-            if count > MAX_FILES:
-                raise GradeError("bundle has more than %d files" % MAX_FILES)
-            target = os.path.join(root, name)
-            os.makedirs(os.path.dirname(target), mode=0o755, exist_ok=True)
-            with open(target, "xb") as f:
-                f.write(tar.extractfile(m).read())
-            os.chmod(target, 0o755 if m.mode & 0o111 else 0o644)
+    try:
+        tar = tarfile.open(fileobj=io.BytesIO(gunzip_capped(data)), mode="r:")
+    except tarfile.TarError as e:
+        raise GradeError("bundle is not a valid tar archive (%s)" % e)
+    try:
+        with tar:
+            for m in tar:
+                if m.isdir():
+                    continue
+                if not m.isreg():
+                    raise GradeError("bundle entry is not a regular file: %r" % m.name)
+                name = safe_member_path(m.name)
+                if name.startswith(DROPPED_PREFIXES):
+                    continue
+                count += 1
+                if count > MAX_FILES:
+                    raise GradeError("bundle has more than %d files" % MAX_FILES)
+                target = os.path.join(root, name)
+                os.makedirs(os.path.dirname(target), mode=0o755, exist_ok=True)
+                try:
+                    f = open(target, "xb")
+                except FileExistsError:
+                    raise GradeError("bundle lists a file twice: %r" % m.name)
+                with f:
+                    f.write(tar.extractfile(m).read())
+                os.chmod(target, 0o755 if m.mode & 0o111 else 0o644)
+    except tarfile.TarError as e:  # truncated or corrupt member headers surface while iterating
+        raise GradeError("bundle is not a valid tar archive (%s)" % e)
     for d in WRITABLE_DIRS:
         path = os.path.join(root, d)
         os.makedirs(path, mode=0o755, exist_ok=True)
@@ -89,17 +134,16 @@ def unpack(data, root):
 
 
 def leave_network():
-    """New empty network namespace (only a down loopback). Returns how isolation was achieved, or raises."""
+    """New empty network namespace (only a down loopback). Needs CAP_SYS_ADMIN; raises if it cannot be done.
+
+    There is deliberately no user-namespace fallback: without uid/gid maps the later setgroups/setuid to nobody fail,
+    so it could never work, and a half-isolated grader is worse than a refused one.
+    """
     try:
         os.unshare(os.CLONE_NEWNET)
         return "netns"
     except OSError as e:
-        first = e
-    try:
-        os.unshare(os.CLONE_NEWUSER | os.CLONE_NEWNET)
-        return "userns+netns"
-    except OSError as e:
-        raise GradeError("cannot isolate the network (%s; %s)" % (first, e))
+        raise GradeError("cannot isolate the network (%s)" % e.strerror)
 
 
 SIOCGIFFLAGS, SIOCSIFFLAGS, IFF_UP = 0x8913, 0x8914, 0x1
@@ -144,12 +188,17 @@ def as_nobody(require_netns):
     # Best effort, never fatal: bringing lo up needs CAP_NET_ADMIN, which a runtime may not grant (plain Docker does
     # not). Grading must not break where it worked before, so the log line says which case applied; a task that
     # needs 127.0.0.1 then fails with a visible reason instead of a silent EADDRNOTAVAIL.
+    # Check first: under docker --network=none loopback is already up (and CAP_NET_ADMIN is not granted).
     try:
-        loopback_up()
         loopback_works()
         how += " loopback=up"
-    except OSError as e:
-        how += " loopback=down (%s)" % e.strerror
+    except OSError:
+        try:
+            loopback_up()
+            loopback_works()
+            how += " loopback=up"
+        except OSError as e:
+            how += " loopback=down (%s)" % e.strerror
     os.setgroups([])
     os.setgid(NOBODY)
     os.setuid(NOBODY)
@@ -253,7 +302,14 @@ def reset_between_phases():
             shutil.rmtree(p)
         elif os.path.lexists(p):
             os.unlink(p)
-    shutil.rmtree(HOME, ignore_errors=True)
+    # Not ignore_errors: if the solution's home cannot be emptied (e.g. root lacks CAP_DAC_OVERRIDE), its files would
+    # survive into the verify phase, so refuse to grade instead.
+    try:
+        shutil.rmtree(HOME)
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        raise GradeError("cannot reset the task home between phases (%s)" % e)
     os.makedirs(HOME, mode=0o700)
     os.chown(HOME, NOBODY, NOBODY)
 
@@ -271,7 +327,10 @@ def run_grader(mode, require_netns):
         logs.append(log)
         if code == 97 or timed_out:
             return "".join(logs), code, timed_out
-    reset_between_phases()
+    try:
+        reset_between_phases()
+    except GradeError as e:
+        return "".join(logs) + "grader setup failed: %s\n" % e, 97, False
     left = max(10, GRADE_SECONDS - int(time.monotonic() - started))
     log, code, timed_out = phase(VERIFY, require_netns, left)
     logs.append(log)
@@ -331,14 +390,22 @@ def main(argv):
         print("usage: grade.py <bundle-ref> <null-agent|oracle> <result-key>", file=sys.stderr)
         return 2
     bundle_ref, mode, result_key = argv[1], argv[2], argv[3]
+    # Popped, so they never reach a child process environment (task code also gets a clean env, see task_env).
     bundle_url, result_url = os.environ.pop("PRAXIS_BUNDLE_URL", ""), os.environ.pop("PRAXIS_RESULT_URL", "")
-    if not bundle_url or not result_url:
-        print("PRAXIS_BUNDLE_URL and PRAXIS_RESULT_URL are required", file=sys.stderr)
+    bundle_file = os.environ.pop("PRAXIS_BUNDLE_FILE", "")
+    if bundle_url and result_url and not bundle_file:
+        local = False
+    elif bundle_file and not bundle_url and not result_url:
+        local = True
+    else:
+        print("set PRAXIS_BUNDLE_URL and PRAXIS_RESULT_URL (sandbox job), or only PRAXIS_BUNDLE_FILE (local)", file=sys.stderr)
         return 2
-    require_netns = os.environ.get("HARBOR_REQUIRE_NETNS", "1") != "0"
+    # The sandbox job always isolates task code in its own network namespace; only a local container (already
+    # --network=none) may run without it. The switch cannot weaken the job, whatever execution overrides say.
+    require_netns = True if not local else os.environ.get("HARBOR_REQUIRE_NETNS", "1") != "0"
     print("grading %s (%s) -> %s" % (bundle_ref, mode, result_key))
     try:
-        unpack(fetch(bundle_url), TASK)
+        unpack(read_file(bundle_file) if local else fetch(bundle_url), TASK)
         log, code, timed_out = run_grader(mode, require_netns)
         if code == 97:
             raise GradeError(log.strip().splitlines()[-1] if log.strip() else "grader setup failed")
@@ -347,7 +414,10 @@ def main(argv):
     except GradeError as e:
         print("grading failed: %s" % e, file=sys.stderr)
         return 1
-    put_json(result_url, result)
+    if local:
+        sys.stdout.write("%s\n%s\n" % (RESULT_MARKER, json.dumps(result)))
+    else:
+        put_json(result_url, result)
     print("score %.2f (%s)" % (score, why))
     return 0
 

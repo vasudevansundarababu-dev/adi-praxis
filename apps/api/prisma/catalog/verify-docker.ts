@@ -63,7 +63,9 @@ export function runInDocker(bundle: Uint8Array, mode: 'null-agent' | 'oracle' | 
     if (typeof mode === 'object') writeFileSync(path.join(root, 'agent.sh'), mode.agentScript);
     const agent = mode === 'oracle' ? 'bash solution/solve.sh && ' : typeof mode === 'object' ? 'bash agent.sh && ' : '';
     // Same hardened pytest call as grade.py: bundle conftest.py / ini files cannot replace the verifiers.
-    const script = `${agent}python3 -P -s -m pytest -q -p no:cacheprovider --noconftest -c /opt/grade/pytest.ini --rootdir /task eval/test_verifiers.py; true`;
+    // The raw reward (including -1 hard fails, which grade.py clamps to 0) is the point of this proof, so it reads the
+    // file directly; any reward the agent pre-wrote is deleted first so only the verifiers can produce it.
+    const script = `${agent}true; rm -f logs/verifier/reward.txt logs/verifier/reward.json; python3 -P -s -m pytest -q -p no:cacheprovider --noconftest -c /opt/grade/pytest.ini --rootdir /task eval/test_verifiers.py; true`;
     const user = typeof process.getuid === 'function' ? [`--user=${process.getuid()}:${process.getgid!()}`] : [];
     const run = spawnSync(
       'docker',

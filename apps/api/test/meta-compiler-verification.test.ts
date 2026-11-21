@@ -6,8 +6,13 @@ import { VerificationRunDto, type HarborBlueprint } from '@praxis/shared';
 import { buildApp } from '../src/app';
 import { MemoryStorage } from '../src/candidate/storage';
 import type { Config } from '../src/config';
-import { defaultRunner, DockerRunner, MockRunner, pytestScore, readTarGz, SandboxJobRunner, splitReward, type HarborRunner } from '../src/harbor/runner';
-import { resolveDeps, tarGz } from '../src/meta-compiler/deps';
+import { defaultRunner, DockerRunner, MockRunner, parseLocalResult, readTarGz, SandboxJobRunner, type HarborRunner } from '../src/harbor/runner';
+import { gzipSync } from 'node:zlib';
+import { resolveDeps } from '../src/meta-compiler/deps';
+import { gzipDeterministic, writeTar } from '../src/harbor/tar';
+
+/** A raw .tar.gz from path -> bytes (fixture helper; real bundles come from buildBundle). */
+const tarGz = (files: Record<string, Buffer>) => Buffer.from(gzipDeterministic(writeTar(Object.entries(files).map(([path, data]) => ({ path, data: new Uint8Array(data), mode: 0o644 })))));
 import { MockContentDrafter } from '../src/meta-compiler/drafter';
 import { metaCompilerHandlers } from '../src/meta-compiler/handlers';
 import { MockJudge } from '../src/meta-compiler/judge';
@@ -152,38 +157,48 @@ describe('A6 runners (unit)', () => {
   });
 
   it('bundle reading refuses paths that escape the task directory', () => {
-    expect(() => readTarGz(tarGz({ '../evil.sh': Buffer.from('x') }))).toThrow(/Unsafe path/);
+    // writeTar refuses unsafe names itself, so hand-build the hostile header a malicious bundle would carry.
+    const h = Buffer.alloc(512);
+    h.write('../evil.sh', 0);
+    h.write('0000644\0', 100);
+    h.write('00000000001\0', 124);
+    h.write('0', 156);
+    h.write('ustar\0', 257);
+    h.fill(' ', 148, 156);
+    h.write(`${h.reduce((a, b) => a + b, 0).toString(8).padStart(6, '0')}\0 `, 148);
+    const hostile = gzipSync(Buffer.concat([h, Buffer.from('x'), Buffer.alloc(511), Buffer.alloc(1024)]));
+    expect(() => readTarGz(hostile)).toThrow(/Unsafe path/);
   });
 
-  it('DockerRunner runs with --network=none and --read-only, the task mounted read-only, and scores from the reward file', async () => {
+  it('DockerRunner runs the image\'s own grade.py on the read-only bundle, with no network and minimal capabilities', async () => {
     await storage.put('b.tar.gz', bundle, 'application/gzip');
     const calls: string[][] = [];
-    const r = new DockerRunner({ storage, image: 'verify:test', exec: async (cmd, args) => (calls.push([cmd, ...args]), { code: 0, stdout: '3 passed, 1 failed in 0.1s\n@@PRAXIS_REWARD@@\n0.6\n', stderr: '' }) });
+    const stdout = 'grading b.tar.gz (oracle) -> local\n@@PRAXIS_RESULT@@\n{"score":0.6,"log":"isolation: network=none loopback=up\\nreward 0.60","outputs":{"memo.md":"m"}}\nscore 0.60 (reward 0.60)\n';
+    const r = new DockerRunner({ storage, image: 'verify:test', exec: async (cmd, args) => (calls.push([cmd, ...args]), { code: 0, stdout, stderr: '' }) });
     const res = await r.run('b.tar.gz', 'oracle');
-    // The verifiers' reward decides the score (as in production), not the pass ratio (0.75).
-    expect(res.score).toBe(0.6);
+    // The score is grade.py's (the verifiers' reward file), exactly as the sandbox job reports it.
+    expect(res).toMatchObject({ score: 0.6, outputs: { 'memo.md': 'm' } });
     expect(res.log).toMatch(/reward 0\.60/);
-    const script = calls[0]![calls[0]!.indexOf('-c') + 1]!;
-    expect(script).toContain('bash solution/solve.sh');
-    expect(script).toMatch(/rm -rf logs\/verifier\/reward\.txt[\s\S]*pytest/);
-    expect(script).toContain('-P -s -m pytest');
-    expect(script).toContain('--noconftest -c /opt/grade/pytest.ini');
     const args = calls[0]!;
     expect(args[0]).toBe('docker');
-    expect(args).toEqual(expect.arrayContaining(['--network=none', '--read-only', '--cap-drop', 'ALL', 'verify:test', 'oracle']));
-    expect(args[args.indexOf('-v') + 1]).toMatch(/:\/task:ro$/);
-    expect(pytestScore('no tests ran')).toBe(0);
-    expect(pytestScore('2 passed in 0.01s')).toBe(1);
+    // No inline script: the image's entrypoint (grade.py) runs, with its normal arguments.
+    expect(args).not.toContain('--entrypoint');
+    expect(args.slice(-4)).toEqual(['verify:test', 'b.tar.gz', 'oracle', 'local']);
+    expect(args).toEqual(expect.arrayContaining(['--network=none', '--read-only', '--security-opt', 'no-new-privileges', 'PRAXIS_BUNDLE_FILE=/in/bundle.tar.gz']));
+    const caps = args.flatMap((a, i) => (args[i - 1] === '--cap-add' ? [a] : []));
+    expect(args[args.indexOf('--cap-drop') + 1]).toBe('ALL');
+    expect(caps.sort()).toEqual(['CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'SETGID', 'SETUID']);
+    expect(caps).not.toContain('SYS_ADMIN');
+    expect(args[args.indexOf('-v') + 1]).toMatch(/bundle\.tar\.gz:\/in\/bundle\.tar\.gz:ro$/);
   });
 
-  it('DockerRunner scores 0.00 for a missing, unparsable or out-of-range reward, like grade.py', () => {
-    expect(splitReward('5 passed').score).toBe(0);
-    expect(splitReward('x\n@@PRAXIS_REWARD@@\n\n').why).toMatch(/no reward/);
-    expect(splitReward('@@PRAXIS_REWARD@@\n1.5\n').score).toBe(0);
-    expect(splitReward('@@PRAXIS_REWARD@@\n-0.1').score).toBe(0);
-    expect(splitReward('@@PRAXIS_REWARD@@\nnan').score).toBe(0);
-    expect(splitReward('@@PRAXIS_REWARD@@\n0.004').score).toBe(0);
-    expect(splitReward('@@PRAXIS_REWARD@@\n1.00\n').score).toBe(1);
+  it('DockerRunner fails clearly when grade.py returns no valid result', async () => {
+    await storage.put('b.tar.gz', bundle, 'application/gzip');
+    const r = new DockerRunner({ storage, exec: async () => ({ code: 1, stdout: 'grading b.tar.gz (oracle) -> local\n', stderr: 'grading failed: bundle is not valid gzip' }) });
+    await expect(r.run('b.tar.gz', 'oracle')).rejects.toThrow(/no result \(exit 1\).*not valid gzip/);
+    // An out-of-range score is refused like a bad sandbox-job result.
+    expect(parseLocalResult('@@PRAXIS_RESULT@@\n{"score":1.5,"log":""}\n')).toBeNull();
+    expect(parseLocalResult('@@PRAXIS_RESULT@@\nnot json\n')).toBeNull();
   });
 
   describe('SandboxJobRunner against a fake Cloud Run API (no network)', () => {

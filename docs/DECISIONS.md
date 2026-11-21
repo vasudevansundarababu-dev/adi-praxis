@@ -2238,3 +2238,45 @@ decision (APR-02 to APR-06, APR-09). Code: `apps/api/src/jobs/kyc-v8-successor.t
   documents and rule sets; for each successor its predecessor mapping, submissions, reviews and approved records
   (record ID, sequence, content and previous hash, receipt reference) and audit events, with actor user IDs and roles
   only (no names or e-mails).
+
+## KYC v8 tool-binding correction and the declared-tool check (20 Nov 2026)
+
+RL Gym's importer refused 9 `S5.steps[].tool` values of 3 approved v8 tasks that v8's `execution.tools` does not
+declare (`PX_TOOL_CALL_MISSING`; the adult-joint task passed). The v8 form's step `tool` is free optional text and
+nothing checked it. The owner (Product Owner) decided in chat (APR-13a-d): 7 exact rebindings; the 2 pending-TIN steps
+left blank with capability gap CG-01 (no TIN capability in v8; a Template Studio request); v8 unchanged; originals
+untouched; the owner approves each revision in the console; a recurrence check. Code:
+`apps/api/src/jobs/kyc-v8-tool-binding.ts`, `apps/api/src/anvil/tool-binding.ts`, `authored-export.ts`.
+
+- **(owner, 20 Nov)** **APR-13a-d** as above. The exact pointers, old and new values are embedded in the job
+  (`KYC_V8_TOOL_BINDING`), with a semantic justification per change.
+- **(chosen by Claude)** **The revision path is the existing one for an approved task (D18).** An approved task may
+  leave Accepted (or Rework) as a new submitted version; its approved record stays (append-only) and is not exported
+  while the task awaits review; the record written by the next console approval replaces it in exports. The job
+  `kyc-v8-tool-binding --requested-by <active Admin> [--apply]` submits the 3 revisions this way (a new
+  `TaskSubmission`, the slot back to in progress, audit `task.tool_binding_revision_submitted`). The new record is a
+  later record of the same task (`supersedesId` stays null, as for every re-approval); the lineage is in the task
+  input `toolBindingCorrection` (predecessor record ID, content hash and asset hashes, each pointer's old and new value
+  and justification, APR-13a-c in the v8 job's approval shape, CG-01, RL Gym's request), so the new record carries it.
+  The job never writes an `ApprovedTaskRecord`.
+- **(chosen by Claude)** **The job refuses, writing nothing, on any difference:** the requester is not an active Admin;
+  the template version is not the published one with sha256 `8449adb0…`; the predecessor is not the task's latest
+  approved record (superseded or a later record); the task is not Accepted/Rework or its content differs from that
+  record; a pointer is not an S5 step tool, or its value is not the expected old value; a new tool is not declared; a
+  blank lacks its capability gap; an approval is missing; or the corrected task fails the checks its approval re-runs.
+  Putting the old values back must give the approved bytes exactly. A task already carrying the same correction is
+  reported (`already_submitted`, with the approval's record once it exists) and not touched.
+- **(chosen by Claude)** **APR-13d: the declared-tool check is a package check (`GENERIC_TOOL_UNDECLARED`).** For any
+  template version whose execution part declares `tools`, every non-blank `S5.steps[].tool` must be exactly one of
+  their IDs (case and spaces count; blank or absent is allowed; templates without `execution.tools` are not checked).
+  It is author-fixable, so the console approval and the live export send a failing task to Rework with the message
+  under S5 (D18), and both export paths leave it out. The offline `authored-export` refuses to write anything when an
+  approved task fails it (or would expose private fields), instead of exporting the rest.
+- **(chosen by Claude)** **Offline export: conformance checks and change records.** Before writing, each ZIP is also
+  checked on its own bytes: declared tools per task, actor.json exactly the public projection of the private reference
+  with no private, criterion or unknown field, private assets under `private/` (plus the existing manifest hash and
+  archive checks). Each part with a corrected task gets `<packageId>.change-record.json` next to the ZIP
+  (`adi-forge.tool-binding-change-record.v1`): predecessor and successor record IDs and content hashes, actor and
+  reference hashes before and after, each pointer's old and new value and justification, approvals and capability gaps.
+- **(chosen by Claude)** The PR #99 test fixture now binds the embedded v8 candidates' tools as APR-13a/b did, since
+  approval refuses the original values.

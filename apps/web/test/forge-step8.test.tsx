@@ -385,7 +385,7 @@ describe('Task page decision box', () => {
 
   it('an approved task shows the decision and the Validate card with the latest result', () => {
     const reviews = [{ id: 'r1', by: 'Platform Admin', decision: 'ACCEPT', stage: null, comments: [], notes: null, rejectReason: null, version: 1, at: '2026-11-15T11:00:00.000Z' }];
-    const run = { id: 'v1', projectId: PID, kind: 'VALIDATE' as const, validator: 'praxis-precheck', validatorVersion: '1', results: [{ recordId: EXPORT.tasks[0]!.recordId, taskId: T(1), title: 'CA', status: 'valid' as const, issues: [] }], counts: { valid: 1, needsFix: 0, notValidated: 0 }, requestedById: 'u1', createdAt: '2026-11-15T11:02:00.000Z', downloadPath: null };
+    const run = { id: 'v1', projectId: PID, kind: 'VALIDATE' as const, validator: 'praxis-precheck', validatorVersion: '1', results: [{ recordId: EXPORT.tasks[0]!.recordId, taskId: T(1), title: 'CA', status: 'valid' as const, issues: [] }], counts: { valid: 1, needsFix: 0, notValidated: 0 }, requestedById: 'u1', createdAt: '2026-11-15T11:02:00.000Z', downloadPath: null, anvil: null };
     const m = renderToStaticMarkup(<ForgeTaskPage code="TSK-001" view={view({ taskId: T(1), status: 'ACCEPTED', canDecide: false, reviews })} people={PEOPLE} exportState={{ ...EXPORT, runs: [run] }} />);
     const t = text(m);
     expect(t).toContain('Approved on 15 Nov 2026 by Platform Admin. Added to the approved dataset.');

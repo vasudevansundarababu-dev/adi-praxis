@@ -21,6 +21,53 @@ export const TaskValidationResult = z.object({
 });
 export type TaskValidationResult = z.infer<typeof TaskValidationResult>;
 
+/**
+ * What RL Gym answered for a run (owner, 21 Nov 2026), as stored with the run: the contract check, then per package
+ * part its validate (and, on export, resolve) answer with RL Gym's status and request id. Never carries tokens, storage
+ * keys or idempotency keys. Null when RL Gym was not asked (its validate API is not connected).
+ */
+export const AnvilPartDto = z.object({
+  partIndex: z.number().int(),
+  partCount: z.number().int(),
+  packageId: z.string(),
+  packageSha256: z.string(),
+  zipSha256: z.string(),
+  bytes: z.number().int(),
+  recordIds: z.array(z.string()),
+  validate: z.object({ kind: z.string(), httpStatus: z.number().int().nullable(), status: z.string(), valid: z.boolean().nullable(), errorCount: z.number().int(), requestId: z.string().nullable(), anvilPackageSha256: z.string().nullable() }),
+  resolve: z.object({ kind: z.string(), httpStatus: z.number().int().nullable(), status: z.string(), requestId: z.string().nullable() }).nullable(),
+});
+export type AnvilPartDto = z.infer<typeof AnvilPartDto>;
+export const AnvilRunDto = z.object({
+  contract: z.string(),
+  support: z.enum(['enabled', 'disabled', 'absent', 'unreachable']),
+  batchId: z.string().nullable(),
+  parts: z.array(AnvilPartDto),
+  /** Tasks ADI Forge could not package, so did not send. */
+  problems: z.array(z.object({ recordId: z.string(), taskId: z.string(), code: z.string(), message: z.string() })),
+});
+export type AnvilRunDto = z.infer<typeof AnvilRunDto>;
+
+/** The stored RL Gym record of a run as its DTO: only the listed fields, so storage keys and tokens never leave. */
+export function anvilRunDto(raw: unknown): AnvilRunDto | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const parts = (Array.isArray(r.parts) ? r.parts : []) as Record<string, unknown>[];
+  const pick = <T extends Record<string, unknown>>(o: unknown, keys: string[]) => (o && typeof o === 'object' ? Object.fromEntries(keys.map((k) => [k, (o as T)[k] ?? null])) : null);
+  const parsed = AnvilRunDto.safeParse({
+    contract: r.contract,
+    support: r.support,
+    batchId: r.batchId ?? null,
+    parts: parts.map((p) => ({
+      ...pick(p, ['partIndex', 'partCount', 'packageId', 'packageSha256', 'zipSha256', 'bytes', 'recordIds']),
+      validate: pick(p.validate, ['kind', 'httpStatus', 'status', 'valid', 'errorCount', 'requestId', 'anvilPackageSha256']),
+      resolve: pick(p.resolve, ['kind', 'httpStatus', 'status', 'requestId']),
+    })),
+    problems: ((Array.isArray(r.problems) ? r.problems : []) as unknown[]).map((x) => pick(x, ['recordId', 'taskId', 'code', 'message'])),
+  });
+  return parsed.success ? parsed.data : null;
+}
+
 export const ValidationRunDto = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
@@ -34,10 +81,24 @@ export const ValidationRunDto = z.object({
   createdAt: z.string(),
   /** EXPORT only: the exported file (newline-delimited JSON) can be downloaded again. */
   downloadPath: z.string().nullable(),
+  /** RL Gym's answer for this run (contract support, per-part status and request id); null when RL Gym was not asked. */
+  anvil: AnvilRunDto.nullable(),
 });
 export type ValidationRunDto = z.infer<typeof ValidationRunDto>;
 
-export const ValidateRequest = z.object({ recordIds: z.array(z.string().uuid()).min(1).max(1) }).strict();
+/** GET /projects/:id/export: what can be done now, the approved tasks and the last runs. */
+export const ProjectExportStateDto = z.object({
+  canValidate: z.boolean(),
+  canExport: z.boolean(),
+  reason: z.string().nullable(),
+  validator: z.object({ name: z.string(), version: z.string(), isAnvil: z.boolean() }),
+  tasks: z.array(z.object({ recordId: z.string().uuid(), taskId: z.string().uuid(), title: z.string(), approvedAt: z.string() })),
+  runs: z.array(ValidationRunDto),
+});
+
+/** The approved tasks to validate in one call: one or many (owner, 21 Nov 2026: multi-select in the task table). */
+export const MAX_VALIDATE_TASKS = 500;
+export const ValidateRequest = z.object({ recordIds: z.array(z.string().uuid()).min(1).max(MAX_VALIDATE_TASKS).refine((ids) => new Set(ids).size === ids.length, 'List each task once.') }).strict();
 
 export interface ExportEligibilityInput {
   status: string;

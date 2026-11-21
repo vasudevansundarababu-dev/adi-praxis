@@ -122,6 +122,40 @@ describe('MVP1 step 4: export eligibility', () => {
     expect(await db.auditEvent.count({ where: { entityId: pid, action: 'project.exported' } })).toBe(1);
   });
 
+  it('multi-select (21 Nov 2026): one Validate call checks several approved tasks; Export still sends every approved task', async () => {
+    const { pid, ids, author } = await project();
+    await submit(author, ids[0]!);
+    await approve(pid, ids[0]!);
+    await submit(author, ids[1]!);
+    await approve(pid, ids[1]!, true);
+    const { tasks } = await state(pid);
+    const both = tasks.map((t: { recordId: string }) => t.recordId);
+    expect(both).toHaveLength(2);
+    const v = await post(pm, `/projects/${pid}/validate`, { recordIds: both });
+    expect(v.statusCode, v.body).toBe(201);
+    expect(v.json()).toMatchObject({ kind: 'VALIDATE' });
+    expect(v.json().results.map((r: { recordId: string }) => r.recordId).sort()).toEqual([...both].sort());
+    const run = await db.projectValidationRun.findUniqueOrThrow({ where: { id: v.json().id } });
+    expect(run.recordIds.sort()).toEqual([...both].sort());
+    expect(await db.auditEvent.count({ where: { entityId: pid, action: 'project.validated' } })).toBe(1);
+    // The local pre-check did not ask RL Gym: the run's RL Gym block is null.
+    expect(v.json().anvil).toBeNull();
+    // A run RL Gym answered returns its status and request id per part, never the stored ZIP key or idempotency key.
+    const answered = await db.projectValidationRun.create({ data: { clientId, projectId: pid, kind: 'VALIDATE', validator: 'anvil-discovery+praxis-precheck', validatorVersion: 'v1', recordIds: both, results: [], requestedById: run.requestedById, anvil: { contract: 'praxis.authored-task-export.v1', support: 'enabled', batchId: 'b-1', problems: [], parts: [{ partIndex: 1, partCount: 1, packageId: 'pkg-1', packageSha256: 'a'.repeat(64), zipSha256: 'b'.repeat(64), bytes: 10, recordIds: both, zipKey: 'exports/secret.zip', validate: { kind: 'business', httpStatus: 409, status: 'validation_blocked', valid: null, errorCount: 0, requestId: 'req-42', anvilPackageSha256: null }, resolve: { kind: 'business', httpStatus: 200, status: 'import_resolved', idempotencyKey: 'praxis-xyz', requestId: 'rs-42' } }] } } });
+    const listed = (await state(pid)).runs.find((r: { id: string }) => r.id === answered.id);
+    expect(listed.anvil).toEqual({ contract: 'praxis.authored-task-export.v1', support: 'enabled', batchId: 'b-1', problems: [], parts: [{ partIndex: 1, partCount: 1, packageId: 'pkg-1', packageSha256: 'a'.repeat(64), zipSha256: 'b'.repeat(64), bytes: 10, recordIds: both, validate: { kind: 'business', httpStatus: 409, status: 'validation_blocked', valid: null, errorCount: 0, requestId: 'req-42', anvilPackageSha256: null }, resolve: { kind: 'business', httpStatus: 200, status: 'import_resolved', requestId: 'rs-42' } }] });
+    expect(JSON.stringify(listed)).not.toMatch(/zipKey|exports\/secret|praxis-xyz|idempotencyKey/);
+    // A repeated id, or one that is not an approved task of this project, is refused.
+    expect((await post(pm, `/projects/${pid}/validate`, { recordIds: [both[0], both[0]] })).statusCode).toBe(400);
+    expect((await post(pm, `/projects/${pid}/validate`, { recordIds: [both[0], randomUUID()] })).statusCode).toBe(404);
+    expect((await post(pm, `/projects/${pid}/validate`, { recordIds: [] })).statusCode).toBe(400);
+    // Export takes no selection.
+    expect((await post(pm, `/projects/${pid}/exports`, { recordIds: [both[0]] })).statusCode).toBe(400);
+    const ex = await post(pm, `/projects/${pid}/exports`);
+    expect(ex.statusCode, ex.body).toBe(201);
+    expect(ex.json().results).toHaveLength(2);
+  });
+
   it('new flow: a rejected task does not count; old flow (switch off) keeps the end-date and complete rules', async () => {
     const { pid, ids, author } = await project();
     await submit(author, ids[0]!);

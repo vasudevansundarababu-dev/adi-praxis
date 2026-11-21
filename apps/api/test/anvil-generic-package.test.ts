@@ -218,6 +218,16 @@ describe('validate and resolve through Anvil (mock transport)', () => {
     expect(out.anvil!.parts[0]!.resolve).toBeUndefined();
   });
 
+  it('RL Gym’s own requirements carry its status, words and request id, so the owner can tell what RL Gym needs', async () => {
+    const body = { data: { valid: null, status: 'validation_blocked', errors: [], anvil_requirements: [{ code: 'AV_TEMPLATE_NOT_REGISTERED', owner: 'anvil', status: 'blocked', message: 'Template kyc.v8 is not registered.', task_id: record(1).taskInstanceId }] }, meta: { request_id: 'req-v9' } };
+    const v = new AnvilGatedValidator(new AnvilExportClient(BASE, 'tok-0123456789', fake({ '/contracts': enabled, '/validate': { status: 409, body } })));
+    const out = await v.run([item(record(1))], ctx(), { resolve: false });
+    expect(out.results[0]).toMatchObject({ status: 'not_validated', issues: [{ code: 'AV_TEMPLATE_NOT_REGISTERED', message: 'RL Gym’s own work (not a task repair), blocked: Template kyc.v8 is not registered; the source is checked separately. (RL Gym request req-v9)' }] });
+    // Blocked without a listed requirement: the request id is still given.
+    const bare = new AnvilGatedValidator(new AnvilExportClient(BASE, 'tok-0123456789', fake({ '/contracts': enabled, '/validate': { status: 409, body: { data: { valid: null, status: 'validation_blocked', errors: [], anvil_requirements: [] }, meta: { request_id: 'req-v10' } } } })));
+    expect((await bare.run([item(record(1))], ctx(), { resolve: false })).results[0]!.issues).toEqual([expect.objectContaining({ code: 'ANVIL_VALIDATION_BLOCKED', message: 'RL Gym could not validate this package (validation_blocked). (RL Gym request req-v10)' })]);
+  });
+
   it('export resolves a valid package with Idempotency-Key = its package hash; resolution never claims a Run', async () => {
     const seen: { url: string; headers: Record<string, string>; body?: Uint8Array }[] = [];
     const v = new AnvilGatedValidator(

@@ -2315,3 +2315,35 @@ TIN); originals append-only; the owner approves each revision in the console. Co
   receipt ref); and the package's other tasks as `unchanged`. The tool-binding change record skips records carrying
   `tinExclusion`, so in the 4-task export it covers only Individual (still the APR-13 revision). The APR-13d
   declared-tool and actor/private conformance checks are unchanged and run on the same ZIP.
+
+### Batch A: environments and grading from first principles (20 Nov 2026)
+
+Source: docs/reviews/CODE-REVIEW-2026-11-20.md (E0, E1, I4, I5, I6, I7, I10). Owner asked for Batch A.
+
+- **(chosen by Claude)** **Production uses the real Meta-Compiler implementations.** `resolveDeps()` now defaults to the
+  shared `generateArtifacts`, `studioSteps`, `studioAnswerProblems` and `harbor/bundle.ts buildBundle`; the TEMPORARY
+  placeholders (verifiers `assert True`, no reward file, unchecked dropzone paths, 100-byte tar names) are deleted, not
+  kept as a fallback. API and worker refuse to start when a real runner (docker/job) is paired with substituted deps.
+  The verification payload is the shared `defaultStudioAnswers` (one definition for the API, CI e2e and catalog proof).
+- **(chosen by Claude)** **The studio's "Task title" is a built-in control, not a custom field.** The shared validator
+  rejected `fields.title` as unknown (masked by the placeholders); it now accepts it as text of at most 200 characters.
+  The stored task JSON is read from the committed bundle's own `task.json` (S4-08), not regenerated.
+- **(chosen by Claude)** **One grading path.** The local DockerRunner runs the image's own `grade.py` (new local mode:
+  `PRAXIS_BUNDLE_FILE`, result on stdout) instead of an inline script, with `--network=none`, read-only root, and only
+  CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID. The sandbox job (signed URLs) always requires its own network namespace;
+  `HARBOR_REQUIRE_NETNS=0` is honoured only in local mode, so an execution override cannot weaken the job. The
+  unworkable user-namespace fallback is removed. Resetting the task home between phases now fails closed.
+- **(chosen by Claude)** **Grading image releases with the worker.** `release.yml` switches `praxis-harbor-verify` in
+  the same step as the worker; `production-agent.yml` promotes staging's grading image with it. QA has no grading job,
+  so a QA promotion keeps production's current grader and says so in the run summary (not blocked: the grader's
+  interface — args, env, result JSON — is stable). Promotion deploys `repo@sha256` digests, never tags.
+- **(chosen by Claude)** **Rollback restores what was recorded, only for what changed.** Both workflows record
+  production's serving revisions and job images before changing anything (`infra/deploy/cloud-run-state.sh`, tested in
+  CI with a fake gcloud) and on failure restore exactly that: job images after a failed migration, traffic only once
+  the canary started, worker and grading job only once switched. Replaces "second-newest revision".
+- **OPEN (owner + RL Gym)** **Graded evidence the agent can write.** Verifiers score from
+  `var/lib/harbor/env_state.json`, which the MCP mock writes while running as the agent, so an agent can also rewrite
+  it. Making it tamper-proof needs the agent runtime (RL Gym) to run `environment/mcp_mock.py` as a separate user that
+  owns the state file, with the agent reaching it only over loopback or a pipe (PRD: "internal loopback MCP server").
+  That is RL Gym's runtime contract, so it is not changed here (CLAUDE.md rules 4 and 7). Praxis's own grading only
+  runs the null agent and the oracle, which are trusted.

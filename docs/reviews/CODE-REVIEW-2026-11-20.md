@@ -20,6 +20,20 @@ Severity: **P0** = fix before any external tester / live money / real candidates
 
 Open item: whether Cloud Run gen2 grants `CAP_NET_ADMIN` (loopback up) is unverified; the first staging grading log shows it.
 
+### Batch A (same branch, 20 Nov) — decisions in docs/DECISIONS.md "Batch A"
+
+| Finding | Status |
+|---|---|
+| E0 placeholder generators in production | **Fixed**: real shared generators + C3 bundle builder; placeholders deleted; startup refuses substituted deps with a real runner. Surfaced and fixed two bugs the placeholders hid: studio title rejected as "unknown field"; stored `taskJson` had `task: null` (now read from the bundle). |
+| E1 (runner half) DockerRunner ≠ production | **Fixed**: DockerRunner runs `grade.py` itself (local mode). New CI step grades the same bundles through it (`scripts/harbor-docker-runner-e2e.ts`). Surfaced: home reset silently failed without DAC_OVERRIDE → now fails closed. |
+| E1 (evidence half) agent-writable `env_state.json` | **Open — owner + RL Gym decision** (runtime contract; see DECISIONS.md). |
+| I4 rollback picks wrong revision | **Fixed**: record-then-restore (`infra/deploy/cloud-run-state.sh`, CI-tested with fake gcloud). |
+| I5 grading image not promoted / not rolled back | **Fixed** for release and staging promotion; QA promotion keeps prod's grader and says so (QA has no grading job). |
+| I6 promotion by mutable tag | **Fixed** for services (digest of serving revision). |
+| I7 web image missing `public/` | **Fixed**, verified: PDF served 200 from the built image. |
+| I10 netns overridable per execution; dead userns fallback | **Fixed**: job mode always requires netns; fallback removed. Restricted Google APIs egress still open (Batch C, Terraform). |
+| grade.py robustness (gzip bomb, bad tar, duplicate entries, download errors) | **Fixed**: clean grading errors, 200 MB decompression cap. |
+
 ---
 
 ## P0 — fix first

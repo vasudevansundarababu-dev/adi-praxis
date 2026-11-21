@@ -49,6 +49,9 @@ import { grantAppRole } from './grant-app-role';
  * - `kyc-v8-tool-binding --requested-by <admin email> [--apply]`: the KYC v8 tool-binding correction (APR-13a-c):
  *   successor revisions of 3 approved v8 tasks where only listed S5 step tools change (7 rebindings, 2 blank with
  *   capability gap CG-01), submitted for review; a person approves each in the console. Dry run by default.
+ * - `kyc-v8-tin-exclusion --requested-by <admin email> [--apply]`: the KYC v8 pending-TIN exclusion (APR-14):
+ *   successor revisions of the Teen joint and Custodial tasks without the pending-TIN step and its dependent text,
+ *   with the limitation recorded, submitted for review; a person approves each in the console. Dry run by default.
  * - `authored-export <projectId> [--apply] [--out <dir>]`: TS-17 offline export of the project's approved tasks as RL
  *   Gym import ZIPs (praxis.authored-task-export.v1), checked against the archive bounds; never calls RL Gym. Writes to
  *   <dir>, else to object storage under exports/offline/<projectId>/. Dry run by default.
@@ -218,6 +221,12 @@ try {
     const r = await kycV8ToolBinding(db, a);
     console.log(JSON.stringify({ report: 'kyc-v8-tool-binding', apply: a.apply, ...r }));
     if (r.outcome === 'refused') process.exitCode = 3;
+  } else if (job === 'kyc-v8-tin-exclusion') {
+    const { parseTinExclusionArgs, kycV8TinExclusion } = await import('./kyc-v8-tin-exclusion');
+    const a = parseTinExclusionArgs(process.argv.slice(3));
+    const r = await kycV8TinExclusion(db, a);
+    console.log(JSON.stringify({ report: 'kyc-v8-tin-exclusion', apply: a.apply, ...r }));
+    if (r.outcome === 'refused') process.exitCode = 3;
   } else if (job === 'authored-export') {
     const rest = process.argv.slice(3);
     const apply = rest.includes('--apply');
@@ -252,7 +261,7 @@ try {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots | marketing-form-v2 | kyc-v8-successor | kyc-v8-readback | kyc-v8-tool-binding | authored-export`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots | marketing-form-v2 | kyc-v8-successor | kyc-v8-readback | kyc-v8-tool-binding | kyc-v8-tin-exclusion | authored-export`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

@@ -112,29 +112,61 @@ const execFile: Exec = (cmd, args, opts) =>
     child.on('close', (code) => (clearTimeout(timer), resolve({ code, stdout, stderr })));
   });
 
-/** Inside the container: copy the read-only task to /tmp, run solve.sh for the oracle, then grade with pytest. */
+const REWARD_MARKER = '@@PRAXIS_REWARD@@';
+
+/**
+ * Inside the container: copy the read-only task to /tmp, run the oracle, then grade. Mirrors
+ * infra/harbor-verify/grade.py so a local score equals the production score:
+ *  - `bash solution/solve.sh` (the runtime contract; `sh` is dash and breaks bash-isms),
+ *  - any reward the solution left behind is deleted before the verifiers run (it must not decide the score),
+ *  - pytest with -P -s --noconftest and the image's own ini, so bundle files cannot replace the verifiers,
+ *  - the score is the reward the verifiers write ($HARBOR_REWARD_PATH), not a pass ratio.
+ */
 const GRADE = `set -u
 cp -r /task /tmp/work && cd /tmp/work
-export HARBOR_ROOT=/tmp/work HARBOR_REWARD_PATH=/tmp/work/logs/verifier/reward.txt
-if [ "$1" = "oracle" ]; then sh solution/solve.sh || echo "solve.sh exited with $?"; fi
-python -m pytest -q -p no:cacheprovider eval/test_verifiers.py 2>&1 | tail -n 200
+export HARBOR_ROOT=/tmp/work HARBOR_REWARD_PATH=/tmp/work/logs/verifier/reward.txt HOME=/tmp/home PYTHONNOUSERSITE=1
+mkdir -p /tmp/home workspace/outputs var/lib/harbor logs/verifier
+if [ "$1" = "oracle" ]; then bash solution/solve.sh || echo "solve.sh exited with $?"; fi
+rm -rf logs/verifier/reward.txt logs/verifier/reward.json
+python3 -P -s -m pytest -q -p no:cacheprovider --noconftest -c /opt/grade/pytest.ini --rootdir /tmp/work eval/test_verifiers.py 2>&1 | tail -n 200
+echo "${REWARD_MARKER}"
+[ -f logs/verifier/reward.txt ] && [ ! -L logs/verifier/reward.txt ] && head -c 64 logs/verifier/reward.txt
+echo
 echo "${OUTPUTS_MARKER}"
-python - <<'PY'
+python3 - <<'PY'
 import json, os
 root, out, left = "/tmp/work/workspace/outputs", {}, ${MAX_RUNNER_OUTPUT_CHARS}
-for d, dirs, names in os.walk(root):
-    dirs.sort()
+for d, dirs, names in os.walk(root, followlinks=False):
+    dirs[:] = sorted(x for x in dirs if not os.path.islink(os.path.join(d, x)))
     for n in sorted(names):
+        p = os.path.join(d, n)
+        if os.path.islink(p) or left <= 0:
+            continue
         try:
-            text = open(os.path.join(d, n), encoding="utf-8").read()[:left]
+            text = open(p, encoding="utf-8").read()[:left]
         except (OSError, UnicodeDecodeError):
             continue
-        out[os.path.relpath(os.path.join(d, n), root).replace(os.sep, "/")] = text
+        out[os.path.relpath(p, root).replace(os.sep, "/")] = text
         left -= len(text)
 print(json.dumps(out))
 PY`;
 
-/** Score from pytest's summary line: passed / (passed + failed + errors). No tests collected scores 0. */
+/**
+ * Splits the pytest text from the reward the verifiers wrote. Same rule as grade.py read_score: a missing,
+ * unparsable or out-of-range reward (a guardrail fired) scores 0.00; otherwise rounded to two places.
+ */
+export function splitReward(text: string): { text: string; score: number; why: string } {
+  const at = text.lastIndexOf(REWARD_MARKER);
+  if (at < 0) return { text, score: 0, why: 'no reward was written: score 0.00' };
+  const raw = text.slice(at + REWARD_MARKER.length).trim();
+  const reward = raw === '' ? Number.NaN : Number(raw);
+  const ok = Number.isFinite(reward) && reward >= 0 && reward <= 1;
+  const score = ok ? Math.round(reward * 100) / 100 : 0;
+  const why = ok ? `reward ${score.toFixed(2)}` : raw === '' ? 'no reward was written: score 0.00' : `reward ${JSON.stringify(raw)} is outside 0..1: score 0.00`;
+  return { text: text.slice(0, at), score, why };
+}
+
+/** Score from pytest's summary line: passed / (passed + failed + errors). No tests collected scores 0. Diagnostic only. */
 export function pytestScore(output: string): number {
   const n = (k: string) => Number(output.match(new RegExp(`(\\d+) ${k}`))?.[1] ?? 0);
   const passed = n('passed');
@@ -142,7 +174,7 @@ export function pytestScore(output: string): number {
   return total === 0 ? 0 : Math.round((passed / total) * 100) / 100;
 }
 
-/** Local development only: the verifier image with no network, a read-only root file system and resource limits. */
+/** Local development only: the same grading image (infra/harbor-verify/Dockerfile) with no network, a read-only root file system and resource limits. */
 export class DockerRunner implements HarborRunner {
   readonly kind = 'docker' as const;
   constructor(private readonly opts: { storage: ObjectStorage; image?: string; exec?: Exec; timeoutMs?: number }) {}
@@ -164,6 +196,8 @@ export class DockerRunner implements HarborRunner {
     await chmod(dir, 0o755);
     try {
       for (const [p, data] of files) {
+        // As in grade.py: the judge's checklists hold the answer key and are graded by Praxis after the run.
+        if (p.startsWith('eval/judge/')) continue;
         const target = path.join(dir, p);
         if (!target.startsWith(dir + path.sep)) throw new RunnerError(`Unsafe path in bundle: ${p}`);
         await mkdir(path.dirname(target), { recursive: true });
@@ -171,9 +205,10 @@ export class DockerRunner implements HarborRunner {
       }
       const name = `praxis-verify-${randomUUID().slice(0, 12)}`;
       const r = await (this.opts.exec ?? execFile)('docker', this.dockerArgs(dir, mode, name), { timeoutMs: this.opts.timeoutMs ?? 120_000 });
-      const { text, outputs } = splitOutputs(r.stdout);
-      const log = `${text}\n${r.stderr}`.trim();
-      return { score: pytestScore(text), log, runnerRef: `docker:${name}`, outputs };
+      const { text: graded, outputs } = splitOutputs(r.stdout);
+      const { text, score, why } = splitReward(graded);
+      const log = `${text}\n${r.stderr}\n${why}`.trim();
+      return { score, log, runnerRef: `docker:${name}`, outputs };
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

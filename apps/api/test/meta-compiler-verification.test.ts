@@ -6,7 +6,7 @@ import { VerificationRunDto, type HarborBlueprint } from '@praxis/shared';
 import { buildApp } from '../src/app';
 import { MemoryStorage } from '../src/candidate/storage';
 import type { Config } from '../src/config';
-import { defaultRunner, DockerRunner, MockRunner, pytestScore, readTarGz, SandboxJobRunner, type HarborRunner } from '../src/harbor/runner';
+import { defaultRunner, DockerRunner, MockRunner, pytestScore, readTarGz, SandboxJobRunner, splitReward, type HarborRunner } from '../src/harbor/runner';
 import { resolveDeps, tarGz } from '../src/meta-compiler/deps';
 import { MockContentDrafter } from '../src/meta-compiler/drafter';
 import { metaCompilerHandlers } from '../src/meta-compiler/handlers';
@@ -155,18 +155,35 @@ describe('A6 runners (unit)', () => {
     expect(() => readTarGz(tarGz({ '../evil.sh': Buffer.from('x') }))).toThrow(/Unsafe path/);
   });
 
-  it('DockerRunner runs with --network=none and --read-only, the task mounted read-only, and scores from pytest', async () => {
+  it('DockerRunner runs with --network=none and --read-only, the task mounted read-only, and scores from the reward file', async () => {
     await storage.put('b.tar.gz', bundle, 'application/gzip');
     const calls: string[][] = [];
-    const r = new DockerRunner({ storage, image: 'verify:test', exec: async (cmd, args) => (calls.push([cmd, ...args]), { code: 0, stdout: '3 passed, 1 failed in 0.1s', stderr: '' }) });
+    const r = new DockerRunner({ storage, image: 'verify:test', exec: async (cmd, args) => (calls.push([cmd, ...args]), { code: 0, stdout: '3 passed, 1 failed in 0.1s\n@@PRAXIS_REWARD@@\n0.6\n', stderr: '' }) });
     const res = await r.run('b.tar.gz', 'oracle');
-    expect(res.score).toBe(0.75);
+    // The verifiers' reward decides the score (as in production), not the pass ratio (0.75).
+    expect(res.score).toBe(0.6);
+    expect(res.log).toMatch(/reward 0\.60/);
+    const script = calls[0]![calls[0]!.indexOf('-c') + 1]!;
+    expect(script).toContain('bash solution/solve.sh');
+    expect(script).toMatch(/rm -rf logs\/verifier\/reward\.txt[\s\S]*pytest/);
+    expect(script).toContain('-P -s -m pytest');
+    expect(script).toContain('--noconftest -c /opt/grade/pytest.ini');
     const args = calls[0]!;
     expect(args[0]).toBe('docker');
     expect(args).toEqual(expect.arrayContaining(['--network=none', '--read-only', '--cap-drop', 'ALL', 'verify:test', 'oracle']));
     expect(args[args.indexOf('-v') + 1]).toMatch(/:\/task:ro$/);
     expect(pytestScore('no tests ran')).toBe(0);
     expect(pytestScore('2 passed in 0.01s')).toBe(1);
+  });
+
+  it('DockerRunner scores 0.00 for a missing, unparsable or out-of-range reward, like grade.py', () => {
+    expect(splitReward('5 passed').score).toBe(0);
+    expect(splitReward('x\n@@PRAXIS_REWARD@@\n\n').why).toMatch(/no reward/);
+    expect(splitReward('@@PRAXIS_REWARD@@\n1.5\n').score).toBe(0);
+    expect(splitReward('@@PRAXIS_REWARD@@\n-0.1').score).toBe(0);
+    expect(splitReward('@@PRAXIS_REWARD@@\nnan').score).toBe(0);
+    expect(splitReward('@@PRAXIS_REWARD@@\n0.004').score).toBe(0);
+    expect(splitReward('@@PRAXIS_REWARD@@\n1.00\n').score).toBe(1);
   });
 
   describe('SandboxJobRunner against a fake Cloud Run API (no network)', () => {

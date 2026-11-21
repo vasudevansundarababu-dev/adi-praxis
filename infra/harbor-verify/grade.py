@@ -9,6 +9,7 @@ task code can reach neither the network nor the signed URLs. The score is the re
 (logs/verifier/reward.txt), as in prisma/catalog/verify-docker.ts.
 """
 
+import fcntl
 import gzip
 import io
 import json
@@ -16,7 +17,9 @@ import os
 import resource
 import shutil
 import signal
+import socket
 import stat
+import struct
 import sys
 import tarfile
 import time
@@ -99,8 +102,38 @@ def leave_network():
         raise GradeError("cannot isolate the network (%s; %s)" % (first, e))
 
 
+SIOCGIFFLAGS, SIOCSIFFLAGS, IFF_UP = 0x8913, 0x8914, 0x1
+
+
+def loopback_up():
+    """Brings `lo` up in the new namespace (it starts down, so 127.0.0.1 could be neither bound nor reached).
+
+    Task code may run an internal loopback server (the MCP mock, a fixture service); loopback never leaves the
+    namespace, so isolation is unchanged. Needs CAP_NET_ADMIN in the namespace: call before dropping privileges.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        req = struct.pack("16sH14x", b"lo", 0)
+        flags = struct.unpack("16sH14x", fcntl.ioctl(s.fileno(), SIOCGIFFLAGS, req))[1]
+        fcntl.ioctl(s.fileno(), SIOCSIFFLAGS, struct.pack("16sH14x", b"lo", flags | IFF_UP))
+    finally:
+        s.close()
+
+
+def loopback_works():
+    """Check, not assumption: bind an ephemeral port on 127.0.0.1 and connect to it."""
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(1)
+        c = socket.create_connection(srv.getsockname(), timeout=2)
+        c.close()
+    finally:
+        srv.close()
+
+
 def as_nobody(require_netns):
-    """In a forked child: own session, empty network namespace, nobody with no groups, resource limits."""
+    """In a forked child: own session, empty network namespace with loopback up, nobody with no groups, limits."""
     os.setsid()
     try:
         how = leave_network()
@@ -108,6 +141,15 @@ def as_nobody(require_netns):
         if require_netns:
             raise
         how = "none (%s)" % e
+    # Best effort, never fatal: bringing lo up needs CAP_NET_ADMIN, which a runtime may not grant (plain Docker does
+    # not). Grading must not break where it worked before, so the log line says which case applied; a task that
+    # needs 127.0.0.1 then fails with a visible reason instead of a silent EADDRNOTAVAIL.
+    try:
+        loopback_up()
+        loopback_works()
+        how += " loopback=up"
+    except OSError as e:
+        how += " loopback=down (%s)" % e.strerror
     os.setgroups([])
     os.setgid(NOBODY)
     os.setuid(NOBODY)

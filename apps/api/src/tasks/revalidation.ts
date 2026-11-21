@@ -2,6 +2,7 @@ import type { ApprovedTaskRecord, Prisma, TaskInstance, Template } from '@prisma
 import { EXECUTABLE_WORKFLOW, praxisContractChecks, type TaskCheck } from '@praxis/shared';
 import { jointTemplateSpec } from '../anvil/joint-template';
 import { AUTHOR_FIXABLE_PACKAGE, taskPackageProblem } from '../anvil/generic-package';
+import { STEP_TOOL_SECTION, TOOL_UNDECLARED } from '../anvil/tool-binding';
 import type { Tx } from '../db';
 import type { AuditInput } from '../platform/audit';
 import { authoredContent, compileForSubmission } from './profile-output';
@@ -51,7 +52,7 @@ export function exportPackageChecks(template: Template, task: Pick<TaskInstance,
   if (jointTemplateSpec(template)) {
     const pseudo = { id: record?.id ?? `pending-${task.id}`, taskInstanceId: task.id, output, input: task.input, contentHash: record?.contentHash ?? '0'.repeat(64) } as unknown as ApprovedTaskRecord;
     const p = taskPackageProblem({ record: pseudo, template });
-    if (p && AUTHOR_FIXABLE_PACKAGE.has(p.code)) checks.push({ id: `export.${p.code}`, section: p.code.startsWith('GENERIC_CASE_SELECTOR_') ? 'S1' : p.code === 'GENERIC_GRAPH_INVALID' ? 'S2' : 'W06', ok: false, message: `RL Gym export: ${p.message}` });
+    if (p && AUTHOR_FIXABLE_PACKAGE.has(p.code)) checks.push({ id: `export.${p.code}`, section: p.code.startsWith('GENERIC_CASE_SELECTOR_') ? 'S1' : p.code === 'GENERIC_GRAPH_INVALID' ? 'S2' : p.code === TOOL_UNDECLARED ? STEP_TOOL_SECTION : 'W06', ok: false, message: `RL Gym export: ${p.message}` });
   }
   return checks;
 }

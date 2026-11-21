@@ -3,6 +3,7 @@ import type { ApprovedTaskRecord, Template } from '@prisma/client';
 import { jcs, jcsBytes, JcsError, jcsSha256, sha256Hex } from './jcs';
 import { caseSelectorOf } from '../tasks/task-service';
 import { jointHashes, jointTemplateSpec, type JointTemplateSpec } from './joint-template';
+import { TOOL_UNDECLARED, undeclaredTools, undeclaredToolMessage } from './tool-binding';
 import { writeZip } from './zip';
 
 /**
@@ -155,7 +156,7 @@ function selectorBlock(input: PackageInput, authored: Record<string, unknown>): 
  * Package problems the author can fix in the task itself (D18). Any other package problem is the template's or RL
  * Gym's (form, publication, private exposure, size): it is reported as "not validated", never as a task repair.
  */
-export const AUTHOR_FIXABLE_PACKAGE: ReadonlySet<string> = new Set(['GENERIC_GRAPH_INVALID', 'GENERIC_CASE_SELECTOR_MISSING', 'GENERIC_CASE_SELECTOR_MISMATCH', 'GENERIC_CASE_SELECTOR_UNKNOWN', 'GENERIC_NOT_CANONICAL', 'GENERIC_PROJECTION_FAILED']);
+export const AUTHOR_FIXABLE_PACKAGE: ReadonlySet<string> = new Set(['GENERIC_GRAPH_INVALID', 'GENERIC_CASE_SELECTOR_MISSING', 'GENERIC_CASE_SELECTOR_MISMATCH', 'GENERIC_CASE_SELECTOR_UNKNOWN', 'GENERIC_NOT_CANONICAL', 'GENERIC_PROJECTION_FAILED', TOOL_UNDECLARED]);
 
 /**
  * D18: the per-task package checks for one task, before or after it has an approved record (the record's identity
@@ -166,7 +167,7 @@ export function taskPackageProblem(input: PackageInput): PackageProblem | null {
   return 'code' in t ? t : null;
 }
 
-function taskFiles(input: PackageInput): TaskFiles | PackageProblem {
+function taskFiles(input: PackageInput, opts: { checkTools?: boolean } = {}): TaskFiles | PackageProblem {
   const { record, template } = input;
   const base = { recordId: record.id, taskId: record.taskInstanceId };
   if (template.status !== 'PUBLISHED' && template.status !== 'RETIRED') return { ...base, code: 'GENERIC_TEMPLATE_NOT_PUBLISHED', message: 'The task’s template version is not published.' };
@@ -177,6 +178,9 @@ function taskFiles(input: PackageInput): TaskFiles | PackageProblem {
   const form = spec.authoring.profile;
   const ref = a.authored.profile as { id: unknown; version: unknown };
   if (ref.id !== form.profileId || ref.version !== form.version) return { ...base, code: 'GENERIC_FORM_MISMATCH', message: `The task was authored on form ${String(ref.id)} v${String(ref.version)}, not the template’s ${String(form.profileId)} v${String(form.version)}.` };
+  // APR-13d: every non-blank procedure step tool must be one of the template's declared tool IDs.
+  const tools = undeclaredTools(spec.execution, a.authored.sections);
+  if (tools.length && opts.checkTools !== false) return { ...base, code: TOOL_UNDECLARED, message: undeclaredToolMessage(tools, spec.execution) };
   try {
     const actor = actorProjection(form, a.authored);
     // Anvil copies whole items of structured fields into actor.json; Praxis hides private sub-fields (e.g. a policy
@@ -207,6 +211,17 @@ function taskFiles(input: PackageInput): TaskFiles | PackageProblem {
     if (e instanceof JcsError) return { ...base, code: 'GENERIC_NOT_CANONICAL', message: `The task cannot be written as RFC 8785 JSON: ${e.message}.` };
     return { ...base, code: 'GENERIC_PROJECTION_FAILED', message: 'The task’s sections do not fit its published form.' };
   }
+}
+
+/**
+ * The JCS SHA-256 of each file a task contributes to a package (form, actor.json, private reference.json), as the
+ * export declares them; or the package problem when the task cannot be packaged. `checkTools: false` hashes content
+ * that predates the APR-13d tool check (a corrected task's predecessor), never to build a package.
+ */
+export function taskAssetHashes(input: PackageInput, opts: { checkTools?: boolean } = {}): { form: string; actor: string; reference: string } | PackageProblem {
+  const t = taskFiles(input, opts);
+  if ('code' in t) return t;
+  return { form: jcsSha256(t.form), actor: jcsSha256(t.actor), reference: jcsSha256(t.privateRef) };
 }
 
 function assemble(tasks: TaskFiles[], ids: { packageId: string; batchId: string; partIndex: number; partCount: number }) {

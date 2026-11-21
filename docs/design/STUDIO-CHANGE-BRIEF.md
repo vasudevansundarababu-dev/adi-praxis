@@ -1,6 +1,6 @@
 # Change brief: Template Studio, ADI Forge (Praxis) and RL Gym (Anvil)
 
-**Revision:** 1, 20 Nov 2026. **From:** Product Owner. **For:** the Praxis (ADI Forge) team and the Anvil (RL Gym) team.
+**Revision:** 3, 20 Nov 2026. **From:** Product Owner. **For:** the Praxis (ADI Forge) team and the Anvil (RL Gym) team.
 **Status:** owner-approved direction. Each team reviews it, raises objections, and agrees the contract changes in section 5.
 Nothing here changes running systems until the Studio exists (section 7).
 
@@ -21,7 +21,7 @@ hand-offs. The detailed, numbered requirements (TS-01 to TS-46), each with its e
 | D5 | **SMEs never write seed data or SQL/API assertions.** | TS-34 (dropped) |
 | D6 | **The Studio produces evaluation datasets** with each release (a synthetic generator per domain pack). RL Gym stores them, selects cases for runs and never edits them. Authors never see or choose evaluation data, and a template declares only the case selector. (Changed 20 Nov 2026 from "RL Gym owns datasets".) | TS-05, TS-47 |
 | D7 | **The schema grows as layered domain packs:** domain core → region pack (US, India, …) → process pack (KYC, AML, …), each versioned and hashed, and grown only when a template needs it. | TS-45, TS-46 |
-| D8 | **Real (purchased) enterprise data is future scope.** Everything stays synthetic until the owner decides and the spec is changed. | TS-44 |
+| D8 | **Two modes, one build: Open and Enterprise.** Open (our projects) uses de-identified enterprise data plus synthetic PII for public benchmarks. Enterprise runs inside a bank's own environment on its training dump, with real PII visible only to its people, for private benchmarks and telemetry. The same images in both, with separate deploy pipelines and the mode fixed per deployment. A data intake utility registers licences, de-identifies and purges. **Future build:** synthetic-only applies everywhere until the non-negotiables are rewritten per mode. See `OPEN-ENTERPRISE-MODES-SPEC.md`. | TS-44, TS-50 to TS-56 |
 
 ## 2. Target flow
 
@@ -117,7 +117,7 @@ A revised contract is drafted only after both teams accept this brief.
 **Owner:**
 1. Approve the revised contract.
 2. Name the Studio's release approver role.
-3. Decide when TS-44 (enterprise data) is taken up.
+3. Decide when the Open and Enterprise modes (TS-50 to TS-56) are built, and approve the per-mode non-negotiables (TS-54).
 
 ## 9. Open items
 
@@ -125,5 +125,5 @@ A revised contract is drafted only after both teams accept this brief.
 |---|---|---|
 | TS-43 | Contract change: Anvil stops proposing templates | Anvil + owner |
 | TS-12 | First qualification receipt (none exists yet for KYC v7 or v8) | Anvil |
-| TS-44 | Real enterprise data: where it lives, visibility, de-identification, licences | Owner (future) |
+| TS-54 | Approve the rewritten non-negotiables per mode (Open and Enterprise), then change CLAUDE.md and SPEC.md, with a privacy or legal review | Owner (future) |
 | TS-16 | Per-environment export credentials | Both (the owner enters secrets) |

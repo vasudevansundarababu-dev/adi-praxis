@@ -14,7 +14,8 @@ import type { Db } from '../db';
  * Nothing is sent to RL Gym; the ZIPs go to a directory or to object storage for someone to hand over. Read-only: it
  * changes no task, record or template. Each part is checked against RL Gym's archive bounds, its own manifest and the
  * portable conformance checks (declared tools, actor/private separation) before anything is written. A corrected task
- * (tool-binding correction, APR-13) also gets a change record next to the ZIP.
+ * (tool-binding correction, APR-13) also gets a change record next to the ZIP; a revised task (pending-TIN exclusion,
+ * APR-14) gets a task change record (`adi-forge.task-change-record.v1`).
  */
 
 /** RL Gym's generic archive bounds (four confirmations; KYC v8 review, 18 Nov 2026). */
@@ -208,7 +209,8 @@ async function changeRecord(db: Db, part: { packageId: string; zipSha256: string
   for (const [i, recordId] of part.recordIds.entries()) {
     const r = records.get(recordId)!;
     const l = (r.input as { toolBindingCorrection?: Lineage } | null)?.toolBindingCorrection;
-    if (!l) continue;
+    // A later revision (APR-14) is described by its own task change record; the APR-13 lineage it carries is history.
+    if (!l || (r.input as { tinExclusion?: unknown } | null)?.tinExclusion) continue;
     request ??= l.request ?? null;
     const e = entries[i]!;
     const pred = await db.approvedTaskRecord.findUnique({ where: { id: l.predecessor.recordId } });
@@ -232,6 +234,83 @@ async function changeRecord(db: Db, part: { packageId: string; zipSha256: string
   return { problems, body: { schema: CHANGE_RECORD_SCHEMA, package_id: part.packageId, zip_sha256: part.zipSha256, package_sha256: part.packageSha256, request, tasks } };
 }
 
+export const TASK_CHANGE_RECORD_SCHEMA = 'adi-forge.task-change-record.v1';
+
+interface TinLineage {
+  schema?: string;
+  predecessor: { recordId: string; contentHash: string; actorSha256: string | null; referenceSha256: string | null };
+  template: Record<string, unknown>;
+  changes: { op: 'replace' | 'remove'; pointer: string; successorPointer?: string; old: unknown; new: unknown }[];
+  approvals: { id: string; what: string; decision: string; approvedAt: string; status: string }[];
+  limitation: string;
+  capabilityGap?: string;
+}
+
+/**
+ * The task change record (APR-14, pending-TIN exclusion) for a package: for each revised task its predecessor and
+ * successor record IDs, content hashes and actor/reference hashes, every changed field (pointer, old, new, or the
+ * removed step), the approval receipts of both records (approver user ID and roles, time, record ID, receipt) and the
+ * decision with its limitation text; and the package's other tasks as unchanged. Null when no task in the part
+ * carries the revision.
+ */
+async function taskChangeRecord(db: Db, part: { packageId: string; zipSha256: string; packageSha256: string; manifest: Record<string, unknown>; recordIds: string[] }, records: Map<string, ApprovedTaskRecord>, templates: Map<string, Template>) {
+  const problems: string[] = [];
+  const tasks: Record<string, unknown>[] = [];
+  const unchanged: Record<string, unknown>[] = [];
+  const decisions = new Map<string, { approval: Record<string, unknown>; limitation: string; capability_gap: string | null }>();
+  const entries = part.manifest.tasks as { task_id: string; revision_id: string; actor: { sha256: string }; private_assets: { sha256: string }[]; review: { receipt_ref: string } }[];
+  const preds = new Map<string, ApprovedTaskRecord>();
+  for (const recordId of part.recordIds) {
+    const l = (records.get(recordId)!.input as { tinExclusion?: TinLineage } | null)?.tinExclusion;
+    const pred = l ? await db.approvedTaskRecord.findUnique({ where: { id: l.predecessor.recordId } }) : null;
+    if (pred) preds.set(recordId, pred);
+  }
+  if (![...part.recordIds].some((id) => (records.get(id)!.input as { tinExclusion?: unknown } | null)?.tinExclusion)) return null;
+  const reviewers = [...new Set([...part.recordIds.map((id) => records.get(id)!.reviewerId), ...[...preds.values()].map((p) => p.reviewerId)])];
+  const roles = new Map((await db.user.findMany({ where: { id: { in: reviewers } }, select: { id: true, roles: true } })).map((u) => [u.id, u.roles as string[]]));
+  const receipt = (r: ApprovedTaskRecord, ref: string) => ({ record_id: r.id, approver_user_id: r.reviewerId, approver_roles: roles.get(r.reviewerId) ?? [], approved_at: r.reviewDecisionAt.toISOString(), receipt_ref: ref });
+  const refOf = (r: { id: string; contentHash: string }) => `praxis-approved-record:${r.id}:${r.contentHash.slice(0, 16)}`;
+  for (const [i, recordId] of part.recordIds.entries()) {
+    const r = records.get(recordId)!;
+    const e = entries[i]!;
+    const l = (r.input as { tinExclusion?: TinLineage } | null)?.tinExclusion;
+    if (!l) {
+      unchanged.push({ task_id: r.taskInstanceId, record_id: r.id, content_hash: r.contentHash, actor_sha256: e.actor.sha256, reference_sha256: e.private_assets[0]!.sha256 });
+      continue;
+    }
+    const pred = preds.get(recordId);
+    if (!pred || pred.taskInstanceId !== r.taskInstanceId || pred.contentHash !== l.predecessor.contentHash || pred.seq >= r.seq) {
+      problems.push(`task ${r.taskInstanceId}: its predecessor record ${l.predecessor.recordId} does not match the revision's lineage`);
+      continue;
+    }
+    const before = taskAssetHashes({ record: pred, template: templates.get(pred.templateId)! }, { checkTools: false });
+    const predecessorHashes = 'code' in before ? { actor_sha256: l.predecessor.actorSha256, reference_sha256: l.predecessor.referenceSha256 } : { actor_sha256: before.actor, reference_sha256: before.reference };
+    for (const a of l.approvals) decisions.set(a.id, { approval: a, limitation: l.limitation, capability_gap: l.capabilityGap ?? null });
+    tasks.push({
+      task_id: r.taskInstanceId,
+      predecessor: { record_id: pred.id, content_hash: pred.contentHash, ...predecessorHashes },
+      successor: { record_id: r.id, content_hash: r.contentHash, actor_sha256: e.actor.sha256, reference_sha256: e.private_assets[0]!.sha256, receipt_ref: e.review.receipt_ref },
+      template: l.template,
+      changes: l.changes.map((c) => ({ op: c.op, pointer: c.pointer, ...(c.successorPointer ? { successor_pointer: c.successorPointer } : {}), old: c.old, new: c.new })),
+      approvals: l.approvals.map((a) => a.id),
+      approval_receipts: { predecessor: receipt(pred, refOf(pred)), successor: receipt(r, e.review.receipt_ref) },
+      limitation: l.limitation,
+    });
+  }
+  return {
+    problems,
+    body: {
+      schema: TASK_CHANGE_RECORD_SCHEMA,
+      package_id: part.packageId,
+      zip_sha256: part.zipSha256,
+      package_sha256: part.packageSha256,
+      decisions: [...decisions.values()].map((d) => ({ ...d.approval, limitation: d.limitation, capability_gap: d.capability_gap })),
+      tasks,
+      unchanged,
+    },
+  };
+}
+
 /** The project's approved tasks as they stand (the same rule as the project export): the latest record of each accepted task. */
 async function currentRecords(db: Db, projectId: string) {
   const rows = await db.approvedTaskRecord.findMany({ where: { projectId }, orderBy: { seq: 'asc' } });
@@ -250,7 +329,7 @@ export interface OfflineExportReport {
   parts: { packageId: string; partIndex: number; partCount: number; file: string; zipSha256: string; packageSha256: string; compressedBytes: number; entries: number; recordIds: string[]; taskIds: string[]; templates: { id: string; version: number; sha256: string }[] }[];
   problems: PackageProblem[];
   archiveProblems: { packageId: string; problems: string[] }[];
-  changeRecords: { packageId: string; file: string; sha256: string; taskIds: string[] }[];
+  changeRecords: { packageId: string; schema: string; file: string; sha256: string; taskIds: string[] }[];
 }
 
 /**
@@ -272,22 +351,26 @@ export async function offlineExport(db: Db, args: { projectId: string; apply: bo
   if (!built.parts.length) return { ...report, outcome: 'nothing_to_export', reason: records.length ? 'No approved task could be packaged; see problems.' : 'The project has no approved tasks.' };
   const byLineage = new Map([...templates.values()].map((t) => [`${t.lineageId}@${t.version}`, jointTemplateSpec(t)?.execution]));
   const byRecord = new Map(records.map((r) => [r.id, r]));
-  const changes: { packageId: string; body: Record<string, unknown> }[] = [];
+  const changes: { packageId: string; name: string; body: Record<string, unknown> }[] = [];
   for (const part of built.parts) {
     const problems = [...archiveProblems(part.zip), ...packageProblems(part.zip), ...conformanceProblems(part.zip, (t) => byLineage.get(`${t.id}@${t.version}`))];
     const cr = await changeRecord(db, part, byRecord, templates);
     if (cr) {
       problems.push(...cr.problems);
-      changes.push({ packageId: part.packageId, body: cr.body });
+      changes.push({ packageId: part.packageId, name: `${part.packageId}.change-record.json`, body: cr.body });
+    }
+    const tcr = await taskChangeRecord(db, part, byRecord, templates);
+    if (tcr) {
+      problems.push(...tcr.problems);
+      changes.push({ packageId: part.packageId, name: `${part.packageId}.task-change-record.json`, body: tcr.body });
     }
     if (problems.length) report.archiveProblems.push({ packageId: part.packageId, problems });
   }
   if (report.archiveProblems.length) return { ...report, outcome: 'refused', reason: 'A package breaks the archive bounds, its own manifest or the conformance checks; nothing was written.' };
   for (const c of changes) {
-    const name = `${c.packageId}.change-record.json`;
     const bytes = Buffer.from(`${JSON.stringify(c.body, null, 2)}\n`, 'utf8');
-    const file = args.apply ? await args.write(name, bytes) : name;
-    report.changeRecords.push({ packageId: c.packageId, file, sha256: createHash('sha256').update(bytes).digest('hex'), taskIds: (c.body.tasks as { task_id: string }[]).map((t) => t.task_id) });
+    const file = args.apply ? await args.write(c.name, bytes) : c.name;
+    report.changeRecords.push({ packageId: c.packageId, schema: c.body.schema as string, file, sha256: createHash('sha256').update(bytes).digest('hex'), taskIds: (c.body.tasks as { task_id: string }[]).map((t) => t.task_id) });
   }
   for (const part of built.parts) {
     const name = `${part.packageId}.zip`;

@@ -175,6 +175,7 @@ enterprise's own people can see the data, and private benchmarks and telemetry r
 
 ## Change log
 
+- 21 Nov 2026: added TS-57 (capability gap CG-01, pending TIN verification) from the KYC v8 tool-binding correction.
 - 20 Nov 2026: owner answers on modes: TS-50 to TS-54 agreed; TS-53 reworked for snapshot dumps (key per dump); added TS-55 (one build, separate deploy pipelines) and TS-56 (data intake utility).
 - 20 Nov 2026: owner direction on Open and Enterprise modes; added TS-50 to TS-54 (fixed mode per deployment, de-identification standard, licences, crypto-shredding, non-negotiables per mode). TS-44 refined.
 - 20 Nov 2026: added TS-47 (the Studio makes datasets; changes TS-05), TS-48 (re-qualification and canaries) and TS-49 (two apps, owner approves releases, web app scope, evaluator scope).
@@ -186,4 +187,3 @@ enterprise's own people can see the data, and private benchmarks and telemetry r
 - 18 Nov 2026: added TS-24 and TS-25 from building the KYC v8 successor package.
 - 18 Nov 2026: added TS-21 to TS-23 from RL Gym's v8 successor-package request.
 - 18 Nov 2026: started with TS-01 to TS-20 from the manual hand-off of KYC v7 and Marketing VEYRA to RL Gym (H0).
-- 21 Nov 2026: added TS-57 (capability gap CG-01, pending TIN verification) from the KYC v8 tool-binding correction.

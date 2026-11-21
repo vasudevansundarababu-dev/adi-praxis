@@ -1,5 +1,5 @@
 import type { ApprovedTaskRecord, Prisma } from '@prisma/client';
-import { exportEligibility, TaskValidationResult, ValidateRequest, ValidationRunDto } from '@praxis/shared';
+import { anvilRunDto, exportEligibility, ProjectExportStateDto, TaskValidationResult, ValidateRequest, ValidationRunDto } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { ObjectStorage } from '../candidate/storage';
@@ -72,9 +72,9 @@ async function eligibility(tx: Db | Tx, clientId: string, p: { id: string; statu
 
 const counts = (results: TaskValidationResult[]) => ({ valid: results.filter((r) => r.status === 'valid').length, needsFix: results.filter((r) => r.status === 'needs_fix').length, notValidated: results.filter((r) => r.status === 'not_validated').length });
 
-function runDto(r: { id: string; projectId: string; kind: string; validator: string; validatorVersion: string; results: unknown; requestedById: string; createdAt: Date; fileKey: string | null }): ValidationRunDto {
+function runDto(r: { id: string; projectId: string; kind: string; validator: string; validatorVersion: string; results: unknown; requestedById: string; createdAt: Date; fileKey: string | null; anvil?: unknown }): ValidationRunDto {
   const results = z.array(TaskValidationResult).parse(r.results);
-  return { id: r.id, projectId: r.projectId, kind: r.kind as 'VALIDATE' | 'EXPORT', validator: r.validator, validatorVersion: r.validatorVersion, results, counts: counts(results), requestedById: r.requestedById, createdAt: r.createdAt.toISOString(), downloadPath: r.fileKey ? `/projects/${r.projectId}/exports/${r.id}/download` : null };
+  return { id: r.id, projectId: r.projectId, kind: r.kind as 'VALIDATE' | 'EXPORT', validator: r.validator, validatorVersion: r.validatorVersion, results, counts: counts(results), requestedById: r.requestedById, createdAt: r.createdAt.toISOString(), downloadPath: r.fileKey ? `/projects/${r.projectId}/exports/${r.id}/download` : null, anvil: anvilRunDto(r.anvil) };
 }
 
 /** Validates the records (and, on export, lets Anvil resolve them); a validator failure marks them not validated. */
@@ -93,12 +93,12 @@ async function validate(tx: Db | Tx, validator: AnvilTaskValidator, records: App
 }
 
 /**
- * Project export with Anvil validation (owner, 12 Nov 2026). The owning PM or an Admin validates one approved task at
- * any time, and exports every approved task once the project is complete (required tasks approved, marked complete or
+ * Project export with Anvil validation (owner, 12 Nov 2026). The owning PM or an Admin validates one or more approved
+ * tasks at any time, and exports every approved task once the project is complete (required tasks approved, marked complete or
  * its end date reached). With the MVP1 new flow on, export opens only when every task of the project is approved. Each run is kept append-only with the validator's verdict per task.
  */
 export const projectExportRoutes: FastifyPluginAsyncZod<{ db: Db; storage: ObjectStorage; validator: AnvilTaskValidator }> = async (app, { db, storage, validator }) => {
-  app.get('/projects/:id/export', { config: { access: ACCESS }, schema: { tags: ['projects'], params: Params } }, async (req) => {
+  app.get('/projects/:id/export', { config: { access: ACCESS }, schema: { tags: ['projects'], params: Params, response: { 200: ProjectExportStateDto } } }, async (req) => {
     const p = await loadProject(db, req.params.id, req.actor!);
     const e = await eligibility(db, req.actor!.clientId, p);
     const runs = await db.projectValidationRun.findMany({ where: { projectId: p.id, clientId: req.actor!.clientId }, orderBy: { createdAt: 'desc' }, take: 10 });

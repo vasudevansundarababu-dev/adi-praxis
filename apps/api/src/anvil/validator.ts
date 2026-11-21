@@ -142,6 +142,11 @@ export interface ValidationOutcome {
 type Issue = TaskValidationResult['issues'][number];
 const asIssue = (code: string, message: string, path: string | null = null): Issue => ({ code, path, message });
 
+/** One of Anvil's own requirements (its work, never a task repair), as Anvil returns it. */
+type AnvilRequirement = { code?: string; task_id?: string; status?: string; message?: string };
+/** Anvil's status and words for a requirement, when it gave them: ", blocked: <message>". */
+const requirementDetail = (q: AnvilRequirement) => [typeof q.status === 'string' ? q.status : null, typeof q.message === 'string' ? q.message.trim().replace(/\.$/, '') : null].filter(Boolean).map((x, i) => (i ? `: ${x}` : `, ${x}`)).join('');
+
 /** Which task an Anvil error belongs to (its file or manifest pointer); null = the whole package. */
 function errorTask(err: { file?: unknown; pointer?: unknown }, part: PackagePart): number[] | null {
   const file = typeof err.file === 'string' ? err.file : '';
@@ -238,13 +243,14 @@ export class AnvilGatedValidator implements AnvilTaskValidator {
         if (idx) for (const i of idx) perTask.set(i, [...(perTask.get(i) ?? []), issue]);
         else whole.push(issue);
       }
-      const reqs = (Array.isArray(v.data.anvil_requirements) ? v.data.anvil_requirements : []) as { code?: string; task_id?: string }[];
+      const reqs = (Array.isArray(v.data.anvil_requirements) ? v.data.anvil_requirements : []) as AnvilRequirement[];
+      const ref = v.requestId ? ` (RL Gym request ${v.requestId})` : '';
       tasks.forEach((r, i) => {
         const own = [...whole, ...(perTask.get(i) ?? [])];
-        const anvilWork = reqs.filter((q) => !q.task_id || q.task_id === part.taskIds[i]).map((q) => asIssue(String(q.code), 'RL Gym’s own work (not a task repair); the source is checked separately.'));
+        const anvilWork = reqs.filter((q) => !q.task_id || q.task_id === part.taskIds[i]).map((q) => asIssue(String(q.code), `RL Gym’s own work (not a task repair)${requirementDetail(q)}; the source is checked separately.${ref}`));
         r.status = v.valid === true ? 'valid' : v.valid === false ? (own.length ? 'needs_fix' : 'valid') : 'not_validated';
         r.issues.push(...own, ...anvilWork);
-        if (v.valid === null && !anvilWork.length) r.issues.push(asIssue('ANVIL_VALIDATION_BLOCKED', `RL Gym could not validate this package (${v.status}).`));
+        if (v.valid === null && !anvilWork.length) r.issues.push(asIssue('ANVIL_VALIDATION_BLOCKED', `RL Gym could not validate this package (${v.status}).${ref}`));
       });
       // Resolve (export only): the same ZIP once Anvil found it valid; the key is the package hash, so a retry of the
       // same content is the same request, and a changed package is a new one. Resolution never starts a Run.
@@ -252,9 +258,10 @@ export class AnvilGatedValidator implements AnvilTaskValidator {
         const key = `praxis-${part.packageSha256}`;
         const rs = await this.client.resolve(part.zip, key);
         pr.resolve = rs.kind === 'business' ? { kind: rs.kind, httpStatus: rs.httpStatus, status: rs.status, idempotencyKey: key, requestId: rs.requestId } : { kind: rs.kind, httpStatus: rs.httpStatus, status: rs.code, idempotencyKey: key, requestId: rs.requestId };
-        const note = rs.kind === 'business' ? (rs.status === 'import_resolved' ? asIssue('ANVIL_RESOLVED', `RL Gym took the package in (${rs.status}); no Run was started.`) : asIssue('ANVIL_RESOLVE_BLOCKED', `RL Gym did not take the package in (${rs.status}); this is RL Gym’s work, not a task repair.`)) : asIssue(`ANVIL_${rs.kind.toUpperCase()}`, `Resolve: ${rs.message}${rs.requestId ? ` (RL Gym request ${rs.requestId})` : ''}`);
+        const rsRef = rs.requestId ? ` (RL Gym request ${rs.requestId})` : '';
+        const note = rs.kind === 'business' ? (rs.status === 'import_resolved' ? asIssue('ANVIL_RESOLVED', `RL Gym took the package in (${rs.status}); no Run was started.${rsRef}`) : asIssue('ANVIL_RESOLVE_BLOCKED', `RL Gym did not take the package in (${rs.status}); this is RL Gym’s work, not a task repair.${rsRef}`)) : asIssue(`ANVIL_${rs.kind.toUpperCase()}`, `Resolve: ${rs.message}${rs.requestId ? ` (RL Gym request ${rs.requestId})` : ''}`);
         for (const r of tasks) r.issues.push(note);
-        if (rs.kind === 'business') for (const q of (Array.isArray(rs.data.anvil_requirements) ? rs.data.anvil_requirements : []) as { code?: string; task_id?: string }[]) for (const [i, r] of tasks.entries()) if (!q.task_id || q.task_id === part.taskIds[i]) r.issues.push(asIssue(String(q.code), 'RL Gym’s own work before intake (not a task repair).'));
+        if (rs.kind === 'business') for (const q of (Array.isArray(rs.data.anvil_requirements) ? rs.data.anvil_requirements : []) as AnvilRequirement[]) for (const [i, r] of tasks.entries()) if (!q.task_id || q.task_id === part.taskIds[i]) r.issues.push(asIssue(String(q.code), `RL Gym’s own work before intake (not a task repair)${requirementDetail(q)}.${rsRef}`));
       }
     }
     return { results: items.map((i) => results.get(i.record.id)!), anvil: record, zips };

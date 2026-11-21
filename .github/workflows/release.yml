@@ -1,5 +1,9 @@
 # Release tag: manual approval (the "production" GitHub environment requires reviewers), migrations, new revisions
-# with no traffic, smoke tests on the tagged revision, 10% canary, smoke tests again, then 100%.
+# with no traffic, 10% canary with smoke tests, then 100% together with the worker and the grading job.
+#
+# Rollback (infra/deploy/cloud-run-state.sh): what production runs is recorded BEFORE anything changes, and a failure
+# restores exactly that, and only what this run actually changed (job images after a failed migration, traffic only
+# once the canary started, the worker and grading job only once they were switched).
 name: Release production
 on:
   push:
@@ -30,6 +34,8 @@ jobs:
           provider: ${{ vars.GCP_WIF_PROVIDER_PRODUCTION }}
           service_account: ${{ vars.GCP_DEPLOYER_SA_PRODUCTION }}
           region: ${{ env.REGION }}
+      - name: Record what production runs now (the rollback target)
+        run: infra/deploy/cloud-run-state.sh record "$RUNNER_TEMP/prod-state"
       - uses: docker/setup-buildx-action@v3
       - name: Build and push images
         run: |
@@ -40,11 +46,12 @@ jobs:
           docker buildx build --push -f infra/harbor-verify/Dockerfile -t "$REG/harbor-verify:$TAG" -t "$REG/harbor-verify:$GITHUB_SHA" .
       - name: Migrations (backward-compatible for one release)
         run: |
+          echo "JOBS_CHANGED=1" >> "$GITHUB_ENV"
           REG="$REGION-docker.pkg.dev/$PROJECT/praxis"
           gcloud run jobs update praxis-migrate --region "$REGION" --image "$REG/api:$TAG"
           gcloud run jobs update praxis-verify-chains --region "$REGION" --image "$REG/api:$TAG"
-          gcloud run jobs update praxis-harbor-verify --region "$REGION" --image "$REG/harbor-verify:$TAG"
           gcloud run jobs execute praxis-migrate --region "$REGION" --wait
+          # The grading job (praxis-harbor-verify) switches with the worker, its main caller, at promotion (below).
       - name: Deploy new revisions without traffic
         run: |
           REG="$REGION-docker.pkg.dev/$PROJECT/praxis"
@@ -56,6 +63,7 @@ jobs:
           # The worker has no user traffic; it switches after the canary succeeds (see below).
       - name: 10% canary
         run: |
+          echo "TRAFFIC_CHANGED=1" >> "$GITHUB_ENV"
           for s in praxis-api praxis-web praxis-candidate; do
             gcloud run services update-traffic "$s" --region "$REGION" --to-tags "rc-$REV=10"
           done
@@ -81,11 +89,15 @@ jobs:
           for s in praxis-api praxis-web praxis-candidate; do
             gcloud run services update-traffic "$s" --region "$REGION" --to-tags "rc-$REV=100"
           done
+          echo "WORKER_CHANGED=1" >> "$GITHUB_ENV"
           gcloud run deploy praxis-worker --region "$REGION" --image "$REG/api:$TAG"
-      - name: Roll back the canary if anything failed
+          gcloud run jobs update praxis-harbor-verify --region "$REGION" --image "$REG/harbor-verify:$TAG"
+      - name: Roll back to what was recorded if anything failed
         if: failure()
         run: |
-          for s in praxis-api praxis-web praxis-candidate; do
-            PREV=$(gcloud run revisions list --service "$s" --region "$REGION" --format='value(metadata.name)' --sort-by='~metadata.creationTimestamp' | sed -n 2p)
-            [ -n "$PREV" ] && gcloud run services update-traffic "$s" --region "$REGION" --to-revisions "$PREV=100" || true
-          done
+          what=""
+          [ -n "${TRAFFIC_CHANGED:-}" ] && what="$what services"
+          [ -n "${WORKER_CHANGED:-}" ] && what="$what worker"
+          [ -n "${JOBS_CHANGED:-}${WORKER_CHANGED:-}" ] && what="$what jobs"
+          if [ -z "$what" ]; then echo "Nothing in production was changed; no rollback needed."; exit 0; fi
+          infra/deploy/cloud-run-state.sh restore "$RUNNER_TEMP/prod-state" $what

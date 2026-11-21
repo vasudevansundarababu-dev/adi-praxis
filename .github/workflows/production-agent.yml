@@ -1,5 +1,10 @@
 # Production agent: promote the build ALREADY RUNNING on QA or staging to production. It does not rebuild from a
-# branch; it reads the image digest currently serving on the chosen source and deploys that same digest to production.
+# branch; it reads the image digest (repo@sha256, never a re-pointable tag) of each service's serving revision on the
+# chosen source and deploys that same digest to production. The grading image (praxis-harbor-verify job) is promoted
+# from staging with the worker; QA has no grading job, so a QA promotion keeps production's current grader and says so.
+#
+# Rollback: production's serving revisions and job images are recorded before anything changes and restored exactly
+# on failure (infra/deploy/cloud-run-state.sh), only for what this run actually changed.
 #
 # Trigger: manual (Actions -> Production agent -> Run workflow) or an issue command
 # `/production deploy from qa` / `/production deploy from staging` (see issue-commands.yml).
@@ -51,12 +56,13 @@ jobs:
           if [ -z "${SRC_PROJECT}" ]; then echo "Source project is not configured for $SOURCE"; exit 1; fi
           : > images.env
           for app in api web candidate; do
-            img=$(gcloud run services describe "praxis-$app" --project "$SRC_PROJECT" --region "$REGION" \
-              --format='value(spec.template.spec.containers[0].image)')
-            if [ -z "$img" ]; then echo "No running image for praxis-$app in $SOURCE"; exit 1; fi
+            img=$(PROJECT="$SRC_PROJECT" infra/deploy/cloud-run-state.sh digest "praxis-$app")
             echo "${app^^}_IMAGE=$img" >> images.env
             echo "$app -> $img"
           done
+          harbor=$(PROJECT="$SRC_PROJECT" infra/deploy/cloud-run-state.sh job-image praxis-harbor-verify)
+          echo "HARBOR_IMAGE=$harbor" >> images.env
+          echo "harbor-verify -> ${harbor:-(no grading job in $SOURCE)}"
           echo "SOURCE_PROJECT=$SRC_PROJECT" >> images.env
       - name: Authenticate to production
         uses: ./.github/actions/gcp-auth
@@ -64,11 +70,14 @@ jobs:
           provider: ${{ vars.GCP_WIF_PROVIDER_PRODUCTION }}
           service_account: ${{ vars.GCP_DEPLOYER_SA_PRODUCTION }}
           region: ${{ env.REGION }}
+      - name: Record what production runs now (the rollback target)
+        run: PROJECT="$PROD_PROJECT" infra/deploy/cloud-run-state.sh record "$RUNNER_TEMP/prod-state"
       - name: Confirm production target and the promoted digests
         run: |
           set -euo pipefail
           if [ -z "${PROD_PROJECT}" ]; then echo "GCP_PROJECT_PRODUCTION is not configured"; exit 1; fi
           source images.env
+          current_harbor=$(awk '$1=="job" && $2=="praxis-harbor-verify" {print $3}' "$RUNNER_TEMP/prod-state")
           {
             echo "## Production promotion"
             echo
@@ -80,11 +89,14 @@ jobs:
             echo "| api | \`$API_IMAGE\` |"
             echo "| web | \`$WEB_IMAGE\` |"
             echo "| candidate | \`$CANDIDATE_IMAGE\` |"
+            if [ -n "$HARBOR_IMAGE" ]; then echo "| harbor-verify (grading job) | \`$HARBOR_IMAGE\` |"
+            else echo "| harbor-verify (grading job) | **not promoted**: $SOURCE has no grading job; production keeps \`$current_harbor\` |"; fi
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Run migrations for the promoted api image
         run: |
           set -euo pipefail
           source images.env
+          echo "JOBS_CHANGED=1" >> "$GITHUB_ENV"
           gcloud run jobs update praxis-migrate --project "$PROD_PROJECT" --region "$REGION" --image "$API_IMAGE"
           gcloud run jobs update praxis-verify-chains --project "$PROD_PROJECT" --region "$REGION" --image "$API_IMAGE"
           gcloud run jobs execute praxis-migrate --project "$PROD_PROJECT" --region "$REGION" --wait
@@ -99,6 +111,7 @@ jobs:
           gcloud run deploy praxis-candidate --project "$PROD_PROJECT" --region "$REGION" --image "$CANDIDATE_IMAGE" --no-traffic --tag "rc-$REV"
       - name: 10% canary
         run: |
+          echo "TRAFFIC_CHANGED=1" >> "$GITHUB_ENV"
           for s in praxis-api praxis-web praxis-candidate; do
             gcloud run services update-traffic "$s" --project "$PROD_PROJECT" --region "$REGION" --to-tags "rc-$REV=10"
           done
@@ -125,11 +138,17 @@ jobs:
           for s in praxis-api praxis-web praxis-candidate; do
             gcloud run services update-traffic "$s" --project "$PROD_PROJECT" --region "$REGION" --to-tags "rc-$REV=100"
           done
+          echo "WORKER_CHANGED=1" >> "$GITHUB_ENV"
           gcloud run deploy praxis-worker --project "$PROD_PROJECT" --region "$REGION" --image "$API_IMAGE"
-      - name: Roll back the canary if anything failed
+          if [ -n "$HARBOR_IMAGE" ]; then
+            gcloud run jobs update praxis-harbor-verify --project "$PROD_PROJECT" --region "$REGION" --image "$HARBOR_IMAGE"
+          fi
+      - name: Roll back to what was recorded if anything failed
         if: failure()
         run: |
-          for s in praxis-api praxis-web praxis-candidate; do
-            PREV=$(gcloud run revisions list --service "$s" --project "$PROD_PROJECT" --region "$REGION" --format='value(metadata.name)' --sort-by='~metadata.creationTimestamp' | sed -n 2p)
-            [ -n "$PREV" ] && gcloud run services update-traffic "$s" --project "$PROD_PROJECT" --region "$REGION" --to-revisions "$PREV=100" || true
-          done
+          what=""
+          [ -n "${TRAFFIC_CHANGED:-}" ] && what="$what services"
+          [ -n "${WORKER_CHANGED:-}" ] && what="$what worker"
+          [ -n "${JOBS_CHANGED:-}${WORKER_CHANGED:-}" ] && what="$what jobs"
+          if [ -z "$what" ]; then echo "Nothing in production was changed; no rollback needed."; exit 0; fi
+          PROJECT="$PROD_PROJECT" infra/deploy/cloud-run-state.sh restore "$RUNNER_TEMP/prod-state" $what

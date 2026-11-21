@@ -19,6 +19,8 @@ export function sampleProfileOutput(profile: TemplateProfile): Record<string, un
       case 'long_text':
       case 'graph_binding':
         if (f.key === 'id') return `${f.idPrefix ?? 'X'}${n}`;
+        // An optional free-text tool name stays blank: a sample never invents a tool the template does not declare (APR-13d).
+        if (f.key === 'tool' && f.type === 'text' && !f.required) return '';
         return `${canary(v)}${f.label} (synthetic sample)`;
       case 'date':
         return '2026-05-01';

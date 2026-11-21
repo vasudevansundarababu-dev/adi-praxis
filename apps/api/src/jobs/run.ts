@@ -46,6 +46,9 @@ import { grantAppRole } from './grant-app-role';
  *   reviews and approves each step in the console. Dry run by default.
  * - `kyc-v8-readback [--v7-template <id>] [--v7-project <id>]`: read-only IDs, hashes, audit events, actor user IDs and
  *   roles, receipts and predecessor mapping for the v8 publication and approval records (no names or e-mails).
+ * - `kyc-v8-tool-binding --requested-by <admin email> [--apply]`: the KYC v8 tool-binding correction (APR-13a-c):
+ *   successor revisions of 3 approved v8 tasks where only listed S5 step tools change (7 rebindings, 2 blank with
+ *   capability gap CG-01), submitted for review; a person approves each in the console. Dry run by default.
  * - `authored-export <projectId> [--apply] [--out <dir>]`: TS-17 offline export of the project's approved tasks as RL
  *   Gym import ZIPs (praxis.authored-task-export.v1), checked against the archive bounds; never calls RL Gym. Writes to
  *   <dir>, else to object storage under exports/offline/<projectId>/. Dry run by default.
@@ -209,6 +212,12 @@ try {
     const r = await kycV8Readback(db, { v7TemplateId: opt('--v7-template', KYC_V8_DEFAULTS.v7TemplateId), v7ProjectId: opt('--v7-project', KYC_V8_DEFAULTS.v7ProjectId) });
     console.log(JSON.stringify(r));
     if (!r.ok) process.exitCode = 3;
+  } else if (job === 'kyc-v8-tool-binding') {
+    const { parseToolBindingArgs, kycV8ToolBinding } = await import('./kyc-v8-tool-binding');
+    const a = parseToolBindingArgs(process.argv.slice(3));
+    const r = await kycV8ToolBinding(db, a);
+    console.log(JSON.stringify({ report: 'kyc-v8-tool-binding', apply: a.apply, ...r }));
+    if (r.outcome === 'refused') process.exitCode = 3;
   } else if (job === 'authored-export') {
     const rest = process.argv.slice(3);
     const apply = rest.includes('--apply');
@@ -243,7 +252,7 @@ try {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots | marketing-form-v2 | kyc-v8-successor | kyc-v8-readback | authored-export`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots | marketing-form-v2 | kyc-v8-successor | kyc-v8-readback | kyc-v8-tool-binding | authored-export`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

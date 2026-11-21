@@ -16,6 +16,7 @@ import { MemoryStorage, stubScanner } from '../src/candidate/storage';
 import { writeApprovedRecord } from '../src/dataset/approved-records';
 import { archiveProblems, ARCHIVE_BOUNDS, offlineExport, packageProblems, safeArchivePath } from '../src/jobs/authored-export';
 import { kycV8Readback } from '../src/jobs/kyc-v8-readback';
+import { applyBindings, KYC_V8_TOOL_BINDING } from '../src/jobs/kyc-v8-tool-binding';
 import { APR04_CLAUSES, loadKycV8Inputs, parseKycV8Args, projectNameFor, successorProject, successorS4, successorTasks, successorTemplate, type KycV8Inputs } from '../src/jobs/kyc-v8-successor';
 import { MemoryEmailSender } from '../src/lib/email';
 import { writeAudit } from '../src/platform/audit';
@@ -35,7 +36,23 @@ import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
  */
 const SECRET = 'test-mock-secret';
 const V7 = JSON.parse(readFileSync(new URL('./fixtures/kyc-v7/proposal.json', import.meta.url), 'utf8')) as Record<string, any>;
-const EMBEDDED = loadKycV8Inputs();
+const RAW = loadKycV8Inputs();
+/**
+ * APR-13d: approval now refuses S5 step tools the template does not declare. The embedded candidates carry the 9 tools
+ * RL Gym refused (corrected for the real tasks by `kyc-v8-tool-binding`), so this fixture binds them as APR-13a/b did.
+ */
+const EMBEDDED: KycV8Inputs = {
+  ...RAW,
+  successors: new Map(
+    [...RAW.successors].map(([id, s]) => {
+      const t = KYC_V8_TOOL_BINDING.tasks.find((x) => x.applicationType === s.candidate.output.sections.S1!.applicationType);
+      if (!t) return [id, s];
+      const r = applyBindings({ sections: s.candidate.output.sections }, t.changes);
+      if ('problems' in r) throw new Error(r.problems.join(' '));
+      return [id, { ...s, candidate: { ...s.candidate, output: { ...s.candidate.output, sections: r.output.sections as typeof s.candidate.output.sections } } }];
+    }),
+  ),
+};
 const WORKFLOW = 'KYC onboarding and refresh';
 const ADMIN_EMAIL = 'admin@test.local';
 const BANK_POLICY = `Golden Bank KYC policy (synthetic test document)

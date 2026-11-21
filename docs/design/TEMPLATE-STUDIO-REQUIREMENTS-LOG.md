@@ -26,6 +26,7 @@ Related: `docs/anvil/FORGE-RLGYM-HANDOFF-GAPS.md` (the 18 Nov hand-off) and `doc
 | H0: manual hand-off | KYC v7, Marketing VEYRA v1/v2 | Off: files sent by hand | Done 18 Nov 2026 | Rows TS-01 to TS-20 below |
 | R1: benchmark run | KYC (one task) | Off | Planned (owner) | *to be added* |
 | R2: benchmark run | Marketing | **On** (live integration) | Planned (owner) | *to be added* |
+| P1: target flow | All | n/a | Proposed by owner 20 Nov 2026 | Rows TS-26 to TS-38 |
 
 After R2, this log becomes the input for the Studio's requirements spec.
 
@@ -86,7 +87,46 @@ After R2, this log becomes the input for the Studio's requirements spec.
 | TS-24 | All | **A successor version may keep an unchanged form.** Creating v8 with the same form as v7 must not need a new form ID. Only a changed form gets a new ID. | ADI Forge's proposal checker rejected the KYC v8 candidate with `TP_FORM_ID_TAKEN` although its form was byte-identical to v7's (18 Nov 2026). | open |
 | TS-25 | Studio | **Official source capture works for every jurisdiction**, including sites that block automated download, and records the capture method: exact server bytes, or a rendered-text capture. Point-in-time versions are used where the publisher offers them; otherwise the record says "current text on capture date". | 15 state sources captured by hand on 18 Nov: TX, FL and IL by direct download (the TX site needed its hidden source endpoint); CA and NY only through a browser (403 to automated clients). No state site offered a point-in-time version. | open |
 
+### G. Release registry and build (the Studio as the factory)
+
+Source for G to I: the owner's proposed target flow and inspection checklist (20 Nov 2026). The checklist cites
+failures found in a review of the RL Gym codebase. This session did not verify those RL Gym findings; they are
+recorded as stated.
+
+Target flow: **Studio** authors the template, schema and seed → builds and smoke-tests the image locally with
+production flags → pushes it to GCP Artifact Registry pinned by `@sha256` → publishes an immutable **release
+manifest** (`template_sha256` + `image_digest`). **ADI Forge** authors tasks against the pinned release. **RL Gym**
+registers the release, binds evaluators and model keys at run time, and runs isolated rollouts and grading.
+
+| ID | Owner | Requirement | Why (evidence) | Status |
+|---|---|---|---|---|
+| TS-26 | Studio | **One immutable release registry.** A release manifest holds `template_sha256` and the environment `image_digest`, plus the content hashes of the bound policy artifacts (TS-07). It is stored in GCS under its own SHA-256 with retention lock; nothing published is overwritten or deleted. ADI Forge and RL Gym have read-only access. A change is a new release with `successor_of` and a part diff (TS-03). | Today each side keeps its own copy, linked only by the template hash. QA services are deployed by tag, not digest. | open |
+| TS-27 | Studio | **Images pinned by digest, built hermetically.** Every image is referenced and deployed as `@sha256:…`, never by tag. Builds download nothing live (no curl, wget or urlopen during `docker build`). Tools come from SHA-256-pinned base stages or vendored lockfiles. | Owner checklist A: a live download during build caused fragility in an RL Gym Dockerfile. | open |
+| TS-28 | Studio | **Base images from the target project only.** `FROM` is parameterised (`ARG BASE_IMAGE`). The Studio checks that the base image exists in the target deployment registry, never in another GCP project. | Owner checklist A: an RL Gym image built `FROM` an image in a different GCP project. | open |
+| TS-29 | Studio | **Read-only, non-root layout.** Immutable assets (schema, fixtures, server code) go under `/opt/…`, owned by root, mode 0555/0444. Mutable files (SQLite, `/workspace/inputs`, `/workspace/output`, temp files) go only in mounted writable paths (`/tmp`, `/workspace`). | RL Gym runs with `--read-only` and `--user 10001:10001`. | open |
+| TS-30 | Studio | **Local contract gate before push.** Before any push, the Studio boots the image with the production flags (`--network none --read-only --user 10001:10001 --tmpfs /tmp:rw,noexec`). `GET /health` must return 200, `POST /reset` must load the seed without EROFS or permission errors, and `GET /snapshot` must export the expected state. A failed gate blocks the push. | Owner checklist A. | open |
+| TS-31 | Studio | **A person approves each release, and revocation is a record.** Publishing a release is an authorised, audited state change, and the AI never approves (TS-11). A bad release is stopped by a separate revocation record, never by deletion. ADI Forge and RL Gym refuse revoked hashes. | Every state change is authorised and audited (non-negotiable). | open |
+
+### H. Authoring checks (ADI Forge)
+
+| ID | Owner | Requirement | Why (evidence) | Status |
+|---|---|---|---|---|
+| TS-32 | Forge | **Tasks pin the release.** Every authored task records the release it was written against (`template_sha256`, and through the release manifest the `env_image_digest`). Export is blocked if that digest is not confirmed present in Artifact Registry, or if the release is revoked. | Owner checklist B. Today tasks record only the template version and hash. | open |
+| TS-33 | Forge | **Pre-export scrub for secrets and host paths.** Before export, check that no local host path (`/Users/…`), `.env` value or model API key appears in the payload. Any hit blocks the export. | Owner checklist B. ADI Forge already blocks private-field exposure (`GENERIC_PRIVATE_EXPOSURE`), but has no secret or path scan. | open |
+| TS-34 | All | **Seed and assertion dry-run: decision needed.** The checklist asks ADI Forge to validate SME-added seed rows and SQL/API assertions against the template's `schema.sql` and API schema before export. This conflicts with today's principle that SMEs write no technical interfaces; tasks carry no SQL or API assertions. Decide first whether SMEs may add seed data or assertions at all. If yes, the dry-run is required. If no, the Studio owns seeds and the row is dropped. | Owner checklist B, compared with the current task design. | open (owner decision) |
+
+### I. Execution and evaluation (RL Gym)
+
+| ID | Owner | Requirement | Why (evidence) | Status |
+|---|---|---|---|---|
+| TS-35 | RL Gym | **Evaluators pinned like environments.** Evaluators (Promptfoo, Gozen, OPA) are images pinned by digest, and each config is hashed. Each grading run writes a **run manifest**: release hash, evaluator digests, config hashes, policy hashes and model identifier, so a score can be reproduced. Model keys come from Secret Manager at run time and never appear in a manifest or image. | Today the template names only an "evaluator kind", not the tool, its version or its config. | open |
+| TS-36 | RL Gym | **Isolation between the Gym, evaluators and secrets.** The Gym container runs with `--network none`, `--cap-drop ALL` and no LLM keys, talking only over owner-restricted Unix sockets (0600/0660, `SO_PEERCRED`). Evaluators run outside the task container, against the immutable post-rollout snapshot (trajectory, final DB dump, API trace). | Owner checklist C. | open |
+| TS-37 | RL Gym | **Fail loudly, with single claim ownership.** A single-attempt runner never exits 0 when `request.json` is missing or already claimed. One active coordinator per bridge directory. | Owner checklist C: a silent exit 0 led to an empty syscall trace downstream. | open |
+| TS-38 | RL Gym | **Symmetric health gates and memory limits.** Every container that `deploy.sh` checks must also be verified healthy by `startup.sh` before it exits 0. Every compose service has an explicit `mem_limit`, so parallel rollouts cannot trigger the OOM killer. | Owner checklist C: an OOM risk to PostgreSQL during parallel rollouts. | open |
+
 ## Change log
+
+- 20 Nov 2026: added TS-26 to TS-38 from the owner's target release flow and inspection checklist. TS-34 needs an owner decision.
 
 - 18 Nov 2026: added TS-24 and TS-25 from building the KYC v8 successor package.
 - 18 Nov 2026: added TS-21 to TS-23 from RL Gym's v8 successor-package request.

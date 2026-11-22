@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { brand, pageTitle, semantic } from '../theme/tokens';
+import { brand, forge, pageTitle, semantic, titleTemplate } from '../theme/tokens';
 
 /** WCAG 2.x relative-luminance contrast ratio. */
 function contrast(a: string, b: string) {
@@ -55,7 +55,7 @@ describe('theme tokens', () => {
   it('theme.css defines the same values as tokens.ts', () => {
     const css = readFileSync(path.join(import.meta.dirname, '../theme/theme.css'), 'utf8').toLowerCase();
     for (const theme of ['light', 'dark'] as const) {
-      const block = theme === 'light' ? css.slice(css.indexOf(':root {')) : css.slice(css.indexOf('.dark,'));
+      const block = theme === 'light' ? css.slice(css.indexOf(':root,')) : css.slice(css.indexOf('.dark,'));
       const t = semantic[theme];
       expect(block).toContain(`--praxis-bg: ${t.bg.toLowerCase()}`);
       expect(block).toContain(`--praxis-text: ${t.text.toLowerCase()}`);
@@ -65,7 +65,21 @@ describe('theme tokens', () => {
     }
   });
 
-  it('page titles read "<Screen> · ADI Forge"', () => {
-    expect(pageTitle('Sign in')).toBe('Sign in · ADI Forge');
+  it('page titles read "<Screen> · Authoring · ADI Labs Forge" (BRANDING.md, 22 Nov 2026)', () => {
+    expect(pageTitle('Sign in')).toBe('Sign in · Authoring · ADI Labs Forge');
+    expect(titleTemplate).toEqual({ template: '%s · Authoring · ADI Labs Forge', default: 'Authoring · ADI Labs Forge' });
+  });
+
+  it('lockup colours match BRANDING.md and theme.css; white text on the primary purple and navy meets AA', () => {
+    const css = readFileSync(path.join(import.meta.dirname, '../theme/theme.css'), 'utf8').toLowerCase();
+    expect(forge).toMatchObject({ navy: '#082044', purple: '#8126af', purpleDark: '#5b21b6', purpleLight: '#b77ae8' });
+    for (const [k, v] of [['navy', forge.navy], ['purple', forge.purple], ['purple-dark', forge.purpleDark], ['purple-light', forge.purpleLight]]) {
+      expect(css).toContain(`--color-forge-${k}: ${v}`);
+    }
+    expect(css).toContain('.btn-primary { color: #ffffff; background: #8126af;');
+    expect(contrast('#FFFFFF', forge.purple)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast('#FFFFFF', forge.purpleDark)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(forge.purpleLight, forge.navy)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(forge.product, forge.navy)).toBeGreaterThanOrEqual(4.5);
   });
 });

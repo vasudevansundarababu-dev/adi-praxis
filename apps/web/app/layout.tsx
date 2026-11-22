@@ -1,6 +1,8 @@
 import { Geist, Geist_Mono, Inter } from 'next/font/google';
 import type { Metadata } from 'next';
-import mark from '@praxis/shared/brand/praxis-mark-512.png';
+import { titleTemplate } from '@praxis/shared/theme';
+import appleIcon from '@praxis/shared/brand/apple-touch-icon.png';
+import icon from '@praxis/shared/brand/icon-32.png';
 import './globals.css';
 
 // Typography (owner, 15 Nov 2026): Inter for body, labels and tables (optical sizing); Geist for headings, titles and
@@ -11,8 +13,9 @@ const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-forge-mono', dis
 const fontVars = `${sans.variable} ${display.variable} ${mono.variable}`;
 
 export const metadata: Metadata = {
-  title: { template: '%s · ADI Forge', default: 'ADI Forge' },
-  icons: { icon: mark.src, apple: mark.src },
+  // Browser tab: "<Page> · Authoring · ADI Labs Forge"; icons made from the shield (BRANDING.md, 22 Nov 2026).
+  title: titleTemplate,
+  icons: { icon: icon.src, apple: appleIcon.src },
 };
 
 // Applies the saved theme before paint to avoid a flash. The console defaults to light.

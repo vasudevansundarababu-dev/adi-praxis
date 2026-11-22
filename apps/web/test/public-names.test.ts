@@ -4,8 +4,14 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Legal rule (owner, 15 Nov 2026): nothing a user sees may name "ADI-Labs", "Praxis" or "Anvil". The product is
- * "ADI Forge"; Anvil is shown as "RL Gym". Internal names stay: code identifiers (`isAnvil`, `PraxisPrecheckValidator`),
+ * Legal rule (owner, 15 Nov 2026): nothing a user sees may name "ADI-Labs", "Praxis" or "Anvil". Anvil is shown as
+ * "RL Gym".
+ *
+ * Exception (owner, 22 Nov 2026; design repo shared/BRANDING.md §1, change F-09): the ADI Labs Forge lockup shows
+ * "ADI LABS-FORGE" and page titles end "Authoring · ADI Labs Forge". "ADI LABS" is the owner's choice and legal should
+ * confirm it before external release (docs/DECISIONS.md). So "ADI LABS" and "ADI Labs Forge" are allowed only in the
+ * lockup and brand-name files (BRAND_FILES); everywhere else any "ADI Labs" / "ADI-Labs" / "ADI LABS" still fails, as
+ * do "Praxis" and "Anvil" everywhere, the lockup files included. Internal names stay: code identifiers (`isAnvil`, `PraxisPrecheckValidator`),
  * packages (`@praxis/shared`), CSS and storage keys (`praxis-theme`), protocol names (`Praxis-Signature`,
  * `praxis.authored-task-export.v1`), "Praxis Demo Bank" (the fictional bank in synthetic data), and comments.
  *
@@ -37,8 +43,11 @@ const API_USER_FACING = [
   'apps/api/src/routes/candidate-auth.ts',
   'packages/shared/theme/tokens.ts',
 ];
+/** The only files whose screen text may carry the family name (the lockup and the one constant holding it). */
+const BRAND_FILES = new Set(['apps/web/components/brand.tsx', 'apps/candidate/components/brand.tsx', 'packages/shared/theme/tokens.ts']);
+const BRAND_NAME = /ADI LABS(?=<)|ADI Labs Forge/g;
 const BANNED = [
-  /ADI[- ]?Labs/,
+  /(?<![@\w./])ADI[- ]?Labs(?!\.\w)/i, // any case; the email domain (admin@adi-labs.ai) is an address, not a name
   /ADI Praxis/,
   /(?<![\w@./-])Praxis(?![\w-])(?! Demo Bank)/,
   /(?<![\w@./-])Anvil(?![\w-])/,
@@ -58,13 +67,14 @@ export function publicNameViolations(files: string[], read: (f: string) => strin
       if (COMMENT.test(line) || /^\s*import\s/.test(line)) return;
       // The support bot's own instruction must name what it may not say.
       if (line.includes('Never use the names Praxis, Anvil or ADI-Labs')) return;
-      if (BANNED.some((re) => re.test(line))) hits.push(`${f}:${i + 1}: ${line.trim().slice(0, 140)}`);
+      const shown = BRAND_FILES.has(f) ? line.replace(BRAND_NAME, '') : line;
+      if (BANNED.some((re) => re.test(shown))) hits.push(`${f}:${i + 1}: ${line.trim().slice(0, 140)}`);
     });
   }
   return hits;
 }
 
-describe('public names (legal, 15 Nov 2026)', () => {
+describe('public names (legal, 15 Nov 2026; lockup exception 22 Nov 2026)', () => {
   it('no UI text, user-facing API message, email or support prompt names ADI-Labs, Praxis or Anvil', () => {
     const files = [...uiFiles(), ...API_USER_FACING];
     expect(files.length).toBeGreaterThan(100);
@@ -83,9 +93,25 @@ describe('public names (legal, 15 Nov 2026)', () => {
         "if (state.validator.isAnvil) send('Praxis-Signature');",
         "const doc = 'US Federal KYC Policy (Praxis Demo Bank)';",
         "const schema = 'praxis.authored-task-export.v1';",
-        "<p>Export to RL Gym from ADI Forge</p>",
+        "<p>Export to RL Gym from Authoring</p>",
+        "<span>ADI LABS</span>",
+        "<a href=\"mailto:admin@adi-labs.ai\">admin@adi-labs.ai</a>",
+        "const t = 'Home · Authoring · ADI Labs Forge';",
       ].join('\n'),
     };
-    expect(publicNameViolations(['a.tsx'], (f) => lines[f]!).map((h) => h.split(':')[1])).toEqual(['1', '2', '3', '4']);
+    expect(publicNameViolations(['a.tsx'], (f) => lines[f]!).map((h) => h.split(':')[1])).toEqual(['1', '2', '3', '4', '11', '13']);
+  });
+
+  it('allows "ADI LABS" and "ADI Labs Forge" only in the lockup files, and never "ADI-Labs", Praxis or Anvil there (BRANDING.md, 22 Nov 2026)', () => {
+    const f = 'apps/web/components/brand.tsx';
+    const lockup = [
+      '<span className="text-white">ADI LABS</span>',
+      '<Image src={mark} alt="ADI Labs Forge" />',
+      '<span>ADI-Labs</span>',
+      '<span>ADI LABS Praxis</span>',
+      '<p>Validated by Anvil</p>',
+      '<p>Hello ADI Labs team</p>',
+    ].join('\n');
+    expect(publicNameViolations([f], () => lockup).map((h) => h.split(':')[1])).toEqual(['3', '4', '5', '6']);
   });
 });

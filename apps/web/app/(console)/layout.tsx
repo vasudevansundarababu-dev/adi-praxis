@@ -24,9 +24,9 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
           {process.env.PRAXIS_BUILD && <span className="ml-2 font-mono">Build {process.env.PRAXIS_BUILD}</span>}
         </p>
       )}
-      <header className="sticky top-0 z-20 bg-brand-navy text-white shadow-md">
+      <header className="sticky top-0 z-20 bg-forge-navy text-white shadow-md">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 pt-3 pb-2">
-          <Link href="/" aria-label="ADI Forge home">
+          <Link href="/" aria-label="Authoring home">
             <NavBrand />
           </Link>
           <div className="ml-auto flex items-center gap-3 text-sm">
@@ -41,7 +41,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
           </div>
         </div>
         <MainNav groups={navGroupsFor(user.roles, undefined, newFlow)} />
-        <div className="h-1 bg-brand-gradient" aria-hidden />
+        <div className="h-[3px] bg-forge-rule" aria-hidden />
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8 pb-24">{children}</main>
       <SupportBot endpoint="/api/v1/support/ask" audience="staff" />

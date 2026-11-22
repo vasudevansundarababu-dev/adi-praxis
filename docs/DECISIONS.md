@@ -2427,3 +2427,30 @@ Design: `docs/design/FORGE-RLGYM-V2-DESIGN.md` part 3. Contract read from the ne
   AI assist. The next re-export carries the new revision with `corrects_revision` and `sme_batch_id` (the batch of the
   task's latest correction decision).
 - **(chosen by Claude)** RL Gym's `suspected_cause` is shown labelled as a hint; it never pre-selects a decision.
+
+## New RL Gym, part 4: SME needs to Studio (22 Nov 2026)
+
+Design: `docs/design/FORGE-RLGYM-V2-DESIGN.md` part 4. Contract read from Studio's PR #14 (`utility/inbox/api.py`,
+`utility/core/auth.py`, `scripts/send_inbox_item.py`), read only.
+
+- **(owner, 22 Nov)** Authors can send a need to the PM (the only author-screen addition); Reviewers and the PM raise
+  needs too; only the PM sends to Studio.
+- **(from Studio)** `POST /api/v1/inbox-items` takes `kind`, `source` (`adi-forge`), `template_id`, `version`,
+  `project_id`, `summary`, `evidence[]`, `needed_by` (and others ADI Forge does not use), refuses unknown fields, and
+  answers `202 {id}`. Locally it accepts a service principal by trusted headers (`X-Tenant-Id`, `X-Actor-Id`,
+  `X-Actor-Kind: service`, `X-Actor-Roles: service`) with an `Idempotency-Key`. Reading an item (`GET`) needs a Studio
+  designer or admin, so ADI Forge cannot show Studio's status yet. **Open for Studio:** the production key for ADI
+  Forge, and a way for ADI Forge to see item status (the proposed webhook, or `GET` for a service).
+- **(chosen by Claude)** Settings `STUDIO_API_URL`, `STUDIO_INBOX_KEY` (Bearer, used when set), and for local
+  `STUDIO_TENANT_ID`, `STUDIO_SERVICE_ACTOR_ID`. Connected = URL plus a key or the local principal.
+- **(chosen by Claude)** The author's control is one collapsed "Send a need to PM" card on the task page beside
+  "Propose a policy document" (kind and a note). The workbench, AI assist and Policy screens are unchanged (tested).
+  Reviewers raise needs from a Benchmark review item ("Raise a need", with the batch and item as its source).
+- **(chosen by Claude)** Three append-only tables: `SmeNeed`, `SmeNeedClosure` (REJECTED or RESOLVED, once per need, with a
+  reason) and `SmeNeedSend` (each send with the body, Studio's item ID or error). State: open → sent (a received send),
+  or rejected / resolved. A sent need can only be resolved, not rejected. Needs of one kind go to Studio as one item,
+  with each need as evidence (`need_id`, `kind`, `task_id`, `raised_by` role, `note`; no names or emails).
+  `template_id`/`version` come from the RL Gym's qualification record (the Studio Template ID), else null.
+- **(chosen by Claude)** A task with an open or sent "New edge case" need is not exported
+  (`WAITING_FOR_NEW_CASE_KIND`) until the PM resolves or rejects it, because Studio's status does not come back yet.
+- **(chosen by Claude)** The console lists the author by role only ("Author"); their task identifies them to the PM.

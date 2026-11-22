@@ -83,6 +83,23 @@ export async function runCandidateCommandPrepared<P, T>(
   return execute(db, req, reply, { actor, actorId: `candidate:${actor.smeUserId}`, actorType: 'CANDIDATE', clientId: actor.clientId }, handler, prepare);
 }
 
+/**
+ * A staff command with a slow step outside the database transaction (RL Gym export and decisions, Studio inbox: the
+ * other product is called after the idempotency check, so a replay never repeats it). The handler then records the
+ * outcome in a short transaction, with the same guarantees.
+ */
+export async function runCommandPrepared<P, T>(
+  db: Db,
+  req: FastifyRequest,
+  reply: FastifyReply,
+  prepare: (actor: Actor) => Promise<P>,
+  handler: (ctx: CommandContext, prepared: P) => Promise<CommandResult<T>>,
+): Promise<void> {
+  const actor = req.actor;
+  if (!actor) throw unauthorized();
+  return execute(db, req, reply, { actor, actorId: actor.userId, actorType: 'USER', clientId: actor.clientId }, handler, prepare);
+}
+
 /** For routes open to staff or a machine client (e.g. client API task-input push). Machine clients audit as SERVICE. */
 export async function runStaffOrServiceCommand<T>(
   db: Db,

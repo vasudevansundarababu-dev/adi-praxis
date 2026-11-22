@@ -220,7 +220,7 @@ export const anvilTemplateRoutes: FastifyPluginAsyncZod<{ db: Db; anvil?: { envi
       field_types: FIELD_TYPES,
       limits: { maximum_upload_bytes: MAX_BYTES, maximum_examples: 20 },
       revocation: { schema_version: 'anvil.template-revocation.v1', endpoint: 'POST /api/v1/integrations/anvil/templates/qualifications', acknowledgement: ['event_id', 'event_sha256', 'status', 'sequence'] },
-      error_codes: ['TP_SCHEMA_VERSION', 'TP_SPEC_SHAPE', 'TP_FORM_INVALID', 'TP_FORM_ID_TAKEN', 'TP_FIELD_TYPE_UNSUPPORTED', 'TP_CRITERIA_WEIGHTS', 'TP_EXAMPLE_INVALID', 'TP_SKILLS_MISSING', 'TP_EVALUATOR_KIND_UNKNOWN', 'TP_TOOL_SCHEMA_MISSING', 'TP_OUTPUT_SCHEMA', 'TP_TEMPLATE_MISSING', 'TP_CASE_SELECTOR_UNSUPPORTED'],
+      error_codes: ['TP_SCHEMA_VERSION', 'TP_SPEC_SHAPE', 'TP_FORM_INVALID', 'TP_FORM_ID_TAKEN', 'TP_FIELD_TYPE_UNSUPPORTED', 'TP_CRITERIA_WEIGHTS', 'TP_EXAMPLE_INVALID', 'TP_SKILLS_MISSING', 'TP_EVALUATOR_KIND_UNKNOWN', 'TP_TOOL_SCHEMA_MISSING', 'TP_OUTPUT_SCHEMA', 'TP_TEMPLATE_MISSING', 'TP_CASE_SELECTOR_UNSUPPORTED', 'TP_EDGE_CASE_INVALID', 'TP_VERIFIERS_INVALID', 'TP_PRIVATE_GRADING_DATA'],
       praxis_requirement_codes: ['PR_RECRUITMENT_NEEDED', 'PR_SUPPLY_INSUFFICIENT', 'PR_CERTIFICATION_NEEDED', 'PR_SUPPLY_OK'],
       paid_calls: false,
     }),
@@ -406,5 +406,22 @@ const AUTHORING_SCHEMA = {
       type: 'object',
     },
     examples: { description: 'Synthetic worked examples: [{name, output}] where output is an authored record of this form. Reference answers stay private.', type: 'array', maxItems: 20 },
+    edge_cases: {
+      description: 'Studio S4 edge cases, public parts only (AUTHORING-SPEC 1.3). Never the recipe, the expected outcome or reference_answers.',
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['tag'],
+        additionalProperties: false,
+        properties: { tag: { type: 'string', pattern: '^[a-z][a-z0-9_]{0,63}$' }, name: { type: 'string' }, archetype: { type: 'string' }, complexity: { type: 'string' }, products: { type: 'array', items: { type: 'string' } }, context: { type: 'string' }, twist: { type: 'string' }, source: { type: 'string' } },
+      },
+    },
+    verifiers: {
+      description: 'Studio S7 verifier blocks, adi.verifier-blocks.v1 (AUTHORING-SPEC 2.2). slots and allowed_checks only when expected_values_from is "sme". No case-reference values. execution.verifier_blocks (per criterion) is also read when this is absent.',
+      type: 'object',
+      required: ['schema', 'expected_values_from', 'failure_taxonomy', 'blocks'],
+      additionalProperties: false,
+      properties: { schema: { const: 'adi.verifier-blocks.v1' }, expected_values_from: { enum: ['case_reference', 'sme'] }, failure_taxonomy: { type: 'array', items: { type: 'string' } }, slots: { type: 'array' }, allowed_checks: { type: 'array' }, blocks: { type: 'array' } },
+    },
   },
 } as const;

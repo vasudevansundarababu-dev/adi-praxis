@@ -2358,3 +2358,67 @@ import, `services/stubs/forge_stub.py`), read only, with the owner's OK for that
 - **(chosen by Claude)** The new table is added to `APPEND_ONLY_TABLES` in `jobs/grant-app-role.ts`, so the QA and
   production app role cannot update or delete it. `TutorialSpend` (D2, PR #84) was missing from that list and is added
   too; its trigger already blocked changes.
+
+## Authoring side of Studio edge cases, verifiers, RL Gym export and branding (22 Nov 2026)
+
+Source: adi-labs-design `praxis/AUTHORING-SPEC-EDGE-CASES-VERIFIERS-BRANDING.md` (rev 1.0), `AUTHORING-SNAPSHOT.md`
+3.1-3.6, `AUTHORING-LOCAL-SETUP.md`, `CHANGES.md` F-05, F-09-F-12; contracts read from Studio PR #14 (`praxis_wire.py`,
+inbox API) and the RL Gym build (`forge_stub.py`, `projects/service.py`, `scoring/service.py`), read only. Local only;
+additive: the old export path, the old-flow project page and the author workbench are unchanged.
+
+- **(chosen by Claude, spec 5 q1)** Proposal content sits where the spec proposes: `authoring.edge_cases[]` and
+  `authoring.verifiers` (`adi.verifier-blocks.v1`). Studio's builder today sends the blocks as `execution.verifier_blocks`
+  (per criterion); Authoring reads that too (display only; its case-reference paths are never shown). Grading data is
+  refused with `TP_PRIVATE_GRADING_DATA`: an edge case's recipe, outcome, `reference_answers`, minimums or rule; a
+  verifier value from `case_reference`. Edge-case slice tags must be values of S1's `complexity`/`archetype` lists when
+  those exist. Unknown authoring keys stay refused (`additionalProperties: false`).
+- **(chosen by Claude, spec 5 q2)** A task focuses on **at most one** edge case.
+- **(chosen by Claude)** Complexity and Archetype are S1 pick-list fields of the template, so the existing workbench
+  shows them; nothing is hard-coded. The focus edge case, expected-result slots and extra state checks are a separate
+  **Benchmark** panel on the SME task page (`TaskInstance.benchmark`, server-side like `drafting`), so the workbench,
+  its autosave and its AI assist are untouched. The panel is editable only while the task is editable, with its own
+  version check.
+- **(chosen by Claude)** "Choosing an edge case fills in its archetype and complexity" is applied in the package: the
+  edge case's archetype always; its complexity unless S1 has one. The panel says so.
+- **(chosen by Claude)** Package private part: `complexity`, `archetype`, `edge_case` and, for `sme` templates,
+  `verifiers {slots, extra_state_checks}` (spec 2.4). Keys appear only when set, so other packages keep their bytes.
+  The RL Gym reads slice tags from `private` (as built). **Gap for the RL Gym:** its scorer reads slots from
+  `private.verifier` (singular) or top-level `private.slots`, and an extra check's `criterion`; the spec says
+  `private.verifiers` and has no criterion on an extra check. Authoring follows the spec; the RL Gym needs a one-line
+  read change (or the spec changes). Golden KYC (`case_reference`) is unaffected.
+- **(chosen by Claude)** The approval gate (required slots, choices, allowed checks) is in `writeApprovedRecord`, the
+  one path every approval uses: `422 BENCHMARK_INPUT_INCOMPLETE`. The package is written from the approved input in the
+  same transaction.
+- **(chosen by Claude)** Export: new routes `GET /projects/:id/rlgym-export` and `POST /projects/:id/rlgym-exports`
+  beside the old `/export`, `/exports` and `/validate` (kept: additive). Body `rlgym.project-export.v1`,
+  `Idempotency-Key` = `export_sha256`, `package_ref` = `forge://packages/<sha>`. The RL Gym template identity
+  (`id`, `version`, `spec_sha256`) comes from the RL Gym's qualification receipt (`rlgym_template_id`,
+  `rlgym_template_version`, `spec_sha256`), so a version the RL Gym has not qualified cannot be exported. Each task
+  carries `complexity`, `archetype`, `edge_case` (spec 1.6) and the focused edge case is added to
+  `case_selector.edge_cases`. Revisions above 1 carry `corrects_revision` and, when a review decision reopened the
+  task, `sme_batch_id`. Tasks behind a sent `new_case_kind` need for the project's current template version are held
+  ("Waiting for new case kind inb-…"). Export runs are append-only (`RlGymProjectExport`). Code adapted from the
+  unfinished part-2 draft in the `forge-rlgym-v2-part2` worktree, without its removal of the old path.
+- **(chosen by Claude)** Run reviews: `POST /projects/:id/run-reviews` (ANVIL key) → `202 {forge_batch_ref}`,
+  idempotent by `batch_id`; a batch carrying `reference_answers` is refused. Decisions are made by the project's PM,
+  Admins and Reviewers (console), sent to the RL Gym **synchronously**; they are recorded (append-only, one per item)
+  only when the RL Gym accepts them, so a failed send can simply be retried. `task_correction` moves an accepted task
+  to Rework with the rationale as the review note (a TaskReview REWORK), the same states as the existing rework.
+- **(chosen by Claude)** SME needs: SMEs raise **Raise an edge case** (four parts) or More data from the task page;
+  the PM/Admin merges, rejects (reason shown to the SME) or sends. Sending posts only the contract's fields to Studio's
+  `POST /api/v1/inbox-items` (`source: "adi-forge"`, one evidence entry per merged need, `raised_by` an opaque
+  `sme-<id prefix>`); Studio's Template ID and version are the RL Gym's names for the release (same qualification
+  receipt). Status is read on demand (`GET /api/v1/inbox-items/{id}`); no webhook (spec 5 q4: reading is enough for
+  now). `SmeNeed` rows change state (open → merged | sent | rejected) with every change audited; they are not
+  append-only.
+- **(chosen by Claude)** Settings (proposed names kept): `RLGYM_API_URL`, `RLGYM_WORKSPACE`, `RLGYM_FORGE_CLIENT_KEY`,
+  `STUDIO_API_URL`, `STUDIO_INBOX_KEY`. Local Studio does not take a bearer key from services: it trusts headers, so
+  `STUDIO_TENANT_ID`, `STUDIO_ACTOR_ID`, `STUDIO_ACTOR_ROLES` (default `service`) are added. Studio's inbox read
+  requires a designer or admin role, so with a service principal the status read may be refused; the need then keeps
+  its last known state.
+- **(chosen by Claude)** Branding: one `BrandLockup` (`product`, `tone`) and `PRODUCT_NAME = 'Authoring'`,
+  `FAMILY_NAME = 'ADI Labs Forge'`; titles `<Page> · Authoring · ADI Labs Forge`; navy `#082044` header with the purple
+  rule on both apps; primary buttons `#8126af`; shield and logo replace the old files under the same names; recruiter
+  PDF has the logo and the running header; default sender "ADI Labs Forge Authoring". The names test now allows
+  "ADI Labs" (spec 3.5; legal to confirm) and also catches compounds such as "Anvil-ready". Running text that says
+  "ADI Forge" is not renamed in this change (part of it is AI prompt text, which this work must not touch).

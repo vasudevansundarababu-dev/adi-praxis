@@ -39,3 +39,4 @@ export * from './forge';
 export * from "./rubric";
 export * from "./field-suggestions";
 export * from './pagination';
+export * from './benchmark';

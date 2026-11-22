@@ -969,6 +969,9 @@ model TaskInstance {
   reviewStage         ReviewStage?                @map("review_stage")
   /// MVP1: the external Reviewer (candidate-app SmeUser) the PM or Admin chose for this task (Reviewer route only).
   reviewerSmeUserId   String?                     @map("reviewer_sme_user_id") @db.Uuid
+  /// Benchmark input (AUTHORING-SPEC 1.4, 2.3): { edgeCase, slots, extraStateChecks, version }. Server-side, so the
+  /// workbench autosave never changes it; copied into the approved revision's package (private part).
+  benchmark           Json?
   createdAt           DateTime                    @default(now()) @map("created_at")
   updatedAt           DateTime                    @updatedAt @map("updated_at")
 
@@ -3339,6 +3342,102 @@ model AuthoredTaskPackage {
 
   @@unique([clientId, packageSha256])
   @@index([projectId, taskInstanceId])
+}
+
+/// New RL Gym: one press of Export / Re-export, with the body sent (no package content) and the RL Gym's answer.
+/// Append-only.
+model RlGymProjectExport {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  exportId      String   @map("export_id")
+  exportSha256  String   @map("export_sha256")
+  reason        String
+  body          Json
+  /// The tasks sent: [{recordId, taskId, title, revision, packageSha256, correctsRevision, complexity, archetype, edgeCase}].
+  tasks         Json
+  /// Approved tasks not sent, with the reason (cannot be packaged, no case, waiting for a new case kind).
+  notSent       Json     @map("not_sent")
+  /// received, rejected or unavailable.
+  outcome       String
+  httpStatus    Int?     @map("http_status")
+  requestId     String?  @map("request_id")
+  receipt       Json?
+  error         Json?
+  requestedById String   @map("requested_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+}
+
+/// An SME review batch from the RL Gym (rlgym.sme-review-package.v1), received into a project. Append-only.
+model RunReviewBatch {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String              @map("client_id") @db.Uuid
+  projectId     String              @map("project_id") @db.Uuid
+  batchId       String              @map("batch_id")
+  forgeBatchRef String              @unique @map("forge_batch_ref")
+  runId         String?             @map("run_id")
+  body          Json
+  bodySha256    String              @map("body_sha256")
+  apiClientId   String              @map("api_client_id") @db.Uuid
+  createdAt     DateTime            @default(now()) @map("created_at")
+  decisions     RunReviewDecision[]
+
+  @@unique([clientId, batchId])
+  @@index([projectId, createdAt])
+}
+
+/// One final decision on one episode of a review batch, and the RL Gym's answer to it. Append-only.
+model RunReviewDecision {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String         @map("client_id") @db.Uuid
+  batchRowId   String         @map("batch_row_id") @db.Uuid
+  itemId       String         @map("item_id")
+  taskId       String         @map("task_id")
+  decision     String
+  rationale    String
+  criterionId  String?        @map("criterion_id")
+  decidedById  String         @map("decided_by_id") @db.Uuid
+  decidedBy    String         @map("decided_by")
+  sendOutcome  String         @map("send_outcome")
+  httpStatus   Int?           @map("http_status")
+  response     Json?
+  reworkTaskId String?        @map("rework_task_id") @db.Uuid
+  createdAt    DateTime       @default(now()) @map("created_at")
+  batch        RunReviewBatch @relation(fields: [batchRowId], references: [id], onDelete: Restrict)
+
+  @@unique([batchRowId, itemId])
+}
+
+/// An SME need raised on a task (Raise an edge case, More data); the PM merges, sends to Studio or rejects.
+model SmeNeed {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String    @map("client_id") @db.Uuid
+  projectId         String    @map("project_id") @db.Uuid
+  taskInstanceId    String    @map("task_instance_id") @db.Uuid
+  raisedBySmeUserId String    @map("raised_by_sme_user_id") @db.Uuid
+  /// new_case_kind or more_data.
+  kind              String
+  /// The SME's parts (new_case_kind: context, twist, expectedOutcome, complexity, archetype; more_data: edgeCase, howMany, why).
+  content           Json
+  /// open, merged (into another need), sent (to Studio) or rejected (reason goes back to the SME).
+  state             String    @default("open")
+  mergedIntoId      String?   @map("merged_into_id") @db.Uuid
+  rejectReason      String?   @map("reject_reason")
+  summary           String?
+  studioItemId      String?   @map("studio_item_id")
+  /// Studio's inbox item state: received, planned, released or declined (read from Studio).
+  studioState       String?   @map("studio_state")
+  studioDetail      Json?     @map("studio_detail")
+  sentAt            DateTime? @map("sent_at")
+  sentById          String?   @map("sent_by_id") @db.Uuid
+  templateId        String    @map("template_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([projectId, state])
+  @@index([taskInstanceId])
 }
 
 model ProjectValidationRun {

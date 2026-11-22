@@ -19,13 +19,25 @@ export type StoreResult = { status: 'stored' | 'existing'; packageSha256: string
  * Builds and keeps the package for one approved record. Idempotent: a record has at most one package, and the same
  * content is never stored twice. A task that cannot be packaged returns its problem and stores nothing.
  */
-export async function storeTaskPackage(tx: Db | Tx, record: ApprovedTaskRecord): Promise<StoreResult> {
+/**
+ * The benchmark input that belongs to a record: on approval the caller passes it; later (an export of an older record)
+ * only the task's latest record can use the task's stored input, and only while the task is still accepted, because
+ * the input is locked from submission until the next approval.
+ */
+async function benchmarkFor(tx: Db | Tx, record: ApprovedTaskRecord): Promise<unknown> {
+  const task = await tx.taskInstance.findUnique({ where: { id: record.taskInstanceId }, select: { status: true, benchmark: true } });
+  if (!task || task.status !== 'ACCEPTED' || !task.benchmark) return null;
+  const latest = await tx.approvedTaskRecord.findFirst({ where: { clientId: record.clientId, taskInstanceId: record.taskInstanceId }, orderBy: { seq: 'desc' }, select: { id: true } });
+  return latest?.id === record.id ? task.benchmark : null;
+}
+
+export async function storeTaskPackage(tx: Db | Tx, record: ApprovedTaskRecord, benchmark?: unknown): Promise<StoreResult> {
   const existing = await tx.authoredTaskPackage.findUnique({ where: { recordId: record.id }, select: { packageSha256: true, revision: true } });
   if (existing) return { status: 'existing', ...existing };
   const template = await tx.template.findUnique({ where: { id: record.templateId } });
   if (!template) return { status: 'problem', problem: { recordId: record.id, taskId: record.taskInstanceId, code: 'GENERIC_TEMPLATE_MISSING', message: 'The task’s template version was not found.' } };
   const revision = await revisionOf(tx, record);
-  const built = buildTaskPackage({ record, template }, revision);
+  const built = buildTaskPackage({ record, template }, revision, benchmark === undefined ? await benchmarkFor(tx, record) : benchmark);
   if ('code' in built) return { status: 'problem', problem: built };
   await tx.authoredTaskPackage.createMany({
     data: [{ packageSha256: built.packageSha256, clientId: record.clientId, projectId: record.projectId, taskInstanceId: record.taskInstanceId, recordId: record.id, revision, schema: TASK_PACKAGE_SCHEMA, content: built.bytes.toString('utf8') }],
@@ -40,7 +52,9 @@ export async function storeTaskPackage(tx: Db | Tx, record: ApprovedTaskRecord):
  */
 export async function storeTaskPackageOnApproval(tx: Tx, record: ApprovedTaskRecord): Promise<void> {
   try {
-    await storeTaskPackage(tx, record);
+    // The task's benchmark input as approved: it is locked from submission until this approval.
+    const task = await tx.taskInstance.findUnique({ where: { id: record.taskInstanceId }, select: { benchmark: true } });
+    await storeTaskPackage(tx, record, task?.benchmark ?? null);
   } catch (e) {
     // A database error has already aborted the transaction and will surface from the caller; anything else (building
     // the package) is not allowed to stop the approval.

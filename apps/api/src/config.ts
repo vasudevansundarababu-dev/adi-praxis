@@ -43,7 +43,7 @@ const Env = z.object({
   SMTP_PORT: z.coerce.number().int().default(1025),
   SMTP_USER: z.string().default(''),
   SMTP_PASSWORD: z.string().default(''),
-  EMAIL_FROM: z.string().default('ADI Forge <no-reply@praxis.local>'),
+  EMAIL_FROM: z.string().default('ADI Labs Forge Authoring <no-reply@praxis.local>'),
   /** Near-duplicate detection embeddings on Vertex AI (same project as Claude). Blank project = local hashing mock. */
   EMBEDDING_LOCATION: z.string().default('us-central1'),
   EMBEDDING_MODEL: z.string().default('text-embedding-005'),
@@ -90,6 +90,20 @@ const Env = z.object({
   ANVIL_EXPORT_BASE_URL: z.string().regex(/^$|^https:\/\/[^\s]+$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/[^\s]*$/, 'ANVIL_EXPORT_BASE_URL must be https (or http on localhost)').default(''),
   /** Audience of Praxis's identity token when calling Anvil. Blank = the origin of ANVIL_EXPORT_BASE_URL. */
   ANVIL_OUTBOUND_AUDIENCE: z.string().default(''),
+  /**
+   * New RL Gym (AUTHORING-LOCAL-SETUP 4.3): its API address, workspace slug and its key for Authoring (server only, never
+   * logged or sent to a browser). Any of the three blank = not connected: the project page says so and Export is off.
+   */
+  RLGYM_API_URL: z.string().regex(/^$|^https:\/\/[^\s]+$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/, 'RLGYM_API_URL must be https (or http on localhost)').default(''),
+  RLGYM_WORKSPACE: z.string().regex(/^$|^[a-z0-9][a-z0-9-]{0,62}$/, 'RLGYM_WORKSPACE must be the RL Gym workspace slug').default(''),
+  RLGYM_FORGE_CLIENT_KEY: z.string().default(''),
+  /** Studio's API (next-version inbox for SME needs) and Authoring's key for it. Either blank = Studio not connected. */
+  STUDIO_API_URL: z.string().regex(/^$|^https:\/\/[^\s]+$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/, 'STUDIO_API_URL must be https (or http on localhost)').default(''),
+  STUDIO_INBOX_KEY: z.string().default(''),
+  /** Local Studio only: it trusts service headers. Tenant and actor UUIDs of a Studio service principal. */
+  STUDIO_TENANT_ID: z.string().default(''),
+  STUDIO_ACTOR_ID: z.string().default(''),
+  STUDIO_ACTOR_ROLES: z.string().default('service'),
   /**
    * Keyless Anvil -> Praxis (K6, 12 Nov 2026): Anvil sends a raw Google-signed identity token. It is accepted only with
    * issuer https://accounts.google.com, exactly this audience (this API's URL), this numeric subject and this account.

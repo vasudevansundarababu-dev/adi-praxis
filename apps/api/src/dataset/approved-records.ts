@@ -1,3 +1,4 @@
+import { approvalProblems } from '../anvil/benchmark';
 import { praxisContractIssues, EXECUTABLE_WORKFLOW } from '@praxis/shared';
 import { AppError } from '../lib/errors';
 import type { ApprovedTaskRecord, Prisma } from '@prisma/client';
@@ -29,6 +30,12 @@ export async function writeApprovedRecord(tx: Tx, args: { taskId: string; review
     include: { project: { include: { template: { include: { domain: true } } } }, slot: true, inputBatch: true, assignedTo: true, projectAssignment: { include: { smeAssignment: true } } },
   });
   if (!t.assignedTo || !t.submittedAt || !t.output) throw new Error('Only a submitted, assigned task can be recorded');
+  // AUTHORING-SPEC 2.4: a task on a template whose expected values come from SMEs is not approved with a required
+  // expected result empty, a value outside its choices or a state check the template does not allow.
+  if (t.taskType === 'AUTHORING') {
+    const problems = approvalProblems(t.project.template, t.benchmark);
+    if (problems.length) throw new AppError(422, 'BENCHMARK_INPUT_INCOMPLETE', `This task can't be approved yet: ${problems.join(' ')}`, { problems });
+  }
   const smeUserId = t.assignedTo.smeUserId;
   const identity = await tx.identityAttempt.findFirst({ where: { smeUserId, status: 'VERIFIED' }, orderBy: { checkedAt: 'desc' } });
   const alternative = identity ? null : await tx.alternativeIdentityCheck.findFirst({ where: { smeUserId }, orderBy: { createdAt: 'desc' } });

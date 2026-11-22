@@ -1,4 +1,4 @@
-import { GOLDEN_PACK_SCHEMA_VERSION } from '@praxis/shared';
+import { edgeCaseProblems, edgeCasesOf, GOLDEN_PACK_SCHEMA_VERSION, sliceLists, verifierProblems } from '@praxis/shared';
 import type { Template } from '@prisma/client';
 import { jcsSha256 } from './jcs';
 
@@ -11,6 +11,8 @@ import { jcsSha256 } from './jcs';
  */
 export const JOINT_TEMPLATE_SPEC = 'praxis.anvil.template-spec.v1' as const;
 export const JOINT_KEYS = ['schemaVersion', 'anvil_template_key', 'template_id', 'version', 'requirement', 'authoring', 'execution', 'skills'] as const;
+/** authoring part keys (AUTHORING-SPEC 1.3 and 2.2 add edge_cases and verifiers, 22 Nov 2026). */
+const AUTHORING_KEYS = ['profile', 'template', 'examples', 'edge_cases', 'verifiers'];
 const PROPOSAL_KEYS = new Set(['schemaVersion', 'anvil_template_key', 'requirement', 'authoring', 'execution', 'skills']);
 const IDENT = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$/;
 
@@ -20,7 +22,7 @@ export interface JointTemplateSpec {
   template_id: string;
   version: number;
   requirement: Record<string, unknown>;
-  authoring: { profile: Record<string, unknown>; template?: Record<string, unknown>; examples?: unknown[] };
+  authoring: { profile: Record<string, unknown>; template?: Record<string, unknown>; examples?: unknown[]; edge_cases?: unknown[]; verifiers?: Record<string, unknown> };
   execution: Record<string, unknown>;
   skills: Record<string, unknown>;
 }
@@ -88,7 +90,20 @@ export function checkJointProposal(body: Record<string, unknown>): { issues: Joi
   const a = body.authoring;
   if (!isObj(a)) issues.push(issue('TP_SPEC_SHAPE', '/authoring', 'authoring must be an object {profile, template?, examples?}.', 'Wrap the form as authoring.profile.'));
   else {
-    for (const k of Object.keys(a)) if (!['profile', 'template', 'examples'].includes(k)) issues.push(issue('TP_SPEC_SHAPE', `/authoring/${k}`, `Unknown authoring field "${k}".`, 'authoring holds only profile, template and examples.'));
+    for (const k of Object.keys(a)) if (!AUTHORING_KEYS.includes(k)) issues.push(issue('TP_SPEC_SHAPE', `/authoring/${k}`, `Unknown authoring field "${k}".`, 'authoring holds only profile, template, examples, edge_cases and verifiers.'));
+    // Studio's S4 edge cases and S7 verifiers (AUTHORING-SPEC 1.3, 2.2): public parts only. Grading data is refused.
+    if (a.edge_cases !== undefined)
+      for (const p of edgeCaseProblems(a.edge_cases)) issues.push(issue(p.private ? 'TP_PRIVATE_GRADING_DATA' : 'TP_EDGE_CASE_INVALID', p.pointer, p.message, p.private ? 'Send only tag, archetype, complexity, products, context, twist (and source); keep the recipe, expected outcome and reference answers in Studio.' : 'Repair the edge case as described.'));
+    if (Array.isArray(a.edge_cases) && isObj(a.profile)) {
+      // Slice tags come from S1's pick lists (spec 1.2); an edge case's tags must be values of those lists when present.
+      const lists = sliceLists(a.profile);
+      edgeCasesOf(a.edge_cases).forEach((e, i) => {
+        for (const k of ['complexity', 'archetype'] as const)
+          if (e[k] && lists[k].length && !lists[k].includes(e[k]!)) issues.push(issue('TP_EDGE_CASE_INVALID', `/authoring/edge_cases/${i}/${k}`, `${k} "${e[k]}" is not one of S1's ${k} values (${lists[k].join(', ')}).`, `Use a value of the S1 ${k} pick list.`));
+      });
+    }
+    if (a.verifiers !== undefined)
+      for (const p of verifierProblems(a.verifiers)) issues.push(issue(p.private ? 'TP_PRIVATE_GRADING_DATA' : 'TP_VERIFIERS_INVALID', p.pointer, p.message, p.private ? 'Send block shapes and SME slots only; case-reference values stay in Studio and the RL Gym.' : 'Repair the verifiers as described (adi.verifier-blocks.v1).'));
     if (!isObj(a.profile)) issues.push(issue('TP_SPEC_SHAPE', '/authoring/profile', 'authoring.profile is required.', 'Send the praxis.template_profile.v1 form.'));
     if (a.template !== undefined && !isObj(a.template)) issues.push(issue('TP_SPEC_SHAPE', '/authoring/template', 'authoring.template must be an object.', 'Send the template block or omit it.'));
     if (a.examples !== undefined && !Array.isArray(a.examples)) issues.push(issue('TP_SPEC_SHAPE', '/authoring/examples', 'authoring.examples must be an array.', 'Send the worked examples as an array or omit it.'));

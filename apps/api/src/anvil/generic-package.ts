@@ -5,6 +5,7 @@ import { caseSelectorOf } from '../tasks/task-service';
 import { jointHashes, jointTemplateSpec, type JointTemplateSpec } from './joint-template';
 import { declaredToolIds, TOOL_UNDECLARED, undeclaredTools, undeclaredToolMessage } from './tool-binding';
 import { writeZip } from './zip';
+import { benchmarkPrivatePart } from './benchmark';
 
 /**
  * Generic authored-task export package for Anvil (`praxis.authored-task-export.v1`; Anvil's generic export API and
@@ -330,7 +331,7 @@ export function buildGenericPackages(inputs: PackageInput[], scope: { projectId:
  */
 export const TASK_PACKAGE_SCHEMA = 'praxis.authored-task-package.v1' as const;
 
-export function buildTaskPackage(input: PackageInput, revision: number): { package: Record<string, unknown>; packageSha256: string; bytes: Buffer } | PackageProblem {
+export function buildTaskPackage(input: PackageInput, revision: number, benchmark: unknown = null): { package: Record<string, unknown>; packageSha256: string; bytes: Buffer } | PackageProblem {
   const t = taskFiles(input);
   if ('code' in t) return t;
   const entry = t.entry as { template: unknown; form: { sha256: string }; agent_mode: unknown; review: unknown };
@@ -350,7 +351,9 @@ export function buildTaskPackage(input: PackageInput, revision: number): { packa
     // refused. Forge sends the template's declared tool IDs; a template that declares none sends no list (an empty
     // list would refuse every call).
     actor: tools?.length ? { ...t.actor, tools } : t.actor,
-    private: t.privateRef,
+    // AUTHORING-SPEC 1.6 / 2.4: slice tags, the focused edge case and (sme templates) the slot values. Added only when
+    // present, so packages of other templates keep their bytes and hashes.
+    private: { ...t.privateRef, ...benchmarkPrivatePart(input.template, (t.privateRef.authored as { sections?: unknown }).sections, benchmark) },
   };
   // RFC 8785 bytes, as every product hashes them. RL Gym's import still re-serialises with Python's encoder, which
   // differs for non-integer numbers (criterion weights such as 0.5); RL Gym is changing to hash the raw body (22 Nov).

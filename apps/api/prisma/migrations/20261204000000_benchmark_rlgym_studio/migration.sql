@@ -54,6 +54,9 @@ CREATE TRIGGER "RunReviewBatch_append_only" BEFORE UPDATE OR DELETE ON "RunRevie
 CREATE TRIGGER "RunReviewBatch_no_truncate" BEFORE TRUNCATE ON "RunReviewBatch" FOR EACH STATEMENT EXECUTE FUNCTION praxis_no_truncate();
 REVOKE UPDATE, DELETE ON "RunReviewBatch" FROM PUBLIC;
 REVOKE UPDATE, DELETE ON "RunReviewBatch" FROM CURRENT_USER;
+-- RunReviewDecision references it: a foreign-key check locks the referenced row as the table owner, which needs UPDATE
+-- on a column (as in 20260927200000_append_only_fk_check). Only the id, which nothing ever changes.
+GRANT UPDATE ("id") ON "RunReviewBatch" TO CURRENT_USER;
 
 -- A person's decision on one episode of a batch, and what the RL Gym answered. One decision per item, final.
 CREATE TABLE "RunReviewDecision" (

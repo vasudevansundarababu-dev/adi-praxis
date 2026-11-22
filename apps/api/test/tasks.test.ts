@@ -784,7 +784,7 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
         await expect(db.taskReview.updateMany({ data: { notes: 'x' } })).rejects.toThrow(/append-only|permission denied/);
         expect((await db.approvedTaskRecord.findUniqueOrThrow({ where: { id } })).reviewNotes).toBeNull();
         // Every append-only table has the trigger and no UPDATE/DELETE privilege for the application role.
-        const tables = ['ApprovedTaskRecord', 'AuthoredTaskPackage', 'RLReviewRecord', 'AuditEvent', 'SelectionDecision', 'TaskReview', 'CandidateStateEvent', 'SmeStanding', 'EarningEntry', 'PartnerFeeEntry', 'PolicyDocumentVersion', 'ProjectRuleSet', 'TaskPolicySnapshot', 'ExtractionSpend', 'ProjectValidationRun', 'UploadedProfile', 'TemplateProposal', 'TemplateQualification', 'AnvilRevocationEvent', 'PolicyRuleAnnotationRevision', 'RubricRecommendationRun', 'RubricCriterionAnnotation', 'RubricTaskSources', 'TutorialSpend'];
+        const tables = ['ApprovedTaskRecord', 'AuthoredTaskPackage', 'RLReviewRecord', 'AuditEvent', 'SelectionDecision', 'TaskReview', 'CandidateStateEvent', 'SmeStanding', 'EarningEntry', 'PartnerFeeEntry', 'PolicyDocumentVersion', 'ProjectRuleSet', 'TaskPolicySnapshot', 'ExtractionSpend', 'ProjectValidationRun', 'UploadedProfile', 'TemplateProposal', 'TemplateQualification', 'AnvilRevocationEvent', 'PolicyRuleAnnotationRevision', 'RubricRecommendationRun', 'RubricCriterionAnnotation', 'RubricTaskSources', 'TutorialSpend', 'RlGymProjectExport', 'RunReviewBatch', 'RunReviewDecision'];
         const triggers = await db.$queryRaw<{ t: string }[]>`SELECT c.relname AS t FROM pg_trigger g JOIN pg_class c ON c.oid = g.tgrelid WHERE g.tgname LIKE '%_append_only'`;
         expect(triggers.map((x) => x.t).sort()).toEqual([...tables].sort());
         // Grants are revoked (the local superuser bypasses grants, so the triggers above are what stop it here).
@@ -796,7 +796,7 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
         // a column; without the id grant every insert that references it fails on Cloud SQL (QA, 14 Nov 2026:
         // ExtractionJob -> PolicyDocumentVersion). The local superuser hides this, so check the grant itself.
         const referenced = await db.$queryRaw<{ t: string }[]>`SELECT DISTINCT c.relname AS t FROM pg_constraint k JOIN pg_class c ON c.oid = k.confrelid WHERE k.contype = 'f' AND c.relname = ANY(${tables})`;
-        expect(referenced.map((r) => r.t).sort()).toEqual(['ApprovedTaskRecord', 'PolicyDocumentVersion', 'SelectionDecision']);
+        expect(referenced.map((r) => r.t).sort()).toEqual(['ApprovedTaskRecord', 'PolicyDocumentVersion', 'RunReviewBatch', 'SelectionDecision']);
         for (const { t } of referenced) {
           const cols = await db.$queryRaw<{ c: string }[]>`SELECT column_name AS c FROM information_schema.column_privileges WHERE table_name = ${t} AND privilege_type = 'UPDATE'`;
           expect(cols.map((x) => x.c), t).toEqual(['id']);

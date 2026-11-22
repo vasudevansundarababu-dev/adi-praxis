@@ -2358,3 +2358,29 @@ import, `services/stubs/forge_stub.py`), read only, with the owner's OK for that
 - **(chosen by Claude)** The new table is added to `APPEND_ONLY_TABLES` in `jobs/grant-app-role.ts`, so the QA and
   production app role cannot update or delete it. `TutorialSpend` (D2, PR #84) was missing from that list and is added
   too; its trigger already blocked changes.
+
+## ADI Labs Forge branding, F-09 (22 Nov 2026)
+Source: the owner's shared branding, design repo `shared/BRANDING.md` (rev 1.1, 22 Nov 2026), change F-09. It replaces
+the 15 Nov "ADI Forge" pen-nib logo (`docs/design/brand-forge/`, kept only as a historical design file).
+- **(owner)** Every screen shows the lockup `[shield] ADI LABS-FORGE │ AUTHORING`; this product is "Authoring", the
+  family "ADI Labs Forge". Header: navy `#082044` with the 3 px `#5b21b6 → #8126af → #b77ae8` rule. Sign-in pages:
+  navy page, centred lockup, one white card. Browser tab: `<Page> · Authoring · ADI Labs Forge`. Brand colours only
+  in the lockup, header, sign-in and primary buttons (`#8126af`, hover `#5b21b6`).
+- **Legal caveat (open).** The 15 Nov legal rule excluded "ADI-Labs" from anything users see. The lockup uses
+  "ADI LABS" by the owner's choice; **legal should confirm this before any external release.**
+  `apps/web/test/public-names.test.ts` allows "ADI LABS" and "ADI Labs Forge" only in the two `components/brand.tsx`
+  files and `packages/shared/theme/tokens.ts` (`FAMILY_NAME`); "ADI-Labs" / "ADI Labs" in any case elsewhere, and
+  "Praxis" and "Anvil" everywhere, still fail the test. If legal says no, change `FAMILY_NAME` and the lockup.
+- **(chosen by Claude)** Assets live in `packages/shared/brand` (`adi-labs-forge-mark-512.png`,
+  `adi-labs-forge-logo.png`); `favicon.ico` (16/32/48), `icon-32.png` and `apple-touch-icon.png` (shield on navy,
+  since iOS fills transparency with black) are generated from the shield. The old `praxis-*` and `adi-labs-logo`
+  files are removed.
+- **(chosen by Claude)** The sign-in card is themed light inside the navy page (`class="light"`, now supported by the
+  shared theme, including the `dark:` variant), so existing forms keep readable colours without changes. Links styled
+  for a dark page (sign out, access request) sit on the navy below the card.
+- **(chosen by Claude)** The candidate header (also shown above the candidate sign-in pages) becomes the navy bar with
+  the lockup; its links stay where they were.
+- **(chosen by Claude)** Not in this change: "ADI Forge" in running text on other screens (about 49 lines in 36 UI
+  files, including the workbench, AI assist and Policy screens, which this change does not touch), the recruiter-pack
+  PDF header and email sender names (BRANDING.md §4, exports and emails), and the HTML design mockups in
+  `docs/design/mockups/`. These are a follow-up.

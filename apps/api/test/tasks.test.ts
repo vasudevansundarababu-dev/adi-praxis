@@ -769,6 +769,8 @@ describe('M5a FLOW 3: slots, task generation, invites, pull, autosave, submit, r
           db.$executeRawUnsafe('GRANT UPDATE ON "ApprovedTaskRecord" TO CURRENT_USER'),
           db.$executeRawUnsafe(sql),
           db.$executeRawUnsafe('REVOKE UPDATE ON "ApprovedTaskRecord" FROM CURRENT_USER'),
+          // The table-wide REVOKE also drops the id-column grant foreign keys need (20260927200000); put it back.
+          db.$executeRawUnsafe('GRANT UPDATE ("id") ON "ApprovedTaskRecord" TO CURRENT_USER'),
           db.$executeRawUnsafe('ALTER TABLE "ApprovedTaskRecord" ENABLE TRIGGER USER'),
         ]);
       }

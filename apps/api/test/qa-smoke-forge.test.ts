@@ -177,7 +177,7 @@ describe('qa-smoke new-flow pass against the real API in-process (all providers 
     const tasks = await db.taskInstance.findMany({ where: { projectId: p.id } });
     expect(tasks).toHaveLength(slots.length);
     expect(new Set(tasks.map((t) => t.slotId)).size).toBe(slots.length);
-    expect(forge(r)['forge-tasks']!.details).toMatchObject({ tasks: slots.length, export: 'Export opens when the task is approved (0 of 1 now).' });
+    expect(forge(r)['forge-tasks']!.details).toMatchObject({ tasks: slots.length, export: 'RL Gym isn’t connected yet.' });
     // Sourced, tagged synthetic people; the SME authored, the Reviewer passed, the PM approved.
     const people = await db.sourcedPerson.findMany({ where: { projectId: p.id }, orderBy: { role: 'asc' } });
     expect(people.map((x) => [x.role, x.firstName, x.agency, x.emailNorm]).sort()).toEqual([

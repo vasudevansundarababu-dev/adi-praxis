@@ -175,7 +175,7 @@ describe('qa-smoke against the real API in-process (all providers mocked)', () =
     const output = record.output as { sections: { S4: { policies: { ruleVersion: string }[] } } };
     expect(output.sections.S4.policies.map((p) => p.ruleVersion)).toEqual([r.ids.ruleVersionId]);
     expect(await db.taskDraftRun.count({ where: { taskInstanceId: r.ids.taskId, section: 'CHAT', status: 'SUCCEEDED' } })).toBe(1);
-    expect(r.steps.find((s) => s.name === 'export')).toMatchObject({ status: 'PASS', details: { validator: 'praxis-precheck' } });
+    expect(r.steps.find((s) => s.name === 'export')).toMatchObject({ status: 'PASS', details: { connected: false, canExport: false, exported: false } });
     expect(r.totalPaidCalls).toBe(4);
     for (const pw of Object.values(PW)) expect(JSON.stringify(r) + logs.join('')).not.toContain(pw);
   }, 120_000);

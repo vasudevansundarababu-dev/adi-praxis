@@ -2,7 +2,8 @@
  * ADI Forge theme: CSS variables + Tailwind v4 theme. Import once from each app's global stylesheet,
  * after `@import "tailwindcss";`. Values mirror theme/tokens.ts. `@theme inline` makes utilities reference
  * the --praxis-* variables directly, so a nested .dark subtree re-themes correctly.
- * Light is the default; add class="dark" (or data-theme="dark") on <html>, or on any element to theme a subtree.
+ * Light is the default; add class="dark" (or data-theme="dark") on <html>, or on any element to theme a subtree;
+ * class="light" inside a dark page themes that subtree light again.
  */
 @theme inline {
   --color-brand-navy: #0a2170;
@@ -28,13 +29,25 @@
 
   --background-image-brand-gradient: linear-gradient(90deg, #0a2170 0%, #2a80d0 50%, #3fac95 100%);
 
+  /* ADI Labs Forge (owner, 22 Nov 2026; BRANDING.md, F-09): lockup, header, sign-in and primary buttons only. */
+  --color-forge-navy: #082044;
+  --color-forge-purple: #8126af;
+  --color-forge-purple-dark: #5b21b6;
+  --color-forge-purple-light: #b77ae8;
+  --color-forge-divider: #2c3d63;
+  --color-forge-product: #a9b4cc;
+  --background-image-forge-rule: linear-gradient(90deg, #5b21b6 0%, #8126af 50%, #b77ae8 100%);
+
   --font-sans: var(--font-praxis), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: var(--font-forge-display), var(--font-praxis), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-forge-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-hairline: var(--praxis-hairline);
 }
 
-:root {
+/* `.light` re-themes a subtree back to light inside a dark page (the white sign-in card, BRANDING.md §4). */
+:root,
+.light,
+[data-theme='light'] {
   color-scheme: light;
   --praxis-bg: #ffffff;
   --praxis-surface: #f5f7fa;
@@ -76,7 +89,7 @@
   --praxis-elevated: #2c2e36;
 }
 
-@custom-variant dark (&:where(.dark, .dark *, [data-theme='dark'], [data-theme='dark'] *));
+@custom-variant dark (&:where(.dark, .dark *, [data-theme='dark'], [data-theme='dark'] *):not(:where(.light, .light *, [data-theme='light'], [data-theme='light'] *)));
 
 body {
   background: var(--praxis-bg);
@@ -166,8 +179,9 @@ code, kbd, samp, pre, .font-mono { font-family: var(--font-mono); font-variant-n
   }
   .btn:active { transform: translateY(1px); }
   .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-  .btn-primary { color: #ffffff; background: linear-gradient(90deg, #1f64b8 0%, #2a80d0 45%, #2f9c8a 100%); box-shadow: 0 8px 20px -10px rgb(42 128 208 / 0.8); }
-  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+  /* Primary buttons in the ADI Labs Forge purple, hover darker (BRANDING.md §4, 22 Nov 2026). */
+  .btn-primary { color: #ffffff; background: #8126af; box-shadow: 0 8px 20px -10px rgb(129 38 175 / 0.8); }
+  .btn-primary:hover:not(:disabled) { background: #5b21b6; }
   .btn-secondary { border: 1px solid var(--praxis-hairline); background: var(--praxis-elevated); color: var(--praxis-text); }
   .btn-secondary:hover:not(:disabled) { border-color: var(--praxis-focus); }
   .hero .btn-secondary { background: rgb(255 255 255 / 0.12); border-color: rgb(255 255 255 / 0.3); color: #ffffff; }

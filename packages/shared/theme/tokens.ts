@@ -48,7 +48,25 @@ export const semantic = {
 } as const;
 
 export const TAGLINE = 'Intelligence Beyond Boundaries';
-export const PRODUCT_NAME = 'ADI Forge';
+/**
+ * ADI Labs Forge branding (owner, 22 Nov 2026; design repo shared/BRANDING.md, change F-09). The family is
+ * "ADI Labs Forge"; this product is shown as "Authoring". A future rename is one line here.
+ */
+export const FAMILY_NAME = 'ADI Labs Forge';
+export const PRODUCT_NAME = 'Authoring';
 
-/** Page titles read "<Screen> · ADI Praxis". */
-export const pageTitle = (screen: string) => `${screen} · ${PRODUCT_NAME}`;
+/** Lockup and header colours (BRANDING.md §3–4). Used only in the lockup, header, sign-in and primary buttons. */
+export const forge = {
+  navy: '#082044',
+  purple: '#8126af',
+  purpleDark: '#5b21b6',
+  purpleLight: '#b77ae8',
+  divider: '#2c3d63',
+  product: '#a9b4cc',
+  rule: 'linear-gradient(90deg, #5b21b6 0%, #8126af 50%, #b77ae8 100%)',
+} as const;
+
+/** Page titles read "<Screen> · Authoring · ADI Labs Forge". */
+export const pageTitle = (screen: string) => `${screen} · ${PRODUCT_NAME} · ${FAMILY_NAME}`;
+/** The `title.template` and default title for each app's root layout. */
+export const titleTemplate = { template: `%s · ${PRODUCT_NAME} · ${FAMILY_NAME}`, default: `${PRODUCT_NAME} · ${FAMILY_NAME}` };

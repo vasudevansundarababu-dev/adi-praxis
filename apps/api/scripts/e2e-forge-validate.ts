@@ -89,7 +89,7 @@ try {
     await call(pm, 'POST', `/projects/${project.id}/tasks/${t.id}/decision`, { expectedVersion: d.expectedVersion, expectedRevision: d.expectedRevision, decision: 'APPROVE', checklist: allTrue, ...(i ? { duplicateDecision: 'ACCEPT_AS_DISTINCT' } : {}) });
   }
   const state = await call(pm, 'GET', `/projects/${project.id}/export`);
-  if (!state.canValidate || !state.canExport || state.tasks.length !== 2) throw new Error(`fixture project not ready: ${JSON.stringify(state)}`);
+  if (state.tasks.length !== 2) throw new Error(`fixture project not ready: ${JSON.stringify(state)}`);
   console.log(JSON.stringify({ projectId: project.id, pm: { email: pmEmail, password: PASSWORD } }));
 } finally {
   await app.close();

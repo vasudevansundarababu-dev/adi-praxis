@@ -6,8 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { emptyOutput, setFieldValue, TemplateProfileSchema, type TemplateProfile } from '@praxis/shared';
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
-import { buildGenericPackages } from '../src/anvil/generic-package';
-import { PraxisPrecheckValidator, validationItem } from '../src/anvil/validator';
+import { buildGenericPackages, taskPackageProblem } from '../src/anvil/generic-package';
 import { compileForSubmission, shownExportStatus } from '../src/tasks/profile-output';
 import { MockGoogleVerifier } from '../src/candidate/google';
 import { MockIdentityProvider } from '../src/candidate/identity-provider';
@@ -271,26 +270,23 @@ describe('KYC v7 and the generic case selector', () => {
     expect(entries.slice(1).every((e) => !('coverage' in e))).toBe(true);
   });
 
-  it('D26: approved v7 tasks validate on the generic package path; bound-contract blockers stored before the fix never apply', async () => {
+  it('D26: approved v7 tasks package on the generic path; bound-contract blockers stored before the fix never apply', async () => {
     await kycWorkflow();
     const v7 = await publishedFrom(clone());
     const pid = await project(v7.id, 4);
     const recs = await records(pid, v7, (value) => ({ applicationType: value }));
     // What QA's four tasks carry in their stored checks: 22 "Name the output field…" blockers each.
     const stale = Array.from({ length: 22 }, (_, i) => ({ code: 'MISSING_BINDING', path: `S7.criteria[${i}].outputField`, message: 'Name the output field this rule or criterion checks' }));
-    const items = recs.map(({ record, template }) => validationItem(record, 'T', stale, template));
-    expect(items.map((i) => [i.exportContract, i.exportProblems])).toEqual(recs.map(() => ['praxis.authored-task-export.v1', []]));
-    const results = await new PraxisPrecheckValidator().validate(items);
-    expect(results.map((r) => r.status)).toEqual(['valid', 'valid', 'valid', 'valid']);
+    // Stale stored blockers do not stop packaging: every task packages cleanly (part 1 package, as RL Gym fetches it).
+    expect(recs.map(({ record, template }) => taskPackageProblem({ record, template }))).toEqual(recs.map(() => null));
+    void stale;
     // The v7 form is graded by the template's evaluators: no per-task bound contract is compiled or shown.
     const out = recs[0]!.record.output as Record<string, unknown>;
     expect(compileForSubmission(v7, out, { taskId: recs[0]!.record.taskInstanceId, revisionId: 'r-1' })).toBeNull();
     expect(shownExportStatus(v7, { status: 'blocked', profile: { id: 'golden-kyc-application-type-v1', version: 1 }, blockers: stale })).toBeNull();
     // An author-fixable package problem is still "needs fix"; it is never hidden.
     const broken = recs.map((r) => ({ ...r, record: { ...r.record, input: { ...(r.record.input as object), slot: { case: { field: 'product', value: 'trust' } } } } as ApprovedTaskRecord }));
-    const [bad] = await new PraxisPrecheckValidator().validate([validationItem(broken[0]!.record, 'T', stale, v7)]);
-    expect(bad!.status).toBe('needs_fix');
-    expect(bad!.issues.map((i) => i.code)).toEqual(['GENERIC_CASE_SELECTOR_MISMATCH']);
+    expect(taskPackageProblem({ record: broken[0]!.record, template: v7 })).toMatchObject({ code: 'GENERIC_CASE_SELECTOR_MISMATCH' });
   });
 
   it('export: a missing, unknown or conflicting selector value blocks the template’s tasks with a reason', async () => {

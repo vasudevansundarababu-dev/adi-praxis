@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 import { createSign, generateKeyPairSync, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { seed } from '../prisma/seed';
-import { AnvilExportClient } from '../src/anvil/export-client';
 import { ensureAnvilGrant } from '../src/anvil/grant';
 import { anvilAudience, googleIdTokenProvider, GoogleServiceIdentityVerifier } from '../src/anvil/service-identity';
 import { buildApp } from '../src/app';
@@ -180,19 +179,6 @@ describe('keyless service identity: requests', () => {
 
 describe('keyless service identity: Praxis calling Anvil', () => {
   const BASE = 'https://anvil-qa.example.test/api/v1/projects/p/dataset-exports/generic';
-  it('sends a fresh identity token from the provider, never a stored key', async () => {
-    const seen: string[] = [];
-    const fetchImpl = async (_url: string, init: { headers: Record<string, string> }) => {
-      seen.push(init.headers.Authorization!);
-      return { status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ data: { contracts: [], enabled: false } }) };
-    };
-    let n = 0;
-    const client = new AnvilExportClient(BASE, async () => `id-token-${++n}`, fetchImpl as never);
-    await client.contracts();
-    await client.contracts();
-    expect(seen).toEqual(['Bearer id-token-1', 'Bearer id-token-2']);
-  });
-
   it('fetches the token only from the metadata server, bounded, cached until near expiry', async () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const fake = `h.${Buffer.from(JSON.stringify({ exp })).toString('base64url')}.s`;
@@ -211,11 +197,4 @@ describe('keyless service identity: Praxis calling Anvil', () => {
     await expect(failing()).rejects.toThrow();
   });
 
-  it('reports a missing identity as a transport problem, without calling Anvil', async () => {
-    let called = false;
-    const client = new AnvilExportClient(BASE, async () => { throw new Error('no metadata server'); }, (async () => { called = true; }) as never);
-    const r = await client.contracts();
-    expect(r).toMatchObject({ kind: 'transport', code: 'IDENTITY_UNAVAILABLE', retryable: true });
-    expect(called).toBe(false);
-  });
 });

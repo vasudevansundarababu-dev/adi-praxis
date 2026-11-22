@@ -16,8 +16,6 @@ import { publishRuleSet } from '../src/policy/rule-sets';
 import { createRuleFromCandidate, markReviewed } from '../src/policy/rules';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
-import { AnvilExportClient } from '../src/anvil/export-client';
-import { AnvilGatedValidator, PraxisPrecheckValidator, type AnvilTaskValidator, type ValidationItem } from '../src/anvil/validator';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
 /**
@@ -66,15 +64,6 @@ describe('Golden KYC: the full Praxis cycle on KYC template version 2', () => {
   const config = testConfig();
   let clientId: string;
   let admin: string;
-  /** Praxis's pre-check, switchable to "Anvil did not answer". */
-  const switchable: { down: boolean; inner: PraxisPrecheckValidator; gated: AnvilGatedValidator | null } = { down: false, inner: new PraxisPrecheckValidator(), gated: null };
-  const validator: AnvilTaskValidator = {
-    name: 'praxis-precheck',
-    version: 'test',
-    validate: (items: ValidationItem[]) => (switchable.down ? Promise.reject(new Error('503 from validator')) : switchable.inner.validate(items)),
-    run: (items, ctx, opts) => (switchable.down ? Promise.reject(new Error('503 from validator')) : switchable.gated ? switchable.gated.run(items, ctx, opts) : switchable.inner.validate(items).then((results) => ({ results }))),
-  };
-
   const post = (cookie: string, url: string, payload: object = {}) => app.inject({ method: 'POST', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
   const patch = (cookie: string, url: string, payload: object) => app.inject({ method: 'PATCH', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
   const put = (cookie: string, url: string, payload: object) => app.inject({ method: 'PUT', url: `/api/v1${url}`, headers: { cookie, ...idem() }, payload });
@@ -87,7 +76,7 @@ describe('Golden KYC: the full Praxis cycle on KYC template version 2', () => {
   const get = (cookie: string, url: string) => app.inject({ method: 'GET', url: `/api/v1${url}`, headers: { cookie } });
 
   beforeAll(async () => {
-    app = await buildApp({ config, db, pingRedis: async () => true, google, identity: new MockIdentityProvider(SECRET, 'http://candidate.test'), resolveClientId: async () => clientId, storage, selectionGate: stubSelectionGate, email, embeddings: new HashingEmbeddingProvider(), anvilValidator: validator });
+    app = await buildApp({ config, db, pingRedis: async () => true, google, identity: new MockIdentityProvider(SECRET, 'http://candidate.test'), resolveClientId: async () => clientId, storage, selectionGate: stubSelectionGate, email, embeddings: new HashingEmbeddingProvider() });
   });
   beforeEach(async () => {
     await resetDb();
@@ -243,76 +232,27 @@ describe('Golden KYC: the full Praxis cycle on KYC template version 2', () => {
     expect(output.sections.S6.recommendation).toBe('ready_for_approval');
     expect(output.sections.S4.policies.map((p) => p.ruleVersion).sort()).toEqual(Object.values(s.versions).sort());
   });
-  it('project export: validate one task any time, export when complete; the validator says which tasks need fixing', async () => {
+  it('project export (new RL Gym): with RL Gym not connected the page says so, the approved task is listed and Export is refused', async () => {
     const { v2 } = await kycTemplates();
     await patch(admin, `/templates/${v2.id}`, { profileId: 'kyc-account-opening' });
     await post(admin, `/templates/${v2.id}/publish`);
     const s = await staffedProject(v2.id);
-    const none = (await get(s.pm, `/projects/${s.projectId}/export`)).json();
-    expect(none).toMatchObject({ canValidate: false, canExport: false, reason: 'Export needs at least one approved task.', validator: { name: 'praxis-precheck', isAnvil: false } });
+    expect((await get(s.pm, `/projects/${s.projectId}/export`)).json()).toMatchObject({ canExport: false, connected: false, reason: 'RL Gym isn’t connected yet.', rlgymTemplate: null, exported: false, tasks: [], runs: [] });
 
     await save(s.sme, s.taskId, withRuleVersions(GOLDEN_KYC_EXAMPLE, s.versions));
     expect((await submit(s.sme, s.taskId)).statusCode).toBe(200);
     await stage(s.expert, s.taskId, { stage: 'EXPERT_REVIEW', decision: 'PASS', checklist: allTrue });
     await stage(s.pm, s.taskId, { stage: 'PM_APPROVAL', decision: 'APPROVE' });
-
-    // Not complete yet: 1 of 2 required tasks, end date ahead. Validate one task; export waits.
-    await db.project.update({ where: { id: s.projectId }, data: { distinctTarget: 2, endDate: new Date('2099-01-01'), status: 'IN_PROGRESS' } });
     const st = (await get(s.pm, `/projects/${s.projectId}/export`)).json();
-    expect(st).toMatchObject({ canValidate: true, canExport: false });
-    expect(st.reason).toContain('1 of 2 required tasks approved, or on 2099-01-01');
-    const recordId = st.tasks[0].recordId as string;
-    expect((await post(s.pm, `/projects/${s.projectId}/validate`, { recordIds: [recordId, recordId] })).statusCode).toBe(400);
-    const v = await post(s.pm, `/projects/${s.projectId}/validate`, { recordIds: [recordId] });
-    expect(v.statusCode, v.body).toBe(201);
-    // The golden task's evaluator-graded checks have no Anvil binding yet (owner decision): it needs fixing.
-    expect(v.json()).toMatchObject({ kind: 'VALIDATE', validator: 'praxis-precheck', counts: { valid: 0, needsFix: 1, notValidated: 0 }, results: [{ recordId, status: 'needs_fix' }], downloadPath: null });
-    expect(v.json().results[0].issues.map((i: { code: string }) => i.code)).toContain('MISSING_BINDING');
-    expect((await post(s.pm, `/projects/${s.projectId}/exports`)).statusCode).toBe(409);
-    // Another PM cannot see or export this project.
+    expect(st).toMatchObject({ canExport: false, connected: false, tasks: [{ taskId: s.taskId, revision: 1, inRlGym: false }] });
+    const ex = await post(s.pm, `/projects/${s.projectId}/exports`);
+    expect(ex.statusCode).toBe(409);
+    expect(ex.json().message).toBe('RL Gym isn’t connected yet.');
+    // The old per-task validate route is gone.
+    expect((await post(s.pm, `/projects/${s.projectId}/validate`, { recordIds: [st.tasks[0].recordId] })).statusCode).toBe(404);
+    // Another PM cannot see the project's export.
     const other = await login(app, (await createUser(clientId, ['PM'])).email);
     expect((await get(other, `/projects/${s.projectId}/export`)).statusCode).toBe(404);
-
-    // The end date has come: export every approved task; the file holds the record, its envelope and the verdict.
-    await db.project.update({ where: { id: s.projectId }, data: { endDate: new Date('2020-01-01') } });
-    const ex = await post(s.pm, `/projects/${s.projectId}/exports`);
-    expect(ex.statusCode, ex.body).toBe(201);
-    expect(ex.json()).toMatchObject({ kind: 'EXPORT', counts: { needsFix: 1 }, downloadPath: `/projects/${s.projectId}/exports/${ex.json().id}/download` });
-    const file = await get(s.pm, ex.json().downloadPath);
-    expect(file.statusCode).toBe(200);
-    const line = JSON.parse(file.body.trim().split('\n')[0]!);
-    expect(line).toMatchObject({ record: { id: recordId, taskInstanceId: s.taskId }, anvilExport: null, validation: { status: 'needs_fix' } });
-    expect(await db.auditEvent.count({ where: { action: { in: ['project.validated', 'project.exported'] } } })).toBe(2);
-
-    // The validator does not answer: tasks are "not validated", never guessed valid; the export record is kept.
-    switchable.down = true;
-    try {
-      const down = await post(admin, `/projects/${s.projectId}/exports`);
-      expect(down.statusCode, down.body).toBe(201);
-      expect(down.json()).toMatchObject({ counts: { valid: 0, needsFix: 0, notValidated: 1 }, results: [{ status: 'not_validated', issues: [{ code: 'VALIDATOR_UNAVAILABLE' }] }] });
-    } finally {
-      switchable.down = false;
-    }
-    // Anvil has the generic contract enabled (mock transport): the export builds packages from the template versions.
-    // This KYC template was not proposed by Anvil in the joint format, so nothing is sent and the run says why.
-    const seen: string[] = [];
-    switchable.gated = new AnvilGatedValidator(new AnvilExportClient('https://anvil-qa.example.test/api/v1/projects/a7454c18-602e-4907-bdd9-277067c36233/dataset-exports/generic', 'tok-0123456789', async (url) => {
-      seen.push(url);
-      return { status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ data: { contracts: ['praxis.authored-task-export.v1'], enabled: true } }) };
-    }));
-    try {
-      const gated = await post(admin, `/projects/${s.projectId}/exports`);
-      expect(gated.statusCode, gated.body).toBe(201);
-      expect(gated.json()).toMatchObject({ counts: { notValidated: 1 }, results: [{ status: 'not_validated', issues: [{ code: 'GENERIC_TEMPLATE_NOT_JOINT' }] }] });
-      const run = await db.projectValidationRun.findUniqueOrThrow({ where: { id: gated.json().id } });
-      expect(run.anvil).toMatchObject({ contract: 'praxis.authored-task-export.v1', support: 'enabled', parts: [], problems: [{ code: 'GENERIC_TEMPLATE_NOT_JOINT', recordId }] });
-      expect(seen.every((u) => u.endsWith('/contracts'))).toBe(true);
-    } finally {
-      switchable.gated = null;
-    }
-    // Runs are append-only; the task and the dataset record are untouched by validation.
-    await expect(db.$executeRawUnsafe(`UPDATE "ProjectValidationRun" SET kind = 'VALIDATE' WHERE project_id = '${s.projectId}'`)).rejects.toThrow();
-    expect(await db.approvedTaskRecord.count({ where: { taskInstanceId: s.taskId } })).toBe(1);
   });
 
   it('a golden task pack is uploaded without a code change: new workflow, draft template, full cycle on the uploaded form', async () => {

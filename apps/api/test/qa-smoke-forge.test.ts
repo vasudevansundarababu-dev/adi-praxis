@@ -177,7 +177,7 @@ describe('qa-smoke new-flow pass against the real API in-process (all providers 
     const tasks = await db.taskInstance.findMany({ where: { projectId: p.id } });
     expect(tasks).toHaveLength(slots.length);
     expect(new Set(tasks.map((t) => t.slotId)).size).toBe(slots.length);
-    expect(forge(r)['forge-tasks']!.details).toMatchObject({ tasks: slots.length, export: 'Export opens when the task is approved (0 of 1 now).' });
+    expect(forge(r)['forge-tasks']!.details).toMatchObject({ tasks: slots.length, export: 'RL Gym isn’t connected yet.' });
     // Sourced, tagged synthetic people; the SME authored, the Reviewer passed, the PM approved.
     const people = await db.sourcedPerson.findMany({ where: { projectId: p.id }, orderBy: { role: 'asc' } });
     expect(people.map((x) => [x.role, x.firstName, x.agency, x.emailNorm]).sort()).toEqual([
@@ -199,9 +199,9 @@ describe('qa-smoke new-flow pass against the real API in-process (all providers 
     expect(records.map((x) => x.taskInstanceId).sort()).toEqual(tasks.map((t) => t.id).sort());
     // Terms were accepted through Before you start, and audited.
     expect(await db.auditEvent.count({ where: { clientId, action: 'candidate.terms_accepted' } })).toBe(2);
-    // Export eligibility only: open at the end, never exported, never validated by RL Gym.
-    expect(forge(r)['forge-export']).toMatchObject({ status: 'PASS', details: { canExport: true, exported: false, validator: 'praxis-precheck' } });
-    expect(await db.projectValidationRun.count({ where: { projectId: p.id } })).toBe(0);
+    // Export state only: RL Gym is not connected here, so export stays closed; nothing is ever exported.
+    expect(forge(r)['forge-export']).toMatchObject({ status: 'PASS', details: { canExport: false, connected: false, exported: false } });
+    expect(await db.rlGymProjectExport.count({ where: { projectId: p.id } })).toBe(0);
     expect(sent.some((x) => x.method === 'POST' && /\/exports$/.test(x.path))).toBe(false);
     // The smoke test never changes the client's settings, and signs its candidates out at the end.
     expect(sent.filter((x) => x.path === '/admin/forge-settings').map((x) => x.method)).toEqual(['GET']);
@@ -232,10 +232,10 @@ describe('qa-smoke new-flow pass against the real API in-process (all providers 
     const selectors = forge(r)['forge-tasks']!.details!.selectors as string[];
     tasks.forEach((t, i) => expect(selectors[i]).toContain((t.input as { slot: { case: { value: string } } }).slot.case.value));
     expect(forge(r)['forge-review']!.details).toMatchObject({ approved: 5, reviewerPassed: 0, records: 5 });
-    // The PM's approvals: each one checked that export was still closed ("n of 5 now") before it, and open after the last.
+    // The PM's approvals: before each one the export state listed the tasks approved so far, and once more at the end.
     const exportReads = sent.filter((x) => x.method === 'GET' && x.path === `/projects/${p.id}/export`);
     expect(exportReads.length).toBe(1 + 5 + 1);
-    expect(forge(r)['forge-export']).toMatchObject({ status: 'PASS', details: { canExport: true, tasks: 5 } });
+    expect(forge(r)['forge-export']).toMatchObject({ status: 'PASS', details: { tasks: 5 } });
     expect(await db.sourcedPerson.count({ where: { projectId: p.id, role: 'REVIEWER' } })).toBe(0);
   }, 180_000);
 

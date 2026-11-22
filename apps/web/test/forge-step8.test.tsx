@@ -33,6 +33,7 @@ import {
 import { navGroupsFor } from '@/lib/nav';
 import { a11yProblems } from './a11y';
 import { project, text } from './helpers';
+import type { ExportState } from '@/components/projects/export-panel';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, refresh: () => undefined }), notFound: () => { throw new Error('NOT_FOUND'); } }));
 
@@ -75,7 +76,7 @@ const PEOPLE: ProjectPersonDto[] = [
   person({ tasks: [{ taskId: T(1), label: TASKS[0]!.label, status: 'ACCEPTED' }, { taskId: T(2), label: TASKS[1]!.label, status: 'SUBMITTED' }] }),
   person({ sourcedPersonId: '00000000-0000-4000-8000-000000000202', firstName: 'Jamie', lastName: 'Okafor', email: 'jamie@gmail.test', role: 'REVIEWER' }),
 ];
-const EXPORT = { canValidate: true, canExport: false, reason: 'Export opens when all 5 tasks are approved (1 of 5 now).', validator: { name: 'praxis-precheck', version: '1', isAnvil: false }, tasks: [{ recordId: '00000000-0000-4000-8000-000000000301', taskId: T(1), title: 'CA', approvedAt: '2026-11-15T10:00:00.000Z' }], runs: [] };
+const EXPORT: ExportState = { canExport: false, reason: 'RL Gym isn’t connected yet.', connected: false, rlgymTemplate: null, exported: false, tasks: [{ recordId: '00000000-0000-4000-8000-000000000301', taskId: T(1), title: 'CA', approvedAt: '2026-11-15T11:00:00.000Z', revision: 1, inRlGym: false }], runs: [] };
 const P = project({ id: PID, name: 'KYC-Of US bank Chicago', status: 'IN_PROGRESS', description: 'KYC workflow for a Chicago bank.', requiredWorkers: 2 });
 
 beforeEach(() => {
@@ -158,8 +159,8 @@ describe('Tasks tab', () => {
     expect(text(m)).not.toMatch(/Assign SME…[^]*Jamie Okafor/);
     expect(m).toContain(`href="/projects/${PID}/tasks/${T(2)}/review"`);
     expect(text(m)).toContain('Your decision');
-    expect(text(m)).toContain('Export to RL Gym');
-    expect(text(m)).toContain('Export opens when all 5 tasks are approved (1 of 5 now).');
+    expect(text(m)).toContain('Export for benchmark');
+    expect(text(m)).toContain('RL Gym isn’t connected yet, so export is off.');
     expect(a11yProblems(m)).toEqual([]);
   });
 });
@@ -181,7 +182,7 @@ describe('Dashboard and Resource assignments tabs', () => {
     expect(nextStep({ ...base, smesAssigned: 1, tasks: noDecision })).toMatchObject({ text: '1 more expert is needed (1 of 2 assigned).', href: `/projects/${PID}/assign` });
     expect(nextStep({ ...base, tasks: noDecision }).text).toBe('2 tasks have no author yet.');
     expect(nextStep({ ...base, tasks: TASKS.map((t) => ({ ...t, status: 'ACCEPTED', canDecide: false })) }).text).toBe('All 5 tasks are approved.');
-    expect(exportStatusLine(EXPORT)).toBe('Not exported · opens when all 5 tasks are approved (1 of 5 now)');
+    expect(exportStatusLine(EXPORT)).toBe('Not connected · RL Gym isn’t connected yet');
   });
 
   it('Dashboard: summary cards, Next step, coverage by state and project details with route, reviewers and export', () => {
@@ -210,7 +211,7 @@ describe('Dashboard and Resource assignments tabs', () => {
     expect(m.match(/data-coverage-row/g)).toHaveLength(5);
     expect(t).toContain('Review route Author → PM/Admin · chosen at project creation, read-only');
     expect(t).toContain('Reviewers Not used: this project&#x27;s review route has no Reviewer step');
-    expect(t).toContain('Export to RL Gym Not exported · opens when all 5 tasks are approved (1 of 5 now)');
+    expect(t).toContain('Export to RL Gym Not connected · RL Gym isn’t connected yet');
     expect(t).toContain('Required workers 2');
     expect(t.indexOf('Export to RL Gym')).toBeLessThan(t.indexOf('Submitted —'));
     const two = text(renderToStaticMarkup(<ForgeDashboardTab project={P} reviewRoute="SME_EXPERT_PM" requiredWorkers={2} tasks={TASKS} people={PEOPLE} dashboard={null} ruleSet={null} exportState={null} attributes={[]} jobDescriptions={[]} />));
@@ -383,16 +384,18 @@ describe('Task page decision box', () => {
     expect(open).not.toContain('Joint checking');
   });
 
-  it('an approved task shows the decision and the Validate card with the latest result', () => {
+  it('an approved task shows the decision and, once exported and not blocked, In RL Gym (no Validate card)', () => {
     const reviews = [{ id: 'r1', by: 'Platform Admin', decision: 'ACCEPT', stage: null, comments: [], notes: null, rejectReason: null, version: 1, at: '2026-11-15T11:00:00.000Z' }];
-    const run = { id: 'v1', projectId: PID, kind: 'VALIDATE' as const, validator: 'praxis-precheck', validatorVersion: '1', results: [{ recordId: EXPORT.tasks[0]!.recordId, taskId: T(1), title: 'CA', status: 'valid' as const, issues: [] }], counts: { valid: 1, needsFix: 0, notValidated: 0 }, requestedById: 'u1', createdAt: '2026-11-15T11:02:00.000Z', downloadPath: null, anvil: null };
-    const m = renderToStaticMarkup(<ForgeTaskPage code="TSK-001" view={view({ taskId: T(1), status: 'ACCEPTED', canDecide: false, reviews })} people={PEOPLE} exportState={{ ...EXPORT, runs: [run] }} />);
+    const m = renderToStaticMarkup(<ForgeTaskPage code="TSK-001" view={view({ taskId: T(1), status: 'ACCEPTED', canDecide: false, reviews })} people={PEOPLE} exportState={EXPORT} />);
     const t = text(m);
     expect(t).toContain('Approved on 15 Nov 2026 by Platform Admin. Added to the approved dataset.');
-    expect(m).toContain('data-validate');
-    expect(t).toContain('Validate Valid 2026-11-15 11:02 · 0 fixes');
+    expect(m).not.toContain('data-validate');
+    expect(m).not.toContain('data-in-rlgym');
     expect(t).toContain('PM/Admin Platform Admin Approved 15 Nov 2026');
     expect(m).not.toContain('data-decision-box');
+    const sent = renderToStaticMarkup(<ForgeTaskPage code="TSK-001" view={view({ taskId: T(1), status: 'ACCEPTED', canDecide: false, reviews })} people={PEOPLE} exportState={{ ...EXPORT, connected: true, exported: true, tasks: [{ ...EXPORT.tasks[0]!, inRlGym: true }] }} />);
+    expect(sent).toContain('data-in-rlgym');
+    expect(text(sent)).toContain('In RL Gym');
   });
 
   it('trail on the Reviewer route: Author → Reviewer → PM/Admin', () => {

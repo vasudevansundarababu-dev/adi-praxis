@@ -2358,3 +2358,43 @@ import, `services/stubs/forge_stub.py`), read only, with the owner's OK for that
 - **(chosen by Claude)** The new table is added to `APPEND_ONLY_TABLES` in `jobs/grant-app-role.ts`, so the QA and
   production app role cannot update or delete it. `TutorialSpend` (D2, PR #84) was missing from that list and is added
   too; its trigger already blocked changes.
+
+## New RL Gym, part 2: project export and re-export (22 Nov 2026)
+
+Design: `docs/design/FORGE-RLGYM-V2-DESIGN.md` part 2. Contract read from the new RL Gym's build
+(`rlgym/projects/service.py` `receive_export`, `rlgym/catalog/templates.py` `forge_qualification`, the stub
+`golden_kyc.project_export`) and Studio's PR #14 (`rlgym_content.py`, `praxis_wire.py`), read only.
+
+- **(owner, 22 Nov)** The old RL Gym is decommissioned: its outbound path is removed, not flagged off. Export runs only
+  when the PM (or an Admin) presses it. Settings are `RLGYM_API_URL`, `RLGYM_WORKSPACE`, `RLGYM_FORGE_CLIENT_KEY`
+  (AUTHORING-LOCAL-SETUP 4.3); any blank = not connected.
+- **(from the RL Gym build)** The export's `template` {id, version, spec_sha256} must match the Studio release the RL
+  Gym activated. Studio's proposal to ADI Forge does not carry them; the RL Gym's qualification record to ADI Forge
+  does (`receipt.rlgym_template_id`, `rlgym_template_version`, `spec_sha256`). **(chosen by Claude)** So the export
+  takes them from the template version's standing QUALIFIED qualification, and a version the RL Gym has not qualified
+  cannot be exported ("RL Gym hasn't qualified this template version yet").
+- **(chosen by Claude, per the snapshot)** Export opens with **one approved task** (the approved tasks so far), replacing
+  the MVP1 rule "every task approved" (15 Nov) and the older end-date rule. Re-export sends the current approved
+  revision of every task; unchanged ones are recognised by hash. D18 revalidation still runs first and sends failing
+  tasks to Rework with nothing sent.
+- **(chosen by Claude)** Three steps, because the RL Gym fetches packages from ADI Forge during the call: (1) checks and
+  package storage in a committed transaction, (2) the call (outside any transaction), (3) the run and audit
+  (`project.exported_to_rlgym`) in a short transaction. New `runCommandPrepared` gives staff commands the existing
+  prepare-outside-the-transaction pattern; a repeated Idempotency-Key replays without calling the RL Gym.
+- **(chosen by Claude)** `export_id` = `exp-` + 16 hex of the JCS hash of everything the body carries, so one export ID
+  never stands for two bodies (the RL Gym refuses that) and a retry after a failure resends the same export.
+  `export_sha256` = JCS SHA-256 of the body without it (strings and integers only, so it equals the RL Gym's hash).
+  `Idempotency-Key` = `export_sha256`. `package_ref` = `forge://packages/<sha>` (RL Gym to accept it).
+- **(chosen by Claude)** `case_selector` = the slot's case value under the snake-cased form field it fills
+  (`S1.applicationType` → `application_type`), the slot's coverage tags, and `edge_cases` from the slot's edge case
+  (`[]` when none). ADI Forge has no `completeness` today, so it is not sent. **Open for the RL Gym team:** whether it
+  needs `completeness`. A task without a case is not sent (`CASE_SELECTOR_MISSING`).
+- **(chosen by Claude)** `corrects_revision` = revision - 1 for revision > 1. `sme_batch_id` waits for part 3.
+  `project_config.mode` from the template's agent mode.
+- **(chosen by Claude)** New append-only table `RlGymProjectExport` (body without package content, tasks sent, not sent,
+  outcome `received | rejected | unavailable`, HTTP status, RL Gym request ID, receipt or error). A refused or
+  unanswered export is kept too. "In RL Gym" = the task's current record was in a received export and not blocked.
+- **(chosen by Claude)** Removed: the ZIP/NDJSON project export, `POST /projects/:id/validate`, the task-page Validate
+  card and the Tasks-table multi-select Validate (PR #102), `anvil/export-client.ts`, `anvil/validator.ts` and their
+  tests. Kept: the template routes the RL Gym and Studio call, the offline export job, and earlier
+  `ProjectValidationRun` rows (append-only history). The QA smoke job now only reads the export state.

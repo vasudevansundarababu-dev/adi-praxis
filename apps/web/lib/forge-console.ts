@@ -160,14 +160,14 @@ export function nextStep(args: {
   return { text: 'Authors are working on their tasks.', href: tabHref(projectId, 'tasks'), link: 'Open tasks →' };
 }
 
-/** Dashboard "Export to RL Gym" row. */
-export function exportStatusLine(e: { canExport: boolean; reason: string | null; runs: { kind: string; createdAt: string }[] } | null): string {
+/** Dashboard "Export to RL Gym" row (new RL Gym, part 2). */
+export function exportStatusLine(e: { canExport: boolean; reason: string | null; connected: boolean; runs: { outcome: string; createdAt: string }[] } | null): string {
   if (!e) return '—';
-  const last = e.runs.find((r) => r.kind === 'EXPORT');
-  if (last) return `Exported ${fmtWhen(last.createdAt)}${e.canExport ? ' · can be exported again' : ''}`;
-  if (e.canExport) return 'Not exported · ready: all tasks are approved';
-  const why = e.reason ? e.reason.replace(/^Export opens/, 'opens').replace(/\.$/, '') : 'not open yet';
-  return `Not exported · ${why}`;
+  if (!e.connected) return 'Not connected · RL Gym isn’t connected yet';
+  const last = e.runs.find((r) => r.outcome === 'received');
+  if (last) return `Exported ${fmtWhen(last.createdAt)}${e.canExport ? ' · can be re-exported' : ''}`;
+  if (e.canExport) return 'Not exported · ready to export the approved tasks so far';
+  return `Not exported · ${e.reason ? e.reason.replace(/\.$/, '') : 'not open yet'}`;
 }
 
 // ── Assign screen ──
@@ -434,11 +434,3 @@ export function reviewTrail(v: {
   return steps;
 }
 
-/** The latest Validate (or export) result that covers this approved record. */
-export function latestValidation<T extends { results: { recordId: string }[] }>(runs: T[], recordId: string): { run: T; result: T['results'][number] } | null {
-  for (const run of runs) {
-    const result = run.results.find((r) => r.recordId === recordId);
-    if (result) return { run, result };
-  }
-  return null;
-}

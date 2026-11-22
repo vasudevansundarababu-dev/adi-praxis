@@ -3341,6 +3341,32 @@ model AuthoredTaskPackage {
   @@index([projectId, taskInstanceId])
 }
 
+/// New RL Gym part 2: one press of Export / Re-export, with the body sent (no package content) and the RL Gym's
+/// answer. Append-only.
+model RlGymProjectExport {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  exportId      String   @map("export_id")
+  exportSha256  String   @map("export_sha256")
+  reason        String
+  body          Json
+  /// The tasks sent: [{recordId, taskId, title, revision, packageSha256, correctsRevision}].
+  tasks         Json
+  /// Approved tasks not sent, with the reason.
+  notSent       Json     @map("not_sent")
+  /// received, rejected or unavailable.
+  outcome       String
+  httpStatus    Int?     @map("http_status")
+  requestId     String?  @map("request_id")
+  receipt       Json?
+  error         Json?
+  requestedById String   @map("requested_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+}
+
 model ProjectValidationRun {
   id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId         String   @map("client_id") @db.Uuid

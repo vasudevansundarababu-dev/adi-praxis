@@ -18,6 +18,7 @@ import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { marketingFormV2 } from '../src/jobs/marketing-form-v2';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
+import { AUTHOR_FIXABLE_PACKAGE, taskPackageProblem } from '../src/anvil/generic-package';
 
 /**
  * Golden Task2, Marketing (owner, 12-13 Nov 2026): the VEYRA Hush One headphone launch as ONE reusable five-agent task.
@@ -312,25 +313,20 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
     const stored = (await db.taskInstance.findUniqueOrThrow({ where: { id: s.taskId } })).checks as { export?: unknown };
     expect(stored.export).toBeUndefined();
     expect(JSON.stringify(record.output)).not.toMatch(/praxisContract/);
-    const validate = async () => {
-      const r = await post(s.pm, `/projects/${s.projectId}/validate`, { recordIds: [record.id] });
-      expect(r.statusCode, r.body).toBe(201);
-      return r.json() as { validator: string; counts: { valid: number; needsFix: number; notValidated: number }; results: { status: string; issues: { code: string; message: string }[] }[] };
-    };
-    const run = await validate();
-    expect(run.validator).toBe('praxis-precheck');
-    expect(JSON.stringify(run)).not.toMatch(/Name the output field|MISSING_BINDING|NO_EXECUTABLE_CONTRACT/);
+    // The package check (the same as the RL Gym package, part 1): no binding blocker the author or PM cannot fix.
+    const tpl = await db.template.findUniqueOrThrow({ where: { id: record.templateId } });
+    const problem = () => taskPackageProblem({ record, template: tpl });
+    const first = problem();
+    expect(JSON.stringify(first)).not.toMatch(/Name the output field|MISSING_BINDING|NO_EXECUTABLE_CONTRACT/);
     // The one remaining problem is the published form's, not the task's: its S4 policy citations do not declare the
-    // sub-fields ADI Forge keeps from agents (appliesTo, rationale) as private. Reported as "not validated", never as
-    // something the author or PM must fix.
-    expect(run.counts).toMatchObject({ valid: 0, needsFix: 0, notValidated: 1 });
-    expect(run.results[0]!.status).toBe('not_validated');
-    expect(run.results[0]!.issues.map((i) => i.code)).toEqual(['GENERIC_PRIVATE_EXPOSURE']);
+    // sub-fields ADI Forge keeps from agents (appliesTo, rationale) as private. It is a form problem, never a task repair.
+    expect(first).toMatchObject({ code: 'GENERIC_PRIVATE_EXPOSURE' });
+    expect(AUTHOR_FIXABLE_PACKAGE.has(first!.code)).toBe(false);
     // A task submitted before the fix keeps the old compile blockers in its stored checks: never shown, never used.
     const old = { status: 'blocked', profile: { id: PROFILE_ID, version: 1 }, blockers: Array.from({ length: 25 }, (_, i) => ({ code: 'MISSING_BINDING', path: `S7.criteria[${i}].outputField`, message: 'Name the output field this rule or criterion checks' })) };
     await db.taskInstance.update({ where: { id: s.taskId }, data: { checks: { ...(stored as object), export: old } } });
-    const again = await validate();
-    expect(again.results).toEqual(run.results);
+    const again = problem();
+    expect(again).toEqual(first);
     expect(JSON.stringify(again)).not.toMatch(/Name the output field/);
     expect((await view(s.sme, s.taskId)).exportStatus).toBeNull();
     const review = (await get(s.pm, `/review/tasks/${s.taskId}`)).json();
@@ -338,7 +334,7 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
     expect(review.exportStatus).toBeNull();
   });
 
-  it('D26 follow-up: form v2 declares S4 citation visibility; its draft keeps every RL Gym part; a task approved on v2 validates', async () => {
+  it('D26 follow-up: form v2 declares S4 citation visibility; its draft keeps every RL Gym part; a task approved on v2 packages cleanly', async () => {
     const v1 = await published();
     const before = await db.template.findUniqueOrThrow({ where: { id: v1.id } });
     // Dry run: nothing is created; the report names the form change and the unchanged parts.
@@ -375,9 +371,8 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
     expect((await stage(s.expert, s.taskId, { stage: 'EXPERT_REVIEW', decision: 'PASS', checklist: allTrue })).statusCode).toBe(200);
     expect((await stage(s.pm, s.taskId, { stage: 'PM_APPROVAL', decision: 'APPROVE' })).statusCode).toBe(200);
     const record = await db.approvedTaskRecord.findFirstOrThrow({ where: { taskInstanceId: s.taskId } });
-    const run = await post(s.pm, `/projects/${s.projectId}/validate`, { recordIds: [record.id] });
-    expect(run.statusCode, run.body).toBe(201);
-    expect(run.json().results[0]).toMatchObject({ status: 'valid', issues: [] });
+    const v2 = await db.template.findUniqueOrThrow({ where: { id: record.templateId } });
+    expect(taskPackageProblem({ record, template: v2 })).toBeNull();
   });
 
   it('a single-agent workflow on the five-agent version, or a rubric group that does not add up, blocks submission', async () => {

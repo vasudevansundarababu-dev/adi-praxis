@@ -549,17 +549,14 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
     return { recordId, seq: record.seq, decidedBy: o.reviewerEmail, chain: { ok: true, checked: v.checked } };
   });
 
-  // ── 7. Export: Praxis's pre-check only; never calls Anvil ──
+  // ── 7. Export: the export state only; the smoke test never exports (that would call the RL Gym) ──
   await step('export', async () => {
     const pid = ids.projectId!;
     const st = (await call('pm', 'GET', `/projects/${pid}/export`)).body;
-    if (st.validator?.name !== 'praxis-precheck') throw new StepSkipped(`The export validator here is "${st.validator?.name}": validating would call Anvil, which the smoke test never does`);
-    if (!st.canValidate) throw new Error(`Export cannot validate: ${st.reason}`);
-    const v = (await call('pm', 'POST', `/projects/${pid}/validate`, { recordIds: [recordId] })).body;
-    ids.validationRunId = v.id;
-    const res = v.results?.[0];
-    if (!res || res.status === 'not_validated') throw new Error(`The pre-check did not validate the record: ${JSON.stringify(res?.issues ?? v).slice(0, 400)}`);
-    return { validator: v.validator, result: res.status, issues: (res.issues ?? []).map((i: Json) => i.code), canExport: st.canExport };
+    const listed = (st.tasks ?? []).some((t: Json) => t.recordId === recordId);
+    if (!listed) throw new Error(`The approved record ${recordId} is not listed for export`);
+    if (st.connected && st.rlgymTemplate && !st.canExport) throw new Error(`RL Gym is connected and qualified, but export is closed: ${st.reason}`);
+    return { connected: !!st.connected, canExport: !!st.canExport, reason: st.reason ?? null, exported: false };
   });
 
   // ── 8. Cleanup: cancel the smoke project unless it already completed; append-only records stay by design ──
@@ -809,8 +806,9 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
       }
       for (const [i, row] of tasks.entries()) {
         const before = (await call('pm', 'GET', `/projects/${pid}/export`)).body;
-        if (before.canExport) throw new Error(`Export is open with ${i} of ${tasks.length} tasks approved`);
-        if (!String(before.reason ?? '').includes(`(${i} of ${tasks.length} now)`)) throw new Error(`Export reason with ${i} of ${tasks.length} approved: "${before.reason}"`);
+        // The approved tasks so far are exportable (new RL Gym); before any approval export is closed.
+        if (i === 0 && before.canExport) throw new Error('Export is open before any task is approved');
+        if ((before.tasks ?? []).length !== i) throw new Error(`Export lists ${(before.tasks ?? []).length} approved tasks with ${i} approved`);
         const v = (await call('pm', 'GET', `/projects/${pid}/forge-tasks/${row.taskId}`)).body;
         if (!v.canDecide) throw new Error(`The PM cannot decide on ${row.taskId} (status ${v.status}, waiting for ${v.waitingFor ?? 'nobody'})`);
         await call('pm', 'POST', `/projects/${pid}/tasks/${row.taskId}/decision`, {
@@ -834,12 +832,12 @@ export async function qaSmoke(o: QaSmokeOptions, log: Log): Promise<QaSmokeRepor
       return { approved: tasks.length, reviewerPassed: withReviewer ? tasks.length : 0, records: records.length, chain: { ok: true, checked: chain.checked } };
     });
 
-    // ── Export: eligibility only; the smoke test never exports (that would call RL Gym) ──
+    // ── Export: the export state only; the smoke test never exports (that would call the RL Gym) ──
     await fstep('forge-export', async () => {
       const ex = (await call('pm', 'GET', `/projects/${fids.projectId}/export`)).body;
-      if (!ex.canExport) throw new Error(`Every task is approved but export is closed: ${ex.reason}`);
       if ((ex.tasks ?? []).length !== tasks.length) throw new Error(`Export lists ${(ex.tasks ?? []).length} approved tasks, expected ${tasks.length}`);
-      return { canExport: true, tasks: ex.tasks.length, validator: ex.validator?.name ?? null, exported: false };
+      if (ex.connected && ex.rlgymTemplate && !ex.canExport) throw new Error(`Every task is approved and RL Gym is connected, but export is closed: ${ex.reason}`);
+      return { canExport: !!ex.canExport, connected: !!ex.connected, reason: ex.reason ?? null, tasks: ex.tasks.length, exported: false };
     });
 
     // ── Cleanup: sign the synthetic candidates out; cancel the project unless it completed (records stay by design) ──

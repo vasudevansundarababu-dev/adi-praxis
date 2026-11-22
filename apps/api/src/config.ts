@@ -91,6 +91,14 @@ const Env = z.object({
   /** Audience of Praxis's identity token when calling Anvil. Blank = the origin of ANVIL_EXPORT_BASE_URL. */
   ANVIL_OUTBOUND_AUDIENCE: z.string().default(''),
   /**
+   * New RL Gym (docs/design/FORGE-RLGYM-V2-DESIGN.md part 2; AUTHORING-LOCAL-SETUP 4.3): its API address, workspace
+   * slug and its key for ADI Forge (server only, never logged or sent to a browser). Any of the three blank = not
+   * connected: the project page says so and Export is off (QA until the RL Gym is deployed).
+   */
+  RLGYM_API_URL: z.string().regex(/^$|^https:\/\/[^\s]+$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/, 'RLGYM_API_URL must be https (or http on localhost)').default(''),
+  RLGYM_WORKSPACE: z.string().regex(/^$|^[a-z0-9][a-z0-9-]{0,62}$/, 'RLGYM_WORKSPACE must be the RL Gym workspace slug').default(''),
+  RLGYM_FORGE_CLIENT_KEY: z.string().default(''),
+  /**
    * Keyless Anvil -> Praxis (K6, 12 Nov 2026): Anvil sends a raw Google-signed identity token. It is accepted only with
    * issuer https://accounts.google.com, exactly this audience (this API's URL), this numeric subject and this account.
    * Any of the three blank = keyless inbound is off.

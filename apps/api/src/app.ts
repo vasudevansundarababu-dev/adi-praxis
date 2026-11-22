@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 import './auth/actor';
 import { z } from 'zod';
 import { rbacPlugin } from './auth/rbac';
-import { anvilAudience, googleIdTokenProvider, GoogleServiceIdentityVerifier, type ServiceIdentityVerifier } from './anvil/service-identity';
+import { GoogleServiceIdentityVerifier, type ServiceIdentityVerifier } from './anvil/service-identity';
 import type { Config } from './config';
 import type { Db } from './db';
 import { AppError } from './lib/errors';
@@ -79,8 +79,7 @@ import { reviewerRecruitmentRoutes } from './routes/reviewer-recruitment';
 import { searchRoutes } from './routes/search';
 import { projectExportRoutes } from './routes/project-export';
 import { taskPackageRoutes } from './routes/task-packages';
-import { AnvilGatedValidator, PraxisPrecheckValidator, type AnvilTaskValidator } from './anvil/validator';
-import { AnvilExportClient } from './anvil/export-client';
+import { RlGymClient, rlGymConnected, type FetchLike as RlGymFetch } from './anvil/rlgym-client';
 import { SearchService } from './search/service';
 import type { IdSearch } from './lib/paging';
 import { projectRoutes } from './routes/projects';
@@ -108,12 +107,10 @@ import type { SignedUrlStorage } from './candidate/storage';
 
 export interface AppDeps {
   config: Config;
-  /** Anvil task validation for project export; defaults to Praxis's own pre-check until Anvil's API is connected. */
-  anvilValidator?: AnvilTaskValidator;
+  /** New RL Gym project export: the fetch used to call the RL Gym (tests pass a mock; never a live call in tests). */
+  rlgymFetch?: RlGymFetch;
   /** Keyless Anvil caller verification; tests inject one with local keys. */
   anvilIdentity?: ServiceIdentityVerifier;
-  /** Praxis's own identity token for calls to Anvil (keyless, no static token); tests inject a stub. */
-  anvilIdTokenProvider?: () => Promise<string>;
   db: Db;
   pingRedis: () => Promise<boolean>;
   logger?: boolean | Record<string, unknown>;
@@ -342,7 +339,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(userRoutes, { db: deps.db, search: idSearch });
       await v1.register(templateRoutes, { db: deps.db, tutorial: tutorialSettings(deps.config) });
       await v1.register(tutorialVideoRoutes, { db: deps.db, settings: tutorialSettings(deps.config), storage: tutorialStorage });
-      await v1.register(projectExportRoutes, { db: deps.db, storage, validator: deps.anvilValidator ?? (deps.config.ANVIL_EXPORT_BASE_URL ? new AnvilGatedValidator(new AnvilExportClient(deps.config.ANVIL_EXPORT_BASE_URL, deps.anvilIdTokenProvider ?? googleIdTokenProvider(anvilAudience(deps.config.ANVIL_EXPORT_BASE_URL, deps.config.ANVIL_OUTBOUND_AUDIENCE)))) : new PraxisPrecheckValidator()) });
+      const rlgymSettings = { apiUrl: deps.config.RLGYM_API_URL, workspace: deps.config.RLGYM_WORKSPACE, key: deps.config.RLGYM_FORGE_CLIENT_KEY };
+      await v1.register(projectExportRoutes, { db: deps.db, rlgym: rlGymConnected(rlgymSettings) ? new RlGymClient(rlgymSettings, deps.rlgymFetch) : null });
       await v1.register(templateProfileRoutes, { db: deps.db });
       await v1.register(taskPackageRoutes, { db: deps.db });
       await v1.register(anvilTemplateRoutes, { db: deps.db, anvil: { environment: deps.config.ANVIL_ENVIRONMENT, exportBaseUrl: deps.config.ANVIL_EXPORT_BASE_URL } });

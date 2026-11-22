@@ -2315,3 +2315,46 @@ TIN); originals append-only; the owner approves each revision in the console. Co
   receipt ref); and the package's other tasks as `unchanged`. The tool-binding change record skips records carrying
   `tinExclusion`, so in the 4-task export it covers only Individual (still the APR-13 revision). The APR-13d
   declared-tool and actor/private conformance checks are unchanged and run on the same ZIP.
+
+## New RL Gym, part 1: authored task packages by hash (22 Nov 2026)
+
+Design: `docs/design/FORGE-RLGYM-V2-DESIGN.md` (PR #104). Contract read from the new RL Gym's build
+(`ADI-Anvil/.claude/worktrees/rlgym-v2-8919f6`: `rlgym/integrations.py` `forge_package`, `rlgym/projects/service.py`
+import, `services/stubs/forge_stub.py`), read only, with the owner's OK for that one read.
+
+- **(owner, 22 Nov)** Part 1 first; the author experience, including AI assist on Authoring and Policy, is unchanged.
+- **(from the RL Gym build)** RL Gym calls `GET /api/v1/packages/{package_sha256}` with `Authorization: Bearer
+  RLGYM_ANVIL_KEY` (Forge's existing `ANVIL` key kind), stores the package's top-level `actor` and `private` objects
+  separately, and refuses a package whose SHA-256 over sorted-key compact JSON differs from `package_sha256`.
+- **(chosen by Claude)** **Package content `praxis.authored-task-package.v1`:** `schema`, `task_id` (the Forge task
+  ID), `revision`, `revision_id` (the approved record), `template` {id, version, sha256}, `form` {profile_id, version,
+  sha256}, `agent_mode`, `content_classification: synthetic`, `review` {status, revision_id, receipt_ref}, `actor` (the
+  same public projection as the ZIP's `actor.json`) and `private` (the same grader-only reference as `reference.json`).
+  The same checks as the ZIP export apply, so a task the export cannot package has no package. Stored as RFC 8785
+  bytes; for strings and integers that equals RL Gym's sorted-key compact JSON, so both hashes agree (tested).
+- **(chosen by Claude)** **Revision** = the record's position among the task's approved records (1, 2, ...).
+- **(chosen by Claude)** **Written when a record is appended** (`appendRecord`, the one path every approval and
+  correction job uses), and idempotently again before an export (part 2), so older records get theirs. Building a
+  package never fails an approval: a problem simply leaves no package, reported at export as today.
+- **(chosen by Claude)** **Table `AuthoredTaskPackage`**, key (client, hash), one package per record, append-only by
+  trigger and revoked UPDATE/DELETE. The route reads only the calling key's client. Unknown or malformed hash: 404.
+- **(RL Gym chat, 22 Nov, relayed by the owner)** Answers to Forge's four questions:
+  - `package_ref` = `forge://packages/<package_sha256>`. RL Gym never follows it; it always fetches by hash from its
+    configured ADI Forge URL. RL Gym will accept `forge://` refs whose sha equals `package_sha256` (RL Gym change,
+    needed before part 2 works end to end).
+  - RL Gym requires the `actor` and `private` objects and reads no other top-level field. Inside them it reads
+    optional `actor.tools` (allowed operation IDs; absent = every declared operation), optional `actor.assignment`
+    (prompt text; RL Gym will build the prompt from profile, title and sections instead), and in `private`
+    `complexity`/`archetype` (V11+) and `slots`/`extra_state_checks` (SME-valued templates). Reference answers come
+    from Studio's registry. Its task page will render Forge's shape generically (RL Gym change).
+  - Hash: RL Gym re-serialises with Python's encoder, which differs from RFC 8785 for non-integer numbers; RL Gym will
+    hash the raw response body instead (RL Gym change). UUID `task_id` is fine.
+- **(chosen by Claude)** `actor.tools` = the template's declared tool IDs (`execution.tools`), only when it declares
+  some (an empty list would refuse every call). No `actor.assignment`. `slots`/`extra_state_checks` and
+  `complexity`/`archetype` wait for F-12 (not built).
+- **(chosen by Claude)** Decimals are **not** refused or turned into text: criterion weights are decimals in real tasks,
+  and changing them would change grading. Packages stay exact RFC 8785 bytes; until RL Gym hashes the raw body, a
+  package containing a decimal fails RL Gym's parsed-hash check. KYC v8 packages contain none (tested).
+- **(chosen by Claude)** The new table is added to `APPEND_ONLY_TABLES` in `jobs/grant-app-role.ts`, so the QA and
+  production app role cannot update or delete it. `TutorialSpend` (D2, PR #84) was missing from that list and is added
+  too; its trigger already blocked changes.

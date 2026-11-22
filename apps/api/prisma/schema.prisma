@@ -3321,6 +3321,26 @@ model SearchDocument {
 
 /// Project export and validation runs (owner, 12 Nov 2026). Append-only: each validation or export is kept with the
 /// validator's verdict per task. Advice for the PM only; it never changes a task or the Approved Task Dataset.
+/// New RL Gym (docs/design/FORGE-RLGYM-V2-DESIGN.md part 1): one authored task package per approved revision,
+/// served to the RL Gym by its hash. `content` is the canonical JSON (RFC 8785) whose SHA-256 is packageSha256.
+/// Append-only.
+model AuthoredTaskPackage {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  packageSha256  String   @map("package_sha256")
+  clientId       String   @map("client_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  taskInstanceId String   @map("task_instance_id") @db.Uuid
+  recordId       String   @unique @map("record_id") @db.Uuid
+  /// 1 for a task's first approved record, then +1 for each later approved record of the same task.
+  revision       Int
+  schema         String
+  content        String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([clientId, packageSha256])
+  @@index([projectId, taskInstanceId])
+}
+
 model ProjectValidationRun {
   id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId         String   @map("client_id") @db.Uuid

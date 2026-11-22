@@ -3,7 +3,7 @@ import type { ApprovedTaskRecord, Template } from '@prisma/client';
 import { jcs, jcsBytes, JcsError, jcsSha256, sha256Hex } from './jcs';
 import { caseSelectorOf } from '../tasks/task-service';
 import { jointHashes, jointTemplateSpec, type JointTemplateSpec } from './joint-template';
-import { TOOL_UNDECLARED, undeclaredTools, undeclaredToolMessage } from './tool-binding';
+import { declaredToolIds, TOOL_UNDECLARED, undeclaredTools, undeclaredToolMessage } from './tool-binding';
 import { writeZip } from './zip';
 
 /**
@@ -319,6 +319,48 @@ export function buildGenericPackages(inputs: PackageInput[], scope: { projectId:
     };
   });
   return { batchId, parts, problems };
+}
+
+/**
+ * One approved task revision as the new RL Gym fetches it by hash (`praxis.authored-task-package.v1`; design
+ * docs/design/FORGE-RLGYM-V2-DESIGN.md part 1). RL Gym stores the `actor` and `private` parts separately and checks the
+ * package against `package_sha256`, the SHA-256 of its canonical JSON. `actor` is the agent's view (Anvil's public
+ * projection, as in the ZIP's actor.json); `private` is the grader-only reference (as in reference.json). Same checks
+ * as the ZIP export, so a task that cannot be exported has no package.
+ */
+export const TASK_PACKAGE_SCHEMA = 'praxis.authored-task-package.v1' as const;
+
+export function buildTaskPackage(input: PackageInput, revision: number): { package: Record<string, unknown>; packageSha256: string; bytes: Buffer } | PackageProblem {
+  const t = taskFiles(input);
+  if ('code' in t) return t;
+  const entry = t.entry as { template: unknown; form: { sha256: string }; agent_mode: unknown; review: unknown };
+  const form = t.form as { profileId?: unknown; version?: unknown };
+  const tools = declaredToolIds(t.spec.execution);
+  const pkg = {
+    schema: TASK_PACKAGE_SCHEMA,
+    task_id: input.record.taskInstanceId,
+    revision,
+    revision_id: input.record.id,
+    template: entry.template,
+    form: { profile_id: form.profileId, version: form.version, sha256: entry.form.sha256 },
+    agent_mode: entry.agent_mode,
+    content_classification: 'synthetic',
+    review: entry.review,
+    // RL Gym (22 Nov): `actor.tools`, when present, is the list of operations the agent may call; every other call is
+    // refused. Forge sends the template's declared tool IDs; a template that declares none sends no list (an empty
+    // list would refuse every call).
+    actor: tools?.length ? { ...t.actor, tools } : t.actor,
+    private: t.privateRef,
+  };
+  // RFC 8785 bytes, as every product hashes them. RL Gym's import still re-serialises with Python's encoder, which
+  // differs for non-integer numbers (criterion weights such as 0.5); RL Gym is changing to hash the raw body (22 Nov).
+  try {
+    const bytes = jcsBytes(pkg);
+    return { package: pkg, packageSha256: sha256Hex(bytes), bytes };
+  } catch (e) {
+    if (e instanceof JcsError) return { recordId: input.record.id, taskId: input.record.taskInstanceId, code: 'GENERIC_NOT_CANONICAL', message: `The task cannot be written as RFC 8785 JSON: ${e.message}.` };
+    throw e;
+  }
 }
 
 /** For tests and diagnostics: the canonical text of a value (never logged with private content). */

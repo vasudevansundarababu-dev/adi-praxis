@@ -68,13 +68,17 @@ export async function buildRlGymExport(
   p: { id: string; name: string; template: Template },
   records: ApprovedTaskRecord[],
   ref: { id: string; version: number; specSha256: string },
-  opts: { exported: boolean; corrections?: Map<string, string> },
+  opts: { exported: boolean; corrections?: Map<string, string>; held?: Set<string> },
 ): Promise<BuiltExport> {
   const tasks: ExportTaskDto[] = [];
   const notSent: NotSentDto[] = [];
   const wire: Record<string, unknown>[] = [];
   for (const r of records) {
     const title = titleOf(r);
+    if (opts.held?.has(r.taskInstanceId)) {
+      notSent.push({ recordId: r.id, taskId: r.taskInstanceId, title, code: 'WAITING_FOR_NEW_CASE_KIND', message: 'Waiting for a new kind of case: a need about this task is open or with Studio. The PM resolves it to export the task.' });
+      continue;
+    }
     const selector = caseSelectorOf(r);
     if (!selector) {
       notSent.push({ recordId: r.id, taskId: r.taskInstanceId, title, code: 'CASE_SELECTOR_MISSING', message: 'The task has no case (no slot case or coverage values), so RL Gym cannot match it to a case.' });

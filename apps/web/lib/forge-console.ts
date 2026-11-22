@@ -31,6 +31,7 @@ export const PROJECT_TABS = [
   { key: 'tasks', label: 'Tasks' },
   { key: 'policies', label: 'Policies' },
   { key: 'benchmark', label: 'Benchmark review' },
+  { key: 'needs', label: 'SME needs' },
 ] as const;
 export type ProjectTab = (typeof PROJECT_TABS)[number]['key'];
 

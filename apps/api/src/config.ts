@@ -99,6 +99,15 @@ const Env = z.object({
   RLGYM_WORKSPACE: z.string().regex(/^$|^[a-z0-9][a-z0-9-]{0,62}$/, 'RLGYM_WORKSPACE must be the RL Gym workspace slug').default(''),
   RLGYM_FORGE_CLIENT_KEY: z.string().default(''),
   /**
+   * Studio's next-version inbox (part 4; AUTHORING-LOCAL-SETUP 4.3). STUDIO_API_URL blank = not connected. The production
+   * key is not decided yet: STUDIO_INBOX_KEY (Bearer) is used when set; locally Studio accepts a service principal by
+   * its trusted headers (STUDIO_TENANT_ID and STUDIO_SERVICE_ACTOR_ID).
+   */
+  STUDIO_API_URL: z.string().regex(/^$|^https:\/\/[^\s]+$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/, 'STUDIO_API_URL must be https (or http on localhost)').default(''),
+  STUDIO_INBOX_KEY: z.string().default(''),
+  STUDIO_TENANT_ID: z.string().regex(/^$|^[0-9a-f-]{36}$/i, 'STUDIO_TENANT_ID must be a UUID').default(''),
+  STUDIO_SERVICE_ACTOR_ID: z.string().regex(/^$|^[0-9a-f-]{36}$/i, 'STUDIO_SERVICE_ACTOR_ID must be a UUID').default(''),
+  /**
    * Keyless Anvil -> Praxis (K6, 12 Nov 2026): Anvil sends a raw Google-signed identity token. It is accepted only with
    * issuer https://accounts.google.com, exactly this audience (this API's URL), this numeric subject and this account.
    * Any of the three blank = keyless inbound is off.

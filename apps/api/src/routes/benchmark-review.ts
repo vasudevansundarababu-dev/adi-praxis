@@ -24,7 +24,7 @@ type Audit = (i: AuditInput) => Promise<void>;
  */
 
 /** Who may open and decide a project's benchmark reviews: Admins, the owning PM, and Reviewers assigned to it. */
-async function reviewableProject(db: Db | Tx, projectId: string, actor: Actor) {
+export async function reviewableProject(db: Db | Tx, projectId: string, actor: Actor) {
   const p = await db.project.findFirst({ where: { id: projectId, clientId: actor.clientId }, select: { id: true, ownerId: true } });
   if (!p) throw notFound('Project not found');
   if (isAdmin(actor) || (actor.roles.includes('PM') && p.ownerId === actor.userId)) return p;

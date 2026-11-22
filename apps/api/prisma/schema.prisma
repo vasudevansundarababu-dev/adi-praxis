@@ -3424,6 +3424,56 @@ model RlGymDecisionDelivery {
   @@index([decisionId, createdAt])
 }
 
+/// New RL Gym part 4: a need raised by an author, a Reviewer or the PM (more data, or a new kind of case). Append-only.
+model SmeNeed {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  projectId    String   @map("project_id") @db.Uuid
+  taskId       String?  @map("task_id") @db.Uuid
+  /// more_data or new_case_kind.
+  kind         String
+  note         String
+  /// AUTHOR (an SME, smeUserId), REVIEWER or PM (a console user).
+  raisedByKind String   @map("raised_by_kind")
+  raisedById   String   @map("raised_by_id") @db.Uuid
+  /// Where it came from, e.g. {batchId, itemId} from Benchmark review.
+  source       Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+}
+
+/// New RL Gym part 4: the PM rejected a need, or marked it resolved. Once per need. Append-only.
+model SmeNeedClosure {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId   String   @map("client_id") @db.Uuid
+  needId     String   @unique @map("need_id") @db.Uuid
+  /// REJECTED or RESOLVED.
+  kind       String
+  reason     String
+  closedById String   @map("closed_by_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+}
+
+/// New RL Gym part 4: one send of one or more needs to Studio's inbox, with Studio's answer. Append-only.
+model SmeNeedSend {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  needIds       String[] @map("need_ids") @db.Uuid
+  kind          String
+  body          Json
+  /// received, rejected or unavailable.
+  outcome       String
+  studioItemId  String?  @map("studio_item_id")
+  httpStatus    Int?     @map("http_status")
+  error         Json?
+  requestedById String   @map("requested_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+}
+
 model ProjectValidationRun {
   id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId         String   @map("client_id") @db.Uuid

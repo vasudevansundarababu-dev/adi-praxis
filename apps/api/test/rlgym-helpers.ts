@@ -47,3 +47,20 @@ export async function qualifyForRlGym(templateId: string, ref = { id: 'tpl_x5rwt
   });
   return ref;
 }
+
+/** Settings that make ADI Forge "connected" to a local Studio through its trusted service headers. */
+export const STUDIO_CONFIG = { STUDIO_API_URL: 'http://127.0.0.1:8000', STUDIO_TENANT_ID: '3981732d-51f5-5fd2-a151-ec2b6687a27d', STUDIO_SERVICE_ACTOR_ID: '00000000-0000-5000-8000-0000000a11ce' } as const;
+
+/** A fake Studio inbox: records each item and answers 202 {id}, or an error when `mode` says so. */
+export function fakeStudio() {
+  const sent: SentExport[] = [];
+  const state = { mode: 'ok' as 'ok' | 'error' | 'down' };
+  const fetch: FetchLike = async (url, init) => {
+    if (state.mode === 'down') throw new Error('connect ECONNREFUSED');
+    const body = JSON.parse(init.body ?? '{}');
+    sent.push({ url, headers: init.headers, body });
+    if (state.mode === 'error') return { status: 422, text: async () => JSON.stringify({ code: 'VALIDATION_FAILED', message: 'Extra inputs are not permitted' }) };
+    return { status: 202, text: async () => JSON.stringify({ id: `inb-${String(41 + sent.length).padStart(4, '0')}` }) };
+  };
+  return { fetch, sent, state };
+}

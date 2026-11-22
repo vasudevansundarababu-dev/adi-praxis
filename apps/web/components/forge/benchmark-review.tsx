@@ -4,6 +4,7 @@ import { BENCHMARK_DECISION_LABEL, BENCHMARK_DECISIONS, NEEDS_CRITERION, type Ba
 import Link from 'next/link';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { RaiseNeed } from './sme-needs';
 
 const Mono = ({ children }: { children: string }) => <code className="font-mono text-xs break-all">{children}</code>;
 const when = (iso: string) => iso.slice(0, 16).replace('T', ' ');
@@ -190,7 +191,7 @@ function DecisionBox({ projectId, reviewId, itemId, criteria, initial, connected
 }
 
 /** One scored episode: rubric verdicts, the agent's path and steps, its output and evidence, RL Gym's hint, the decision. */
-function Episode({ projectId, reviewId, e, criteria, decision, connected }: { projectId: string; reviewId: string; e: Obj; criteria: string[]; decision: DecisionDto | null; connected: boolean }) {
+function Episode({ projectId, reviewId, batchId, taskId, e, criteria, decision, connected }: { projectId: string; reviewId: string; batchId: string; taskId: string; e: Obj; criteria: string[]; decision: DecisionDto | null; connected: boolean }) {
   const system = (e.system ?? {}) as Obj;
   const path = (e.path ?? {}) as Obj;
   const evidence = (e.evidence ?? {}) as Obj;
@@ -255,6 +256,7 @@ function Episode({ projectId, reviewId, e, criteria, decision, connected }: { pr
         </p>
       )}
       <DecisionBox projectId={projectId} reviewId={reviewId} itemId={itemId} criteria={criteria} initial={decision} connected={connected} />
+      <RaiseNeed projectId={projectId} taskId={/^[0-9a-f-]{36}$/i.test(taskId) ? taskId : null} source={{ batchId, itemId }} />
     </article>
   );
 }
@@ -287,7 +289,7 @@ export function BenchmarkReviewer({ projectId, batch }: { projectId: string; bat
             {t.title ?? <Mono>{t.taskId}</Mono>} <span className="text-sm font-normal text-fg-muted">revision {t.revision}</span>
           </h3>
           {t.episodes.map((e) => (
-            <Episode key={str(e.item_id)} projectId={projectId} reviewId={batch.id} e={e} criteria={criteria} decision={byItem.get(str(e.item_id)) ?? null} connected={batch.connected} />
+            <Episode key={str(e.item_id)} projectId={projectId} reviewId={batch.id} batchId={batch.batchId} taskId={t.taskId} e={e} criteria={criteria} decision={byItem.get(str(e.item_id)) ?? null} connected={batch.connected} />
           ))}
         </div>
       ))}

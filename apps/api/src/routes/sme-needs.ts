@@ -4,7 +4,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db, Tx } from '../db';
 import { jcsSha256 } from '../anvil/jcs';
-import { rlgymTemplateRef } from '../anvil/rlgym-export';
+import { rlgymProjectId, rlgymTemplateRef } from '../anvil/rlgym-export';
 import type { StudioClient, StudioResult } from '../anvil/studio-client';
 import { AppError, notFound } from '../lib/errors';
 import { runCandidateCommand, runCommand, runCommandPrepared } from '../platform/command';
@@ -128,7 +128,8 @@ export const smeNeedRoutes: FastifyPluginAsyncZod<{ db: Db; studio: StudioClient
           source: 'adi-forge',
           template_id: ref?.id ?? null,
           version: ref?.version ?? null,
-          project_id: p.id,
+          // The same project ID the RL Gym uses (prj_<hex>), so Studio, the RL Gym and ADI Forge name it alike.
+          project_id: rlgymProjectId(p.id),
           summary: req.body.summary,
           evidence: rows.map((r) => ({ type: 'need', need_id: r.need.id, kind: r.need.kind, task_id: r.need.taskId, raised_by: r.need.raisedByKind.toLowerCase(), note: r.need.note })),
           needed_by: req.body.neededBy ?? null,

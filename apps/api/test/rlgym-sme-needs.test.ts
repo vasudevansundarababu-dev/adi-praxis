@@ -17,6 +17,7 @@ import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { call, forgeKit } from './forge-helpers';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 import { fakeRlGym, fakeStudio, qualifyForRlGym, RLGYM_CONFIG, STUDIO_CONFIG } from './rlgym-helpers';
+import { rlgymProjectId } from '../src/anvil/rlgym-export';
 
 /**
  * New RL Gym part 4 (docs/design/FORGE-RLGYM-V2-DESIGN.md; AUTHORING-SNAPSHOT §3.3): an author sends a need to the PM
@@ -200,7 +201,7 @@ describe('SME needs', () => {
     expect(s!.headers['Idempotency-Key']).toMatch(/^forge-needs-[0-9a-f]{32}$/);
     // Exactly Studio's fields; evidence names no person.
     expect(Object.keys(s!.body).sort()).toEqual(['evidence', 'kind', 'needed_by', 'project_id', 'source', 'summary', 'template_id', 'version']);
-    expect(s!.body).toMatchObject({ kind: 'more_data', source: 'adi-forge', template_id: REF.id, version: REF.version, project_id: pid, summary: 'KYC November needs more cases in two cells.', needed_by: '2026-12-15' });
+    expect(s!.body).toMatchObject({ kind: 'more_data', source: 'adi-forge', template_id: REF.id, version: REF.version, project_id: rlgymProjectId(pid), summary: 'KYC November needs more cases in two cells.', needed_by: '2026-12-15' });
     expect(s!.body.evidence).toHaveLength(2);
     expect(JSON.stringify(s!.body)).not.toContain(reviewerUser.name);
     expect(JSON.stringify(s!.body)).not.toMatch(/@/);

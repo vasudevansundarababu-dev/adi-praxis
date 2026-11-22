@@ -2454,3 +2454,12 @@ Design: `docs/design/FORGE-RLGYM-V2-DESIGN.md` part 4. Contract read from Studio
 - **(chosen by Claude)** A task with an open or sent "New edge case" need is not exported
   (`WAITING_FOR_NEW_CASE_KIND`) until the PM resolves or rejects it, because Studio's status does not come back yet.
 - **(chosen by Claude)** The console lists the author by role only ("Author"); their task identifies them to the PM.
+
+## New RL Gym: project ID in the RL Gym's form (22 Nov 2026)
+
+- **(from the RL Gym build)** The RL Gym's `projects` table accepts only `project_id ~ '^prj_[a-z0-9]{4,40}$'`
+  (migration `039_rlgym_foundation.sql`), so an export naming the project by its ADI Forge UUID is refused.
+- **(chosen by Claude; owner asked to fix it)** ADI Forge sends `prj_` + the UUID's 32 hex digits
+  (`rlgymProjectId`) as the export's `project_id`, in the export URL, and as the `project_id` of SME needs sent to
+  Studio, so all three products name the project alike. It converts back exactly (`forgeProjectId`): the RL Gym's
+  `run-reviews` call may name the project either way, and anything else is not found. Stored rows keep the UUID.

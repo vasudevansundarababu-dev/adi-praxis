@@ -6,7 +6,7 @@ import type { Db, Tx } from '../db';
 import { AppError, notFound } from '../lib/errors';
 import { runCandidateCommand, runCommand, runCommandPrepared, runStaffOrServiceCommand } from '../platform/command';
 import { templateBenchmark, taskBenchmarkOf } from '../anvil/benchmark';
-import { buildRlGymExport, rlgymTemplateRef, titleOf, type BuiltExport } from '../anvil/rlgym-export';
+import { buildRlGymExport, projectIdFromRlGym, rlgymProjectId, rlgymTemplateRef, titleOf, type BuiltExport } from '../anvil/rlgym-export';
 import type { RlGymClient, RlGymResult } from '../anvil/rlgym-client';
 import type { StudioClient, StudioResult, InboxItemBody } from '../anvil/studio-client';
 import { jcsSha256 } from '../anvil/jcs';
@@ -301,6 +301,7 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
     const packages = new Map((await db.authoredTaskPackage.findMany({ where: { recordId: { in: s.records.map((r) => r.id) } }, select: { recordId: true, revision: true } })).map((x) => [x.recordId, x.revision]));
     return {
       connected: !!rlgym,
+      rlgymProjectId: rlgymProjectId(p.id),
       canExport: !s.reason,
       reason: s.reason,
       rlgymTemplate: s.ref,
@@ -324,7 +325,7 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
         const batches = await correctionBatches(db, actor.clientId, s.records.map((r) => r.taskInstanceId));
         const built = await db.$transaction((tx) => buildRlGymExport(tx, { id: p.id, name: p.name, template: p.template }, s.records, s.ref!, { exported: s.runs.some((r) => r.outcome === 'received'), held: s.held, batches }));
         if (!built.tasks.length) throw new AppError(422, 'NOTHING_TO_EXPORT', 'None of the approved tasks can be sent.', { notSent: built.notSent });
-        const result = await rlgym.exportProject(p.id, built.body, built.exportSha256);
+        const result = await rlgym.exportProject(rlgymProjectId(p.id), built.body, built.exportSha256);
         return { projectId: p.id, built, result };
       },
       async ({ tx, actor, audit }, { built, result, projectId }) => {
@@ -366,7 +367,9 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
     // Idempotent by batch_id: the same batch sent again returns the same ref, whatever the route's project.
     const existing = await db.runReviewBatch.findUnique({ where: { clientId_batchId: { clientId: client.clientId, batchId } } });
     if (existing) return reply.status(202).send({ forge_batch_ref: existing.forgeBatchRef });
-    const project = /^[0-9a-f-]{36}$/i.test(req.params.id) ? await db.project.findFirst({ where: { id: req.params.id, clientId: client.clientId } }) : null;
+    // The RL Gym names the project as exported (`prj_<32 hex>`); the Authoring UUID is accepted too.
+    const uuid = projectIdFromRlGym(req.params.id);
+    const project = uuid ? await db.project.findFirst({ where: { id: uuid, clientId: client.clientId } }) : null;
     if (!project) throw notFound('Project not found');
     await runStaffOrServiceCommand(db, req, reply, async ({ tx, audit }) => {
       const again = await tx.runReviewBatch.findUnique({ where: { clientId_batchId: { clientId: client.clientId, batchId } } });

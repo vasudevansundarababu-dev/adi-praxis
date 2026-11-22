@@ -10,6 +10,7 @@ import { jointHashes, jointTemplateSpec, type JointTemplateSpec } from '../src/a
 import { taskPackageProblem } from '../src/anvil/generic-package';
 import { jcsSha256 } from '../src/anvil/jcs';
 import { templateVersionHash } from '../src/routes/anvil-templates';
+import { projectIdFromRlGym, rlgymProjectId } from '../src/anvil/rlgym-export';
 import { MockGoogleVerifier } from '../src/candidate/google';
 import { MockIdentityProvider } from '../src/candidate/identity-provider';
 import { MemoryStorage } from '../src/candidate/storage';
@@ -264,7 +265,7 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     }
     return out;
   }
-  const packable = async (rows: { record: ApprovedTaskRecord | null }[]) => {
+  const packable = async <R extends { record: ApprovedTaskRecord | null }>(rows: R[]) => {
     const templates = new Map((await db.template.findMany()).map((t) => [t.id, t]));
     return rows.filter((r) => r.record && !taskPackageProblem({ record: r.record, template: templates.get(r.record.templateId)! }));
   };
@@ -338,12 +339,16 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(res.statusCode, res.body).toBe(201);
     expect(res.json()).toMatchObject({ outcome: 'received', receipt: { new: rows.length } });
     const sent = calls.find((c) => c.url.endsWith('/exports'))!;
-    expect(sent.url).toBe(`${RLGYM}/api/v1/workspaces/adi-labs-research/projects/${projectId}/exports`);
+    // The RL Gym accepts only prj_[a-z0-9]{4,40}: Authoring sends prj_ + the UUID's hex, reversibly.
+    const gymProject = rlgymProjectId(projectId);
+    expect(gymProject).toMatch(/^prj_[a-z0-9]{4,40}$/);
+    expect(projectIdFromRlGym(gymProject)).toBe(projectId);
+    expect(sent.url).toBe(`${RLGYM}/api/v1/workspaces/adi-labs-research/projects/${gymProject}/exports`);
     expect(sent.headers.Authorization).toBe('Bearer test-rlgym-forge-key');
     const { export_sha256, ...rest } = sent.body;
     expect(sent.headers['Idempotency-Key']).toBe(export_sha256);
     expect(jcsSha256(rest)).toBe(export_sha256);
-    expect(sent.body).toMatchObject({ schema: 'rlgym.project-export.v1', project_id: projectId, template: { id: 'tpl_x5rwt6d5eu', version: 9, spec_sha256: 'c'.repeat(64), forge_template_id: v8.lineageId, forge_version: v8.version }, project_config: { mode: 'single_agent' } });
+    expect(sent.body).toMatchObject({ schema: 'rlgym.project-export.v1', project_id: gymProject, template: { id: 'tpl_x5rwt6d5eu', version: 9, spec_sha256: 'c'.repeat(64), forge_template_id: v8.lineageId, forge_version: v8.version }, project_config: { mode: 'single_agent' } });
     expect(sent.body.tasks).toHaveLength(rows.length);
     for (const t of sent.body.tasks) {
       expect(t).toMatchObject({ schema: 'praxis.authored-task-export.v1', revision: 1, package_ref: `forge://packages/${t.package_sha256}`, case_selector: expect.objectContaining({ application_type: expect.any(String) }) });
@@ -432,12 +437,14 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     const rows = await packable(await authored(projectId));
     const t = rows[0]!.record!;
     const batch = { schema: 'rlgym.sme-review-package.v1', batch_id: 'smr-0008', run_id: 'run-0107', project_id: projectId, template: {}, scoring_pass: { pass: 1, reason: 'first' }, rubric: [{ criterion_id: 'decision', configuration_id: 'c', version: 1, weight: 5, is_gate: false, skill_group: 'g' }], tasks: [{ task_id: t.taskInstanceId, revision: 1, episodes: [{ item_id: 'it-1', episode_id: 'ep-1', system: { id: 'm', version: '1', name: 'Mock' }, attempt: 1, case_id: 'kyc-1', score: 40, criteria: [], path: {}, timeline: [], final_output: {}, evidence: { sealed_sha256: 'a'.repeat(64), manifest_sha256: 'b'.repeat(64) }, suspected_cause: 'task', suspected_cause_source: 'rules' }, { item_id: 'it-2', episode_id: 'ep-2', criteria: [] }] }], synthetic: true };
-    const first = await asGym('POST', `/projects/${projectId}/run-reviews`, batch);
+    // The RL Gym calls back with the project ID it was given (prj_…); the UUID works too.
+    const first = await asGym('POST', `/projects/${rlgymProjectId(projectId)}/run-reviews`, batch);
     expect(first.statusCode, first.body).toBe(202);
     const again = await asGym('POST', `/projects/${projectId}/run-reviews`, batch);
     expect(again.json().forge_batch_ref).toBe(first.json().forge_batch_ref);
     expect((await asGym('POST', `/projects/${projectId}/run-reviews`, { ...batch, batch_id: 'smr-9', tasks: [{ reference_answers: {} }] })).statusCode).toBe(422);
     expect((await asGym('POST', `/projects/${randomUUID()}/run-reviews`, { ...batch, batch_id: 'smr-10' })).statusCode).toBe(404);
+    expect((await asGym('POST', '/projects/prj_unknown/run-reviews', { ...batch, batch_id: 'smr-11' })).statusCode).toBe(404);
     expect((await call(app, 'POST', pm, `/projects/${projectId}/run-reviews`, batch)).statusCode).toBe(403);
     const ref = first.json().forge_batch_ref as string;
     const list = (await get(pm, `/projects/${projectId}/run-reviews`)).json();

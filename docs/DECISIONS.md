@@ -2422,3 +2422,14 @@ additive: the old export path, the old-flow project page and the author workbenc
   PDF has the logo and the running header; default sender "ADI Labs Forge Authoring". The names test now allows
   "ADI Labs" (spec 3.5; legal to confirm) and also catches compounds such as "Anvil-ready". Running text that says
   "ADI Forge" is not renamed in this change (part of it is AI prompt text, which this work must not touch).
+- **(found in the local run, chosen by Claude)** The RL Gym accepts only project IDs `prj_[a-z0-9]{4,40}` (database
+  check), and Authoring's are UUIDs. The export sends `prj_` + the UUID's 32 hex digits; `run-reviews` accepts that
+  form (and the UUID) and maps it back. Deterministic and reversible, so re-exports and review batches find the same
+  project. The RL Gym may prefer to accept UUIDs instead; then this is one line.
+- **Local run (22 Nov 2026, `apps/api/scripts/local-link-check.ts`, throwaway database, real RL Gym on 8200):**
+  Studio's four Golden KYC edge cases (projected as Studio's `praxis_wire` does) validate and are stored; the same
+  with Studio's recipe and outcome is refused (`TP_PRIVATE_GRADING_DATA`). Export of a Golden KYC project, qualified
+  as `tpl_x5rwt6d5eu` v2, passes the RL Gym's schema, hash, active-template and fingerprint checks and stops at the
+  package fetch (`FORGE_UNAVAILABLE`: the RL Gym still fetches packages from its Authoring stub on 8212). It imports
+  once the owner points the RL Gym's `RLGYM_FORGE_URL` at this Authoring. 3 of the 4 embedded v8 tasks are not sent
+  (`GENERIC_TOOL_UNDECLARED`, as in part 1).

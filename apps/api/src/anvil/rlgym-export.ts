@@ -14,6 +14,18 @@ export const RLGYM_EXPORT_SCHEMA = 'rlgym.project-export.v1' as const;
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const snake = (s: string) => s.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/[\s-]+/g, '_').toLowerCase();
+/**
+ * The RL Gym's project ID for an Authoring project. The RL Gym accepts only `prj_[a-z0-9]{4,40}` (its database check),
+ * and Authoring's IDs are UUIDs, so the export sends `prj_` + the UUID's 32 hex digits. Reversible: the RL Gym's calls
+ * back (run reviews) name the same ID, and `projectIdFromRlGym` turns it into the UUID again.
+ */
+export const rlgymProjectId = (uuid: string) => `prj_${uuid.toLowerCase().replace(/-/g, '')}`;
+export function projectIdFromRlGym(id: string): string | null {
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return id.toLowerCase();
+  const m = /^prj_([0-9a-f]{32})$/.exec(id);
+  return m ? m[1]!.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5') : null;
+}
+
 export const titleOf = (r: ApprovedTaskRecord) => String((r.output as { header?: { title?: unknown } } | null)?.header?.title ?? '') || `Task ${r.taskInstanceId.slice(0, 8)}`;
 
 export interface ExportTask {
@@ -142,8 +154,9 @@ export async function buildRlGymExport(
   const reason = opts.exported ? `re-export of ${p.name}` : `first export of ${p.name}`;
   // The ID covers everything the body carries, so one export ID never stands for two different bodies (the RL Gym
   // refuses that as an idempotency conflict).
-  const exportId = `exp-${jcsSha256({ project: p.id, name: p.name, template, project_config, reason, tasks: wire }).slice(0, 16)}`;
-  const body: Record<string, unknown> = { schema: RLGYM_EXPORT_SCHEMA, project_id: p.id, project_name: p.name, template, project_config, export_id: exportId, reason, tasks: wire };
+  const projectId = rlgymProjectId(p.id);
+  const exportId = `exp-${jcsSha256({ project: projectId, name: p.name, template, project_config, reason, tasks: wire }).slice(0, 16)}`;
+  const body: Record<string, unknown> = { schema: RLGYM_EXPORT_SCHEMA, project_id: projectId, project_name: p.name, template, project_config, export_id: exportId, reason, tasks: wire };
   const exportSha256 = jcsSha256(body);
   body.export_sha256 = exportSha256;
   return { body, exportSha256, exportId, reason, tasks, notSent };

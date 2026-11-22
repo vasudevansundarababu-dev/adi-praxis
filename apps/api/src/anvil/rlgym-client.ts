@@ -31,6 +31,11 @@ export class RlGymClient {
     return this.post(`/projects/${encodeURIComponent(projectId)}/exports`, body, idempotencyKey);
   }
 
+  /** POST /sme-review-batches/{batch_id}/decisions (`rlgym.sme-decisions.v1`). A decision is final at the RL Gym too. */
+  sendDecisions(batchId: string, body: Record<string, unknown>, idempotencyKey: string) {
+    return this.post(`/sme-review-batches/${encodeURIComponent(batchId)}/decisions`, body, idempotencyKey);
+  }
+
   private async post(path: string, body: Record<string, unknown>, idempotencyKey: string): Promise<RlGymResult> {
     const url = `${this.settings.apiUrl.replace(/\/$/, '')}/api/v1/workspaces/${encodeURIComponent(this.settings.workspace)}${path}`;
     const ctrl = new AbortController();

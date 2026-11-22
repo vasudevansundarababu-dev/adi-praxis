@@ -2398,3 +2398,32 @@ Design: `docs/design/FORGE-RLGYM-V2-DESIGN.md` part 2. Contract read from the ne
   card and the Tasks-table multi-select Validate (PR #102), `anvil/export-client.ts`, `anvil/validator.ts` and their
   tests. Kept: the template routes the RL Gym and Studio call, the offline export job, and earlier
   `ProjectValidationRun` rows (append-only history). The QA smoke job now only reads the export state.
+
+## New RL Gym, part 3: Benchmark review (22 Nov 2026)
+
+Design: `docs/design/FORGE-RLGYM-V2-DESIGN.md` part 3. Contract read from the new RL Gym's build (`rlgym/results/sme.py`
+`create_batch` / `receive_decisions`, `rlgym/results/routes.py`, `rlgym/integrations.py` dispatcher), read only.
+
+- **(owner, 22 Nov)** The project's Reviewers and its PM decide; "task needs correction" is a normal Rework.
+- **(from the RL Gym build)** The batch arrives as `POST /api/v1/projects/{id}/run-reviews` with the RL Gym's ANVIL key,
+  an `Idempotency-Key` (its outbox row) and an extra `batch_sha256` field; it reads `forge_batch_ref` from the top level
+  of the reply (no `{data}` envelope). Decisions go to `POST /sme-review-batches/{batch_id}/decisions` (Idempotency-Key
+  required), each needing `item_id`, `decision`, non-empty `rationale`, `decided_by`, and `criterion_id` for
+  `grader_wrong` / `rubric_correction`. A different decision on a decided item is refused; the same one is accepted.
+- **(chosen by Claude)** Who: Admins, the owning PM, and console Reviewers assigned to the project (`ProjectReviewer`).
+  Candidate-app (SME) reviewers have no Benchmark review screen yet.
+- **(chosen by Claude)** Three append-only tables: `RlGymReviewBatch` (body as received, unique per client and
+  `batch_id`; the same batch again returns the same `forge_batch_ref`, other content is 409), `RlGymReviewDecision`
+  (one per item, enforced by a unique index; rationale and, for grader/rubric, criterion required by CHECK), and
+  `RlGymDecisionDelivery` (every send attempt with outcome, HTTP status, RL Gym request ID or error).
+- **(chosen by Claude)** Deciding and sending are two calls: the decision is recorded (and a task correction applied)
+  in one transaction; then "Send to RL Gym" calls the RL Gym outside any transaction and records the attempt. The
+  console does both on Decide; "Send again" retries with the same `Idempotency-Key` (`forge-decision-<id>`). Not an
+  outbox worker: a failed send stays visible on the item until someone sends it again.
+- **(chosen by Claude)** `decided_by` = `adi-forge-user:<user id>`, never a name or email.
+- **(chosen by Claude)** "Task needs correction" moves an approved task to Rework (status, revision +1, rework count +1,
+  slot back to in progress, a REWORK review with notes `Benchmark review: <rationale>`, audit
+  `task.rework_benchmark_review`); its approved record stays. The author fixes it in the same workbench with the same
+  AI assist. The next re-export carries the new revision with `corrects_revision` and `sme_batch_id` (the batch of the
+  task's latest correction decision).
+- **(chosen by Claude)** RL Gym's `suspected_cause` is shown labelled as a hint; it never pre-selects a decision.

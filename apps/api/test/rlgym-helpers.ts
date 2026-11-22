@@ -27,7 +27,11 @@ export function fakeRlGym() {
     const body = JSON.parse(init.body ?? '{}');
     sent.push({ url, headers: init.headers, body });
     if (state.mode === 'error') return { status: 422, text: async () => JSON.stringify({ error: { code: 'TEMPLATE_NOT_ACTIVE', message: 'Template is not active in this workspace', request_id: 'req-err' } }) };
-    const data = state.answer ? state.answer(body) : { project_id: body.project_id, export_id: body.export_id, new: body.tasks.length, superseding: 0, unchanged: 0, blocked: [], receipt_sha256: 'r'.repeat(64) };
+    const data = state.answer
+      ? state.answer(body)
+      : url.includes('/sme-review-batches/')
+        ? { batch_id: body.batch_id, state: 'decided', items: body.decisions.map((d: { item_id: string; decision: string }) => ({ item_id: d.item_id, decision: d.decision })) }
+        : { project_id: body.project_id, export_id: body.export_id, new: body.tasks.length, superseding: 0, unchanged: 0, blocked: [], receipt_sha256: 'r'.repeat(64) };
     return { status: 201, text: async () => JSON.stringify({ data, meta: { request_id: `req-${sent.length}` } }) };
   };
   return { fetch, sent, state };

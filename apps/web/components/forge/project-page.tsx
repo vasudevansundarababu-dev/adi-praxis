@@ -1,8 +1,9 @@
-import type { DemographicAttributeDto, ForgeTaskRow, JobDescriptionDto, ProjectDto, ProjectPersonDto } from '@praxis/shared';
+import type { BatchSummaryDto, DemographicAttributeDto, ForgeTaskRow, JobDescriptionDto, ProjectDto, ProjectPersonDto } from '@praxis/shared';
 import { ForgeDashboardTab, type DashboardNumbers } from '@/components/forge/dashboard-tab';
 import { ForgePeopleTab, type WithoutTask } from '@/components/forge/people-tab';
 import { ForgeProjectShell } from '@/components/forge/project-shell';
 import { ForgeTasksTab } from '@/components/forge/tasks-tab';
+import { BenchmarkBatchList } from '@/components/forge/benchmark-review';
 import { PolicyWorkspace, type DocumentsData, type ExtractionData, type PreviewData, type RuleRow } from '@/components/policy/policy-workspace';
 import type { ExportState } from '@/components/projects/export-panel';
 import type { SearchParams } from '@/components/pager';
@@ -11,7 +12,7 @@ import { smesOf, type ProjectTab, type ReviewRoute } from '@/lib/forge-console';
 
 type People = { reviewRoute: ReviewRoute; requiredWorkers: number | null; items: ProjectPersonDto[]; withoutTask?: WithoutTask };
 
-/** The MVP1 project page: header and tabs Dashboard, Resource assignments, Tasks, Policies (`?tab=`). */
+/** The MVP1 project page: header and tabs Dashboard, Resource assignments, Tasks, Policies, Benchmark review (`?tab=`). */
 export async function ForgeProjectPage({ project, tab, searchParams = {} }: { project: ProjectDto; tab: ProjectTab; searchParams?: SearchParams }) {
   const id = project.id;
   const [peopleRes, tasksRes, setsRes] = await Promise.all([
@@ -33,6 +34,9 @@ export async function ForgeProjectPage({ project, tab, searchParams = {} }: { pr
   } else if (tab === 'tasks') {
     const { data: exportState } = await apiGet<ExportState>(`/projects/${id}/export`);
     body = <ForgeTasksTab projectId={id} tasks={tasks} people={people} exportState={exportState} />;
+  } else if (tab === 'benchmark') {
+    const { data } = await apiGet<{ items: BatchSummaryDto[]; connected: boolean }>(`/projects/${id}/benchmark-reviews`);
+    body = <BenchmarkBatchList projectId={id} items={data?.items ?? []} connected={data?.connected ?? false} />;
   } else if (tab === 'policies') {
     const [docs, extraction, rules, preview, user] = await Promise.all([
       apiGet<DocumentsData>(`/projects/${id}/policy/documents`),

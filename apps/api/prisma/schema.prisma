@@ -3367,6 +3367,63 @@ model RlGymProjectExport {
   @@index([projectId, createdAt])
 }
 
+/// New RL Gym part 3: an SME review batch (rlgym.sme-review-package.v1) the RL Gym sent into a project. Append-only.
+model RlGymReviewBatch {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  batchId       String   @map("batch_id")
+  /// ADI Forge's reference returned to the RL Gym (`forge_batch_ref`).
+  forgeBatchRef String   @unique @map("forge_batch_ref")
+  runId         String   @map("run_id")
+  itemCount     Int      @map("item_count")
+  /// The batch exactly as received (reference answers are never in it).
+  body          Json
+  apiClientId   String   @map("api_client_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([clientId, batchId])
+  @@index([projectId, createdAt])
+}
+
+/// New RL Gym part 3: a person's decision on one review item. Final: one per item, enforced in the database.
+model RlGymReviewDecision {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  reviewBatchId String   @map("review_batch_id") @db.Uuid
+  batchId       String   @map("batch_id")
+  itemId        String   @map("item_id")
+  episodeId     String   @map("episode_id")
+  taskId        String   @map("task_id")
+  taskRevision  Int      @map("task_revision")
+  /// agent_failure, task_correction, rubric_correction, grader_wrong or environment_wrong.
+  decision      String
+  rationale     String
+  criterionId   String?  @map("criterion_id")
+  decidedById   String   @map("decided_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([reviewBatchId, itemId])
+  @@index([projectId, taskId])
+}
+
+/// New RL Gym part 3: one attempt to send a decision to the RL Gym, with its answer. Append-only.
+model RlGymDecisionDelivery {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  decisionId    String   @map("decision_id") @db.Uuid
+  /// delivered, rejected or unavailable.
+  outcome       String
+  httpStatus    Int?     @map("http_status")
+  requestId     String?  @map("request_id")
+  error         Json?
+  requestedById String   @map("requested_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([decisionId, createdAt])
+}
+
 model ProjectValidationRun {
   id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId         String   @map("client_id") @db.Uuid

@@ -68,7 +68,7 @@ export async function buildRlGymExport(
   p: { id: string; name: string; template: Template },
   records: ApprovedTaskRecord[],
   ref: { id: string; version: number; specSha256: string },
-  opts: { exported: boolean },
+  opts: { exported: boolean; corrections?: Map<string, string> },
 ): Promise<BuiltExport> {
   const tasks: ExportTaskDto[] = [];
   const notSent: NotSentDto[] = [];
@@ -93,6 +93,8 @@ export async function buildRlGymExport(
       revision: stored.revision,
       title,
       ...(correctsRevision ? { corrects_revision: correctsRevision } : {}),
+      // The SME review batch whose "task needs correction" led to this revision (part 3), when there was one.
+      ...(correctsRevision && opts.corrections?.get(r.taskInstanceId) ? { sme_batch_id: opts.corrections.get(r.taskInstanceId) } : {}),
       package_sha256: stored.packageSha256,
       package_ref: `forge://packages/${stored.packageSha256}`,
       case_selector: selector,

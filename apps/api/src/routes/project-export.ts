@@ -8,6 +8,7 @@ import { runCommandPrepared } from '../platform/command';
 import { buildRlGymExport, rlgymTemplateRef, titleOf, type BuiltExport } from '../anvil/rlgym-export';
 import { rlGymConnected, type RlGymClient, type RlGymResult } from '../anvil/rlgym-client';
 import { loadProject } from './projects';
+import { correctionBatches } from './benchmark-review';
 import { revalidateTask, reworkForValidation } from '../tasks/revalidation';
 
 const Params = z.object({ id: z.string().uuid() });
@@ -128,7 +129,8 @@ export const projectExportRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymCl
         // D18: re-check every approved task first; if any fail, they go back to Rework and nothing is sent.
         const failing = await failingTasks(db, s.records);
         if (failing.length) return { kind: 'rework', projectId: p.id, failing };
-        const built = await db.$transaction((tx) => buildRlGymExport(tx, { id: p.id, name: p.name, template: p.template }, s.records, s.ref!, { exported: s.runs.some((r) => r.outcome === 'received') }));
+        const corrections = await correctionBatches(db, p.id);
+        const built = await db.$transaction((tx) => buildRlGymExport(tx, { id: p.id, name: p.name, template: p.template }, s.records, s.ref!, { exported: s.runs.some((r) => r.outcome === 'received'), corrections }));
         if (!built.tasks.length) throw new AppError(422, 'NOTHING_TO_EXPORT', 'None of the approved tasks can be sent.', { notSent: built.notSent });
         const result = await rlgym.exportProject(p.id, built.body, built.exportSha256);
         return { kind: 'sent', projectId: p.id, built, result };

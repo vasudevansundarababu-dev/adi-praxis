@@ -34,6 +34,7 @@ export * from "./review-stages";
 export * from './policy-proposal';
 export * from './cluster-f1';
 export * from './project-export';
+export * from './benchmark-review';
 export * from './anvil-definition';
 export * from './forge';
 export * from "./rubric";

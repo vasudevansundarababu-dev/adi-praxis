@@ -34,6 +34,12 @@ r["env_urls"] = [k for k in os.environ if "URL" in k]
 try: r["parent_env"] = "PRAXIS" in open("/proc/1/environ","rb").read().decode("latin1")
 except OSError as e: r["parent_env"] = "unreadable:" + type(e).__name__
 r["uid"] = os.getuid()
+# Loopback must work (an internal MCP mock or fixture server binds 127.0.0.1) while staying inside the sandbox.
+try:
+    srv = socket.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(1)
+    c = socket.create_connection(srv.getsockname(), timeout=3); conn, _ = srv.accept()
+    c.sendall(b"ping"); r["loopback"] = "ok" if conn.recv(4) == b"ping" else "bad-echo"
+except OSError as e: r["loopback"] = "failed:" + type(e).__name__
 for p in ["/etc/shadow", os.environ["HARBOR_ROOT"] + "/eval/test_verifiers.py"]:
     try: open(p, "a").close(); r["write:" + p] = "WROTE"
     except OSError as e: r["write:" + p] = "denied"

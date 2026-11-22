@@ -82,8 +82,12 @@ jobs:
         run: docker build -t praxis-harbor-verify:ci -f infra/harbor-verify/Dockerfile .
       - name: Build catalog and hostile bundles
         run: mkdir -p "$RUNNER_TEMP/hv" && pnpm --filter @praxis/api exec tsx scripts/harbor-verify-bundles.ts "$RUNNER_TEMP/hv"
-      - name: Grade in the image
+      - name: Grade in the image (sandbox-job entry, signed URLs)
         run: python3 infra/harbor-verify/test/run_e2e.py praxis-harbor-verify:ci "$RUNNER_TEMP/hv"
+      - name: Release rollback state script (fake gcloud, no cloud access)
+        run: bash infra/deploy/test/cloud-run-state.test.sh
+      - name: Grade in the image (local DockerRunner entry; must agree with the job)
+        run: pnpm --filter @praxis/api exec tsx scripts/harbor-docker-runner-e2e.ts "$RUNNER_TEMP/hv" praxis-harbor-verify:ci
 
   changes:
     runs-on: ubuntu-latest

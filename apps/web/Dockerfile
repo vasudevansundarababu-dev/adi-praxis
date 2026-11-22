@@ -22,6 +22,8 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=8080 HOSTNAME=0.0.0.0
 WORKDIR /app
 COPY --from=build --chown=node:node /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=node:node /repo/apps/web/.next/static ./apps/web/.next/static
+# Next's standalone output does not include public/ (template-instruction PDFs are linked from the console).
+COPY --from=build --chown=node:node /repo/apps/web/public ./apps/web/public
 # Tutorial videos and guides, served after a sign-in check by app/tutorials/files (not public).
 COPY --from=build --chown=node:node /repo/apps/web/tutorials ./apps/web/tutorials
 USER node

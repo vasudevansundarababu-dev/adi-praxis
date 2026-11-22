@@ -15,7 +15,7 @@ import { defaultAdapters, policyExtractionHandler } from './policy/extraction/se
 import { policyAnnotationHandler } from './policy/annotate-job';
 import { POLICY_AI_ACTIONS } from './policy/ai-cap';
 import { defaultRuleAssistant } from './policy/rule-assistant';
-import { resolveDeps } from './meta-compiler/deps';
+import { assertRealDeps, resolveDeps } from './meta-compiler/deps';
 import { defaultDrafterFactory } from './meta-compiler/drafter';
 import { defaultJudge } from './meta-compiler/judge';
 import { metaCompilerHandlers } from './meta-compiler/handlers';
@@ -41,7 +41,10 @@ registry.register(policyExtractionHandler({ storage, adapters: defaultAdapters(c
 registry.register(policyAnnotationHandler({ storage, assistant: defaultRuleAssistant(config), dailyCap: config.POLICY_AI_DAILY_CALL_CAP, capActions: POLICY_AI_ACTIONS }));
 // D2: tutorial video runs (mocks unless TUTORIAL_VIDEO_LIVE; never on publish in QA or locally).
 registry.register(tutorialVideoHandler(defaultTutorialPipeline(config)));
-for (const h of metaCompilerHandlers({ config, storage, drafters: defaultDrafterFactory(config), deps: resolveDeps(), runner: defaultRunner(config, storage), judge: defaultJudge(config) })) registry.register(h);
+const mcDeps = resolveDeps();
+const mcRunner = defaultRunner(config, storage);
+assertRealDeps(mcDeps, mcRunner.kind);
+for (const h of metaCompilerHandlers({ config, storage, drafters: defaultDrafterFactory(config), deps: mcDeps, runner: mcRunner, judge: defaultJudge(config) })) registry.register(h);
 const log = (level: string, msg: string, extra: object = {}) =>
   console.log(JSON.stringify({ level, severity: level.toUpperCase(), message: msg, msg, service: 'praxis-worker', time: new Date().toISOString(), ...extra }));
 // D30: stored (uploaded) authoring forms are registered per process. Handlers here (tutorial video, conversation,

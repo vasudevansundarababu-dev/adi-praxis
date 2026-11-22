@@ -6,7 +6,7 @@ import { buildApp } from '../src/app';
 import { MockGoogleVerifier } from '../src/candidate/google';
 import { MemoryStorage } from '../src/candidate/storage';
 import { agentVisibleFiles, buildBundle, isHiddenPath, judgeFilePath } from '../src/harbor/bundle';
-import { MockRunner, readTarGz, splitOutputs, type HarborRunner } from '../src/harbor/runner';
+import { MockRunner, parseLocalResult, readTarGz, type HarborRunner } from '../src/harbor/runner';
 import { spentTodayUsd } from '../src/meta-compiler/cost';
 import { defaultAnswers } from '../src/meta-compiler/deps';
 import { ClaudeVertexJudge, defaultJudge, estimateJudgeUsd, JudgeError, judgePrompt, MAX_DELIVERABLE_CHARS, MockJudge, scoreReply, type LlmJudge } from '../src/meta-compiler/judge';
@@ -153,8 +153,9 @@ describe('J2 LlmJudge', () => {
   });
 
   it('the Docker grading output carries the output files after a marker', () => {
-    expect(splitOutputs('2 passed\n@@PRAXIS_OUTPUTS@@\n{"memo.md":"hi"}\n')).toEqual({ text: '2 passed\n', outputs: { 'memo.md': 'hi' } });
-    expect(splitOutputs('2 passed\n')).toEqual({ text: '2 passed\n', outputs: undefined });
+    // The local grader (grade.py) returns the oracle's output files in its result, as the sandbox job does.
+    expect(parseLocalResult('grading b (oracle) -> local\n@@PRAXIS_RESULT@@\n{"score":1,"log":"ok","outputs":{"memo.md":"hi"}}\nscore 1.00\n')?.outputs).toEqual({ 'memo.md': 'hi' });
+    expect(parseLocalResult('2 passed\n')).toBeNull();
   });
 });
 

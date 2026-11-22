@@ -47,10 +47,10 @@ host = os.environ.get("E2E_HOST", "172.17.0.1")
 docker = os.environ.get("DOCKER", "docker").split()
 
 
-def grade(name, mode):
+def grade(name, mode, caps=()):
     key = "%s-%s" % (name, mode)
     run = subprocess.run(
-        docker + ["run", "--rm", "--cap-add", "SYS_ADMIN", "--security-opt", "seccomp=unconfined", "--security-opt", "apparmor=unconfined",
+        docker + ["run", "--rm", "--cap-add", "SYS_ADMIN", *[a for c in caps for a in ("--cap-add", c)], "--security-opt", "seccomp=unconfined", "--security-opt", "apparmor=unconfined",
                   "--memory", "1g", "--cpus", "1",
                   "-e", "PRAXIS_BUNDLE_URL=http://%s:%d/%s.tar.gz" % (host, port, name),
                   "-e", "PRAXIS_RESULT_URL=http://%s:%d/%s" % (host, port, key),
@@ -68,17 +68,25 @@ for name in json.load(open(os.path.join(folder, "names.json"))):
     if name == "hostile":
         continue
     zero, oracle = grade(name, "null-agent"), grade(name, "oracle")
-    ok = zero["score"] == 0 and oracle["score"] == 1 and "network=netns" in oracle["log"]
+    ok = zero["score"] == 0 and oracle["score"] == 1 and "network=netns" in oracle["log"] and "loopback=" in oracle["log"]
     failed |= not ok
     print("%s  %s: null agent %.2f, oracle %.2f" % ("PASS" if ok else "FAIL", name, zero["score"], oracle["score"]))
     if not ok:
         print(zero["log"][-3000:], oracle["log"][-3000:])
 
 h = grade("hostile", "oracle")
+# With CAP_NET_ADMIN the grader brings lo up inside the empty namespace: 127.0.0.1 works, the internet still does not.
+lo = grade("hostile", "oracle", caps=("NET_ADMIN",))
+lo_probe = json.loads(lo["outputs"].get("probe.json", "{}"))
 probe = json.loads(h["outputs"].get("probe.json", "{}"))
 checks = {
     "score is 0.00 (forged reward and conftest.py ignored)": h["score"] == 0,
     "no internet": probe.get("net", "").startswith("blocked"),
+    "without NET_ADMIN: loopback down is reported, grading still runs": "loopback=down" in h["log"],
+    "with NET_ADMIN: loopback sockets work inside the sandbox": lo_probe.get("loopback") == "ok" and "loopback=up" in lo["log"],
+    "with NET_ADMIN: still no internet": lo_probe.get("net", "").startswith("blocked"),
+    "with NET_ADMIN: still no route to the host": lo_probe.get("host", "").startswith("blocked"),
+    "with NET_ADMIN: score still 0.00": lo["score"] == 0,
     "no route to the host": probe.get("host", "").startswith("blocked"),
     "no signed URLs in the environment": probe.get("env_urls") == [],
     "parent environment unreadable": str(probe.get("parent_env", "")).startswith("unreadable") or probe.get("parent_env") is False,

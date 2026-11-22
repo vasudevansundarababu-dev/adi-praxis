@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildBundle } from '../../src/harbor/bundle';
 import { readTarGz } from '../../src/harbor/tar';
 import { catalogBlueprints } from './index';
@@ -19,16 +20,23 @@ import { catalogBlueprints } from './index';
  */
 
 export const VERIFY_IMAGE = process.env.HARBOR_VERIFY_IMAGE || 'praxis-harbor-verify:local';
-const DOCKERFILE = 'FROM python:3.12-slim\nRUN pip install --no-cache-dir pytest==8.3.5\n';
+/** Repository root (apps/api/prisma/catalog -> ../../../..): the grading image's build context. */
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
+const DOCKERFILE = path.join(REPO_ROOT, 'infra/harbor-verify/Dockerfile');
 
 export function dockerAvailable(): boolean {
   return spawnSync('docker', ['info'], { stdio: 'ignore' }).status === 0;
 }
 
-/** Builds the verifier image once (the build needs network for pip; every run is --network=none). */
+/**
+ * Builds the grading image from infra/harbor-verify/Dockerfile, the same image CI tests and the sandbox job runs
+ * (pinned base digest, hash-pinned wheels, build-time runtime check). It used to build an ad-hoc unpinned image under
+ * the same tag, so a local DockerRunner could silently grade with a different runtime. Docker's layer cache makes
+ * a rebuild cheap, and rebuilding means an edited grade.py or requirements.txt is never graded with a stale image.
+ * The build needs network for pip; every grading run is --network=none.
+ */
 export function ensureVerifyImage(): void {
-  if (spawnSync('docker', ['image', 'inspect', VERIFY_IMAGE], { stdio: 'ignore' }).status === 0) return;
-  execFileSync('docker', ['build', '-q', '-t', VERIFY_IMAGE, '-'], { input: DOCKERFILE, stdio: ['pipe', 'ignore', 'inherit'] });
+  execFileSync('docker', ['build', '-q', '-t', VERIFY_IMAGE, '-f', DOCKERFILE, REPO_ROOT], { stdio: ['ignore', 'ignore', 'inherit'] });
 }
 
 export function catalogMeta(bp: HarborBlueprint): BundleTaskMeta {
@@ -54,7 +62,10 @@ export function runInDocker(bundle: Uint8Array, mode: 'null-agent' | 'oracle' | 
     }
     if (typeof mode === 'object') writeFileSync(path.join(root, 'agent.sh'), mode.agentScript);
     const agent = mode === 'oracle' ? 'bash solution/solve.sh && ' : typeof mode === 'object' ? 'bash agent.sh && ' : '';
-    const script = `${agent}python3 -m pytest -q -p no:cacheprovider eval/test_verifiers.py; true`;
+    // Same hardened pytest call as grade.py: bundle conftest.py / ini files cannot replace the verifiers.
+    // The raw reward (including -1 hard fails, which grade.py clamps to 0) is the point of this proof, so it reads the
+    // file directly; any reward the agent pre-wrote is deleted first so only the verifiers can produce it.
+    const script = `${agent}true; rm -f logs/verifier/reward.txt logs/verifier/reward.json; python3 -P -s -m pytest -q -p no:cacheprovider --noconftest -c /opt/grade/pytest.ini --rootdir /task eval/test_verifiers.py; true`;
     const user = typeof process.getuid === 'function' ? [`--user=${process.getuid()}:${process.getgid!()}`] : [];
     const run = spawnSync(
       'docker',

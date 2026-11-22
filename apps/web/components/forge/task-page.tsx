@@ -1,6 +1,6 @@
 'use client';
 
-import { getFieldValue, isArrayType, itemFieldsOf, PROFILE_SECTIONS, scoreKeysFor, type ForgeComment, type ItemField, type ProjectPersonDto, type RubricView, type SectionKey, type TemplateProfile, type ValidationRunDto, publicText } from '@praxis/shared';
+import { getFieldValue, isArrayType, itemFieldsOf, PROFILE_SECTIONS, scoreKeysFor, type ForgeComment, type ItemField, type ProjectPersonDto, type RubricView, type SectionKey, type TemplateProfile, publicText } from '@praxis/shared';
 import { RubricReadOnly } from './rubric-readonly';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -13,7 +13,6 @@ import {
   decisionProblem,
   fmtWhen,
   fullName,
-  latestValidation,
   REJECT_REASONS,
   reviewersOf,
   reviewTrail,
@@ -568,73 +567,13 @@ export function DecisionBox({ projectId, view }: { projectId: string; view: Forg
   );
 }
 
-function ValidateCard({ projectId, recordId, initial }: { projectId: string; recordId: string; initial: ValidationRunDto[] }) {
-  const [runs, setRuns] = useState(initial);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const latest = latestValidation(runs, recordId);
-  return (
-    <section className="card mb-4 p-5" data-validate>
-      <h3 className="mb-3 flex flex-wrap items-center gap-2.5 font-semibold">
-        RL Gym validation <span className="text-xs font-semibold text-fg-muted">checks this task against RL Gym&apos;s export contract; doesn&apos;t export it</span>
-      </h3>
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          disabled={pending}
-          className="btn btn-secondary disabled:opacity-60"
-          onClick={async () => {
-            setPending(true);
-            setError(null);
-            const res = await mutate<ValidationRunDto>('POST', `/projects/${projectId}/validate`, { recordIds: [recordId] });
-            setPending(false);
-            if (!res.ok) return setError(res.error);
-            setRuns((r) => [res.data!, ...r]);
-          }}
-        >
-          Validate
-        </button>
-        <span className="text-sm" role="status">
-          {latest ? (
-            <>
-              <span className={`pill ${latest.result.status === 'valid' ? 'pill-success' : latest.result.status === 'needs_fix' ? 'pill-warning' : ''}`}>
-                {latest.result.status === 'valid' ? 'Valid' : latest.result.status === 'needs_fix' ? 'Needs fixing' : 'Not validated'}
-              </span>{' '}
-              <span className="text-fg-muted">
-                {latest.run.createdAt.slice(0, 16).replace('T', ' ')} · {latest.result.issues.length} {latest.result.issues.length === 1 ? 'fix' : 'fixes'}
-              </span>
-            </>
-          ) : (
-            <span className="text-fg-muted">Not validated yet.</span>
-          )}
-        </span>
-      </div>
-      {latest && latest.result.issues.length > 0 && (
-        <ul className="mt-2 list-disc pl-5 text-sm">
-          {latest.result.issues.map((x, i) => (
-            <li key={i}>
-              <span className="font-mono text-xs">{x.code}</span> {x.message}
-            </li>
-          ))}
-        </ul>
-      )}
-      {error && (
-        <p role="alert" className="mt-2 text-sm text-error">
-          {error}
-        </p>
-      )}
-      <p className="mt-2.5 text-xs text-fg-muted">PM or Admin. Fixes are listed per task; nothing changes automatically. &quot;Valid&quot; isn&apos;t approval or RL Gym readiness.</p>
-    </section>
-  );
-}
-
-/** MVP1 task page: the authored form read-only, the review trail, and the decision box when it is the viewer's turn. */
 export function ForgeTaskPage({ code, view, people, exportState, rubric = null }: { code: string; view: ForgeTaskView; people: ProjectPersonDto[]; exportState: ExportState | null; rubric?: RubricView | null }) {
   const projectId = view.project.id;
   const last = view.reviews.at(-1) ?? null;
   const decided = ['ACCEPTED', 'REWORK', 'REJECTED'].includes(view.status);
   const trail = reviewTrail(view);
-  const recordId = exportState?.tasks.find((t) => t.taskId === view.taskId)?.recordId ?? null;
+  // New RL Gym: whether this task's approved revision is in RL Gym (exported and not blocked).
+  const inRlGym = !!exportState?.tasks.find((t) => t.taskId === view.taskId)?.inRlGym;
   const canPickReviewer = view.reviewRoute === 'SME_EXPERT_PM' && !view.reviewer && !!view.author && REVIEWABLE.includes(view.status);
   const showReview = ['SUBMITTED', 'ACCEPTED', 'REWORK', 'REJECTED'].includes(view.status) || canPickReviewer;
   const meta = view.author ? `Authored by ${view.author.name} · ${fmtWhen(view.date)}` : 'No author assigned';
@@ -648,6 +587,11 @@ export function ForgeTaskPage({ code, view, people, exportState, rubric = null }
           {code} · {taskName(view.label)}
         </h1>
         <span className={`pill ${taskStatusTone(view.status)}`}>{taskStatusLabel(view.status)}</span>
+        {inRlGym && (
+          <span className="pill pill-info" data-in-rlgym>
+            In RL Gym
+          </span>
+        )}
       </div>
       <p className="mb-3 text-sm text-fg-muted">
         {meta}
@@ -662,7 +606,6 @@ export function ForgeTaskPage({ code, view, people, exportState, rubric = null }
 
       <AuthoredForm profile={view.template.profile} output={view.status === 'CREATED' ? null : view.output} rubric={rubric} />
 
-      {view.status === 'ACCEPTED' && recordId && <ValidateCard projectId={projectId} recordId={recordId} initial={exportState?.runs ?? []} />}
 
       {showReview && (
         <section className="card mb-4 p-5" data-review-card>

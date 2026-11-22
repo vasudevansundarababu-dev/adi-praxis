@@ -1,45 +1,79 @@
+import type { ProjectExportRunDto } from '@praxis/shared';
 import { describe, expect, it } from 'vitest';
 import { ExportPanel, type ExportState } from '../components/projects/export-panel';
+import { exportStatusLine } from '../lib/forge-console';
 import { a11yProblems } from './a11y';
 import { html, text } from './helpers';
 
+/** New RL Gym part 2 (22 Nov 2026): Export for benchmark, Re-export, the receipt history, and "not connected". */
 const P = '00000000-0000-4000-8000-000000000001';
-const task = { recordId: '00000000-0000-4000-8000-000000000011', taskId: '00000000-0000-4000-8000-000000000021', title: 'Teen joint checking (NY)', approvedAt: '2026-11-12T10:00:00.000Z' };
-const base: ExportState = { canValidate: true, canExport: false, reason: 'Export opens when the project is complete: 1 of 2 required tasks approved, or on 2026-12-31. You can validate one task now.', validator: { name: 'praxis-precheck', version: 'v1', isAnvil: false }, tasks: [task], runs: [] };
+const task = { recordId: '00000000-0000-4000-8000-000000000011', taskId: '00000000-0000-4000-8000-000000000021', title: 'Teen joint checking (NY)', approvedAt: '2026-11-12T10:00:00.000Z', revision: 1, inRlGym: false };
+const base: ExportState = { canExport: true, reason: null, connected: true, rlgymTemplate: { id: 'tpl_x5rwt6d5eu', version: 9, specSha256: 'f'.repeat(64) }, exported: false, tasks: [task], runs: [] };
+const run = (over: Partial<ProjectExportRunDto> = {}): ProjectExportRunDto => ({
+  id: '00000000-0000-4000-8000-000000000031',
+  projectId: P,
+  exportId: 'exp-0123456789abcdef',
+  exportSha256: 'a'.repeat(64),
+  reason: 'first export of KYC November',
+  tasks: [{ recordId: task.recordId, taskId: task.taskId, title: task.title, revision: 1, packageSha256: 'b'.repeat(64), correctsRevision: null }],
+  notSent: [],
+  outcome: 'received',
+  httpStatus: 201,
+  requestId: 'req-7',
+  receipt: { new: 1, superseding: 0, unchanged: 0, blocked: [], replayed: false, receiptSha256: 'c'.repeat(64) },
+  error: null,
+  requestedById: P,
+  createdAt: '2026-11-22T11:00:00.000Z',
+  ...over,
+});
 
-describe('project export panel (owner, 12 Nov 2026)', () => {
-  it('validate one task now; Export is disabled until the project is complete; says Anvil is not connected', () => {
-    const m = html(<ExportPanel projectId={P} initial={base} />);
-    expect(text(m)).toContain('RL Gym validation is not connected yet');
-    expect(text(m)).toContain('1 of 2 required tasks approved');
-    expect(m).toMatch(/<button[^>]*disabled=""[^>]*>Export to RL Gym<\/button>/);
-    expect(text(m)).toContain('Validate');
+describe('export for benchmark panel', () => {
+  it('not connected: says so and Export is off', () => {
+    const m = html(<ExportPanel projectId={P} initial={{ ...base, connected: false, canExport: false, reason: 'RL Gym isn’t connected yet.', rlgymTemplate: null }} />);
+    expect(text(m)).toContain('RL Gym isn’t connected yet, so export is off.');
+    expect(m).toMatch(/<button[^>]*disabled=""[^>]*>Export for benchmark<\/button>/);
+    expect(text(m)).not.toContain('Validate');
     expect(a11yProblems(m)).toEqual([]);
   });
 
-  it('shows which tasks need fixing and the export download', () => {
-    const run = { id: '00000000-0000-4000-8000-000000000031', projectId: P, kind: 'EXPORT' as const, validator: 'praxis-precheck', validatorVersion: 'v1', results: [{ ...task, status: 'needs_fix' as const, issues: [{ code: 'MISSING_BINDING', path: 'S7.criteria[0].outputField', message: 'Name the output field this rule or criterion checks' }] }], counts: { valid: 0, needsFix: 1, notValidated: 0 }, requestedById: P, createdAt: '2026-11-12T11:00:00.000Z', downloadPath: `/projects/${P}/exports/x/download`, anvil: null };
-    const m = html(<ExportPanel projectId={P} initial={{ ...base, canExport: true, reason: null, runs: [run] }} />);
-    expect(text(m)).toContain('Last export');
-    expect(text(m)).toContain('0 valid, 1 need fixing');
-    expect(text(m)).toContain('Teen joint checking (NY) — needs fixing: MISSING_BINDING Name the output field this rule or criterion checks');
-    expect(m).toContain('<code class="font-mono text-xs">S7.criteria[0].outputField</code>');
-    expect(m).toContain(`href="/api/v1/projects/${P}/exports/x/download"`);
+  it('connected and qualified: Export for benchmark is on and names the RL Gym template', () => {
+    const m = html(<ExportPanel projectId={P} initial={base} />);
+    expect(m).toMatch(/<button type="button" class="btn btn-primary[^"]*">Export for benchmark<\/button>/);
+    expect(text(m)).toContain('tpl_x5rwt6d5eu');
+    expect(text(m)).toContain('1 approved task.');
   });
 
-  it('new flow: shows how many tasks are approved while export is closed, and enables Export to RL Gym when all are', () => {
-    const closed = html(<ExportPanel projectId={P} initial={{ ...base, reason: 'Export opens when all 5 tasks are approved (1 of 5 now).' }} />);
-    expect(text(closed)).toContain('Export opens when all 5 tasks are approved (1 of 5 now).');
-    expect(closed).toMatch(/<button[^>]*disabled=""[^>]*>Export to RL Gym<\/button>/);
-    expect(closed).toMatch(/<button[^>]*>Validate<\/button>/);
-    const open = html(<ExportPanel projectId={P} initial={{ ...base, canExport: true, reason: null }} />);
-    expect(open).toMatch(/<button type="button" class="btn btn-primary[^"]*">Export to RL Gym<\/button>/);
-    expect(text(open)).not.toContain('Export opens');
+  it('after an export: Re-export, the receipt with RL Gym’s request ID, and how many tasks are in RL Gym', () => {
+    const m = html(<ExportPanel projectId={P} initial={{ ...base, exported: true, tasks: [{ ...task, inRlGym: true }], runs: [run()] }} />);
+    expect(m).toMatch(/>Re-export<\/button>/);
+    expect(text(m)).toContain('1 approved task, 1 in RL Gym.');
+    expect(text(m)).toContain('Received by RL Gym');
+    expect(text(m)).toContain('1 new, 0 superseding, 0 unchanged.');
+    expect(m).toContain('<code class="font-mono text-xs">req-7</code>');
+    expect(a11yProblems(m)).toEqual([]);
   });
 
-  it('with no approved task there is nothing to validate', () => {
-    const m = html(<ExportPanel projectId={P} initial={{ ...base, canValidate: false, reason: 'Export needs at least one approved task.', tasks: [] }} />);
-    expect(text(m)).toContain('Export needs at least one approved task.');
-    expect(text(m)).not.toContain('Task to validate');
+  it('a refused export shows RL Gym’s code and message; blocked and not-sent tasks link to the task', () => {
+    const refused = html(<ExportPanel projectId={P} initial={{ ...base, runs: [run({ outcome: 'rejected', httpStatus: 422, receipt: null, error: { code: 'TEMPLATE_NOT_ACTIVE', message: 'Template is not active in this workspace' } })] }} />);
+    expect(text(refused)).toContain('Refused by RL Gym');
+    expect(text(refused)).toContain('TEMPLATE_NOT_ACTIVE Template is not active in this workspace');
+    const blocked = html(
+      <ExportPanel
+        projectId={P}
+        newFlow
+        initial={{ ...base, runs: [run({ receipt: { new: 1, superseding: 0, unchanged: 0, blocked: [{ taskId: task.taskId, reason: 'BINDING_UNRESOLVED' }], replayed: false, receiptSha256: null }, notSent: [{ recordId: '00000000-0000-4000-8000-000000000012', taskId: '00000000-0000-4000-8000-000000000022', title: 'Custodial', code: 'GENERIC_PRIVATE_EXPOSURE', message: 'Form problem.' }] })] }}
+      />,
+    );
+    expect(text(blocked)).toContain('Teen joint checking (NY) — blocked by RL Gym: BINDING_UNRESOLVED');
+    expect(text(blocked)).toContain('Custodial — not sent: GENERIC_PRIVATE_EXPOSURE Form problem.');
+    expect(blocked).toContain(`href="/projects/${P}/tasks/${task.taskId}/review"`);
+  });
+
+  it('dashboard line: not connected, ready, exported', () => {
+    expect(exportStatusLine({ ...base, connected: false })).toBe('Not connected · RL Gym isn’t connected yet');
+    expect(exportStatusLine(base)).toBe('Not exported · ready to export the approved tasks so far');
+    expect(exportStatusLine({ ...base, canExport: false, reason: 'Export needs at least one approved task.' })).toBe('Not exported · Export needs at least one approved task');
+    expect(exportStatusLine({ ...base, runs: [run()] })).toMatch(/^Exported .* · can be re-exported$/);
+    expect(exportStatusLine(null)).toBe('—');
   });
 });

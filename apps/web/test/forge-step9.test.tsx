@@ -1,4 +1,4 @@
-import { KYC_ACCOUNT_OPENING_PROFILE, type ForgeTaskRow, type ProjectPersonDto, type ValidationRunDto } from '@praxis/shared';
+import { KYC_ACCOUNT_OPENING_PROFILE, type ForgeTaskRow, type ProjectPersonDto, type ProjectExportRunDto } from '@praxis/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CandidateSignInSettings } from '@/components/forge/candidate-sign-in';
@@ -50,14 +50,15 @@ const row = (n: number, o: Partial<ForgeTaskRow> = {}): ForgeTaskRow => ({
 });
 const TASKS = [1, 2, 3, 4].map((n) => row(n));
 const P = project({ id: PID, name: 'KYC v7', status: 'IN_PROGRESS', requiredWorkers: 2 });
-const run = (results: ValidationRunDto['results']): ValidationRunDto => ({ id: 'r1', projectId: PID, kind: 'VALIDATE', validator: 'praxis-precheck', validatorVersion: '1', results, counts: { valid: 0, needsFix: results.length, notValidated: 0 }, requestedById: 'u1', createdAt: '2026-11-15T10:00:00.000Z', downloadPath: null, anvil: null });
+const run: ProjectExportRunDto = { id: 'r1', projectId: PID, exportId: 'exp-1', exportSha256: 'a'.repeat(64), reason: 'first export of KYC v7', tasks: [], notSent: [{ recordId: 'rec-1', taskId: T(1), title: 'Single case', code: 'GENERIC_CASE_SELECTOR_MISMATCH', message: 'Fix the case' }], outcome: 'received', httpStatus: 201, requestId: 'req-1', receipt: { new: 0, superseding: 0, unchanged: 0, blocked: [], replayed: false, receiptSha256: null }, error: null, requestedById: 'u1', createdAt: '2026-11-15T10:00:00.000Z' };
 const EXPORT: ExportState = {
-  canValidate: true,
-  canExport: false,
-  reason: 'Export opens when all 4 tasks are approved (1 of 4 now).',
-  validator: { name: 'praxis-precheck', version: '1', isAnvil: false },
-  tasks: [{ recordId: 'rec-1', taskId: T(1), title: 'Single case', approvedAt: '2026-11-15T10:00:00.000Z' }],
-  runs: [run([{ recordId: 'rec-1', taskId: T(1), title: 'Single case', status: 'needs_fix', issues: [{ code: 'X', path: null, message: 'Fix the rubric' }] }])],
+  canExport: true,
+  reason: null,
+  connected: true,
+  rlgymTemplate: { id: 'tpl_x', version: 7, specSha256: 's'.repeat(64) },
+  exported: true,
+  tasks: [{ recordId: 'rec-1', taskId: T(1), title: 'Single case', approvedAt: '2026-11-15T10:00:00.000Z', revision: 1, inRlGym: false }],
+  runs: [run],
 };
 
 describe('coverage selector from the API', () => {
@@ -97,7 +98,7 @@ describe('coverage selector from the API', () => {
 });
 
 describe('export fix links and the recruiter back link', () => {
-  it('needs-fixing links open the new task page in the new flow and Task review otherwise', () => {
+  it('not-sent task links open the new task page in the new flow and Task review otherwise', () => {
     expect(exportFixHref(PID, T(1), true)).toBe(`/projects/${PID}/tasks/${T(1)}/review`);
     expect(exportFixHref(PID, T(1), false)).toBe(`/review/tasks/${T(1)}`);
     expect(renderToStaticMarkup(<ExportPanel projectId={PID} initial={EXPORT} newFlow />)).toContain(`href="/projects/${PID}/tasks/${T(1)}/review"`);

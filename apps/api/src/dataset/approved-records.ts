@@ -5,6 +5,7 @@ import type { Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { provenanceFor } from '../tasks/drafting/service';
 import type { StoredChecks } from '../tasks/submission';
+import { storeTaskPackageOnApproval } from '../anvil/task-package-store';
 
 export const APPROVED_RECORD_SCHEMA_VERSION = 1;
 /** One writer at a time extends the hash chain (transaction-scoped advisory lock). */
@@ -93,7 +94,7 @@ export async function appendRecord(tx: Tx, base: RecordBase) {
   const prev = await tx.approvedTaskRecord.findFirst({ orderBy: { seq: 'desc' }, select: { contentHash: true } });
   const prevHash = prev?.contentHash ?? null;
   const contentHash = recordHash(recordContent(base), prevHash);
-  return tx.approvedTaskRecord.create({
+  const record = await tx.approvedTaskRecord.create({
     data: {
       ...base,
       input: base.input as Prisma.InputJsonValue,
@@ -105,6 +106,9 @@ export async function appendRecord(tx: Tx, base: RecordBase) {
       contentHash,
     },
   });
+  // New RL Gym part 1: keep this revision's authored task package so RL Gym can fetch it by hash. Never blocks approval.
+  await storeTaskPackageOnApproval(tx, record);
+  return record;
 }
 
 /** Everything but the chain fields, as stored: the input to `recordContent` when verifying. */

@@ -315,6 +315,8 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
         const context=await browser.newContext({viewport:{width:1200,height:900}});
         await context.addCookies([{name:'praxis_candidate',value:fixture.a.cookie.split('=')[1]!,domain:'127.0.0.1',path:'/'}]);
         const generic=await context.newPage();
+        // Same 60 s step limit as the main page: CI's dev server can take longer than Playwright's 30 s default to compile a page.
+        generic.setDefaultTimeout(60_000);
         await generic.goto(`http://127.0.0.1:${port}/tasks/${fixture.id}`,{waitUntil:'networkidle'});
         await generic.getByLabel('I agree to these terms.').check();
         await generic.getByRole('button',{name:'Accept authorship terms'}).click();
@@ -328,6 +330,7 @@ describe('M9 task drafting from documents and interviews, MCP tool recording (do
         const saved=(await task(fixture.a,fixture.id)).output;
         expect(profiled?saved.sections.S1.businessContext:saved.body).toBe(answer);
         await generic.reload({waitUntil:'networkidle'});
+        await generic.getByLabel('Your answer').and(generic.locator(':enabled')).waitFor({ timeout: 60_000 });
         expect(await generic.getByLabel('Your answer').inputValue()).toBe('Unsent draft for '+templateHelp.id);
         await generic.getByRole('button',{name:'Classic',exact:true}).click();
         expect(await body.inputValue()).toBe(answer);

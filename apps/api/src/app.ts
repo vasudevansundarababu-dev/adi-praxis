@@ -78,6 +78,7 @@ import { opportunityRoutes } from './routes/opportunities';
 import { reviewerRecruitmentRoutes } from './routes/reviewer-recruitment';
 import { searchRoutes } from './routes/search';
 import { projectExportRoutes } from './routes/project-export';
+import { taskPackageRoutes } from './routes/task-packages';
 import { AnvilGatedValidator, PraxisPrecheckValidator, type AnvilTaskValidator } from './anvil/validator';
 import { AnvilExportClient } from './anvil/export-client';
 import { SearchService } from './search/service';
@@ -343,6 +344,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(tutorialVideoRoutes, { db: deps.db, settings: tutorialSettings(deps.config), storage: tutorialStorage });
       await v1.register(projectExportRoutes, { db: deps.db, storage, validator: deps.anvilValidator ?? (deps.config.ANVIL_EXPORT_BASE_URL ? new AnvilGatedValidator(new AnvilExportClient(deps.config.ANVIL_EXPORT_BASE_URL, deps.anvilIdTokenProvider ?? googleIdTokenProvider(anvilAudience(deps.config.ANVIL_EXPORT_BASE_URL, deps.config.ANVIL_OUTBOUND_AUDIENCE)))) : new PraxisPrecheckValidator()) });
       await v1.register(templateProfileRoutes, { db: deps.db });
+      await v1.register(taskPackageRoutes, { db: deps.db });
       await v1.register(anvilTemplateRoutes, { db: deps.db, anvil: { environment: deps.config.ANVIL_ENVIRONMENT, exportBaseUrl: deps.config.ANVIL_EXPORT_BASE_URL } });
       await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });
       const drafters = deps.metaCompiler?.drafters ?? defaultDrafterFactory(deps.config);

@@ -2,11 +2,9 @@ import type { ApprovedTaskRecord, Template } from '@prisma/client';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { AnvilExportClient, type FetchLike } from '../src/anvil/export-client';
 import { actorProjection, buildGenericPackages, CASE_SELECTOR_IN_STATE_PACKAGES, MAX_TASKS_PER_PART } from '../src/anvil/generic-package';
 import { jcs, JcsError, jcsSha256 } from '../src/anvil/jcs';
 import { jointHashes, jointTemplateSpec } from '../src/anvil/joint-template';
-import { AnvilGatedValidator, genericSupport, validationItem } from '../src/anvil/validator';
 import { readZip } from '../src/anvil/zip';
 import { anvilSpecChecks } from '../src/tasks/submission';
 
@@ -160,96 +158,6 @@ describe('generic export package builder', () => {
     const form = SPEC.authoring.profile;
     const a = actorProjection(form, AUTHORED);
     expect(a).toEqual(anvilFile('tasks/NEW-SME-9001/actor.json'));
-  });
-});
-
-function fake(routes: Record<string, { status: number; body: unknown }>, seen: { url: string; headers: Record<string, string>; body?: Uint8Array }[] = []): FetchLike {
-  return async (url, init) => {
-    seen.push({ url, headers: init.headers, ...(init.body ? { body: init.body } : {}) });
-    const key = Object.keys(routes).find((k) => url.endsWith(k))!;
-    const r = routes[key]!;
-    return { status: r.status, headers: { get: () => null }, text: async () => JSON.stringify(r.body) };
-  };
-}
-const BASE = 'https://anvil-qa.example.test/api/v1/projects/a7454c18-602e-4907-bdd9-277067c36233/dataset-exports/generic';
-const enabled = { status: 200, body: { data: { contracts: ['praxis.authored-task-export.v1'], contract: 'praxis.authored-task-export.v1', enabled: true }, meta: { request_id: 'c1' } } };
-const ctx = (ts: Template[] = [template()]) => ({ projectId: 'p1', templates: new Map(ts.map((t) => [t.id, t])) });
-const item = (r: ApprovedTaskRecord) => validationItem(r, 'T', []);
-
-describe('validate and resolve through Anvil (mock transport)', () => {
-  it('discovery: the exact ID in data.contracts with enabled:true; nothing else counts', () => {
-    expect(genericSupport({ contracts: ['praxis.authored-task-export.v1'], enabled: true })).toBe('enabled');
-    expect(genericSupport({ contracts: ['praxis.authored-task-export.v1'], enabled: false })).toBe('disabled');
-    expect(genericSupport({ contract: 'praxis.authored-task-export.v1', enabled: true })).toBe('absent');
-    expect(genericSupport({ contracts: ['praxis.authored-task-export.v1-proposed', 'anvil.evaluator-task-export.v1'], enabled: true })).toBe('absent');
-  });
-
-  it('valid:true -> the task is valid; Anvil’s own requirements are listed as Anvil work, not repairs; no resolve on validate', async () => {
-    const seen: { url: string; headers: Record<string, string>; body?: Uint8Array }[] = [];
-    const valid = json('synthetic-offline-validation.json');
-    valid.anvil_requirements[0].task_id = record(1).taskInstanceId;
-    const v = new AnvilGatedValidator(new AnvilExportClient(BASE, 'tok-0123456789', fake({ '/contracts': enabled, '/validate': { status: 200, body: { data: valid, meta: { request_id: 'v1' } } } }, seen)));
-    const out = await v.run([item(record(1))], ctx(), { resolve: false });
-    expect(out.results[0]).toMatchObject({ status: 'valid', issues: [{ code: 'AV_TEMPLATE_NOT_QUALIFIED' }] });
-    expect(seen.map((s) => s.url.slice(BASE.length))).toEqual(['/contracts', '/validate']);
-    expect(seen[1]!.headers['Content-Type']).toBe('application/zip');
-    expect(readZip(Buffer.from(seen[1]!.body!)).has('praxis-export.json')).toBe(true);
-    expect(out.anvil).toMatchObject({ support: 'enabled', parts: [{ partIndex: 1, validate: { status: 'export_valid', valid: true, requestId: 'v1' } }] });
-    expect(JSON.stringify(out.anvil)).not.toContain('PRIVATE-REFERENCE-SENTINEL');
-  });
-
-  it('valid:false -> PX errors go to the task they name; other tasks stay valid', async () => {
-    const r1 = record(1);
-    const r2 = record(2);
-    const body = { data: { valid: false, status: 'export_invalid', errors: [{ code: 'PX_CRITERIA_ANCHORS', owner: 'praxis', file: `private/${r2.taskInstanceId}/reference.json`, pointer: '/authored/sections/S7/criteria/0', message: 'Explicit 5/2/0 conditions are incomplete.', fix: 'Supply passCondition, partialCredit and failCondition.', retryable: false }], error_count: 1, anvil_requirements: [] } };
-    const v = new AnvilGatedValidator(new AnvilExportClient(BASE, 'tok-0123456789', fake({ '/contracts': enabled, '/validate': { status: 422, body } })));
-    const out = await v.run([item(r1), item(r2)], ctx(), { resolve: true });
-    expect(out.results.map((x) => x.status)).toEqual(['valid', 'needs_fix']);
-    expect(out.results[1]!.issues[0]).toMatchObject({ code: 'PX_CRITERIA_ANCHORS', path: `private/${r2.taskInstanceId}/reference.json#/authored/sections/S7/criteria/0` });
-    // An invalid package is never resolved.
-    expect(out.anvil!.parts[0]!.resolve).toBeUndefined();
-  });
-
-  it('valid:null (validation_blocked) -> not validated, with Anvil’s reason', async () => {
-    const body = { data: { valid: null, status: 'validation_blocked', errors: [], anvil_requirements: [{ code: 'AV_TEMPLATE_NOT_REGISTERED', owner: 'anvil', status: 'blocked', task_id: record(1).taskInstanceId }] } };
-    const v = new AnvilGatedValidator(new AnvilExportClient(BASE, 'tok-0123456789', fake({ '/contracts': enabled, '/validate': { status: 409, body } })));
-    const out = await v.run([item(record(1))], ctx(), { resolve: true });
-    expect(out.results[0]).toMatchObject({ status: 'not_validated', issues: [{ code: 'AV_TEMPLATE_NOT_REGISTERED' }] });
-    expect(out.anvil!.parts[0]!.resolve).toBeUndefined();
-  });
-
-  it('RL Gym’s own requirements carry its status, words and request id, so the owner can tell what RL Gym needs', async () => {
-    const body = { data: { valid: null, status: 'validation_blocked', errors: [], anvil_requirements: [{ code: 'AV_TEMPLATE_NOT_REGISTERED', owner: 'anvil', status: 'blocked', message: 'Template kyc.v8 is not registered.', task_id: record(1).taskInstanceId }] }, meta: { request_id: 'req-v9' } };
-    const v = new AnvilGatedValidator(new AnvilExportClient(BASE, 'tok-0123456789', fake({ '/contracts': enabled, '/validate': { status: 409, body } })));
-    const out = await v.run([item(record(1))], ctx(), { resolve: false });
-    expect(out.results[0]).toMatchObject({ status: 'not_validated', issues: [{ code: 'AV_TEMPLATE_NOT_REGISTERED', message: 'RL Gym’s own work (not a task repair), blocked: Template kyc.v8 is not registered; the source is checked separately. (RL Gym request req-v9)' }] });
-    // Blocked without a listed requirement: the request id is still given.
-    const bare = new AnvilGatedValidator(new AnvilExportClient(BASE, 'tok-0123456789', fake({ '/contracts': enabled, '/validate': { status: 409, body: { data: { valid: null, status: 'validation_blocked', errors: [], anvil_requirements: [] }, meta: { request_id: 'req-v10' } } } })));
-    expect((await bare.run([item(record(1))], ctx(), { resolve: false })).results[0]!.issues).toEqual([expect.objectContaining({ code: 'ANVIL_VALIDATION_BLOCKED', message: 'RL Gym could not validate this package (validation_blocked). (RL Gym request req-v10)' })]);
-  });
-
-  it('export resolves a valid package with Idempotency-Key = its package hash; resolution never claims a Run', async () => {
-    const seen: { url: string; headers: Record<string, string>; body?: Uint8Array }[] = [];
-    const v = new AnvilGatedValidator(
-      new AnvilExportClient(BASE, 'tok-0123456789', fake({ '/contracts': enabled, '/validate': { status: 200, body: { data: { valid: true, status: 'export_valid', errors: [], anvil_requirements: [] } } }, '/resolve': { status: 200, body: { data: { status: 'import_resolved', valid: true }, meta: { request_id: 'rs1' } } } }, seen)),
-    );
-    const out = await v.run([item(record(1))], ctx(), { resolve: true });
-    const part = out.anvil!.parts[0]!;
-    expect(seen[2]!.url).toBe(`${BASE}/resolve`);
-    expect(seen[2]!.headers['Idempotency-Key']).toBe(`praxis-${part.packageSha256}`);
-    expect(Buffer.from(seen[2]!.body!).equals(Buffer.from(seen[1]!.body!))).toBe(true);
-    expect(part.resolve).toMatchObject({ status: 'import_resolved', requestId: 'rs1' });
-    expect(out.results[0]!.issues).toEqual([expect.objectContaining({ code: 'ANVIL_RESOLVED', message: expect.stringContaining('no Run was started') })]);
-  });
-
-  it('a task Praxis cannot package is not sent and says why; disabled or unreachable Anvil sends nothing', async () => {
-    const seen: { url: string; headers: Record<string, string> }[] = [];
-    const v = new AnvilGatedValidator(new AnvilExportClient(BASE, 'tok-0123456789', fake({ '/contracts': enabled }, seen)));
-    const out = await v.run([item(record(1))], ctx([template({ anvilSpec: null })]), { resolve: true });
-    expect(out.results[0]).toMatchObject({ status: 'not_validated', issues: [{ code: 'GENERIC_TEMPLATE_NOT_JOINT' }] });
-    expect(seen.map((s) => s.url.slice(BASE.length))).toEqual(['/contracts']);
-    const down = new AnvilGatedValidator(new AnvilExportClient(BASE, 'tok-0123456789', fake({ '/contracts': { status: 503, body: { error: { code: 'UNAVAILABLE', message: 'Down.' } } } })));
-    expect((await down.run([item(record(1))], ctx(), { resolve: true })).results[0]!.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'ANVIL_UNAVAILABLE' })]));
   });
 });
 

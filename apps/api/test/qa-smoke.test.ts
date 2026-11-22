@@ -24,7 +24,7 @@ interface Scenario {
   readyz?: number;
   citations?: string[];
   extraction?: { status: string; candidateCount: number; error?: string | null };
-  validator?: string;
+  connected?: boolean;
   chat?: 'SUCCEEDED' | 'FAILED';
   echoPasswordOnLogin?: boolean;
   slotCase?: { field: string; source: string; value: string } | null;
@@ -183,10 +183,7 @@ function fakeApi(sc: Scenario = {}) {
         return ok({ table: 'ApprovedTaskRecord', checked: 7, breaks: [], ok: true });
       // ── export ──
       case route === `GET /projects/${P}/export`:
-        return ok({ canValidate: true, canExport: false, reason: '1 of 1', validator: { name: sc.validator ?? 'praxis-precheck', isAnvil: false }, tasks: [{ recordId: id(85) }] });
-      case route === `POST /projects/${P}/validate`:
-        expect(b).toEqual({ recordIds: [id(85)] });
-        return ok({ id: id(86), validator: 'praxis-precheck', results: [{ recordId: id(85), status: 'needs_fix', issues: [{ code: 'MISSING_BINDING' }] }] }, 201);
+        return ok({ canExport: sc.connected ?? false, connected: sc.connected ?? false, reason: sc.connected ? null : 'RL Gym isn’t connected yet.', rlgymTemplate: sc.connected ? { id: 'tpl_x', version: 1, specSha256: 's'.repeat(64) } : null, exported: false, tasks: [{ recordId: id(85) }], runs: [] });
       // ── cleanup ──
       case route === `GET /projects/${P}`:
         return ok({ id: P, status: s.projectStatus });
@@ -241,7 +238,7 @@ describe('qa-smoke: QA end-to-end smoke job (orchestration, mocked HTTP)', () =>
     expect(r.steps.map((x) => x.name)).toEqual([...STEPS]);
     expect(statuses(r)).toEqual(Object.fromEntries(STEPS.map((n) => [n, 'PASS'])));
     for (const x of r.steps) expect(x.durationMs).toBeGreaterThanOrEqual(0);
-    expect(r.ids).toMatchObject({ projectId: P, templateId: id(11), documentVersionId: id(41), extractionBatchId: id(42), ruleVersionId: id(53), ruleSetId: id(54), enrollmentId: id(61), candidateId: id(71), smeAssignmentId: id(72), taskId: id(80), recordId: id(85), validationRunId: id(86) });
+    expect(r.ids).toMatchObject({ projectId: P, templateId: id(11), documentVersionId: id(41), extractionBatchId: id(42), ruleVersionId: id(53), ruleSetId: id(54), enrollmentId: id(61), candidateId: id(71), smeAssignmentId: id(72), taskId: id(80), recordId: id(85) });
 
     // Paid calls: the extraction's reported cost, plus estimates for the model calls.
     expect(r.paidCalls).toEqual([
@@ -315,12 +312,14 @@ describe('qa-smoke: QA end-to-end smoke job (orchestration, mocked HTTP)', () =>
     expect(statuses(r)).toMatchObject({ review: 'SKIPPED', export: 'SKIPPED', cleanup: 'PASS' });
   });
 
-  it('when export validation would call Anvil, export is SKIPPED with the reason and the run still passes', async () => {
-    const api = fakeApi({ validator: 'anvil-discovery+praxis-precheck' });
-    const r = await qaSmoke(options(api.http), log);
-    expect(r.ok).toBe(true);
-    expect(r.steps.find((x) => x.name === 'export')).toMatchObject({ status: 'SKIPPED', reason: expect.stringContaining('would call Anvil') });
-    expect(api.calls.some((c) => c.path.endsWith('/validate'))).toBe(false);
+  it('export reads the state only: the approved record is listed, nothing is exported, connected or not', async () => {
+    for (const connected of [false, true]) {
+      const api = fakeApi({ connected });
+      const r = await qaSmoke(options(api.http), log);
+      expect(r.ok).toBe(true);
+      expect(r.steps.find((x) => x.name === 'export')).toMatchObject({ status: 'PASS', details: { connected, canExport: connected, exported: false } });
+      expect(api.calls.some((c) => c.method === 'POST' && (c.path.endsWith('/exports') || c.path.endsWith('/validate')))).toBe(false);
+    }
   });
 
   it('an unhealthy API skips everything after health; nothing is created', async () => {

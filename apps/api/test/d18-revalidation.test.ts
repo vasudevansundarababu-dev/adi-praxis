@@ -13,6 +13,7 @@ import { MemoryEmailSender } from '../src/lib/email';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { call, forgeKit } from './forge-helpers';
 import { createUser, db, login, resetDb, testConfig } from './helpers';
+import { fakeRlGym, qualifyForRlGym, RLGYM_CONFIG } from './rlgym-helpers';
 
 /**
  * D18 (owner, 16 Nov 2026): "If validation fails even if its approved then we need make the task needed for re work.
@@ -43,7 +44,8 @@ const WARNING_GRAPH = {
 describe('D18: a task that fails validation goes back to its author, at approval and at export', () => {
   let app: FastifyInstance;
   const google = new MockGoogleVerifier(SECRET);
-  const config = testConfig();
+  const config = testConfig({ ...RLGYM_CONFIG });
+  const rlgym = fakeRlGym();
   let clientId: string;
   let admin: string;
   let pm: string;
@@ -54,7 +56,7 @@ describe('D18: a task that fails validation goes back to its author, at approval
   const get = (cookie: string, url: string) => call(app, 'GET', cookie, url);
 
   beforeAll(async () => {
-    app = await buildApp({ config, db, pingRedis: async () => true, google, identity: new MockIdentityProvider(SECRET, 'http://candidate.test'), resolveClientId: async () => clientId, storage: new MemoryStorage(), email: new MemoryEmailSender(), embeddings: new HashingEmbeddingProvider() });
+    app = await buildApp({ rlgymFetch: rlgym.fetch, config, db, pingRedis: async () => true, google, identity: new MockIdentityProvider(SECRET, 'http://candidate.test'), resolveClientId: async () => clientId, storage: new MemoryStorage(), email: new MemoryEmailSender(), embeddings: new HashingEmbeddingProvider() });
   });
   beforeEach(async () => {
     await resetDb();
@@ -261,10 +263,10 @@ describe('D18: a task that fails validation goes back to its author, at approval
     const s = await submitted('SME_PM');
     expect((await decide(pm, s.pid, s.id, { decision: 'APPROVE', checklist: allTrue })).statusCode).toBe(200);
     const record = await db.approvedTaskRecord.findFirstOrThrow({ where: { taskInstanceId: s.id } });
-    // Export on the earlier rules (all approved records, project ended).
-    await setFlow(false);
-    await db.project.update({ where: { id: s.pid }, data: { distinctTarget: 1, endDate: new Date('2020-01-01') } });
-    expect((await get(pm, `/projects/${s.pid}/export`)).json()).toMatchObject({ canExport: true, tasks: [{ recordId: record.id }] });
+    // The RL Gym is connected and has qualified the project's template version: export is open.
+    const project = await db.project.findUniqueOrThrow({ where: { id: s.pid } });
+    await qualifyForRlGym(project.templateId);
+    expect((await get(pm, `/projects/${s.pid}/export`)).json()).toMatchObject({ canExport: true, connected: true, tasks: [{ recordId: record.id }] });
 
     // After approval, the task's coverage cell no longer exists in its template's values: a submit check now fails.
     const t = await db.taskInstance.findUniqueOrThrow({ where: { id: s.id } });
@@ -274,7 +276,8 @@ describe('D18: a task that fails validation goes back to its author, at approval
     expect(ex.statusCode, ex.body).toBe(422);
     expect(ex.json()).toMatchObject({ error: 'EXPORT_BLOCKED_REWORK', details: { tasks: [{ taskId: s.id, recordId: record.id }] } });
     expect(ex.json().details.tasks[0].checks).toEqual([expect.objectContaining({ id: 'coverage.values', ok: false })]);
-    expect(await db.projectValidationRun.count({ where: { projectId: s.pid, kind: 'EXPORT' } })).toBe(0);
+    expect(await db.rlGymProjectExport.count({ where: { projectId: s.pid } })).toBe(0);
+    expect(rlgym.sent).toHaveLength(0);
 
     // The task is in Rework as a new revision; its slot is open to it again.
     expect(await db.taskInstance.findUniqueOrThrow({ where: { id: s.id }, include: { slot: true } })).toMatchObject({ status: 'REWORK', reworkCount: 1, revision: t.revision + 1, slot: { status: 'IN_PROGRESS' } });

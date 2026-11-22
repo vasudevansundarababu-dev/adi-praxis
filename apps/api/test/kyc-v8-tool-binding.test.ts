@@ -22,6 +22,7 @@ import { exportPackageChecks } from '../src/tasks/revalidation';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { call, forgeKit } from './forge-helpers';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
+import { fakeRlGym, qualifyForRlGym, RLGYM_CONFIG } from './rlgym-helpers';
 
 /**
  * KYC v8 tool-binding correction (RL Gym's request and the owner's APR-13a-d, 20 Nov 2026): the job that submits
@@ -41,7 +42,8 @@ const stepsOf = (output: unknown) => ((output as { sections: Sections }).section
 
 describe('KYC v8 tool-binding correction', () => {
   let app: FastifyInstance;
-  const google = new MockGoogleVerifier(SECRET);
+  const rlgym = fakeRlGym();
+    const google = new MockGoogleVerifier(SECRET);
   const storage = new MemoryStorage();
   let clientId: string;
   let admin: string;
@@ -52,7 +54,7 @@ describe('KYC v8 tool-binding correction', () => {
 
   beforeAll(async () => {
     app = await buildApp({
-      config: testConfig({ ANVIL_CREDENTIAL_NOT_AFTER: new Date(Date.now() + 60 * 86_400_000).toISOString() }),
+      rlgymFetch: rlgym.fetch, config: testConfig({ ...RLGYM_CONFIG, ANVIL_CREDENTIAL_NOT_AFTER: new Date(Date.now() + 60 * 86_400_000).toISOString() }),
       db,
       pingRedis: async () => true,
       google,
@@ -366,9 +368,11 @@ describe('KYC v8 tool-binding correction', () => {
 
   it('APR-13d in the live RL Gym export: the export is blocked and the 3 tasks go to Rework; the job still corrects them from Rework', async () => {
     const h = await approvedV8();
+    await qualifyForRlGym(h.v8.id);
     const res = await post(admin, `/projects/${h.projectId}/exports`, {});
     expect(res.statusCode, res.body).toBe(422);
     expect(res.json().error).toBe('EXPORT_BLOCKED_REWORK');
+    expect(rlgym.sent).toHaveLength(0);
     expect((res.json().details.problems as string[]).join('\n')).toMatch(/S5: RL Gym export: S5 procedure steps name tools this template does not declare/);
     const statuses = await Promise.all(h.spec.tasks.map(async (t) => (await db.taskInstance.findUniqueOrThrow({ where: { id: t.taskId } })).status));
     expect(statuses).toEqual(['REWORK', 'REWORK', 'REWORK']);

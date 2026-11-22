@@ -71,7 +71,7 @@ Rules for every part of this build:
 - New `RlGymProjectClient`: JSON, `Authorization: Bearer <RL Gym key for Forge>`, `Idempotency-Key = export_sha256`.
   Reply and error handling follow the existing client's rules (business results kept apart from auth, transport and
   availability errors; the key is never logged).
-- `POST {RLGYM_BASE_URL}/api/v1/workspaces/{ws}/projects/{project_id}/exports` with `rlgym.project-export.v1`, built from
+- `POST {RLGYM_API_URL}/api/v1/workspaces/{ws}/projects/{project_id}/exports` with `rlgym.project-export.v1`, built from
   the project's current approved records (`currentRecords` in `routes/project-export.ts`):
   - `case_selector` comes from the task's coverage slot (`CoverageSlot.coverageTags`) and the template's case
     dimensions. **The author does not pick it**; the slot brief already tells them which case to write.
@@ -110,14 +110,14 @@ Rules for every part of this build:
   Nothing else on the author screen changes.
 - **Reviewers** can raise a need from Benchmark review.
 - Project page **SME needs**: the PM merges, sends or rejects. Only the PM sends.
-- Sending goes through the outbox to `POST {STUDIO_BASE_URL}/api/v1/inbox-items` (`kind`, `source: "adi-forge"`,
+- Sending goes through the outbox to `POST {STUDIO_API_URL}/api/v1/inbox-items` (`kind`, `source: "adi-forge"`,
   `template_id`, `version`, `project_id`, `summary`, `evidence`, `needed_by`). Unknown fields are not sent.
 - Status: Forge reads `GET /api/v1/inbox-items/{id}`. Studio's status webhook has no sender yet and is not built.
 - This keeps the rule that every template change is a Studio release; Forge only sends requests.
 
 ## Part 5. Keys and settings (§3.4 Admin)
 
-- `RLGYM_BASE_URL`, `RLGYM_WORKSPACE`, `STUDIO_BASE_URL`: names in `.env.example`. Locally they point at the local
+- `RLGYM_API_URL`, `RLGYM_WORKSPACE`, `RLGYM_FORGE_CLIENT_KEY` (part 2) and `STUDIO_API_URL`, `STUDIO_INBOX_KEY` (part 4), as named in AUTHORING-LOCAL-SETUP 4.3; names in `.env.example`. Locally they point at the local
   RL Gym and Studio; in QA they are empty until both are deployed.
 - RL Gym's key for Forge and Forge's key for Studio live in Secret Manager or local env, never in the database, chat,
   logs or the browser. Admin → API clients shows only whether each is set.

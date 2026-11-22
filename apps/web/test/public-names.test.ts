@@ -4,8 +4,10 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Legal rule (owner, 15 Nov 2026): nothing a user sees may name "ADI-Labs", "Praxis" or "Anvil". The product is
- * "ADI Forge"; Anvil is shown as "RL Gym". Internal names stay: code identifiers (`isAnvil`, `PraxisPrecheckValidator`),
+ * Legal rule (owner, 15 Nov 2026), as updated by the branding spec (AUTHORING-SPEC 3.5, 22 Nov 2026): nothing a user
+ * sees may name "Praxis" or "Anvil" (nor the old "ADI-Labs" spelling). "ADI Labs" is allowed again in the family name
+ * "ADI Labs Forge" (the owner's logo; legal to confirm before external release). This product is "Authoring"; Anvil is
+ * shown as "RL Gym". Internal names stay: code identifiers (`isAnvil`, `PraxisPrecheckValidator`),
  * packages (`@praxis/shared`), CSS and storage keys (`praxis-theme`), protocol names (`Praxis-Signature`,
  * `praxis.authored-task-export.v1`), "Praxis Demo Bank" (the fictional bank in synthetic data), and comments.
  *
@@ -36,9 +38,21 @@ const API_USER_FACING = [
   'apps/api/src/routes/candidate-password.ts',
   'apps/api/src/routes/candidate-auth.ts',
   'packages/shared/theme/tokens.ts',
+  // Studio edge cases, verifiers, RL Gym export and SME needs (AUTHORING-SPEC 1-2): messages people see.
+  'apps/api/src/routes/benchmark.ts',
+  'apps/api/src/anvil/benchmark.ts',
+  'apps/api/src/anvil/rlgym-export.ts',
+  'apps/api/src/dataset/approved-records.ts',
+  'packages/shared/src/benchmark.ts',
+  'packages/shared/src/ui/benchmark-checks.tsx',
+  'packages/shared/src/ui/task-checks.tsx',
+  'packages/shared/src/ui/brand-lockup.tsx',
+  'apps/api/src/lib/email.ts',
 ];
 const BANNED = [
-  /ADI[- ]?Labs/,
+  /ADI-Labs/,
+  // A compound such as "Anvil-ready" is public text; capitalised protocol names (`Praxis-Signature`) are not.
+  /(?<![\w@./-])(Praxis|Anvil)-[a-z]/,
   /ADI Praxis/,
   /(?<![\w@./-])Praxis(?![\w-])(?! Demo Bank)/,
   /(?<![\w@./-])Anvil(?![\w-])/,
@@ -84,8 +98,12 @@ describe('public names (legal, 15 Nov 2026)', () => {
         "const doc = 'US Federal KYC Policy (Praxis Demo Bank)';",
         "const schema = 'praxis.authored-task-export.v1';",
         "<p>Export to RL Gym from ADI Forge</p>",
+        "<p>Hello ADI-Labs</p>",
+        "<p>Anvil-ready for benchmarks</p>",
+        "<span>ADI LABS-FORGE │ AUTHORING</span>",
+        "const page = `Templates · Authoring · ADI Labs Forge`;",
       ].join('\n'),
     };
-    expect(publicNameViolations(['a.tsx'], (f) => lines[f]!).map((h) => h.split(':')[1])).toEqual(['1', '2', '3', '4']);
+    expect(publicNameViolations(['a.tsx'], (f) => lines[f]!).map((h) => h.split(':')[1])).toEqual(['1', '2', '3', '11', '12']);
   });
 });

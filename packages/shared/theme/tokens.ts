@@ -48,7 +48,15 @@ export const semantic = {
 } as const;
 
 export const TAGLINE = 'Intelligence Beyond Boundaries';
-export const PRODUCT_NAME = 'ADI Forge';
+/**
+ * Branding (adi-labs-design shared/BRANDING.md, AUTHORING-SPEC 3): the family is ADI Labs Forge; this product is
+ * Authoring. Every screen shows the lockup "[shield] ADI LABS-FORGE │ AUTHORING". A rename is one line here.
+ */
+export const PRODUCT_NAME = 'Authoring';
+export const FAMILY_NAME = 'ADI Labs Forge';
+/** Lockup colours (BRANDING.md 3). Primary buttons use BRAND.purple (hover BRAND.purpleDeep). */
+export const BRAND = { navy: '#082044', purple: '#8126af', purpleDeep: '#5b21b6', purpleLight: '#b77ae8', divider: '#2c3d63', productOnDark: '#a9b4cc', dividerLight: '#d9dbe3', productOnLight: '#5d6475' } as const;
 
-/** Page titles read "<Screen> · ADI Praxis". */
-export const pageTitle = (screen: string) => `${screen} · ${PRODUCT_NAME}`;
+/** Browser tab: "<Page> · Authoring · ADI Labs Forge". */
+export const TITLE_SUFFIX = `${PRODUCT_NAME} · ${FAMILY_NAME}`;
+export const pageTitle = (screen: string) => `${screen} · ${TITLE_SUFFIX}`;

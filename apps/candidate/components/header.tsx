@@ -1,6 +1,5 @@
-import Image from 'next/image';
 import Link from 'next/link';
-import mark from '@praxis/shared/brand/praxis-mark-512.png';
+import { NavBrand } from './brand';
 import { getForgeSettings, getMeSafe } from '@/lib/api';
 import { smeSupplyEnabled } from '@/lib/features';
 import { SignOut } from './sign-out';
@@ -9,12 +8,11 @@ import { SignOut } from './sign-out';
 export async function Header() {
   const [me, forge] = await Promise.all([getMeSafe(), getForgeSettings()]);
   return (
-    <header className="sticky top-0 z-20 border-b border-hairline bg-bg/85 backdrop-blur">
+    <header className="brand-header sticky top-0 z-20 bg-brand-navy text-white">
       {process.env.PRAXIS_DEMO === '1' && <DemoBanner />}
       <div className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-3">
-        <Link href={me ? '/home' : '/'} className="flex items-center gap-2 font-semibold">
-          <Image src={mark} alt="" width={28} height={28} className="rounded" />
-          ADI Forge
+        <Link href={me ? '/home' : '/'} aria-label="Authoring home">
+          <NavBrand />
         </Link>
         {forge.newFlow ? (
           <nav className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm">
@@ -51,7 +49,7 @@ export async function Header() {
         </nav>
         )}
       </div>
-      <div className="h-0.5 bg-brand-gradient" aria-hidden />
+      <div className="h-[3px] bg-brand-gradient" aria-hidden />
     </header>
   );
 }

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { FAMILY_NAME, PRODUCT_NAME } from '@praxis/shared/theme';
 import {
   demographicProfile,
   educationLabel,
@@ -283,6 +285,20 @@ class Writer {
     this.page.drawLine({ start: { x: MARGIN, y: this.y }, end: { x: A4[0] - MARGIN, y: this.y }, thickness: 1.5, color: NAVY });
     this.y -= 22;
   }
+  /** The full ADI Labs Forge logo (navy text, for light backgrounds) at the top of page 1; skipped if the file is missing. */
+  async logo(doc: PDFDocument) {
+    let bytes: Buffer;
+    try {
+      bytes = readFileSync(new URL('../../../../packages/shared/brand/praxis-logo-cropped.png', import.meta.url));
+    } catch {
+      return;
+    }
+    const img = await doc.embedPng(bytes);
+    const h = 64;
+    const w = (img.width / img.height) * h;
+    this.page.drawImage(img, { x: MARGIN, y: this.y - h, width: w, height: h });
+    this.y -= h + 16;
+  }
   private need(h: number) {
     if (this.y - h < MARGIN) this.newPage();
   }
@@ -337,14 +353,16 @@ class Writer {
 /** One PDF with the four sections, and the assessment sheet embedded as a file attachment. */
 export async function buildRecruiterPdf(pack: RecruiterPackDto, sheet: Buffer, now = new Date()): Promise<Buffer> {
   const doc = await PDFDocument.create();
-  const title = `ADI Forge — Recruiter pack · ${pack.projectName} · ${pack.date}`;
+  // Branding (AUTHORING-SPEC 3.4): running header "ADI Labs Forge · Authoring", the full logo at the top of page 1.
+  const title = `${FAMILY_NAME} · ${PRODUCT_NAME} — Recruiter pack · ${pack.projectName} · ${pack.date}`;
   doc.setTitle(title);
-  doc.setAuthor('ADI Forge');
-  doc.setCreator('ADI Forge');
-  doc.setProducer('ADI Forge');
+  doc.setAuthor(FAMILY_NAME);
+  doc.setCreator(`${FAMILY_NAME} ${PRODUCT_NAME}`);
+  doc.setProducer(`${FAMILY_NAME} ${PRODUCT_NAME}`);
   doc.setCreationDate(now);
   doc.setModificationDate(now);
   const w = new Writer(doc, await doc.embedFont(StandardFonts.Helvetica), await doc.embedFont(StandardFonts.HelveticaBold), title);
+  await w.logo(doc);
 
   w.para('One pack for recruitment agencies. Use it to pick the right profiles and send back one row per candidate in the attached sheet.', { muted: true });
 

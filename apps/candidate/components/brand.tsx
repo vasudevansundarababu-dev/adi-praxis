@@ -1,26 +1,21 @@
 import Image from 'next/image';
-import logo from '@praxis/shared/brand/praxis-logo-cropped.png';
 import mark from '@praxis/shared/brand/praxis-mark-512.png';
+import { BrandLockup } from '@praxis/shared/ui/brand-lockup';
 
 /**
- * Full ADI Forge logo (mark and wordmark), for sign-in and public pages (dark backgrounds only: "ADI" is white).
- * No tagline: the old ADI-Labs tagline is not used (legal, 15 Nov 2026).
- * The PNG has a near-charcoal background; `lighten` blends it into the page until a transparent logo is supplied.
+ * Sign-in and other unauthenticated pages (AUTHORING-SPEC 3.4): on the navy page, centred, the shield, "ADI LABS-FORGE"
+ * and "AUTHORING". The full logo (navy text) is for light backgrounds only (PDFs, emails), so it is not used here.
  */
 export function FullLogo() {
+  // A navy panel, so the lockup reads on the navy sign-in page and on the candidate app's light pages alike.
   return (
-    <div className="flex flex-col items-center">
-      <Image src={logo} alt="ADI Forge" priority className="h-auto w-56 mix-blend-lighten" />
+    <div className="flex justify-center rounded-xl bg-brand-navy px-6 py-6">
+      <BrandLockup stacked mark={<Image src={mark} alt="ADI Labs Forge" width={104} height={104} priority />} />
     </div>
   );
 }
 
-/** ADI Forge mark plus the product name, for each app's top navigation. */
+/** The header lockup [shield] ADI LABS-FORGE │ AUTHORING on the navy bar. */
 export function NavBrand() {
-  return (
-    <span className="flex items-center gap-2">
-      <Image src={mark} alt="" width={28} height={28} className="rounded" />
-      <span className="font-semibold">ADI Forge</span>
-    </span>
-  );
+  return <BrandLockup mark={<Image src={mark} alt="" width={30} height={30} />} />;
 }

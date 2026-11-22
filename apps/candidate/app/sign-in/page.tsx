@@ -18,14 +18,14 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4 py-10">
       <FullLogo />
-      <h1 className="mt-10 text-xl font-semibold">Sign in to ADI Forge</h1>
+      <h1 className="mt-10 text-xl font-semibold">Sign in to Authoring</h1>
       {forge.newFlow ? (
         <p className="mt-2 text-sm text-fg-muted">
           Sign in with the email you gave your recruitment agency{signInVariant(forge) === 'password' ? ' and your password' : ''}. You&apos;ll see the tasks assigned to you.
         </p>
       ) : (
         <p className="mt-2 text-sm text-fg-muted">
-          ADI Forge invites subject-matter experts to write realistic, synthetic tasks. We check your identity to protect
+          ADI Labs Forge invites subject-matter experts to write realistic, synthetic tasks. We check your identity to protect
           the contributor community, and we ask about your relevant experience to match you with suitable work.
         </p>
       )}

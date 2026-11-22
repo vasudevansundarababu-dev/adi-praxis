@@ -13,7 +13,7 @@ export default async function ChangePasswordPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
   return (
-    <main className="dark flex min-h-screen items-center justify-center bg-brand-charcoal px-4 py-10 text-fg">
+    <main className="dark flex min-h-screen items-center justify-center bg-brand-navy px-4 py-10 text-fg">
       <div className="w-full max-w-sm">
         <FullLogo />
         <h1 className="mt-8 text-center text-lg font-semibold">{user.mustChangePassword ? 'Choose your own password' : 'Change password'}</h1>

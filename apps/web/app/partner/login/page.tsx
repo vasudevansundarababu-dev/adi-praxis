@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: 'Partner sign in' };
 export default async function PartnerLoginPage() {
   if (await getPartnerMe()) redirect('/partner');
   return (
-    <main className="dark flex min-h-screen items-center justify-center bg-brand-charcoal px-4 text-fg">
+    <main className="dark flex min-h-screen items-center justify-center bg-brand-navy px-4 text-fg">
       <div className="w-full max-w-sm">
         <FullLogo />
         <h1 className="mt-8 text-center text-lg font-semibold">Sign in to the partner portal</h1>

@@ -8,8 +8,8 @@ describe('Anvil readiness badge (Praxis-Anvil contract)', () => {
   it('says not yet qualified, and where the proposal came from', () => {
     expect(text(html(<AnvilReadinessBadge r={base} />))).toBe('Not yet qualified by RL Gym for benchmarks · proposed by RL Gym for requirement REQ-2026-041 (enterprise-banking)');
   });
-  it('qualified and published: Anvil-ready with the receipt', () => {
-    expect(text(html(<AnvilReadinessBadge r={{ ...base, qualification: 'qualified', anvilReady: true, receiptId: 'RCPT-1' }} />))).toContain('Anvil-ready for benchmarks (receipt RCPT-1)');
+  it('qualified and published: RL Gym-ready with the receipt', () => {
+    expect(text(html(<AnvilReadinessBadge r={{ ...base, qualification: 'qualified', anvilReady: true, receiptId: 'RCPT-1' }} />))).toContain('RL Gym-ready for benchmarks (receipt RCPT-1)');
   });
   it('revoked is never shown as ready', () => {
     expect(text(html(<AnvilReadinessBadge r={{ ...base, qualification: 'revoked' }} />))).toContain('revoked its qualification');

@@ -11,7 +11,7 @@ test.describe('console smoke', () => {
   test('an Admin signs in and sees the console for their role', async ({ page }) => {
     await page.goto(`${WEB}/login`);
     await page.waitForLoadState('networkidle'); // let the form hydrate before submitting it
-    await expect(page).toHaveTitle(/ADI Forge/);
+    await expect(page).toHaveTitle(/Authoring · ADI Labs Forge/);
     await page.getByLabel('Email').fill(ADMIN.email);
     await page.getByLabel('Password').fill(ADMIN.password);
     await page.getByRole('button', { name: /sign in/i }).click();
@@ -111,7 +111,7 @@ test.describe('candidate smoke', () => {
   test('the sign-in page offers Google sign-in and never the local mock in a deployed environment', async ({ page }) => {
     test.skip(!EXTERNAL, 'deployed environments only');
     await page.goto(`${CANDIDATE}/sign-in`);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to ADI Forge');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to Authoring');
     await expect(page.getByText('Dev sign-in (mock Google)')).toHaveCount(0);
   });
 

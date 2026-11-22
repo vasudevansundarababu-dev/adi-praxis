@@ -16,7 +16,7 @@ export interface AnvilReadiness {
 
 export function AnvilReadinessBadge({ r }: { r: AnvilReadiness }) {
   const text = r.anvilReady
-    ? `Anvil-ready for benchmarks (receipt ${r.receiptId})`
+    ? `RL Gym-ready for benchmarks (receipt ${r.receiptId})`
     : r.qualification === 'revoked'
       ? 'RL Gym revoked its qualification of this version: not ready for benchmarks'
       : 'Not yet qualified by RL Gym for benchmarks';

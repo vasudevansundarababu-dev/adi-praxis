@@ -65,7 +65,7 @@ describe('theme tokens', () => {
     }
   });
 
-  it('page titles read "<Screen> · ADI Forge"', () => {
-    expect(pageTitle('Sign in')).toBe('Sign in · ADI Forge');
+  it('page titles read "<Screen> · Authoring · ADI Labs Forge" (BRANDING.md 4, 22 Nov 2026)', () => {
+    expect(pageTitle('Sign in')).toBe('Sign in · Authoring · ADI Labs Forge');
   });
 });

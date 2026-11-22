@@ -12,7 +12,7 @@ const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-forge-mono', dis
 const fontVars = `${sans.variable} ${display.variable} ${mono.variable}`;
 
 export const metadata: Metadata = {
-  title: { template: '%s · ADI Forge', default: 'ADI Forge' },
+  title: { template: '%s · Authoring · ADI Labs Forge', default: 'Authoring · ADI Labs Forge' },
   applicationName: 'ADI Forge',
   icons: { icon: mark.src, apple: mark.src },
 };

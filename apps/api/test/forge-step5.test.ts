@@ -215,7 +215,7 @@ describe('MVP1 step 5: Sourcing screens and Export to Recruiter', () => {
       expect(r.headers['content-disposition']).toBe('attachment; filename="recruiter-pack-KYC-Of-US-bank-Chicago.pdf"');
       const pdf = await PDFDocument.load(r.rawPayload);
       expect(pdf.getPageCount()).toBeGreaterThanOrEqual(1);
-      expect(pdf.getTitle()).toMatch(/^ADI Forge — Recruiter pack · KYC-Of US bank Chicago · \d{1,2} \w{3} \d{4}$/);
+      expect(pdf.getTitle()).toMatch(/^ADI Labs Forge · Authoring — Recruiter pack · KYC-Of US bank Chicago · \d{1,2} \w{3} \d{4}$/);
       const files = attachments(pdf);
       expect([...files.keys()]).toEqual(['candidate-assessment-KYC-Of-US-bank-Chicago.xlsx']);
       const read = await readAssessmentSheet(Buffer.from(files.get('candidate-assessment-KYC-Of-US-bank-Chicago.xlsx')!));

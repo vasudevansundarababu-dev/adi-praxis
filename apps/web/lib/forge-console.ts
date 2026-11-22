@@ -30,6 +30,8 @@ export const PROJECT_TABS = [
   { key: 'people', label: 'Resource assignments' },
   { key: 'tasks', label: 'Tasks' },
   { key: 'policies', label: 'Policies' },
+  // RL Gym export, SME needs and Benchmark review (AUTHORING-SNAPSHOT 3.4).
+  { key: 'benchmark', label: 'Benchmark' },
 ] as const;
 export type ProjectTab = (typeof PROJECT_TABS)[number]['key'];
 

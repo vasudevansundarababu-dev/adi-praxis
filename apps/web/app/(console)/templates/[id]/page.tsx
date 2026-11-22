@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { BlueprintSummary } from '@/components/templates/compiler/blueprint-summary';
 import { MetaCompiler } from '@/components/templates/compiler/meta-compiler';
 import { AnvilReadinessBadge, type AnvilReadiness } from '@/components/templates/anvil-readiness';
+import { TemplateBenchmarkPanel, type TemplateBenchmarkDto } from '@/components/templates/benchmark-panel';
 import { McHeader } from '@/components/templates/mc-header';
 import { StatusBadge } from '@/components/templates/status-badge';
 import { TemplateActions, type FormOption } from '@/components/templates/template-actions';
@@ -30,7 +31,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const user = (await getCurrentUser())!;
   const isAdmin = user.roles.includes('ADMIN');
-  const [{ data: t }, { data: bp }, { data: anvil }] = await Promise.all([mcServer.template(id), mcServer.blueprint(id), apiGet<AnvilReadiness>(`/templates/${id}/anvil`)]);
+  const [{ data: t }, { data: bp }, { data: anvil }, { data: benchmark }] = await Promise.all([mcServer.template(id), mcServer.blueprint(id), apiGet<AnvilReadiness>(`/templates/${id}/anvil`), apiGet<TemplateBenchmarkDto>(`/templates/${id}/benchmark`)]);
   if (!t || !bp) notFound();
 
   const heading = (
@@ -50,6 +51,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
         {heading}
         <TutorialSettings template={t} canEdit={false} />
         <BlueprintSummary bp={bp.blueprint} templateId={t.id} />
+        {benchmark && <TemplateBenchmarkPanel b={benchmark} />}
       </div>
     );
   }
@@ -90,6 +92,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
       )}
       <TutorialSettings key={`tutorial:${t.updatedAt}`} template={t} canEdit />
       {tutorialRuns && <TutorialVideoPanel templateId={t.id} initial={tutorialRuns} />}
+      {benchmark && <TemplateBenchmarkPanel b={benchmark} />}
       <div className="mt-4">
         <MetaCompiler
           key={`${t.id}:${bp.blueprintRevision}`}

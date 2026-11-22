@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import { TaskPage } from '@/components/work/task-page';
 import { TaskAids } from '@/components/forge/task-aids';
 import { PolicyProposals } from '@/components/work/policy-proposals';
+import { BenchmarkFields } from '@/components/work/benchmark-fields';
 import { TaskRules, type TaskRulesView } from '@/components/work/task-rules';
 import { api, getForgeSettings, getMe } from '@/lib/api';
 import type { ForgeHomeDto } from '@praxis/shared';
@@ -30,6 +31,7 @@ export default async function TaskRoute({ params }: { params: Promise<{ id: stri
       <TaskAids taskId={data.id} kind="author" tutorial={data.tutorial ?? null} />
       {policy && <TaskRules policy={policy} />}
       {data.taskType === 'AUTHORING' && <PolicyProposals taskId={data.id} readOnly={data.readOnly} />}
+      {data.taskType === 'AUTHORING' && <BenchmarkFields taskId={data.id} />}
       <TaskPage task={data} newFlow={newFlow} />
     </main>
   );

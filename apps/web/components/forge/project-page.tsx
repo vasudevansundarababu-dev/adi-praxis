@@ -3,6 +3,7 @@ import { ForgeDashboardTab, type DashboardNumbers } from '@/components/forge/das
 import { ForgePeopleTab, type WithoutTask } from '@/components/forge/people-tab';
 import { ForgeProjectShell } from '@/components/forge/project-shell';
 import { ForgeTasksTab } from '@/components/forge/tasks-tab';
+import { BenchmarkSection } from '@/components/projects/benchmark-section';
 import { PolicyWorkspace, type DocumentsData, type ExtractionData, type PreviewData, type RuleRow } from '@/components/policy/policy-workspace';
 import type { ExportState } from '@/components/projects/export-panel';
 import type { SearchParams } from '@/components/pager';
@@ -33,6 +34,8 @@ export async function ForgeProjectPage({ project, tab, searchParams = {} }: { pr
   } else if (tab === 'tasks') {
     const { data: exportState } = await apiGet<ExportState>(`/projects/${id}/export`);
     body = <ForgeTasksTab projectId={id} tasks={tasks} people={people} exportState={exportState} />;
+  } else if (tab === 'benchmark') {
+    body = <BenchmarkSection projectId={id} />;
   } else if (tab === 'policies') {
     const [docs, extraction, rules, preview, user] = await Promise.all([
       apiGet<DocumentsData>(`/projects/${id}/policy/documents`),

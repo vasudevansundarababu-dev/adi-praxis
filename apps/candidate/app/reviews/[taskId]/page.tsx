@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { ReviewPage, type ReviewView } from '@/components/forge/review-page';
 import { TaskAids } from '@/components/forge/task-aids';
+import { TaskChecks, type TaskChecksDto } from '@praxis/shared/ui/task-checks';
 import { getForgeSettings, getMeSafe } from '@/lib/api';
 
 export const metadata: Metadata = { title: { absolute: pageTitle('Review') } };
@@ -23,10 +24,14 @@ export default async function ReviewRoute({ params }: { params: Promise<{ taskId
   // The rubric's internal details (RUBRIC_RECOMMENDATIONS_ENABLED); a 404 when the flag is off shows nothing extra.
   const rub = await fetch(`${API_BASE}/api/v1/me/reviews/${taskId}/rubric`, { headers: { cookie: (await cookies()).toString() }, cache: 'no-store' });
   const rubric = rub.ok ? ((await rub.json()) as RubricView) : null;
+  // Studio's verifier checks for this task, read-only (AUTHORING-SPEC 2.3).
+  const chk = await fetch(`${API_BASE}/api/v1/me/reviews/${taskId}/benchmark-checks`, { headers: { cookie: (await cookies()).toString() }, cache: 'no-store' });
+  const checks = chk.ok ? ((await chk.json()) as TaskChecksDto) : null;
   return (
     <>
       <div className="mx-auto max-w-4xl px-4 pt-6">
         <TaskAids taskId={body.taskId} kind="reviewer" tutorial={body.tutorial ?? null} />
+        {checks && <TaskChecks data={checks} />}
       </div>
       {/* D17: room at the end so the floating Help mascot never covers the last content. */}
       <div className="pb-36">

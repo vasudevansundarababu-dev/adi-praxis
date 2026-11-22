@@ -7,6 +7,7 @@ import type { ExportState } from '@/components/projects/export-panel';
 import { NoAccess } from '@/components/no-access';
 import { apiGet, newFlowOn } from '@/lib/api';
 import { taskCodes } from '@/lib/forge-console';
+import { TaskChecks, type TaskChecksDto } from '@praxis/shared/ui/task-checks';
 
 export const metadata: Metadata = { title: 'Task' };
 
@@ -22,16 +23,22 @@ export default async function ForgeTaskReviewPage({ params }: { params: Promise<
         </Link>
       </div>
     );
-  const [v, list, people, exp, rubric] = await Promise.all([
+  const [v, list, people, exp, rubric, checks] = await Promise.all([
     apiGet<ForgeTaskView>(`/projects/${id}/forge-tasks/${taskId}`),
     apiGet<{ items: ForgeTaskRow[] }>(`/projects/${id}/forge-tasks`),
     apiGet<{ items: ProjectPersonDto[] }>(`/projects/${id}/people`),
     apiGet<ExportState>(`/projects/${id}/export`),
     // The rubric's internal details (RUBRIC_RECOMMENDATIONS_ENABLED); a 404 when the flag is off shows nothing extra.
     apiGet<RubricView>(`/projects/${id}/forge-tasks/${taskId}/rubric`),
+    apiGet<TaskChecksDto>(`/tasks/${taskId}/benchmark-checks`),
   ]);
   if (v.status === 403) return <NoAccess need="PMs and Admins" />;
   if (!v.data) notFound();
   const code = taskCodes(list.data?.items ?? []).get(taskId) ?? 'Task';
-  return <ForgeTaskPage code={code} view={v.data} people={people.data?.items ?? []} exportState={exp.data} rubric={rubric.data} />;
+  return (
+    <>
+      {checks.data && <TaskChecks data={checks.data} />}
+      <ForgeTaskPage code={code} view={v.data} people={people.data?.items ?? []} exportState={exp.data} rubric={rubric.data} />
+    </>
+  );
 }

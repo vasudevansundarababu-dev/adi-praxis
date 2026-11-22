@@ -14,7 +14,10 @@
       "default": "./security-headers.mjs"
     },
     "./ui/pagination": "./src/ui/pagination.tsx",
-    "./ui/use-page": "./src/ui/use-page.ts"
+    "./ui/use-page": "./src/ui/use-page.ts",
+    "./ui/benchmark-checks": "./src/ui/benchmark-checks.tsx",
+    "./ui/task-checks": "./src/ui/task-checks.tsx",
+    "./ui/brand-lockup": "./src/ui/brand-lockup.tsx"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

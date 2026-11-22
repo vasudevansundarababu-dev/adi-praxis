@@ -79,6 +79,8 @@ import { reviewerRecruitmentRoutes } from './routes/reviewer-recruitment';
 import { searchRoutes } from './routes/search';
 import { projectExportRoutes } from './routes/project-export';
 import { benchmarkReviewRoutes } from './routes/benchmark-review';
+import { smeNeedRoutes } from './routes/sme-needs';
+import { StudioClient, studioConnected } from './anvil/studio-client';
 import { taskPackageRoutes } from './routes/task-packages';
 import { RlGymClient, rlGymConnected, type FetchLike as RlGymFetch } from './anvil/rlgym-client';
 import { SearchService } from './search/service';
@@ -110,6 +112,8 @@ export interface AppDeps {
   config: Config;
   /** New RL Gym project export: the fetch used to call the RL Gym (tests pass a mock; never a live call in tests). */
   rlgymFetch?: RlGymFetch;
+  /** Studio inbox (part 4): the fetch used to call Studio (tests pass a mock). */
+  studioFetch?: RlGymFetch;
   /** Keyless Anvil caller verification; tests inject one with local keys. */
   anvilIdentity?: ServiceIdentityVerifier;
   db: Db;
@@ -344,6 +348,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       const rlgymClient = rlGymConnected(rlgymSettings) ? new RlGymClient(rlgymSettings, deps.rlgymFetch) : null;
       await v1.register(projectExportRoutes, { db: deps.db, rlgym: rlgymClient });
       await v1.register(benchmarkReviewRoutes, { db: deps.db, rlgym: rlgymClient });
+      const studioSettings = { apiUrl: deps.config.STUDIO_API_URL, key: deps.config.STUDIO_INBOX_KEY, tenantId: deps.config.STUDIO_TENANT_ID, serviceActorId: deps.config.STUDIO_SERVICE_ACTOR_ID };
+      await v1.register(smeNeedRoutes, { db: deps.db, studio: studioConnected(studioSettings) ? new StudioClient(studioSettings, deps.studioFetch) : null });
       await v1.register(templateProfileRoutes, { db: deps.db });
       await v1.register(taskPackageRoutes, { db: deps.db });
       await v1.register(anvilTemplateRoutes, { db: deps.db, anvil: { environment: deps.config.ANVIL_ENVIRONMENT, exportBaseUrl: deps.config.ANVIL_EXPORT_BASE_URL } });

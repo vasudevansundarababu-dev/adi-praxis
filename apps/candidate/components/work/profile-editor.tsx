@@ -46,6 +46,17 @@ import { criticalRulesFor } from '@/lib/whole-task-suggestion';
 
 /** RUBRIC_RECOMMENDATIONS_ENABLED: the S4/S7/S8 controls change. Template text always shows public names (D5). */
 const FormV2 = createContext(false);
+/** APR-13d: the template's declared tools; a procedure step's Tool (S5.steps[].tool) is a dropdown of these. */
+const StepTools = createContext<{ id: string; label: string }[] | null>(null);
+const STEP_TOOL_PATH = /^S5\.steps\[\d+\]\.tool$/;
+export const NOT_A_TEMPLATE_TOOL = 'not one of this template’s tools: choose another';
+
+/** The step Tool field as a pick list of the template's tools; a value already saved that is not one of them stays visible, marked. */
+export function stepToolField(field: ItemField, value: unknown, tools: { id: string; label: string }[]): ItemField {
+  const options = tools.map((t) => ({ value: t.id, label: t.label }));
+  if (typeof value === 'string' && value && !tools.some((t) => t.id === value)) options.push({ value, label: `${value} (${NOT_A_TEMPLATE_TOOL})` });
+  return { ...field, type: 'pick_list', options } as ItemField;
+}
 
 /**
  * The Classic editor for any registered template profile (handover v2.1 ch. 04/05): eight sections with progress,
@@ -111,8 +122,10 @@ function Messages({ id, problems }: { id: string; problems: ProfileProblem[] }) 
   );
 }
 
-function FieldControl({ field, value, path, problems, lookup, onChange }: FieldProps) {
+function FieldControl({ field: given, value, path, problems, lookup, onChange }: FieldProps) {
   const v2 = useContext(FormV2);
+  const stepTools = useContext(StepTools);
+  const field = stepTools?.length && STEP_TOOL_PATH.test(path) && !isArrayType(given.type) ? stepToolField(given, value, stepTools) : given;
   const id = domId(path);
   const mine = problems.filter((p) => p.path === path);
   const describedBy = [`${id}-help`, mine.length ? `${id}-problems` : ''].filter(Boolean).join(' ');
@@ -397,6 +410,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
 
   return (
     <FormV2.Provider value={v2}>
+    <StepTools.Provider value={task.template.stepTools ?? null}>
     <div className="max-w-4xl min-w-0 space-y-4">
       {openLink && <SourcePanel link={openLink} onClose={() => setOpenLink(null)} onOpenInForm={openInForm} />}
       <div className="flex flex-wrap items-center gap-3">
@@ -597,6 +611,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
       </section>
 
     </div>
+    </StepTools.Provider>
     </FormV2.Provider>
   );
 }

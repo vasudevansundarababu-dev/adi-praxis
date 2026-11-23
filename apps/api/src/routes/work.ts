@@ -25,8 +25,22 @@ import { profileSaveProblems, shownExportStatus } from '../tasks/profile-output'
 import { tutorialOf } from '../forge/tutorial';
 import { servedTutorial } from '../forge/tutorial-video/service';
 import { normaliseRubricOutput, rubricSubmitChecks } from '../tasks/rubric/service';
+import { jointTemplateSpec } from '../anvil/joint-template';
+import { declaredToolIds } from '../anvil/tool-binding';
 
 const IdParams = z.object({ id: z.string().uuid() });
+
+/** The template's declared tools as dropdown choices (id, with its effect when stated), or null when it declares none. */
+function stepToolsOf(template: Parameters<typeof jointTemplateSpec>[0]): { id: string; label: string }[] | null {
+  const spec = jointTemplateSpec(template);
+  const ids = spec ? declaredToolIds(spec.execution) : null;
+  if (!ids?.length) return null;
+  const tools = (spec!.execution as { tools?: { id?: unknown; effect?: unknown }[] }).tools ?? [];
+  return ids.map((id) => {
+    const effect = tools.find((x) => x?.id === id)?.effect;
+    return { id, label: typeof effect === 'string' && effect ? `${id} (${effect})` : id };
+  });
+}
 
 /** What still stands between this candidate and the project's tasks (SPEC FLOW 3, candidate login step 4). */
 type Step = { step: 'identity' | 'account' | 'accept' | 'onboarding' | 'eligibility' | 'not_assigned' | 'terms'; message: string; href: string | null };
@@ -36,6 +50,7 @@ type Step = { step: 'identity' | 'account' | 'accept' | 'onboarding' | 'eligibil
  * (as SME) in Resource assignments. Then being assigned is the selection: no identity check, no selection or
  * onboarding gate, and tasks come only from the PM (no pulling).
  */
+
 export async function directWork(tx: Db | Tx, u: { id: string; clientId: string }, projectId: string) {
   if (!(await forgeSettings(tx, u.clientId)).newFlow) return false;
   return directlyAssignedSme(tx, u.id, projectId);
@@ -179,6 +194,8 @@ export const workRoutes: FastifyPluginAsyncZod<{ db: Db; selectionGate: Selectio
         coverageDimensions: template.coverageDimensions,
         edgeCases: template.edgeCases,
         collectionSchema: template.collectionSchema,
+        // APR-13d: the tool IDs a procedure step may name (the S5 step Tool dropdown), or null when none are declared.
+        stepTools: stepToolsOf(t.project.template),
       },
       input: t.input,
       output: t.quarantinedAt ? null : t.output,

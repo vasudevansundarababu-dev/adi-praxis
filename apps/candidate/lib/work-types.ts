@@ -54,6 +54,8 @@ export interface TaskView extends TaskSummary {
     workflow: string;
     /** The template version's chosen form (null = the workflow default). */
     profileId?: string | null;
+    /** The tools a procedure step (S5) may name: the step Tool is a dropdown of these. Null when none are declared. */
+    stepTools?: { id: string; label: string }[] | null;
     /** The chosen form, sent by the server (uploaded forms are not built into the app). */
     profile?: import('@praxis/shared').TemplateProfile | null;
     domain: string;

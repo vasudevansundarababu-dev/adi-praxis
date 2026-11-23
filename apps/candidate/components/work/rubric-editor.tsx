@@ -13,7 +13,8 @@ import {
   type ToFinish,
   type ViewLink,
 } from '@praxis/shared';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { FormSaveContext, saveStatus } from './save-bar';
 import { suggestWholeTaskCondition, type CriticalRule } from '@/lib/whole-task-suggestion';
 
 /**
@@ -117,9 +118,13 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
   // A criterion the template lists but the form has not stored yet is added on its first edit (never lost).
   const setItem = (id: string, patch: Record<string, unknown>) =>
     onChange(items.some((i) => i.id === id) ? items.map((i) => (i.id === id ? { ...i, ...patch } : i)) : [...items, { ...newItem(field, items), ...(view.seed?.find((x) => x.id === id) ?? {}), id, ...patch }]);
+  // The owner (23 Nov 2026): show that criterion edits are saved, in the panel itself.
+  const [detailSave, setDetailSave] = useState<DetailSave>({ kind: 'idle' });
   const saveDetail = async (c: { id: string; annotationVersion: number }, body: Omit<SaveCriterionRequest, 'expectedVersion'>) => {
+    setDetailSave({ kind: 'saving' });
     const r = await send('PUT', `${base}/criteria/${encodeURIComponent(c.id)}`, { expectedVersion: c.annotationVersion, ...body });
     if (!r.ok) setMsg(r.message);
+    setDetailSave(r.ok ? { kind: 'saved', at: new Date().toISOString() } : { kind: 'error' });
     await reload();
   };
   const refresh = async (mode: 'DERIVED' | 'AI') => {
@@ -232,7 +237,7 @@ export function RubricEditor({ taskId, field, value, onChange, view, reload, rea
             </button>
           </div>
           <div className="overflow-auto">{body(view.criteria.find((c) => c.id === panel)!)}</div>
-          <p className="border-t border-line px-4 py-2 text-xs text-fg-muted">Changes save automatically, as everywhere on this form.</p>
+          <PanelSaveStatus detail={detailSave} />
         </aside>
       )}
 
@@ -338,6 +343,12 @@ const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0
 const filled = (v: unknown) => typeof v === 'string' && v.trim() !== '';
 
 /** What blocks Submit in the rubric, in plain words (D14). Everything else is a recommendation. */
+/** D-029: the weight total the template sets (its field's total, else its criteria's weights), or null when it sets none. */
+export function weightTarget(view: RubricView, field: ItemField): number | null {
+  if (view.template.weightTotal !== undefined) return view.template.weightTotal;
+  return field.weightTotal ?? 100;
+}
+
 export function rubricBlockers(view: RubricView, field: ItemField, items: Record<string, unknown>[]): RubricBlocker[] {
   const out: RubricBlocker[] = [];
   const required = view.template.scoreKeys.filter((k) => k.required);
@@ -352,9 +363,10 @@ export function rubricBlockers(view: RubricView, field: ItemField, items: Record
     const missing = required.filter((k) => !filled(item[k.key])).map((k) => k.label);
     if (missing.length) out.push({ criterionId: id, message: `${id}: ${missing.join(', ')} text is missing.`, fix: 'EDIT' });
   }
-  const total = field.weightTotal ?? 100;
+  // D-029: the total comes from the live template (null: no fixed total), never a hard-coded 100.
+  const total = weightTarget(view, field);
   const sum = items.reduce((a, i) => a + num(i.weight), 0);
-  if (items.length && sum !== total) out.push({ criterionId: null, message: `Weights add up to ${sum}; they must add up to exactly ${total}.`, fix: null });
+  if (items.length && total !== null && Math.abs(sum - total) > 0.001) out.push({ criterionId: null, message: `Weights add up to ${sum}; they must add up to exactly ${total} for this template.`, fix: null });
   for (const g of field.groups ?? []) {
     const gs = items.filter((i) => i.group === g.id).reduce((a, i) => a + num(i.weight), 0);
     if (gs !== g.weight) out.push({ criterionId: null, message: `Group ${g.id} (${g.label}) adds up to ${gs}; it must be ${g.weight}.`, fix: null });
@@ -411,7 +423,7 @@ function HowScoreWorks({ view, field }: { view: RubricView; field: ItemField }) 
       {four ? (
         <div className="mt-2 space-y-1">
           <p>
-            Each criterion is scored on a level from <strong>0 to 4</strong>. Points = <strong>weight × level ÷ 4</strong>. Weights add up to {field.weightTotal ?? 100}
+            Each criterion is scored on a level from <strong>0 to 4</strong>. Points = <strong>weight × level ÷ 4</strong>. {weightTarget(view, field) === null ? 'Weights can be any positive numbers' : `Weights add up to ${weightTarget(view, field)}`}
             {field.groups?.length ? ` (${field.groups.map((g) => `${g.id} ${g.weight}`).join(' · ')})` : ''}.
           </p>
           <p className="text-fg-muted">Example: a criterion with weight 5 at Level 4 earns 5 points; at Level 2 it earns 2.5; at Level 0, nothing. Failing a critical criterion fails the task.</p>
@@ -419,9 +431,9 @@ function HowScoreWorks({ view, field }: { view: RubricView; field: ItemField }) 
       ) : (
         <div className="mt-2 space-y-1">
           <p>
-            Each criterion is scored <strong>{view.template.scoreKeys.map((k) => `${k.points} (${k.label.toLowerCase()})`).join(', ')}</strong>. The points add up to {field.weightTotal ?? 100}.
+            Each criterion is scored <strong>{view.template.scoreKeys.map((k) => `${k.points} (${k.label.toLowerCase()})`).join(', ')}</strong>. {weightTarget(view, field) === null ? 'The points add up to the sum of the weights.' : `The points add up to ${weightTarget(view, field)}.`}
           </p>
-          <p className="text-fg-muted">Example: 17 pass × 5 = 85, 2 partial × 2 = 4, 1 fail × 0 = 0, so 89 of 100. {view.template.wholeTaskRule}</p>
+          <p className="text-fg-muted">{scoreExample(view.criteria.length, view.template.scoreKeys)} {view.template.wholeTaskRule}</p>
         </div>
       )}
     </details>
@@ -437,7 +449,7 @@ export function RubricTable({ view, field, items, readOnly, onEdit, onRemove }: 
   const attention = (id: string, item: Record<string, unknown>) => isNotInTemplate(view, id) || !filled(item.name) || keys.some((k) => !filled(item[k.key]));
   const shown = rows.filter((r) => (filter === 'critical' ? r.item.critical === true : filter === 'attention' ? attention(r.id, r.item) : true));
   const total = items.reduce((a, i) => a + num(i.weight), 0);
-  const target = field.weightTotal ?? 100;
+  const target = weightTarget(view, field);
   const critical = items.filter((i) => i.critical === true).length;
   const groups = filter === 'all' && field.groups?.length ? field.groups : null;
   const clip = full ? '' : 'line-clamp-2';
@@ -1077,5 +1089,55 @@ export function SourcePanel({ link, onClose, onOpenInForm }: { link: ViewLink; o
         )}
       </div>
     </aside>
+  );
+}
+
+
+/** "Example: 3 pass × 5 = 15, 1 partial × 2 = 2, 1 fail × 0 = 0, so 17 of 25." for this template's criteria count. */
+export function scoreExample(n: number, keys: { points: number; label: string }[]): string {
+  const top = Math.max(...keys.map((k) => k.points), 0);
+  if (n < 1 || !top || keys.length < 2) return '';
+  const sorted = [...keys].sort((a, b) => b.points - a.points);
+  const [pass, partial, fail] = [sorted[0]!, sorted[1]!, sorted[sorted.length - 1]!];
+  const counts = n >= 3 ? [n - 2, 1, 1] : n === 2 ? [1, 1, 0] : [1, 0, 0];
+  const got = counts[0]! * pass.points + counts[1]! * partial.points + counts[2]! * fail.points;
+  const parts = [`${counts[0]} ${pass.label.toLowerCase()} × ${pass.points} = ${counts[0]! * pass.points}`, counts[1] ? `${counts[1]} ${partial.label.toLowerCase()} × ${partial.points} = ${counts[1]! * partial.points}` : '', counts[2] ? `${counts[2]} ${fail.label.toLowerCase()} × ${fail.points} = 0` : ''].filter(Boolean);
+  return `Example with this template’s ${n} criteria: ${parts.join(', ')}, so ${got} of ${n * top}.`;
+}
+
+type DetailSave = { kind: 'idle' } | { kind: 'saving' } | { kind: 'saved'; at: string } | { kind: 'error' };
+
+/** The criterion panel's footer: whether the form's text and this criterion's details are saved, and Save now. */
+export function PanelSaveStatus({ detail }: { detail: DetailSave }) {
+  const form = useContext(FormSaveContext);
+  const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const base = form ? saveStatus(pending ? { kind: 'saving' } : form.state, null, failed) : { text: 'Changes save automatically', error: false };
+  const saving = pending || detail.kind === 'saving' || base.text === 'Saving…';
+  const error = base.error || detail.kind === 'error';
+  const savedAt = detail.kind === 'saved' ? detail.at : null;
+  const text = saving ? 'Saving…' : error ? (detail.kind === 'error' ? 'This criterion’s details were not saved. Try again.' : base.text) : savedAt && !base.text.startsWith('Saved at') ? `Saved at ${new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : base.text;
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-2 text-xs" data-panel-save>
+      {form && (
+        <button
+          type="button"
+          className="btn btn-secondary !px-3 !py-1 text-xs disabled:opacity-60"
+          disabled={pending}
+          onClick={async () => {
+            setPending(true);
+            const ok = await form.flush();
+            setPending(false);
+            setFailed(!ok);
+          }}
+        >
+          {error ? 'Try again' : 'Save now'}
+        </button>
+      )}
+      <span role="status" aria-live="polite" className={error ? 'text-error' : 'text-fg-muted'}>
+        {text}
+      </span>
+      <span className="text-fg-muted">Edits also save automatically.</span>
+    </div>
   );
 }

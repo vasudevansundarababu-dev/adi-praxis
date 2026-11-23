@@ -1,5 +1,7 @@
 import { evaluatorMap, JOINT_TEMPLATE_SPEC, jointTemplateSpec, jointToolIds } from '../anvil/joint-template';
 import { stepToolChecks } from '../anvil/tool-binding';
+import { expectedWeightTotal, type WeightTotal } from './rubric/authoring-defaults';
+import { profileFor } from './profile-output';
 import { rubricSubmitChecks } from './rubric/service';
 import { suggestionChecks } from './suggestions/service';
 import type { Prisma, TaskInstance } from '@prisma/client';
@@ -53,7 +55,12 @@ export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 
     checks.push({ id: 'conversation.policy_version', section: 'W06', ok: chat.policyDigest === (policy?.digest ?? 'none'), message: 'Reconcile conversation against current published project rules' });
   }
   if (task.taskType === 'AUTHORING' && template.profileId) checks.push(...(await boundRuleChecks(tx, project.clientId, task, output)));
-  if (task.taskType === 'AUTHORING' && project.template.anvilSpec) checks.push(...anvilSpecChecks(project.template.anvilSpec, output));
+  if (task.taskType === 'AUTHORING' && project.template.anvilSpec) {
+    // D-029: the S7 weight total from the live template (its field's weightTotal, else its criteria's weights, else none).
+    const form = profileFor({ workflowName: template.workflowName, profileId: template.profileId });
+    const declared = form?.sections.find((s) => s.key === 'S7')?.fields.find((f) => f.type === 'criterion')?.weightTotal;
+    checks.push(...anvilSpecChecks(project.template.anvilSpec, output, expectedWeightTotal((project.template.anvilSpec as { execution?: unknown }).execution, template.profileId, declared)));
+  }
   // D-016: each procedure step's tool fits its words; referral and findings are conditional; the procedure ends with recommend.
   if (task.taskType === 'AUTHORING' && project.template.anvilSpec) checks.push(...stepToolChecks(jointTemplateSpec(project.template)?.execution, output.sections));
   // RUBRIC_RECOMMENDATIONS_ENABLED: every template criterion present (D8); S4 references from the project library (D6).
@@ -169,8 +176,8 @@ export async function boundRuleChecks(tx: Db | Tx, clientId: string, task: { id:
  * uses a tool Anvil described with its schemas. Owner, 11 Nov 2026: weights above 0 totalling exactly 100, and 5/2/0
  * descriptions on every criterion.
  */
-export function anvilSpecChecks(anvilSpec: unknown, output: Record<string, unknown>): TaskCheck[] {
-  if ((anvilSpec as { schemaVersion?: unknown }).schemaVersion === JOINT_TEMPLATE_SPEC) return jointSpecChecks(anvilSpec as { execution: Record<string, unknown> }, output);
+export function anvilSpecChecks(anvilSpec: unknown, output: Record<string, unknown>, weightTotal: WeightTotal = { total: 100, source: 'template_field' }): TaskCheck[] {
+  if ((anvilSpec as { schemaVersion?: unknown }).schemaVersion === JOINT_TEMPLATE_SPEC) return jointSpecChecks(anvilSpec as { execution: Record<string, unknown> }, output, weightTotal.total);
   const exec = (anvilSpec as { execution?: { evaluatorKinds?: string[]; tools?: { name: string }[] } }).execution ?? {};
   const kinds = new Set(exec.evaluatorKinds ?? []);
   const tools = new Set((exec.tools ?? []).map((t) => t.name));
@@ -205,15 +212,17 @@ export function anvilSpecChecks(anvilSpec: unknown, output: Record<string, unkno
 }
 
 /** Shared weight and 5/2/0 anchor checks (owner, 11 Nov 2026, Anvil Q4). */
-function weightAndAnchorChecks(criteria: { id?: string; weight?: unknown; passCondition?: unknown; partialCredit?: unknown; failCondition?: unknown }[]): TaskCheck[] {
+function weightAndAnchorChecks(criteria: { id?: string; weight?: unknown; passCondition?: unknown; partialCredit?: unknown; failCondition?: unknown }[], expected: number | null = 100): TaskCheck[] {
   const bps = criteria.map((c) => (typeof c.weight === 'number' && Number.isFinite(c.weight) ? Math.round(c.weight * 100) : NaN));
   const badWeights = criteria.filter((c, i) => !(bps[i]! > 0) || Math.abs((c.weight as number) * 100 - bps[i]!) > 1e-6);
   const total = bps.reduce((n, b) => n + (Number.isNaN(b) ? 0 : b), 0);
-  const weightsOk = criteria.length > 0 && badWeights.length === 0 && total === 10_000;
+  // D-029: the template's total (or none); legacy Anvil-format templates keep 100.
+  const target = expected === null ? null : Math.round(expected * 100);
+  const weightsOk = criteria.length > 0 && badWeights.length === 0 && (target === null || total === target);
   const text = (v: unknown) => typeof v === 'string' && v.trim() !== '';
   const badAnchors = criteria.filter((c) => !text(c.passCondition) || !text(c.partialCredit) || !text(c.failCondition));
   return [
-    { id: 'anvil.criteria-weights', section: 'S7', ok: weightsOk, message: weightsOk ? 'Every weight is above 0 with at most two decimals, and the weights total exactly 100' : badWeights.length ? `Give criteria ${badWeights.map((c) => c.id ?? '?').join(', ')} a weight above 0 with at most two decimals` : `Weights must total exactly 100 (now ${total / 100})` },
+    { id: 'anvil.criteria-weights', section: 'S7', ok: weightsOk, message: weightsOk ? (target === null ? `Every weight is above 0 with at most two decimals (total ${total / 100})` : `Every weight is above 0 with at most two decimals, and the weights total exactly ${target / 100}`) : badWeights.length ? `Give criteria ${badWeights.map((c) => c.id ?? '?').join(', ')} a weight above 0 with at most two decimals` : `Weights must total exactly ${target! / 100} for this template (now ${total / 100})` },
     { id: 'anvil.criteria-anchors', section: 'S7', ok: badAnchors.length === 0, message: badAnchors.length ? `State the pass condition (5), partial credit (2) and fail (0) for criteria ${badAnchors.map((c) => c.id ?? '?').join(', ')}` : 'Every criterion states full, partial and fail' },
   ];
 }
@@ -224,7 +233,7 @@ function weightAndAnchorChecks(criteria: { id?: string; weight?: unknown; passCo
  * the template's output schema and a private expected value; at least one criterion is critical; recorded calls use
  * tools the execution part declares.
  */
-function jointSpecChecks(spec: { execution: Record<string, unknown> }, output: Record<string, unknown>): TaskCheck[] {
+function jointSpecChecks(spec: { execution: Record<string, unknown> }, output: Record<string, unknown>, expectedTotal: number | null): TaskCheck[] {
   const sections = (output.sections ?? {}) as Record<string, Record<string, unknown> | undefined>;
   type C = { id?: string; evaluatorKind?: unknown; evaluatorVersion?: unknown; weight?: unknown; passCondition?: unknown; partialCredit?: unknown; failCondition?: unknown; critical?: unknown; outputField?: unknown; expectedValue?: unknown };
   const criteria = (Array.isArray(sections.S7?.criteria) ? sections.S7!.criteria : []) as C[];
@@ -241,7 +250,7 @@ function jointSpecChecks(spec: { execution: Record<string, unknown> }, output: R
   // A 0-4 template (execution v3 rubric descriptor, Keystone decision 3) is never scored on KYC's 5/2/0 anchors; its form
   // already requires the level 4, 2 and 0 statements. Weights are still checked.
   const zeroToFour = (spec.execution.rubric as { scale?: unknown } | undefined)?.scale === 'zero_to_four';
-  const weightAnchor = weightAndAnchorChecks(criteria).filter((c) => !(zeroToFour && c.id === 'anvil.criteria-anchors'));
+  const weightAnchor = weightAndAnchorChecks(criteria, expectedTotal).filter((c) => !(zeroToFour && c.id === 'anvil.criteria-anchors'));
   return [
     ...weightAnchor,
     { id: 'anvil.evaluator-binding', section: 'S7', ok: unmapped.length === 0, message: unmapped.length ? `Criteria ${unmapped.map((c) => c.id ?? '?').join(', ')} have no evaluator in this template; use the template’s criterion IDs (${[...map.keys()].join(', ')})` : 'Every criterion has an evaluator in the template' },

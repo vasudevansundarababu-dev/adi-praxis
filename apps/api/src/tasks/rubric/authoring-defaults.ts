@@ -34,3 +34,25 @@ export function authoringDefaultsFor(execution: unknown, profileId?: string | nu
     }
   return out;
 }
+
+export interface WeightTotal {
+  /** The total the S7 weights must reach, or null when the template sets none (weights must only be above 0). */
+  total: number | null;
+  source: 'template_field' | 'template_criteria' | 'none';
+}
+
+/**
+ * D-029 (owner, 23 Nov 2026): the S7 weight total comes from the live template, never a hard-coded 100.
+ * 1. The template's criterion field declares weightTotal: that total.
+ * 2. Otherwise the criteria the template maps each have a default weight: their sum (Golden KYC v6: 5 criteria × 5 = 25).
+ * 3. Otherwise no fixed total: each weight must be above 0, and the total is reported.
+ */
+export function expectedWeightTotal(execution: unknown, profileId: string | null | undefined, declared?: number): WeightTotal {
+  if (typeof declared === 'number' && declared > 0) return { total: declared, source: 'template_field' };
+  const mapped = evaluatorsOf(execution);
+  const defaults = authoringDefaultsFor(execution, profileId);
+  if (mapped.size > 0 && defaults.length === mapped.size && defaults.every((d) => typeof d.weight === 'number' && d.weight > 0)) {
+    return { total: Math.round(defaults.reduce((n, d) => n + (d.weight as number), 0) * 100) / 100, source: 'template_criteria' };
+  }
+  return { total: null, source: 'none' };
+}

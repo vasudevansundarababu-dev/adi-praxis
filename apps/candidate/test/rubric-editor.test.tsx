@@ -117,7 +117,7 @@ describe('simplified rubric editor (S7)', () => {
     // D14: what blocks Submit is red and first; the rest is collapsed and never blocks.
     expect(t).toContain('2 things block Submit');
     expect(t).toContain('identification_verification: Fail text is missing.');
-    expect(t).toContain('Weights add up to 15; they must add up to exactly 100.');
+    expect(t).toContain('Weights add up to 15; they must add up to exactly 100 for this template.');
     expect(t).toMatch(/Recommended, not required \(3\)\. These never block Submit\./);
     expect(t).toContain('S4 · Policy rules · R-SC-1 isn’t linked to a criterion. The criteria are fixed, so link it as a source of an existing criterion, or leave it.');
     expect(t).not.toContain('Still to finish');
@@ -235,7 +235,8 @@ describe('rubric table (S7 default view)', () => {
     expect(t).toContain('Total weight 15 of 100');
     expect(t).toContain('1 critical');
     expect(t).toContain('How the score works');
-    expect(t).toContain('17 pass × 5 = 85');
+    // D-029: the worked example follows the template's own criteria count.
+    expect(t).toMatch(/Example with this template’s \d+ criteria: \d+ pass × 5 = \d+/);
     // Nothing is open until a row is clicked.
     expect(html).not.toContain('data-criterion-panel');
   });
@@ -256,7 +257,7 @@ describe('rubric table (S7 default view)', () => {
     expect(t).toContain('C1 isn’t one of this template’s criteria. Remove it to submit. Remove C1');
     expect(html).toContain('data-rubric-row="C1"');
     expect(t).toContain('Not in this template');
-    expect(t).toContain('Weights add up to 20; they must add up to exactly 100.');
+    expect(t).toContain('Weights add up to 20; they must add up to exactly 100 for this template.');
     // Template criteria have no Remove; the non-template one does.
     const view = { ...VIEW, criteria: [...VIEW.criteria, criterion('C1', { exportable: false, defaults: null })] };
     const cards = renderToStaticMarkup(<RubricEditor taskId="task" field={S7.fields[0]!} value={items} onChange={() => undefined} view={view} reload={async () => undefined} readOnly={false} onOpenSource={() => undefined} initialOpen={['C1', 'revision_integrity']} initialView="cards" />);
@@ -266,7 +267,7 @@ describe('rubric table (S7 default view)', () => {
 
   it('rubricBlockers / recommendedOnly: only real blockers block; coverage and source links are recommendations', () => {
     const blockers = rubricBlockers(VIEW, S7.fields[0]!, ITEMS);
-    expect(blockers.map((b) => b.message)).toEqual(['identification_verification: Fail text is missing.', 'Weights add up to 15; they must add up to exactly 100.']);
+    expect(blockers.map((b) => b.message)).toEqual(['identification_verification: Fail text is missing.', 'Weights add up to 15; they must add up to exactly 100 for this template.']);
     expect(rubricBlockers(VIEW, S7.fields[0]!, ITEMS.map((i) => ({ ...i, critical: false }))).map((b) => b.message)).toContain('Tick Critical on at least one criterion.');
     const rec = recommendedOnly(VIEW, [
       { kind: 'SCORE_MISSING', criterionId: 'identification_verification', message: 'x' },

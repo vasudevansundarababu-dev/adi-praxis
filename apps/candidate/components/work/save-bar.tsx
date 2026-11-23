@@ -1,7 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { createContext, useState } from 'react';
 import type { SaveState } from './use-autosave';
+
+/** The form's save state and Save, for panels drawn over the save bar (the criterion panel). */
+export const FormSaveContext = createContext<{ state: SaveState; flush: () => Promise<boolean> } | null>(null);
 
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 

@@ -44,7 +44,7 @@ import { useAutosave } from './use-autosave';
 import { ClauseNotes } from './clause-notes';
 import { FieldCoach } from './field-coach';
 import { FollowUpsText, ProcedureTranslator, procedureWarnings, StepFollowUps, StepWarnings } from './step-guide';
-import { SaveBar } from './save-bar';
+import { FormSaveContext, SaveBar } from './save-bar';
 import { PolicyPicker, type LibraryView } from './policy-picker';
 import { RuleCitationPicker } from './rule-citation-picker';
 import { RubricEditor, SourcePanel, rubricBlockers, useRubricView } from './rubric-editor';
@@ -449,6 +449,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
 
   return (
     <FormV2.Provider value={v2}>
+    <FormSaveContext.Provider value={task.readOnly ? null : { state, flush }}>
     <EditorTaskId.Provider value={task.readOnly ? null : task.id}>
     <StepTools.Provider value={task.template.stepTools ?? null}>
     <div className="max-w-4xl min-w-0 space-y-4">
@@ -654,6 +655,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
     </div>
     </StepTools.Provider>
     </EditorTaskId.Provider>
+    </FormSaveContext.Provider>
     </FormV2.Provider>
   );
 }

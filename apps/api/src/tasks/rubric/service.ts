@@ -1,3 +1,4 @@
+import { expectedWeightTotal } from './authoring-defaults';
 import {
   ACTOR_LABEL,
   MARKING_LABEL,
@@ -58,6 +59,12 @@ export interface RubricContext {
   execution: Record<string, unknown> | null;
   rubric: TemplateRubric;
   output: Record<string, unknown>;
+}
+
+/** D-029: the S7 weight total from the live template (field weightTotal, else its criteria's weights, else none). */
+export function weightTotalOf(ctx: Pick<RubricContext, 'profile' | 'execution'>) {
+  const declared = ctx.profile.sections.find((s) => s.key === 'S7')?.fields.find((f) => f.type === 'criterion')?.weightTotal;
+  return expectedWeightTotal(ctx.execution, ctx.profile.profileId, declared);
 }
 
 /** The rubric context of a task, or null when its template's form has no rubric field (nothing to show). */
@@ -329,7 +336,7 @@ export async function rubricView(tx: Db | Tx, ctx: RubricContext, opts: { aiEnab
   const seedNeeded = seed.length !== items.length || seed.some((s, i) => stableStringify(s) !== stableStringify(items[i]));
   return {
     aiEnabled: opts.aiEnabled,
-    template: { id: ctx.template.id, version: ctx.template.version, scale: ctx.rubric.scale, scoreKeys: ctx.rubric.scoreKeys, fixedSet: ctx.rubric.fixedSet, wholeTaskRule: ctx.rubric.wholeTaskRule, criterionFailureSupported: ctx.rubric.criterionFailureSupported, weightsFromTemplate: ctx.rubric.weightsFromTemplate },
+    template: { id: ctx.template.id, version: ctx.template.version, scale: ctx.rubric.scale, scoreKeys: ctx.rubric.scoreKeys, fixedSet: ctx.rubric.fixedSet, wholeTaskRule: ctx.rubric.wholeTaskRule, criterionFailureSupported: ctx.rubric.criterionFailureSupported, weightsFromTemplate: ctx.rubric.weightsFromTemplate, weightTotal: weightTotalOf(ctx).total, weightTotalSource: weightTotalOf(ctx).source },
     rubric: { section: ctx.rubric.section, fieldKey: ctx.rubric.fieldKey },
     seed: seedNeeded ? seed : null,
     criteria,

@@ -42,7 +42,7 @@ export interface RubricAdditionView {
 
 export interface RubricView {
   aiEnabled: boolean;
-  template: { id: string; version: number; scale: 'five_two_zero' | 'zero_to_four'; scoreKeys: ScoreKey[]; fixedSet: boolean; wholeTaskRule: string; criterionFailureSupported: boolean; weightsFromTemplate: boolean };
+  template: { id: string; version: number; scale: 'five_two_zero' | 'zero_to_four'; scoreKeys: ScoreKey[]; fixedSet: boolean; wholeTaskRule: string; criterionFailureSupported: boolean; weightsFromTemplate: boolean; /** D-029: the S7 weight total from the live template; null = no fixed total. */ weightTotal?: number | null; weightTotalSource?: 'template_field' | 'template_criteria' | 'none' };
   rubric: { section: string; fieldKey: string };
   /** D8: the S7 criteria with the template's missing criteria added (null when nothing is missing). */
   seed: Record<string, unknown>[] | null;

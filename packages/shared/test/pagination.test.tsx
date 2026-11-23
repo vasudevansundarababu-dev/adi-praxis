@@ -29,14 +29,19 @@ describe('D24 paging logic', () => {
     expect(PageQuery.parse({})).toEqual({});
   });
 
-  it('shows page numbers with an ellipsis for long ranges, as in the owner reference (1 2 3 4 [5] … 99)', () => {
+  it('shows the first five pages, then from page 5 the current page and the five after it (owner, 23 Nov 2026)', () => {
     expect(pageButtons(1, 1)).toEqual([1]);
     expect(pageButtons(3, 7)).toEqual([1, 2, 3, 4, 5, 6, 7]);
-    expect(pageButtons(5, 99)).toEqual([1, 2, 3, 4, 5, 'ellipsis', 99]);
     expect(pageButtons(1, 99)).toEqual([1, 2, 3, 4, 5, 'ellipsis', 99]);
-    expect(pageButtons(50, 99)).toEqual([1, 'ellipsis', 49, 50, 51, 'ellipsis', 99]);
-    expect(pageButtons(97, 99)).toEqual([1, 'ellipsis', 95, 96, 97, 98, 99]);
-    expect(pageButtons(99, 99)).toEqual([1, 'ellipsis', 95, 96, 97, 98, 99]);
+    expect(pageButtons(4, 11)).toEqual([1, 2, 3, 4, 5, 'ellipsis', 11]);
+    // The owner's case: on page 5 of 11 the next pages 6 to 10 are shown.
+    expect(pageButtons(5, 11)).toEqual([1, 'ellipsis', 5, 6, 7, 8, 9, 10, 11]);
+    expect(pageButtons(6, 11)).toEqual([1, 'ellipsis', 6, 7, 8, 9, 10, 11]);
+    expect(pageButtons(5, 99)).toEqual([1, 'ellipsis', 5, 6, 7, 8, 9, 10, 'ellipsis', 99]);
+    expect(pageButtons(50, 99)).toEqual([1, 'ellipsis', 50, 51, 52, 53, 54, 55, 'ellipsis', 99]);
+    expect(pageButtons(97, 99)).toEqual([1, 'ellipsis', 94, 95, 96, 97, 98, 99]);
+    expect(pageButtons(99, 99)).toEqual([1, 'ellipsis', 94, 95, 96, 97, 98, 99]);
+    expect(pageButtons(10, 11)).toEqual([1, 'ellipsis', 6, 7, 8, 9, 10, 11]);
     for (let p = 1; p <= 40; p++) expect(pageButtons(p, 40)).toContain(p);
   });
 
@@ -78,7 +83,7 @@ describe('D24 shared Pagination component', () => {
     const m = bar();
     expect(text(m)).toContain('Showing 10 of 990 users');
     expect(m).toContain('<nav aria-label="Users pages"');
-    expect(text(m)).toMatch(/‹ Previous 1 2 3 4 5 … 99 Next ›/);
+    expect(text(m)).toMatch(/‹ Previous 1 … 5 6 7 8 9 10 … 99 Next ›/);
     expect(m).toContain('href="?page=4"');
     expect(m).toContain('href="?page=6"');
     expect(m).toContain('href="?page=99"');

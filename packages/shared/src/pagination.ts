@@ -57,16 +57,24 @@ export function pageWindow(page: number, total: number, pageSize = PAGE_SIZE) {
 export type PageButton = number | 'ellipsis';
 
 /**
- * The page numbers to show: always the first and last, a window around the current page, and an ellipsis for each
- * gap. As in the owner's reference: page 5 of 99 → 1 2 3 4 5 … 99; page 50 of 99 → 1 … 49 50 51 … 99; page 97 of 99 →
- * 1 … 95 96 97 98 99. At most 7 entries.
+ * The page numbers to show: the first and last always; on pages 1–4 the first five; from page 5 the current page and the
+ * five after it, so the next pages are always one click away (owner, 23 Nov 2026: "after I select 5 it should show 6, 7,
+ * 8, 9, 10"); near the end the last six. An ellipsis marks each gap. Page 5 of 11 → 1 … 5 6 7 8 9 10 11; page 50 of
+ * 99 → 1 … 50 51 52 53 54 55 … 99; page 97 of 99 → 1 … 94 95 96 97 98 99.
  */
 export function pageButtons(page: number, count: number): PageButton[] {
   if (count <= 7) return Array.from({ length: Math.max(1, count) }, (_, i) => i + 1);
   const current = Math.min(Math.max(1, page), count);
-  if (current <= 5) return [1, 2, 3, 4, 5, 'ellipsis', count];
-  if (current >= count - 4) return [1, 'ellipsis', count - 4, count - 3, count - 2, count - 1, count];
-  return [1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', count];
+  if (current <= 4) return [1, 2, 3, 4, 5, 'ellipsis', count];
+  const start = Math.min(current, count - 5);
+  const end = Math.min(count, start + 5);
+  const out: PageButton[] = [1];
+  if (start > 2) out.push('ellipsis');
+  else for (let p = 2; p < start; p++) out.push(p);
+  for (let p = start; p <= end; p++) out.push(p);
+  if (end < count - 1) out.push('ellipsis', count);
+  else if (end === count - 1) out.push(count);
+  return out;
 }
 
 /** "Showing 10 of 50 users". `noun` is the plural; one row of one is "Showing 1 of 1 user" when `singular` is given. */

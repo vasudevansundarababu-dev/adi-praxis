@@ -599,6 +599,34 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(res.json().answer).toMatch(/minor_without_tin|sanctions_dob_mismatch|FOCUS ON EDGE CASE/);
   });
 
+  it('E-001 Q4: a task held 3 days waiting for a new case kind prompts the PM; releasing it drops the focus and it exports as a normal case', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    await qualify(v8);
+    const projectId = await project(v8);
+    const a = await signIn('sme-hold@gmail.test');
+    const rows = await packable(await authored(projectId, { smeUserId: a.smeUserId, benchmark: (i) => (i === 0 ? { edgeCase: 'sanctions_dob_mismatch', slots: {}, extraStateChecks: [], version: 1 } : null) }));
+    const task = rows[0]!;
+    const need = await post(a.cookie, `/me/tasks/${task.taskId}/needs`, { kind: 'new_case_kind', context: 'Applicant APP-999 applies for an individual checking account.', twist: 'Sanctions screening returns a name match with a different date of birth.', expectedOutcome: 'Manual review, citing the DOB mismatch.', complexity: 'multi_hop', archetype: 'sanctions_near_match' });
+    expect(need.statusCode, need.body).toBe(201);
+    answer = (c) => (c.url.endsWith('/inbox-items') ? { status: 202, body: { id: 'inb-0077' } } : { status: 404, body: {} });
+    expect((await post(pm, `/projects/${projectId}/needs/${need.json().id}/send`, { summary: 'Sanctions DOB mismatch' })).statusCode).toBe(200);
+    const heldKinds = async () => ((await get(pm, '/me/inbox')).json().items as { kind: string; href: string }[]).filter((i) => i.kind === 'held_over_3_days' && i.href.includes(projectId));
+    expect(await heldKinds()).toEqual([]);
+    // Three days later the PM is asked.
+    await db.smeNeed.update({ where: { id: need.json().id }, data: { sentAt: new Date(Date.now() - 4 * 86_400_000) } });
+    expect(await heldKinds()).toEqual([expect.objectContaining({ kind: 'held_over_3_days' })]);
+    // Release: only a held task; a reason is needed; the focus is dropped as a new benchmark version.
+    expect((await post(pm, `/projects/${projectId}/held-tasks/${rows[1]?.taskId ?? randomUUID()}/release`, { reason: 'Not held.' })).statusCode).toBe(409);
+    expect((await post(pm, `/projects/${projectId}/held-tasks/${task.taskId}/release`, { reason: '' })).statusCode).toBe(400);
+    const rel = await post(pm, `/projects/${projectId}/held-tasks/${task.taskId}/release`, { reason: 'The bank needs months to generate these cases; export as a normal case.' });
+    expect(rel.statusCode, rel.body).toBe(201);
+    expect((await db.taskInstance.findUniqueOrThrow({ where: { id: task.taskId } })).benchmark).toMatchObject({ edgeCase: null, version: 2 });
+    expect(await heldKinds()).toEqual([]);
+    const state = (await get(pm, `/projects/${projectId}/rlgym-export`)).json();
+    expect(JSON.stringify(state.notSent ?? [])).not.toContain(task.taskId);
+    await expect(db.$executeRaw`DELETE FROM "TaskHoldRelease"`).rejects.toThrow();
+  });
+
   it('SME review batches: received idempotently; a person decides; decisions go to the RL Gym; task_correction reopens the task', async () => {
     const v8 = await publishedV8(CASE_REF_VERIFIERS);
     const projectId = await project(v8);

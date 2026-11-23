@@ -10,6 +10,8 @@ import { buildRlGymExport, projectIdFromRlGym, rlgymProjectId, rlgymTemplateRef,
 import type { RlGymClient, RlGymResult } from '../anvil/rlgym-client';
 import type { StudioClient, StudioResult, InboxItemBody } from '../anvil/studio-client';
 import { jcsSha256 } from '../anvil/jcs';
+import { NotConnectedCoverageClient, type StudioCoverageClient } from '../anvil/coverage-client';
+import { approvedClauses } from '../policy/fact-catalog';
 import { assignedRunReviews, batchTasks, currentAssignees, eligibleReviewers, smeInbox, staffInbox } from '../anvil/run-review-access';
 import { loadProject } from './projects';
 import { ownTask } from './work';
@@ -56,11 +58,30 @@ async function heldTasks(tx: Db | Tx, projectId: string, templateId: string) {
   const needs = await tx.smeNeed.findMany({ where: { projectId, templateId, kind: 'new_case_kind', state: { in: ['sent', 'merged'] } } });
   const byId = new Map(needs.map((n) => [n.id, n]));
   const held = new Map<string, string>();
+  // E-001 Q4: a task the PM released (after the need was sent) is no longer held.
+  const releases = needs.length ? await tx.taskHoldRelease.findMany({ where: { projectId, taskInstanceId: { in: needs.map((n) => n.taskInstanceId) } } }) : [];
   for (const n of needs) {
     const root = n.state === 'merged' && n.mergedIntoId ? byId.get(n.mergedIntoId) : n;
-    if (root?.state === 'sent' && root.studioItemId && root.studioState !== 'declined') held.set(n.taskInstanceId, root.studioItemId);
+    const released = releases.some((r) => r.taskInstanceId === n.taskInstanceId && (!root?.sentAt || r.createdAt >= root.sentAt));
+    if (!released && root?.state === 'sent' && root.studioItemId && root.studioState !== 'declined') held.set(n.taskInstanceId, root.studioItemId);
   }
   return held;
+}
+
+export const HOLD_PROMPT_DAYS = 3;
+
+/** E-001 Q4: tasks held at least 3 days waiting for a new case kind, across the client's projects (oldest first). */
+export async function longHeldTasks(tx: Db | Tx, clientId: string, now = new Date()) {
+  const needs = await tx.smeNeed.findMany({ where: { clientId, kind: 'new_case_kind', state: { in: ['sent', 'merged'] } } });
+  const byId = new Map(needs.map((n) => [n.id, n]));
+  const releases = needs.length ? await tx.taskHoldRelease.findMany({ where: { clientId, taskInstanceId: { in: needs.map((n) => n.taskInstanceId) } } }) : [];
+  const cutoff = now.getTime() - HOLD_PROMPT_DAYS * 86_400_000;
+  return needs.flatMap((n) => {
+    const root = n.state === 'merged' && n.mergedIntoId ? byId.get(n.mergedIntoId) : n;
+    if (!root || root.state !== 'sent' || !root.studioItemId || root.studioState === 'declined' || !root.sentAt || root.sentAt.getTime() > cutoff) return [];
+    if (releases.some((r) => r.taskInstanceId === n.taskInstanceId && r.createdAt >= root.sentAt!)) return [];
+    return [{ projectId: n.projectId, taskInstanceId: n.taskInstanceId, needId: n.id, studioItemId: root.studioItemId, heldSince: root.sentAt.toISOString(), days: Math.floor((now.getTime() - root.sentAt.getTime()) / 86_400_000) }];
+  }).sort((a, b) => a.heldSince.localeCompare(b.heldSince));
 }
 
 /** The review batch whose `task_correction` reopened each task (its latest such decision). */
@@ -143,7 +164,7 @@ export function waitingBatches(
   });
 }
 
-export const benchmarkRoutes:FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient | null; studio: StudioClient | null }> = async (app, { db, rlgym, studio }) => {
+export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient | null; studio: StudioClient | null; coverage?: StudioCoverageClient }> = async (app, { db, rlgym, studio, coverage = new NotConnectedCoverageClient() }) => {
   // ── Templates → version detail: edge cases and read-only checks (spec 1.4, 2.3) ──
   app.get('/templates/:id/benchmark', { config: { access: STAFF_REVIEW }, schema: { tags: ['templates'], params: Id } }, async (req) => {
     const t = await db.template.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
@@ -211,6 +232,21 @@ export const benchmarkRoutes:FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient 
     const tasks = await db.taskInstance.findMany({ where: { id: { in: needs.map((n) => n.taskInstanceId) } }, select: { id: true, output: true } });
     const title = (id: string) => String(((tasks.find((t) => t.id === id)?.output ?? {}) as { header?: { title?: unknown } }).header?.title ?? '') || null;
     return { items: needs.map((n) => needDto(n, title(n.taskInstanceId))), studioConnected: !!studio };
+  });
+
+  // ── E-001 §4 / E-002 §5: Validate = Studio's coverage check for the project's edge cases (needs and task focus) and clauses ──
+  app.post('/projects/:id/coverage-check', { config: { access: PM }, schema: { tags: ['projects'], params: Id } }, async (req) => {
+    const p = await loadProject(db, req.params.id, req.actor!);
+    const project = await db.project.findUniqueOrThrow({ where: { id: p.id }, include: { template: true } });
+    const tasks = await db.taskInstance.findMany({ where: { projectId: p.id }, select: { benchmark: true } });
+    const needs = await db.smeNeed.findMany({ where: { projectId: p.id, state: { in: ['open', 'sent', 'merged'] } }, select: { content: true } });
+    const tags = new Set<string>();
+    for (const t of tasks) if (isObj(t.benchmark) && typeof t.benchmark.edgeCase === 'string' && t.benchmark.edgeCase) tags.add(t.benchmark.edgeCase);
+    for (const n of needs) if (isObj(n.content) && typeof n.content.edgeCase === 'string' && n.content.edgeCase) tags.add(n.content.edgeCase);
+    const clauses = (await approvedClauses(db, req.actor!.clientId, p.id, project.template.anvilSpec)).filter((c) => c.condition !== null).map((c) => ({ clause_id: c.clauseId, version: c.version, condition: c.condition }));
+    const ref = { id: project.template.lineageId, version: project.template.version };
+    const r = await coverage.check({ template: ref, edge_case_tags: [...tags].sort(), clauses });
+    return r.ok ? { connected: true, request: { edgeCaseTags: [...tags].sort(), clauses: clauses.length }, result: r.result } : { connected: coverage.connected, request: { edgeCaseTags: [...tags].sort(), clauses: clauses.length }, message: r.message };
   });
 
   const NeedParams = z.object({ id: z.string().uuid(), needId: z.string().uuid() });
@@ -538,6 +574,25 @@ export const benchmarkRoutes:FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient 
       await tx.runReviewAssignment.create({ data: { clientId: actor.clientId, batchRowId: b.id, taskId: req.body.taskId, smeUserId: who.smeUserId, assignedById: actor.userId } });
       await audit({ entityType: 'RunReviewBatch', entityId: b.id, action: 'run_review.assigned', before: { smeUserId: current }, after: { taskId: req.body.taskId, smeUserId: who.smeUserId, role: who.role } });
       return { status: 201, body: { taskId: req.body.taskId, smeUserId: who.smeUserId, name: who.name, role: who.role } };
+    });
+    return reply;
+  });
+
+  // ── E-001 Q4: release a held task (drop its edge-case focus so it exports as a normal case). PM, Admin. ──
+  app.post('/projects/:id/held-tasks/:taskId/release', { config: { access: PM_ADMIN }, schema: { tags: ['projects'], params: z.object({ id: z.string().uuid(), taskId: z.string().uuid() }), body: z.object({ reason: z.string().trim().min(3).max(1000) }).strict() } }, async (req, reply) => {
+    await runCommand<unknown>(db, req, reply, async ({ tx, actor, audit }) => {
+      const p = await tx.project.findFirst({ where: { id: req.params.id, clientId: actor.clientId } });
+      if (!p) throw notFound('Project not found');
+      const held = await heldTasks(tx, p.id, p.templateId);
+      if (!held.has(req.params.taskId)) throw new AppError(409, 'NOT_HELD', 'This task is not held waiting for a new case kind.');
+      const need = await tx.smeNeed.findFirstOrThrow({ where: { projectId: p.id, taskInstanceId: req.params.taskId, kind: 'new_case_kind', state: { in: ['sent', 'merged'] } }, orderBy: { createdAt: 'desc' } });
+      const t = await tx.taskInstance.findUniqueOrThrow({ where: { id: req.params.taskId } });
+      const bench = isObj(t.benchmark) ? t.benchmark : null;
+      // Drop the edge-case focus as a new benchmark version (the SME's other benchmark values stay).
+      if (bench && bench.edgeCase) await tx.taskInstance.update({ where: { id: t.id }, data: { benchmark: { ...bench, edgeCase: null, version: (Number(bench.version) || 0) + 1 } as Prisma.InputJsonValue } });
+      const row = await tx.taskHoldRelease.create({ data: { clientId: actor.clientId, projectId: p.id, taskInstanceId: t.id, needId: need.id, reason: req.body.reason, releasedById: actor.userId } });
+      await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.hold_released', before: { held: held.get(t.id), edgeCase: bench?.edgeCase ?? null }, after: { edgeCase: null, reason: req.body.reason, releaseId: row.id } });
+      return { status: 201, body: { released: true, taskId: t.id } };
     });
     return reply;
   });

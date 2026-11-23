@@ -1,4 +1,5 @@
 import type { Db, Tx } from '../db';
+import { longHeldTasks } from '../routes/benchmark';
 
 /**
  * D-004 (owner, 23 Nov 2026): who reviews RL Gym run results, and what each person's inbox (header bell) shows.
@@ -114,6 +115,10 @@ export async function staffInbox(db: Db, clientId: string): Promise<InboxItem[]>
     if (unassigned) items.push({ kind: 'run_review_unassigned', title: `Assign a reviewer to ${plural(unassigned, 'task')} in run review ${b.batchId}`, detail: `${name}${b.runId ? ` · run ${b.runId}` : ''}`, href, count: unassigned });
     if (waiting) items.push({ kind: 'run_review_waiting', title: `${plural(waiting, 'episode')} waiting for the assigned SME in ${b.batchId}`, detail: `${name}${b.runId ? ` · run ${b.runId}` : ''}`, href, count: waiting });
   }
+  // E-001 Q4: tasks held 3+ days waiting for a new case kind: chase it in Studio, or release the task.
+  const held = await longHeldTasks(db, clientId);
+  const heldNames = new Map((await db.project.findMany({ where: { id: { in: [...new Set(held.map((h) => h.projectId))] }, clientId }, select: { id: true, name: true } })).map((p) => [p.id, p.name]));
+  for (const h of held) items.push({ kind: 'held_over_3_days', title: `Task held ${h.days} days waiting for a new case kind (${h.studioItemId})`, detail: `${heldNames.get(h.projectId) ?? 'Project'} · chase it in Studio, or release the task to export it as a normal case`, href: `/projects/${h.projectId}?tab=benchmark`, count: 1 });
   for (const n of needs) {
     const name = names.get(n.projectId);
     if (name) items.push({ kind: 'sme_needs', title: `${plural(n._count._all, 'SME need')} to merge, send or reject`, detail: name, href: `/projects/${n.projectId}?tab=benchmark`, count: n._count._all });

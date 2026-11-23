@@ -3754,3 +3754,30 @@ model TutorialSpend {
 
   @@index([createdAt])
 }
+
+/// E-002 §4.1: the project scope's fact catalog (fact-catalog.v1), versioned; clause conditions use its facts. Append-only.
+model ProjectFactCatalog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  version     Int
+  catalog     Json
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([projectId, version])
+}
+
+/// E-001 Q4: a PM released a task held waiting for a new case kind (edge-case focus dropped; exports as a normal case). Append-only.
+model TaskHoldRelease {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String   @map("client_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  taskInstanceId String   @map("task_instance_id") @db.Uuid
+  needId         String   @map("need_id") @db.Uuid
+  reason         String
+  releasedById   String   @map("released_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([taskInstanceId])
+}

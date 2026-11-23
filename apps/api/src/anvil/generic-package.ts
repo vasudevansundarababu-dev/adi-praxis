@@ -340,7 +340,7 @@ export function buildGenericPackages(inputs: PackageInput[], scope: { projectId:
  */
 export const TASK_PACKAGE_SCHEMA = 'praxis.authored-task-package.v1' as const;
 
-export function buildTaskPackage(input: PackageInput, revision: number, benchmark: unknown = null): { package: Record<string, unknown>; packageSha256: string; bytes: Buffer } | PackageProblem {
+export function buildTaskPackage(input: PackageInput, revision: number, benchmark: unknown = null, clauses: Record<string, unknown>[] = []): { package: Record<string, unknown>; packageSha256: string; bytes: Buffer } | PackageProblem {
   const t = taskFiles(input);
   if ('code' in t) return t;
   const entry = t.entry as { template: unknown; form: { sha256: string }; agent_mode: unknown; review: unknown };
@@ -362,7 +362,8 @@ export function buildTaskPackage(input: PackageInput, revision: number, benchmar
     actor: tools?.length ? { ...t.actor, tools } : t.actor,
     // AUTHORING-SPEC 1.6 / 2.4: slice tags, the focused edge case and (sme templates) the slot values. Added only when
     // present, so packages of other templates keep their bytes and hashes.
-    private: { ...t.privateRef, ...benchmarkPrivatePart(input.template, (t.privateRef.authored as { sections?: unknown }).sections, benchmark) },
+    // E-002: the cited clause versions with their approved conditions, only when there are any (bytes unchanged otherwise).
+    private: { ...t.privateRef, ...benchmarkPrivatePart(input.template, (t.privateRef.authored as { sections?: unknown }).sections, benchmark), ...(clauses.length ? { clauses } : {}) },
   };
   // RFC 8785 bytes, as every product hashes them. RL Gym's import still re-serialises with Python's encoder, which
   // differs for non-integer numbers (criterion weights such as 0.5); RL Gym is changing to hash the raw body (22 Nov).

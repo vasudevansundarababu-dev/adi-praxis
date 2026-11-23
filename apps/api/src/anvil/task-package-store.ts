@@ -1,3 +1,4 @@
+import { clausesFor } from './clause-export';
 import type { ApprovedTaskRecord } from '@prisma/client';
 import type { Db, Tx } from '../db';
 import { buildTaskPackage, TASK_PACKAGE_SCHEMA, type PackageProblem } from './generic-package';
@@ -37,7 +38,7 @@ export async function storeTaskPackage(tx: Db | Tx, record: ApprovedTaskRecord, 
   const template = await tx.template.findUnique({ where: { id: record.templateId } });
   if (!template) return { status: 'problem', problem: { recordId: record.id, taskId: record.taskInstanceId, code: 'GENERIC_TEMPLATE_MISSING', message: 'The task’s template version was not found.' } };
   const revision = await revisionOf(tx, record);
-  const built = buildTaskPackage({ record, template }, revision, benchmark === undefined ? await benchmarkFor(tx, record) : benchmark);
+  const built = buildTaskPackage({ record, template }, revision, benchmark === undefined ? await benchmarkFor(tx, record) : benchmark, await clausesFor(tx, record, template.anvilSpec));
   if ('code' in built) return { status: 'problem', problem: built };
   await tx.authoredTaskPackage.createMany({
     data: [{ packageSha256: built.packageSha256, clientId: record.clientId, projectId: record.projectId, taskInstanceId: record.taskInstanceId, recordId: record.id, revision, schema: TASK_PACKAGE_SCHEMA, content: built.bytes.toString('utf8') }],

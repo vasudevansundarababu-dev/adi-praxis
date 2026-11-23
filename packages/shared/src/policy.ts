@@ -1,3 +1,4 @@
+import { ClauseCondition } from './clause-condition';
 import { z } from 'zod';
 import { RuleAnnotation } from './policy-annotations';
 
@@ -89,6 +90,11 @@ export const PolicyRuleBody = z.object({
    * rule without one has the same body, content hash and rule-set digest as before annotations existed.
    */
   annotation: RuleAnnotation.optional(),
+  /**
+   * E-002 §4.1: the approved condition as a structured predicate over logical facts (clause-condition.v1; null = applies
+   * across the approved scope). Optional, never defaulted: a rule without one keeps its body, content hash and digest.
+   */
+  condition: ClauseCondition.optional(),
 });
 export type PolicyRuleBody = z.infer<typeof PolicyRuleBody>;
 

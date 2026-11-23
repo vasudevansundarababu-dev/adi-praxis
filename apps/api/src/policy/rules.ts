@@ -1,3 +1,5 @@
+import { conditionProblems } from '@praxis/shared';
+import { projectFactCatalog } from './fact-catalog';
 import type { Prisma, PolicyDocumentVersion } from '@prisma/client';
 import { PolicyRuleBody, isOpenClarification, type CandidateCitation, type CandidateRule } from '@praxis/shared';
 import type { Db, Tx } from '../db';
@@ -88,7 +90,14 @@ export async function editRule(
   // An annotation edit gets the next annotation version; an unchanged one keeps its version; a body sent without one
   // (an older client) keeps the current annotation: annotations are never dropped by omission.
   const prepared = await prepareAnnotation(tx, rule.id, PolicyRuleBody.parse(cur.body).annotation, PolicyRuleBody.parse(input.body));
-  const body = prepared.body;
+  let body = prepared.body;
+  // E-002: a condition is kept when an edit omits it (like annotations), and checked against the project's fact catalog.
+  const curCondition = PolicyRuleBody.parse(cur.body).condition;
+  if (body.condition === undefined && curCondition !== undefined) body = { ...body, condition: curCondition };
+  if (body.condition !== undefined && body.condition !== null) {
+    const problems = conditionProblems(body.condition, await projectFactCatalog(tx, input.projectId));
+    if (problems.length) throw new AppError(422, 'CONDITION_INVALID', `The condition cannot be saved: ${problems.join(' ')}`, { problems });
+  }
 
   const citationInputs = input.citations ?? cur.citations.map((c) => ({ documentVersionId: c.documentVersionId, fieldPath: c.fieldPath, role: c.role as CitationEdit['role'], quote: c.quote, section: (c.locator as { section?: string | null })?.section ?? null }));
   const resolved = [];

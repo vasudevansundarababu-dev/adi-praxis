@@ -68,6 +68,8 @@ import { defaultRubricAssistant, type RubricAssistant } from './tasks/rubric/ass
 import { defaultFieldSuggester, type FieldSuggester } from './tasks/suggestions/assistant';
 import { defaultStepTranslator, type StepTranslator } from './tasks/steps/translator';
 import { stepTranslateRoutes } from './routes/step-translate';
+import { policyClauseRoutes } from './routes/policy-clauses';
+import type { StudioCoverageClient } from './anvil/coverage-client';
 import { suggestionRoutes } from './routes/suggestions';
 import { MemoryEmailSender, SmtpEmailSender, type EmailSender } from './lib/email';
 import { HashingEmbeddingProvider, VertexEmbeddingProvider, type EmbeddingProvider } from './tasks/embeddings';
@@ -163,6 +165,8 @@ export interface AppDeps {
   fieldSuggester?: FieldSuggester;
   /** D-016: business-language procedure → S5 steps. Defaults to the model in vertex mode, else the deterministic mock. */
   stepTranslator?: StepTranslator;
+  /** E-001/E-002: Studio's coverage check (Validate). Not connected until Studio defines its endpoint. */
+  coverageClient?: StudioCoverageClient;
 }
 
 export function defaultSupport(config: Config): SupportAssistant {
@@ -357,7 +361,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       {
         const rl = { apiUrl: deps.config.RLGYM_API_URL, workspace: deps.config.RLGYM_WORKSPACE, key: deps.config.RLGYM_FORGE_CLIENT_KEY };
         const st = { apiUrl: deps.config.STUDIO_API_URL, key: deps.config.STUDIO_INBOX_KEY, tenantId: deps.config.STUDIO_TENANT_ID, actorId: deps.config.STUDIO_ACTOR_ID, actorRoles: deps.config.STUDIO_ACTOR_ROLES };
-        await v1.register(benchmarkRoutes, { db: deps.db, rlgym: rlGymConnected(rl) ? new RlGymClient(rl, deps.outboundFetch) : null, studio: studioConnected(st) ? new StudioClient(st, deps.outboundFetch) : null });
+        await v1.register(benchmarkRoutes, { db: deps.db, rlgym: rlGymConnected(rl) ? new RlGymClient(rl, deps.outboundFetch) : null, studio: studioConnected(st) ? new StudioClient(st, deps.outboundFetch) : null, ...(deps.coverageClient ? { coverage: deps.coverageClient } : {}) });
       }
       await v1.register(anvilTemplateRoutes, { db: deps.db, anvil: { environment: deps.config.ANVIL_ENVIRONMENT, exportBaseUrl: deps.config.ANVIL_EXPORT_BASE_URL } });
       await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });
@@ -400,6 +404,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(modelProviderRoutes, { db: deps.db, config: deps.config });
       await v1.register(conversationRoutes, { db: deps.db, selectionGate, dailyModelCallCap: deps.config.AUTHORING_DAILY_CALL_CAP, suggestionsEnabled: deps.config.FIELD_SUGGESTIONS_ENABLED });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
+      await v1.register(policyClauseRoutes, { db: deps.db });
       await v1.register(policyRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, adapters: deps.policyAdapters ?? defaultAdapters(deps.config.policy), assistant: deps.ruleAssistant ?? defaultRuleAssistant(deps.config) });
       await v1.register(policyProposalRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       // M10 SME supply: nothing is registered with the flag off (docs/SME-SUPPLY.md section 13).

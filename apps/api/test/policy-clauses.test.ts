@@ -239,3 +239,18 @@ describe('Validate against Studio’s live coverage endpoint (client, with a rec
     expect(await refused.check({ template: { id: 't', version: 1 }, edge_case_tags: [], clauses: [] })).toEqual({ ok: false, message: 'Studio refused the coverage check: bad condition at /clauses/0/condition' });
   });
 });
+
+describe('fact catalog from the template (v8 with policy bindings)', () => {
+  it('builds the first project catalog from the template’s bound facts; refuses when one exists or the template binds none', async () => {
+    expect((await api(pmCookie).post(`/projects/${projectId}/policy/fact-catalog/from-template`, {})).statusCode).toBe(422);
+    await db.template.update({ where: { id: templateId }, data: { anvilSpec: { execution: { policy_bindings: { fact_catalog: 'golden-kyc-openenv.facts@1', facts: [{ fact: 'governing_state', environment_fact: 'governing_state' }, { fact: 'product', environment_fact: 'product', type: 'enum', label: 'Product', allowed_values: ['individual', 'adult_joint', 'teen_joint', 'custodial'] }] } } } } });
+    const r = await api(pmCookie).post(`/projects/${projectId}/policy/fact-catalog/from-template`, {});
+    expect(r.statusCode, r.body).toBe(201);
+    const cat = (await api(pmCookie).get(`/projects/${projectId}/policy/fact-catalog`)).json();
+    expect(cat.catalog.facts).toEqual([
+      { id: 'governing_state', label: 'Governing state', type: 'string', availability: 'case_data' },
+      { id: 'product', label: 'Product', type: 'enum', allowed_values: ['individual', 'adult_joint', 'teen_joint', 'custodial'], availability: 'case_data' },
+    ]);
+    expect((await api(pmCookie).post(`/projects/${projectId}/policy/fact-catalog/from-template`, {})).statusCode).toBe(409);
+  });
+});

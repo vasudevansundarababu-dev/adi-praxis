@@ -12,7 +12,7 @@ import type { Db } from '../db';
 import { AppError } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { POLICY_ACCESS, policyProject } from '../policy/access';
-import { approvedClauses, projectFactCatalog, templateBoundFacts } from '../policy/fact-catalog';
+import { approvedClauses, catalogFromTemplate, projectFactCatalog, templateBoundFacts } from '../policy/fact-catalog';
 import { jcsSha256 } from '../anvil/jcs';
 import { ownTask } from './work';
 
@@ -149,6 +149,22 @@ export const policyClauseRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Object
       const row = await tx.projectFactCatalog.create({ data: { clientId: actor.clientId, projectId: p.id, version, catalog: { ...content, version } as object, createdById: actor.userId } });
       await audit({ entityType: 'ProjectFactCatalog', entityId: row.id, action: 'policy.fact_catalog_saved', after: { version, facts: req.body.facts.map((f) => f.id) } });
       return { status: 201, body: { version } };
+    });
+    return reply;
+  });
+
+  // A first fact catalog from the facts the template binds (E-002 decision 9.1: the template maps project facts to the
+  // environment's). Refused when the project already has one: then the PM edits it.
+  app.post('/projects/:projectId/policy/fact-catalog/from-template', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams } }, async (req, reply) => {
+    await runCommand<unknown>(db, req, reply, async ({ tx, actor, audit }) => {
+      const p = await policyProject(tx, actor, req.params.projectId);
+      if (await tx.projectFactCatalog.findFirst({ where: { projectId: p.id } })) throw new AppError(409, 'CATALOG_EXISTS', 'This project already has a fact catalog. Edit it instead.');
+      const project = await tx.project.findUniqueOrThrow({ where: { id: p.id }, include: { template: true } });
+      const catalog = catalogFromTemplate(project.template.anvilSpec, p.id);
+      if (!catalog) throw new AppError(422, 'NO_TEMPLATE_FACTS', 'This project’s template does not bind any policy facts yet, so there is nothing to start from. Studio adds them to the template (policy bindings).');
+      const row = await tx.projectFactCatalog.create({ data: { clientId: actor.clientId, projectId: p.id, version: 1, catalog: catalog as object, createdById: actor.userId } });
+      await audit({ entityType: 'ProjectFactCatalog', entityId: row.id, action: 'policy.fact_catalog_saved', after: { version: 1, facts: catalog.facts.map((f) => f.id), from: 'template' } });
+      return { status: 201, body: { version: 1, facts: catalog.facts.map((f) => f.id) } };
     });
     return reply;
   });

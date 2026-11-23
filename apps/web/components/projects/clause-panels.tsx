@@ -122,6 +122,12 @@ export function ApprovedClausesPanel({ projectId, clauses, catalog }: { projectI
   const router = useRouter();
   const [text, setText] = useState(catalog.catalog ? JSON.stringify(catalog.catalog, null, 2) : '');
   const [error, setError] = useState<string | null>(null);
+  async function fromTemplate() {
+    setError(null);
+    const r = await mutate('POST', `/projects/${projectId}/policy/fact-catalog/from-template`, {});
+    if (!r.ok) return setError(r.error);
+    router.refresh();
+  }
   async function save() {
     setError(null);
     let body: unknown;
@@ -156,6 +162,14 @@ export function ApprovedClausesPanel({ projectId, clauses, catalog }: { projectI
             </li>
           ))}
         </ul>
+      )}
+      {!catalog.version && (
+        <div className="mt-3 text-sm">
+          <button type="button" className="btn btn-secondary" onClick={fromTemplate}>
+            Start the fact catalog from the template’s facts
+          </button>
+          <p className="mt-1 text-xs text-fg-muted">Uses the facts the template already supplies (its policy bindings), so conditions can use them. You can edit it afterwards.</p>
+        </div>
       )}
       <details className="mt-3">
         <summary className="cursor-pointer text-sm text-link">Project fact catalog {catalog.version ? `(version ${catalog.version})` : '(not set up)'}</summary>
@@ -219,7 +233,7 @@ export function DispositionsPanel({ projectId, initial = null }: { projectId: st
       <h2 id="dispositions-h" className="text-lg font-semibold">
         Suggested dispositions
       </h2>
-      <p className="text-sm text-fg-muted">An AI suggestion per rule, against this project’s scope and fact catalog: Recommended (always, or when a condition holds), Needs review (with a question for you) or Outside scope (with the quoted mismatch). Suggestions never approve anything; you decide and apply rules as usual.</p>
+      <p className="text-sm text-fg-muted">An AI suggestion per rule, against this project’s scope and fact catalog: Recommended (always, or when a condition holds), Needs review (with a question for you) or Outside scope (with the quoted mismatch). Suggestions never approve anything; you decide and apply rules as usual. Using a condition saves a new draft of the rule: tick Apply to project on it afterwards (and publish the rule set) to approve it.</p>
       <button type="button" className="btn btn-secondary mt-2" disabled={busy} onClick={suggest}>
         {busy ? 'Suggesting…' : data ? 'Suggest again' : 'Suggest dispositions'}
       </button>

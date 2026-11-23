@@ -57,3 +57,26 @@ export async function approvedClauses(tx: Db | Tx, clientId: string, projectId: 
     }];
   });
 }
+
+/**
+ * A first project fact catalog from the facts the template binds (policy_bindings.facts), so the PM does not have to
+ * type JSON. A binding entry may carry type, label and allowed_values (fact-catalog.v1 fields); otherwise the fact is
+ * text, available from case data. The PM can edit it afterwards; saving makes a new version.
+ */
+export function catalogFromTemplate(anvilSpec: unknown, projectId: string): FactCatalog | null {
+  if (!isObj(anvilSpec)) return null;
+  const exec = isObj(anvilSpec.execution) ? anvilSpec.execution : {};
+  const b = [isObj(anvilSpec.policies) ? anvilSpec.policies.policy_bindings : undefined, isObj(exec.policies) ? exec.policies.policy_bindings : undefined, exec.policy_bindings].find(isObj);
+  if (!b || !Array.isArray(b.facts)) return null;
+  const facts = b.facts.filter(isObj).flatMap((f) => {
+    const id = typeof f.fact === 'string' ? f.fact : '';
+    if (!/^[a-z][a-z0-9_]{0,63}$/.test(id)) return [];
+    const type = ['string', 'number', 'boolean', 'date', 'enum'].includes(f.type as string) ? (f.type as FactCatalog['facts'][number]['type']) : 'string';
+    const allowed = Array.isArray(f.allowed_values) ? f.allowed_values.filter((v) => ['string', 'number', 'boolean'].includes(typeof v)) as (string | number | boolean)[] : undefined;
+    const label = typeof f.label === 'string' && f.label ? f.label : id.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+    return [{ id, label, type: allowed?.length && type === 'string' ? ('enum' as const) : type, ...(allowed?.length ? { allowed_values: allowed } : {}), availability: 'case_data' }];
+  });
+  if (!facts.length) return null;
+  const unique = facts.filter((f, i) => facts.findIndex((x) => x.id === f.id) === i);
+  return FactCatalog.parse({ schema_version: 'adi.utility.fact-catalog.v1', catalog_id: 'project.facts', version: 1, owner: { kind: 'project_scope', id: projectId }, facts: unique });
+}

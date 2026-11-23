@@ -12,6 +12,7 @@ import type { StudioCoverageClient } from '../anvil/coverage-client';
 import { SupportUnavailableError, type SupportAssistant, type SupportContext } from '../support/assistant';
 import { SME_HELP } from '../support/help-pack';
 import { profileFor } from '../tasks/profile-output';
+import { loadUploadedProfiles } from '../templates/uploaded-profiles';
 import { templateRef } from '../tasks/task-service';
 import { ownTask } from './work';
 
@@ -56,7 +57,8 @@ export const forgeHelpRoutes: FastifyPluginAsyncZod<{ db: Db; assistant: Support
   app.post('/me/tasks/:id/help', { config: { access: 'candidate', rateLimit: perSession }, schema: { tags: ['work'], params: z.object({ id: z.string().uuid() }), body: TaskHelpRequest } }, async (req) => {
     const t = await ownTask(db, req.params.id, req.candidate!.smeUserId);
     const template = await templateRef(db, t.project.templateId);
-    const profile = profileFor({ workflowName: template.workflowName, profileId: template.profileId });
+    const form = { workflowName: template.workflowName, profileId: template.profileId };
+    const profile = profileFor(form) ?? (await loadUploadedProfiles(db), profileFor(form));
     const context: TaskHelpContext = {
       task: taskBasics(t),
       template: { name: template.workflowName, sections: sectionStatus(profile, t.output) },

@@ -7,6 +7,7 @@ import { aiUnavailableMessage } from '../lib/ai-errors';
 import { AppError, notFound } from '../lib/errors';
 import { avoidFromRules, CoachUnavailableError, ruleCheck, type CheckResult, type ExampleResult, type FieldCoachModel } from '../tasks/coach/field-coach';
 import { profileFor } from '../tasks/profile-output';
+import { loadUploadedProfiles } from '../templates/uploaded-profiles';
 import { templateRef } from '../tasks/task-service';
 import { ownTask } from './work';
 
@@ -22,7 +23,9 @@ export const fieldCoachRoutes: FastifyPluginAsyncZod<{ db: Db; coach: FieldCoach
   app.post('/me/tasks/:id/fields/coach', { config: { access: 'candidate', rateLimit: { max: 40, timeWindow: '1 minute' } }, schema: { tags: ['work'], params: z.object({ id: z.string().uuid() }), body: Body } }, async (req) => {
     const t = await ownTask(db, req.params.id, req.candidate!.smeUserId);
     const template = await templateRef(db, t.project.templateId);
-    const profile = profileFor({ workflowName: template.workflowName, profileId: template.profileId });
+    const form = { workflowName: template.workflowName, profileId: template.profileId };
+    // A form registered by another instance or a new release: load stored forms once before giving up.
+    const profile = profileFor(form) ?? (await loadUploadedProfiles(db), profileFor(form));
     const section = profile?.sections.find((s) => s.key === req.body.section);
     const field = section?.fields.find((f) => f.key === req.body.field);
     if (!profile || !section || !field) throw notFound('That field is not part of this task’s form.');

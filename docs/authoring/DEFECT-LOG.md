@@ -275,5 +275,13 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
   plain message instead of raw JSON, in Help, the policy assistant and the other live-model features: "The AI
   assistant can't sign in to Google right now: the sign-in for AI on this environment has expired. Ask the owner to
   sign in again; nothing was changed." The raw error goes only to the server log.
-- **Status:** investigated. Root cause is the expired local credentials (owner action). Content and logging fixes are
-  waiting for "go".
+- **Credentials renewed (23 Nov 2026, about 1 PM CST):**
+  - The owner ran `gcloud auth application-default login`. The API reads the standard user sign-in
+    (`~/.config/gcloud/application_default_credentials.json`, type `authorized_user`, quota project
+    adi-praxis-staging). No service account and no `GOOGLE_APPLICATION_CREDENTIALS` are set.
+  - The Authoring dev processes and worker were restarted.
+  - Verified in fresh processes with the same code and credentials: a Help call (Gemini) answered, and a policy
+    assistant "define" on a made-up rule succeeded. Nothing was written to project data.
+- **Still open:** with a working model, Help answered the Benchmark question with "I can only help with this task and
+  its form…". That is the content gap above: Help knows nothing about the Benchmark panel yet.
+- **Status:** the outage is resolved. Content, logging and plain-message fixes are waiting for "go".

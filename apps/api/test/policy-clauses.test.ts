@@ -141,6 +141,9 @@ describe('project fact catalog, conditions on rules, approved clauses', () => {
     expect(clauses).toEqual([{ ...entry, binding_revision: 'golden-kyc-openenv.facts@1' }]);
     // approved-task-export.v1 policy_clauses (Studio ef06119): every approved selected clause, condition null when none.
     expect((await policyClausesFor(db, { clientId, projectId, output })).map((c) => c.entry)).toEqual([entry]);
+    // Pinned per revision: a revision approved before the clause's approval never gains it later (same revision, same clauses).
+    expect(await policyClausesFor(db, { clientId, projectId, output, createdAt: new Date(v.reviewedAt!.getTime() - 1000) })).toEqual([]);
+    expect((await policyClausesFor(db, { clientId, projectId, output, createdAt: new Date(v.reviewedAt!.getTime() + 1000) })).length).toBe(1);
     // A rule without a structured condition adds nothing (packages keep their bytes).
     expect(await clausesFor(db, { clientId, projectId, output: { sections: { S4: { statePolicies: [{ ruleId: randomUUID(), contentSha256: 'a'.repeat(64) }] } } } }, template.anvilSpec)).toEqual([]);
 

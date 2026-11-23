@@ -27,13 +27,15 @@ export interface PolicyClauseEntry {
  * (clause-condition.v1; null = applies across the approved scope), title, obligation and exceptions. Versions that were
  * never approved (no reviewedAt) or have no source are left out: the contract requires both.
  */
-export async function policyClausesFor(tx: Db | Tx, record: Pick<ApprovedTaskRecord, 'clientId' | 'projectId' | 'output'>): Promise<PolicyClauseEntry[]> {
+export async function policyClausesFor(tx: Db | Tx, record: Pick<ApprovedTaskRecord, 'clientId' | 'projectId' | 'output'> & { createdAt?: Date }): Promise<PolicyClauseEntry[]> {
   // Only Authoring's own citations (a rule UUID); anything else (older fixtures, free text) is not a clause reference.
   const cited = citedRules(record.output).filter((c) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.ruleId));
   const out: PolicyClauseEntry[] = [];
   for (const c of cited) {
     const v = await tx.policyRuleVersion.findFirst({ where: { ruleId: c.ruleId, contentHash: c.contentSha256, clientId: record.clientId }, include: { rule: true, citations: { take: 1, include: { documentVersion: true } } } });
-    if (!v || !v.reviewedAt) continue;
+    // Pinned per revision: only approvals that existed when this revision was approved, so the same revision always
+    // exports the same policy_clauses (the selection itself is in the package's authored sections).
+    if (!v || !v.reviewedAt || (record.createdAt && v.reviewedAt > record.createdAt)) continue;
     const src = v.citations[0];
     if (!src) continue;
     const body = PolicyRuleBody.parse(v.body);
@@ -61,7 +63,7 @@ export async function policyClausesFor(tx: Db | Tx, record: Pick<ApprovedTaskRec
  * The package's private part: the same entries plus the template binding revision, only for clauses with a structured
  * condition, so packages without one keep their exact bytes (old exports stay reproducible).
  */
-export async function clausesFor(tx: Db | Tx, record: Pick<ApprovedTaskRecord, 'clientId' | 'projectId' | 'output'>, anvilSpec: unknown): Promise<Record<string, unknown>[]> {
+export async function clausesFor(tx: Db | Tx, record: Pick<ApprovedTaskRecord, 'clientId' | 'projectId' | 'output'> & { createdAt?: Date }, anvilSpec: unknown): Promise<Record<string, unknown>[]> {
   const bound = templateBoundFacts(anvilSpec);
   return (await policyClausesFor(tx, record)).filter((c) => c.hasCondition).map((c) => ({ ...c.entry, binding_revision: bound?.factCatalog || null }));
 }

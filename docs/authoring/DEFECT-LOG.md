@@ -223,3 +223,46 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
     - no final recommend.
   - **Where the warnings show:** under each step in the SME form, in the SME's Check and Submit lists, and on the
     console task page ("Procedure and tool guide").
+
+## Help on the SME task page fails, and can't explain the Benchmark fields (number assigned by the master log)
+
+- **Reported:** 23 Nov 2026, relayed by the Studio session. On a Golden KYC task (template "KYC onboarding and refresh"
+  v5), the owner asked Help: "what is this Benchmark field, Focus on Edge Case, and Save benchmark fields? Explain each
+  item in the dropdown." The answer was "Help is not available right now. Try again in a minute."
+- **Finding (investigated, nothing changed):**
+  1. **Root cause: expired Google sign-in on this computer, not a code fault.**
+     - The API log shows `POST /me/tasks/dd43b46d…/help → 503` after 9 s. The model call log reads
+       `{"feature":"support-bot","model":"gemini-3.8-flash","ok":false,"error":"Error"}`.
+     - One diagnostic call through the same Help code returned Google's
+       `invalid_grant: reauth related error (invalid_rapt)`. The local Application Default Credentials need
+       re-authentication. The token is refused before Gemini is reached.
+     - Every live-model feature of the local Authoring uses the same credentials: Help, field suggestions, the SME
+       profile chat, the S5 step drafter (model mode) and live policy extraction. All of them fail until the owner signs
+       in again with `gcloud auth application-default login`.
+  2. **Logging gap.** The support-bot failure log records only the error's class name ("Error"), not its message, so the
+     cause is invisible in the API log.
+  3. **Content gap (separate from the failure).** Help can't answer this well even with a working model:
+     - The SME help pack has nothing about the Benchmark panel.
+     - Help's task context (`TaskHelpContext`) doesn't include the template's edge cases or the task's current focus,
+       so it can't explain each item in the dropdown.
+- **Planned fix (waiting for "go"):**
+  - Log the model error message, without secrets, beside its name for support-bot calls, as the other model call logs
+    do.
+  - Add a plain-English "Benchmark fields" entry to the SME help pack, saying what the author should do:
+    - **The panel:** reviewers and the RL Gym see these fields; the agent never does.
+    - **Focus on edge case (optional):** pick one when the task is written about one of the template's edge cases. The
+      list is the template's S4 edge cases, shown as name (archetype, complexity). Picking one sets Archetype;
+      Complexity follows unless S1 sets another.
+    - **Save benchmark fields:** saves the focus (and, on templates with SME expected values, the slots and extra
+      checks) as a new version. It is locked after submission until approval. At export the RL Gym receives
+      `case_selector.edge_cases = [tag]` and runs the task only on cases with that tag.
+    - **Current caveat (Studio defect D-012):** Studio's case records have no edge-case tags yet, so a focused task
+      matches no RL Gym case. For Golden KYC, leave Focus on None until that is fixed.
+    - **Raise a need:** for a situation the template doesn't cover. It goes to the PM, not straight to Studio.
+  - Give Help's task context the template's edge cases (tag, name, archetype, complexity, context, twist: what the SME
+    already sees) and the task's current focus, so it can explain each dropdown item.
+  - Tests with the mock assistant only.
+- **Owner action now:** run `gcloud auth application-default login` on this computer, then try Help again. Nothing
+  needs a restart.
+- **Status:** investigated. Root cause is the expired local credentials (owner action). Content and logging fixes are
+  waiting for "go".

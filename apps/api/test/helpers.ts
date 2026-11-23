@@ -16,6 +16,8 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
     DATABASE_URL: TEST_DATABASE_URL,
     REDIS_URL: TEST_REDIS_URL,
     LOGIN_RATE_LIMIT_PER_MINUTE: '1000',
+    // D-024: older tests build templates through the old editor routes; production keeps them closed.
+    TEMPLATE_EDITING_ENABLED: 'true',
     ...overrides,
   });
 }

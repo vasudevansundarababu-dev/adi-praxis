@@ -46,35 +46,9 @@ export function TemplateActions({ template: t, hasDraft, forms: fromApi }: { tem
     <div className="mt-4">
       {alternates.length > 0 && (
         <div className="mb-3 text-sm">
-          {t.status === 'DRAFT' ? (
-            <label className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">Authoring form</span>
-              <select
-                className="rounded-md border border-line bg-surface px-2 py-1"
-                value={t.profileId ?? ''}
-                disabled={pending}
-                onChange={async (e) => {
-                  setPending(true);
-                  setError(null);
-                  const res = await mutate<TemplateDto>('PATCH', `/templates/${t.id}`, { profileId: e.target.value || null });
-                  setPending(false);
-                  if (!res.ok) setError(res.error);
-                  else router.refresh();
-                }}
-              >
-                <option value="">{formLabel(null)}</option>
-                {alternates.map((f) => (
-                  <option key={f.profileId} value={f.profileId}>
-                    {formLabel(f.profileId)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <p>
-              <span className="font-medium">Authoring form:</span> {formLabel(t.profileId)}
-            </p>
-          )}
+          <p>
+            <span className="font-medium">Authoring form:</span> {formLabel(t.profileId)}
+          </p>
           <p className="mt-1 text-xs text-fg-muted">Projects keep the form of the version they were created from.</p>
         </div>
       )}
@@ -87,16 +61,6 @@ export function TemplateActions({ template: t, hasDraft, forms: fromApi }: { tem
             className="btn btn-primary disabled:opacity-60"
           >
             Publish
-          </button>
-        )}
-        {t.status !== 'DRAFT' && !hasDraft && (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => run(`/templates/${t.id}/versions`, (v) => router.push(`/templates/${v.id}`))}
-            className={btn}
-          >
-            New version
           </button>
         )}
         {t.status === 'PUBLISHED' &&
@@ -116,7 +80,7 @@ export function TemplateActions({ template: t, hasDraft, forms: fromApi }: { tem
           ))}
       </div>
       {t.status === 'DRAFT' && (
-        <p className="mt-2 text-xs text-fg-muted">Save your changes before publishing. Published versions can’t be edited.</p>
+        <p className="mt-2 text-xs text-fg-muted">This version came from a Studio release. Publish it to make it available for new projects. Templates are changed only in Studio.</p>
       )}
       {confirmRetire && (
         <p className="mt-2 text-sm text-fg-muted">

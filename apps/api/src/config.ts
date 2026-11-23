@@ -106,6 +106,8 @@ const Env = z.object({
   STUDIO_ACTOR_ROLES: z.string().default('service'),
   /** E-001: the data family Validate checks against (Studio resolves its newest qualified environment version). Empty: Validate is not connected. */
   STUDIO_SEED_FAMILY: z.string().default(''),
+  /** D-024: the old in-Authoring template editor and builder. Off: templates are read-only (Studio releases only). */
+  TEMPLATE_EDITING_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   /**
    * Keyless Anvil -> Praxis (K6, 12 Nov 2026): Anvil sends a raw Google-signed identity token. It is accepted only with
    * issuer https://accounts.google.com, exactly this audience (this API's URL), this numeric subject and this account.

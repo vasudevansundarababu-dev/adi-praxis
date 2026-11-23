@@ -31,11 +31,12 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Projects',
     items: [
       { label: 'Projects', href: '/projects', roles: ['ADMIN', 'PM'] },
-      { label: 'Templates', href: '/templates', roles: ['ADMIN', 'PM'] },
       { label: 'Approved exports', href: '/dataset', roles: ['ADMIN'] },
       { label: 'Requisitions', href: '/requisitions', roles: ['ADMIN', 'PM', 'REVIEWER'], smeSupply: true, oldFlowOnly: true },
     ],
   },
+  // D-024 (owner, 23 Nov 2026): Templates is its own top-level item, right after Projects (view and publish only).
+  { key: 'templates', label: 'Templates', items: [{ label: 'Templates', href: '/templates', roles: ['ADMIN', 'PM'] }] },
   // MVP1 (owner, 15 Nov): Sourcing is its own top-level item, right after Projects.
   { key: 'sourcing', label: 'Sourcing', items: [{ label: 'Sourcing', href: '/sourcing', roles: ['ADMIN', 'PM'] }] },
   {

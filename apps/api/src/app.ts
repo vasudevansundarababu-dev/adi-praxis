@@ -70,6 +70,7 @@ import { defaultStepTranslator, type StepTranslator } from './tasks/steps/transl
 import { stepTranslateRoutes } from './routes/step-translate';
 import { policyClauseRoutes } from './routes/policy-clauses';
 import { HttpCoverageClient, type StudioCoverageClient } from './anvil/coverage-client';
+import { templateEditClosed, TEMPLATE_READ_ONLY_MESSAGE } from './templates/read-only';
 import { defaultDispositionSuggester, type DispositionSuggester } from './policy/dispositions';
 import { suggestionRoutes } from './routes/suggestions';
 import { MemoryEmailSender, SmtpEmailSender, type EmailSender } from './lib/email';
@@ -272,6 +273,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.addHook('onRequest', async (req) => {
     if (/%00/i.test(req.url) || req.url.includes('\0')) throw new AppError(400, 'INVALID_ADDRESS', 'This address contains an invalid character.');
   });
+  // D-024: templates are read-only in Authoring (Studio releases only); the editor and builder routes are closed.
+  if (!deps.config.TEMPLATE_EDITING_ENABLED)
+    app.addHook('onRequest', async (req) => {
+      if (templateEditClosed(req.method, req.url)) throw new AppError(403, 'TEMPLATES_READ_ONLY', TEMPLATE_READ_ONLY_MESSAGE);
+    });
 
   app.setErrorHandler((err, req, reply) => {
     const requestId = String(req.id);

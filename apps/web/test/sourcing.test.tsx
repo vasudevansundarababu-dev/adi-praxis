@@ -85,7 +85,7 @@ describe('Sourcing list (owner, 15 Nov)', () => {
 
   it('is a top-level menu item after Projects, for Admins and PMs only', () => {
     const groups = navGroupsFor(['PM'], false);
-    expect(groups.map((g) => g.label).slice(0, 3)).toEqual(['Home', 'Projects', 'Sourcing']);
+    expect(groups.map((g) => g.label).slice(0, 4)).toEqual(['Home', 'Projects', 'Templates', 'Sourcing']);
     expect(activeGroup(groups, '/sourcing/new')?.key).toBe('sourcing');
     expect(navGroupsFor(['REVIEWER'], false).some((g) => g.key === 'sourcing')).toBe(false);
     expect(navGroupsFor(['ADMIN'], false).some((g) => g.key === 'sourcing')).toBe(true);

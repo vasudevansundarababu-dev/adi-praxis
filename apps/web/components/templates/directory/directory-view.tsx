@@ -166,7 +166,7 @@ function DirectoryRow({ row: r, isAdmin }: { row: DirectoryRowDto; isAdmin: bool
             )}
             {isAdmin ? (
               <Link href={`/templates/${r.templateId}`} className="text-link hover:underline">
-                Edit Template<span aria-hidden> →</span>
+                View<span aria-hidden> →</span>
               </Link>
             ) : (
               <Link href={`/projects/new?templateId=${r.templateId}`} className="text-link hover:underline">

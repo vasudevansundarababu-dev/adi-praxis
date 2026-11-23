@@ -62,7 +62,9 @@ describe('U1 Screen 1 directory', () => {
     expect(t).toContain('45m (12 Wks)');
     expect(t).toContain('Hermetic MCP');
     expect(t).toContain('Unassigned');
-    expect(t).toContain('Edit Template');
+    // D-024: templates are view-only in Authoring.
+    expect(t).toContain('View');
+    expect(t).not.toContain('Edit Template');
     expect(tptText(null, 'x')).toBe('—');
     expect(tptText(35, '15 Steps')).toBe('35m (15 Steps)');
   });

@@ -3,7 +3,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { BlueprintSummary } from '@/components/templates/compiler/blueprint-summary';
-import { MetaCompiler } from '@/components/templates/compiler/meta-compiler';
 import { AnvilReadinessBadge, type AnvilReadiness } from '@/components/templates/anvil-readiness';
 import { TemplateBenchmarkPanel, type TemplateBenchmarkDto } from '@/components/templates/benchmark-panel';
 import { McHeader } from '@/components/templates/mc-header';
@@ -93,19 +92,8 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
       <TutorialSettings key={`tutorial:${t.updatedAt}`} template={t} canEdit />
       {tutorialRuns && <TutorialVideoPanel templateId={t.id} initial={tutorialRuns} />}
       {benchmark && <TemplateBenchmarkPanel b={benchmark} />}
-      <div className="mt-4">
-        <MetaCompiler
-          key={`${t.id}:${bp.blueprintRevision}`}
-          initial={bp}
-          template={{ id: t.id, workflowName: t.workflowName, domainName: t.domainName, version: t.version, status: t.status }}
-          switcher={switcher}
-          presets={presets}
-          jobDescriptions={jds.map((j) => ({ id: j.id, title: j.title }))}
-          factoryId={factoryOf(t, versions, bp.variantOfId)}
-          draftId={draft?.id ?? null}
-          anvil={anvil?.definition ?? null}
-        />
-      </div>
+      {/* D-024: templates are read-only in Authoring (Studio releases only); the builder is not shown. */}
+      <BlueprintSummary bp={bp.blueprint} templateId={t.id} />
     </div>
   );
 }

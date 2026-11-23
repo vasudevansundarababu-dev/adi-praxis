@@ -21,14 +21,9 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
       <h1 className="mt-4 text-2xl font-semibold">Harbor Templates Directory</h1>
       <p className="mt-1 text-sm text-fg-muted">
         {isAdmin
-          ? 'Templates and active SME applications by domain. Open a workflow to edit its blueprint, then generate, verify and deploy its SME studio.'
+          ? 'Templates by domain, as released from Studio. Open a version to view it, and publish or retire it. Templates are changed only in Studio.'
           : 'Published workflow templates you can create projects from.'}
       </p>
-      {isAdmin && (
-        <p className="mt-2 text-sm">
-          <Link href="/templates/forms">Authoring forms and golden packs</Link>
-        </p>
-      )}
       {data ? (
         <DirectoryView data={data} domainFilter={domain} searchParams={sp} query={q} matchIds={matchIds} />
       ) : (

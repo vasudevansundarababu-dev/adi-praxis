@@ -181,7 +181,10 @@ export function SmeNeedsPanel({ projectId, needs, studioConnected }: { projectId
               <div className="mt-2 flex flex-wrap items-end gap-2">
                 <label className="flex flex-col">
                   <span className="text-xs text-fg-muted">Summary for Studio</span>
-                  <input className="input" value={summary[n.id] ?? ''} onChange={(e) => setSummary({ ...summary, [n.id]: e.target.value })} />
+                  <input className="input" aria-describedby={`need-${n.id}-hint`} value={summary[n.id] ?? ''} onChange={(e) => setSummary({ ...summary, [n.id]: e.target.value })} />
+                  <span id={`need-${n.id}-hint`} className="mt-0.5 text-xs text-fg-muted">
+                    {!studioConnected ? 'Studio isn’t connected, so needs can’t be sent yet.' : (summary[n.id] ?? '').trim().length < 3 ? 'Write a short summary (3 characters or more) to send. It becomes the item’s title in Studio’s inbox.' : 'Ready to send.'}
+                  </span>
                 </label>
                 <button type="button" className="btn btn-primary" disabled={!studioConnected || (summary[n.id] ?? '').trim().length < 3} onClick={() => act(`${n.id}/send`, { summary: summary[n.id] })}>
                   Send to Studio

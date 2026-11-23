@@ -1,5 +1,5 @@
 import { CoverageCheck } from '@praxis/shared';
-import type { StudioClient } from './studio-client';
+import { StudioClient, studioConnected } from './studio-client';
 
 /**
  * E-001 §4 / E-002 §5: Studio's coverage check (coverage-check.v1), which Authoring's Validate shows on needs and tasks.
@@ -50,4 +50,10 @@ export class HttpCoverageClient implements StudioCoverageClient {
     const parsed = CoverageCheck.safeParse(r.data);
     return parsed.success ? { ok: true, result: parsed.data } : { ok: false, message: 'Studio’s coverage answer did not match coverage-check.v1.' };
   }
+}
+
+/** The coverage client the app uses: a test double when given, else the live client when Studio and a data family are configured. */
+export function coverageFromConfig(config: { STUDIO_API_URL: string; STUDIO_INBOX_KEY: string; STUDIO_TENANT_ID: string; STUDIO_ACTOR_ID: string; STUDIO_ACTOR_ROLES: string; STUDIO_SEED_FAMILY: string }, fetchImpl?: ConstructorParameters<typeof StudioClient>[1]): StudioCoverageClient | null {
+  const st = { apiUrl: config.STUDIO_API_URL, key: config.STUDIO_INBOX_KEY, tenantId: config.STUDIO_TENANT_ID, actorId: config.STUDIO_ACTOR_ID, actorRoles: config.STUDIO_ACTOR_ROLES };
+  return studioConnected(st) && config.STUDIO_SEED_FAMILY ? new HttpCoverageClient(new StudioClient(st, fetchImpl), config.STUDIO_SEED_FAMILY) : null;
 }

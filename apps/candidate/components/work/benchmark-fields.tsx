@@ -1,6 +1,6 @@
 'use client';
 
-import type { AllowedCheck, EdgeCase, ExtraStateCheck, VerifierSlot } from '@praxis/shared';
+import { archetypePlain, complexityPlain, edgeCaseOptionLabel, type AllowedCheck, type EdgeCase, type ExtraStateCheck, type VerifierSlot } from '@praxis/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@/lib/client';
 
@@ -81,14 +81,14 @@ export function BenchmarkFields({ taskId }: { taskId: string }) {
           <option value="">None</option>
           {view.edgeCases.map((e) => (
             <option key={e.tag} value={e.tag}>
-              {e.name ?? e.tag} ({e.archetype ?? '—'}, {e.complexity ?? '—'})
+              {edgeCaseOptionLabel(e)}
             </option>
           ))}
         </select>
       </label>
       {focused && (
         <p className="mt-1 max-w-3xl text-sm text-fg-muted">
-          {focused.context} {focused.twist} This task’s Archetype becomes {focused.archetype ?? '—'}; its Complexity is {focused.complexity ?? '—'} unless you set another in S1.
+          {focused.context} {focused.twist} This task’s Archetype becomes “{archetypePlain(focused.archetype) ?? '—'}”; its Complexity is “{complexityPlain(focused.complexity)?.name ?? '—'}” unless you set another in S1.
         </p>
       )}
 

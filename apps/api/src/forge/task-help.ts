@@ -1,4 +1,4 @@
-import { getFieldValue, orderedTools, toolOptionLabel, type TemplateProfile } from '@praxis/shared';
+import { archetypePlain, businessNotes, complexityPlain, edgeCaseOptionLabel, getFieldValue, orderedTools, toolOptionLabel, type BusinessNote, type TemplateProfile } from '@praxis/shared';
 import type { Template } from '@prisma/client';
 import { templateBenchmark, taskBenchmarkOf } from '../anvil/benchmark';
 import { jointTemplateSpec } from '../anvil/joint-template';
@@ -17,21 +17,59 @@ export interface TaskHelpContext {
   template: { name: string; sections: { section: string; title: string; filled: boolean }[] };
   rules: { id: string; title: string }[];
   reviewComments: { section: string | null; text: string }[];
-  /** D-020: the Benchmark panel as the author sees it: the template's edge cases (public fields), this task's focus, Archetype and Complexity. */
-  benchmark?: { edgeCases: { name: string; tag: string; archetype: string | null; complexity: string | null; context: string; twist: string }[]; focus: string | null; archetype: string | null; complexity: string | null };
+  /**
+   * D-020 / D-025: the Benchmark panel in plain words, from the live template: each edge case's dropdown label, the
+   * situation and what is unusual, the kind of problem and how much checking it needs, the business notes, and (when
+   * Studio answers) whether the benchmark has cases for it. No raw codes.
+   */
+  benchmark?: {
+    edgeCases: { dropdownLabel: string; situation: string; whatIsUnusual: string; kindOfProblem: string | null; checkingNeeded: string | null; appliesTo: string[]; businessNotes: BusinessNote[]; benchmarkCases?: string }[];
+    focus: string | null;
+    archetype: string | null;
+    complexity: string | null;
+  };
   /** D-020: the template's tools by purpose ("Screen an applicant — screening.check"). */
   toolGuide?: string[];
 }
 
 /** D-020: the Benchmark panel and the tool guide for Help, from the template and the task (nothing the author does not already see). */
-export function benchmarkHelp(t: { benchmark: unknown; output: unknown; project: { template: Pick<Template, 'lineageId' | 'version' | 'anvilSpec'> } }): Pick<TaskHelpContext, 'benchmark' | 'toolGuide'> {
+const PRODUCT_PLAIN: Record<string, string> = { individual: 'individual accounts', adult_joint: 'joint accounts', teen_joint: 'teen joint accounts', custodial: 'custodial accounts' };
+const AVAILABILITY_PLAIN: Record<string, string> = {
+  supported: 'The benchmark has practice cases for this situation, so a task focused on it can run.',
+  needs_data: 'The benchmark is still building enough practice cases for this situation; a focused task may wait until they exist.',
+  needs_environment_change: 'The benchmark cannot run this situation yet; a focused task would wait. Leave the focus on None for now, or ask your project manager.',
+};
+
+export function benchmarkHelp(t: { benchmark: unknown; output: unknown; project: { template: Pick<Template, 'lineageId' | 'version' | 'anvilSpec'> } }, availability: Map<string, string> | null = null): Pick<TaskHelpContext, 'benchmark' | 'toolGuide'> {
   const b = templateBenchmark(t.project.template);
   const value = taskBenchmarkOf(t.benchmark);
   const s1 = ((t.output as { sections?: { S1?: Record<string, unknown> } } | null)?.sections?.S1 ?? {}) as Record<string, unknown>;
   const spec = jointTemplateSpec(t.project.template);
   const offered = spec ? declaredToolIds(spec.execution) : null;
   return {
-    ...(b.edgeCases.length || value.edgeCase ? { benchmark: { edgeCases: b.edgeCases.map((e) => ({ name: e.name ?? e.tag, tag: e.tag, archetype: e.archetype, complexity: e.complexity, context: e.context, twist: e.twist })), focus: value.edgeCase, archetype: typeof s1.archetype === 'string' ? s1.archetype : null, complexity: typeof s1.complexity === 'string' ? s1.complexity : null } } : {}),
+    ...(b.edgeCases.length || value.edgeCase
+      ? {
+          benchmark: {
+            edgeCases: b.edgeCases.map((e) => {
+              const c = complexityPlain(e.complexity);
+              const status = availability?.get(e.tag);
+              return {
+                dropdownLabel: edgeCaseOptionLabel(e),
+                situation: e.context,
+                whatIsUnusual: e.twist,
+                kindOfProblem: archetypePlain(e.archetype),
+                checkingNeeded: c ? (c.meaning ? `${c.name}: ${c.meaning}` : c.name) : null,
+                appliesTo: (e.products ?? []).map((p) => PRODUCT_PLAIN[p] ?? p.replace(/_/g, ' ')),
+                businessNotes: businessNotes(e),
+                ...(status && AVAILABILITY_PLAIN[status] ? { benchmarkCases: AVAILABILITY_PLAIN[status] } : {}),
+              };
+            }),
+            focus: value.edgeCase ? edgeCaseOptionLabel(b.edgeCases.find((e) => e.tag === value.edgeCase) ?? { tag: value.edgeCase }) : null,
+            archetype: typeof s1.archetype === 'string' ? archetypePlain(s1.archetype) : null,
+            complexity: typeof s1.complexity === 'string' ? (complexityPlain(s1.complexity)?.name ?? null) : null,
+          },
+        }
+      : {}),
     ...(offered?.length ? { toolGuide: orderedTools(offered).map(toolOptionLabel) } : {}),
   };
 }

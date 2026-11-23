@@ -69,7 +69,7 @@ import { defaultFieldSuggester, type FieldSuggester } from './tasks/suggestions/
 import { defaultStepTranslator, type StepTranslator } from './tasks/steps/translator';
 import { stepTranslateRoutes } from './routes/step-translate';
 import { policyClauseRoutes } from './routes/policy-clauses';
-import { HttpCoverageClient, type StudioCoverageClient } from './anvil/coverage-client';
+import { coverageFromConfig, HttpCoverageClient, type StudioCoverageClient } from './anvil/coverage-client';
 import { templateEditClosed, TEMPLATE_READ_ONLY_MESSAGE } from './templates/read-only';
 import { defaultDispositionSuggester, type DispositionSuggester } from './policy/dispositions';
 import { suggestionRoutes } from './routes/suggestions';
@@ -433,7 +433,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       }
       const support = deps.support ?? defaultSupport(deps.config);
       await v1.register(supportRoutes, { assistant: support, partnerPortal: deps.config.SME_SUPPLY_ENABLED });
-      await v1.register(forgeHelpRoutes, { db: deps.db, assistant: support });
+      await v1.register(forgeHelpRoutes, { db: deps.db, assistant: support, coverage: deps.coverageClient ?? coverageFromConfig(deps.config, deps.outboundFetch) });
       await v1.register(datasetRoutes, { db: deps.db });
       await v1.register(anvilRoutes, { db: deps.db, storage });
       await v1.register(rlRoutes, { db: deps.db });

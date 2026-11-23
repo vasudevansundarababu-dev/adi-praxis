@@ -8,6 +8,7 @@ import { requireForgeTerms } from '../forge/candidate';
 import { requireNewFlow, reviewerTaskView } from '../forge/review';
 import { benchmarkHelp, commentsOf, helpGuides, publishedRules, sectionStatus, taskBasics, type TaskHelpContext } from '../forge/task-help';
 import { AppError } from '../lib/errors';
+import type { StudioCoverageClient } from '../anvil/coverage-client';
 import { SupportUnavailableError, type SupportAssistant, type SupportContext } from '../support/assistant';
 import { SME_HELP } from '../support/help-pack';
 import { profileFor } from '../tasks/profile-output';
@@ -21,7 +22,20 @@ import { ownTask } from './work';
  */
 const perSession = { max: 20, timeWindow: '1 minute', keyGenerator: (r: FastifyRequest) => r.cookies?.praxis_candidate ?? r.ip };
 
-export const forgeHelpRoutes: FastifyPluginAsyncZod<{ db: Db; assistant: SupportAssistant }> = async (app, { db, assistant }) => {
+export const forgeHelpRoutes: FastifyPluginAsyncZod<{ db: Db; assistant: SupportAssistant; coverage?: StudioCoverageClient | null }> = async (app, { db, assistant, coverage = null }) => {
+  /** D-025: whether the benchmark has cases for each of the template's edge cases (Studio's coverage check), or null. */
+  async function edgeCaseAvailability(template: { lineageId: string; version: number; anvilSpec: unknown }): Promise<Map<string, string> | null> {
+    if (!coverage) return null;
+    const spec = template.anvilSpec as { authoring?: { edge_cases?: unknown } } | null;
+    const entries = (Array.isArray(spec?.authoring?.edge_cases) ? spec!.authoring!.edge_cases : []).filter((e): e is Record<string, unknown> => !!e && typeof e === 'object' && typeof (e as { tag?: unknown }).tag === 'string');
+    if (!entries.length) return null;
+    try {
+      const r = await Promise.race([coverage.check({ template: { id: template.lineageId, version: template.version }, edge_case_tags: entries.map((e) => String(e.tag)), edge_cases: entries, clauses: [] }), new Promise<null>((res) => setTimeout(() => res(null), 4000))]);
+      return r && r.ok ? new Map(r.result.edge_cases.map((e) => [e.tag, e.status])) : null;
+    } catch {
+      return null;
+    }
+  }
   async function answer(req: FastifyRequest, scope: NonNullable<SupportContext['scope']>, context: TaskHelpContext, templates: string[], body: TaskHelpRequest) {
     const started = Date.now();
     try {
@@ -48,7 +62,7 @@ export const forgeHelpRoutes: FastifyPluginAsyncZod<{ db: Db; assistant: Support
       template: { name: template.workflowName, sections: sectionStatus(profile, t.output) },
       rules: await publishedRules(db, t),
       reviewComments: commentsOf(t.reviews[0]?.comments),
-      ...benchmarkHelp(t),
+      ...benchmarkHelp(t, await edgeCaseAvailability(t.project.template)),
     };
     return answer(req, 'TASK_AUTHOR', context, helpGuides(profile), req.body);
   });

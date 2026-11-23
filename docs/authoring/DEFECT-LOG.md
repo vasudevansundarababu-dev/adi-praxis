@@ -52,7 +52,7 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
   - The staff **Reviewer** role (a console user, not an SME) loses the right to decide run reviews. Today
     `STAFF_REVIEW` allows Admin, PM and Reviewer. The owner named only PM/Admin, the author SME and the SME Reviewer, so
     it becomes Admin and PM only. Staff Reviewers can still read the batches.
-- **Status:** planned, waiting for "go". Nothing changed for D-004 yet.
+- **Status:** FIXED 23 Nov 2026 (owner "go"). Commits 98baabbc (API) and 1730d2b6 (UI). See "Fixes".
 
 ## D-012 Authoring: case selectors send `edge_cases: []` for every episode (low)
 
@@ -81,7 +81,7 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
     selector carries it without depending on the SME.
   - **Recommendation:** A now. B without the new key (just required, with a None choice) if the owner wants the SME's
     intent always recorded. C later.
-- **Status:** investigated, plan logged, waiting for the owner's choice and "go".
+- **Status:** resolved 23 Nov 2026 with no contract change (owner "go"), option A. A task with a Focus edge case sends it in `case_selector.edge_cases`; this is proved through the real SME save in commit e4ab41a3. The fields are visible since D-013.
 
 ## D-007 (RL Gym) note from Authoring: actor payload has no `assignment` field
 
@@ -170,3 +170,25 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
 - **Tests:** `apps/web/test/benchmark-review-panel.test.tsx` (4 tests). The web suite (222 tests) and the SME app suite
   (119 tests) pass, and both typechecks are clean.
 - **Checked live** on 3100 (batch smr-0051) and 3101.
+| 23 Nov 2026 | Task correction path (owner's first priority) | e4ab41a3 | No code change was needed. A new test covers the whole path through the real routes. |
+| 23 Nov 2026 | D-012 | e4ab41a3 | Test only. |
+| 23 Nov 2026 | D-004 | 98baabbc, 1730d2b6 | Run-review assignment per task, SME decisions, and the two bells. Migration 20261205000000 (one new empty table) applied to the dev database. |
+
+- **Task correction, end to end** (test "task correction end to end"):
+  1. A PM chooses "Task needs correction" in Benchmark review. The task goes to Rework with the rationale.
+  2. The SME (sourced and assigned) saves the Focus edge case and the form, confirms authorship for the revision, and
+     resubmits.
+  3. A person approves the task in the console.
+  4. Re-export sends revision 2 with `corrects_revision` 1, `sme_batch_id` and `case_selector.edge_cases` holding the
+     focus edge case.
+  - Staff cannot edit a task directly on an SME → PM project. The only staff edit is the Expert edit, on SME → Expert
+    → PM projects, so the correction goes through the SME.
+- **D-004, as built:**
+  - `RunReviewAssignment` is append-only, one assignment per task in a batch. Only the task's author or an SME Reviewer
+    on the project can be assigned. SME Reviewers exist only on SME → Expert → PM projects, so on the live SME → PM
+    project only the author can be picked.
+  - The assignment can change until the task's first decision. Every assignment is audited.
+  - Decisions can be made by PM or Admin (console), or by the assigned SME (SME app, **Run reviews**). The staff
+    Reviewer role can read batches but no longer decides.
+  - Bells: the console bell is for PM and Admin. It lists tasks to approve, run-review tasks with no reviewer or not
+    yet decided, and open SME needs. The SME bell lists own Rework with the reason, and assigned run reviews.

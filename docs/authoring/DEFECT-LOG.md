@@ -306,3 +306,28 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
     say these are part of the task and ask for plain, simple English.
   - **Tests:** `ai-errors.test.ts`, plus new cases in `forge-step7.test.ts` (expired sign-in → plain 503; Benchmark
     question answered) and `rlgym-benchmark.test.ts` (Help context has the edge cases).
+
+## E-002 / E-001 enhancements, Authoring part (23 Nov 2026, owner "go"; built against Studio's draft contracts d27063d)
+
+Additive. The Golden KYC v7 (version 5) re-authoring, the D-016 procedure form and task correction are unchanged. No
+existing task or rule changed: every new field is optional, and packages without clause conditions keep their bytes.
+
+| Item | Commit | State |
+| --- | --- | --- |
+| Conditions as structured predicates over logical facts, plain language (clause-condition.v1, fact-catalog.v1); project fact catalog, versioned; checked on save | 270e7782 | done |
+| S4: approved clause list with "setup needed" (template's `policy_bindings`); SME sees it in S4 only when a clause has a condition | 270e7782, 99efc14e | done |
+| Export: clause_id, version, source sha256, condition, exceptions, approval, binding revision per cited clause | 270e7782 | done |
+| Validate → Studio coverage check (coverage-check.v1) via `StudioCoverageClient` | 270e7782, 99efc14e | interface and UI done; **not connected**: Studio's endpoint, request, auth not defined yet (asked) |
+| 3-day hold prompt to the PM (E-001 Q4) + Release task (drops focus, exports as a normal case) | 270e7782, 99efc14e | done |
+| Three-category suggestion contract (Recommended always/conditional, Needs review + question, Outside scope + quoted mismatch), server-side checks, binding gaps, manual fallback | 85c5a607 | done (mock and model) |
+| PM quality evaluation (private labels, discrepancy types, precision/recall-style counts with raw numbers, reproducibility metadata) | 85c5a607 | done |
+
+**Still open:**
+- **Coverage endpoint.** Studio's coverage-check endpoint, and a live edge-case-catalog.v1 read for "Focus on edge case",
+  are waiting on Studio.
+- **Condition editing.** A structured condition editor for the PM (today: "Use this condition" from a suggestion, or
+  the API).
+- **Frozen project scope.** A versioned project scope text (today the project name and the fact catalog are used).
+- **Generic names.** Retiring `statePolicies` and `exampleGoverningState` in favour of generic names, which waits on
+  Studio (§4.1.7).
+- **Clause receipts.** Showing the RL Gym's clause receipts.

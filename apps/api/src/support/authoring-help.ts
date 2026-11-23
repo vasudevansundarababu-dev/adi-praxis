@@ -42,7 +42,7 @@ const TEMPLATE_NOTES: Record<string, string> = {
   'adverse-media-review':
     'Rate every media source high, medium, low or unknown with a reason (owner, 12 Nov 2026). An "escalate" recommendation goes to a person step, "Compliance reviewer decides" (Confirm or Dismiss); close and request_information go straight to the output.',
   'enhanced-due-diligence':
-    'The overall risk rating (low, medium, high, very_high) is graded beside the recommendation; the written risk assessment stays in S5. The business hand-off is required, and the workflow ends with "Approver decides" (Approve or Decline).',
+    'The overall risk rating (low, medium, high, very high) is graded beside the recommendation; the written risk assessment stays in S5. The business hand-off is required, and the workflow ends with "Approver decides" (Approve or Decline).',
   'customer-risk-rating':
     'Rate each risk factor low, medium or high. There are no weights or formula in ADI Forge: your methodology evidence (S2) decides the overall rating. If you propose an override (increase or decrease), write the override rationale; the workflow sends it to "Senior compliance approver decides" (Approve or Decline). No override goes straight to the output.',
   'q4-global-paid-search-query-clustering':

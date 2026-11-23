@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { benchmarkInputProblems, edgeCaseProblems, templateVerifiers, verifierProblems } from '@praxis/shared';
+import { AUTHORSHIP_VERSION, benchmarkInputProblems, edgeCaseProblems, templateVerifiers, verifierProblems } from '@praxis/shared';
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { jointHashes, jointTemplateSpec, type JointTemplateSpec } from '../src/anvil/joint-template';
@@ -121,7 +121,7 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     const a = answer(c);
     return { status: a.status, text: async () => JSON.stringify(a.body) };
   };
-  const { setFlow, signIn } = forgeKit(() => ({ app, pm, admin }), google);
+  const { setFlow, signIn, source, assign } = forgeKit(() => ({ app, pm, admin }), google);
   const post = (cookie: string, url: string, payload: object = {}) => call(app, 'POST', cookie, url, payload);
   const get = (cookie: string, url: string) => call(app, 'GET', cookie, url);
   const asGym = (method: 'GET' | 'POST', url: string, payload?: object) => app.inject({ method, url: `/api/v1${url}`, headers: { authorization: `Bearer ${anvilKey}`, ...(method === 'POST' ? idem() : {}) }, ...(payload ? { payload } : {}) });
@@ -429,6 +429,67 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     const third = (await post(a.cookie, `/me/tasks/${task.taskId}/needs`, { kind: 'more_data', edgeCase: 'minor_without_tin', howMany: 5, why: 'Only one teen joint case without a TIN.' })).json();
     expect((await post(pm, `/projects/${projectId}/needs/${third.id}/reject`, { reason: 'Already planned for V10.' })).statusCode).toBe(200);
     expect((await get(a.cookie, `/me/tasks/${task.taskId}/benchmark`)).json().needs.find((n: { id: string }) => n.id === third.id)).toMatchObject({ state: 'rejected', rejectReason: 'Already planned for V10.' });
+  });
+
+  it('task correction end to end (owner, 23 Nov 2026): PM sends a run task back, the SME edits every field and resubmits, a person approves, Re-export sends revision 2 with the focus edge case', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    await qualify(v8);
+    const projectId = await project(v8);
+    // A real SME, sourced and directly assigned by the PM, as on the project's Resource assignments tab.
+    const anyTask = (await db.taskInstance.findMany({ where: { projectId } }))[0]!;
+    const person = await source(projectId, 'SME', { email: 'sme-correction@gmail.test', first: 'John', last: 'Doe' });
+    expect((await assign(projectId, person.id, anyTask.id)).statusCode).toBe(200);
+    const me = await signIn('sme-correction@gmail.test');
+    const rows = await packable(await authored(projectId, { smeUserId: me.smeUserId }));
+    const t = rows[0]!.record!;
+    answer = (c) => (c.url.endsWith('/exports') ? { status: 201, body: { data: { new: c.body.tasks.length, superseding: 0, unchanged: 0, blocked: [] }, meta: { request_id: 'e1' } } } : c.url.includes('/sme-review-batches/') ? { status: 200, body: { data: { accepted: c.body.decisions.length, inbox_items: [] }, meta: { request_id: 'd1' } } } : { status: 404, body: {} });
+    expect((await post(pm, `/projects/${projectId}/rlgym-exports`)).statusCode).toBe(201);
+    const first = calls.filter((c) => c.url.endsWith('/exports')).at(-1)!.body.tasks.find((x: { task_id: string }) => x.task_id === t.taskInstanceId);
+    expect(first).toMatchObject({ revision: 1, case_selector: { edge_cases: [] } });
+
+    // 1. Benchmark review → Task needs correction, with a rationale.
+    const batch = { schema: 'rlgym.sme-review-package.v1', batch_id: 'smr-0051', run_id: 'run-0228', project_id: projectId, template: {}, rubric: [], tasks: [{ task_id: t.taskInstanceId, revision: 1, episodes: [{ item_id: 'it-1', episode_id: 'ep-1', score: { score: 42.86, passed: false, failed_criteria: ['account_agreements'] }, criteria: [] }] }], synthetic: true };
+    const ref = (await asGym('POST', `/projects/${rlgymProjectId(projectId)}/run-reviews`, batch)).json().forge_batch_ref as string;
+    const rationale = 'The account agreements step does not say which agreements the applicant must sign.';
+    const decided = await post(pm, `/projects/${projectId}/run-reviews/${ref}/decisions`, { decisions: [{ itemId: 'it-1', decision: 'task_correction', rationale }] });
+    expect(decided.statusCode, decided.body).toBe(201);
+
+    // 2. The SME sees it in Rework with the rationale, and every field is editable.
+    const view = await get(me.cookie, `/me/tasks/${t.taskInstanceId}`);
+    expect(view.statusCode, view.body).toBe(200);
+    expect(view.json()).toMatchObject({ status: 'REWORK', readOnly: false });
+    expect(JSON.stringify(view.json().review)).toContain(rationale);
+    const bench = (await get(me.cookie, `/me/tasks/${t.taskInstanceId}/benchmark`)).json();
+    expect(bench.editable).toBe(true);
+    const saveBench = await call(app, 'PUT', me.cookie, `/me/tasks/${t.taskInstanceId}/benchmark`, { edgeCase: 'sanctions_dob_mismatch', expectedVersion: bench.value.version });
+    expect(saveBench.statusCode, saveBench.body).toBe(200);
+    // The SME accepted the human-authorship terms when first writing the task; this fixture task skipped that step.
+    const consent = await post(me.cookie, `/me/tasks/${t.taskInstanceId}/conversation/consent`, { version: AUTHORSHIP_VERSION, accepted: true });
+    expect(consent.statusCode, consent.body).toBe(200);
+    const output = structuredClone(view.json().output) as Record<string, any>;
+    output.sections.S8.reviewerNotes = `${String(output.sections.S8.reviewerNotes ?? '')} The applicant must sign the deposit agreement and the e-sign consent.`.trim();
+    const saved = await call(app, 'PUT', me.cookie, `/me/tasks/${t.taskInstanceId}`, { output, expectedRevision: view.json().revision });
+    expect(saved.statusCode, saved.body).toBe(200);
+    const rev = (await get(me.cookie, `/me/tasks/${t.taskInstanceId}`)).json().revision as number;
+    // Review this revision and confirm human authorship (the task page's Review step).
+    const reviewed = await post(me.cookie, `/me/tasks/${t.taskInstanceId}/conversation/review`, { expectedRevision: rev, ownWork: true, noExternalLlm: true, authorisedSources: true });
+    expect(reviewed.statusCode, reviewed.body).toBe(200);
+    const submitted = await post(me.cookie, `/me/tasks/${t.taskInstanceId}/submit`, { expectedRevision: (await get(me.cookie, `/me/tasks/${t.taskInstanceId}`)).json().revision, syntheticDeclaration: true });
+    expect(submitted.statusCode, submitted.body).toBeLessThan(300);
+
+    // 3. A person approves it in the console (SME → PM route).
+    const task = (await get(admin, `/projects/${projectId}/forge-tasks/${t.taskInstanceId}`)).json();
+    const approved = await post(admin, `/projects/${projectId}/tasks/${t.taskInstanceId}/decision`, { decision: 'APPROVE', expectedVersion: task.expectedVersion, expectedRevision: task.expectedRevision, checklist: Object.fromEntries((task.checklist as { key: string }[]).map((c) => [c.key, true])) });
+    expect(approved.statusCode, approved.body).toBeLessThan(300);
+    expect((await db.taskInstance.findUniqueOrThrow({ where: { id: t.taskInstanceId } })).status).toBe('ACCEPTED');
+
+    // 4. Re-export: revision 2 corrects revision 1, names the batch, and carries the focus edge case (D-012).
+    answer = (c) => (c.url.endsWith('/exports') ? { status: 201, body: { data: { new: 0, superseding: 1, unchanged: c.body.tasks.length - 1, blocked: [] }, meta: { request_id: 'e2' } } } : { status: 404, body: {} });
+    const again = await post(pm, `/projects/${projectId}/rlgym-exports`);
+    expect(again.statusCode, again.body).toBe(201);
+    const sent = calls.filter((c) => c.url.endsWith('/exports')).at(-1)!.body.tasks.find((x: { task_id: string }) => x.task_id === t.taskInstanceId);
+    expect(sent).toMatchObject({ revision: 2, corrects_revision: 1, sme_batch_id: 'smr-0051', edge_case: 'sanctions_dob_mismatch' });
+    expect(sent.case_selector.edge_cases).toEqual(['sanctions_dob_mismatch']);
   });
 
   it('SME review batches: received idempotently; a person decides; decisions go to the RL Gym; task_correction reopens the task', async () => {

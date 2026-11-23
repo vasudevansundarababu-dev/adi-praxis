@@ -92,3 +92,62 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
   `PRAXIS-EXPORT-REQUIREMENT.md` asks for "objective, assignment and requested deliverable" as content, which lives in
   the sections.
 - The RL Gym reading sections is correct. No Authoring change.
+
+## D-013 Authoring: Rationale box invisible in Benchmark review (high)
+
+- **Reported:** 23 Nov 2026, from the owner's screenshot of batch smr-0051 (run-0228).
+- **Finding (investigated, nothing changed):**
+  - Every field added on this branch for the RL Gym and Studio link uses `className="input"`. That class is not defined
+    in any stylesheet: not in `apps/web/app/globals.css`, `apps/candidate`, or `packages/shared/theme/theme.css`.
+  - Tailwind's reset removes a plain input's border and background, so text boxes and text areas render with no visible
+    box. Selects still show the browser's arrow.
+  - The rest of the console uses `rounded-md border border-line bg-surface px-2 py-1 text-fg`.
+  - Fields affected:
+    - **Staff console, `apps/web/components/projects/rlgym-panel.tsx`:**
+      - Benchmark review: Rationale and Criterion.
+      - SME needs: Summary for Studio and Reject reason. This is the real cause of the earlier "Send to Studio is
+        always disabled" report. The 97415d59 hint only explains the rule; the box itself is still invisible.
+    - **SME app, `apps/candidate/components/work/benchmark-fields.tsx`:**
+      - Focus edge case, the expected-result slot fields and the extra state-check fields.
+      - Raise an edge case: Context and Twist.
+      - These may also be why the 4 run-0228 tasks have no Focus edge case, Complexity or Archetype. See D-012.
+- **Planned fix:**
+  - Define `.input` once as a component class with the console's field style, in each app's globals, so every
+    existing use is fixed together.
+  - Add a hint under Decide while it is disabled: "Type a rationale to decide", and, for "Grader was wrong" or
+    "Rubric correction", also a criterion.
+  - Test: render the panels and the SME benchmark fields and assert that every text control carries a defined,
+    bordered class.
+- **Status:** investigated, waiting for "go".
+
+## D-014 Authoring: "score [object Object]" on review items (medium)
+
+- **Finding:**
+  - The panel prints `String(e.score)`. In batch smr-0051 the RL Gym sends `score` as an object:
+    `{score: 42.86, passed: false, failed_criteria: [account_agreements, identification_verification, screening,
+    state_rule_selection]}`.
+  - Authoring's test fixture had a plain number (`score: 40`), so the test missed it. There is no pass mark in the
+    payload.
+- **Planned fix:**
+  - Show "Score 42.86 · not passed · failed: account_agreements, identification_verification, screening,
+    state_rule_selection".
+  - Keep accepting a plain number.
+  - Show the pass mark only if the RL Gym ever sends one.
+  - Test with the real shape.
+- **Status:** investigated, waiting for "go".
+
+## D-015 Path line contradicts itself and repeats the failure (low; split between the RL Gym and Authoring)
+
+- **Finding:** the episode's `path` from the RL Gym is:
+  - `summary`: "Took 3 of 8 steps; failed at account (criterion account_agreements fail); not reached: verify, screen,
+    account, state, act";
+  - `failed_node`: "account";
+  - `failed_why`: "criterion account_agreements fail";
+  - `order`: [intake, identify, decide].
+- **RL Gym's part:** the summary string is the RL Gym's, shown verbatim. Listing "account" as both failed and not
+  reached is in the RL Gym's text, and so is "failed at account" when only intake, identify and decide ran.
+- **Authoring's part:** the panel appends " · failed at {failed_node} ({failed_why})" after the summary, which repeats
+  the failure.
+- **Planned fix (Authoring):** show the RL Gym's summary alone when there is one. Build "Failed at … (…)" only when no
+  summary is sent.
+- **Status:** investigated, waiting for "go". The contradictory summary text is for the RL Gym to fix.

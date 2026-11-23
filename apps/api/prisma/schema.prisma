@@ -3372,17 +3372,18 @@ model RlGymProjectExport {
 
 /// An SME review batch from the RL Gym (rlgym.sme-review-package.v1), received into a project. Append-only.
 model RunReviewBatch {
-  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId      String              @map("client_id") @db.Uuid
-  projectId     String              @map("project_id") @db.Uuid
-  batchId       String              @map("batch_id")
-  forgeBatchRef String              @unique @map("forge_batch_ref")
-  runId         String?             @map("run_id")
+  id            String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String                @map("client_id") @db.Uuid
+  projectId     String                @map("project_id") @db.Uuid
+  batchId       String                @map("batch_id")
+  forgeBatchRef String                @unique @map("forge_batch_ref")
+  runId         String?               @map("run_id")
   body          Json
-  bodySha256    String              @map("body_sha256")
-  apiClientId   String              @map("api_client_id") @db.Uuid
-  createdAt     DateTime            @default(now()) @map("created_at")
+  bodySha256    String                @map("body_sha256")
+  apiClientId   String                @map("api_client_id") @db.Uuid
+  createdAt     DateTime              @default(now()) @map("created_at")
   decisions     RunReviewDecision[]
+  assignments   RunReviewAssignment[]
 
   @@unique([clientId, batchId])
   @@index([projectId, createdAt])
@@ -3408,6 +3409,22 @@ model RunReviewDecision {
   batch        RunReviewBatch @relation(fields: [batchRowId], references: [id], onDelete: Restrict)
 
   @@unique([batchRowId, itemId])
+}
+
+/// D-004: the SME a PM or Admin assigned to review one task's episodes in a batch (its author or a project SME
+/// Reviewer). The latest row per (batch, task) is in force. Append-only.
+model RunReviewAssignment {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String         @map("client_id") @db.Uuid
+  batchRowId   String         @map("batch_row_id") @db.Uuid
+  taskId       String         @map("task_id")
+  smeUserId    String         @map("sme_user_id") @db.Uuid
+  assignedById String         @map("assigned_by_id") @db.Uuid
+  createdAt    DateTime       @default(now()) @map("created_at")
+  batch        RunReviewBatch @relation(fields: [batchRowId], references: [id], onDelete: Restrict)
+
+  @@index([batchRowId, taskId, createdAt])
+  @@index([smeUserId])
 }
 
 /// An SME need raised on a task (Raise an edge case, More data); the PM merges, sends to Studio or rejects.

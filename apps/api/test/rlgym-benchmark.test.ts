@@ -235,10 +235,10 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(res.statusCode, res.body).toBeLessThan(300);
   }
 
-  async function project(v8: Template) {
+  async function project(v8: Template, reviewRoute: 'SME_PM' | 'SME_EXPERT_PM' = 'SME_PM') {
     await setFlow(true);
     const jd = (await post(pm, '/job-descriptions', { title: 'Analyst', responsibilities: 'Author cases.', skills: v8.skills, wagePerTask: 40, wageCurrency: 'GBP', locationType: 'REMOTE' })).json();
-    const created = await post(pm, '/projects', { authoringExperience: 'CLASSIC', reviewRoute: 'SME_PM', templateId: v8.id, name: `KYC November ${randomUUID().slice(0, 6)}`, taskMode: 'AUTHORING', distinctTarget: 4, maxPerExpert: 4, tptMinutes: 60, startDate: '2026-11-05', endDate: '2026-11-30', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['US'], required: true }] });
+    const created = await post(pm, '/projects', { authoringExperience: 'CLASSIC', reviewRoute, templateId: v8.id, name: `KYC November ${randomUUID().slice(0, 6)}`, taskMode: 'AUTHORING', distinctTarget: 4, maxPerExpert: 4, tptMinutes: 60, startDate: '2026-11-05', endDate: '2026-11-30', jobDescriptionId: jd.id, demographicFilters: [{ attributeKey: 'country', operator: 'IN', values: ['US'], required: true }] });
     expect(created.statusCode, created.body).toBe(201);
     const projectId = created.json().id as string;
     expect((await post(pm, `/projects/${projectId}/submit`)).statusCode).toBe(200);
@@ -490,6 +490,67 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     const sent = calls.filter((c) => c.url.endsWith('/exports')).at(-1)!.body.tasks.find((x: { task_id: string }) => x.task_id === t.taskInstanceId);
     expect(sent).toMatchObject({ revision: 2, corrects_revision: 1, sme_batch_id: 'smr-0051', edge_case: 'sanctions_dob_mismatch' });
     expect(sent.case_selector.edge_cases).toEqual(['sanctions_dob_mismatch']);
+  });
+
+  it('D-004: a PM assigns each task’s run review to its author or a project SME Reviewer; only that SME (or PM/Admin) decides; inboxes show what waits', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    // SME Reviewers exist on the SME → Expert → PM route.
+    const projectId = await project(v8, 'SME_EXPERT_PM');
+    const tasks = await db.taskInstance.findMany({ where: { projectId } });
+    const authorP = await source(projectId, 'SME', { email: 'author-d004@gmail.test', first: 'Ann', last: 'Author' });
+    expect((await assign(projectId, authorP.id, tasks[0]!.id)).statusCode).toBe(200);
+    const author = await signIn('author-d004@gmail.test');
+    await source(projectId, 'REVIEWER', { email: 'reviewer-d004@gmail.test', first: 'Rae', last: 'Reviewer' });
+    const reviewer = await signIn('reviewer-d004@gmail.test');
+    const outsider = await signIn('outsider-d004@gmail.test');
+    const rows = await authored(projectId, { smeUserId: author.smeUserId });
+    const [t0, t1] = [rows[0]!.taskId, rows[1]!.taskId];
+    const ep = (id: string) => ({ item_id: id, episode_id: id, score: 40, criteria: [] });
+    const batch = { schema: 'rlgym.sme-review-package.v1', batch_id: 'smr-d004', run_id: 'run-d004', project_id: projectId, template: {}, rubric: [], tasks: [{ task_id: t0, revision: 1, episodes: [ep('a-1'), ep('a-2')] }, { task_id: t1, revision: 1, episodes: [ep('b-1')] }], synthetic: true };
+    const ref = (await asGym('POST', `/projects/${projectId}/run-reviews`, batch)).json().forge_batch_ref as string;
+    answer = (c) => (c.url.includes('/sme-review-batches/') ? { status: 200, body: { data: { accepted: c.body.decisions.length, inbox_items: [] }, meta: { request_id: 'd4' } } } : { status: 404, body: {} });
+
+    // Staff bell (PM): both tasks need a reviewer. A staff Reviewer has no bell and can no longer decide.
+    const kinds = async () => ((await get(pm, '/me/inbox')).json().items as { kind: string; count: number; href: string }[]).filter((i) => i.href.includes(projectId));
+    expect(await kinds()).toEqual([expect.objectContaining({ kind: 'run_review_unassigned', count: 2, href: `/projects/${projectId}?tab=benchmark` })]);
+    const staffReviewer = await login(app, (await createUser(clientId, ['REVIEWER'])).email);
+    expect((await get(staffReviewer, '/me/inbox')).statusCode).toBe(403);
+    expect((await post(staffReviewer, `/projects/${projectId}/run-reviews/${ref}/decisions`, { decisions: [{ itemId: 'a-1', decision: 'agent_failure', rationale: 'x' }] })).statusCode).toBe(403);
+
+    // Eligible: the author first, then the project's SME Reviewers. Anyone else is refused.
+    const view = (await get(pm, `/projects/${projectId}/run-reviews`)).json().items[0];
+    expect(view.tasks.find((x: { taskId: string }) => x.taskId === t0).eligible.map((e: { smeUserId: string; role: string }) => [e.smeUserId, e.role])).toEqual([[author.smeUserId, 'author'], [reviewer.smeUserId, 'reviewer']]);
+    const assignTo = (taskId: string, smeUserId: string) => post(pm, `/projects/${projectId}/run-reviews/${ref}/assignments`, { taskId, smeUserId });
+    expect((await assignTo(t0, outsider.smeUserId)).statusCode).toBe(422);
+    expect((await assignTo(t0, author.smeUserId)).statusCode).toBe(201);
+    const same = await assignTo(t0, author.smeUserId);
+    expect(same.json().unchanged, same.body).toBe(true);
+    expect((await assignTo(t1, reviewer.smeUserId)).statusCode).toBe(201);
+    expect(await kinds()).toEqual([expect.objectContaining({ kind: 'run_review_waiting', count: 3 })]);
+
+    // Each SME sees only their tasks' episodes, and may decide only those.
+    const mine = (await get(author.cookie, '/me/run-reviews')).json().items;
+    expect(mine).toHaveLength(1);
+    expect(mine[0].items.map((i: { itemId: string }) => i.itemId)).toEqual(['a-1', 'a-2']);
+    expect((await get(outsider.cookie, '/me/run-reviews')).json().items).toEqual([]);
+    expect(((await get(reviewer.cookie, '/me/forge/inbox')).json().items as { kind: string; count: number }[])).toEqual([expect.objectContaining({ kind: 'run_review', count: 1, href: '/run-reviews' })]);
+    const decideAs = (cookie: string, body: object) => post(cookie, `/me/run-reviews/${ref}/decisions`, body);
+    expect((await decideAs(author.cookie, { decisions: [{ itemId: 'b-1', decision: 'agent_failure', rationale: 'Not mine.' }] })).statusCode).toBe(403);
+    expect((await decideAs(outsider.cookie, { decisions: [{ itemId: 'a-1', decision: 'agent_failure', rationale: 'Not mine.' }] })).statusCode).toBe(403);
+    const res = await decideAs(author.cookie, { decisions: [{ itemId: 'a-1', decision: 'task_correction', rationale: 'Step 4 names the wrong agreement.' }, { itemId: 'a-2', decision: 'agent_failure', rationale: 'The agent skipped screening.' }] });
+    expect(res.statusCode, res.body).toBe(201);
+    const sent = calls.filter((c) => c.url.includes('/sme-review-batches/')).at(-1)!;
+    expect(sent.body.decisions[0]).toMatchObject({ item_id: 'a-1', decision: 'task_correction', decided_by: expect.any(String) });
+    expect((await db.taskInstance.findUniqueOrThrow({ where: { id: t0 } })).status).toBe('REWORK');
+    // The author's bell now shows the Rework with the reason; the run review is done. Reassigning a decided task is refused.
+    const authorBell = (await get(author.cookie, '/me/forge/inbox')).json().items as { kind: string; detail: string; href: string }[];
+    expect(authorBell).toEqual([expect.objectContaining({ kind: 'rework', href: `/tasks/${t0}`, detail: expect.stringContaining('Step 4 names the wrong agreement.') })]);
+    expect((await assignTo(t0, reviewer.smeUserId)).statusCode).toBe(409);
+    // PM or Admin can still decide any task themselves.
+    expect((await post(pm, `/projects/${projectId}/run-reviews/${ref}/decisions`, { decisions: [{ itemId: 'b-1', decision: 'environment_wrong', rationale: 'The sandbox lost the screening tool.' }] })).statusCode).toBe(201);
+    expect(await kinds()).toEqual([]);
+    expect(await db.auditEvent.count({ where: { action: 'run_review.assigned' } })).toBe(2);
+    await expect(db.$executeRaw`DELETE FROM "RunReviewAssignment"`).rejects.toThrow();
   });
 
   it('SME review batches: received idempotently; a person decides; decisions go to the RL Gym; task_correction reopens the task', async () => {

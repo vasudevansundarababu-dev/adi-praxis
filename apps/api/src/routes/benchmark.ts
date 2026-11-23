@@ -4,12 +4,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db, Tx } from '../db';
 import { AppError, notFound } from '../lib/errors';
-import { runCandidateCommand, runCommand, runCommandPrepared, runStaffOrServiceCommand } from '../platform/command';
+import { runCandidateCommand, runCandidateCommandPrepared, runCommand, runCommandPrepared, runStaffOrServiceCommand } from '../platform/command';
 import { templateBenchmark, taskBenchmarkOf } from '../anvil/benchmark';
 import { buildRlGymExport, projectIdFromRlGym, rlgymProjectId, rlgymTemplateRef, titleOf, type BuiltExport } from '../anvil/rlgym-export';
 import type { RlGymClient, RlGymResult } from '../anvil/rlgym-client';
 import type { StudioClient, StudioResult, InboxItemBody } from '../anvil/studio-client';
 import { jcsSha256 } from '../anvil/jcs';
+import { assignedRunReviews, batchTasks, currentAssignees, eligibleReviewers, smeInbox, staffInbox } from '../anvil/run-review-access';
 import { loadProject } from './projects';
 import { ownTask } from './work';
 
@@ -26,6 +27,7 @@ import { ownTask } from './work';
 const ANVIL = { roles: [] as const, apiClient: 'ANVIL' as const };
 const PM = ['ADMIN', 'PM'] as const;
 const STAFF_REVIEW = ['ADMIN', 'PM', 'REVIEWER'] as const;
+const PM_ADMIN = ['ADMIN', 'PM'] as const;
 const Id = z.object({ id: z.string().uuid() });
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -400,12 +402,22 @@ export const benchmarkRoutes:FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient 
   app.get('/projects/:id/run-reviews', { config: { access: STAFF_REVIEW }, schema: { tags: ['projects'], params: Id } }, async (req) => {
     const p = await db.project.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
     if (!p) throw notFound('Project not found');
-    const batches = await db.runReviewBatch.findMany({ where: { projectId: p.id }, orderBy: { createdAt: 'desc' }, include: { decisions: true } });
+    const batches = await db.runReviewBatch.findMany({ where: { projectId: p.id }, orderBy: { createdAt: 'desc' }, include: { decisions: true, assignments: true } });
+    const allTasks = [...new Set(batches.flatMap((b) => [...batchTasks(b.body).keys()]))];
+    const eligible = await eligibleReviewers(db, req.actor!.clientId, p.id, allTasks);
     return {
       connected: !!rlgym,
+      canDecide: req.actor!.roles.some((r) => r === 'ADMIN' || r === 'PM'),
       items: batches.map((b) => {
         const body = b.body as Record<string, unknown>;
+        const current = currentAssignees(b.assignments);
         return {
+          // D-004: who reviews each task's episodes (its author or a project SME Reviewer), chosen by a PM or Admin.
+          tasks: [...batchTasks(b.body).keys()].map((taskId) => {
+            const list = eligible.get(taskId) ?? [];
+            const sme = current.get(taskId) ?? null;
+            return { taskId, assignee: sme ? (list.find((e) => e.smeUserId === sme) ?? { smeUserId: sme, name: 'Former reviewer', role: 'reviewer' as const }) : null, eligible: list, locked: b.decisions.some((d) => d.taskId === taskId) };
+          }),
           ref: b.forgeBatchRef,
           batchId: b.batchId,
           runId: b.runId,
@@ -431,67 +443,128 @@ export const benchmarkRoutes:FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient 
     return { items: waitingBatches(batches, projects) };
   });
 
+  // ── Benchmark review decisions (staff: PM, Admin; SME: the task's assigned reviewer). One implementation. ──
   type DecisionPrep = { batchRowId: string; batchId: string; items: z.infer<typeof DecisionsBody>['decisions']; taskOf: Record<string, string>; result: RlGymResult; decidedBy: string };
-  app.post('/projects/:id/run-reviews/:ref/decisions', { config: { access: STAFF_REVIEW }, schema: { tags: ['projects'], params: z.object({ id: z.string().uuid(), ref: z.string().min(1).max(100) }), body: DecisionsBody } }, async (req, reply) => {
+  type Decisions = z.infer<typeof DecisionsBody>['decisions'];
+
+  /** Checks the decisions and sends them to the RL Gym (outside the transaction). `mayDecide` limits which tasks the person may decide. */
+  async function prepareDecisions(where: Prisma.RunReviewBatchWhereInput, decisions: Decisions, decidedBy: string, mayDecide: (taskId: string, current: Map<string, string>) => boolean): Promise<DecisionPrep> {
+    if (!rlgym) throw new AppError(409, 'RLGYM_NOT_CONNECTED', 'RL Gym isn’t connected yet, so decisions cannot be sent.');
+    const b = await db.runReviewBatch.findFirst({ where, include: { decisions: true, assignments: { orderBy: { createdAt: 'asc' } } } });
+    if (!b) throw notFound('Review batch not found');
+    const items = batchItems(b.body);
+    const current = currentAssignees(b.assignments);
+    const seen = new Set<string>();
+    for (const d of decisions) {
+      const item = items.find((i) => i.itemId === d.itemId);
+      if (!item) throw new AppError(422, 'UNKNOWN_ITEM', `Item ${d.itemId} is not in this batch.`);
+      if (!mayDecide(item.taskId, current)) throw new AppError(403, 'NOT_ASSIGNED_REVIEWER', `You are not the assigned reviewer for the task of item ${d.itemId}.`);
+      if (seen.has(d.itemId)) throw new AppError(422, 'DUPLICATE_ITEM', `Item ${d.itemId} is decided twice.`);
+      seen.add(d.itemId);
+      // A decision is final: a different decision on the same item is refused.
+      if (b.decisions.some((x) => x.itemId === d.itemId)) throw new AppError(409, 'ALREADY_DECIDED', `Item ${d.itemId} already has a decision.`);
+      if ((d.decision === 'grader_wrong' || d.decision === 'rubric_correction') && !d.criterionId) throw new AppError(422, 'CRITERION_REQUIRED', `${d.decision} needs the criterion it is about.`);
+    }
+    const body = { schema: 'rlgym.sme-decisions.v1', batch_id: b.batchId, decisions: decisions.map((d) => ({ item_id: d.itemId, decision: d.decision, rationale: d.rationale, decided_by: decidedBy, ...(d.criterionId ? { criterion_id: d.criterionId } : {}) })) };
+    const result = await rlgym.sendDecisions(b.batchId, body, `${b.batchId}-${jcsSha256(body).slice(0, 16)}`);
+    return { batchRowId: b.id, batchId: b.batchId, items: decisions, taskOf: Object.fromEntries(items.map((i) => [i.itemId, i.taskId])), result, decidedBy };
+  }
+
+  /** Records what the RL Gym took; task_correction sends the task back to Rework with the rationale. `deciderId` is a staff user or an SME user. */
+  async function commitDecisions(tx: Tx, audit: (i: { entityType: string; entityId: string; action: string; before?: unknown; after?: unknown }) => Promise<void>, clientId: string, deciderId: string, prep: DecisionPrep) {
+    if (!prep.result.ok) {
+      await audit({ entityType: 'RunReviewBatch', entityId: prep.batchRowId, action: 'run_review.decisions_not_sent', after: { code: prep.result.code, httpStatus: prep.result.httpStatus } });
+      return { status: prep.result.kind === 'rejected' ? 422 : 503, body: { error: 'RLGYM_' + prep.result.code, message: `RL Gym did not take the decisions: ${prep.result.message}. Nothing was recorded; try again.` } };
+    }
+    const out = [];
+    for (const d of prep.items) {
+      const taskId = prep.taskOf[d.itemId] ?? '';
+      let reworkTaskId: string | null = null;
+      // task_correction: the task goes back to Rework through the normal path; its next approval is a new revision.
+      if (d.decision === 'task_correction' && /^[0-9a-f-]{36}$/i.test(taskId)) {
+        const t = await tx.taskInstance.findFirst({ where: { id: taskId, clientId } });
+        if (t) {
+          reworkTaskId = t.id;
+          if (t.status === 'ACCEPTED') {
+            const notes = `RL Gym review (batch ${prep.batchId}): ${d.rationale}`;
+            const { count } = await tx.taskInstance.updateMany({ where: { id: t.id, status: 'ACCEPTED', revision: t.revision }, data: { status: 'REWORK', reviewStage: null, reworkCount: { increment: 1 }, revision: { increment: 1 }, reviewNotes: notes, reviewerId: deciderId } });
+            if (count) {
+              const sub = await tx.taskSubmission.findFirst({ where: { taskInstanceId: t.id }, orderBy: { version: 'desc' }, select: { version: true } });
+              await tx.taskReview.create({ data: { clientId: t.clientId, taskInstanceId: t.id, submissionVersion: sub?.version ?? 1, reviewerId: deciderId, decision: 'REWORK', checklist: {}, comments: [{ section: 'general', text: d.rationale, source: 'rlgym_review' }] as Prisma.InputJsonValue, notes } });
+              if (t.slotId) await tx.coverageSlot.update({ where: { id: t.slotId }, data: { status: 'IN_PROGRESS' } });
+              await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.rework_rlgym_review', before: { status: 'ACCEPTED' }, after: { status: 'REWORK', batchId: prep.batchId, itemId: d.itemId } });
+            }
+          }
+        }
+      }
+      const row = await tx.runReviewDecision.create({ data: { clientId, batchRowId: prep.batchRowId, itemId: d.itemId, taskId, decision: d.decision, rationale: d.rationale, criterionId: d.criterionId ?? null, decidedById: deciderId, decidedBy: prep.decidedBy, sendOutcome: 'received', httpStatus: prep.result.httpStatus, response: prep.result.data as Prisma.InputJsonValue, reworkTaskId } });
+      out.push({ itemId: row.itemId, decision: row.decision, reworkTaskId });
+    }
+    await audit({ entityType: 'RunReviewBatch', entityId: prep.batchRowId, action: 'run_review.decided', after: { batchId: prep.batchId, decisions: out.map((o) => ({ itemId: o.itemId, decision: o.decision })), requestId: prep.result.requestId } });
+    return { status: 201, body: { decisions: out, rlgym: prep.result.data } };
+  }
+
+  // D-004 (owner, 23 Nov 2026): run results are verified by PM/Admin, or by the SME assigned to the task. The staff
+  // Reviewer role can still read batches but no longer decides.
+  app.post('/projects/:id/run-reviews/:ref/decisions', { config: { access: PM_ADMIN }, schema: { tags: ['projects'], params: z.object({ id: z.string().uuid(), ref: z.string().min(1).max(100) }), body: DecisionsBody } }, async (req, reply) => {
     await runCommandPrepared<DecisionPrep, unknown>(
       db,
       req,
       reply,
       async (actor) => {
-        if (!rlgym) throw new AppError(409, 'RLGYM_NOT_CONNECTED', 'RL Gym isn’t connected yet, so decisions cannot be sent.');
-        const b = await db.runReviewBatch.findFirst({ where: { forgeBatchRef: req.params.ref, projectId: req.params.id, clientId: actor.clientId }, include: { decisions: true } });
-        if (!b) throw notFound('Review batch not found');
-        const items = batchItems(b.body);
-        const seen = new Set<string>();
-        for (const d of req.body.decisions) {
-          if (!items.some((i) => i.itemId === d.itemId)) throw new AppError(422, 'UNKNOWN_ITEM', `Item ${d.itemId} is not in this batch.`);
-          if (seen.has(d.itemId)) throw new AppError(422, 'DUPLICATE_ITEM', `Item ${d.itemId} is decided twice.`);
-          seen.add(d.itemId);
-          // A decision is final: a different decision on the same item is refused.
-          if (b.decisions.some((x) => x.itemId === d.itemId)) throw new AppError(409, 'ALREADY_DECIDED', `Item ${d.itemId} already has a decision.`);
-          if ((d.decision === 'grader_wrong' || d.decision === 'rubric_correction') && !d.criterionId) throw new AppError(422, 'CRITERION_REQUIRED', `${d.decision} needs the criterion it is about.`);
-        }
         const user = await db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { name: true } });
-        const decidedBy = user.name || actor.userId;
-        const body = { schema: 'rlgym.sme-decisions.v1', batch_id: b.batchId, decisions: req.body.decisions.map((d) => ({ item_id: d.itemId, decision: d.decision, rationale: d.rationale, decided_by: decidedBy, ...(d.criterionId ? { criterion_id: d.criterionId } : {}) })) };
-        const result = await rlgym.sendDecisions(b.batchId, body, `${b.batchId}-${jcsSha256(body).slice(0, 16)}`);
-        return { batchRowId: b.id, batchId: b.batchId, items: req.body.decisions, taskOf: Object.fromEntries(items.map((i) => [i.itemId, i.taskId])), result, decidedBy };
+        return prepareDecisions({ forgeBatchRef: req.params.ref, projectId: req.params.id, clientId: actor.clientId }, req.body.decisions, user.name || actor.userId, () => true);
       },
-      async ({ tx, actor, audit }, prep) => {
-        if (!prep.result.ok) {
-          await audit({ entityType: 'RunReviewBatch', entityId: prep.batchRowId, action: 'run_review.decisions_not_sent', after: { code: prep.result.code, httpStatus: prep.result.httpStatus } });
-          return { status: prep.result.kind === 'rejected' ? 422 : 503, body: { error: 'RLGYM_' + prep.result.code, message: `RL Gym did not take the decisions: ${prep.result.message}. Nothing was recorded; try again.` } };
-        }
-        const out = [];
-        for (const d of prep.items) {
-          const taskId = prep.taskOf[d.itemId] ?? '';
-          let reworkTaskId: string | null = null;
-          // task_correction: the task goes back to Rework through the normal path; its next approval is a new revision.
-          if (d.decision === 'task_correction' && /^[0-9a-f-]{36}$/i.test(taskId)) {
-            const t = await tx.taskInstance.findFirst({ where: { id: taskId, clientId: actor.clientId } });
-            if (t) {
-              reworkTaskId = t.id;
-              if (t.status === 'ACCEPTED') {
-                const notes = `RL Gym review (batch ${prep.batchId}): ${d.rationale}`;
-                const { count } = await tx.taskInstance.updateMany({ where: { id: t.id, status: 'ACCEPTED', revision: t.revision }, data: { status: 'REWORK', reviewStage: null, reworkCount: { increment: 1 }, revision: { increment: 1 }, reviewNotes: notes, reviewerId: actor.userId } });
-                if (count) {
-                  const sub = await tx.taskSubmission.findFirst({ where: { taskInstanceId: t.id }, orderBy: { version: 'desc' }, select: { version: true } });
-                  await tx.taskReview.create({ data: { clientId: t.clientId, taskInstanceId: t.id, submissionVersion: sub?.version ?? 1, reviewerId: actor.userId, decision: 'REWORK', checklist: {}, comments: [{ section: 'general', text: d.rationale, source: 'rlgym_review' }] as Prisma.InputJsonValue, notes } });
-                  if (t.slotId) await tx.coverageSlot.update({ where: { id: t.slotId }, data: { status: 'IN_PROGRESS' } });
-                  await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.rework_rlgym_review', before: { status: 'ACCEPTED' }, after: { status: 'REWORK', batchId: prep.batchId, itemId: d.itemId } });
-                }
-              }
-            }
-          }
-          const row = await tx.runReviewDecision.create({ data: { clientId: actor.clientId, batchRowId: prep.batchRowId, itemId: d.itemId, taskId, decision: d.decision, rationale: d.rationale, criterionId: d.criterionId ?? null, decidedById: actor.userId, decidedBy: prep.decidedBy, sendOutcome: 'received', httpStatus: prep.result.httpStatus, response: prep.result.data as Prisma.InputJsonValue, reworkTaskId } });
-          out.push({ itemId: row.itemId, decision: row.decision, reworkTaskId });
-        }
-        await audit({ entityType: 'RunReviewBatch', entityId: prep.batchRowId, action: 'run_review.decided', after: { batchId: prep.batchId, decisions: out.map((o) => ({ itemId: o.itemId, decision: o.decision })), requestId: prep.result.requestId } });
-        return { status: 201, body: { decisions: out, rlgym: prep.result.data } };
-      },
+      async ({ tx, actor, audit }, prep) => commitDecisions(tx, audit, actor.clientId, actor.userId, prep),
     );
     return reply;
   });
+
+  // ── D-004: assign the SME who reviews each task of a batch (PM, Admin) ──
+  app.post('/projects/:id/run-reviews/:ref/assignments', { config: { access: PM_ADMIN }, schema: { tags: ['projects'], params: z.object({ id: z.string().uuid(), ref: z.string().min(1).max(100) }), body: z.object({ taskId: z.string().min(1).max(200), smeUserId: z.string().uuid() }).strict() } }, async (req, reply) => {
+    await runCommand<unknown>(db, req, reply, async ({ tx, actor, audit }) => {
+      const b = await tx.runReviewBatch.findFirst({ where: { forgeBatchRef: req.params.ref, projectId: req.params.id, clientId: actor.clientId }, include: { decisions: { select: { taskId: true } }, assignments: { orderBy: { createdAt: 'asc' } } } });
+      if (!b) throw notFound('Review batch not found');
+      if (!batchItems(b.body).some((i) => i.taskId === req.body.taskId)) throw new AppError(422, 'UNKNOWN_TASK', 'That task is not in this batch.');
+      const eligible = (await eligibleReviewers(tx, actor.clientId, req.params.id, [req.body.taskId])).get(req.body.taskId) ?? [];
+      const who = eligible.find((e) => e.smeUserId === req.body.smeUserId);
+      if (!who) throw new AppError(422, 'NOT_ELIGIBLE_REVIEWER', 'Only the SME who wrote the task, or an SME Reviewer on this project, can review its run results.');
+      const current = currentAssignees(b.assignments).get(req.body.taskId) ?? null;
+      if (current === req.body.smeUserId) {
+        await audit({ entityType: 'RunReviewBatch', entityId: b.id, action: 'run_review.assignment_unchanged', after: { taskId: req.body.taskId, smeUserId: current } });
+        return { status: 200, body: { taskId: req.body.taskId, smeUserId: current, unchanged: true } };
+      }
+      if (b.decisions.some((d) => d.taskId === req.body.taskId)) throw new AppError(409, 'ALREADY_DECIDED', 'This task already has a decision, so its reviewer can no longer change.');
+      await tx.runReviewAssignment.create({ data: { clientId: actor.clientId, batchRowId: b.id, taskId: req.body.taskId, smeUserId: who.smeUserId, assignedById: actor.userId } });
+      await audit({ entityType: 'RunReviewBatch', entityId: b.id, action: 'run_review.assigned', before: { smeUserId: current }, after: { taskId: req.body.taskId, smeUserId: who.smeUserId, role: who.role } });
+      return { status: 201, body: { taskId: req.body.taskId, smeUserId: who.smeUserId, name: who.name, role: who.role } };
+    });
+    return reply;
+  });
+
+  // ── D-004: the SME's side, in the SME app: the run reviews assigned to me, and my decisions on them ──
+  app.get('/me/run-reviews', { config: { access: 'candidate' }, schema: { tags: ['work'] } }, async (req) => {
+    const me = req.candidate!;
+    return { items: await assignedRunReviews(db, me.clientId, me.smeUserId) };
+  });
+
+  app.post('/me/run-reviews/:ref/decisions', { config: { access: 'candidate' }, schema: { tags: ['work'], params: z.object({ ref: z.string().min(1).max(100) }), body: DecisionsBody } }, async (req, reply) => {
+    await runCandidateCommandPrepared<DecisionPrep, unknown>(
+      db,
+      req,
+      reply,
+      async (actor) => {
+        const sme = await db.smeUser.findUniqueOrThrow({ where: { id: actor.smeUserId }, select: { displayName: true, contactEmail: true } });
+        return prepareDecisions({ forgeBatchRef: req.params.ref, clientId: actor.clientId }, req.body.decisions, sme.displayName || sme.contactEmail || actor.smeUserId, (taskId, current) => current.get(taskId) === actor.smeUserId);
+      },
+      async ({ tx, actor, audit }, prep) => commitDecisions(tx, audit, actor.clientId, actor.smeUserId, prep),
+    );
+    return reply;
+  });
+
+  // ── D-004: inboxes (the header bell). Items disappear when their work is done. ──
+  app.get('/me/inbox', { config: { access: PM_ADMIN }, schema: { tags: ['projects'] } }, async (req) => ({ items: await staffInbox(db, req.actor!.clientId) }));
+  app.get('/me/forge/inbox', { config: { access: 'candidate' }, schema: { tags: ['work'] } }, async (req) => ({ items: await smeInbox(db, req.candidate!.clientId, req.candidate!.smeUserId) }));
 
   // ── Review → Decision: the task's checks, read-only (spec 2.3) ──
   const checksFor = async (t: { benchmark: unknown; output: unknown; project: { template: Template } }) => {

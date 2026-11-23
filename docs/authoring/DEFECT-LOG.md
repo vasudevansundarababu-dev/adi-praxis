@@ -262,7 +262,18 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
   - Give Help's task context the template's edge cases (tag, name, archetype, complexity, context, twist: what the SME
     already sees) and the task's current focus, so it can explain each dropdown item.
   - Tests with the mock assistant only.
-- **Owner action now:** run `gcloud auth application-default login` on this computer, then try Help again. Nothing
-  needs a restart.
+- **Same cause, also reported (23 Nov 2026, from the Studio session):** Policy → Define with AI showed "The policy
+  assistant is not available right now ({"error":"invalid_grant", … "invalid_rapt"})". The policy assistant
+  (`apps/api/src/policy/rule-assistant.ts`) and Help (`apps/api/src/support/assistant.ts`, through
+  `GeminiVertexContentDrafter`) use the same Google Application Default Credentials. Confirmed.
+- **Owner action now:**
+  1. Run `gcloud auth application-default login` on this computer.
+  2. **Restart the Authoring API** (terminal tab "Authoring dev"). Each assistant keeps its Google client for the life
+     of the process (`this.auth ??= new GoogleAuth(…)`), so the refused credential stays in use until a restart. This
+     corrects the earlier note that no restart was needed.
+- **Planned, also waiting for "go":** an expired or refused Google sign-in (`invalid_grant` / `invalid_rapt`) shows a
+  plain message instead of raw JSON, in Help, the policy assistant and the other live-model features: "The AI
+  assistant can't sign in to Google right now: the sign-in for AI on this environment has expired. Ask the owner to
+  sign in again; nothing was changed." The raw error goes only to the server log.
 - **Status:** investigated. Root cause is the expired local credentials (owner action). Content and logging fixes are
   waiting for "go".

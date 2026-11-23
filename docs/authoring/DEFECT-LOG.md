@@ -192,3 +192,34 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
     Reviewer role can read batches but no longer decides.
   - Bells: the console bell is for PM and Admin. It lists tasks to approve, run-review tasks with no reviewer or not
     yet decided, and open SME needs. The SME bell lists own Rework with the reason, and assigned run reviews.
+
+## D-016 Authoring: procedure steps get the wrong tool (high)
+
+- **Reported:** 23 Nov 2026 by the owner, from run-0228:
+  - screening on specialist.refer;
+  - address on specialist.refer;
+  - "parse joint application" on finding.write;
+  - "retrieve case record" on document.read;
+  - document.check where identity.check was meant.
+- **Cause:** the Tool picker listed bare tool IDs and nothing checked a step against its tool. S5 reaches the agent
+  verbatim.
+- **Fixed** in commits ad483ff7 (API) and 6f6e3aac (UI), with the owner's design:
+  - **Tool guide.** Each tool shows as "<purpose> — <tool>", using the owner's purposes. Authoring added purposes for
+    the other offered tools: parties.list, document.read, policy.read, document.check, document.compare,
+    operation.lookup, operation.read, information.read, finding.resolve, specialist.read, search and search.read.
+  - **Conditional follow-ups.** A step can carry `followUps: [{if, tools}]`, which the SME edits as "If …: tool → tool".
+    They are kept in the export's actor part only when present. Follow-up tools must be declared, which blocks at
+    approval as for main tools. Picking documents.list adds document.read as its continuation. The RL Gym session has
+    been told the shape so its renderer can show them.
+  - **Translation.** "Write the procedure in your own words" calls `POST /me/tasks/:id/steps/translate`. The mock
+    drafter is deterministic; in vertex mode the model is given the guide. The SME reviews the proposal and applies it;
+    nothing is saved until then. AI field suggestions for S5 also get the guide.
+  - **Checks are warnings, never blocks.** The purpose match reads the step's words, so a sensibly worded step can be
+    flagged. Undeclared tools stay blocking. The warnings are:
+    - a step's words don't fit its tool (with a one-click "Use <tool>");
+    - specialist.refer or finding.write as a main tool with no condition;
+    - a follow-up with no condition that isn't a chain;
+    - a follow-up tool the template doesn't offer;
+    - no final recommend.
+  - **Where the warnings show:** under each step in the SME form, in the SME's Check and Submit lists, and on the
+    console task page ("Procedure and tool guide").

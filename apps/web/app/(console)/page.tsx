@@ -2,6 +2,7 @@ import { roleLabel } from '@praxis/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { benchmarkReviewTile, type WaitingBatch } from '@/lib/benchmark-waiting';
 
 export const metadata: Metadata = { title: 'Home' };
 
@@ -31,6 +32,11 @@ export default async function HomePage() {
       { label: 'Projects staffing', count: projects.filter((p) => p.status === 'STAFFING' || p.status === 'READY_FOR_STAFFING').length, hint: 'Assign selected experts and launch sourcing.', href: '/projects' },
       { label: 'Projects in progress', count: projects.filter((p) => p.status === 'IN_PROGRESS' || p.status === 'STAFFED').length, hint: 'Follow coverage and accepted tasks.', href: '/projects' },
     );
+  }
+  // Owner, 23 Nov 2026: RL Gym review batches waiting for a decision, one tile per batch, straight to the project's Benchmark tab.
+  if (has('PM') || has('ADMIN') || has('REVIEWER')) {
+    const waiting = (await apiGet<{ items: WaitingBatch[] }>('/run-reviews/waiting')).data?.items ?? [];
+    tiles.push(...waiting.map(benchmarkReviewTile));
   }
   // M10: only shown when SME supply is on (the endpoints answer 404 when it is off).
   if (has('REVIEWER') || has('ADMIN')) {

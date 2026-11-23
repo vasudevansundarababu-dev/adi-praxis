@@ -8,6 +8,7 @@ import { PolicyWorkspace, type DocumentsData, type ExtractionData, type PreviewD
 import type { ExportState } from '@/components/projects/export-panel';
 import type { SearchParams } from '@/components/pager';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { benchmarkTabCount, type WaitingBatch } from '@/lib/benchmark-waiting';
 import { smesOf, type ProjectTab, type ReviewRoute } from '@/lib/forge-console';
 
 type People = { reviewRoute: ReviewRoute; requiredWorkers: number | null; items: ProjectPersonDto[]; withoutTask?: WithoutTask };
@@ -15,17 +16,18 @@ type People = { reviewRoute: ReviewRoute; requiredWorkers: number | null; items:
 /** The MVP1 project page: header and tabs Dashboard, Resource assignments, Tasks, Policies (`?tab=`). */
 export async function ForgeProjectPage({ project, tab, searchParams = {} }: { project: ProjectDto; tab: ProjectTab; searchParams?: SearchParams }) {
   const id = project.id;
-  const [peopleRes, tasksRes, setsRes] = await Promise.all([
+  const [peopleRes, tasksRes, setsRes, waitingRes] = await Promise.all([
     apiGet<People>(`/projects/${id}/people`),
     apiGet<{ reviewRoute: ReviewRoute; items: ForgeTaskRow[] }>(`/projects/${id}/forge-tasks`),
     apiGet<{ items: { version: number; ruleCount: number }[] }>(`/projects/${id}/policy/rule-sets`),
+    apiGet<{ items: WaitingBatch[] }>('/run-reviews/waiting'),
   ]);
   const people = peopleRes.data?.items ?? [];
   const tasks = tasksRes.data?.items ?? [];
   const reviewRoute: ReviewRoute = peopleRes.data?.reviewRoute ?? tasksRes.data?.reviewRoute ?? project.reviewRoute ?? 'SME_PM';
   const requiredWorkers = peopleRes.data?.requiredWorkers ?? project.requiredWorkers ?? null;
   const ruleSet = setsRes.data?.items[0] ?? null;
-  const counts = { people: `${smesOf(people).length} / ${requiredWorkers ?? '—'}`, tasks: String(tasks.length), policies: ruleSet ? `${ruleSet.ruleCount} rules` : undefined };
+  const counts = { people: `${smesOf(people).length} / ${requiredWorkers ?? '—'}`, tasks: String(tasks.length), policies: ruleSet ? `${ruleSet.ruleCount} rules` : undefined, benchmark: benchmarkTabCount(waitingRes.data?.items ?? [], id) };
   const failed = !peopleRes.data || !tasksRes.data;
 
   let body: React.ReactNode;

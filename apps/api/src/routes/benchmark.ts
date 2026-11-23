@@ -126,7 +126,22 @@ function batchItems(body: unknown) {
   return out;
 }
 
-export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient | null; studio: StudioClient | null }> = async (app, { db, rlgym, studio }) => {
+/** Batches with at least one episode that has no decision yet, oldest first; each names its project and links to its Benchmark tab. */
+export function waitingBatches(
+  batches: { projectId: string; forgeBatchRef: string; batchId: string; runId: string | null; body: unknown; createdAt: Date; decisions: { itemId: string }[] }[],
+  projects: { id: string; name: string }[],
+) {
+  return batches.flatMap((b) => {
+    const items = batchItems(b.body);
+    const decided = new Set(b.decisions.map((d) => d.itemId));
+    const waiting = items.filter((i) => !decided.has(i.itemId)).length;
+    const project = projects.find((p) => p.id === b.projectId);
+    if (!waiting || !project) return [];
+    return [{ projectId: project.id, projectName: project.name, ref: b.forgeBatchRef, batchId: b.batchId, runId: b.runId, items: items.length, waiting, receivedAt: b.createdAt.toISOString(), href: `/projects/${project.id}?tab=benchmark` }];
+  });
+}
+
+export const benchmarkRoutes:FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient | null; studio: StudioClient | null }> = async (app, { db, rlgym, studio }) => {
   // ── Templates → version detail: edge cases and read-only checks (spec 1.4, 2.3) ──
   app.get('/templates/:id/benchmark', { config: { access: STAFF_REVIEW }, schema: { tags: ['templates'], params: Id } }, async (req) => {
     const t = await db.template.findFirst({ where: { id: req.params.id, clientId: req.actor!.clientId } });
@@ -406,6 +421,14 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
         };
       }),
     };
+  });
+
+  // Owner, 23 Nov 2026: a received batch was only visible on Project → Benchmark, so nobody knew it was waiting.
+  // Console Home and the Benchmark tab read this: every batch, in every project, with episodes still undecided.
+  app.get('/run-reviews/waiting', { config: { access: STAFF_REVIEW }, schema: { tags: ['projects'] } }, async (req) => {
+    const batches = await db.runReviewBatch.findMany({ where: { clientId: req.actor!.clientId }, orderBy: { createdAt: 'asc' }, include: { decisions: { select: { itemId: true } } } });
+    const projects = await db.project.findMany({ where: { id: { in: [...new Set(batches.map((b) => b.projectId))] }, clientId: req.actor!.clientId }, select: { id: true, name: true } });
+    return { items: waitingBatches(batches, projects) };
   });
 
   type DecisionPrep = { batchRowId: string; batchId: string; items: z.infer<typeof DecisionsBody>['decisions']; taskOf: Record<string, string>; result: RlGymResult; decidedBy: string };

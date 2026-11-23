@@ -449,6 +449,9 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     const ref = first.json().forge_batch_ref as string;
     const list = (await get(pm, `/projects/${projectId}/run-reviews`)).json();
     expect(list.items[0]).toMatchObject({ batchId: 'smr-0008', items: [expect.objectContaining({ itemId: 'it-1', decision: null }), expect.objectContaining({ itemId: 'it-2' })] });
+    // Console Home and the Benchmark tab are told the batch is waiting (owner, 23 Nov 2026).
+    const waitingFor = async () => (await get(pm, '/run-reviews/waiting')).json().items.filter((w: { projectId: string }) => w.projectId === projectId);
+    expect(await waitingFor()).toEqual([expect.objectContaining({ batchId: 'smr-0008', runId: 'run-0107', items: 2, waiting: 2, href: `/projects/${projectId}?tab=benchmark` })]);
 
     answer = (c) => (c.url.includes('/sme-review-batches/') ? { status: 200, body: { data: { accepted: c.body.decisions.length, inbox_items: [] }, meta: { request_id: 'r2' } } } : { status: 404, body: {} });
     const decide = (body: object) => post(pm, `/projects/${projectId}/run-reviews/${ref}/decisions`, body);
@@ -460,6 +463,7 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(sent.headers['Idempotency-Key']).toBeTruthy();
     expect(sent.body).toMatchObject({ schema: 'rlgym.sme-decisions.v1', batch_id: 'smr-0008', decisions: [{ item_id: 'it-1', decision: 'task_correction', rationale: expect.any(String), decided_by: expect.any(String) }, { item_id: 'it-2', criterion_id: 'decision' }] });
     expect((await db.taskInstance.findUniqueOrThrow({ where: { id: t.taskInstanceId } })).status).toBe('REWORK');
+    expect(await waitingFor()).toEqual([]);
     // A decision is final.
     expect((await decide({ decisions: [{ itemId: 'it-1', decision: 'agent_failure', rationale: 'Changed my mind.' }] })).statusCode).toBe(409);
     await expect(db.$executeRaw`UPDATE "RunReviewDecision" SET "decision" = 'agent_failure'`).rejects.toThrow();

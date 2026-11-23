@@ -172,3 +172,197 @@ export function ApprovedClausesPanel({ projectId, clauses, catalog }: { projectI
     </section>
   );
 }
+
+export interface DispositionRow {
+  ruleKey: string;
+  ruleId: string;
+  contentHash: string;
+  disposition: 'recommended' | 'needs_review' | 'outside_scope';
+  mode?: 'always' | 'conditional';
+  condition?: unknown;
+  conditionText?: string;
+  question?: string;
+  mismatch?: { quote: string; reason: string };
+  bindingGaps: string[];
+}
+const DISPOSITION_LABEL = { recommended: 'Recommended', needs_review: 'Needs review', outside_scope: 'Outside scope' } as const;
+const DISPOSITION_PILL = { recommended: 'pill-success', needs_review: 'pill-warning', outside_scope: '' } as const;
+
+/**
+ * E-002 §1.3: the AI suggests one disposition per rule; it never approves. The PM can use a suggested condition (a new
+ * rule version, audited), then applies the rule as usual. When the AI is unavailable, every rule can still be reviewed
+ * by hand in the rules table above.
+ */
+export function DispositionsPanel({ projectId, initial = null }: { projectId: string; initial?: { model: string; items: DispositionRow[] } | null }) {
+  const router = useRouter();
+  const [data, setData] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [used, setUsed] = useState<Record<string, boolean>>({});
+  async function suggest() {
+    setBusy(true);
+    setError(null);
+    const r = await mutate<{ model: string; items: DispositionRow[] }>('POST', `/projects/${projectId}/policy/dispositions`, {});
+    setBusy(false);
+    if (!r.ok) return setError(r.error);
+    setData(r.data ?? null);
+  }
+  async function use(d: DispositionRow) {
+    setError(null);
+    const r = await mutate('POST', `/projects/${projectId}/policy/rules/${d.ruleId}/condition`, { expectedContentHash: d.contentHash, condition: d.condition ?? null });
+    if (!r.ok) return setError(r.error);
+    setUsed({ ...used, [d.ruleKey]: true });
+    router.refresh();
+  }
+  return (
+    <section aria-labelledby="dispositions-h" className="mt-6 rounded-md border border-line p-4" data-dispositions>
+      <h2 id="dispositions-h" className="text-lg font-semibold">
+        Suggested dispositions
+      </h2>
+      <p className="text-sm text-fg-muted">An AI suggestion per rule, against this project’s scope and fact catalog: Recommended (always, or when a condition holds), Needs review (with a question for you) or Outside scope (with the quoted mismatch). Suggestions never approve anything; you decide and apply rules as usual.</p>
+      <button type="button" className="btn btn-secondary mt-2" disabled={busy} onClick={suggest}>
+        {busy ? 'Suggesting…' : data ? 'Suggest again' : 'Suggest dispositions'}
+      </button>
+      <Err text={error} />
+      {data && data.items.length === 0 && <p className="mt-2 text-sm text-fg-muted">No rules to suggest for yet.</p>}
+      {data && data.items.length > 0 && (
+        <ul className="mt-3 space-y-2 text-sm">
+          {data.items.map((d) => (
+            <li key={d.ruleKey} className="rounded border border-line p-2">
+              <span className="font-medium">{d.ruleKey}</span> <span className={`pill ${DISPOSITION_PILL[d.disposition]}`}>{DISPOSITION_LABEL[d.disposition]}</span> <span className="text-xs text-fg-muted">AI suggestion</span>
+              {d.disposition === 'recommended' && <span className="block text-xs">Applies when: {d.conditionText}</span>}
+              {d.bindingGaps.length > 0 && <span className="block text-xs text-warning">Setup needed: the template doesn’t supply {d.bindingGaps.join(', ')} yet.</span>}
+              {d.question && <span className="block text-xs">Question for you: {d.question}</span>}
+              {d.mismatch && (
+                <span className="block text-xs">
+                  “{d.mismatch.quote}”: {d.mismatch.reason}
+                </span>
+              )}
+              {d.disposition === 'recommended' && (
+                <button type="button" className="btn btn-secondary mt-1 !px-2 !py-1 text-xs" disabled={used[d.ruleKey]} onClick={() => use(d)}>
+                  {used[d.ruleKey] ? 'Condition saved' : 'Use this condition'}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {data && <p className="mt-2 text-xs text-fg-muted">Suggested by {data.model}.</p>}
+    </section>
+  );
+}
+
+type Ratio = { value: number | null; numerator: number; denominator: number };
+export interface QualityRun {
+  id: string;
+  at: string;
+  result: { extraction: { precision: Ratio; recall: Ratio }; suggestions: { agreement: Ratio }; counts: Record<string, number>; discrepancies: { type: string; labelId?: string; ruleKey?: string; expected?: string; got?: string }[] };
+  metadata: { document: { sha256: string; documentVersion: number }; scope: { factCatalogVersion: number | null }; extraction: { provider: string; jobId: string } | null; suggestions: { promptVersion: string; model: string } | null; referenceSet: { version: number; labels: number } };
+}
+const pct = (r: Ratio) => `${r.value === null ? '—' : `${Math.round(r.value * 100)}%`} (${r.numerator} of ${r.denominator})`;
+const DISCREPANCY_WORDS: Record<string, string> = { missed_obligation: 'Missed obligation', extra_rule: 'Extra rule (not in your labels)', merged_obligations: 'Two labelled obligations in one rule', disposition_mismatch: 'Suggestion differs from your label', no_suggestion: 'No suggestion' };
+
+/** E-002 §4.1.4: PM-only quality evaluation of extraction and suggestions, against private reference labels; reproducible. */
+export function QualityPanel({ projectId, documents, runs, sets }: { projectId: string; documents: { versionId: string; label: string }[]; runs: QualityRun[]; sets: { id: string; documentVersionId: string; version: number; labels: number }[] }) {
+  const router = useRouter();
+  const [doc, setDoc] = useState(documents[0]?.versionId ?? '');
+  const [labels, setLabels] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const latestSet = sets.find((s) => s.documentVersionId === doc);
+  async function saveLabels() {
+    setError(null);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(labels);
+    } catch {
+      return setError('The labels are not valid JSON: a list of {"id", "quote", "disposition"}.');
+    }
+    const r = await mutate('PUT', `/projects/${projectId}/policy/reference-sets`, { documentVersionId: doc, labels: parsed });
+    if (!r.ok) return setError(r.error);
+    router.refresh();
+  }
+  async function evaluate(includeSuggestions: boolean) {
+    if (!latestSet) return;
+    setBusy(true);
+    setError(null);
+    const r = await mutate('POST', `/projects/${projectId}/policy/quality-runs`, { referenceSetId: latestSet.id, includeSuggestions });
+    setBusy(false);
+    if (!r.ok) return setError(r.error);
+    router.refresh();
+  }
+  return (
+    <section aria-labelledby="quality-h" className="mt-6 rounded-md border border-line p-4" data-quality>
+      <h2 id="quality-h" className="text-lg font-semibold">
+        Quality evaluation (PM only)
+      </h2>
+      <p className="text-sm text-fg-muted">Compare extraction and suggestions with your own private labels for a document. Your labels are never shown to SMEs or sent anywhere. Each run keeps what it used, so it can be repeated.</p>
+      {documents.length === 0 ? (
+        <p className="mt-2 text-sm text-fg-muted">Add a policy document first.</p>
+      ) : (
+        <div className="mt-2 space-y-2 text-sm">
+          <label className="flex flex-col text-xs">
+            <span className="text-fg-muted">Document version</span>
+            <select className="input" value={doc} onChange={(e) => setDoc(e.target.value)}>
+              {documents.map((d) => (
+                <option key={d.versionId} value={d.versionId}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-xs">{latestSet ? `Reference labels: version ${latestSet.version}, ${latestSet.labels} labels.` : 'No reference labels for this document yet.'}</p>
+          <details>
+            <summary className="cursor-pointer text-link">Add a new version of the labels</summary>
+            <label htmlFor="quality-labels" className="sr-only">
+              Reference labels (JSON)
+            </label>
+            <textarea id="quality-labels" className="input mt-1 w-full font-mono text-xs" rows={6} placeholder='[{"id":"L1","quote":"exact text of one obligation","disposition":"recommended"}]' value={labels} onChange={(e) => setLabels(e.target.value)} />
+            <button type="button" className="btn btn-secondary mt-1" disabled={!labels.trim() || !doc} onClick={saveLabels}>
+              Save labels
+            </button>
+          </details>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-secondary" disabled={!latestSet || busy} onClick={() => evaluate(true)}>
+              Evaluate extraction and suggestions
+            </button>
+            <button type="button" className="btn btn-secondary" disabled={!latestSet || busy} onClick={() => evaluate(false)}>
+              Evaluate extraction only
+            </button>
+          </div>
+        </div>
+      )}
+      <Err text={error} />
+      {runs.length > 0 && (
+        <ul className="mt-3 space-y-2 text-sm">
+          {runs.map((r) => (
+            <li key={r.id} className="rounded border border-line p-2">
+              <span className="text-xs text-fg-muted">{new Date(r.at).toLocaleString()}</span>
+              <span className="block">
+                Extraction precision {pct(r.result.extraction.precision)} · recall {pct(r.result.extraction.recall)} · suggestion agreement {pct(r.result.suggestions.agreement)}
+              </span>
+              <span className="block text-xs">{Object.entries(r.result.counts).filter(([, n]) => n > 0).map(([k, n]) => `${DISCREPANCY_WORDS[k] ?? k}: ${n}`).join(' · ') || 'No discrepancies.'}</span>
+              <details className="text-xs">
+                <summary className="cursor-pointer text-link">Discrepancies and how to reproduce this run</summary>
+                <ul className="mt-1 list-disc pl-5">
+                  {r.result.discrepancies.map((d, i) => (
+                    <li key={i}>
+                      {DISCREPANCY_WORDS[d.type] ?? d.type}
+                      {d.labelId ? ` · label ${d.labelId}` : ''}
+                      {d.ruleKey ? ` · rule ${d.ruleKey}` : ''}
+                      {d.expected ? ` · expected ${d.expected}` : ''}
+                      {d.got ? ` · got ${d.got}` : ''}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1 font-mono">
+                  document v{r.metadata.document.documentVersion} sha256 {r.metadata.document.sha256.slice(0, 12)}… · scope (fact catalog) v{r.metadata.scope.factCatalogVersion ?? '—'} · extraction {r.metadata.extraction ? `${r.metadata.extraction.provider} job ${r.metadata.extraction.jobId.slice(0, 8)}` : 'manual'} · {r.metadata.suggestions ? `prompt ${r.metadata.suggestions.promptVersion}, model ${r.metadata.suggestions.model}` : 'no suggestions'} · labels v{r.metadata.referenceSet.version}
+                </p>
+              </details>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}

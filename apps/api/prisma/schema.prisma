@@ -3781,3 +3781,31 @@ model TaskHoldRelease {
 
   @@index([taskInstanceId])
 }
+
+/// E-002 §4.1.4: private reference labels for one policy document version (PM/Admin only), versioned. Append-only.
+model PolicyReferenceSet {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String   @map("client_id") @db.Uuid
+  projectId         String   @map("project_id") @db.Uuid
+  documentVersionId String   @map("document_version_id") @db.Uuid
+  version           Int
+  labels            Json
+  createdById       String   @map("created_by_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@unique([documentVersionId, version])
+}
+
+/// E-002 §4.1.4: one quality evaluation of extraction and suggestions against a reference set, with its reproducibility metadata. Append-only.
+model PolicyQualityRun {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String   @map("client_id") @db.Uuid
+  projectId      String   @map("project_id") @db.Uuid
+  referenceSetId String   @map("reference_set_id") @db.Uuid
+  result         Json
+  metadata       Json
+  createdById    String   @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+}

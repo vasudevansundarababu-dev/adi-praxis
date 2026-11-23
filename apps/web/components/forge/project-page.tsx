@@ -4,7 +4,7 @@ import { ForgePeopleTab, type WithoutTask } from '@/components/forge/people-tab'
 import { ForgeProjectShell } from '@/components/forge/project-shell';
 import { ForgeTasksTab } from '@/components/forge/tasks-tab';
 import { BenchmarkSection } from '@/components/projects/benchmark-section';
-import { ApprovedClausesPanel, type ClauseRow } from '@/components/projects/clause-panels';
+import { ApprovedClausesPanel, DispositionsPanel, QualityPanel, type ClauseRow, type QualityRun } from '@/components/projects/clause-panels';
 import { PolicyWorkspace, type DocumentsData, type ExtractionData, type PreviewData, type RuleRow } from '@/components/policy/policy-workspace';
 import type { ExportState } from '@/components/projects/export-panel';
 import type { SearchParams } from '@/components/pager';
@@ -40,7 +40,7 @@ export async function ForgeProjectPage({ project, tab, searchParams = {} }: { pr
   } else if (tab === 'benchmark') {
     body = <BenchmarkSection projectId={id} />;
   } else if (tab === 'policies') {
-    const [docs, extraction, rules, preview, user, clauses, factCatalog] = await Promise.all([
+    const [docs, extraction, rules, preview, user, clauses, factCatalog, quality] = await Promise.all([
       apiGet<DocumentsData>(`/projects/${id}/policy/documents`),
       apiGet<ExtractionData>(`/projects/${id}/policy/extraction`),
       apiGet<{ items: RuleRow[] }>(`/projects/${id}/policy/rules`),
@@ -48,6 +48,7 @@ export async function ForgeProjectPage({ project, tab, searchParams = {} }: { pr
       getCurrentUser(),
       apiGet<{ items: ClauseRow[] }>(`/projects/${id}/policy/clauses`),
       apiGet<{ catalog: unknown; version: number | null }>(`/projects/${id}/policy/fact-catalog`),
+      apiGet<{ referenceSets: { id: string; documentVersionId: string; version: number; labels: number }[]; runs: QualityRun[] }>(`/projects/${id}/policy/quality`),
     ]);
     body = (
       <section aria-label="Policies">
@@ -62,7 +63,9 @@ export async function ForgeProjectPage({ project, tab, searchParams = {} }: { pr
           rules={rules.data?.items ?? []}
           preview={preview.data}
         />
+        <DispositionsPanel projectId={id} />
         {clauses.data && <ApprovedClausesPanel projectId={id} clauses={clauses.data.items} catalog={factCatalog.data ?? { version: null, catalog: null }} />}
+        {quality.data && <QualityPanel projectId={id} documents={(docs.data?.items ?? []).flatMap((d) => d.versions.map((v) => ({ versionId: v.id, label: `${d.title} v${v.version}` })))} runs={quality.data.runs} sets={quality.data.referenceSets} />}
       </section>
     );
   } else {

@@ -6,7 +6,9 @@ import { buildApp } from '../src/app';
 import { MemoryStorage } from '../src/candidate/storage';
 import { citedRules, clausesFor } from '../src/anvil/clause-export';
 import { FixedCoverageClient } from '../src/anvil/coverage-client';
+import { checkedDispositions, DispositionUnavailableError, MockDispositionSuggester, type DispositionSuggester } from '../src/policy/dispositions';
 import { templateBoundFacts } from '../src/policy/fact-catalog';
+import { evaluateQuality } from '../src/policy/quality';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { createClient, createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
@@ -54,6 +56,7 @@ const POLICY = ['Synthetic KYC policy', 'For California joint accounts, each joi
 const BASE = { requirementType: 'obligation', visibility: 'agent_visible', applicability: { universal: true, actors: [], actions: [], entities: [], channels: [], locales: [], jurisdictions: [], conditionText: null }, prerequisites: [], precedence: [], exceptions: { kind: 'none', items: [] }, effective: { from: null, to: null, conditionText: 'always' }, evidenceNeeds: ['case record'], verificationHint: null, uncertainty: [] };
 
 let app: FastifyInstance;
+let suggester: DispositionSuggester = new MockDispositionSuggester();
 let clientId: string;
 let pmCookie: string;
 let projectId: string;
@@ -66,7 +69,7 @@ const api = (cookie: string) => ({
 });
 
 beforeAll(async () => {
-  app = await buildApp({ config: testConfig(), db, pingRedis: async () => true, selectionGate: stubSelectionGate, storage: new MemoryStorage(), coverageClient: new FixedCoverageClient(coverageAnswer) });
+  app = await buildApp({ config: testConfig(), db, pingRedis: async () => true, selectionGate: stubSelectionGate, storage: new MemoryStorage(), coverageClient: new FixedCoverageClient(coverageAnswer), dispositionSuggester: { get modelVersion() { return suggester.modelVersion; }, suggest: (i) => suggester.suggest(i) } });
 });
 afterAll(async () => {
   await app.close();
@@ -82,11 +85,11 @@ beforeEach(async () => {
   pmCookie = await login(app, pm.email);
 });
 
-async function caRule() {
+async function caRule(applicability: object = BASE.applicability) {
   const d = await api(pmCookie).post(`/projects/${projectId}/policy/documents/text`, { title: 'Synthetic KYC policy', text: POLICY, format: 'txt', granularity: 'line' });
   expect(d.statusCode, d.body).toBe(201);
   const quote = POLICY.split('\n')[1]!;
-  const r = await api(pmCookie).post(`/projects/${projectId}/policy/rules`, { documentVersionId: d.json().version.id, ruleKey: 'CA-JOINT', body: { ...BASE, title: 'CA joint ID', requirement: quote }, citations: [{ fieldPath: 'requirement', role: 'supports', quote }] });
+  const r = await api(pmCookie).post(`/projects/${projectId}/policy/rules`, { documentVersionId: d.json().version.id, ruleKey: 'CA-JOINT', body: { ...BASE, applicability, title: 'CA joint ID', requirement: quote }, citations: [{ fieldPath: 'requirement', role: 'supports', quote }] });
   expect(r.statusCode, r.body).toBe(201);
   return r.json() as { ruleId: string; contentHash: string };
 }
@@ -142,5 +145,78 @@ describe('project fact catalog, conditions on rules, approved clauses', () => {
     const check = await api(pmCookie).post(`/projects/${projectId}/coverage-check`, {});
     expect(check.statusCode, check.body).toBe(200);
     expect(check.json()).toMatchObject({ connected: true, request: { clauses: 1 }, result: { clauses: [{ clause_id: 'R-CA-JOINT', status: 'needs_environment_change' }] } });
+  });
+});
+
+describe('suggested dispositions (E-002 §1.3): never approvals; checked on the server; manual fallback', () => {
+  const RULES = [{ ruleKey: 'R-1', title: 't', requirement: 'r', applicability: null, jurisdictions: [], quotes: ['Each joint holder must provide an ID.'] }];
+  it('server-side checks: unknown keys dropped, an invalid condition or an unquoted mismatch becomes Needs review', () => {
+    const catalog = { facts: FACTS } as never;
+    expect(checkedDispositions([{ ruleKey: 'R-9', disposition: 'recommended', mode: 'always' }], RULES, catalog, null)).toEqual([]);
+    expect(checkedDispositions([{ ruleKey: 'R-1', disposition: 'recommended', mode: 'conditional', condition: { fact: 'charter', op: 'eq', value: 'x' } }], RULES, catalog, null)[0]).toMatchObject({ disposition: 'needs_review', question: expect.stringContaining('"charter" is not a fact') });
+    expect(checkedDispositions([{ ruleKey: 'R-1', disposition: 'outside_scope', mismatch: { quote: 'not in the rule', reason: 'x' } }], RULES, catalog, null)[0]!.disposition).toBe('needs_review');
+    expect(checkedDispositions([{ ruleKey: 'R-1', disposition: 'outside_scope', mismatch: { quote: 'joint holder', reason: 'Project has no joint accounts.' } }], RULES, catalog, null)[0]).toMatchObject({ disposition: 'outside_scope', mismatch: { quote: 'joint holder' } });
+    expect(checkedDispositions([{ ruleKey: 'R-1', disposition: 'recommended', mode: 'conditional', condition: { fact: 'governing_state', op: 'eq', value: 'CA' } }], RULES, catalog, ['product'])[0]).toMatchObject({ conditionText: 'Governing state is CA', bindingGaps: ['governing_state'] });
+  });
+
+  it('the PM gets a conditional suggestion with plain words, uses it, and the rule stores the condition; an AI failure says so plainly', async () => {
+    const r = await caRule({ ...BASE.applicability, universal: false, jurisdictions: ['US-CA'], conditionText: 'California joint accounts' });
+    await api(pmCookie).put(`/projects/${projectId}/policy/fact-catalog`, CATALOG(projectId));
+    const res = await api(pmCookie).post(`/projects/${projectId}/policy/dispositions`, {});
+    expect(res.statusCode, res.body).toBe(200);
+    const d = res.json().items[0];
+    expect(d).toMatchObject({ ruleKey: 'R-CA-JOINT', disposition: 'recommended', mode: 'conditional', conditionText: 'Governing state is CA', bindingGaps: ['governing_state'], ruleId: r.ruleId });
+    // Nothing was approved or changed by the suggestion.
+    expect((await db.policyRuleVersion.findMany({ where: { ruleId: r.ruleId } })).length).toBe(1);
+    const used = await api(pmCookie).post(`/projects/${projectId}/policy/rules/${r.ruleId}/condition`, { expectedContentHash: d.contentHash, condition: d.condition });
+    expect(used.statusCode, used.body).toBe(200);
+    const body = (await db.policyRuleVersion.findFirstOrThrow({ where: { ruleId: r.ruleId }, orderBy: { version: 'desc' } })).body as { condition?: unknown };
+    expect(body.condition).toEqual({ fact: 'governing_state', op: 'eq', value: 'CA' });
+    suggester = { modelVersion: 'failing', suggest: async () => { throw new DispositionUnavailableError('{"error":"invalid_grant","error_description":"reauth related error (invalid_rapt)"}'); } };
+    try {
+      const fail = await api(pmCookie).post(`/projects/${projectId}/policy/dispositions`, {});
+      expect(fail.statusCode).toBe(503);
+      expect(fail.json().message).toBe('Suggestions can’t reach the AI service: the Google sign-in for AI on this computer has expired. Ask an admin to sign in again. You can review each rule by hand.');
+    } finally {
+      suggester = new MockDispositionSuggester();
+    }
+  });
+});
+
+describe('PM quality evaluation (E-002 §4.1.4)', () => {
+  it('counts with raw numbers and lists each discrepancy by type', () => {
+    const r = evaluateQuality(
+      [
+        { id: 'L1', quote: 'each joint holder must provide a California-compliant ID', disposition: 'recommended' },
+        { id: 'L2', quote: 'The bank must verify the residential address.', disposition: 'needs_review' },
+        { id: 'L3', quote: 'Staff must not open an account without a CIP record.' },
+      ],
+      [
+        { ruleKey: 'R-CA', quotes: ['For California joint accounts, each joint holder must provide a California-compliant ID.'], disposition: 'recommended' },
+        { ruleKey: 'R-ADDR', quotes: ['The bank must verify the residential address.'], disposition: 'recommended' },
+        { ruleKey: 'R-EXTRA', quotes: ['Something the PM did not label.'], disposition: null },
+      ],
+    );
+    expect(r.extraction.precision).toEqual({ value: 0.667, numerator: 2, denominator: 3 });
+    expect(r.extraction.recall).toEqual({ value: 0.667, numerator: 2, denominator: 3 });
+    expect(r.suggestions.agreement).toEqual({ value: 0.5, numerator: 1, denominator: 2 });
+    expect(r.counts).toEqual({ missed_obligation: 1, extra_rule: 1, merged_obligations: 0, disposition_mismatch: 1, no_suggestion: 0 });
+    expect(r.discrepancies).toContainEqual({ type: 'disposition_mismatch', labelId: 'L2', ruleKey: 'R-ADDR', expected: 'needs_review', got: 'recommended' });
+  });
+
+  it('a run is stored with its reproducibility metadata; labels stay private to PM/Admin', async () => {
+    await caRule({ ...BASE.applicability, universal: false, jurisdictions: ['US-CA'], conditionText: 'California joint accounts' });
+    await api(pmCookie).put(`/projects/${projectId}/policy/fact-catalog`, CATALOG(projectId));
+    const dv = await db.policyDocumentVersion.findFirstOrThrow({ where: { projectId } });
+    const set = await api(pmCookie).put(`/projects/${projectId}/policy/reference-sets`, { documentVersionId: dv.id, labels: [{ id: 'L1', quote: 'each joint holder must provide a California-compliant ID', disposition: 'recommended' }, { id: 'L2', quote: 'The bank must verify the residential address.' }] });
+    expect(set.statusCode, set.body).toBe(201);
+    const run = await api(pmCookie).post(`/projects/${projectId}/policy/quality-runs`, { referenceSetId: set.json().id });
+    expect(run.statusCode, run.body).toBe(201);
+    expect(run.json().result).toMatchObject({ extraction: { precision: { numerator: 1, denominator: 1 }, recall: { numerator: 1, denominator: 2 } }, suggestions: { agreement: { numerator: 1, denominator: 1 } }, counts: { missed_obligation: 1 } });
+    expect(run.json().metadata).toMatchObject({ document: { sha256: dv.sha256, documentVersion: dv.version }, scope: { factCatalogVersion: 1 }, suggestions: { promptVersion: 'dispositions/1', model: 'mock-dispositions-1' }, referenceSet: { version: 1, labels: 2 } });
+    expect((await api(pmCookie).get(`/projects/${projectId}/policy/quality`)).json().runs).toHaveLength(1);
+    const sme = await login(app, (await createUser(clientId, ['REVIEWER'])).email);
+    expect((await api(sme).get(`/projects/${projectId}/policy/quality`)).statusCode).toBe(403);
+    await expect(db.$executeRaw`DELETE FROM "PolicyQualityRun"`).rejects.toThrow();
   });
 });

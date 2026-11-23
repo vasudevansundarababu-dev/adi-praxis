@@ -245,7 +245,9 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
     for (const n of needs) if (isObj(n.content) && typeof n.content.edgeCase === 'string' && n.content.edgeCase) tags.add(n.content.edgeCase);
     const clauses = (await approvedClauses(db, req.actor!.clientId, p.id, project.template.anvilSpec)).filter((c) => c.condition !== null).map((c) => ({ clause_id: c.clauseId, version: c.version, condition: c.condition }));
     const ref = { id: project.template.lineageId, version: project.template.version };
-    const r = await coverage.check({ template: ref, edge_case_tags: [...tags].sort(), clauses });
+    const spec = project.template.anvilSpec as { authoring?: { edge_cases?: unknown } } | null;
+    const entries = (Array.isArray(spec?.authoring?.edge_cases) ? spec!.authoring!.edge_cases : []).filter((e): e is Record<string, unknown> => isObj(e) && typeof e.tag === 'string' && tags.has(e.tag));
+    const r = await coverage.check({ template: ref, edge_case_tags: [...tags].sort(), edge_cases: entries, clauses });
     return r.ok ? { connected: true, request: { edgeCaseTags: [...tags].sort(), clauses: clauses.length }, result: r.result } : { connected: coverage.connected, request: { edgeCaseTags: [...tags].sort(), clauses: clauses.length }, message: r.message };
   });
 

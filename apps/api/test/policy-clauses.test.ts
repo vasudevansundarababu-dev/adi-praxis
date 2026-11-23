@@ -4,8 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { conditionFacts, conditionLabel, conditionProblems, CoverageCheck, FactCatalog, type ClauseCondition } from '@praxis/shared';
 import { buildApp } from '../src/app';
 import { MemoryStorage } from '../src/candidate/storage';
-import { citedRules, clausesFor } from '../src/anvil/clause-export';
-import { FixedCoverageClient } from '../src/anvil/coverage-client';
+import { citedRules, clausesFor, policyClausesFor } from '../src/anvil/clause-export';
+import { FixedCoverageClient, HttpCoverageClient } from '../src/anvil/coverage-client';
 import { checkedDispositions, DispositionUnavailableError, MockDispositionSuggester, type DispositionSuggester } from '../src/policy/dispositions';
 import { templateBoundFacts } from '../src/policy/fact-catalog';
 import { evaluateQuality } from '../src/policy/quality';
@@ -137,7 +137,10 @@ describe('project fact catalog, conditions on rules, approved clauses', () => {
     expect(citedRules(output)).toEqual([{ ruleId: r.ruleId, contentSha256: v.contentHash }]);
     const template = await db.template.findUniqueOrThrow({ where: { id: templateId } });
     const clauses = await clausesFor(db, { clientId, projectId, output }, template.anvilSpec);
-    expect(clauses).toEqual([{ clause_id: 'R-CA-JOINT', version: v.version, source: { document_id: expect.any(String), document_version: 1, sha256: expect.stringMatching(/^[0-9a-f]{64}$/), locator: expect.any(Object) }, condition: CA_JOINT, exceptions: { kind: 'none', items: [] }, approval: { approval_id: v.id, project_id: projectId, approved_by: expect.any(String), approved_at: expect.any(String) }, binding_revision: 'golden-kyc-openenv.facts@1' }]);
+    const entry = { clause_id: 'R-CA-JOINT', version: v.version, title: 'CA joint ID', obligation: POLICY.split('\n')[1], source: { document_id: expect.any(String), document_version: 1, sha256: expect.stringMatching(/^[0-9a-f]{64}$/), quote: POLICY.split('\n')[1] }, approval: { approval_id: v.id, project_id: projectId, approved_by: expect.any(String), approved_at: expect.any(String) }, condition: CA_JOINT };
+    expect(clauses).toEqual([{ ...entry, binding_revision: 'golden-kyc-openenv.facts@1' }]);
+    // approved-task-export.v1 policy_clauses (Studio ef06119): every approved selected clause, condition null when none.
+    expect((await policyClausesFor(db, { clientId, projectId, output })).map((c) => c.entry)).toEqual([entry]);
     // A rule without a structured condition adds nothing (packages keep their bytes).
     expect(await clausesFor(db, { clientId, projectId, output: { sections: { S4: { statePolicies: [{ ruleId: randomUUID(), contentSha256: 'a'.repeat(64) }] } } } }, template.anvilSpec)).toEqual([]);
 
@@ -218,5 +221,18 @@ describe('PM quality evaluation (E-002 §4.1.4)', () => {
     const sme = await login(app, (await createUser(clientId, ['REVIEWER'])).email);
     expect((await api(sme).get(`/projects/${projectId}/policy/quality`)).statusCode).toBe(403);
     await expect(db.$executeRaw`DELETE FROM "PolicyQualityRun"`).rejects.toThrow();
+  });
+});
+
+describe('Validate against Studio’s live coverage endpoint (client, with a recorded Studio)', () => {
+  it('sends seed_family, the edge-case entries in use and the clauses; reads coverage-check.v1; plain messages on errors', async () => {
+    const sent: Record<string, unknown>[] = [];
+    const answer = { schema_version: 'adi.utility.coverage-check.v1', environment_version_id: 'golden-kyc-openenv@8', checked_at: '2026-11-23T20:00:00Z', edge_cases: [{ tag: 'expired_document', status: 'supported', gaps: [] }], clauses: [] };
+    const ok = new HttpCoverageClient({ coverageCheck: async (b) => (sent.push(b), { ok: true as const, httpStatus: 200, data: answer }) }, 'synthetic-kyc-cases@1.1.0:20261119');
+    const r = await ok.check({ template: { id: 't', version: 5 }, edge_case_tags: ['expired_document'], edge_cases: [{ tag: 'expired_document', context: 'c', twist: 't' }], clauses: [] });
+    expect(r).toMatchObject({ ok: true, result: { environment_version_id: 'golden-kyc-openenv@8' } });
+    expect(sent[0]).toEqual({ seed_family: 'synthetic-kyc-cases@1.1.0:20261119', clauses: [], edge_cases: [{ tag: 'expired_document', context: 'c', twist: 't' }] });
+    const refused = new HttpCoverageClient({ coverageCheck: async () => ({ ok: false as const, kind: 'rejected' as const, httpStatus: 422, code: 'SCHEMA_INVALID', message: 'bad condition at /clauses/0/condition' }) }, 'f');
+    expect(await refused.check({ template: { id: 't', version: 1 }, edge_case_tags: [], clauses: [] })).toEqual({ ok: false, message: 'Studio refused the coverage check: bad condition at /clauses/0/condition' });
   });
 });

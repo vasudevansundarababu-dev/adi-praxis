@@ -15,33 +15,53 @@ export function citedRules(output: unknown): { ruleId: string; contentSha256: st
   return out;
 }
 
+/** One `policy_clauses` entry (approved-task-export.v1, Studio ef06119), and whether the PM set a structured condition. */
+export interface PolicyClauseEntry {
+  entry: Record<string, unknown>;
+  hasCondition: boolean;
+}
+
 /**
- * E-002 §4.1.6: per task revision, the clause identity the RL Gym's applicability resolver needs: clause ID and version,
- * source document hash, the approved condition, exceptions, the project approval and the template binding revision.
- * Only cited versions that carry a structured condition are listed, so packages without one keep their exact bytes
- * (old exports stay reproducible).
+ * E-002 §4.1.6: every approved clause version the task's S4 cites, pinned exactly as the PM approved it: clause ID and
+ * version, source document (ID, version, sha256, locator, quote), approval (ID, project, by, at), the condition
+ * (clause-condition.v1; null = applies across the approved scope), title, obligation and exceptions. Versions that were
+ * never approved (no reviewedAt) or have no source are left out: the contract requires both.
  */
-export async function clausesFor(tx: Db | Tx, record: Pick<ApprovedTaskRecord, 'clientId' | 'projectId' | 'output'>, anvilSpec: unknown): Promise<Record<string, unknown>[]> {
+export async function policyClausesFor(tx: Db | Tx, record: Pick<ApprovedTaskRecord, 'clientId' | 'projectId' | 'output'>): Promise<PolicyClauseEntry[]> {
   // Only Authoring's own citations (a rule UUID); anything else (older fixtures, free text) is not a clause reference.
   const cited = citedRules(record.output).filter((c) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.ruleId));
-  if (!cited.length) return [];
-  const bound = templateBoundFacts(anvilSpec);
-  const out: Record<string, unknown>[] = [];
+  const out: PolicyClauseEntry[] = [];
   for (const c of cited) {
     const v = await tx.policyRuleVersion.findFirst({ where: { ruleId: c.ruleId, contentHash: c.contentSha256, clientId: record.clientId }, include: { rule: true, citations: { take: 1, include: { documentVersion: true } } } });
-    if (!v) continue;
-    const body = PolicyRuleBody.parse(v.body);
-    if (body.condition === undefined) continue;
+    if (!v || !v.reviewedAt) continue;
     const src = v.citations[0];
+    if (!src) continue;
+    const body = PolicyRuleBody.parse(v.body);
+    const loc = src.locator as { section?: string | null; page?: number | null } | null;
+    const locator = loc ? [loc.section, loc.page ? `page ${loc.page}` : null].filter(Boolean).join(', ') : '';
+    const exceptions = (body.exceptions.items ?? []).map((e: { statement?: string }) => e.statement).filter((t): t is string => !!t).map((text) => ({ text }));
     out.push({
-      clause_id: v.rule.ruleKey,
-      version: v.version,
-      source: src ? { document_id: src.documentVersion.documentId, document_version: src.documentVersion.version, sha256: src.documentVersion.sha256, locator: src.locator } : null,
-      condition: body.condition,
-      exceptions: body.exceptions,
-      approval: v.reviewedAt ? { approval_id: v.id, project_id: record.projectId, approved_by: v.reviewedById, approved_at: v.reviewedAt.toISOString() } : null,
-      binding_revision: bound?.factCatalog || null,
+      hasCondition: body.condition !== undefined,
+      entry: {
+        clause_id: v.rule.ruleKey,
+        version: v.version,
+        title: body.title,
+        obligation: body.requirement,
+        source: { document_id: src.documentVersion.documentId, document_version: src.documentVersion.version, sha256: src.documentVersion.sha256, ...(locator ? { locator } : {}), quote: src.quote },
+        approval: { approval_id: v.id, project_id: record.projectId, ...(v.reviewedById ? { approved_by: v.reviewedById } : {}), approved_at: v.reviewedAt.toISOString() },
+        condition: body.condition ?? null,
+        ...(exceptions.length ? { exceptions } : {}),
+      },
     });
   }
   return out;
+}
+
+/**
+ * The package's private part: the same entries plus the template binding revision, only for clauses with a structured
+ * condition, so packages without one keep their exact bytes (old exports stay reproducible).
+ */
+export async function clausesFor(tx: Db | Tx, record: Pick<ApprovedTaskRecord, 'clientId' | 'projectId' | 'output'>, anvilSpec: unknown): Promise<Record<string, unknown>[]> {
+  const bound = templateBoundFacts(anvilSpec);
+  return (await policyClausesFor(tx, record)).filter((c) => c.hasCondition).map((c) => ({ ...c.entry, binding_revision: bound?.factCatalog || null }));
 }

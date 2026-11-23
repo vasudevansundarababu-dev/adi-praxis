@@ -47,6 +47,11 @@ export class StudioClient {
     return this.call('GET', `/api/v1/inbox-items/${encodeURIComponent(id)}`);
   }
 
+  /** E-001/E-002: Studio's coverage check (a read; no Idempotency-Key). Answers coverage-check.v1. */
+  coverageCheck(body: Record<string, unknown>) {
+    return this.call('POST', '/api/v1/coverage-checks', body);
+  }
+
   private headers(idempotencyKey?: string): Record<string, string> {
     const h: Record<string, string> = { Accept: 'application/json' };
     if (this.settings.key) h.Authorization = `Bearer ${this.settings.key}`;
@@ -76,7 +81,8 @@ export class StudioClient {
     // Studio answers plain objects; accept a {data} envelope too.
     const data = json && typeof json.data === 'object' && json.data && !Array.isArray(json.data) ? (json.data as Record<string, unknown>) : json;
     if (res.status >= 200 && res.status < 300 && data) return { ok: true, httpStatus: res.status, data };
-    const err = (json?.error ?? json?.detail ?? null) as { code?: unknown; message?: unknown } | null;
+    // adi.utility.error.v1 is a top-level {code, message}; older answers nest it under error or detail.
+    const err = (json?.error ?? json?.detail ?? (json && typeof json.code === 'string' ? json : null)) as { code?: unknown; message?: unknown } | null;
     const code = typeof err?.code === 'string' ? err.code : `HTTP_${res.status}`;
     const message = typeof err?.message === 'string' ? err.message : `Studio answered ${res.status}.`;
     return { ok: false, kind: res.status >= 500 || res.status === 404 ? 'unavailable' : 'rejected', httpStatus: res.status, code, message };

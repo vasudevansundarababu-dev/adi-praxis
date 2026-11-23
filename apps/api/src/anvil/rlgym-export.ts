@@ -1,3 +1,4 @@
+import { policyClausesFor } from './clause-export';
 import type { ApprovedTaskRecord, Template } from '@prisma/client';
 import type { Db, Tx } from '../db';
 import { anvilReadiness } from '../routes/anvil-templates';
@@ -131,6 +132,7 @@ export async function buildRlGymExport(
       notSent.push({ recordId: r.id, taskId: r.taskInstanceId, title, code: 'CASE_SELECTOR_MISSING', message: 'The task has no case (no slot case or coverage values), so RL Gym cannot match it to a case.' });
       continue;
     }
+    const policyClauses = await policyClausesFor(tx, r);
     const correctsRevision = stored.revision > 1 ? stored.revision - 1 : null;
     const smeBatchId = correctsRevision ? (opts.batches?.get(r.taskInstanceId) ?? null) : null;
     tasks.push({ recordId: r.id, taskId: r.taskInstanceId, title, revision: stored.revision, packageSha256: stored.packageSha256, correctsRevision, smeBatchId, complexity, archetype, edgeCase });
@@ -147,6 +149,8 @@ export async function buildRlGymExport(
       ...(complexity ? { complexity } : {}),
       ...(archetype ? { archetype } : {}),
       ...(edgeCase ? { edge_case: edgeCase } : {}),
+      // E-002 (Studio ef06119): the approved clause versions selected in S4, pinned as approved. Only when there are any.
+      ...(policyClauses.length ? { policy_clauses: policyClauses.map((c) => c.entry) } : {}),
     });
   }
   const template = { id: ref.id, version: ref.version, spec_sha256: ref.specSha256, forge_template_id: p.template.lineageId, forge_version: p.template.version };

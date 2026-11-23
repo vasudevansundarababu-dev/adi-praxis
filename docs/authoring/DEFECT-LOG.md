@@ -53,3 +53,42 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
     `STAFF_REVIEW` allows Admin, PM and Reviewer. The owner named only PM/Admin, the author SME and the SME Reviewer, so
     it becomes Admin and PM only. Staff Reviewers can still read the batches.
 - **Status:** planned, waiting for "go". Nothing changed for D-004 yet.
+
+## D-012 Authoring: case selectors send `edge_cases: []` for every episode (low)
+
+- **Reported:** 23 Nov 2026, from the run-0228 evidence pack.
+- **Finding (investigated, nothing changed):**
+  - `caseSelectorOf` in `apps/api/src/anvil/rlgym-export.ts` fills `edge_cases` from two places:
+    1. the coverage slot's `edgeCase`;
+    2. the Focus edge case the SME picked on the task (package `private.edge_case`).
+  - Both are empty for all 4 exported tasks of project f8719e2b ("KYC Customer onboarding for US bank"):
+    - The slots carry only the product: adult_joint, individual, teen_joint, custodial.
+    - The SME left Focus edge case blank. It is optional today, as are Complexity and Archetype.
+  - The last export (23 Nov, 02:32) sent `{application_type: X, edge_cases: []}` for each task. This matches the
+    contract: AUTHORING-SNAPSHOT 3.1a and the RL Gym ARCHITECTURE example both allow an empty list. An empty list means
+    "no edge-case constraint", not "a standard case".
+  - So the RL Gym's sampler was free to draw any case of that product, edge variants included. Which edge case an
+    episode got is decided by the RL Gym when it draws the case. Authoring cannot know it per episode. The RL Gym has it
+    in its own case catalog (`edge_cases` tags per case) and should record it from there. This follows "RL Gym owns
+    input data; Forge declares the case selector".
+- **Authoring-side options (plan; nothing built):**
+  - **A. No Authoring change.** The RL Gym records each episode's edge case from the case it drew.
+  - **B. Make the edge-case choice explicit.** On templates that list edge cases, the task form's Focus edge case gets a
+    "None (standard case)" option and becomes required before approval. With None, Authoring sends `edge_cases: []`
+    plus a new `standard_case: true`, so the RL Gym can draw only cases without edge tags. Adding that key changes the
+    contract, so it needs the RL Gym's agreement.
+  - **C. PM sets edge cases on coverage slots.** The project's slot plan can aim some slots at an edge case, so the
+    selector carries it without depending on the SME.
+  - **Recommendation:** A now. B without the new key (just required, with a None choice) if the owner wants the SME's
+    intent always recorded. C later.
+- **Status:** investigated, plan logged, waiting for the owner's choice and "go".
+
+## D-007 (RL Gym) note from Authoring: actor payload has no `assignment` field
+
+- Authoring's actor part (`actorProjection` in `apps/api/src/anvil/generic-package.ts`) is `{sections: S1…S8}` with
+  only the public fields, plus `tools` when the template declares tools.
+- Neither the export contract (AUTHORING-SNAPSHOT 3.1) nor the generic package agreed for KYC v7/v8 defines an
+  `assignment` key. "Assignment, Inputs, Tools, Output" in the RL Gym's SCREENS.md is the RL Gym's own display grouping.
+  `PRAXIS-EXPORT-REQUIREMENT.md` asks for "objective, assignment and requested deliverable" as content, which lives in
+  the sections.
+- The RL Gym reading sections is correct. No Authoring change.

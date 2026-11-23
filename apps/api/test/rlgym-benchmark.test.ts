@@ -627,6 +627,26 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     await expect(db.$executeRaw`DELETE FROM "TaskHoldRelease"`).rejects.toThrow();
   });
 
+  it('D-027: the SME checks a weak S1 trigger and gets plain findings and a rewrite; examples come from the template or say plainly they are not available', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    const projectId = await project(v8);
+    const tasks = await db.taskInstance.findMany({ where: { projectId } });
+    const person = await source(projectId, 'SME', { email: 'sme-d027@gmail.test', first: 'Cara', last: 'Coach' });
+    expect((await assign(projectId, person.id, tasks[0]!.id)).statusCode).toBe(200);
+    const me = await signIn('sme-d027@gmail.test');
+    const [row] = await authored(projectId, { approve: false, smeUserId: me.smeUserId });
+    const check = await post(me.cookie, `/me/tasks/${row!.taskId}/fields/coach`, { section: 'S1', field: 'trigger', mode: 'check', text: 'Application APP-999 for "Elena Vance" is submitted on 2026-03-14.' });
+    expect(check.statusCode, check.body).toBe(200);
+    expect(check.json()).toMatchObject({ reviewedBy: 'rules', findings: [expect.objectContaining({ kind: 'too_specific' })], rewrite: 'An application for the applicant is submitted on the application date.' });
+    const ex = await post(me.cookie, `/me/tasks/${row!.taskId}/fields/coach`, { section: 'S1', field: 'trigger', mode: 'example' });
+    expect([200, 503]).toContain(ex.statusCode);
+    if (ex.statusCode === 200) expect(ex.json()).toMatchObject({ example: expect.any(String), avoid: expect.arrayContaining([expect.objectContaining({ why: expect.stringContaining('every application') })]) });
+    else expect(ex.json().message).toContain('Use the field’s help text');
+    expect((await post(me.cookie, `/me/tasks/${row!.taskId}/fields/coach`, { section: 'S1', field: 'nope', mode: 'check', text: 'x' })).statusCode).toBe(404);
+    const other = await signIn('not-mine-d027@gmail.test');
+    expect((await post(other.cookie, `/me/tasks/${row!.taskId}/fields/coach`, { section: 'S1', field: 'trigger', mode: 'check', text: 'x' })).statusCode).toBe(404);
+  });
+
   it('SME review batches: received idempotently; a person decides; decisions go to the RL Gym; task_correction reopens the task', async () => {
     const v8 = await publishedV8(CASE_REF_VERIFIERS);
     const projectId = await project(v8);

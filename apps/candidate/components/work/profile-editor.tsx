@@ -29,6 +29,7 @@ import {
   AUTHORSHIP_DECLARATION,
   type FieldSuggestion,
   type SuggestionState,
+  optionPlainLabel,
   type ProcedureStep,
   type StepFollowUp,
 } from '@praxis/shared';
@@ -41,6 +42,7 @@ import { SubmitPanel } from './submit-panel';
 import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
 import { ClauseNotes } from './clause-notes';
+import { FieldCoach } from './field-coach';
 import { FollowUpsText, ProcedureTranslator, procedureWarnings, StepFollowUps, StepWarnings } from './step-guide';
 import { SaveBar } from './save-bar';
 import { PolicyPicker, type LibraryView } from './policy-picker';
@@ -132,6 +134,7 @@ function FieldControl({ field: given, value, path, problems, lookup, onChange }:
   const v2 = useContext(FormV2);
   const stepTools = useContext(StepTools);
   const field = stepTools?.length && STEP_TOOL_PATH.test(path) && !isArrayType(given.type) ? stepToolField(given, value, stepTools) : given;
+  const coachTaskId = useContext(EditorTaskId);
   const id = domId(path);
   const mine = problems.filter((p) => p.path === path);
   const describedBy = [`${id}-help`, mine.length ? `${id}-problems` : ''].filter(Boolean).join(' ');
@@ -232,16 +235,20 @@ function FieldControl({ field: given, value, path, problems, lookup, onChange }:
         <option value="">Choose…</option>
         {(field.options ?? []).map((o) => (
           <option key={o.value} value={o.value}>
-            {o.label}
+            {optionPlainLabel(o)}
           </option>
         ))}
       </select>
     );
   else control = <input {...common} type="text" value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} className={input} />;
+  // D-027: example text and "Check this" under each top-level free-text field of an editable task.
+  const top = /^(S[1-8])\.([A-Za-z0-9_]+)$/.exec(path);
+  const coach = coachTaskId && top && (field.type === 'text' || field.type === 'long_text') ? <FieldCoach taskId={coachTaskId} section={top[1]!} field={top[2]!} label={field.label} value={typeof value === 'string' ? value : ''} onUse={(t) => onChange(t)} /> : null;
   return (
     <div className="min-w-0">
       {header}
       {control}
+      {coach}
       {example}
       <Messages id={`${id}-problems`} problems={mine} />
     </div>

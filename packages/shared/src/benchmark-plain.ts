@@ -111,3 +111,27 @@ export function businessNotes(e: { tag: string; archetype?: string | null; conte
   const text = [e.tag, e.archetype, e.context, e.twist].filter(Boolean).join(' ');
   return NOTES.filter(([re]) => re.test(text)).map(([, n]) => n);
 }
+
+const PRODUCTS: Record<string, string> = { individual: 'Individual account', adult_joint: 'Joint account (adults)', teen_joint: 'Teen joint account (minor with an adult)', custodial: 'Custodial account' };
+
+/**
+ * D-027: an option as an SME should read it. A real label wins; a label that is just the code is replaced by a plain name
+ * (archetype, complexity, product, or the code written out). Applies to every section's pick lists.
+ */
+export function optionPlainLabel(o: { value: string; label?: string | null }): string {
+  const label = o.label?.trim();
+  if (label && label !== o.value) return label;
+  const v = o.value;
+  return ARCHETYPES[v] ?? COMPLEXITY[v]?.name ?? PRODUCTS[v] ?? (/^[a-z0-9]+(_[a-z0-9]+)+$/.test(v) ? humanize(v) : label || v);
+}
+
+/** When to choose a value, in plain words, where known (complexity and archetype). */
+export function optionWhenToChoose(value: string): string | null {
+  if (COMPLEXITY[value]?.meaning) return `Choose when ${COMPLEXITY[value]!.meaning}.`;
+  const a: Record<string, string> = {
+    sanctions_near_match: 'Choose when the case turns on a screening hit that may or may not be the same person.',
+    missing_doc: 'Choose when a required document or detail is missing or not acceptable (no TIN, no proof of address, an expired ID).',
+    policy_conflict: 'Choose when two rules or sources point to different answers and the analyst must decide which applies.',
+  };
+  return a[value] ?? null;
+}

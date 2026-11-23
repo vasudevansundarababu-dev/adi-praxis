@@ -1,3 +1,4 @@
+import { optionPlainLabel, optionWhenToChoose } from '@praxis/shared';
 import { TEMPLATE_PROFILES, templateStartingGraph, type TemplateProfile, type TemplateProfileField } from '@praxis/shared';
 
 /**
@@ -57,10 +58,12 @@ const PRIVATE = new Set(['private_reference', 'private_rubric']);
 function fieldLine(f: TemplateProfileField, indent = '  '): string {
   const req = f.required === true ? ' (required)' : f.required ? ' (required in some cases)' : '';
   const vis = f.visibility && PRIVATE.has(f.visibility) ? ' [private]' : '';
-  const opts = f.options?.length ? ` — values: ${f.options.map((o) => o.value).join(', ')}` : '';
+  // D-027: plain labels only (never codes), with when to choose each where known.
+  const opts = f.options?.length ? ` — choices: ${f.options.map((o) => { const when = optionWhenToChoose(o.value); return `${optionPlainLabel(o)}${when ? ` (${when})` : ''}`; }).join('; ')}` : '';
   const max = f.maxItems ? ` — at most ${f.maxItems}` : '';
   const sub = f.itemFields?.length ? `\n${f.itemFields.map((x) => fieldLine(x, `${indent}  `)).join('\n')}` : '';
-  return `${indent}- ${f.label}${req}${vis}${opts}${max}: ${f.help}${sub}`;
+  const ex = f.example ? ` Example from the template: "${f.example}"` : '';
+  return `${indent}- ${f.label}${req}${vis}${opts}${max}: ${f.help}${ex}${sub}`;
 }
 
 /** A plain-language guide to one template: sections and fields, graded outputs, the starting workflow and decisions. */
@@ -71,7 +74,7 @@ export function templateGuide(profile: TemplateProfile): string {
   return [
     `TEMPLATE GUIDE: ${profile.catalogWorkflowName} (${profile.templateId}). Agent mode: ${profile.agentMode === 'SINGLE' ? 'one agent' : 'several agents'}. Field contract: ${profile.contractStatus === 'confirmed' ? 'confirmed' : 'requires domain confirmation'}.`,
     TEMPLATE_NOTES[profile.profileId] ?? '',
-    outputs.length ? `Graded outputs (S6): ${outputs.map((f) => `${f.outputField} = ${(f.options ?? []).map((o) => o.value).join(' / ') || f.type}`).join('; ')}.` : '',
+    outputs.length ? `Graded outputs (S6): ${outputs.map((f) => `${f.label} = ${(f.options ?? []).map((o) => optionPlainLabel(o)).join(' / ') || 'free text'}`).join('; ')}.` : '',
     graph ? `Starting workflow: ${graph.nodes.filter((n) => n.type !== 'input' && n.type !== 'output' && n.type !== 'escalation').map((n) => n.label).join(' → ')}.${people.length ? ` Person steps: ${people.join(', ')}.` : ' No person steps.'}` : '',
     ...profile.sections.filter((s) => s.fields.length).map((s) => `${s.key} ${s.title}:\n${s.fields.map((f) => fieldLine(f)).join('\n')}`),
   ]

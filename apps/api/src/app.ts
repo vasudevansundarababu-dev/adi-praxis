@@ -69,6 +69,8 @@ import { defaultFieldSuggester, type FieldSuggester } from './tasks/suggestions/
 import { defaultStepTranslator, type StepTranslator } from './tasks/steps/translator';
 import { stepTranslateRoutes } from './routes/step-translate';
 import { policyClauseRoutes } from './routes/policy-clauses';
+import { fieldCoachRoutes } from './routes/field-coach';
+import { defaultFieldCoach, type FieldCoachModel } from './tasks/coach/field-coach';
 import { coverageFromConfig, HttpCoverageClient, type StudioCoverageClient } from './anvil/coverage-client';
 import { templateEditClosed, TEMPLATE_READ_ONLY_MESSAGE } from './templates/read-only';
 import { defaultDispositionSuggester, type DispositionSuggester } from './policy/dispositions';
@@ -171,6 +173,8 @@ export interface AppDeps {
   coverageClient?: StudioCoverageClient;
   /** E-002 §1.3: suggested dispositions for candidate rules. */
   dispositionSuggester?: DispositionSuggester;
+  /** D-027: field examples and "Check this" (model in vertex mode; null = rule-based only). */
+  fieldCoach?: FieldCoachModel | null;
 }
 
 export function defaultSupport(config: Config): SupportAssistant {
@@ -405,6 +409,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(reviewRoutes, { db: deps.db, evaluator: deps.evaluator ?? defaultEvaluator(deps.config), storage });
       await v1.register(journeyRoutes, { db: deps.db, config: deps.config, selectionGate });
       await v1.register(workRoutes, { db: deps.db, selectionGate, embeddings: deps.embeddings ?? defaultEmbeddings(deps.config), rubricEnabled: deps.config.RUBRIC_RECOMMENDATIONS_ENABLED, suggestionsEnabled: deps.config.FIELD_SUGGESTIONS_ENABLED });
+      await v1.register(fieldCoachRoutes, { db: deps.db, coach: deps.fieldCoach !== undefined ? deps.fieldCoach : defaultFieldCoach(deps.config) });
       await v1.register(stepTranslateRoutes, { db: deps.db, translator: deps.stepTranslator ?? defaultStepTranslator(deps.config) });
       if (deps.config.FIELD_SUGGESTIONS_ENABLED) await v1.register(suggestionRoutes, { db: deps.db, selectionGate, suggester: deps.fieldSuggester ?? defaultFieldSuggester(deps.config) });
       if (deps.config.RUBRIC_RECOMMENDATIONS_ENABLED) await v1.register(rubricRoutes, { db: deps.db, selectionGate, assistant: deps.rubricAssistant !== undefined ? deps.rubricAssistant : defaultRubricAssistant(deps.config) });

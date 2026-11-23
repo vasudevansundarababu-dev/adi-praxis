@@ -40,6 +40,7 @@ import type { TaskView } from '@/lib/work-types';
 import { SubmitPanel } from './submit-panel';
 import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
+import { ClauseNotes } from './clause-notes';
 import { FollowUpsText, ProcedureTranslator, procedureWarnings, StepFollowUps, StepWarnings } from './step-guide';
 import { SaveBar } from './save-bar';
 import { PolicyPicker, type LibraryView } from './policy-picker';
@@ -546,6 +547,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
               </label>
             </div>
           )}
+          {section.key === 'S4' && <ClauseNotes taskId={task.id} />}
           {section.fields.map((f) =>
             slot?.case && slot.case.source === `${section.key}.${f.key}` ? (
               <SelectorField key={f.key} field={f} value={slot.case.value} label={slot.case.label} />

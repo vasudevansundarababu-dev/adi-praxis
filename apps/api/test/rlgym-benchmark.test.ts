@@ -584,6 +584,21 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(checks.some((c) => c.id === 'steps.tool.tool_purpose_mismatch.1')).toBe(true);
   });
 
+  it('D-020: Help on a task knows the template’s edge cases, the task’s focus and the tool guide', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    const projectId = await project(v8);
+    const tasks = await db.taskInstance.findMany({ where: { projectId } });
+    const person = await source(projectId, 'SME', { email: 'sme-d020@gmail.test', first: 'Hal', last: 'Help' });
+    expect((await assign(projectId, person.id, tasks[0]!.id)).statusCode).toBe(200);
+    const me = await signIn('sme-d020@gmail.test');
+    const [row] = await authored(projectId, { approve: false, smeUserId: me.smeUserId });
+    await db.taskInstance.update({ where: { id: row!.taskId }, data: { benchmark: { edgeCase: 'minor_without_tin', slots: {}, extraStateChecks: [], version: 1 } } });
+    const res = await post(me.cookie, `/me/tasks/${row!.taskId}/help`, { question: 'Explain each item in the Focus on edge case dropdown: sanctions_dob_mismatch and minor_without_tin.' });
+    expect(res.statusCode, res.body).toBe(200);
+    // The local assistant answers from the help pack and the task's record, which now carries the edge cases.
+    expect(res.json().answer).toMatch(/minor_without_tin|sanctions_dob_mismatch|FOCUS ON EDGE CASE/);
+  });
+
   it('SME review batches: received idempotently; a person decides; decisions go to the RL Gym; task_correction reopens the task', async () => {
     const v8 = await publishedV8(CASE_REF_VERIFIERS);
     const projectId = await project(v8);

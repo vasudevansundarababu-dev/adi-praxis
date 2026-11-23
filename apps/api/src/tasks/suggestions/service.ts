@@ -1,3 +1,4 @@
+import { aiFailureKind, aiUnavailableMessage } from '../../lib/ai-errors';
 import {
   emptySuggestionState,
   getFieldValue,
@@ -109,7 +110,7 @@ export async function generateSuggestions(db: Db | Tx, t: TaskLike, args: { sect
       raw = await suggester.suggest(fields, ctx);
     } catch (err) {
       if (err instanceof FieldSuggesterTimeoutError) throw new AppError(503, 'SUGGESTIONS_TIMEOUT', 'The suggestion took too long. Try again.');
-      if (err instanceof FieldSuggesterUnavailableError) throw new AppError(503, 'SUGGESTIONS_UNAVAILABLE', 'Suggestions are not available right now. Write the text yourself, or try again in a minute.');
+      if (err instanceof FieldSuggesterUnavailableError) throw new AppError(503, 'SUGGESTIONS_UNAVAILABLE', aiUnavailableMessage(err, 'Suggestions', 'Write the text yourself.', 'Suggestions are not available right now. Write the text yourself, or try again in a minute.'), { reason: aiFailureKind(err) });
       throw err;
     }
   }

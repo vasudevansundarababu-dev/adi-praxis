@@ -285,3 +285,24 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
 - **Still open:** with a working model, Help answered the Benchmark question with "I can only help with this task and
   its form…". That is the content gap above: Help knows nothing about the Benchmark panel yet.
 - **Status:** the outage is resolved. Content, logging and plain-message fixes are waiting for "go".
+
+## D-020 Help for the Benchmark panel and plain AI error messages (the Help defect above)
+
+- **Fixed** 23 Nov 2026 (owner "go"). Commit below.
+  - **Plain messages for AI provider errors** (`apps/api/src/lib/ai-errors.ts`), in Help, the Support Bot, the policy
+    assistant, step drafting, field suggestions and section drafting:
+    - an expired or refused Google sign-in reads "<Feature> can't reach the AI service: the Google sign-in for AI on
+      this computer has expired. Ask an admin to sign in again." followed by what the person can still do by hand;
+    - an AI service that is busy or over its limit, and a timeout, have their own plain messages.
+
+    The raw provider text goes to the server log only. The support-bot log now records the error message, not just
+    "Error".
+  - **Help knows the Benchmark panel.** The SME help pack gains plain-English entries: Benchmark panel, Focus on edge
+    case, Archetype and Complexity, Save benchmark fields, the Golden KYC note (Studio D-012), Raise a need, procedure
+    steps and tools, conditional follow-ups, "Write the procedure in your own words", tool guide warnings, and when an AI
+    helper is unavailable.
+  - **Help's context and rules.** The task's Help context now carries the template's edge cases (name, archetype,
+    complexity, context, twist), the task's focus, Archetype and Complexity, and the tool guide. The task-scope rules
+    say these are part of the task and ask for plain, simple English.
+  - **Tests:** `ai-errors.test.ts`, plus new cases in `forge-step7.test.ts` (expired sign-in → plain 503; Benchmark
+    question answered) and `rlgym-benchmark.test.ts` (Help context has the edge cases).

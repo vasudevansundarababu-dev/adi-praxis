@@ -1,3 +1,4 @@
+import { aiFailureKind, aiUnavailableMessage } from '../lib/ai-errors';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db } from '../db';
@@ -21,7 +22,7 @@ export const stepTranslateRoutes: FastifyPluginAsyncZod<{ db: Db; translator: St
     try {
       return await translateSteps(translator, req.body.text, offered);
     } catch (err) {
-      if (err instanceof StepTranslatorUnavailableError) throw new AppError(503, 'TRANSLATOR_UNAVAILABLE', 'The steps could not be drafted just now. Try again, or add the steps yourself.');
+      if (err instanceof StepTranslatorUnavailableError) throw new AppError(503, 'TRANSLATOR_UNAVAILABLE', aiUnavailableMessage(err, 'Step drafting', 'You can add the steps yourself.', 'The steps could not be drafted just now. Try again, or add the steps yourself.'), { reason: aiFailureKind(err) });
       throw err;
     }
   });

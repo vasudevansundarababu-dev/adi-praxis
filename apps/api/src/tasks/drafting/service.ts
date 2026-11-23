@@ -1,3 +1,4 @@
+import { aiUnavailableMessage } from '../../lib/ai-errors';
 import type { Prisma, TaskDraftRun, TaskInstance } from '@prisma/client';
 import { KYC_MCP_CATALOG_VERSION, type KycTask, type TaskCheck } from '@praxis/shared';
 import { createHash, randomUUID } from 'node:crypto';
@@ -238,7 +239,7 @@ export async function executeDraft(db: Db, deps: { drafter: TaskDrafter; storage
       if (empty.length) lastProblem = `The draft left section(s) ${empty.join(', ')} empty`;
       else result = { task: s.task, problems: s.problems, notes: d.notes, model: d.model };
     } catch (err) {
-      lastProblem = err instanceof DrafterUnavailableError ? `The drafting assistant is unavailable: ${err.message}` : `Drafting failed: ${String(err)}`;
+      lastProblem = err instanceof DrafterUnavailableError ? aiUnavailableMessage(err, 'The drafting assistant', 'You can write this section yourself.', 'The drafting assistant is unavailable right now. You can write this section yourself.') : 'Drafting failed. You can write this section yourself.';
       if (!(err instanceof DrafterUnavailableError)) break;
     }
   }

@@ -1,3 +1,4 @@
+import { aiFailureKind, aiUnavailableMessage } from '../lib/ai-errors';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { roleLabel } from '@praxis/shared';
@@ -109,7 +110,7 @@ export const supportRoutes: FastifyPluginAsyncZod<{ assistant: SupportAssistant;
       req.log.info({ support: { audience: ctx.audience, path: body.screen.path, record: record?.source ?? null, templates: templates.map((t) => t.profileId), model: assistant.model, ms: Date.now() - started, ...r.usage } }, 'support answer');
       return { answer: r.answer, model: assistant.model, helpVersion: HELP_VERSION, usedRecord: record?.source ?? null, usedTemplates: templates.map((t) => t.catalogWorkflowName) };
     } catch (err) {
-      if (err instanceof SupportUnavailableError) throw new AppError(503, 'SUPPORT_UNAVAILABLE', 'The Support Bot is not available right now. Try again in a minute, or ask an Admin.');
+      if (err instanceof SupportUnavailableError) throw new AppError(503, 'SUPPORT_UNAVAILABLE', aiUnavailableMessage(err, 'The Support Bot', 'Everything else on this screen still works.', 'The Support Bot is not available right now. Try again in a minute, or ask an Admin.'), { reason: aiFailureKind(err) });
       throw err;
     }
   };

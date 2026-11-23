@@ -8,7 +8,7 @@ import { MockGoogleVerifier } from '../src/candidate/google';
 import { MockIdentityProvider } from '../src/candidate/identity-provider';
 import { MemorySignedStorage, MemoryStorage } from '../src/candidate/storage';
 import { MemoryEmailSender } from '../src/lib/email';
-import { MockSupportAssistant } from '../src/support/assistant';
+import { MockSupportAssistant, SupportUnavailableError } from '../src/support/assistant';
 import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { call, forgeKit } from './forge-helpers';
 import { createUser, db, login, resetDb, testConfig } from './helpers';
@@ -221,6 +221,26 @@ describe('MVP1 step 7: Tutorial and Help scoped to the task', () => {
       const res = await post(s.author.cookie, `/me/tasks/${s.id}/help`, { question: "What's the weather in Chicago?" });
       expect(res.statusCode).toBe(200);
       expect(res.json().answer).toBe(TASK_HELP_REFUSAL);
+    });
+
+    it('D-020: an expired Google sign-in gives a plain message (never the raw provider text); Benchmark questions are answered from the help pack', async () => {
+      const s = await setup({ submit: false });
+      const original = bot.answer.bind(bot);
+      bot.answer = async () => {
+        throw new SupportUnavailableError('{"error":"invalid_grant","error_description":"reauth related error (invalid_rapt)","error_subtype":"invalid_rapt"}');
+      };
+      try {
+        const res = await post(s.author.cookie, `/me/tasks/${s.id}/help`, { question: 'What goes in S1?' });
+        expect(res.statusCode).toBe(503);
+        expect(res.json().message).toBe('Help can’t reach the AI service: the Google sign-in for AI on this computer has expired. Ask an admin to sign in again. You can keep writing the task; the form’s own guidance still applies.');
+        expect(res.body).not.toContain('invalid_rapt');
+      } finally {
+        bot.answer = original;
+      }
+      const ok = await post(s.author.cookie, `/me/tasks/${s.id}/help`, { question: 'What is Focus on edge case and Save benchmark fields?' });
+      expect(ok.statusCode).toBe(200);
+      expect(ok.json().answer).toMatch(/FOCUS ON EDGE CASE|SAVE BENCHMARK FIELDS/);
+      expect(bot.calls.at(-1)!.system).toContain('Benchmark panel');
     });
 
     it("someone else's task is not found; a missing or long question is refused", async () => {

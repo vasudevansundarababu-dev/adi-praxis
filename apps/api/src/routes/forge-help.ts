@@ -1,3 +1,4 @@
+import { aiFailureKind, aiUnavailableMessage } from '../lib/ai-errors';
 import { TaskHelpRequest } from '@praxis/shared';
 import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -5,7 +6,7 @@ import { z } from 'zod';
 import type { Db } from '../db';
 import { requireForgeTerms } from '../forge/candidate';
 import { requireNewFlow, reviewerTaskView } from '../forge/review';
-import { commentsOf, helpGuides, publishedRules, sectionStatus, taskBasics, type TaskHelpContext } from '../forge/task-help';
+import { benchmarkHelp, commentsOf, helpGuides, publishedRules, sectionStatus, taskBasics, type TaskHelpContext } from '../forge/task-help';
 import { AppError } from '../lib/errors';
 import { SupportUnavailableError, type SupportAssistant, type SupportContext } from '../support/assistant';
 import { SME_HELP } from '../support/help-pack';
@@ -25,14 +26,14 @@ export const forgeHelpRoutes: FastifyPluginAsyncZod<{ db: Db; assistant: Support
     const started = Date.now();
     try {
       const r = await assistant.answer(
-        { audience: 'SME', roles: [scope === 'TASK_REVIEWER' ? 'Reviewer' : 'SME'], help: SME_HELP, scope, templates, record: { source: 'this task', data: context }, screen: { path: '/', title: scope === 'TASK_REVIEWER' ? 'Review a task' : 'Task', headings: context.template.sections.map((s) => `${s.section} ${s.title}`), fields: [], messages: [] } },
+        { audience: 'SME', roles: [scope === 'TASK_REVIEWER' ? 'Reviewer' : 'SME'], help: SME_HELP, scope, templates, record: { source: 'this task', data: context }, screen: { path: '/', title: scope === 'TASK_REVIEWER' ? 'Review a task' : 'Task', headings: [...context.template.sections.map((s) => `${s.section} ${s.title}`), ...(context.benchmark ? ['Benchmark panel'] : [])], fields: [], messages: [] } },
         body.history,
         body.question,
       );
       req.log.info({ taskHelp: { scope, model: assistant.model, ms: Date.now() - started, ...r.usage } }, 'task help answer');
       return { answer: r.answer, scoped: true as const };
     } catch (err) {
-      if (err instanceof SupportUnavailableError) throw new AppError(503, 'SUPPORT_UNAVAILABLE', 'Help is not available right now. Try again in a minute.');
+      if (err instanceof SupportUnavailableError) throw new AppError(503, 'SUPPORT_UNAVAILABLE', aiUnavailableMessage(err, 'Help', 'You can keep writing the task; the form’s own guidance still applies.', 'Help is not available right now. Try again in a minute.'), { reason: aiFailureKind(err) });
       throw err;
     }
   }
@@ -47,6 +48,7 @@ export const forgeHelpRoutes: FastifyPluginAsyncZod<{ db: Db; assistant: Support
       template: { name: template.workflowName, sections: sectionStatus(profile, t.output) },
       rules: await publishedRules(db, t),
       reviewComments: commentsOf(t.reviews[0]?.comments),
+      ...benchmarkHelp(t),
     };
     return answer(req, 'TASK_AUTHOR', context, helpGuides(profile), req.body);
   });

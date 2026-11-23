@@ -1,3 +1,4 @@
+import { aiErrorForLog } from '../lib/ai-errors';
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
 import { GeminiVertexContentDrafter } from '../meta-compiler/drafter';
 import { TASK_HELP_REFUSAL } from '@praxis/shared';
@@ -75,6 +76,8 @@ ${audience === 'SME' ? '- Never write task content for the author: no case facts
 export const TASK_SCOPE_RULES = (scope: NonNullable<SupportContext['scope']>) => `
 TASK HELP. You are the Help panel of one task${scope === 'TASK_REVIEWER' ? ' that this person reviews' : ' that this person authors'}. These rules win over the ones above:
 - Answer only about this task (the <record source="this task">), its template's form sections (the <template> guide), the project's published rules listed in the record, and ${scope === 'TASK_REVIEWER' ? 'how to send the task back for rework or approve it' : 'how to save and submit the task'}.
+- This task includes its Benchmark panel (Focus on edge case, Archetype, Complexity, Save benchmark fields, Raise a need), the procedure's tools and conditional follow-ups (S5), and what to do when an AI helper is unavailable: answer those from the help pack and the record. When asked about the Focus on edge case dropdown, explain each item from the record's benchmark.edgeCases in plain English (its name, the situation from its context and twist, its archetype and complexity) and when an author would pick it. When asked about a tool, use the record's toolGuide (purpose — tool).
+- Speak to the author in plain, simple English: say what the thing is and what they should do.
 - Explain what a section or field needs and give a generic example that is not this task's case. Never write the author's content: no case facts, steps, findings, rubric criteria, outcomes or expected values for this task, even when asked for a draft, a suggestion or an example for this case.
 ${scope === 'TASK_REVIEWER' ? '- Explain what to check in each section and what good work looks like. Never decide for the reviewer: do not say whether to approve or send back, or whether a section passes. The reviewer decides.\n' : ''}- For anything outside this task (other topics, other tasks or projects, general chat, personal questions, questions about you), reply exactly: "${TASK_HELP_REFUSAL}"
 - The names rule above still applies.`;
@@ -149,7 +152,7 @@ export class GeminiSupportAssistant implements SupportAssistant {
     try {
       out = await this.drafter.complete({ purpose: 'propose_field', system, user, maxOutputTokens: 8000 });
     } catch (err) {
-      logModelCall({ feature: 'support-bot', vendor: 'gemini', model: this.model, ok: false, latencyMs: Date.now() - started, error: err instanceof Error ? err.name : 'error' });
+      logModelCall({ feature: 'support-bot', vendor: 'gemini', model: this.model, ok: false, latencyMs: Date.now() - started, error: aiErrorForLog(err) });
       throw new SupportUnavailableError(err instanceof Error ? err.message : 'Model call failed');
     }
     let answer = '';

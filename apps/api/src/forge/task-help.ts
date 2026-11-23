@@ -1,4 +1,8 @@
-import { getFieldValue, type TemplateProfile } from '@praxis/shared';
+import { getFieldValue, orderedTools, toolOptionLabel, type TemplateProfile } from '@praxis/shared';
+import type { Template } from '@prisma/client';
+import { templateBenchmark, taskBenchmarkOf } from '../anvil/benchmark';
+import { jointTemplateSpec } from '../anvil/joint-template';
+import { declaredToolIds } from '../anvil/tool-binding';
 import type { Db, Tx } from '../db';
 import { authoringPolicyView, effectivePolicy, sidecar } from '../policy/task-policy';
 import { templateGuide } from '../support/authoring-help';
@@ -13,6 +17,23 @@ export interface TaskHelpContext {
   template: { name: string; sections: { section: string; title: string; filled: boolean }[] };
   rules: { id: string; title: string }[];
   reviewComments: { section: string | null; text: string }[];
+  /** D-020: the Benchmark panel as the author sees it: the template's edge cases (public fields), this task's focus, Archetype and Complexity. */
+  benchmark?: { edgeCases: { name: string; tag: string; archetype: string | null; complexity: string | null; context: string; twist: string }[]; focus: string | null; archetype: string | null; complexity: string | null };
+  /** D-020: the template's tools by purpose ("Screen an applicant — screening.check"). */
+  toolGuide?: string[];
+}
+
+/** D-020: the Benchmark panel and the tool guide for Help, from the template and the task (nothing the author does not already see). */
+export function benchmarkHelp(t: { benchmark: unknown; output: unknown; project: { template: Pick<Template, 'lineageId' | 'version' | 'anvilSpec'> } }): Pick<TaskHelpContext, 'benchmark' | 'toolGuide'> {
+  const b = templateBenchmark(t.project.template);
+  const value = taskBenchmarkOf(t.benchmark);
+  const s1 = ((t.output as { sections?: { S1?: Record<string, unknown> } } | null)?.sections?.S1 ?? {}) as Record<string, unknown>;
+  const spec = jointTemplateSpec(t.project.template);
+  const offered = spec ? declaredToolIds(spec.execution) : null;
+  return {
+    ...(b.edgeCases.length || value.edgeCase ? { benchmark: { edgeCases: b.edgeCases.map((e) => ({ name: e.name ?? e.tag, tag: e.tag, archetype: e.archetype, complexity: e.complexity, context: e.context, twist: e.twist })), focus: value.edgeCase, archetype: typeof s1.archetype === 'string' ? s1.archetype : null, complexity: typeof s1.complexity === 'string' ? s1.complexity : null } } : {}),
+    ...(offered?.length ? { toolGuide: orderedTools(offered).map(toolOptionLabel) } : {}),
+  };
 }
 
 const filled = (v: unknown) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0) && !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0);

@@ -5,7 +5,7 @@
  */
 import { AUTHORING_GUIDE } from './authoring-help';
 
-export const HELP_VERSION = 'help/2.1 (12 Nov 2026: authoring v2.1, review routes, policy proposals, template guides, generated job descriptions, KYC template v2, golden task packs)';
+export const HELP_VERSION = 'help/2.2 (23 Nov 2026: Benchmark panel, procedure tool guide and follow-ups, AI unavailable) · help/2.1 (12 Nov 2026: authoring v2.1, review routes, policy proposals, template guides, generated job descriptions, KYC template v2, golden task packs)';
 
 const COMMON = `ADI Forge is where subject-matter experts (SMEs) write and review realistic, fully synthetic work tasks from domain workflow templates (for example Banking / KYC onboarding). Approved tasks go into an append-only Approved Task Dataset that the separate RL Gym platform uses. People make every decision — selection, task acceptance, certification, payment approval. AI only drafts, checks and recommends.
 
@@ -71,6 +71,32 @@ API AND WEBHOOKS. Create API clients per environment: Sandbox (simulated candida
 
 
 /** SMEs (authors) in the candidate app: how to author, what happens in review, and policy. */
+/**
+ * D-020 (owner, 23 Nov 2026): plain-English Help for the task's Benchmark panel, the procedure's tool guide and
+ * follow-ups, and what to do when an AI helper is unavailable. Written for the author: what it is and what to do.
+ */
+export const BENCHMARK_HELP = `BENCHMARK PANEL. Below the task form there is a Benchmark panel. The AI agent that does the task never sees it; your reviewers and the benchmark (RL Gym) do. It tells the benchmark which kind of case your task is about.
+
+FOCUS ON EDGE CASE (optional). The dropdown lists the template's edge cases (from section S4). Each item shows its name, then its archetype and complexity in brackets, for example "sanctions_dob_mismatch (sanctions_near_match, multi_hop)". Each edge case has a context (the usual situation) and a twist (what makes it unusual). Pick one only when your task is written about that situation; otherwise leave it on None. Picking one sets the task's Archetype, and its Complexity unless you choose a different Complexity in S1.
+
+ARCHETYPE AND COMPLEXITY (S1). Archetype is the kind of problem the case tests, for example a missing document or a near-match on a sanctions list. Complexity is how much work it takes to reach the answer: single_hop means one check settles it; multi_hop means several checks have to be combined. Choose the values that fit your case. They help the benchmark balance its tasks; they are not shown to the agent.
+
+SAVE BENCHMARK FIELDS. This button saves your Focus on edge case (and, on templates where you give expected values, those values and any extra checks) as a new version. You can change it until you submit. After you submit it is locked until your task is approved or sent back to you. When the task is exported, the benchmark runs it only on cases tagged with your edge case.
+
+GOLDEN KYC NOTE (current). For Golden KYC tasks, leave Focus on edge case on None for now. The benchmark's case records do not carry edge-case tags yet (Studio defect D-012), so a task focused on an edge case would match no case.
+
+RAISE A NEED. If your task needs a situation the template does not cover, use Raise a need. Describe the context, the twist and the expected outcome. It goes to your project manager, who decides whether to ask Studio for it; it does not go to Studio directly.
+
+PROCEDURE STEPS AND TOOLS (S5). Each step says what the analyst does and which tool records it. Choose the tool by what the step does; each option in the Tool list reads "what it is for — tool". For example: screening an applicant uses screening.check, checking an address uses address.check, checking identity uses identity.check, checking an adult's or custodian's authority uses authority.check, reading the application and its parties uses application.read, finding and reading documents uses documents.list then document.read, asking the customer for missing evidence uses information.request, and the final recommendation uses recommend (always the last step). Recording a finding (finding.write) and referring to a specialist (specialist.refer) are not routine steps: they happen only when a check finds a problem.
+
+CONDITIONAL FOLLOW-UPS (S5). Under each step, "Conditional follow-ups" say what happens only if that step finds a problem. Write the condition in plain words in the "If" box and pick the tools in order, for example: If either applicant has an unresolved match, then finding.write, and then specialist.refer. Choosing "Find supporting documents" (documents.list) adds "then read a specific one" (document.read) for you.
+
+WRITE THE PROCEDURE IN YOUR OWN WORDS (S5). At the top of the Investigation procedure, open "Write the procedure in your own words", describe what an analyst does in business language, and press Draft the steps. ADI Forge proposes steps with tools and follow-ups. Review them, then press "Use these steps" (or "Replace my steps with these", or "Add after my steps"), or Discard. Nothing changes until you apply them, and you can edit every step afterwards.
+
+TOOL GUIDE WARNINGS (S5). A yellow note under a step means its tool may not fit its words, a referral or finding has no condition, a follow-up has no condition, or the procedure does not end with the recommendation. Use the suggested tool ("Use <tool>") or fix the wording. These notes do not stop you submitting; your reviewer sees them too.
+
+WHEN AN AI HELPER IS UNAVAILABLE. If Help, suggestions or step drafting say the AI service is unavailable, you can still do everything by hand and nothing you wrote is lost. If the message says the Google sign-in for AI has expired, ask an admin to sign in again; if it says the service is busy or over its limit, try again in a few minutes.`;
+
 export const SME_HELP = `ADI Forge is where subject-matter experts like you write realistic, fully synthetic work tasks from a project's workflow template. Approved tasks go into an append-only dataset used to train and test AI agents. People make every decision about your task — the Expert, the PM or an Admin. AI only organises your words, checks and recommends; it never writes your answers.
 
 All task content must be synthetic: invented people, companies, accounts and identifiers only. Never enter real customer, employer or identity data. ADI Forge flags possible real data (for example a valid IBAN or card number) and blocks it.
@@ -78,5 +104,7 @@ All task content must be synthetic: invented people, companies, accounts and ide
 YOUR TASKS. Your home page lists your projects and tasks. Open a task to author it. It autosaves; reopening keeps everything. When the checks pass, submit it. You can see its state at the top: Authoring, Review pending or Approval pending, Approved, or Rejected. If it comes back for rework you see the reviewer's comments, pinned to the section, field or workflow step they concern; fix them and resubmit. If an Expert made a material change (anything in the rubric or the reference answer), the task comes back for you to reconfirm.
 
 PAYMENT. You earn once per accepted task, at the project's rate; rework and resubmission do not create a second earning.
+
+${BENCHMARK_HELP}
 
 ${AUTHORING_GUIDE}`;

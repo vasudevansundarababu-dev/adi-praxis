@@ -1,3 +1,4 @@
+import { aiFailureKind, aiUnavailableMessage } from '../lib/ai-errors';
 import { randomUUID } from 'node:crypto';
 import '@fastify/multipart';
 import type { FastifyRequest } from 'fastify';
@@ -328,7 +329,7 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
     if (used >= config.POLICY_AI_DAILY_CALL_CAP) throw new AppError(429, 'MODEL_DAILY_CAP', 'The policy assistant has reached today’s usage limit. You can still tick rules and edit them by hand.');
   }
   const unavailable = (e: unknown): never => {
-    if (e instanceof RuleAssistantUnavailableError) throw new AppError(503, 'ASSISTANT_UNAVAILABLE', `The policy assistant is not available right now (${e.message}). Nothing was changed; try again or edit by hand.`);
+    if (e instanceof RuleAssistantUnavailableError) throw new AppError(503, 'ASSISTANT_UNAVAILABLE', aiUnavailableMessage(e, 'The policy assistant', 'Nothing was changed; you can edit the rule by hand.', 'The policy assistant is not available right now. Nothing was changed; try again or edit by hand.'), { reason: aiFailureKind(e) });
     throw e;
   };
 

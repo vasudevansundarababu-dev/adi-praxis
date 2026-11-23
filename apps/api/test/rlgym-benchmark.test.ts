@@ -525,6 +525,30 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(await db.auditEvent.count({ where: { action: 'task.sent_back_after_approval' } })).toBe(1);
   });
 
+  it('Send back for rework (owner, 23 Nov 2026): the PM sends an approved task back from the task page; the record is kept; a stale or repeated request is refused', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    const projectId = await project(v8);
+    const anyTask = (await db.taskInstance.findMany({ where: { projectId } }))[0]!;
+    const person = await source(projectId, 'SME', { email: 'sme-button@gmail.test', first: 'Bea', last: 'Button' });
+    expect((await assign(projectId, person.id, anyTask.id)).statusCode).toBe(200);
+    const me = await signIn('sme-button@gmail.test');
+    const t = (await packable(await authored(projectId, { smeUserId: me.smeUserId })))[0]!.record!;
+    const view = (await get(pm, `/projects/${projectId}/forge-tasks/${t.taskInstanceId}`)).json();
+    expect(view).toMatchObject({ status: 'ACCEPTED', canSendBack: true });
+    const url = `/projects/${projectId}/tasks/${t.taskInstanceId}/send-back`;
+    expect((await post(pm, url, { notes: 'short', expectedRevision: view.expectedRevision })).statusCode).toBe(400);
+    expect((await post(pm, url, { notes: 'S5 step 4 should use document.read.', expectedRevision: view.expectedRevision + 1 })).statusCode).toBe(409);
+    const sent = await post(pm, url, { notes: 'S5 step 4 should use document.read.', expectedRevision: view.expectedRevision });
+    expect(sent.statusCode, sent.body).toBe(200);
+    expect(sent.json()).toMatchObject({ status: 'REWORK', recordId: t.id, recordKept: true });
+    expect(await db.taskInstance.findUniqueOrThrow({ where: { id: t.taskInstanceId } })).toMatchObject({ status: 'REWORK', reviewNotes: 'S5 step 4 should use document.read.' });
+    expect(await db.approvedTaskRecord.findUniqueOrThrow({ where: { id: t.id } })).toMatchObject({ contentHash: t.contentHash });
+    expect(await db.auditEvent.count({ where: { action: 'task.sent_back_after_approval', entityId: t.taskInstanceId } })).toBe(1);
+    expect((await get(pm, `/projects/${projectId}/forge-tasks/${t.taskInstanceId}`)).json().canSendBack).toBe(false);
+    expect((await post(pm, url, { notes: 'S5 step 4 should use document.read.', expectedRevision: view.expectedRevision + 1 })).statusCode).toBe(409);
+    expect(((await get(me.cookie, '/me/forge/inbox')).json().items as { kind: string; detail: string }[])).toEqual([expect.objectContaining({ kind: 'rework', detail: 'S5 step 4 should use document.read.' })]);
+  });
+
   it('D-004: a PM assigns each task’s run review to its author or a project SME Reviewer; only that SME (or PM/Admin) decides; inboxes show what waits', async () => {
     const v8 = await publishedV8(CASE_REF_VERIFIERS);
     // SME Reviewers exist on the SME → Expert → PM route.

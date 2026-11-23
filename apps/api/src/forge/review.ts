@@ -2,13 +2,14 @@ import { followUpsOf, provenanceSummary, stepToolWarnings, toolOptionLabel } fro
 import { jointTemplateSpec } from '../anvil/joint-template';
 import { declaredToolIds } from '../anvil/tool-binding';
 import { sectionsProfile, suggestionStateOf } from '../tasks/suggestions/service';
-import { CoverageDimensions, forgeSlotSelector, normEmail, smeTaskStatus, type ForgeDecisionRequest, type ForgeTaskSelector, type SelectorSlot, type ForgePerson, type ForgeTaskRow, type ReviewerDecisionRequest, type ReviewerTaskStatus } from '@praxis/shared';
+import { CoverageDimensions, forgeSlotSelector, normEmail, smeTaskStatus, type ForgeDecisionRequest, type ForgeSendBackRequest, type ForgeTaskSelector, type SelectorSlot, type ForgePerson, type ForgeTaskRow, type ReviewerDecisionRequest, type ReviewerTaskStatus } from '@praxis/shared';
 import type { Actor, CandidateActor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { AppError, forbidden, notFound } from '../lib/errors';
 import type { AuditInput } from '../platform/audit';
 import type { OutboxInput } from '../outbox/outbox';
 import { hasQuotas } from '../tasks/definitions';
+import { sendBackApproved } from '../tasks/send-back';
 import { profileFor } from '../tasks/profile-output';
 import { CHECKLIST, decideOneStep } from '../tasks/review-service';
 import { assertCurrent, contentHash, decideStageFor, lock, passInForce, reviewerNames, TASK_INCLUDE, type StageTask } from '../tasks/stage-review';
@@ -202,6 +203,8 @@ export async function forgeTaskView(tx: Db | Tx, actor: Actor, projectId: string
     reviews: await reviewHistory(tx, t),
     date: lastChange(t, t.reviews.map((r) => r.createdAt)),
     ...turn(t, await ownOrConflicted(tx, actor, author)),
+    // PM/Admin: an approved task can be sent back to its author for a new revision (never by its author).
+    canSendBack: t.status === 'ACCEPTED' && !(await ownOrConflicted(tx, actor, author)),
     expertPass: inForce ? { version: inForce.submissionVersion, at: inForce.createdAt.toISOString() } : null,
     expectedVersion: latest?.version ?? null,
     expectedRevision: t.revision,
@@ -242,6 +245,17 @@ export async function forgeDecide(tx: Tx, actor: Actor, projectId: string, taskI
     audit,
     emit,
   );
+}
+
+/** PM/Admin on the task page: send an approved task back to its author for a new revision (owner, 23 Nov 2026). */
+export async function forgeSendBack(tx: Tx, actor: Actor, projectId: string, taskId: string, body: ForgeSendBackRequest, audit: Audit) {
+  await requireNewFlow(tx, actor.clientId);
+  await lock(tx, taskId);
+  const t = await consoleTask(tx, actor, projectId, taskId);
+  if (await ownOrConflicted(tx, actor, t.assignedTo?.smeUser)) throw forbidden('You cannot send back this task: you wrote it, or you declared a conflict with its author.');
+  if (t.revision !== body.expectedRevision) throw new AppError(409, 'STALE_REVISION', 'The task changed since you opened it. Reload and try again.');
+  const { recordId } = await sendBackApproved(tx, t, { actorId: actor.userId, notes: body.notes, source: 'pm_send_back', audit, auditExtra: { via: 'tasks_tab' } });
+  return { status: 'REWORK' as const, recordId, recordKept: true };
 }
 
 // ── External Reviewer (candidate app) ──

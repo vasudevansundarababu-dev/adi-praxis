@@ -150,6 +150,10 @@ export const ForgeDecisionRequest = z
   .refine((d) => d.decision !== 'REJECT' || !!d.rejectReason, { message: 'Choose a reason for rejecting', path: ['rejectReason'] });
 export type ForgeDecisionRequest = z.infer<typeof ForgeDecisionRequest>;
 
+/** PM/Admin: send an approved task back to its author for a new revision (the approved record is kept). */
+export const ForgeSendBackRequest = z.object({ notes: z.string().trim().min(10, 'Say what the author must fix.').max(4000), expectedRevision: z.number().int().min(0) }).strict();
+export type ForgeSendBackRequest = z.infer<typeof ForgeSendBackRequest>;
+
 /** The external Reviewer's decision: pass to the PM or Admin, or send back to the author. A Reviewer never rejects. */
 export const ReviewerDecisionRequest = z
   .object({

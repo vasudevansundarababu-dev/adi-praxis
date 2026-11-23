@@ -1,6 +1,6 @@
-import type { Prisma } from '@prisma/client';
 import type { Db } from '../db';
 import { writeAudit } from '../platform/audit';
+import { latestApprovedRecord, sendBackApproved } from '../tasks/send-back';
 
 /**
  * Send an approved task back to its author for a new revision (owner, 23 Nov 2026: TSK-001). The same transition as
@@ -56,18 +56,11 @@ export async function taskSendBack(db: Db, args: SendBackArgs): Promise<SendBack
     if (!admin) return { outcome: 'refused', reason: 'The requester is not an active Admin of the task’s client.' };
     if (t.status === 'REWORK' && t.reviewNotes === notes) return { outcome: 'already_sent_back', taskId: t.id };
     if (t.status !== 'ACCEPTED') return { outcome: 'refused', reason: `The task is ${t.status.toLowerCase()}, not approved.` };
-    const record = await tx.approvedTaskRecord.findFirst({ where: { taskInstanceId: t.id }, orderBy: { seq: 'desc' } });
-    if (!record) return { outcome: 'refused', reason: 'The task has no approved record.' };
-    if (await tx.approvedTaskRecord.count({ where: { supersedesId: record.id } })) return { outcome: 'refused', reason: 'The latest approved record has been superseded.' };
-    const plan = { taskId: t.id, recordId: record.id, recordKept: true as const, fromStatus: 'ACCEPTED' as const, toStatus: 'REWORK' as const };
+    const latest = await latestApprovedRecord(tx, t.id);
+    if (!latest.ok) return { outcome: 'refused', reason: latest.problem };
+    const plan = { taskId: t.id, recordId: latest.record.id, recordKept: true as const, fromStatus: 'ACCEPTED' as const, toStatus: 'REWORK' as const };
     if (!args.apply) return { outcome: 'planned', ...plan };
-
-    const { count } = await tx.taskInstance.updateMany({ where: { id: t.id, status: 'ACCEPTED', revision: t.revision }, data: { status: 'REWORK', reviewStage: null, reworkCount: { increment: 1 }, revision: { increment: 1 }, reviewNotes: notes, reviewerId: admin.id } });
-    if (!count) throw new Error('The task changed while it was being sent back; nothing was written. Run the job again.');
-    const sub = await tx.taskSubmission.findFirst({ where: { taskInstanceId: t.id }, orderBy: { version: 'desc' }, select: { version: true } });
-    await tx.taskReview.create({ data: { clientId: t.clientId, taskInstanceId: t.id, submissionVersion: sub?.version ?? 1, reviewerId: admin.id, decision: 'REWORK', checklist: {}, comments: [{ section: 'general', text: notes, source: 'admin_send_back' }] as Prisma.InputJsonValue, notes } });
-    if (t.slotId) await tx.coverageSlot.update({ where: { id: t.slotId }, data: { status: 'IN_PROGRESS' } });
-    await writeAudit(tx, { clientId: t.clientId, actorType: 'SYSTEM', actorId: ACTOR }, { entityType: 'TaskInstance', entityId: t.id, action: 'task.sent_back_after_approval', before: { status: 'ACCEPTED', revision: t.revision }, after: { status: 'REWORK', requestedBy: admin.id, recordId: record.id, recordKept: true, notes } });
+    await sendBackApproved(tx, t, { actorId: admin.id, notes, source: 'admin_send_back', audit: (a) => writeAudit(tx, { clientId: t.clientId, actorType: 'SYSTEM', actorId: ACTOR }, a), auditExtra: { requestedBy: admin.id } });
     return { outcome: 'sent_back', ...plan };
   });
 }

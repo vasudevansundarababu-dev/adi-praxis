@@ -395,6 +395,18 @@ describe('Task page decision box', () => {
     expect(m).not.toContain('data-decision-box');
   });
 
+  it('Send back for rework (owner, 23 Nov 2026): an approved task offers it to the PM/Admin, with what happens to the approved version', () => {
+    const m = renderToStaticMarkup(<ForgeTaskPage code="TSK-001" view={view({ taskId: T(1), status: 'ACCEPTED', canDecide: false, canSendBack: true })} people={PEOPLE} exportState={EXPORT} />);
+    const t = text(m);
+    expect(m).toContain('data-send-back');
+    expect(t).toContain('Send back for rework');
+    expect(t).toContain('The approved version stays in the dataset as it is');
+    expect(a11yProblems(m)).toEqual([]);
+    // Not offered on a task that is not approved, or to its author.
+    expect(renderToStaticMarkup(<ForgeTaskPage code="TSK-001" view={view({ taskId: T(1), status: 'ACCEPTED', canDecide: false, canSendBack: false })} people={PEOPLE} exportState={EXPORT} />)).not.toContain('data-send-back');
+    expect(renderToStaticMarkup(<ForgeTaskPage code="TSK-002" view={view()} people={PEOPLE} exportState={EXPORT} />)).not.toContain('data-send-back');
+  });
+
   it('trail on the Reviewer route: Author → Reviewer → PM/Admin', () => {
     const steps = reviewTrail({
       status: 'SUBMITTED',

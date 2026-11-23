@@ -363,4 +363,8 @@ task back, so a new job, `task-send-back`, makes the same transition as the RL G
 - **Safety:** dry run by default; Admin only; audited as `task.sent_back_after_approval`; idempotent.
 - **Applied to TSK-001** as admin@praxis.local: it is now in Rework at revision 163 with the two fixes above. Its
   content is unchanged.
-- **Follow-up:** a console button for this (PM/Admin) instead of the job.
+- **Console button (owner "Yes, add the button"):** an approved task's page (Project → Tasks → the task) now has
+  **Send back for rework** for the project's PM or an Admin, never the task's author.
+  - The PM writes what the author must fix; the task goes to Rework with those notes.
+  - The request is bound to the task's revision, so a stale or repeated request is refused.
+  - The route is `POST /projects/:id/tasks/:taskId/send-back`. The job and the button share `tasks/send-back.ts`.

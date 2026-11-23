@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { ExportState } from '@/components/projects/export-panel';
+import { Req } from '@/components/required';
 import { mutate } from '@/lib/client-api';
 import {
   changeAuthorState,
@@ -48,6 +49,8 @@ export interface ForgeTaskView {
   reviews: { id: string; by: string; decision: string; stage: string | null; comments: ForgeComment[] | null; notes: string | null; rejectReason: string | null; version: number | null; at: string }[];
   date: string;
   canDecide: boolean;
+  /** PM/Admin: the task is approved and may be sent back to its author for a new revision. */
+  canSendBack?: boolean;
   waitingFor: 'REVIEWER' | 'PM' | null;
   expectedVersion: number | null;
   expectedRevision: number;
@@ -611,6 +614,61 @@ export function DecisionBox({ projectId, view }: { projectId: string; view: Forg
   );
 }
 
+/** Owner, 23 Nov 2026: send an approved task back to its author for a new revision. The approved record is kept. */
+export function SendBackBox({ projectId, view }: { projectId: string; view: ForgeTaskView }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  async function send() {
+    if (notes.trim().length < 10) return setError('Say what the author must fix.');
+    setPending(true);
+    setError(null);
+    const res = await mutate('POST', `/projects/${projectId}/tasks/${view.taskId}/send-back`, { notes: notes.trim(), expectedRevision: view.expectedRevision });
+    setPending(false);
+    if (!res.ok) return setError(res.error);
+    setOpen(false);
+    setNotes('');
+    router.refresh();
+  }
+  return (
+    <section aria-labelledby="send-back-h" className="card mb-4 p-5" data-send-back>
+      <h3 id="send-back-h" className="font-semibold">
+        Send back for rework
+      </h3>
+      <p className="mt-1 text-[13px] text-fg-muted">
+        The author gets the task back in Rework with your notes, in their bell and on the task page. The approved version stays in the dataset as it is and is not sent to the benchmark while the task is in Rework. When you approve the new version, it replaces this one.
+      </p>
+      {!open ? (
+        <button type="button" className="btn btn-secondary mt-3" onClick={() => setOpen(true)}>
+          Send back for rework
+        </button>
+      ) : (
+        <div className="mt-3">
+          <label htmlFor="send-back-notes" className="text-sm font-medium">
+            What the author must fix <Req />
+          </label>
+          <textarea id="send-back-notes" rows={4} value={notes} onChange={(e) => { setNotes(e.target.value); setError(null); }} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5 text-sm" placeholder="For example: S5 step 4 reads document contents with documents.list; use document.read." />
+          {error && (
+            <p role="alert" className="mt-2 text-sm text-error">
+              {error}
+            </p>
+          )}
+          <div className="mt-3 flex gap-2">
+            <button type="button" className="btn btn-primary disabled:opacity-60" disabled={pending} onClick={() => void send()}>
+              {pending ? 'Sending…' : 'Send back to the author'}
+            </button>
+            <button type="button" className="btn btn-secondary" disabled={pending} onClick={() => { setOpen(false); setError(null); }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ValidateCard({ projectId, recordId, initial }: { projectId: string; recordId: string; initial: ValidationRunDto[] }) {
   const [runs, setRuns] = useState(initial);
   const [pending, setPending] = useState(false);
@@ -756,6 +814,7 @@ export function ForgeTaskPage({ code, view, people, exportState, rubric = null }
 
       {view.procedure && <ProcedureCard procedure={view.procedure} />}
       {view.canDecide && <DecisionBox projectId={projectId} view={view} />}
+      {view.canSendBack && <SendBackBox projectId={projectId} view={view} />}
       {!view.canDecide && view.waitingFor === 'REVIEWER' && (
         <p className="card mb-4 p-5 text-sm" data-waiting>
           <strong>Waiting for the Reviewer.</strong> The decision box opens here once {view.reviewer?.name ?? 'the Reviewer'} passes the task to the PM/Admin.

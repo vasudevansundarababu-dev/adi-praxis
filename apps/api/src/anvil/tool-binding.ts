@@ -1,3 +1,4 @@
+import { stepToolWarnings, type TaskCheck } from '@praxis/shared';
 /**
  * APR-13d (owner, 20 Nov 2026): tool bindings must come from the template's runtime catalogue. A procedure step's
  * `tool` (`S5.steps[].tool`) is free text on the form, so nothing stopped an author naming a tool the template does
@@ -38,12 +39,35 @@ export function undeclaredTools(execution: unknown, sections: unknown): Undeclar
   const steps = isObj(s) && Array.isArray(s[STEP_TOOL_LIST]) ? (s[STEP_TOOL_LIST] as unknown[]) : [];
   const out: UndeclaredTool[] = [];
   steps.forEach((step, i) => {
-    if (!isObj(step) || step.tool === undefined || step.tool === null) return;
+    if (!isObj(step)) return;
+    // D-016: a step's conditional follow-ups name tools too; each must be one the template declares.
+    if (Array.isArray(step.followUps))
+      step.followUps.forEach((f, j) => {
+        if (!isObj(f) || !Array.isArray(f.tools)) return;
+        f.tools.forEach((t, k) => {
+          if (typeof t === 'string' && (t.trim() === '' || declared.has(t))) return;
+          out.push({ step: i, pointer: `/sections/${STEP_TOOL_SECTION}/${STEP_TOOL_LIST}/${i}/followUps/${j}/tools/${k}`, value: t });
+        });
+      });
+    if (step.tool === undefined || step.tool === null) return;
     const v = step.tool;
     if (typeof v === 'string' && (v.trim() === '' || declared.has(v))) return;
     out.push({ step: i, pointer: stepToolPointer(i), value: v });
   });
   return out;
+}
+
+/**
+ * D-016: the step-tool guide's warnings as task checks (S5). Warnings, not blocks: the purpose match reads the step's
+ * words, and a sensible step can be worded unusually. Undeclared tools stay blocking (undeclaredTools).
+ */
+export function stepToolChecks(execution: unknown, sections: unknown): TaskCheck[] {
+  const offered = declaredToolIds(execution);
+  if (!offered) return [];
+  const s = isObj(sections) ? sections[STEP_TOOL_SECTION] : undefined;
+  const steps = isObj(s) && Array.isArray(s[STEP_TOOL_LIST]) ? (s[STEP_TOOL_LIST] as unknown[]) : [];
+  if (!steps.length) return [];
+  return stepToolWarnings(steps, offered).map((w) => ({ id: `steps.tool.${w.code.toLowerCase()}.${w.step + 1}`, section: STEP_TOOL_SECTION, ok: false, severity: 'warning' as const, message: w.message }));
 }
 
 /** The author-facing message: which steps, which values, and the declared IDs to choose from. */

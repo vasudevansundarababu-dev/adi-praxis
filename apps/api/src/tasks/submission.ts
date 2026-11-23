@@ -1,4 +1,5 @@
-import { evaluatorMap, JOINT_TEMPLATE_SPEC, jointToolIds } from '../anvil/joint-template';
+import { evaluatorMap, JOINT_TEMPLATE_SPEC, jointTemplateSpec, jointToolIds } from '../anvil/joint-template';
+import { stepToolChecks } from '../anvil/tool-binding';
 import { rubricSubmitChecks } from './rubric/service';
 import { suggestionChecks } from './suggestions/service';
 import type { Prisma, TaskInstance } from '@prisma/client';
@@ -53,6 +54,8 @@ export async function evaluateTask(tx: Db | Tx, task: Pick<TaskInstance, 'id' | 
   }
   if (task.taskType === 'AUTHORING' && template.profileId) checks.push(...(await boundRuleChecks(tx, project.clientId, task, output)));
   if (task.taskType === 'AUTHORING' && project.template.anvilSpec) checks.push(...anvilSpecChecks(project.template.anvilSpec, output));
+  // D-016: each procedure step's tool fits its words; referral and findings are conditional; the procedure ends with recommend.
+  if (task.taskType === 'AUTHORING' && project.template.anvilSpec) checks.push(...stepToolChecks(jointTemplateSpec(project.template)?.execution, output.sections));
   // RUBRIC_RECOMMENDATIONS_ENABLED: every template criterion present (D8); S4 references from the project library (D6).
   if (task.taskType === 'AUTHORING' && opts.rubricChecks) checks.push(...(await rubricSubmitChecks(tx, { id: task.id, clientId: project.clientId, projectId: task.projectId, revision: task.revision, output: task.output, taskType: task.taskType, project: { template: project.template } })));
   // FIELD_SUGGESTIONS_ENABLED (owner decision 1): every section confirmed for its current content.

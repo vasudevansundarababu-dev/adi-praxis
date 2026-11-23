@@ -1,4 +1,4 @@
-import { agentGraphProjection, agentProjection, type TemplateProfile, WorkflowGraph } from '@praxis/shared';
+import { agentGraphProjection, agentProjection, followUpsOf, type TemplateProfile, WorkflowGraph } from '@praxis/shared';
 import type { ApprovedTaskRecord, Template } from '@prisma/client';
 import { jcs, jcsBytes, JcsError, jcsSha256, sha256Hex } from './jcs';
 import { caseSelectorOf } from '../tasks/task-service';
@@ -104,6 +104,15 @@ export function actorProjection(form: Record<string, unknown>, authored: Record<
   const sections: Record<string, unknown> = {};
   for (const s of (form.sections as { key: string; fields?: Field[] }[]) ?? []) {
     const v = publicFields(s.fields ?? [], source[s.key] ?? {});
+    // D-016: a procedure step's conditional follow-ups reach the agent with the step (only when a step has any, so
+    // packages without them keep their exact bytes).
+    if (s.key === 'S5' && Array.isArray(v.steps) && isObj(source.S5) && Array.isArray(source.S5.steps)) {
+      const raw = (source.S5.steps as unknown[]).filter(isObj);
+      v.steps = (v.steps as Record<string, unknown>[]).map((step, i) => {
+        const f = followUpsOf(raw[i]);
+        return f.length ? { ...step, followUps: f } : step;
+      });
+    }
     if (Object.keys(v).length) sections[s.key] = v;
   }
   const header = isObj(authored.header) ? authored.header : {};

@@ -1,4 +1,4 @@
-import type { TemplateProfileField } from '@praxis/shared';
+import { toolOptionLabel, type TemplateProfileField } from '@praxis/shared';
 import { z } from 'zod';
 import { vertexCompleter, type Completer } from '../../policy/rule-assistant';
 
@@ -134,7 +134,7 @@ project rules:
 ${ctx.rules.slice(0, 40).map((r) => `- ${strip(r.key)}: ${strip(r.title)}. ${strip(r.requirement).slice(0, 300)}`).join('\n') || '- none published'}
 the expert's text so far:
 ${ctx.authorText.slice(0, 40).map((t) => `- ${strip(t).slice(0, 600)}`).join('\n') || '- none yet'}
-${ctx.tools?.length ? `tools the agent can call (a step's tool must be exactly one of these IDs, or blank): ${ctx.tools.map(strip).join(', ')}\n` : ''}${ctx.again ? 'The expert asked for a different suggestion than before: vary the wording.\n' : ''}</context>
+${ctx.tools?.length ? `tools the agent can call (a step's tool must be exactly one of these IDs, or blank): ${ctx.tools.map(strip).join(', ')}\ntool guide (purpose — tool; pick a step's tool by what the step does; finding.write and specialist.refer only as a step's conditional follow-up, never its main tool; end with recommend): ${ctx.tools.map((t) => strip(toolOptionLabel(t))).join('; ')}\n` : ''}${ctx.again ? 'The expert asked for a different suggestion than before: vary the wording.\n' : ''}</context>
 <form>
 ${fields.map((f) => `key: ${f.key}; ${strip(describe(f.field))}`).join('\n')}
 </form>`;

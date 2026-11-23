@@ -1,4 +1,6 @@
-import { provenanceSummary } from '@praxis/shared';
+import { followUpsOf, provenanceSummary, stepToolWarnings, toolOptionLabel } from '@praxis/shared';
+import { jointTemplateSpec } from '../anvil/joint-template';
+import { declaredToolIds } from '../anvil/tool-binding';
 import { sectionsProfile, suggestionStateOf } from '../tasks/suggestions/service';
 import { CoverageDimensions, forgeSlotSelector, normEmail, smeTaskStatus, type ForgeDecisionRequest, type ForgeTaskSelector, type SelectorSlot, type ForgePerson, type ForgeTaskRow, type ReviewerDecisionRequest, type ReviewerTaskStatus } from '@praxis/shared';
 import type { Actor, CandidateActor } from '../auth/actor';
@@ -150,6 +152,26 @@ async function reviewHistory(tx: Db | Tx, t: StageTask) {
 const flaggedDuplicate = (t: StageTask) => ((t.checks as StoredChecks | null)?.similar ?? []).some((m) => m.flagged);
 
 /** The console task page: the authored form, statuses, people, every decision, and the decision box's inputs. */
+/**
+ * D-016: the procedure as the reviewer checks it: each S5 step with its tool's purpose and conditional follow-ups, and
+ * the tool guide's warnings (null when the template declares no tools or the task has no steps).
+ */
+export function procedureView(template: Parameters<typeof jointTemplateSpec>[0], output: unknown) {
+  const spec = jointTemplateSpec(template);
+  const offered = spec ? declaredToolIds(spec.execution) : null;
+  const o = output as { sections?: { S5?: { steps?: unknown } } } | null;
+  const steps = Array.isArray(o?.sections?.S5?.steps) ? (o!.sections!.S5!.steps as unknown[]) : [];
+  if (!offered || !steps.length) return null;
+  return {
+    steps: steps.map((raw) => {
+      const st = (raw && typeof raw === 'object' ? raw : {}) as { action?: unknown; tool?: unknown };
+      const tool = typeof st.tool === 'string' ? st.tool : '';
+      return { action: typeof st.action === 'string' ? st.action : '', tool, toolLabel: tool ? toolOptionLabel(tool) : null, followUps: followUpsOf(raw) };
+    }),
+    warnings: stepToolWarnings(steps, offered),
+  };
+}
+
 export async function forgeTaskView(tx: Db | Tx, actor: Actor, projectId: string, taskId: string) {
   const t = await consoleTask(tx, actor, projectId, taskId);
   const author = t.assignedTo?.smeUser ?? null;
@@ -175,6 +197,7 @@ export async function forgeTaskView(tx: Db | Tx, actor: Actor, projectId: string
     versions: t.submissions.map((v) => ({ version: v.version, submittedAt: v.submittedAt.toISOString() })),
     coverageTags: t.coverageTags,
     checks: checks?.results ?? [],
+    procedure: procedureView(t.project.template, shownOutput(t)),
     flags: t.flags ?? [],
     reviews: await reviewHistory(tx, t),
     date: lastChange(t, t.reviews.map((r) => r.createdAt)),

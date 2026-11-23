@@ -27,18 +27,23 @@ import { servedTutorial } from '../forge/tutorial-video/service';
 import { normaliseRubricOutput, rubricSubmitChecks } from '../tasks/rubric/service';
 import { jointTemplateSpec } from '../anvil/joint-template';
 import { declaredToolIds } from '../anvil/tool-binding';
+import { orderedTools, toolOptionLabel } from '@praxis/shared';
 
 const IdParams = z.object({ id: z.string().uuid() });
 
-/** The template's declared tools as dropdown choices (id, with its effect when stated), or null when it declares none. */
+/**
+ * The template's declared tools as dropdown choices, in the tool guide's order and labelled "<purpose> — <tool>"
+ * (D-016), or null when it declares none. A tool outside the guide keeps its ID (and effect when stated).
+ */
 function stepToolsOf(template: Parameters<typeof jointTemplateSpec>[0]): { id: string; label: string }[] | null {
   const spec = jointTemplateSpec(template);
   const ids = spec ? declaredToolIds(spec.execution) : null;
   if (!ids?.length) return null;
   const tools = (spec!.execution as { tools?: { id?: unknown; effect?: unknown }[] }).tools ?? [];
-  return ids.map((id) => {
+  return orderedTools(ids).map((id) => {
     const effect = tools.find((x) => x?.id === id)?.effect;
-    return { id, label: typeof effect === 'string' && effect ? `${id} (${effect})` : id };
+    const label = toolOptionLabel(id);
+    return { id, label: label !== id ? label : typeof effect === 'string' && effect ? `${id} (${effect})` : id };
   });
 }
 

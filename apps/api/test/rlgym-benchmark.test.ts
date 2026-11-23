@@ -553,6 +553,37 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     await expect(db.$executeRaw`DELETE FROM "RunReviewAssignment"`).rejects.toThrow();
   });
 
+  it('D-016: the SME drafts steps from business language (mock drafter); the reviewer sees the procedure with the tool guide’s warnings', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    const projectId = await project(v8);
+    const tasks = await db.taskInstance.findMany({ where: { projectId } });
+    const person = await source(projectId, 'SME', { email: 'sme-d016@gmail.test', first: 'Sam', last: 'Steps' });
+    expect((await assign(projectId, person.id, tasks[0]!.id)).statusCode).toBe(200);
+    const me = await signIn('sme-d016@gmail.test');
+    const [row] = await authored(projectId, { approve: false, smeUserId: me.smeUserId });
+    const res = await post(me.cookie, `/me/tasks/${row!.taskId}/steps/translate`, { text: 'Screen both joint applicants. If either has an unresolved match, record the finding and refer the case according to policy. Submit the final recommendation with the evidence.' });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json()).toMatchObject({ model: 'mock-step-translator-1', warnings: [], steps: [{ tool: 'screening.check', followUps: [{ if: 'either has an unresolved match', tools: ['finding.write', 'specialist.refer'] }] }, { tool: 'recommend' }] });
+    expect((await post(me.cookie, `/me/tasks/${row!.taskId}/steps/translate`, { text: 'short' })).statusCode).toBe(400);
+    const other = await signIn('not-the-author-d016@gmail.test');
+    expect((await post(other.cookie, `/me/tasks/${row!.taskId}/steps/translate`, { text: 'Screen both joint applicants please.' })).statusCode).toBe(404);
+    // Nothing was stored by drafting.
+    const before = (await db.taskInstance.findUniqueOrThrow({ where: { id: row!.taskId } })).output as Record<string, any>;
+    expect(JSON.stringify(before.sections.S5)).not.toContain('either has an unresolved match');
+
+    // The reviewer's view: purposes, follow-ups and the guide's warnings for the task's own steps.
+    const output = structuredClone(before);
+    output.sections.S5.steps = [{ action: 'Perform watch-list screening on both applicants', tool: 'specialist.refer' }, { action: 'Screen both joint applicants.', tool: 'screening.check', followUps: [{ if: 'either has an unresolved match', tools: ['finding.write', 'specialist.refer'] }] }];
+    await db.taskInstance.update({ where: { id: row!.taskId }, data: { output } });
+    const view = (await get(admin, `/projects/${projectId}/forge-tasks/${row!.taskId}`)).json();
+    expect(view.procedure.steps[1]).toEqual({ action: 'Screen both joint applicants.', tool: 'screening.check', toolLabel: 'Screen an applicant — screening.check', followUps: [{ if: 'either has an unresolved match', tools: ['finding.write', 'specialist.refer'] }] });
+    expect(view.procedure.warnings.map((w: { code: string }) => w.code)).toEqual(['TOOL_PURPOSE_MISMATCH', 'CONDITIONAL_TOOL_AS_MAIN', 'NO_FINAL_RECOMMEND']);
+    // The SME's own check shows them as warnings (never blocking).
+    const checks = (await post(me.cookie, `/me/tasks/${row!.taskId}/check`)).json().checks as { id: string; ok: boolean; severity?: string }[];
+    expect(checks.filter((c) => c.id.startsWith('steps.tool.')).every((c) => !c.ok && c.severity === 'warning')).toBe(true);
+    expect(checks.some((c) => c.id === 'steps.tool.tool_purpose_mismatch.1')).toBe(true);
+  });
+
   it('SME review batches: received idempotently; a person decides; decisions go to the RL Gym; task_correction reopens the task', async () => {
     const v8 = await publishedV8(CASE_REF_VERIFIERS);
     const projectId = await project(v8);

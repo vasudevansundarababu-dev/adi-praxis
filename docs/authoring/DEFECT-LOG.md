@@ -317,14 +317,15 @@ existing task or rule changed: every new field is optional, and packages without
 | Conditions as structured predicates over logical facts, plain language (clause-condition.v1, fact-catalog.v1); project fact catalog, versioned; checked on save | 270e7782 | done |
 | S4: approved clause list with "setup needed" (template's `policy_bindings`); SME sees it in S4 only when a clause has a condition | 270e7782, 99efc14e | done |
 | Export: clause_id, version, source sha256, condition, exceptions, approval, binding revision per cited clause | 270e7782 | done |
-| Validate → Studio coverage check (coverage-check.v1) via `StudioCoverageClient` | 270e7782, 99efc14e | interface and UI done; **not connected**: Studio's endpoint, request, auth not defined yet (asked) |
+| Validate → Studio coverage check (coverage-check.v1): `POST /api/v1/coverage-checks` with `seed_family` (`STUDIO_SEED_FAMILY`) | 270e7782, 99efc14e, 826e0826 | done; verified live: golden-kyc-openenv@8, 4 edge cases supported |
+| Export `policy_clauses` per task (approved-task-export.v1 shape, Studio ef06119) | 826e0826 | done; no live task carries any yet |
 | 3-day hold prompt to the PM (E-001 Q4) + Release task (drops focus, exports as a normal case) | 270e7782, 99efc14e | done |
 | Three-category suggestion contract (Recommended always/conditional, Needs review + question, Outside scope + quoted mismatch), server-side checks, binding gaps, manual fallback | 85c5a607 | done (mock and model) |
 | PM quality evaluation (private labels, discrepancy types, precision/recall-style counts with raw numbers, reproducibility metadata) | 85c5a607 | done |
 
 **Still open:**
-- **Coverage endpoint.** Studio's coverage-check endpoint, and a live edge-case-catalog.v1 read for "Focus on edge case",
-  are waiting on Studio.
+- **Live catalog read.** "Focus on edge case" reading Studio's live edge-case-catalog.v1. The endpoint exists, but it is
+  not wired, so the owner's re-authoring dropdown stays as it is.
 - **Condition editing.** A structured condition editor for the PM (today: "Use this condition" from a suggestion, or
   the API).
 - **Frozen project scope.** A versioned project scope text (today the project name and the fact catalog are used).

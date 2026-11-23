@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { NavBrand } from '@/components/brand';
 import { SignOutButton, ThemeToggle } from '@/components/shell-controls';
-import { getCurrentUser, newFlowOn } from '@/lib/api';
+import { apiGet, getCurrentUser, newFlowOn } from '@/lib/api';
+import { InboxBell, type InboxItem } from '@/components/inbox-bell';
 import { MainNav } from '@/components/main-nav';
 import { SupportBot } from '@/components/support/support-bot';
 import { navGroupsFor } from '@/lib/nav';
@@ -15,6 +16,8 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
   if (user.mustChangePassword) redirect('/change-password');
   // MVP1: with the new flow on, the menu is Home, Projects, Sourcing, Admin and Tutorials. Only PMs and Admins can read it.
   const newFlow = user.roles.some((r) => r === 'ADMIN' || r === 'PM') ? await newFlowOn() : false;
+  // D-004 (owner, 23 Nov 2026): the bell is for PM and Admin only.
+  const inbox = user.roles.some((r) => r === 'ADMIN' || r === 'PM') ? await apiGet<{ items: InboxItem[] }>('/me/inbox') : null;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -33,6 +36,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
             <span className="hidden text-white/70 sm:inline">
               {user.name} · {user.roles.map(roleLabel).join(', ')}
             </span>
+            {inbox && <InboxBell items={inbox.data?.items ?? []} unavailable={!inbox.data} />}
             <ThemeToggle />
             <Link href="/change-password" className="hidden text-white/80 hover:text-white hover:underline sm:inline">
               Change password

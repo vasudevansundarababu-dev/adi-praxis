@@ -1,12 +1,16 @@
 import Link from 'next/link';
 import { NavBrand } from './brand';
-import { getForgeSettings, getMeSafe } from '@/lib/api';
+import { api, getForgeSettings, getMeSafe } from '@/lib/api';
+import { InboxBell, type InboxItem } from './inbox-bell';
 import { smeSupplyEnabled } from '@/lib/features';
 import { SignOut } from './sign-out';
 
 /** Top navigation: mark + product name and the account menu. With the MVP1 flow on: only Home and Sign out. */
 export async function Header() {
   const [me, forge] = await Promise.all([getMeSafe(), getForgeSettings()]);
+  // D-004: the SME's bell (Rework to fix, run reviews assigned to them). Shown once signed in.
+  const inbox = me ? await api<{ items: InboxItem[] }>('/me/forge/inbox').catch(() => ({ status: 0, data: null })) : null;
+  const bell = me ? <InboxBell items={inbox?.data?.items ?? []} unavailable={!inbox?.data} /> : null;
   return (
     <header className="brand-header sticky top-0 z-20 bg-brand-navy text-white">
       {process.env.PRAXIS_DEMO === '1' && <DemoBanner />}
@@ -21,6 +25,7 @@ export async function Header() {
                 <Link href="/home" className="text-link hover:underline">
                   Home
                 </Link>
+                {bell}
                 <SignOut />
               </>
             ) : (
@@ -45,6 +50,7 @@ export async function Header() {
           <Link href="/tutorials" className="text-link hover:underline">
             Tutorials
           </Link>
+          {bell}
           {me ? <SignOut /> : <Link href="/sign-in" className="btn btn-primary !px-3 !py-1.5">Sign in</Link>}
         </nav>
         )}

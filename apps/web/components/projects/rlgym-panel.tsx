@@ -40,7 +40,22 @@ export interface ReviewBatch {
   receivedAt: string;
   note: unknown;
   items: { itemId: string; taskId: string; revision: number; episode: Record<string, unknown>; decision: { decision: string; rationale: string; criterionId: string | null; decidedBy: string; at: string } | null }[];
+  /** D-004: who reviews each task's episodes. Absent from older responses. */
+  tasks?: ReviewTask[];
 }
+export interface ReviewerOption {
+  smeUserId: string;
+  name: string;
+  role: 'author' | 'reviewer';
+}
+export interface ReviewTask {
+  taskId: string;
+  assignee: ReviewerOption | null;
+  eligible: ReviewerOption[];
+  /** A decision exists for this task, so its reviewer can no longer change. */
+  locked: boolean;
+}
+const ROLE_LABEL = { author: 'wrote the task', reviewer: 'SME Reviewer' } as const;
 
 const DECISION_LABEL: Record<string, string> = {
   agent_failure: 'Agent failure confirmed',
@@ -259,7 +274,50 @@ export function decideHint(connected: boolean, d: { decision: string; rationale:
 }
 export const canDecide = (connected: boolean, d: { decision: string; rationale: string; criterionId: string }) => connected && !!d.rationale.trim() && (!needsCriterion(d.decision) || !!d.criterionId.trim());
 
-export function BenchmarkReviewPanel({ projectId, batches, connected }: { projectId: string; batches: ReviewBatch[]; connected: boolean }) {
+/** D-004: per task of a batch, the SME who reviews its episodes (author or project SME Reviewer). PM and Admin choose. */
+export function ReviewerPicker({ projectId, batchRef, task, canAssign }: { projectId: string; batchRef: string; task: ReviewTask; canAssign: boolean }) {
+  const router = useRouter();
+  const [pick, setPick] = useState(task.assignee?.smeUserId ?? task.eligible[0]?.smeUserId ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const id = `reviewer-${batchRef}-${task.taskId}`;
+  const label = (o: ReviewerOption) => `${o.name} (${ROLE_LABEL[o.role]})`;
+  async function save() {
+    setError(null);
+    const res = await mutate('POST', `/projects/${projectId}/run-reviews/${batchRef}/assignments`, { taskId: task.taskId, smeUserId: pick });
+    if (!res.ok) return setError(res.error);
+    router.refresh();
+  }
+  return (
+    <li className="flex flex-wrap items-center gap-2 text-sm">
+      <span>
+        Task <span className="font-mono">{task.taskId.slice(0, 8)}</span>:
+      </span>
+      {task.assignee ? <span>reviewed by {label(task.assignee)}</span> : <span className="text-warning">no reviewer yet</span>}
+      {canAssign && !task.locked && task.eligible.length > 0 && (
+        <>
+          <label htmlFor={id} className="sr-only">
+            Reviewer for task {task.taskId.slice(0, 8)}
+          </label>
+          <select id={id} className="input" value={pick} onChange={(e) => setPick(e.target.value)}>
+            {task.eligible.map((o) => (
+              <option key={o.smeUserId} value={o.smeUserId}>
+                {label(o)}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="btn btn-secondary" disabled={!pick || pick === task.assignee?.smeUserId} onClick={save}>
+            {task.assignee ? 'Change reviewer' : 'Assign reviewer'}
+          </button>
+        </>
+      )}
+      {canAssign && !task.locked && task.eligible.length === 0 && <span className="text-fg-muted">No SME can review it: the task has no author and the project has no SME Reviewers.</span>}
+      {task.locked && <span className="text-fg-muted">· decided, so the reviewer is fixed</span>}
+      <Err text={error} />
+    </li>
+  );
+}
+
+export function BenchmarkReviewPanel({ projectId, batches, connected, canDecide: staffCanDecide = true }: { projectId: string; batches: ReviewBatch[]; connected: boolean; canDecide?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, { decision: string; rationale: string; criterionId: string }>>({});
@@ -276,7 +334,7 @@ export function BenchmarkReviewPanel({ projectId, batches, connected }: { projec
       <h2 id="benchmark-review" className="text-lg font-semibold">
         Benchmark review
       </h2>
-      <p className="text-sm text-fg-muted">Episodes RL Gym sent back for review. Decide each one with a rationale. “Task needs correction” sends the task back to Rework; the corrected revision goes in the next Re-export.</p>
+      <p className="text-sm text-fg-muted">Episodes RL Gym sent back for review. Assign each task to the SME who wrote it or to an SME Reviewer on the project; they decide in the SME app. A PM or Admin can also decide here, each with a rationale. “Task needs correction” sends the task back to Rework; the corrected revision goes in the next Re-export.</p>
       {!connected && <p className="mt-2 text-sm">RL Gym isn’t connected yet, so decisions cannot be sent.</p>}
       <Err text={error} />
       {batches.length === 0 && <p className="mt-2 text-sm text-fg-muted">No review batches yet.</p>}
@@ -286,6 +344,13 @@ export function BenchmarkReviewPanel({ projectId, batches, connected }: { projec
             Batch <span className="font-mono">{b.batchId}</span>
             {b.runId && <> · run {b.runId}</>} · received {new Date(b.receivedAt).toLocaleString()}
           </h3>
+          {b.tasks && b.tasks.length > 0 && (
+            <ul className="mt-1 space-y-1" aria-label={`Reviewers for batch ${b.batchId}`}>
+              {b.tasks.map((t) => (
+                <ReviewerPicker key={t.taskId} projectId={projectId} batchRef={b.ref} task={t} canAssign={staffCanDecide} />
+              ))}
+            </ul>
+          )}
           <ul className="mt-1 space-y-2 text-sm">
             {b.items.map((i) => {
               const e = i.episode;
@@ -302,6 +367,8 @@ export function BenchmarkReviewPanel({ projectId, batches, connected }: { projec
                     <p className="mt-1">
                       Decided: {DECISION_LABEL[i.decision.decision] ?? i.decision.decision} by {i.decision.decidedBy} · {i.decision.rationale}
                     </p>
+                  ) : !staffCanDecide ? (
+                    <p className="mt-1 text-fg-muted">Not decided yet. A PM, an Admin or the assigned SME decides.</p>
                   ) : (
                     <div className="mt-2 flex flex-wrap items-end gap-2">
                       <label className="flex flex-col">

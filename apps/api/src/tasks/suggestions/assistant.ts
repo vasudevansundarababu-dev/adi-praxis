@@ -23,6 +23,11 @@ export interface SuggestContext {
   authorText: string[];
   /** A different suggestion than last time was asked for. */
   again: boolean;
+  /**
+   * The tool IDs the template's execution part declares (APR-13d), or absent when it declares none. A procedure step's
+   * tool must be exactly one of these or blank, so the model is told the list instead of inventing names.
+   */
+  tools?: string[];
 }
 export interface FieldSuggester {
   readonly modelVersion: string;
@@ -129,7 +134,7 @@ project rules:
 ${ctx.rules.slice(0, 40).map((r) => `- ${strip(r.key)}: ${strip(r.title)}. ${strip(r.requirement).slice(0, 300)}`).join('\n') || '- none published'}
 the expert's text so far:
 ${ctx.authorText.slice(0, 40).map((t) => `- ${strip(t).slice(0, 600)}`).join('\n') || '- none yet'}
-${ctx.again ? 'The expert asked for a different suggestion than before: vary the wording.\n' : ''}</context>
+${ctx.tools?.length ? `tools the agent can call (a step's tool must be exactly one of these IDs, or blank): ${ctx.tools.map(strip).join(', ')}\n` : ''}${ctx.again ? 'The expert asked for a different suggestion than before: vary the wording.\n' : ''}</context>
 <form>
 ${fields.map((f) => `key: ${f.key}; ${strip(describe(f.field))}`).join('\n')}
 </form>`;

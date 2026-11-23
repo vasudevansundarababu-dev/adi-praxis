@@ -15,13 +15,15 @@ import {
 } from '@praxis/shared';
 import type { TaskInstance, Template } from '@prisma/client';
 import type { Db, Tx } from '../../db';
+import { jointTemplateSpec } from '../../anvil/joint-template';
+import { declaredToolIds, STEP_TOOL_LIST, STEP_TOOL_SECTION } from '../../anvil/tool-binding';
 import { AppError } from '../../lib/errors';
 import { authoringPolicyView, effectivePolicy } from '../../policy/task-policy';
 import { profileFor } from '../profile-output';
 import { scanForRealData } from '../synthetic-scan';
 import { FieldSuggesterTimeoutError, FieldSuggesterUnavailableError, sanitizeValue, type FieldSuggester, type SuggestContext } from './assistant';
 
-type TaskLike = Pick<TaskInstance, 'id' | 'clientId' | 'projectId' | 'drafting' | 'output' | 'input' | 'taskType'> & { project: { template: Pick<Template, 'workflowName' | 'profileId'> } };
+type TaskLike = Pick<TaskInstance, 'id' | 'clientId' | 'projectId' | 'drafting' | 'output' | 'input' | 'taskType'> & { project: { template: Pick<Template, 'workflowName' | 'profileId'> & Partial<Pick<Template, 'lineageId' | 'version' | 'anvilSpec'>> } };
 
 export const suggestionStateOf = (t: Pick<TaskInstance, 'drafting'>): SuggestionState => {
   const s = (t.drafting as { suggestions?: Partial<SuggestionState> } | null)?.suggestions;
@@ -35,6 +37,29 @@ export function sectionsProfile(t: Pick<TaskLike, 'project' | 'taskType'>): Temp
   if (t.taskType !== 'AUTHORING') return null;
   const p = profileFor({ workflowName: t.project.template.workflowName, profileId: t.project.template.profileId });
   return p && p.storage === 'sections' ? p : null;
+}
+
+/** The template's declared tool IDs (execution.tools), or null when it declares none or is not a joint template. */
+function templateTools(t: TaskLike): string[] | null {
+  const tpl = t.project.template;
+  if (tpl.anvilSpec === undefined || tpl.lineageId === undefined || tpl.version === undefined) return null;
+  const spec = jointTemplateSpec(tpl as Pick<Template, 'lineageId' | 'version' | 'anvilSpec'>);
+  return spec ? declaredToolIds(spec.execution) : null;
+}
+
+/**
+ * APR-13d: a suggested procedure step whose tool is not one of the template's tool IDs gets a blank tool (the field is
+ * optional), so a suggestion can never put a task into the state the approval check refuses (GENERIC_TOOL_UNDECLARED).
+ */
+export function keepDeclaredStepTools(section: string, key: string, value: unknown, tools: string[] | null): unknown {
+  if (!tools || section !== STEP_TOOL_SECTION || key !== STEP_TOOL_LIST || !Array.isArray(value)) return value;
+  const ok = new Set(tools);
+  return value.map((step) => {
+    if (!step || typeof step !== 'object' || Array.isArray(step)) return step;
+    const tool = (step as { tool?: unknown }).tool;
+    if (tool === undefined || tool === null || (typeof tool === 'string' && (tool.trim() === '' || ok.has(tool)))) return step;
+    return { ...(step as object), tool: '' };
+  });
 }
 
 const slotOf = (t: Pick<TaskInstance, 'input'>) => (t.input as { slot?: { brief?: string; case?: { source?: string; label?: string; value?: string } } } | null)?.slot ?? null;
@@ -76,7 +101,8 @@ export async function generateSuggestions(db: Db | Tx, t: TaskLike, args: { sect
       .filter(([, , v]) => typeof v === 'string' && v.trim())
       .map(([s2, f, v]) => `${s2.key} › ${f.label}: ${String(v)}`),
   );
-  const ctx: SuggestContext = { workflow: t.project.template.workflowName, section: { key: section.key, title: section.title, help: section.help }, slot: { brief: slot?.brief ?? null, caseLabel: slot?.case?.label ?? slot?.case?.value ?? null }, rules, authorText, again: !!args.again };
+  const tools = templateTools(t);
+  const ctx: SuggestContext = { workflow: t.project.template.workflowName, section: { key: section.key, title: section.title, help: section.help }, slot: { brief: slot?.brief ?? null, caseLabel: slot?.case?.label ?? slot?.case?.value ?? null }, rules, authorText, again: !!args.again, ...(tools?.length ? { tools } : {}) };
   let raw: { key: string; value?: unknown }[] = [];
   if (fields.length) {
     try {
@@ -90,7 +116,7 @@ export async function generateSuggestions(db: Db | Tx, t: TaskLike, args: { sect
   const secret = privateAnswers(profile, output);
   const items: FieldSuggestion[] = [];
   for (const { key, field } of fields) {
-    const value = sanitizeValue(field, raw.find((r) => r.key === key)?.value);
+    const value = keepDeclaredStepTools(section.key, key, sanitizeValue(field, raw.find((r) => r.key === key)?.value), tools);
     if (value === undefined) continue;
     if (scanForRealData({ [key]: value }).length) continue;
     if ((field.visibility ?? 'author_and_agent') === 'author_and_agent') {

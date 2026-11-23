@@ -133,9 +133,11 @@ describe('help bot: authoring v2.1 knowledge for authors, reviewers and approver
     expect(by('q4-global-paid-search-query-clustering')).toContain('q01_intent');
     expect(by('q4-global-paid-search-query-clustering')).toContain('at most 20');
     expect(by('customer-risk-rating')).toContain('"Senior compliance approver decides" (Senior compliance approver)');
-    expect(by('customer-risk-rating')).toMatch(/Factor rating \(required\) \[private\]? ?— values: low, medium, high|Factor rating \(required\) — values: low, medium, high/);
+    // D-027: choices by plain label (never codes).
+    expect(by('customer-risk-rating')).toContain('Factor rating (required) — choices: low; medium; high');
     expect(by('adverse-media-review')).toContain('Compliance reviewer decides');
-    expect(by('enhanced-due-diligence')).toContain('risk_rating = low / medium / high / very_high');
+    expect(by('enhanced-due-diligence')).toContain('Risk rating = low / medium / high / very high');
+    expect(by('enhanced-due-diligence')).not.toContain('very_high');
     expect(by('fraud-risk-and-compliance-handoffs')).toContain('authorised_push_payment_scam');
     expect(by('fraud-risk-and-compliance-handoffs')).not.toContain('Business hand-off');
     expect(by('compliance-monitoring')).toContain('Give each exception its own severity');

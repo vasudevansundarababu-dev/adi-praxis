@@ -55,6 +55,49 @@ export interface ForgeTaskView {
   checklistRequired: boolean;
   flaggedDuplicate: boolean;
   confirmCoverage: boolean;
+  /** D-016: the procedure with each step's tool purpose, conditional follow-ups and the tool guide's warnings. */
+  procedure?: ProcedureView | null;
+}
+export interface ProcedureView {
+  steps: { action: string; tool: string; toolLabel: string | null; followUps: { if?: string; tools: string[] }[] }[];
+  warnings: { step: number; code: string; message: string; suggest?: string }[];
+}
+
+/** D-016: the reviewer's view of the procedure and the tool guide's warnings (they inform the decision; they do not block it). */
+export function ProcedureCard({ procedure }: { procedure: ProcedureView }) {
+  return (
+    <section aria-labelledby="procedure-h" className="card mb-4 p-5 text-sm" data-procedure>
+      <h2 id="procedure-h" className="font-semibold">
+        Procedure and tool guide
+      </h2>
+      <p className="text-xs text-fg-muted">Each step’s tool by its purpose, and what the agent does only when a check finds a problem. Warnings are for your review; they do not block a decision.</p>
+      <ol className="mt-3 space-y-2">
+        {procedure.steps.map((s, i) => (
+          <li key={i}>
+            <span className="font-medium">
+              {i + 1}. {s.action || '(no action written)'}
+            </span>
+            <span className="block text-xs text-fg-muted">Tool: {s.toolLabel ?? 'none'}</span>
+            {s.followUps.map((f, j) => (
+              <span key={j} className="block text-xs text-fg-muted">
+                {f.if ? `If ${f.if}: ` : 'Then: '}
+                {f.tools.join(' → ')}
+              </span>
+            ))}
+          </li>
+        ))}
+      </ol>
+      {procedure.warnings.length > 0 ? (
+        <ul className="mt-3 space-y-1 rounded-md border border-warning/60 bg-warning/10 p-2 text-xs" aria-label="Tool guide warnings">
+          {procedure.warnings.map((w, i) => (
+            <li key={i}>{w.message}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-xs text-success">Every step’s tool fits its words, referral and findings are conditional, and the procedure ends with the recommendation.</p>
+      )}
+    </section>
+  );
 }
 
 const REVIEWABLE = ['ASSIGNED', 'IN_PROGRESS', 'SUBMITTED', 'REWORK'];
@@ -711,6 +754,7 @@ export function ForgeTaskPage({ code, view, people, exportState, rubric = null }
         </section>
       )}
 
+      {view.procedure && <ProcedureCard procedure={view.procedure} />}
       {view.canDecide && <DecisionBox projectId={projectId} view={view} />}
       {!view.canDecide && view.waitingFor === 'REVIEWER' && (
         <p className="card mb-4 p-5 text-sm" data-waiting>

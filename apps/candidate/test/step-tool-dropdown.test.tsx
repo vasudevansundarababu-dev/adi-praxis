@@ -71,4 +71,25 @@ describe('S5 step Tool dropdown', () => {
   it('stays a text box when the template declares no tools', () => {
     expect(toolControl(render(withSteps([{ action: 'x', tool: 'anything' }]), null), 0).startsWith('<input')).toBe(true);
   });
+
+  it('D-016: purpose-labelled options, conditional follow-ups, the guide’s warnings with a fix, and the translator', () => {
+    const tools = [
+      { id: 'screening.check', label: 'Screen an applicant — screening.check' },
+      { id: 'finding.write', label: 'Record a discrepancy found during a check — finding.write' },
+      { id: 'specialist.refer', label: 'Route an unresolved issue to a specialist when policy requires it — specialist.refer' },
+      { id: 'recommend', label: 'Submit the final onboarding recommendation — recommend' },
+    ];
+    const html = render(withSteps([{ action: 'Perform watch-list screening on both applicants', tool: 'specialist.refer' }, { action: 'Screen both joint applicants.', tool: 'screening.check', followUps: [{ if: 'either has an unresolved match', tools: ['finding.write', 'specialist.refer'] }] }]), tools);
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    expect(toolControl(html, 0)).toContain('Screen an applicant — screening.check');
+    expect(text).toContain('Conditional follow-ups');
+    expect(html).toContain('value="either has an unresolved match"');
+    expect(text).toContain('but its tool is specialist.refer');
+    expect(text).toContain('Use screening.check');
+    expect(text).toContain('uses specialist.refer as its main tool with no condition');
+    expect(text).toContain('does not end with the final recommendation');
+    expect(text).toContain('Write the procedure in your own words');
+    expect(a11yProblems(html)).toEqual([]);
+  });
 });
+

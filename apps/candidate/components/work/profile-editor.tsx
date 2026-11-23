@@ -29,6 +29,8 @@ import {
   AUTHORSHIP_DECLARATION,
   type FieldSuggestion,
   type SuggestionState,
+  type ProcedureStep,
+  type StepFollowUp,
 } from '@praxis/shared';
 import { FieldSuggestionBox, ProvenanceCounts, SectionConfirm, UseAllSuggestions, useSuggestions } from './field-suggestions';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
@@ -38,6 +40,7 @@ import type { TaskView } from '@/lib/work-types';
 import { SubmitPanel } from './submit-panel';
 import { SaveIndicator } from './task-page';
 import { useAutosave } from './use-autosave';
+import { FollowUpsText, ProcedureTranslator, procedureWarnings, StepFollowUps, StepWarnings } from './step-guide';
 import { SaveBar } from './save-bar';
 import { PolicyPicker, type LibraryView } from './policy-picker';
 import { RuleCitationPicker } from './rule-citation-picker';
@@ -49,6 +52,8 @@ const FormV2 = createContext(false);
 /** APR-13d: the template's declared tools; a procedure step's Tool (S5.steps[].tool) is a dropdown of these. */
 const StepTools = createContext<{ id: string; label: string }[] | null>(null);
 const STEP_TOOL_PATH = /^S5\.steps\[\d+\]\.tool$/;
+/** D-016: the task being edited, for the procedure translator. */
+const EditorTaskId = createContext<string | null>(null);
 export const NOT_A_TEMPLATE_TOOL = 'not one of this template’s tools: choose another';
 
 /** The step Tool field as a pick list of the template's tools; a value already saved that is not one of them stays visible, marked. */
@@ -250,6 +255,20 @@ function ArrayControl({ field, value, path, problems, lookup, onChange }: FieldP
   const subs = itemFieldsOf(field);
   const mine = problems.filter((p) => p.path === path);
   const required = evaluateRequired(field.required, lookup).required;
+  // D-016: the procedure (S5 steps) gets the tool guide: conditional follow-ups, warnings and the translator.
+  const stepTools = useContext(StepTools);
+  const taskId = useContext(EditorTaskId);
+  const isSteps = path === 'S5.steps' && !!stepTools?.length;
+  const warnings = isSteps ? procedureWarnings(items, stepTools) : [];
+  const offered = new Set((stepTools ?? []).map((t) => t.id));
+  const setItem = (i: number, patch: Record<string, unknown>) => onChange(items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const withChain = (item: Record<string, unknown>, tool: unknown): Record<string, unknown> => {
+    // documents.list → document.read is one step: picking documents.list adds the read as its continuation.
+    if (!isSteps || tool !== 'documents.list' || !offered.has('document.read')) return item;
+    const fus = Array.isArray(item.followUps) ? (item.followUps as StepFollowUp[]) : [];
+    return fus.some((f) => !f.if && f.tools?.includes('document.read')) ? item : { ...item, followUps: [...fus, { tools: ['document.read'] }] };
+  };
+  const fromProposal = (st: ProcedureStep) => ({ ...newItem(field, items), action: st.action, tool: st.tool ?? '', ...(st.failureBehaviour ? { failureBehaviour: st.failureBehaviour } : {}), ...(st.followUps?.length ? { followUps: st.followUps } : {}) });
   return (
     <fieldset className="min-w-0 rounded-md border border-line p-3" aria-describedby={`${id}-help`}>
       <legend className="px-1 text-sm font-medium">
@@ -266,6 +285,7 @@ function ArrayControl({ field, value, path, problems, lookup, onChange }: FieldP
         </details>
       )}
       <Messages id={`${id}-problems`} problems={mine} />
+      {isSteps && taskId && <ProcedureTranslator taskId={taskId} hasSteps={items.length > 0} onApply={(steps, mode) => onChange([...(mode === 'append' ? items : []), ...steps.map(fromProposal)])} />}
       {items.length === 0 && <p className="mt-2 text-sm text-fg-muted">No {noun}s yet. Use “Add {noun}” to create one; it opens its fields here.</p>}
       <ol className="mt-2 space-y-3">
         {items.map((item, i) => {
@@ -285,14 +305,25 @@ function ArrayControl({ field, value, path, problems, lookup, onChange }: FieldP
               <div className="mt-2 grid gap-3 sm:grid-cols-2">
                 {subs.map((sub) => (
                   <div key={sub.key} className={sub.type === 'long_text' || isArrayType(sub.type) || sub.type === 'multi_select' ? 'sm:col-span-2' : ''}>
-                    <FieldControl field={sub} value={item[sub.key]} path={`${itemPath}.${sub.key}`} problems={problems} lookup={sibling} onChange={(v) => onChange(items.map((x, j) => (j === i ? { ...x, [sub.key]: v } : x)))} />
+                    <FieldControl field={sub} value={item[sub.key]} path={`${itemPath}.${sub.key}`} problems={problems} lookup={sibling} onChange={(v) => onChange(items.map((x, j) => (j === i ? (sub.key === 'tool' ? withChain({ ...x, tool: v }, v) : { ...x, [sub.key]: v }) : x)))} />
                   </div>
                 ))}
+                {isSteps && (
+                  <>
+                    {taskId ? <StepFollowUps step={item} index={i} tools={stepTools!} onChange={(fus) => setItem(i, { followUps: fus })} /> : <FollowUpsText step={item} />}
+                    <StepWarnings warnings={warnings.filter((w) => w.step === i && w.code !== 'NO_FINAL_RECOMMEND')} onUseTool={(t) => onChange(items.map((x, j) => (j === i ? withChain({ ...x, tool: t }, t) : x)))} />
+                  </>
+                )}
               </div>
             </li>
           );
         })}
       </ol>
+      {warnings.filter((w) => w.code === 'NO_FINAL_RECOMMEND').map((w, k) => (
+        <p key={k} className="mt-2 rounded-md border border-warning/60 bg-warning/10 p-2 text-xs">
+          {w.message}
+        </p>
+      ))}
       <button type="button" className={`${button} mt-3`} onClick={() => onChange([...items, newItem(field, items)])}>
         Add {noun}
       </button>
@@ -410,6 +441,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
 
   return (
     <FormV2.Provider value={v2}>
+    <EditorTaskId.Provider value={task.readOnly ? null : task.id}>
     <StepTools.Provider value={task.template.stepTools ?? null}>
     <div className="max-w-4xl min-w-0 space-y-4">
       {openLink && <SourcePanel link={openLink} onClose={() => setOpenLink(null)} onOpenInForm={openInForm} />}
@@ -612,6 +644,7 @@ export function ProfileEditor({ task, profile, onSubmitted, initialSection, init
 
     </div>
     </StepTools.Provider>
+    </EditorTaskId.Provider>
     </FormV2.Provider>
   );
 }

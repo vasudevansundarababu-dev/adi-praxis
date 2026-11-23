@@ -21,6 +21,8 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
   2. The SME (candidate) app has a bell for what the SME must act on: **Rework** to fix, and **SME review** of RL Gym runs
      they have been asked to validate.
   3. An RL Gym run's output is verified by **PM/Admin, or by the SME alone**. **PM/Admin assigns the SME** to a review.
+  4. (Added the same day.) Only **the SME who authored the task**, or **an SME with the Reviewer role on the project**,
+     may review that task's run results.
 - **Planned fix (F-004), to roll out around 1 PM CST on 23 Nov 2026:**
   - **F-004a Staff bell (PM, Admin).**
     - A bell in the console header with a count. It opens a short list in which each item links to where the work is
@@ -35,17 +37,19 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
     - Each item links to the task, or to the new run-review page.
     - API: `GET /me/forge/inbox` (candidate).
   - **F-004c Run review assignment and SME decision.**
-    - On Project → Benchmark → Benchmark review, a PM or Admin picks one SME of the project for a batch. The pick can be
-      changed until the first decision is sent. It is stored in a new append-only assignment table (additive migration)
-      and audited.
-    - The assigned SME sees the batch in the SME app, with the same episode view and decision choices as staff, and
+    - Assignment is **per task within a batch**, because one batch can cover tasks by different authors. Batch smr-0051
+      has 2 tasks.
+    - On Project → Benchmark → Benchmark review, a PM or Admin picks the SME for each task. Only these SMEs can be
+      picked: **the task's author**, or **an SME who is a Reviewer on the project**. The default pick is the author.
+    - The pick can be changed until that task's first decision is sent. It is stored in a new append-only assignment
+      table (additive migration) and audited.
+    - The assigned SME sees those episodes in the SME app, with the same episode view and decision choices as staff, and
       decides. Each decision is final and goes to the RL Gym with `decided_by` set to the SME, exactly as today.
-    - PM or Admin can still decide any batch themselves.
+    - PM or Admin can still decide any task's episodes themselves. The server refuses a decision from anyone else.
     - AI hints (`suspected_cause`) stay hints only, and a person decides.
 - **Defaults chosen (log; change on request):**
-  - Assignment is per batch, one SME at a time. The default choice is the SME who wrote the batch's tasks, when there
-    is exactly one.
   - Bell counts are open items, not unread items.
-- **Open question for the owner:** the Reviewer role can decide run reviews today. Does it keep that, or is it now only
-  PM/Admin and the assigned SME?
+  - The staff **Reviewer** role (a console user, not an SME) loses the right to decide run reviews. Today
+    `STAFF_REVIEW` allows Admin, PM and Reviewer. The owner named only PM/Admin, the author SME and the SME Reviewer, so
+    it becomes Admin and PM only. Staff Reviewers can still read the batches.
 - **Status:** planned, waiting for "go". Nothing changed for D-004 yet.

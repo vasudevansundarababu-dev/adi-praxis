@@ -134,7 +134,7 @@ export const projectExportRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymCl
         const held = await heldTasks(db, actor.clientId, p.id);
         const built = await db.$transaction((tx) => buildRlGymExport(tx, { id: p.id, name: p.name, template: p.template }, s.records, s.ref!, { exported: s.runs.some((r) => r.outcome === 'received'), corrections, held }));
         if (!built.tasks.length) throw new AppError(422, 'NOTHING_TO_EXPORT', 'None of the approved tasks can be sent.', { notSent: built.notSent });
-        const result = await rlgym.exportProject(p.id, built.body, built.exportSha256);
+        const result = await rlgym.exportProject(built.body.project_id as string, built.body, built.exportSha256);
         return { kind: 'sent', projectId: p.id, built, result };
       },
       async ({ tx, actor, audit }, prep) => {

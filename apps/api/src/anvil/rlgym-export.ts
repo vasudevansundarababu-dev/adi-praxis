@@ -49,6 +49,23 @@ export function caseSelectorOf(record: ApprovedTaskRecord): Record<string, unkno
   return out;
 }
 
+/**
+ * The RL Gym's ID for an ADI Forge project. The RL Gym accepts only `prj_[a-z0-9]{4,40}` (a database check in its
+ * `projects` table), and ADI Forge's IDs are UUIDs, so the export sends `prj_` + the UUID's 32 hex digits. It converts
+ * back exactly (`forgeProjectId`), so the RL Gym's calls into ADI Forge can name the project as it was exported.
+ */
+export const rlgymProjectId = (uuid: string) => `prj_${uuid.toLowerCase().replace(/-/g, '')}`;
+
+/** The ADI Forge project UUID for an RL Gym project ID (`prj_<32 hex>`) or a UUID; null for anything else. */
+export function forgeProjectId(id: string): string | null {
+  const s = id.toLowerCase();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s)) return s;
+  const m = /^prj_([0-9a-f]{32})$/.exec(s);
+  if (!m) return null;
+  const h = m[1]!;
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 export interface BuiltExport {
   body: Record<string, unknown>;
   exportSha256: string;
@@ -109,8 +126,9 @@ export async function buildRlGymExport(
   const reason = opts.exported ? `re-export of ${p.name}` : `first export of ${p.name}`;
   // The ID covers everything the body carries, so one export ID never stands for two different bodies (the RL Gym
   // refuses that as an idempotency conflict).
-  const exportId = `exp-${jcsSha256({ project: p.id, name: p.name, template, project_config, reason, tasks: wire }).slice(0, 16)}`;
-  const body: Record<string, unknown> = { schema: RLGYM_EXPORT_SCHEMA, project_id: p.id, project_name: p.name, template, project_config, export_id: exportId, reason, tasks: wire };
+  const projectId = rlgymProjectId(p.id);
+  const exportId = `exp-${jcsSha256({ project: projectId, name: p.name, template, project_config, reason, tasks: wire }).slice(0, 16)}`;
+  const body: Record<string, unknown> = { schema: RLGYM_EXPORT_SCHEMA, project_id: projectId, project_name: p.name, template, project_config, export_id: exportId, reason, tasks: wire };
   const exportSha256 = jcsSha256(body);
   body.export_sha256 = exportSha256;
   return { body, exportSha256, exportId, reason, tasks, notSent };

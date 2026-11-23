@@ -17,6 +17,7 @@ import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { call, forgeKit } from './forge-helpers';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 import { fakeRlGym, qualifyForRlGym, RLGYM_CONFIG } from './rlgym-helpers';
+import { rlgymProjectId } from '../src/anvil/rlgym-export';
 
 /**
  * New RL Gym part 3 (docs/design/FORGE-RLGYM-V2-DESIGN.md; AUTHORING-SNAPSHOT §3.1 b, §3.2 b): the RL Gym sends an SME
@@ -143,7 +144,8 @@ describe('benchmark review', () => {
       schema: 'rlgym.sme-review-package.v1',
       batch_id: 'smr-0001',
       run_id: 'run-0001',
-      project_id: pid,
+      // The RL Gym names the project as it was exported (prj_<hex>).
+      project_id: rlgymProjectId(pid),
       template: { id: REF.id, version: REF.version, spec_sha256: REF.spec },
       scoring_pass: { pass: 1, reason: 'first scoring' },
       rubric: [
@@ -177,7 +179,7 @@ describe('benchmark review', () => {
       ...over,
     };
   }
-  const sendBatch = (body: object, key = anvilKey) => app.inject({ method: 'POST', url: `/api/v1/projects/${pid}/run-reviews`, headers: { authorization: `Bearer ${key}`, 'idempotency-key': randomUUID() }, payload: body });
+  const sendBatch = (body: object, key = anvilKey, path = rlgymProjectId(pid)) => app.inject({ method: 'POST', url: `/api/v1/projects/${path}/run-reviews`, headers: { authorization: `Bearer ${key}`, 'idempotency-key': randomUUID() }, payload: body });
   const decide = (cookie: string, reviewId: string, body: object) => app.inject({ method: 'POST', url: `/api/v1/projects/${pid}/benchmark-reviews/${reviewId}/decisions`, headers: { cookie, ...idem() }, payload: body });
   const send = (cookie: string, reviewId: string, decisionId: string) => app.inject({ method: 'POST', url: `/api/v1/projects/${pid}/benchmark-reviews/${reviewId}/decisions/${decisionId}/send`, headers: { cookie, ...idem() }, payload: {} });
 
@@ -200,8 +202,14 @@ describe('benchmark review', () => {
     expect((await sendBatch(batch([a, b]))).json()).toEqual({ forge_batch_ref: ref });
     expect((await sendBatch(batch([a, b], { note: 'changed' }))).statusCode).toBe(409);
     expect(await db.rlGymReviewBatch.count()).toBe(1);
+    // The plain ADI Forge UUID works in the path too; an unknown or malformed ID is not found.
+    expect((await sendBatch(batch([a, b]), anvilKey, pid)).json()).toEqual({ forge_batch_ref: ref });
+    expect((await sendBatch({ ...batch([a]), batch_id: 'smr-u', project_id: pid }, anvilKey, pid)).statusCode).toBe(202);
+    expect((await sendBatch({ ...batch([a]), batch_id: 'smr-x' }, anvilKey, `prj_${'0'.repeat(32)}`)).statusCode).toBe(422);
+    expect((await sendBatch({ ...batch([a]), batch_id: 'smr-y', project_id: `prj_${'0'.repeat(32)}` }, anvilKey, `prj_${'0'.repeat(32)}`)).statusCode).toBe(404);
+    expect((await sendBatch({ ...batch([a]), batch_id: 'smr-z' }, anvilKey, 'prj_unknown')).statusCode).toBe(404);
     // Refused: another project in the path, a malformed batch, a PM instead of the RL Gym key.
-    expect((await sendBatch({ ...batch([a]), project_id: randomUUID() })).statusCode).toBe(422);
+    expect((await sendBatch({ ...batch([a]), project_id: rlgymProjectId(randomUUID()) })).statusCode).toBe(422);
     expect((await sendBatch({ ...batch([a]), schema: 'other' })).statusCode).toBe(422);
     expect((await sendBatch({ ...batch([a]), synthetic: false })).statusCode).toBe(422);
     expect((await app.inject({ method: 'POST', url: `/api/v1/projects/${pid}/run-reviews`, headers: { cookie: pm, ...idem() }, payload: batch([a]) })).statusCode).toBe(403);

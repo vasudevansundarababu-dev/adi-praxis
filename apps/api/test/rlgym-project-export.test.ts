@@ -17,6 +17,7 @@ import { HashingEmbeddingProvider } from '../src/tasks/embeddings';
 import { call, forgeKit } from './forge-helpers';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 import { fakeRlGym, qualifyForRlGym, RLGYM_CONFIG } from './rlgym-helpers';
+import { forgeProjectId, rlgymProjectId } from '../src/anvil/rlgym-export';
 
 /**
  * New RL Gym part 2 (docs/design/FORGE-RLGYM-V2-DESIGN.md; AUTHORING-SNAPSHOT §3.2 a): the PM exports the approved tasks
@@ -157,12 +158,17 @@ describe('project export to the new RL Gym', () => {
     // Exactly the RL Gym's contract, sent once with its key and the export hash as Idempotency-Key.
     expect(rlgym.sent).toHaveLength(1);
     const [sent] = rlgym.sent;
-    expect(sent!.url).toBe(`http://127.0.0.1:8200/api/v1/workspaces/adi-labs-research/projects/${pid}/exports`);
+    // The RL Gym's project ID: prj_ + the UUID's hex (its database accepts only prj_[a-z0-9]{4,40}), reversible.
+    const gymPid = rlgymProjectId(pid);
+    expect(gymPid).toMatch(/^prj_[a-z0-9]{4,40}$/);
+    expect(gymPid).toBe(`prj_${pid.replace(/-/g, '')}`);
+    expect(forgeProjectId(gymPid)).toBe(pid);
+    expect(sent!.url).toBe(`http://127.0.0.1:8200/api/v1/workspaces/adi-labs-research/projects/${gymPid}/exports`);
     expect(sent!.headers).toMatchObject({ Authorization: 'Bearer test-rlgym-forge-key', 'Idempotency-Key': sent!.body.export_sha256 });
     const { export_sha256, ...rest } = sent!.body;
     expect(rlGymSha(rest)).toBe(export_sha256);
     expect(run.exportSha256).toBe(export_sha256);
-    expect(sent!.body).toMatchObject({ schema: 'rlgym.project-export.v1', project_id: pid, project_name: 'KYC November', template: { id: REF.id, version: REF.version, spec_sha256: REF.spec, forge_template_id: v8.lineageId, forge_version: v8.version }, project_config: { mode: 'single_agent' }, export_id: run.exportId });
+    expect(sent!.body).toMatchObject({ schema: 'rlgym.project-export.v1', project_id: gymPid, project_name: 'KYC November', template: { id: REF.id, version: REF.version, spec_sha256: REF.spec, forge_template_id: v8.lineageId, forge_version: v8.version }, project_config: { mode: 'single_agent' }, export_id: run.exportId });
     expect(sent!.body.tasks).toHaveLength(2);
     for (const t of sent!.body.tasks as Record<string, any>[]) {
       const record = [a, b].find((r) => r.taskInstanceId === t.task_id)!;

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { Actor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { jcsSha256 } from '../anvil/jcs';
+import { forgeProjectId } from '../anvil/rlgym-export';
 import { AppError, notFound } from '../lib/errors';
 import { runCommand, runCommandPrepared, runStaffOrServiceCommand } from '../platform/command';
 import type { AuditInput } from '../platform/audit';
@@ -67,18 +68,21 @@ async function reworkForBenchmark(tx: Tx, projectId: string, taskId: string, arg
 
 export const benchmarkReviewRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient | null }> = async (app, { db, rlgym }) => {
   // ── RL Gym → ADI Forge: a review batch for a project ──
-  app.post('/projects/:projectId/run-reviews', { config: { access: ANVIL }, bodyLimit: 8 * 1024 * 1024, schema: { tags: ['anvil'], params: z.object({ projectId: z.string().uuid() }), body: z.record(z.string(), z.unknown()) } }, async (req, reply) => {
+  // The RL Gym names the project as it was exported (`prj_<32 hex>`); the plain ADI Forge UUID is accepted too.
+  app.post('/projects/:projectId/run-reviews', { config: { access: ANVIL }, bodyLimit: 8 * 1024 * 1024, schema: { tags: ['anvil'], params: z.object({ projectId: z.string().max(64) }), body: z.record(z.string(), z.unknown()) } }, async (req, reply) => {
     const client = req.apiClient;
     if (!client) throw new AppError(401, 'UNAUTHENTICATED', 'An RL Gym key is required.');
     const parsed = SmeReviewPackage.safeParse(req.body);
     if (!parsed.success) throw new AppError(422, 'REVIEW_BATCH_INVALID', 'The batch does not follow rlgym.sme-review-package.v1.', { issues: parsed.error.issues.slice(0, 20).map((i) => `/${i.path.join('/')}: ${i.message}`) });
     const pkg = parsed.data;
-    if (pkg.project_id !== req.params.projectId) throw new AppError(422, 'REVIEW_BATCH_INVALID', 'project_id in the body and the path differ.');
+    const projectId = forgeProjectId(req.params.projectId);
+    if (!projectId) throw notFound('Project not found');
+    if (forgeProjectId(pkg.project_id) !== projectId) throw new AppError(422, 'REVIEW_BATCH_INVALID', 'project_id in the body and the path differ.');
     const items = pkg.tasks.flatMap((t) => t.episodes.map((e) => e.item_id));
     if (new Set(items).size !== items.length) throw new AppError(422, 'REVIEW_BATCH_INVALID', 'Each item_id must appear once in the batch.');
     const { batch_sha256: _ignored, ...content } = req.body as Record<string, unknown>;
     await runStaffOrServiceCommand(db, req, reply, async ({ tx, audit }) => {
-      const p = await tx.project.findFirst({ where: { id: req.params.projectId, clientId: client.clientId }, select: { id: true } });
+      const p = await tx.project.findFirst({ where: { id: projectId, clientId: client.clientId }, select: { id: true } });
       if (!p) throw notFound('Project not found');
       // Idempotent by batch_id: the same batch again answers with the same reference; other content is a conflict.
       const same = await tx.rlGymReviewBatch.findUnique({ where: { clientId_batchId: { clientId: client.clientId, batchId: pkg.batch_id } } });

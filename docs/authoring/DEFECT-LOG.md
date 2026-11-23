@@ -355,3 +355,12 @@ exposed.
 content fixes go into a new revision (not a status change):
 - **S2:** `parties.list` is not offered in S3.
 - **S5 step 4:** reads document contents with `documents.list`; it should be `document.read`.
+
+**TSK-001 sent back (owner "Yes, new revision", 23 Nov 2026).** There was no console action that sends an approved
+task back, so a new job, `task-send-back`, makes the same transition as the RL Gym's `task_correction`:
+- **What it does:** Accepted → Rework with notes, as the SME's bell and the task page show them. The approved record
+  is kept (append-only), the task is left out of exports while in Rework, and the next approval writes the new revision.
+- **Safety:** dry run by default; Admin only; audited as `task.sent_back_after_approval`; idempotent.
+- **Applied to TSK-001** as admin@praxis.local: it is now in Rework at revision 163 with the two fixes above. Its
+  content is unchanged.
+- **Follow-up:** a console button for this (PM/Admin) instead of the job.

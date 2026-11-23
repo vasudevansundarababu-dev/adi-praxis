@@ -492,6 +492,39 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(sent.case_selector.edge_cases).toEqual(['sanctions_dob_mismatch']);
   });
 
+  it('task-send-back job (owner, 23 Nov 2026, TSK-001): an Admin sends an approved task back to its author; the record is kept; dry run, refusals and a repeat change nothing', async () => {
+    const { parseSendBackArgs, taskSendBack } = await import('../src/jobs/task-send-back');
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    const projectId = await project(v8);
+    const anyTask = (await db.taskInstance.findMany({ where: { projectId } }))[0]!;
+    const person = await source(projectId, 'SME', { email: 'sme-sendback@gmail.test', first: 'Sara', last: 'Back' });
+    expect((await assign(projectId, person.id, anyTask.id)).statusCode).toBe(200);
+    const me = await signIn('sme-sendback@gmail.test');
+    const t = (await packable(await authored(projectId, { smeUserId: me.smeUserId })))[0]!.record!;
+    const notes = 'S2 names parties.list, which S3 does not offer. S5 step 4 reads document contents with documents.list; use document.read.';
+    expect(() => parseSendBackArgs(['--task', t.taskInstanceId, '--notes', notes])).toThrow(/requested-by/);
+    expect(() => parseSendBackArgs(['--task', 'x', '--requested-by', ADMIN_EMAIL, '--notes', notes])).toThrow(/--task/);
+    const args = parseSendBackArgs(['--task', t.taskInstanceId, '--requested-by', ADMIN_EMAIL, '--notes', notes]);
+    expect(await taskSendBack(db, { ...args, requestedBy: 'sme-sendback@gmail.test' })).toMatchObject({ outcome: 'refused' });
+    const audits = await db.auditEvent.count();
+    expect(await taskSendBack(db, args)).toMatchObject({ outcome: 'planned', recordId: t.id, recordKept: true });
+    expect((await db.taskInstance.findUniqueOrThrow({ where: { id: t.taskInstanceId } })).status).toBe('ACCEPTED');
+    expect(await db.auditEvent.count()).toBe(audits);
+
+    expect(await taskSendBack(db, { ...args, apply: true })).toMatchObject({ outcome: 'sent_back', recordId: t.id });
+    expect(await db.taskInstance.findUniqueOrThrow({ where: { id: t.taskInstanceId } })).toMatchObject({ status: 'REWORK', reviewNotes: notes, reviewStage: null });
+    expect(await db.approvedTaskRecord.findUniqueOrThrow({ where: { id: t.id } })).toMatchObject({ contentHash: t.contentHash });
+    expect(await db.auditEvent.count({ where: { action: 'task.sent_back_after_approval', entityId: t.taskInstanceId } })).toBe(1);
+    // The SME sees it in Rework with the notes, editable, and in the bell.
+    const view = (await get(me.cookie, `/me/tasks/${t.taskInstanceId}`)).json();
+    expect(view).toMatchObject({ status: 'REWORK', readOnly: false });
+    expect(JSON.stringify(view.review)).toContain('document.read');
+    expect(((await get(me.cookie, '/me/forge/inbox')).json().items as { kind: string; detail: string }[])).toEqual([expect.objectContaining({ kind: 'rework', detail: notes })]);
+    // A repeat is reported and writes nothing.
+    expect(await taskSendBack(db, { ...args, apply: true })).toMatchObject({ outcome: 'already_sent_back' });
+    expect(await db.auditEvent.count({ where: { action: 'task.sent_back_after_approval' } })).toBe(1);
+  });
+
   it('D-004: a PM assigns each task’s run review to its author or a project SME Reviewer; only that SME (or PM/Admin) decides; inboxes show what waits', async () => {
     const v8 = await publishedV8(CASE_REF_VERIFIERS);
     // SME Reviewers exist on the SME → Expert → PM route.

@@ -151,3 +151,24 @@ describe('rule page (PR-M07)', () => {
     expect(html).not.toContain('Define with AI');
   });
 });
+
+import { byName } from '@/components/policy/rules-table-logic';
+
+describe('rules table: search by rule name (owner, 23 Nov 2026)', () => {
+  const rules = [rule({ ruleId: 'a', ruleKey: 'R-BENEFICIAL-OWNER-IDENTIFICATION-AND-VERI', title: 'Beneficial-owner identification and verification' }), rule({ ruleId: 'b', ruleKey: 'R-BENEFICIAL-OWNERSHIP-EXCLUSIONS', title: 'Beneficial-ownership exclusions' }), rule({ ruleId: 'c', ruleKey: 'R-CIP-ADDRESS', title: 'CIP address' })];
+  it('matches every word in the name or key, in any order and case', () => {
+    expect(byName(rules, 'beneficial').map((r) => r.ruleId)).toEqual(['a', 'b']);
+    expect(byName(rules, 'Exclusions BENEFICIAL').map((r) => r.ruleId)).toEqual(['b']);
+    expect(byName(rules, 'r-cip').map((r) => r.ruleId)).toEqual(['c']);
+    expect(byName(rules, '  ').length).toBe(3);
+    expect(byName(rules, 'payment hold')).toEqual([]);
+  });
+
+  it('shows a labelled search box with a Search button above the filters', () => {
+    const html = renderToStaticMarkup(<RulesTable projectId="p1" documents={[{ id: 'd1', title: 'SEED — Federal KYC policy' }]} rules={rules} />);
+    expect(html).toContain('role="search"');
+    expect(html).toMatch(/Search rule name<\/span><input type="search"/);
+    expect(html).toMatch(/<button type="submit"[^>]*>Search<\/button>/);
+    expect(a11yProblems(html)).toEqual([]);
+  });
+});

@@ -9,7 +9,7 @@ import { ClientPager } from '@/components/pager';
 import { mutate } from '@/lib/client-api';
 import { MARKING_FILTERS, OUTCOME_LABEL, applicationTypeOptions, byMarking, forApplication, sourceLabel, withMarking, type AnnotatedRow, type MarkingFilter } from './annotation-logic';
 import { setRuleApplied, type ApplyTarget } from './apply-rule';
-import { applySteps, rulesForDocument, STATE_LABEL, visibleRules, type Suggestion, type TableRule } from './rules-table-logic';
+import { applySteps, rulesForDocument, STATE_LABEL, visibleRules, type Suggestion, type TableRule, byName } from './rules-table-logic';
 
 export interface RulesTableRule extends TableRule, AnnotatedRow {
   versionId: string;
@@ -47,6 +47,9 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
   const [govState, setGovState] = useState('');
   const [annotationRun, setAnnotationRun] = useState<AnnotationRun | null>(null);
   const [appliedOnly, setAppliedOnly] = useState(false);
+  // Rule-name search: the box is typed into; Search (or Enter) applies it.
+  const [nameInput, setNameInput] = useState('');
+  const [nameQuery, setNameQuery] = useState('');
   /** Suggestions the PM rejected in this session: hidden from the suggested list; the rule itself is unchanged. */
   const [rejected, setRejected] = useState<Set<string>>(new Set());
 
@@ -54,11 +57,11 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
   const rows = useMemo(() => {
     const kept = suggestions && !showAll ? docRules.filter((r) => !rejected.has(r.ruleKey) || r.applied) : docRules;
     const visible = visibleRules(kept, suggestions, showAll).filter((r) => !appliedOnly || r.applied);
-    return forApplication(byMarking(visible, markingFilter), { applicationType: appType, governingState: govState.trim() });
-  }, [docRules, suggestions, showAll, markingFilter, appType, govState, appliedOnly, rejected]);
+    return forApplication(byMarking(byName(visible, nameQuery), markingFilter), { applicationType: appType, governingState: govState.trim() });
+  }, [docRules, suggestions, showAll, markingFilter, appType, govState, appliedOnly, rejected, nameQuery]);
   const appTypes = useMemo(() => applicationTypeOptions(rules), [rules]);
   // D24: 10 rules per page (?rulesPage=); a new document, prompt or filter returns to page 1.
-  const paged = usePagedRows(rows, { param: 'rulesPage', resetKey: [docId, ranPrompt, showAll, markingFilter, appType, govState.trim(), appliedOnly].join('|') });
+  const paged = usePagedRows(rows, { param: 'rulesPage', resetKey: [docId, ranPrompt, showAll, markingFilter, appType, govState.trim(), appliedOnly, nameQuery].join('|') });
   const filtering = !!appType || !!govState.trim();
 
   // The AI annotation run for the chosen document: polled while it runs, then the rules reload.
@@ -252,6 +255,39 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
       </div>
 
       <div className="flex flex-wrap items-end gap-3 rounded border border-line p-2">
+        <form
+          role="search"
+          className="flex w-full flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setNameQuery(nameInput.trim());
+          }}
+        >
+          <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
+            <span className="font-medium">Search rule name</span>
+            <input type="search" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={nameInput} placeholder="e.g. beneficial owner" maxLength={200} onChange={(e) => setNameInput(e.target.value)} />
+          </label>
+          <button type="submit" className="btn btn-secondary">
+            Search
+          </button>
+          {nameQuery && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setNameInput('');
+                setNameQuery('');
+              }}
+            >
+              Clear
+            </button>
+          )}
+          {nameQuery && (
+            <span className="self-center text-sm text-fg-muted" role="status">
+              {rows.length} rule{rows.length === 1 ? '' : 's'} match “{nameQuery}”
+            </span>
+          )}
+        </form>
         <label className="flex flex-col gap-1">
           <span className="font-medium">Mandatory marking</span>
           <select className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={markingFilter} onChange={(e) => setMarkingFilter(e.target.value as MarkingFilter)}>
@@ -324,7 +360,7 @@ export function RulesTable({ projectId, documents, rules, initialDocumentId }: {
       )}
 
       {rows.length === 0 ? (
-        <p className="text-fg-muted">{suggestions ? 'The assistant suggested no rules from this document. Tick “Show all rules” to choose by hand.' : 'No rules from this document yet. Extract candidates first.'}</p>
+        <p className="text-fg-muted">{nameQuery ? `No rules match “${nameQuery}”. Clear the search to see every rule.` : suggestions ? 'The assistant suggested no rules from this document. Tick “Show all rules” to choose by hand.' : 'No rules from this document yet. Extract candidates first.'}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left">

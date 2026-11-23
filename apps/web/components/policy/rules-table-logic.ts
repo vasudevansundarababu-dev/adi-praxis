@@ -40,3 +40,13 @@ export function applySteps(r: Pick<TableRule, 'definitionProblems' | 'evidencePr
 }
 
 export const STATE_LABEL: Record<TableRule['state'], string> = { DRAFT: 'Draft', NEEDS_DEFINITION: 'Needs definition', REVIEWED: 'Applied', EXCLUDED: 'Excluded' };
+
+/** Owner, 23 Nov 2026: search rules by name. Every word must appear in the rule's name or key (any order, any case). */
+export function byName<R extends Pick<TableRule, 'title' | 'ruleKey'>>(rules: R[], query: string): R[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return rules;
+  return rules.filter((r) => {
+    const hay = `${r.title} ${r.ruleKey}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
+}

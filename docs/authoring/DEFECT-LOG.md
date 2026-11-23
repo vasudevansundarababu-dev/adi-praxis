@@ -118,7 +118,7 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
     "Rubric correction", also a criterion.
   - Test: render the panels and the SME benchmark fields and assert that every text control carries a defined,
     bordered class.
-- **Status:** investigated, waiting for "go".
+- **Status:** FIXED 23 Nov 2026 (owner "go", Benchmark review screen), commit below. See "Fixes".
 
 ## D-014 Authoring: "score [object Object]" on review items (medium)
 
@@ -134,7 +134,7 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
   - Keep accepting a plain number.
   - Show the pass mark only if the RL Gym ever sends one.
   - Test with the real shape.
-- **Status:** investigated, waiting for "go".
+- **Status:** FIXED 23 Nov 2026 (owner "go", Benchmark review screen), commit below. See "Fixes".
 
 ## D-015 Path line contradicts itself and repeats the failure (low; split between the RL Gym and Authoring)
 
@@ -150,4 +150,23 @@ clarification, and fix only in the agreed window. Fixes are committed to `forge-
   the failure.
 - **Planned fix (Authoring):** show the RL Gym's summary alone when there is one. Build "Failed at … (…)" only when no
   summary is sent.
-- **Status:** investigated, waiting for "go". The contradictory summary text is for the RL Gym to fix.
+- **Status:** FIXED 23 Nov 2026 (owner "go", Benchmark review screen), commit below. See "Fixes". The contradictory summary text is for the RL Gym to fix.
+
+## Fixes
+
+| Date | Defects | Commit | What changed |
+| --- | --- | --- | --- |
+| 23 Nov 2026 | D-013, D-014, D-015 (Authoring's part) | see git log: "Benchmark review: visible fields, score, path, Decide hint" | See the notes below. |
+
+- **D-013:**
+  - `.input` is defined once in `packages/shared/theme/theme.css`, which both apps import. Every field that used the
+    class now shows its box, in the console and in the SME app.
+  - A hint under Decide says why it is off: "Type a rationale to decide.", plus "the criterion it is about" for "Grader is
+    wrong" and "Rubric needs correction", since the API refuses those without one.
+  - Decide now also stays off until the criterion is typed.
+- **D-014:** the score reads "Score 42.86 · not passed · failed: …". A plain number still works, and a pass mark shows
+  if the RL Gym sends one.
+- **D-015:** the RL Gym's path summary is shown once. "Failed at …" is built only when no summary is sent.
+- **Tests:** `apps/web/test/benchmark-review-panel.test.tsx` (4 tests). The web suite (222 tests) and the SME app suite
+  (119 tests) pass, and both typechecks are clean.
+- **Checked live** on 3100 (batch smr-0051) and 3101.

@@ -176,6 +176,21 @@ code, kbd, samp, pre, .font-mono { font-family: var(--font-mono); font-variant-n
   .btn-secondary:hover:not(:disabled) { border-color: var(--praxis-focus); }
   .hero .btn-secondary { background: rgb(255 255 255 / 0.12); border-color: rgb(255 255 255 / 0.3); color: #ffffff; }
 
+  /* D-013 (23 Nov 2026): the form field the Benchmark, SME needs and SME benchmark fields use. Same look as the console's
+     other fields (border-line, bg-surface); the border keeps --praxis-border for 3:1 contrast. */
+  .input {
+    display: block;
+    min-width: 12rem;
+    border: 1px solid var(--praxis-border);
+    border-radius: 6px;
+    background: var(--praxis-surface);
+    color: var(--praxis-text);
+    padding: 4px 8px;
+    font-size: 14px;
+  }
+  .input:focus-visible { outline: 2px solid var(--praxis-focus); outline-offset: 1px; }
+  .input:disabled { opacity: 0.6; cursor: not-allowed; }
+
   /* Tap-to-choose answers. */
   .chip {
     border: 1px solid var(--praxis-hairline);

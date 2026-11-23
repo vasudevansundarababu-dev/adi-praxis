@@ -230,6 +230,35 @@ export function SmeNeedsPanel({ projectId, needs, studioConnected }: { projectId
   );
 }
 
+/** D-014: the RL Gym sends `score` as a number or as {score, passed, failed_criteria}; show it as words, never "[object Object]". */
+export function scoreText(score: unknown): string {
+  if (typeof score === 'number') return `Score ${score}`;
+  if (!score || typeof score !== 'object') return 'Score —';
+  const s = score as { score?: unknown; passed?: unknown; pass_mark?: unknown; failed_criteria?: unknown };
+  const parts = [`Score ${typeof s.score === 'number' ? s.score : '—'}${typeof s.pass_mark === 'number' ? ` (pass mark ${s.pass_mark})` : ''}`];
+  if (typeof s.passed === 'boolean') parts.push(s.passed ? 'passed' : 'not passed');
+  const failed = Array.isArray(s.failed_criteria) ? s.failed_criteria.filter((c): c is string => typeof c === 'string') : [];
+  if (failed.length) parts.push(`failed: ${failed.join(', ')}`);
+  return parts.join(' · ');
+}
+
+/** D-015: the RL Gym's summary as sent; "Failed at …" is built only when no summary came, so it is never repeated. */
+export function pathText(path: { summary?: string; failed_node?: string; failed_why?: string }): string {
+  if (path.summary) return path.summary;
+  if (path.failed_node) return `Failed at ${path.failed_node}${path.failed_why ? ` (${path.failed_why})` : ''}`;
+  return '';
+}
+
+/** D-013: why Decide is off, under the button. */
+const needsCriterion = (decision: string) => decision === 'grader_wrong' || decision === 'rubric_correction';
+export function decideHint(connected: boolean, d: { decision: string; rationale: string; criterionId: string }): string {
+  if (!connected) return 'RL Gym isn’t connected, so decisions can’t be sent yet.';
+  const missing = [!d.rationale.trim() && 'a rationale', needsCriterion(d.decision) && !d.criterionId.trim() && 'the criterion it is about'].filter(Boolean);
+  if (missing.length) return `Type ${missing.join(' and ')} to decide.`;
+  return 'Ready to decide. A decision is final.';
+}
+export const canDecide = (connected: boolean, d: { decision: string; rationale: string; criterionId: string }) => connected && !!d.rationale.trim() && (!needsCriterion(d.decision) || !!d.criterionId.trim());
+
 export function BenchmarkReviewPanel({ projectId, batches, connected }: { projectId: string; batches: ReviewBatch[]; connected: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -265,13 +294,9 @@ export function BenchmarkReviewPanel({ projectId, batches, connected }: { projec
               return (
                 <li key={i.itemId} className="rounded border border-line p-2">
                   <p>
-                    <span className="font-mono text-xs">{i.itemId}</span> · task {i.taskId.slice(0, 8)} r{i.revision} · score {String(e.score ?? '—')} · {String((e.system as { name?: string } | undefined)?.name ?? '')}
+                    <span className="font-mono text-xs">{i.itemId}</span> · task {i.taskId.slice(0, 8)} r{i.revision} · {scoreText(e.score)} · {String((e.system as { name?: string } | undefined)?.name ?? '')}
                   </p>
-                  {(path.summary || path.failed_node) && (
-                    <p className="text-fg-muted">
-                      Path: {path.summary ?? ''} {path.failed_node ? `· failed at ${path.failed_node}${path.failed_why ? ` (${path.failed_why})` : ''}` : ''}
-                    </p>
-                  )}
+                  {pathText(path) && <p className="text-fg-muted">Path: {pathText(path)}</p>}
                   {typeof e.suspected_cause === 'string' && <p className="text-fg-muted">RL Gym’s hint (not a decision): {e.suspected_cause}</p>}
                   {i.decision ? (
                     <p className="mt-1">
@@ -299,9 +324,12 @@ export function BenchmarkReviewPanel({ projectId, batches, connected }: { projec
                         <span className="text-xs text-fg-muted">Rationale</span>
                         <input className="input" value={d.rationale} onChange={(ev) => setDraft({ ...draft, [i.itemId]: { ...d, rationale: ev.target.value } })} />
                       </label>
-                      <button type="button" className="btn btn-primary" disabled={!connected || !d.rationale.trim()} onClick={() => decide(b.ref, i.itemId)}>
+                      <button type="button" className="btn btn-primary" aria-describedby={`decide-${i.itemId}-hint`} disabled={!canDecide(connected, d)} onClick={() => decide(b.ref, i.itemId)}>
                         Decide
                       </button>
+                      <span id={`decide-${i.itemId}-hint`} className="basis-full text-xs text-fg-muted">
+                        {decideHint(connected, d)}
+                      </span>
                     </div>
                   )}
                 </li>

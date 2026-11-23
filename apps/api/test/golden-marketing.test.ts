@@ -226,7 +226,7 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
     expect(await db.template.count({ where: { workflowName: 'Launch of Noise Cancelling Phone' } })).toBe(0);
   });
 
-  it('SME authors the Task2 case with the five-agent workflow; Expert passes, PM approves; it enters the dataset', async () => {
+  it('SME authors the Task2 case with the five-agent workflow; Expert passes; on form v1 the PM’s approval is refused because the benchmark could not receive it', async () => {
     const v = await published();
     const s = await staffedProject(v.id);
 
@@ -296,42 +296,23 @@ describe('Golden Task2 (Marketing): the full Praxis cycle on the reusable VEYRA 
     // Expert passes, PM approves: people decide at each stage.
     const ex = await stage(s.expert, s.taskId, { stage: 'EXPERT_REVIEW', decision: 'PASS', checklist: allTrue });
     expect(ex.statusCode, ex.body).toBe(200);
+    // Owner, 23 Nov 2026: approval runs the same package check as Validate. On this form (v1) the S4 policy citations do
+    // not declare the sub-fields ADI Forge keeps from agents (appliesTo, rationale) as private, so the benchmark could not
+    // receive the task: the PM's approval is refused with that reason (the form's problem, not the author's), nothing
+    // enters the dataset, and the task stays waiting for approval. v2 fixes the form (next test).
     const approved = await stage(s.pm, s.taskId, { stage: 'PM_APPROVAL', decision: 'APPROVE' });
-    expect(approved.statusCode, approved.body).toBe(200);
-    const record = await db.approvedTaskRecord.findFirstOrThrow({ where: { taskInstanceId: s.taskId } });
-    const rec = record.output as { profile: { id: string }; sections: { S6: Record<string, unknown>; S2: { sourceRefs: { checksum: string }[] }; S7: { criticalFailures: string[] } } };
-    expect(rec.profile.id).toBe(PROFILE_ID);
-    // One reusable task: no per-case outcome; wire critical-rule IDs.
-    expect(Object.keys(rec.sections.S6)).toEqual(['outputContract']);
-    expect(rec.sections.S7.criticalFailures).toEqual(['CR-01', 'CR-02', 'CR-03', 'CR-04', 'CR-05', 'CR-06']);
-    // Source data travels by reference only.
-    expect(rec.sections.S2.sourceRefs.every((r) => /^[0-9a-f]{64}$/.test(r.checksum))).toBe(true);
+    expect(approved.statusCode, approved.body).toBe(409);
+    expect(approved.json()).toMatchObject({ error: 'NOT_EXPORTABLE' });
+    expect(approved.json().message).toMatch(/fields ADI Forge keeps private/);
+    expect(approved.json().message).toMatch(/not something the author can fix/);
+    expect(approved.body).not.toMatch(/Name the output field|MISSING_BINDING|NO_EXECUTABLE_CONTRACT/);
+    expect(await db.approvedTaskRecord.count({ where: { taskInstanceId: s.taskId } })).toBe(0);
+    expect(await db.taskInstance.findUniqueOrThrow({ where: { id: s.taskId } })).toMatchObject({ status: 'SUBMITTED', reviewStage: 'PM_APPROVAL' });
 
-    // D26: the template's evaluators grade this form, so no per-task bound contract is compiled and the export
-    // pre-check is the generic package entry: no "Name the output field…" blocker the author or PM cannot fix.
+    // D26: the template's evaluators grade this form, so no per-task bound contract is compiled: no "Name the output
+    // field…" blocker the author or PM cannot fix.
     const stored = (await db.taskInstance.findUniqueOrThrow({ where: { id: s.taskId } })).checks as { export?: unknown };
     expect(stored.export).toBeUndefined();
-    expect(JSON.stringify(record.output)).not.toMatch(/praxisContract/);
-    const validate = async () => {
-      const r = await post(s.pm, `/projects/${s.projectId}/validate`, { recordIds: [record.id] });
-      expect(r.statusCode, r.body).toBe(201);
-      return r.json() as { validator: string; counts: { valid: number; needsFix: number; notValidated: number }; results: { status: string; issues: { code: string; message: string }[] }[] };
-    };
-    const run = await validate();
-    expect(run.validator).toBe('praxis-precheck');
-    expect(JSON.stringify(run)).not.toMatch(/Name the output field|MISSING_BINDING|NO_EXECUTABLE_CONTRACT/);
-    // The one remaining problem is the published form's, not the task's: its S4 policy citations do not declare the
-    // sub-fields ADI Forge keeps from agents (appliesTo, rationale) as private. Reported as "not validated", never as
-    // something the author or PM must fix.
-    expect(run.counts).toMatchObject({ valid: 0, needsFix: 0, notValidated: 1 });
-    expect(run.results[0]!.status).toBe('not_validated');
-    expect(run.results[0]!.issues.map((i) => i.code)).toEqual(['GENERIC_PRIVATE_EXPOSURE']);
-    // A task submitted before the fix keeps the old compile blockers in its stored checks: never shown, never used.
-    const old = { status: 'blocked', profile: { id: PROFILE_ID, version: 1 }, blockers: Array.from({ length: 25 }, (_, i) => ({ code: 'MISSING_BINDING', path: `S7.criteria[${i}].outputField`, message: 'Name the output field this rule or criterion checks' })) };
-    await db.taskInstance.update({ where: { id: s.taskId }, data: { checks: { ...(stored as object), export: old } } });
-    const again = await validate();
-    expect(again.results).toEqual(run.results);
-    expect(JSON.stringify(again)).not.toMatch(/Name the output field/);
     expect((await view(s.sme, s.taskId)).exportStatus).toBeNull();
     const review = (await get(s.pm, `/review/tasks/${s.taskId}`)).json();
     expect(review.id).toBe(s.taskId);

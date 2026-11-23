@@ -10,7 +10,7 @@ import type { OutboxInput } from '../outbox/outbox';
 import { authoredContent, compileForSubmission, profileSaveProblems } from './profile-output';
 import { acceptTask, rejectTask, reviewableTask, type ReviewerIdentity } from './review-service';
 import { blocking, evaluateTask, refreshSimilarity, type StoredChecks } from './submission';
-import { revalidateTask, reworkForValidation, type ApprovalBlocked } from './revalidation';
+import { approvalExportBlocker, revalidateTask, reworkForValidation, type ApprovalBlocked } from './revalidation';
 import type { SimilarMatch } from './similarity';
 
 /**
@@ -180,6 +180,12 @@ export async function decideStageFor(tx: Tx, t: StageTask, reviewer: ReviewerIde
   }
   // D18: a pass or an approval re-runs the submit and export checks; a blocking failure sends the task back to its author.
   const revalidated = async (): Promise<ApprovalBlocked | null> => {
+    // Owner, 23 Nov 2026: the approval that creates the dataset record first runs Validate's package check, so a task
+    // the benchmark could not receive is never approved. The Expert's pass is not held up by a form problem.
+    if (body.stage === 'PM_APPROVAL') {
+      const notExportable = approvalExportBlocker(t.project.template, t, authoredContent(t.output));
+      if (notExportable) throw new AppError(409, 'NOT_EXPORTABLE', notExportable);
+    }
     const rv = await revalidateTask(tx, t);
     if (!rv.failing.length) return null;
     await reworkForValidation(tx, t, { trigger: 'approval', actorId: reviewer.id, byUser: reviewer.kind === 'USER', version: v.version, checks: rv.checks, failing: rv.failing, stage: body.stage, contentHash: hash, auditExtra: { responsibility, ...auditExtra } }, audit);

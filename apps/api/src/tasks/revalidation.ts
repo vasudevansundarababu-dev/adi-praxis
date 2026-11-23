@@ -57,6 +57,19 @@ export function exportPackageChecks(template: Template, task: Pick<TaskInstance,
   return checks;
 }
 
+/**
+ * Owner (23 Nov 2026): approval runs the same package check as Validate. A problem the author can fix is a blocking
+ * check (the task goes back to them, D18); any other problem (the template's form, or Authoring itself) stops the
+ * approval with a plain message instead, because sending the task to its author would not help.
+ */
+export function approvalExportBlocker(template: Template, task: Pick<TaskInstance, 'id' | 'taskType' | 'input'>, output: unknown): string | null {
+  if (task.taskType !== 'AUTHORING' || !output || typeof output !== 'object' || !jointTemplateSpec(template)) return null;
+  const pseudo = { id: `pending-${task.id}`, taskInstanceId: task.id, output, input: task.input, contentHash: '0'.repeat(64) } as unknown as ApprovedTaskRecord;
+  const p = taskPackageProblem({ record: pseudo, template });
+  if (!p || AUTHOR_FIXABLE_PACKAGE.has(p.code)) return null;
+  return `This task can’t be approved yet: the benchmark could not receive it. ${p.message} This is not something the author can fix; Validate shows the same problem. Ask your Admin to raise it with Studio.`;
+}
+
 const sectionOf = (path: string) => /^(S\d+)\b/.exec(path)?.[1] ?? (path.startsWith('rubric') ? 'W05' : 'W06');
 
 /**

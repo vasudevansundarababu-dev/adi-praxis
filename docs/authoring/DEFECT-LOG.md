@@ -332,3 +332,26 @@ existing task or rule changed: every new field is optional, and packages without
 - **Generic names.** Retiring `statePolicies` and `exampleGoverningState` in favour of generic names, which waits on
   Studio (§4.1.7).
 - **Clause receipts.** Showing the RL Gym's clause receipts.
+
+## D-030 Validate reported GENERIC_PRIVATE_EXPOSURE on TSK-001, and approval did not check it (23 Nov 2026, owner)
+
+**Cause (Authoring's bug, not the SME's).** D-016 sends a procedure step's conditional follow-ups to the agent in the
+export's public part (actor.json). ADI Forge's own agent view did not include them. The package check compares the two
+views, so every task with follow-ups failed with "would include fields ADI Forge keeps private". Nothing private was
+exposed.
+
+**Fix.**
+- **Agent view.** `agentProjection` now carries S5 follow-ups exactly as the actor projection does. Covered by a test
+  in step-tools.test.ts.
+- **Approval checks the package.** PM approval (and the single-stage Accept) now runs Validate's package check first.
+  - A problem the author can't fix (the published form's) refuses approval with `409 NOT_EXPORTABLE` and a plain
+    reason. Nothing enters the dataset, and the task stays waiting for approval.
+  - Problems the author can fix still go back to Rework (D18).
+  - The Expert's pass is not held up.
+- **Test change.** golden-marketing.test.ts now expects form v1 (S4 citations without declared private sub-fields)
+  to be refused at approval; v2 approves and validates.
+
+**TSK-001.** It was approved before this fix, so its record is permanent. Validate is clean now. The SME's actual
+content fixes go into a new revision (not a status change):
+- **S2:** `parties.list` is not offered in S3.
+- **S5 step 4:** reads document contents with `documents.list`; it should be `document.read`.

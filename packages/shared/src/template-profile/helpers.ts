@@ -1,3 +1,4 @@
+import { followUpsOf } from '../step-tools';
 import { PROFILE_SECTIONS, type FieldVisibility, type PickOption, type ProfileCondition, type TemplateProfileField, type ProfileOutput, type RequiredRule, type SectionKey, type TemplateProfile } from './schema';
 
 /**
@@ -406,6 +407,16 @@ export function agentProjection(profile: TemplateProfile, output: unknown): Reco
       if ((f.visibility ?? 'author_and_agent') !== 'author_and_agent') continue;
       const v = getFieldValue(profile, output, s.key, f);
       if (v !== undefined) visible[f.key] = project(f, v, 'author_and_agent');
+    }
+    // D-016: a procedure step's conditional follow-ups are agent-visible, exactly as the export's actor part carries
+    // them (only on steps that have any), so the two views stay identical.
+    if (s.key === 'S5' && Array.isArray(visible.steps)) {
+      const raw = getFieldValue(profile, output, 'S5', { key: 'steps' });
+      const items = (Array.isArray(raw) ? raw : []).filter((x): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x));
+      visible.steps = (visible.steps as Record<string, unknown>[]).map((step, i) => {
+        const fu = followUpsOf(items[i]);
+        return fu.length ? { ...step, followUps: fu } : step;
+      });
     }
     if (Object.keys(visible).length) sections[s.key] = visible;
   }

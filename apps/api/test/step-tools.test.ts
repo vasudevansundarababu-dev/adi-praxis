@@ -1,6 +1,8 @@
 import { followUpsOf, orderedTools, stepToolWarnings, toolOptionLabel, translateProcedure } from '@praxis/shared';
 import { describe, expect, it } from 'vitest';
 import { actorProjection } from '../src/anvil/generic-package';
+import { agentProjection, TemplateProfileSchema } from '@praxis/shared';
+import { readFileSync } from 'node:fs';
 import { stepToolChecks, undeclaredTools } from '../src/anvil/tool-binding';
 import { procedureView } from '../src/forge/review';
 import { MockStepTranslator, translateSteps, translateUser } from '../src/tasks/steps/translator';
@@ -99,5 +101,19 @@ describe('follow-ups reach the agent and the reviewer', () => {
   it('the reviewer’s procedure view shows purposes, follow-ups and warnings', () => {
     const template = { lineageId: 'l', version: 1, anvilSpec: null };
     expect(procedureView(template as never, { sections: { S5: { steps: [] } } })).toBeNull();
+  });
+});
+
+describe('follow-ups are agent-visible in both views (owner, 23 Nov 2026: Validate said GENERIC_PRIVATE_EXPOSURE on TSK-001)', () => {
+  it('the agent view carries a step’s follow-ups exactly as the export’s actor part does', () => {
+    const V7 = JSON.parse(readFileSync(new URL('./fixtures/kyc-v7/proposal.json', import.meta.url), 'utf8'));
+    const profile = TemplateProfileSchema.parse(V7.authoring.profile);
+    const steps = [{ action: 'Screen each applicant', tool: 'screening.check', followUps: [{ if: 'a match', tools: ['finding.write', 'specialist.refer'] }] }, { action: 'Recommend', tool: 'recommend' }];
+    const output = { schema: 'praxis.template_output.v1', profile: { id: profile.profileId, version: profile.version }, header: { title: 'T' }, sections: { S5: { steps } } };
+    const agent = agentProjection(profile as never, output) as { sections: { S5: { steps: Record<string, unknown>[] } } };
+    const actor = actorProjection(profile as never, { profile: { id: profile.profileId, version: profile.version }, sections: { S5: { steps } } }) as { sections: { S5: { steps: Record<string, unknown>[] } } };
+    expect(agent.sections.S5.steps[0]).toMatchObject({ followUps: [{ if: 'a match', tools: ['finding.write', 'specialist.refer'] }] });
+    expect(agent.sections.S5.steps[1]).not.toHaveProperty('followUps');
+    expect(JSON.stringify(agent.sections.S5.steps)).toBe(JSON.stringify(actor.sections.S5.steps));
   });
 });

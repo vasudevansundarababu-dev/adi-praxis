@@ -9,7 +9,8 @@ import { AppError, forbidden, notFound } from '../lib/errors';
 import type { writeAudit } from '../platform/audit';
 import type { OutboxInput } from '../outbox/outbox';
 import type { StoredChecks } from './submission';
-import { revalidateTask, reworkForValidation, type ApprovalBlocked } from './revalidation';
+import { authoredContent } from './profile-output';
+import { approvalExportBlocker, revalidateTask, reworkForValidation, type ApprovalBlocked } from './revalidation';
 
 type Audit = (i: Parameters<typeof writeAudit>[2]) => Promise<void>;
 
@@ -127,6 +128,8 @@ export async function decideOneStep(
   if (body.decision === 'ACCEPT' && isOpen && hasQuotas(t.project.template) && !body.confirmedCoverage) throw new AppError(400, 'CONFIRM_TAGS', 'Open slot: confirm (or correct) the author’s coverage tags and edge case before accepting.');
   if (body.decision === 'ACCEPT') {
     // D18: the approval re-runs the submit and export checks; a blocking failure sends the task back to its author.
+    const notExportable = approvalExportBlocker(t.project.template, t, authoredContent(t.output));
+    if (notExportable) throw new AppError(409, 'NOT_EXPORTABLE', notExportable);
     const rv = await revalidateTask(tx, t);
     if (rv.failing.length) {
       await reworkForValidation(tx, t, { trigger: 'approval', actorId: reviewer.id, byUser: reviewer.kind === 'USER', version, checks: rv.checks, failing: rv.failing, ...(opts.contentHash ? { contentHash: opts.contentHash } : {}), auditExtra: extra }, audit);

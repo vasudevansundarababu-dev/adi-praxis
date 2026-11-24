@@ -13,11 +13,13 @@ export function RunReviews({ reviews }: { reviews: AssignedReview[] }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, { decision: string; rationale: string; criterionId: string }>>({});
-  async function decide(ref: string, itemId: string) {
+  async function decide(ref: string, item: AssignedReview['items'][number]) {
+    const itemId = item.itemId;
     const d = draft[itemId];
     if (!d) return;
     setError(null);
-    const res = await call('POST', `/me/run-reviews/${ref}/decisions`, { decisions: [{ itemId, decision: d.decision, rationale: d.rationale, ...(d.criterionId ? { criterionId: d.criterionId } : {}) }] });
+    // E-007 phase 2: the decision names the score pass and the evidence reviewed; a stale one is refused.
+    const res = await call('POST', `/me/run-reviews/${ref}/decisions`, { ...(item.scorePass ? { scorePass: item.scorePass } : {}), decisions: [{ itemId, decision: d.decision, rationale: d.rationale, ...(d.criterionId ? { criterionId: d.criterionId } : {}), ...(item.evidenceSha256 ? { evidenceSha256: item.evidenceSha256 } : {}) }] });
     if (!res.ok) return setError(res.error ?? 'The decision was not sent. Try again.');
     router.refresh();
   }
@@ -48,6 +50,9 @@ export function RunReviews({ reviews }: { reviews: AssignedReview[] }) {
                   <p>
                     <span className="font-mono text-xs">{i.itemId}</span> · task {i.taskId.slice(0, 8)} r{i.revision} · {scoreText(e.score)}
                   </p>
+                  <p className="text-xs text-fg-muted" data-bound>
+                    Reviewing run {i.runId ?? '—'} · score pass {i.scorePass ?? '—'} · evidence <span className="font-mono">{i.evidenceSha256?.slice(0, 16) ?? '—'}</span>
+                  </p>
                   {path && <p className="text-fg-muted">Path: {path}</p>}
                   {typeof e.suspected_cause === 'string' && <p className="text-fg-muted">RL Gym’s hint (not a decision): {e.suspected_cause}</p>}
                   {i.decision ? (
@@ -57,7 +62,7 @@ export function RunReviews({ reviews }: { reviews: AssignedReview[] }) {
                   ) : (
                     <div className="mt-2 flex flex-wrap items-end gap-2">
                       <label className="flex flex-col">
-                        <span className="text-xs text-fg-muted">Decision</span>
+                        <span className="text-xs text-fg-muted">Your verdict</span>
                         <select className="input" value={d.decision} onChange={(ev) => set({ decision: ev.target.value })}>
                           {Object.entries(DECISION_LABEL).map(([k, v]) => (
                             <option key={k} value={k}>
@@ -76,7 +81,7 @@ export function RunReviews({ reviews }: { reviews: AssignedReview[] }) {
                         <span className="text-xs text-fg-muted">Rationale</span>
                         <input className="input" value={d.rationale} onChange={(ev) => set({ rationale: ev.target.value })} />
                       </label>
-                      <button type="button" className="btn btn-primary" aria-describedby={hint} disabled={!canDecide(d)} onClick={() => decide(b.ref, i.itemId)}>
+                      <button type="button" className="btn btn-primary" aria-describedby={hint} disabled={!canDecide(d)} onClick={() => decide(b.ref, i)}>
                         Decide
                       </button>
                       <span id={hint} className="basis-full text-xs text-fg-muted">

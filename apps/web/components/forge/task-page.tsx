@@ -1,6 +1,6 @@
 'use client';
 
-import { getFieldValue, isArrayType, itemFieldsOf, PROFILE_SECTIONS, scoreKeysFor, type ForgeComment, type ItemField, type ProjectPersonDto, type RubricView, type SectionKey, type TemplateProfile, type ValidationRunDto, publicText } from '@praxis/shared';
+import { getFieldValue, isArrayType, itemFieldsOf, PROFILE_SECTIONS, scoreKeysFor, type ForgeComment, type ItemField, type ProjectPersonDto, type RubricView, type SectionKey, type TemplateProfile, type ValidationRunDto, publicText, ISSUE_OWNER_LABEL } from '@praxis/shared';
 import { RubricReadOnly } from './rubric-readonly';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -713,8 +713,9 @@ function ValidateCard({ projectId, recordId, initial }: { projectId: string; rec
       {latest && latest.result.issues.length > 0 && (
         <ul className="mt-2 list-disc pl-5 text-sm">
           {latest.result.issues.map((x, i) => (
-            <li key={i}>
+            <li key={i} data-issue-code={x.code}>
               <span className="font-mono text-xs">{x.code}</span> {x.message}
+              {x.owner && <> · to fix: {ISSUE_OWNER_LABEL[x.owner]}{x.retryHelps ? ' (trying again may help)' : ''}</>}
             </li>
           ))}
         </ul>

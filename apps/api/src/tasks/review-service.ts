@@ -10,7 +10,7 @@ import type { writeAudit } from '../platform/audit';
 import type { OutboxInput } from '../outbox/outbox';
 import type { StoredChecks } from './submission';
 import { authoredContent } from './profile-output';
-import { approvalExportBlocker, revalidateTask, reworkForValidation, type ApprovalBlocked } from './revalidation';
+import { approvalExportBlocker, approvalIntegrity, revalidateTask, reworkForValidation, type ApprovalBlocked } from './revalidation';
 
 type Audit = (i: Parameters<typeof writeAudit>[2]) => Promise<void>;
 
@@ -130,7 +130,10 @@ export async function decideOneStep(
     // D18: the approval re-runs the submit and export checks; a blocking failure sends the task back to its author.
     const notExportable = approvalExportBlocker(t.project.template, t, authoredContent(t.output));
     if (notExportable) throw new AppError(409, 'NOT_EXPORTABLE', notExportable);
-    const rv = await revalidateTask(tx, t);
+    const integrity = await approvalIntegrity(tx, t);
+    if (integrity.stop) throw new AppError(409, 'NOT_APPROVABLE', integrity.stop);
+    const base = await revalidateTask(tx, t);
+    const rv = { checks: [...base.checks, ...integrity.authorChecks], failing: [...base.failing, ...integrity.authorChecks] };
     if (rv.failing.length) {
       await reworkForValidation(tx, t, { trigger: 'approval', actorId: reviewer.id, byUser: reviewer.kind === 'USER', version, checks: rv.checks, failing: rv.failing, ...(opts.contentHash ? { contentHash: opts.contentHash } : {}), auditExtra: extra }, audit);
       return { status: 'REWORK', approvalBlocked: true, version, checks: rv.failing } satisfies ApprovalBlocked;

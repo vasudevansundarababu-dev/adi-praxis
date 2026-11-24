@@ -1,6 +1,6 @@
 'use client';
 
-import type { ValidationRunDto } from '@praxis/shared';
+import { ISSUE_OWNER_LABEL, type ValidationRunDto } from '@praxis/shared';
 import Link from 'next/link';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
@@ -168,6 +168,7 @@ function RunResults({ projectId, run, newFlow }: { projectId: string; run: Valid
                             (at <Mono>{p.location}</Mono>)
                           </>
                         )}
+                        {issue.owner && <> · to fix: {ISSUE_OWNER_LABEL[issue.owner]}{issue.retryHelps ? ' (trying again may help)' : ''}</>}
                         {p.requestId && (
                           <>
                             {' '}

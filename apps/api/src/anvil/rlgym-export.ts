@@ -4,6 +4,7 @@ import type { Db, Tx } from '../db';
 import { anvilReadiness } from '../routes/anvil-templates';
 import { jcsSha256 } from './jcs';
 import { storeTaskPackage } from './task-package-store';
+import { OWNER_LABEL, TASK_CHECKER, TASK_CHECKER_VERSION, type TaskCheckReport, type TaskProblem } from '../tasks/task-integrity';
 
 /**
  * The `rlgym.project-export.v1` body for a project's current approved tasks (AUTHORING-SNAPSHOT 3.2 a; AUTHORING-SPEC
@@ -40,6 +41,10 @@ export interface ExportTask {
   complexity: string | null;
   archetype: string | null;
   edgeCase: string | null;
+  /** E-007 phase 2: digests for the receipt (the record's content hash, the frozen snapshot, the check report). */
+  contentHash?: string;
+  snapshotSha256?: string | null;
+  checkReportSha256?: string | null;
 }
 export interface NotSent {
   recordId: string;
@@ -47,6 +52,8 @@ export interface NotSent {
   title: string;
   code: string;
   message: string;
+  /** E-007 phase 2: the failing checks, with section, field, who fixes them and whether trying again helps. */
+  problems?: TaskProblem[];
 }
 
 /** The RL Gym's identity of a template version: from its standing qualification receipt, or null when not qualified. */
@@ -104,7 +111,7 @@ export async function buildRlGymExport(
   p: { id: string; name: string; template: Template },
   records: ApprovedTaskRecord[],
   ref: { id: string; version: number; specSha256: string },
-  opts: { exported: boolean; held?: Map<string, string>; batches?: Map<string, string> },
+  opts: { exported: boolean; held?: Map<string, string>; batches?: Map<string, string>; reports?: Map<string, TaskCheckReport> },
 ): Promise<BuiltExport> {
   const tasks: ExportTask[] = [];
   const notSent: NotSent[] = [];
@@ -114,6 +121,13 @@ export async function buildRlGymExport(
     const waiting = opts.held?.get(r.taskInstanceId);
     if (waiting) {
       notSent.push({ recordId: r.id, taskId: r.taskInstanceId, title, code: 'WAITING_FOR_NEW_CASE_KIND', message: `Waiting for new case kind ${waiting}. Move the project to the template version that has it.` });
+      continue;
+    }
+    // E-007 phase 2: a task whose frozen snapshot fails a blocking check is not sent; the PM sees why and who fixes it.
+    const report = opts.reports?.get(r.id);
+    const failing = report?.problems.filter((x) => x.severity === 'blocking') ?? [];
+    if (failing.length) {
+      notSent.push({ recordId: r.id, taskId: r.taskInstanceId, title, code: 'CHECKS_FAILED', message: failing.map((x) => `${x.section}: ${x.message} (to fix: ${OWNER_LABEL[x.owner]})`).join(' · '), problems: failing });
       continue;
     }
     const stored = await storeTaskPackage(tx, r);
@@ -135,7 +149,7 @@ export async function buildRlGymExport(
     const policyClauses = await policyClausesFor(tx, r);
     const correctsRevision = stored.revision > 1 ? stored.revision - 1 : null;
     const smeBatchId = correctsRevision ? (opts.batches?.get(r.taskInstanceId) ?? null) : null;
-    tasks.push({ recordId: r.id, taskId: r.taskInstanceId, title, revision: stored.revision, packageSha256: stored.packageSha256, correctsRevision, smeBatchId, complexity, archetype, edgeCase });
+    tasks.push({ recordId: r.id, taskId: r.taskInstanceId, title, revision: stored.revision, packageSha256: stored.packageSha256, correctsRevision, smeBatchId, complexity, archetype, edgeCase, contentHash: r.contentHash, snapshotSha256: report?.snapshotSha256 ?? null, checkReportSha256: report ? jcsSha256(report) : null });
     wire.push({
       schema: 'praxis.authored-task-export.v1',
       task_id: r.taskInstanceId,
@@ -164,4 +178,48 @@ export async function buildRlGymExport(
   const exportSha256 = jcsSha256(body);
   body.export_sha256 = exportSha256;
   return { body, exportSha256, exportId, reason, tasks, notSent };
+}
+
+export const EXPORT_RECEIPT_SCHEMA = 'praxis.export-receipt.v1' as const;
+
+/**
+ * E-007 phase 2: the receipt ADI Forge issues with an Export for benchmark, kept with the run (not sent; the RL Gym
+ * keeps its own receipt). It binds the export's digest to every task sent: its approved record and content hash, its
+ * package, the frozen snapshot the checks ran on and the check report. `receipt_sha256` is the JCS SHA-256 of the rest.
+ * Unsigned for now: signing with a key registry is phase 7.
+ */
+export function exportReceipt(built: BuiltExport, issuedAt: Date): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    schema: EXPORT_RECEIPT_SCHEMA,
+    issuer: 'adi-forge-authoring',
+    export_id: built.exportId,
+    export_sha256: built.exportSha256,
+    project_id: built.body.project_id,
+    template: built.body.template,
+    checker: { id: TASK_CHECKER, version: TASK_CHECKER_VERSION },
+    issued_at: issuedAt.toISOString(),
+    tasks: built.tasks.map((t) => ({ task_id: t.taskId, revision: t.revision, record_id: t.recordId, record_content_hash: t.contentHash ?? null, package_sha256: t.packageSha256, snapshot_sha256: t.snapshotSha256 ?? null, check_report_sha256: t.checkReportSha256 ?? null, checks: 'pass' })),
+    not_sent: built.notSent.map((n) => ({ task_id: n.taskId, record_id: n.recordId, code: n.code, checks: (n.problems ?? []).map((p) => p.code) })),
+    signature: null,
+  };
+  return { ...body, receipt_sha256: jcsSha256(body) };
+}
+
+export type RlGymTaskAnswer = 'accepted' | 'duplicate' | 'rejected' | 'not_answered';
+
+/**
+ * The RL Gym's answer for each task of an export, in Authoring's words. Its receipt gives counts, not a list, so a
+ * task is a duplicate when the same revision was received in an earlier export, rejected when the RL Gym blocked it
+ * (or refused the whole export), and accepted otherwise. A replayed receipt means the whole export was a duplicate.
+ */
+export function rlgymTaskAnswers(run: { outcome: string; tasks: unknown; receipt: unknown; createdAt: Date }, earlier: { outcome: string; tasks: unknown; createdAt: Date }[]): Record<string, RlGymTaskAnswer> {
+  const tasks = (Array.isArray(run.tasks) ? run.tasks : []) as { taskId: string; revision: number }[];
+  const out: Record<string, RlGymTaskAnswer> = {};
+  if (run.outcome === 'rejected') { for (const t of tasks) out[t.taskId] = 'rejected'; return out; }
+  if (run.outcome !== 'received') { for (const t of tasks) out[t.taskId] = 'not_answered'; return out; }
+  const receipt = (run.receipt ?? {}) as { blocked?: { taskId: string }[]; replayed?: boolean };
+  const blocked = new Set((receipt.blocked ?? []).map((b) => b.taskId));
+  const before = new Set(earlier.filter((e) => e.outcome === 'received' && e.createdAt < run.createdAt).flatMap((e) => ((Array.isArray(e.tasks) ? e.tasks : []) as { taskId: string; revision: number }[]).map((t) => `${t.taskId}#${t.revision}`)));
+  for (const t of tasks) out[t.taskId] = blocked.has(t.taskId) ? 'rejected' : receipt.replayed || before.has(`${t.taskId}#${t.revision}`) ? 'duplicate' : 'accepted';
+  return out;
 }

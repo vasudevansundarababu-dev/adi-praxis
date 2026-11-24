@@ -17,8 +17,22 @@ export const TaskValidationResult = z.object({
   title: z.string(),
   status: z.enum(VALIDATION_STATUSES),
   /** What to fix, in the validator's words. */
-  issues: z.array(z.object({ code: z.string(), path: z.string().nullable(), message: z.string() })),
+  issues: z.array(
+    z.object({
+      code: z.string(),
+      path: z.string().nullable(),
+      message: z.string(),
+      /** E-007 phase 2: ADI Forge's own task checks also say the section, who can fix it and whether trying again helps. */
+      section: z.string().optional(),
+      owner: z.enum(['author', 'pm', 'template', 'authoring', 'rlgym']).optional(),
+      retryHelps: z.boolean().optional(),
+      severity: z.enum(['blocking', 'warning']).optional(),
+    }),
+  ),
 });
+
+/** Who fixes a problem, in words for the PM. */
+export const ISSUE_OWNER_LABEL = { author: 'the author', pm: 'the PM', template: 'the template (Studio)', authoring: 'ADI Forge support', rlgym: 'RL Gym' } as const;
 export type TaskValidationResult = z.infer<typeof TaskValidationResult>;
 
 /**

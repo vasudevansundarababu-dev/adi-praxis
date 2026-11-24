@@ -14,6 +14,7 @@ import { loadProject } from './projects';
 import type { AuditInput } from '../platform/audit';
 import { revalidateTask, reworkForValidation } from '../tasks/revalidation';
 import type { TaskCheck } from '@praxis/shared';
+import { taskCheckReport, type TaskCheckReport } from '../tasks/task-integrity';
 
 const Params = z.object({ id: z.string().uuid() });
 const ACCESS = ['ADMIN', 'PM'] as const;
@@ -78,18 +79,44 @@ function runDto(r: { id: string; projectId: string; kind: string; validator: str
 }
 
 /** Validates the records (and, on export, lets Anvil resolve them); a validator failure marks them not validated. */
-async function validate(tx: Db | Tx, validator: AnvilTaskValidator, records: ApprovedTaskRecord[], projectId: string, resolve = false): Promise<{ items: ValidationItem[]; results: TaskValidationResult[]; anvil?: AnvilRunRecord; zips?: Map<number, Buffer> }> {
+async function validate(tx: Db | Tx, validator: AnvilTaskValidator, records: ApprovedTaskRecord[], projectId: string, resolve = false): Promise<{ items: ValidationItem[]; results: TaskValidationResult[]; anvil?: AnvilRunRecord; zips?: Map<number, Buffer>; reports: Map<string, TaskCheckReport> }> {
   const tasks = await tx.taskInstance.findMany({ where: { id: { in: records.map((r) => r.taskInstanceId) } }, select: { id: true, checks: true } });
   const blockers = new Map(tasks.map((t) => [t.id, ((t.checks as { export?: { blockers?: { code: string; path: string; message: string }[] } } | null)?.export?.blockers ?? [])]));
   const templates = new Map((await tx.template.findMany({ where: { id: { in: [...new Set(records.map((r) => r.templateId))] } } })).map((t) => [t.id, t]));
   const items = records.map((r) => validationItem(r, titleOf(r), blockers.get(r.taskInstanceId) ?? [], templates.get(r.templateId)));
+  let out: { items: ValidationItem[]; results: TaskValidationResult[]; anvil?: AnvilRunRecord; zips?: Map<number, Buffer> };
   try {
-    if (validator.run) return { items, ...(await validator.run(items, { projectId, templates }, { resolve })) };
-    return { items, results: await validator.validate(items, { projectId, templates }) };
+    if (validator.run) out = { items, ...(await validator.run(items, { projectId, templates }, { resolve })) };
+    else out = { items, results: await validator.validate(items, { projectId, templates }) };
   } catch (e) {
     const message = `The validator did not answer: ${e instanceof Error ? e.message : String(e)}`;
-    return { items, results: items.map((i) => ({ recordId: i.record.id, taskId: i.taskId, title: i.title, status: 'not_validated' as const, issues: [{ code: 'VALIDATOR_UNAVAILABLE', path: null, message }] })) };
+    out = { items, results: items.map((i) => ({ recordId: i.record.id, taskId: i.taskId, title: i.title, status: 'not_validated' as const, issues: [{ code: 'VALIDATOR_UNAVAILABLE', path: null, message, owner: 'rlgym' as const, retryHelps: true, severity: 'blocking' as const }] })) };
   }
+  // E-007 phase 2: ADI Forge's own checks on each approved record (the frozen snapshot), added to the validator's verdict.
+  const reports = await recordReports(tx, records);
+  out.results = out.results.map((r) => {
+    const rep = reports.get(r.recordId);
+    if (!rep?.problems.length) return r;
+    const issues = [...r.issues, ...rep.problems.map((p) => ({ code: p.code, path: p.field, message: p.message, section: p.section, owner: p.owner, retryHelps: p.retryHelps, severity: p.severity }))];
+    const status = r.status === 'valid' && rep.status === 'fail' ? ('needs_fix' as const) : r.status;
+    return { ...r, status, issues };
+  });
+  return { ...out, reports };
+}
+
+/** The task check report of each approved record, on the record's own content. */
+export async function recordReports(tx: Db | Tx, records: ApprovedTaskRecord[]): Promise<Map<string, TaskCheckReport>> {
+  const tasks = await tx.taskInstance.findMany({ where: { id: { in: records.map((r) => r.taskInstanceId) } }, include: { project: { include: { template: true } } } });
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const out = new Map<string, TaskCheckReport>();
+  for (const r of records) {
+    const t = byId.get(r.taskInstanceId);
+    if (!t || t.taskType !== 'AUTHORING') continue;
+    // The record is checked against its own template version; a project moved to another version is reported as stale.
+    const template = (await tx.template.findUnique({ where: { id: r.templateId } })) ?? t.project.template;
+    out.set(r.id, await taskCheckReport(tx, { id: t.id, clientId: t.clientId, input: r.input, benchmark: t.benchmark, project: { templateId: t.project.templateId, template } }, r.output, r));
+  }
+  return out;
 }
 
 /**
@@ -159,6 +186,16 @@ export const projectExportRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Objec
       return { status: 201, body: runDto(run) };
     });
     return reply;
+  });
+
+  // E-007 phase 2: the task check report as JSON (the same checks Validate, approval and Export run).
+  app.get('/projects/:id/tasks/:taskId/check-report', { config: { access: ACCESS }, schema: { tags: ['projects'], params: Params.extend({ taskId: z.string().uuid() }) } }, async (req) => {
+    const p = await loadProject(db, req.params.id, req.actor!);
+    const t = await db.taskInstance.findFirst({ where: { id: req.params.taskId, projectId: p.id, clientId: req.actor!.clientId }, include: { project: { include: { template: true } } } });
+    if (!t) throw notFound('Task not found');
+    const record = (await currentRecords(db, req.actor!.clientId, p.id)).find((r) => r.taskInstanceId === t.id) ?? null;
+    if (record) return (await recordReports(db, [record])).get(record.id) ?? null;
+    return taskCheckReport(db, { id: t.id, clientId: t.clientId, input: t.input, benchmark: t.benchmark, project: { templateId: t.project.templateId, template: t.project.template } }, t.output);
   });
 
   app.get('/projects/:id/exports/:runId/download', { config: { access: ACCESS }, schema: { tags: ['projects'], params: Params.extend({ runId: z.string().uuid() }) } }, async (req, reply) => {

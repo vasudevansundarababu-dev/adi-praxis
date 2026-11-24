@@ -10,7 +10,7 @@ import type { OutboxInput } from '../outbox/outbox';
 import { authoredContent, compileForSubmission, profileSaveProblems } from './profile-output';
 import { acceptTask, rejectTask, reviewableTask, type ReviewerIdentity } from './review-service';
 import { blocking, evaluateTask, refreshSimilarity, type StoredChecks } from './submission';
-import { approvalExportBlocker, revalidateTask, reworkForValidation, type ApprovalBlocked } from './revalidation';
+import { approvalExportBlocker, approvalIntegrity, revalidateTask, reworkForValidation, type ApprovalBlocked } from './revalidation';
 import type { SimilarMatch } from './similarity';
 
 /**
@@ -186,7 +186,10 @@ export async function decideStageFor(tx: Tx, t: StageTask, reviewer: ReviewerIde
       const notExportable = approvalExportBlocker(t.project.template, t, authoredContent(t.output));
       if (notExportable) throw new AppError(409, 'NOT_EXPORTABLE', notExportable);
     }
-    const rv = await revalidateTask(tx, t);
+    const integrity = await approvalIntegrity(tx, t);
+    if (integrity.stop && body.stage === 'PM_APPROVAL') throw new AppError(409, 'NOT_APPROVABLE', integrity.stop);
+    const base = await revalidateTask(tx, t);
+    const rv = { checks: [...base.checks, ...integrity.authorChecks], failing: [...base.failing, ...integrity.authorChecks] };
     if (!rv.failing.length) return null;
     await reworkForValidation(tx, t, { trigger: 'approval', actorId: reviewer.id, byUser: reviewer.kind === 'USER', version: v.version, checks: rv.checks, failing: rv.failing, stage: body.stage, contentHash: hash, auditExtra: { responsibility, ...auditExtra } }, audit);
     return { status: 'REWORK', approvalBlocked: true, version: v.version, checks: rv.failing };

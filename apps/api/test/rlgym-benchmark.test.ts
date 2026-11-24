@@ -246,7 +246,7 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
   }
 
   /** Tasks with the embedded v8 outputs; `benchmark` per task; approved by a person when `approve`. */
-  async function authored(projectId: string, o: { benchmark?: (i: number) => object | null; approve?: boolean; smeUserId?: string } = {}) {
+  async function authored(projectId: string, o: { benchmark?: (i: number) => object | null; approve?: boolean; smeUserId?: string; output?: (i: number, output: any) => any } = {}) {
     const reviewer = await createUser(clientId, ['ADMIN']);
     const tasks = await db.taskInstance.findMany({ where: { projectId } });
     const out: { taskId: string; record: ApprovedTaskRecord | null }[] = [];
@@ -257,8 +257,9 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
       const sme = o.smeUserId ? { id: o.smeUserId } : await db.smeUser.create({ data: { clientId, contactEmail: `${value}-${randomUUID().slice(0, 4)}@sme.test` } });
       const cand = (await db.candidate.findFirst({ where: { smeUserId: sme.id } })) ?? (await db.candidate.create({ data: { clientId, smeUserId: sme.id } }));
       const benchmark = o.benchmark?.(i) ?? null;
-      await db.taskInstance.update({ where: { id: task.id }, data: { status: o.approve === false ? 'IN_PROGRESS' : 'ACCEPTED', assignedToId: cand.id, assignedAt: new Date(), submittedAt: new Date(), output: candidate.output as unknown as Prisma.InputJsonValue, ...(benchmark ? { benchmark: benchmark as Prisma.InputJsonValue } : {}) } });
-      await db.taskSubmission.create({ data: { clientId, taskInstanceId: task.id, version: 1, output: candidate.output as unknown as Prisma.InputJsonValue, checks: {} } });
+      const output = o.output ? o.output(i, structuredClone(candidate.output)) : candidate.output;
+      await db.taskInstance.update({ where: { id: task.id }, data: { status: o.approve === false ? 'IN_PROGRESS' : 'ACCEPTED', assignedToId: cand.id, assignedAt: new Date(), submittedAt: new Date(), output: output as unknown as Prisma.InputJsonValue, ...(benchmark ? { benchmark: benchmark as Prisma.InputJsonValue } : {}) } });
+      await db.taskSubmission.create({ data: { clientId, taskInstanceId: task.id, version: 1, output: output as unknown as Prisma.InputJsonValue, checks: {} } });
       const record = o.approve === false ? null : await db.$transaction((tx) => writeApprovedRecord(tx, { taskId: task.id, reviewerId: reviewer.id, reviewNotes: null, duplicateDecision: null, decidedAt: new Date() }));
       out.push({ taskId: task.id, record });
       i += 1;
@@ -366,6 +367,76 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     for (const t of after.json().tasks as { recordId: string; inRlGym: boolean }[]) expect(t.inRlGym).toBe(sentIds.has(t.recordId));
     // Append-only.
     await expect(db.$executeRaw`DELETE FROM "RlGymProjectExport"`).rejects.toThrow();
+  });
+
+  it('E-007 phase 2: stronger checks on the frozen snapshot in Validate, approval and Export; JSON report; receipt; the RL Gym’s answer per task', async () => {
+    const { approvalIntegrity } = await import('../src/tasks/revalidation');
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    await qualify(v8);
+    const projectId = await project(v8);
+    // Task 0 names a step tool its S3 does not offer (as the custodial task of 23 Nov did).
+    let dropped = '';
+    const rows = await packable(
+      await authored(projectId, {
+        output: (i, out) => {
+          if (i !== 0) return out;
+          const used = (out.sections.S5.steps as { tool?: string }[]).map((st) => st.tool).filter(Boolean) as string[];
+          dropped = used.find((t) => (out.sections.S3.tools as string[]).includes(t))!;
+          out.sections.S3.tools = (out.sections.S3.tools as string[]).filter((t) => t !== dropped);
+          return out;
+        },
+      }),
+    );
+    const bad = rows[0]!.record!;
+    expect(dropped).not.toBe('');
+    // JSON report: section, field, code, owner, retry.
+    const report = await get(pm, `/projects/${projectId}/tasks/${bad.taskInstanceId}/check-report`);
+    expect(report.statusCode, report.body).toBe(200);
+    expect(report.json()).toMatchObject({ schema: 'praxis.task-check-report.v1', taskId: bad.taskInstanceId, recordId: bad.id, status: 'fail', snapshotSha256: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    const problems = report.json().problems as Record<string, unknown>[];
+    expect(problems.length).toBeGreaterThan(0);
+    for (const p of problems) expect(p).toMatchObject({ code: 'STEP_TOOL_NOT_OFFERED', section: 'S5', field: expect.stringMatching(/^S5\.steps\[\d+\]\.tool$/), owner: 'author', retryHelps: false, severity: 'blocking', message: expect.stringContaining(dropped) });
+    // Approval: the author's problem joins the D18 checks.
+    const t = await db.taskInstance.findUniqueOrThrow({ where: { id: bad.taskInstanceId }, include: { project: { include: { template: true } } } });
+    const integrity = await db.$transaction((tx) => approvalIntegrity(tx, t));
+    expect(integrity.stop).toBeNull();
+    expect(integrity.authorChecks.length).toBe(problems.length);
+    for (const c of integrity.authorChecks) expect(c).toMatchObject({ id: 'integrity.STEP_TOOL_NOT_OFFERED', section: 'S5', ok: false });
+    // Validate: the task needs a fix, and the issue says who fixes it.
+    const v = await post(pm, `/projects/${projectId}/validate`, { recordIds: [bad.id] });
+    expect(v.statusCode, v.body).toBe(201);
+    expect(v.json().results[0].issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'STEP_TOOL_NOT_OFFERED', section: 'S5', owner: 'author', retryHelps: false })]));
+    expect(v.json().results[0].status).not.toBe('valid');
+    // Export: the failing task is not sent, with why and who fixes it (here it was the only task, so nothing goes).
+    answer = (c) => (c.url.endsWith('/exports') ? { status: 201, body: { data: { new: c.body.tasks.length, superseding: 0, unchanged: 0, blocked: [] }, meta: { request_id: 'req-1' } } } : { status: 404, body: {} });
+    const blocked = await post(pm, `/projects/${projectId}/rlgym-exports`);
+    expect(blocked.statusCode, blocked.body).toBe(422);
+    expect(blocked.json().details.notSent).toEqual(expect.arrayContaining([expect.objectContaining({ taskId: bad.taskInstanceId, code: 'CHECKS_FAILED', problems: expect.arrayContaining([expect.objectContaining({ code: 'STEP_TOOL_NOT_OFFERED', owner: 'author' })]) })]));
+    expect(calls.some((c) => c.url.endsWith('/exports'))).toBe(false);
+
+    // A clean project: the check report passes; the export carries ADI Forge's receipt and the RL Gym's answer per task.
+    const cleanProject = await project(v8);
+    const clean = await packable(await authored(cleanProject));
+    expect(clean.length).toBeGreaterThan(0);
+    expect((await get(pm, `/projects/${cleanProject}/tasks/${clean[0]!.record!.taskInstanceId}/check-report`)).json()).toMatchObject({ status: 'pass', problems: [] });
+    const res = await post(pm, `/projects/${cleanProject}/rlgym-exports`);
+    expect(res.statusCode, res.body).toBe(201);
+    const run = await db.rlGymProjectExport.findFirstOrThrow({ where: { projectId: cleanProject } });
+    const { receipt_sha256, ...rest } = run.authoringReceipt as Record<string, unknown>;
+    expect(receipt_sha256).toBe(jcsSha256(rest));
+    expect(rest).toMatchObject({ schema: 'praxis.export-receipt.v1', export_id: run.exportId, export_sha256: run.exportSha256, signature: null });
+    expect((rest.not_sent as { code: string }[]).some((n) => n.code === 'CHECKS_FAILED')).toBe(false);
+    const sentIds = clean.map((r) => r.record!.taskInstanceId);
+    expect((rest.tasks as { task_id: string; snapshot_sha256: string; package_sha256: string; record_content_hash: string }[]).map((x) => x.task_id).sort()).toEqual([...sentIds].sort());
+    for (const x of rest.tasks as { snapshot_sha256: string; package_sha256: string; check_report_sha256: string }[]) expect([x.snapshot_sha256, x.package_sha256, x.check_report_sha256].every((h) => /^[0-9a-f]{64}$/.test(h))).toBe(true);
+    expect(res.json()).toMatchObject({ authoringReceiptSha256: receipt_sha256 });
+    expect(Object.values(res.json().taskAnswers)).toEqual(Array(clean.length).fill('accepted'));
+    // Exporting again with nothing changed: the RL Gym already has those revisions.
+    const again = await post(pm, `/projects/${cleanProject}/rlgym-exports`);
+    expect(again.statusCode, again.body).toBe(201);
+    expect(Object.values(again.json().taskAnswers)).toEqual(Array(clean.length).fill('duplicate'));
+    const state = (await get(pm, `/projects/${cleanProject}/rlgym-export`)).json();
+    expect(state.runs[0]).toMatchObject({ authoringReceiptSha256: expect.stringMatching(/^[0-9a-f]{64}$/), taskAnswers: expect.any(Object) });
   });
 
   it('export is off and says why when the RL Gym has not qualified the version; an unreachable RL Gym is recorded', async () => {
@@ -702,6 +773,52 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect((await post(me.cookie, `/me/tasks/${row!.taskId}/fields/coach`, { section: 'S1', field: 'nope', mode: 'check', text: 'x' })).statusCode).toBe(404);
     const other = await signIn('not-mine-d027@gmail.test');
     expect((await post(other.cookie, `/me/tasks/${row!.taskId}/fields/coach`, { section: 'S1', field: 'trigger', mode: 'check', text: 'x' })).statusCode).toBe(404);
+  });
+
+  it('E-007 phase 2: a Benchmark review item shows the run, score pass and evidence digest; Accept, Dispute or Can’t assess; a stale or superseded decision is refused', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    const projectId = await project(v8);
+    const t = (await packable(await authored(projectId)))[0]!.record!;
+    const ep = (id: string, score: number) => ({ item_id: id, episode_id: `ep-${id}`, system: { id: 'm', version: '1', name: 'Mock' }, attempt: 1, case_id: 'kyc-1', score, criteria: [], path: {}, timeline: [], final_output: {}, suspected_cause: 'agent', suspected_cause_source: 'rules' });
+    const batch = (batchId: string, pass: number, score: number) => ({ schema: 'rlgym.sme-review-package.v1', batch_id: batchId, run_id: 'run-0300', project_id: projectId, template: {}, scoring_pass: { pass, reason: pass === 1 ? 'first' : 'rescored' }, rubric: [], tasks: [{ task_id: t.taskInstanceId, revision: 1, episodes: [ep('it-1', score), ep('it-2', score)] }], synthetic: true });
+    const first = await asGym('POST', `/projects/${projectId}/run-reviews`, batch('smr-p1', 1, 40));
+    expect(first.statusCode, first.body).toBe(202);
+    const ref1 = first.json().forge_batch_ref as string;
+    const item = (await get(pm, `/projects/${projectId}/run-reviews`)).json().items[0].items[0];
+    expect(item).toMatchObject({ itemId: 'it-1', runId: 'run-0300', scorePass: 1, evidenceSha256: jcsSha256(ep('it-1', 40)) });
+    answer = (c) => (c.url.includes('/sme-review-batches/') ? { status: 200, body: { data: { accepted: c.body.decisions.length }, meta: { request_id: 'r' } } } : { status: 404, body: {} });
+    const decide = (ref: string, body: object) => post(pm, `/projects/${projectId}/run-reviews/${ref}/decisions`, body);
+    // Stale: the reviewer saw another score pass, or other evidence.
+    expect((await decide(ref1, { scorePass: 2, decisions: [{ itemId: 'it-1', decision: 'agent_failure', rationale: 'Agent missed the expiry.' }] })).json().error).toBe('STALE_SCORE_PASS');
+    expect((await decide(ref1, { scorePass: 1, decisions: [{ itemId: 'it-1', decision: 'agent_failure', rationale: 'Agent missed the expiry.', evidenceSha256: 'f'.repeat(64) }] })).json().error).toBe('EVIDENCE_CHANGED');
+    // Accept, bound to pass 1 and the evidence; the RL Gym is told the verdict, pass and digest.
+    const ok = await decide(ref1, { scorePass: 1, decisions: [{ itemId: 'it-1', decision: 'agent_failure', rationale: 'Agent missed the expiry.', evidenceSha256: item.evidenceSha256 }] });
+    expect(ok.statusCode, ok.body).toBe(201);
+    expect(ok.json().decisions[0]).toMatchObject({ verdict: 'accept', scorePass: 1, evidenceSha256: item.evidenceSha256 });
+    expect(calls.filter((c) => c.url.includes('/sme-review-batches/')).at(-1)!.body.decisions[0]).toMatchObject({ item_id: 'it-1', decision: 'agent_failure', verdict: 'accept', score_pass: 1, evidence_sha256: item.evidenceSha256 });
+    // Can't assess stays in ADI Forge: nothing is sent to the RL Gym.
+    const before = calls.length;
+    const cant = await decide(ref1, { scorePass: 1, decisions: [{ itemId: 'it-2', decision: 'cannot_assess', rationale: 'The timeline is empty, so I cannot judge it.' }] });
+    expect(cant.statusCode, cant.body).toBe(201);
+    expect(cant.json().decisions[0]).toMatchObject({ verdict: 'cannot_assess' });
+    expect(calls.length).toBe(before);
+    expect(await db.runReviewDecision.findFirstOrThrow({ where: { itemId: 'it-2' } })).toMatchObject({ verdict: 'cannot_assess', sendOutcome: 'kept_in_forge', scorePass: 1 });
+    // The RL Gym re-scores the run (pass 2): the earlier decisions do not decide the new batch, and nothing more can be
+    // decided on pass 1.
+    const second = await asGym('POST', `/projects/${projectId}/run-reviews`, batch('smr-p2', 2, 55));
+    const ref2 = second.json().forge_batch_ref as string;
+    const list = (await get(pm, `/projects/${projectId}/run-reviews`)).json().items;
+    const p2 = list.find((b: { batchId: string }) => b.batchId === 'smr-p2');
+    expect(p2.items.map((i: { decision: unknown; scorePass: number }) => [i.scorePass, i.decision])).toEqual([[2, null], [2, null]]);
+    const third = await asGym('POST', `/projects/${projectId}/run-reviews`, { ...batch('smr-p1b', 1, 40), tasks: [{ task_id: t.taskInstanceId, revision: 1, episodes: [ep('it-9', 40)] }] });
+    expect(third.statusCode).toBe(202);
+    const old = await decide(ref1, { scorePass: 1, decisions: [{ itemId: 'it-1', decision: 'grader_wrong', rationale: 'x', criterionId: 'decision' }] });
+    expect(old.statusCode).toBe(409);
+    // Deciding the newer pass works.
+    const p2item = p2.items[0];
+    const newer = await decide(ref2, { scorePass: 2, decisions: [{ itemId: 'it-1', decision: 'grader_wrong', rationale: 'The grader missed the cited evidence.', criterionId: 'decision', evidenceSha256: p2item.evidenceSha256 }] });
+    expect(newer.statusCode, newer.body).toBe(201);
+    expect(newer.json().decisions[0]).toMatchObject({ verdict: 'dispute', scorePass: 2 });
   });
 
   it('SME review batches: received idempotently; a person decides; decisions go to the RL Gym; task_correction reopens the task', async () => {

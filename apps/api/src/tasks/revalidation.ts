@@ -7,6 +7,7 @@ import type { Tx } from '../db';
 import type { AuditInput } from '../platform/audit';
 import { authoredContent, compileForSubmission } from './profile-output';
 import { blocking, evaluateTask, type StoredChecks } from './submission';
+import { OWNER_LABEL, problemCheck, splitByOwner, taskCheckReport } from './task-integrity';
 
 /**
  * D18 (owner, 16 Nov 2026): "If validation fails even if its approved then we need make the task needed for re work."
@@ -68,6 +69,19 @@ export function approvalExportBlocker(template: Template, task: Pick<TaskInstanc
   const p = taskPackageProblem({ record: pseudo, template });
   if (!p || AUTHOR_FIXABLE_PACKAGE.has(p.code)) return null;
   return `This task can’t be approved yet: the benchmark could not receive it. ${p.message} This is not something the author can fix; Validate shows the same problem. Ask your Admin to raise it with Studio.`;
+}
+
+/**
+ * E-007 phase 2 (owner, 24 Nov 2026): the stronger checks on the content being approved (a frozen snapshot). The
+ * author's problems join the D18 checks (the task goes back with them pinned to their sections); a problem only the PM,
+ * the template or ADI Forge can fix stops the approval with a plain message, since sending the task back would not help.
+ */
+export async function approvalIntegrity(tx: Tx, t: Pick<TaskInstance, 'id' | 'clientId' | 'taskType' | 'input' | 'output'> & { benchmark?: unknown; project: { template: Template } }) {
+  if (t.taskType !== 'AUTHORING') return { authorChecks: [] as TaskCheck[], stop: null as string | null, report: null };
+  const report = await taskCheckReport(tx, { id: t.id, clientId: t.clientId, input: t.input, benchmark: t.benchmark ?? null, project: { templateId: t.project.template.id, template: t.project.template } }, t.output);
+  const { author, others } = splitByOwner(report.problems);
+  const stop = others.length ? `This task can’t be approved yet: ${others.map((p) => `${p.section}: ${p.message} (to fix: ${OWNER_LABEL[p.owner]})`).join(' · ')}` : null;
+  return { authorChecks: author.map(problemCheck), stop, report };
 }
 
 const sectionOf = (path: string) => /^(S\d+)\b/.exec(path)?.[1] ?? (path.startsWith('rubric') ? 'W05' : 'W06');

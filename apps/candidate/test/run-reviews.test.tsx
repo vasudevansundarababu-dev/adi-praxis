@@ -17,7 +17,7 @@ const REVIEW = {
   projectName: 'KYC Customer onboarding for US bank',
   receivedAt: '2026-11-23T15:38:59.742Z',
   items: [
-    { itemId: 'it-1', taskId: '24c82997-e8fa-46f0-8a41-863bd3e54dbd', revision: 1, episode: { score: { score: 42.86, passed: false, failed_criteria: ['account_agreements'] }, path: { summary: 'Took 3 of 8 steps', failed_node: 'account' }, suspected_cause: 'task' }, decision: null },
+    { itemId: 'it-1', taskId: '24c82997-e8fa-46f0-8a41-863bd3e54dbd', revision: 1, runId: 'run-0228', scorePass: 2, evidenceSha256: 'ab'.repeat(32), episode: { score: { score: 42.86, passed: false, failed_criteria: ['account_agreements'] }, path: { summary: 'Took 3 of 8 steps', failed_node: 'account' }, suspected_cause: 'task' }, decision: null },
     { itemId: 'it-2', taskId: '24c82997-e8fa-46f0-8a41-863bd3e54dbd', revision: 1, episode: { score: 70 }, decision: { decision: 'agent_failure', rationale: 'Skipped screening.', criterionId: null, decidedBy: 'John Doe', at: '2026-11-23T16:00:00Z' } },
   ],
 };
@@ -48,7 +48,11 @@ describe('Run reviews page', () => {
     expect(t).toContain('RL Gym’s hint (not a decision): task');
     expect(html).toMatch(/Rationale<\/span><input class="input"/);
     expect(t).toContain('Type a rationale to decide.');
-    expect(t).toContain('Decided: Agent failure confirmed by John Doe · Skipped screening.');
+    expect(t).toContain('Decided: Accept: the score stands (agent failure confirmed) by John Doe · Skipped screening.');
+    // E-007 phase 2: what the decision is bound to, and the three kinds of verdict.
+    expect(t).toContain(`Reviewing run run-0228 · score pass 2 · evidence ${'ab'.repeat(8)}`);
+    expect(t).toContain('Your verdict');
+    for (const v of ['Accept: the score stands', 'Dispute: the grader is wrong', 'Can’t assess']) expect(t).toContain(v);
     expect(a11yProblems(html)).toEqual([]);
     expect(canDecide({ decision: 'task_correction', rationale: 'Step 4 is wrong.', criterionId: '' })).toBe(true);
     expect(decideHint({ decision: 'rubric_correction', rationale: 'x', criterionId: '' })).toBe('Type the criterion it is about to decide.');

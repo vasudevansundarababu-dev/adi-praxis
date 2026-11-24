@@ -3364,6 +3364,8 @@ model RlGymProjectExport {
   requestId     String?  @map("request_id")
   receipt       Json?
   error         Json?
+  /// E-007 phase 2: ADI Forge's own receipt for the export (praxis.export-receipt.v1): digests per task, unsigned for now.
+  authoringReceipt Json? @map("authoring_receipt")
   requestedById String   @map("requested_by_id") @db.Uuid
   createdAt     DateTime @default(now()) @map("created_at")
 
@@ -3405,6 +3407,10 @@ model RunReviewDecision {
   httpStatus   Int?           @map("http_status")
   response     Json?
   reworkTaskId String?        @map("rework_task_id") @db.Uuid
+  /// E-007 phase 2: accept, dispute or cannot_assess; the score pass and the evidence digest the reviewer saw.
+  verdict        String?
+  scorePass      Int?    @map("score_pass")
+  evidenceSha256 String? @map("evidence_sha256")
   createdAt    DateTime       @default(now()) @map("created_at")
   batch        RunReviewBatch @relation(fields: [batchRowId], references: [id], onDelete: Restrict)
 

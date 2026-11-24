@@ -10,6 +10,9 @@ import { mutate } from '@/lib/client-api';
  * The RL Gym's suspected cause is shown as a hint only: a person makes every decision.
  */
 
+const ANSWER_LABEL = { accepted: 'accepted by RL Gym', duplicate: 'already in RL Gym (duplicate, unchanged)', rejected: 'rejected by RL Gym', not_answered: 'no answer from RL Gym' } as const;
+const OWNER_WORDS: Record<string, string> = { author: 'the author (send it back for rework)', pm: 'the PM', template: 'the template (Studio)', authoring: 'ADI Forge support', rlgym: 'RL Gym' };
+
 export interface RlGymExportState {
   connected: boolean;
   canExport: boolean;
@@ -17,7 +20,7 @@ export interface RlGymExportState {
   rlgymTemplate: { id: string; version: number; specSha256: string } | null;
   exported: boolean;
   tasks: { recordId: string; taskId: string; title: string; revision: number | null; inRlGym: boolean; waitingFor: string | null }[];
-  runs: { id: string; exportId: string; reason: string; outcome: string; createdAt: string; tasks: unknown[]; notSent: { title: string; code: string; message: string }[]; receipt: { new: number; superseding: number; unchanged: number; blocked: { taskId: string; reason: string }[]; replayed: boolean } | null; error: { code: string; message: string } | null }[];
+  runs: { id: string; exportId: string; reason: string; outcome: string; createdAt: string; tasks: unknown[]; notSent: { title: string; code: string; message: string; problems?: { code: string; section: string; field: string | null; owner: string; retryHelps: boolean; message: string }[] }[]; authoringReceiptSha256?: string | null; taskAnswers?: Record<string, 'accepted' | 'duplicate' | 'rejected' | 'not_answered'>; receipt: { new: number; superseding: number; unchanged: number; blocked: { taskId: string; reason: string }[]; replayed: boolean } | null; error: { code: string; message: string } | null }[];
 }
 export interface NeedRow {
   id: string;
@@ -39,7 +42,7 @@ export interface ReviewBatch {
   runId: string | null;
   receivedAt: string;
   note: unknown;
-  items: { itemId: string; taskId: string; revision: number; episode: Record<string, unknown>; decision: { decision: string; rationale: string; criterionId: string | null; decidedBy: string; at: string } | null }[];
+  items: { itemId: string; taskId: string; revision: number; episode: Record<string, unknown>; runId?: string | null; scorePass?: number | null; evidenceSha256?: string; decision: { decision: string; verdict?: string | null; scorePass?: number | null; evidenceSha256?: string | null; rationale: string; criterionId: string | null; decidedBy: string; at: string } | null }[];
   /** D-004: who reviews each task's episodes. Absent from older responses. */
   tasks?: ReviewTask[];
 }
@@ -58,11 +61,12 @@ export interface ReviewTask {
 const ROLE_LABEL = { author: 'wrote the task', reviewer: 'SME Reviewer' } as const;
 
 const DECISION_LABEL: Record<string, string> = {
-  agent_failure: 'Agent failure confirmed',
-  task_correction: 'Task needs correction',
-  rubric_correction: 'Rubric needs correction',
-  grader_wrong: 'Grader is wrong',
-  environment_wrong: 'Environment is wrong',
+  agent_failure: 'Accept: the score stands (agent failure confirmed)',
+  task_correction: 'Dispute: the task needs correction',
+  rubric_correction: 'Dispute: the rubric needs correction',
+  grader_wrong: 'Dispute: the grader is wrong',
+  environment_wrong: 'Dispute: the environment is wrong',
+  cannot_assess: 'Can’t assess',
 };
 
 function Err({ text }: { text: string | null }) {
@@ -137,14 +141,40 @@ export function RlGymExportPanel({ projectId, initial }: { projectId: string; in
                 {r.outcome === 'received' && r.receipt
                   ? `RL Gym receipt: ${r.receipt.new} imported, ${r.receipt.superseding} superseding, ${r.receipt.unchanged} unchanged, ${r.receipt.blocked.length} blocked${r.receipt.replayed ? ' (replayed)' : ''}`
                   : `${r.outcome === 'rejected' ? 'Refused by RL Gym' : 'RL Gym unavailable'}: ${r.error?.message ?? ''}`}
-                {r.notSent.length > 0 && (
-                  <ul className="mt-1 list-disc pl-5 text-fg-muted">
-                    {r.notSent.map((n, i) => (
-                      <li key={i}>
-                        Not sent: {n.title}: {n.message}
+                {r.taskAnswers && Object.keys(r.taskAnswers).length > 0 && (
+                  <ul className="mt-1 list-disc pl-5" aria-label="RL Gym’s answer per task" data-task-answers>
+                    {(r.tasks as { taskId: string; title: string; revision: number }[]).map((t) => (
+                      <li key={t.taskId} data-answer={r.taskAnswers![t.taskId]}>
+                        {t.title} (revision {t.revision}): {ANSWER_LABEL[r.taskAnswers![t.taskId] ?? 'not_answered']}
                       </li>
                     ))}
                   </ul>
+                )}
+                {r.notSent.length > 0 && (
+                  <ul className="mt-1 list-disc pl-5 text-fg-muted">
+                    {r.notSent.map((n, i) => (
+                      <li key={i} data-not-sent={n.code}>
+                        Not sent: {n.title}
+                        {n.problems?.length ? (
+                          <ul className="list-[circle] pl-5">
+                            {n.problems.map((p, j) => (
+                              <li key={j} data-check={p.code}>
+                                <span className="font-mono text-xs">{p.code}</span> {p.section}
+                                {p.field ? ` · ${p.field}` : ''}: {p.message} To fix: {OWNER_WORDS[p.owner] ?? p.owner}. {p.retryHelps ? 'Trying again may help.' : 'Trying again won’t help until it is fixed.'}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <>: {n.message}</>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {r.authoringReceiptSha256 && (
+                  <p className="mt-1 text-xs text-fg-muted">
+                    ADI Forge receipt <span className="font-mono">{r.authoringReceiptSha256.slice(0, 16)}</span>
+                  </p>
                 )}
               </li>
             ))}
@@ -321,11 +351,13 @@ export function BenchmarkReviewPanel({ projectId, batches, connected, canDecide:
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, { decision: string; rationale: string; criterionId: string }>>({});
-  async function decide(ref: string, itemId: string) {
+  async function decide(ref: string, item: ReviewBatch['items'][number]) {
+    const itemId = item.itemId;
     const d = draft[itemId];
     if (!d) return;
     setError(null);
-    const res = await mutate('POST', `/projects/${projectId}/run-reviews/${ref}/decisions`, { decisions: [{ itemId, decision: d.decision, rationale: d.rationale, ...(d.criterionId ? { criterionId: d.criterionId } : {}) }] });
+    // E-007 phase 2: the decision names the score pass and the evidence reviewed; a stale one is refused.
+    const res = await mutate('POST', `/projects/${projectId}/run-reviews/${ref}/decisions`, { ...(item.scorePass ? { scorePass: item.scorePass } : {}), decisions: [{ itemId, decision: d.decision, rationale: d.rationale, ...(d.criterionId ? { criterionId: d.criterionId } : {}), ...(item.evidenceSha256 ? { evidenceSha256: item.evidenceSha256 } : {}) }] });
     if (!res.ok) return setError(res.error);
     router.refresh();
   }
@@ -361,6 +393,9 @@ export function BenchmarkReviewPanel({ projectId, batches, connected, canDecide:
                   <p>
                     <span className="font-mono text-xs">{i.itemId}</span> · task {i.taskId.slice(0, 8)} r{i.revision} · {scoreText(e.score)} · {String((e.system as { name?: string } | undefined)?.name ?? '')}
                   </p>
+                  <p className="text-xs text-fg-muted" data-bound>
+                    Reviewing run {i.runId ?? '—'} · score pass {i.scorePass ?? '—'} · evidence <span className="font-mono">{i.evidenceSha256?.slice(0, 16) ?? '—'}</span>
+                  </p>
                   {pathText(path) && <p className="text-fg-muted">Path: {pathText(path)}</p>}
                   {typeof e.suspected_cause === 'string' && <p className="text-fg-muted">RL Gym’s hint (not a decision): {e.suspected_cause}</p>}
                   {i.decision ? (
@@ -372,7 +407,7 @@ export function BenchmarkReviewPanel({ projectId, batches, connected, canDecide:
                   ) : (
                     <div className="mt-2 flex flex-wrap items-end gap-2">
                       <label className="flex flex-col">
-                        <span className="text-xs text-fg-muted">Decision</span>
+                        <span className="text-xs text-fg-muted">Verdict</span>
                         <select className="input" value={d.decision} onChange={(ev) => setDraft({ ...draft, [i.itemId]: { ...d, decision: ev.target.value } })}>
                           {Object.entries(DECISION_LABEL).map(([k, v]) => (
                             <option key={k} value={k}>
@@ -391,7 +426,7 @@ export function BenchmarkReviewPanel({ projectId, batches, connected, canDecide:
                         <span className="text-xs text-fg-muted">Rationale</span>
                         <input className="input" value={d.rationale} onChange={(ev) => setDraft({ ...draft, [i.itemId]: { ...d, rationale: ev.target.value } })} />
                       </label>
-                      <button type="button" className="btn btn-primary" aria-describedby={`decide-${i.itemId}-hint`} disabled={!canDecide(connected, d)} onClick={() => decide(b.ref, i.itemId)}>
+                      <button type="button" className="btn btn-primary" aria-describedby={`decide-${i.itemId}-hint`} disabled={!canDecide(connected, d)} onClick={() => decide(b.ref, i)}>
                         Decide
                       </button>
                       <span id={`decide-${i.itemId}-hint`} className="basis-full text-xs text-fg-muted">

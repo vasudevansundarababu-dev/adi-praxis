@@ -1,3 +1,4 @@
+import { jcsSha256 } from './jcs';
 import type { Db, Tx } from '../db';
 import { longHeldTasks } from '../routes/benchmark';
 
@@ -71,7 +72,10 @@ export async function assignedRunReviews(db: Db, clientId: string, smeUserId: st
         if (!itemId) return [];
         const d = b.decisions.find((x) => x.itemId === itemId);
         // suspected_cause is the RL Gym's hint only; a person decides.
-        return [{ itemId, taskId: String(t.task_id ?? ''), revision: Number(t.revision ?? 1), episode: e, decision: d ? { decision: d.decision, rationale: d.rationale, criterionId: d.criterionId, decidedBy: d.decidedBy, at: d.createdAt.toISOString() } : null }];
+        // E-007 phase 2: the run, score pass and evidence digest under review, which the decision is bound to.
+        const pass = isObj(body.scoring_pass) && Number.isInteger(body.scoring_pass.pass) ? (body.scoring_pass.pass as number) : null;
+        const evidence = typeof e.evidence_sha256 === 'string' && /^[0-9a-f]{64}$/.test(e.evidence_sha256) ? e.evidence_sha256 : jcsSha256(e);
+        return [{ itemId, taskId: String(t.task_id ?? ''), revision: Number(t.revision ?? 1), episode: e, runId: b.runId, scorePass: pass, evidenceSha256: evidence, decision: d ? { decision: d.decision, verdict: d.verdict, scorePass: d.scorePass, evidenceSha256: d.evidenceSha256, rationale: d.rationale, criterionId: d.criterionId, decidedBy: d.decidedBy, at: d.createdAt.toISOString() } : null }];
       }),
     );
     return [{ ref: b.forgeBatchRef, batchId: b.batchId, runId: b.runId, projectId: b.projectId, projectName: projects.find((p) => p.id === b.projectId)?.name ?? 'Project', receivedAt: b.createdAt.toISOString(), rubric: body.rubric ?? [], items }];

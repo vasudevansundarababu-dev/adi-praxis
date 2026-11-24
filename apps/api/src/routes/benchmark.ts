@@ -6,7 +6,8 @@ import type { Db, Tx } from '../db';
 import { AppError, notFound } from '../lib/errors';
 import { runCandidateCommand, runCandidateCommandPrepared, runCommand, runCommandPrepared, runStaffOrServiceCommand } from '../platform/command';
 import { templateBenchmark, taskBenchmarkOf } from '../anvil/benchmark';
-import { buildRlGymExport, projectIdFromRlGym, rlgymProjectId, rlgymTemplateRef, titleOf, type BuiltExport } from '../anvil/rlgym-export';
+import { buildRlGymExport, exportReceipt, projectIdFromRlGym, rlgymProjectId, rlgymTaskAnswers, rlgymTemplateRef, titleOf, type BuiltExport } from '../anvil/rlgym-export';
+import { recordReports } from './project-export';
 import type { RlGymClient, RlGymResult } from '../anvil/rlgym-client';
 import type { StudioClient, StudioResult, InboxItemBody } from '../anvil/studio-client';
 import { jcsSha256 } from '../anvil/jcs';
@@ -107,7 +108,10 @@ function receiptOf(data: Record<string, unknown>) {
   return { new: n(data.new), superseding: n(data.superseding), unchanged: n(data.unchanged), blocked, replayed: data.replayed === true, receiptSha256: typeof data.receipt_sha256 === 'string' ? data.receipt_sha256 : null };
 }
 
-const runDto = (r: RlGymProjectExport) => ({ id: r.id, exportId: r.exportId, exportSha256: r.exportSha256, reason: r.reason, tasks: r.tasks, notSent: r.notSent, outcome: r.outcome, httpStatus: r.httpStatus, requestId: r.requestId, receipt: r.receipt, error: r.error, createdAt: r.createdAt.toISOString() });
+const runDto = (r: RlGymProjectExport, all: RlGymProjectExport[] = []) => ({
+  authoringReceiptSha256: (r.authoringReceipt as { receipt_sha256?: string } | null)?.receipt_sha256 ?? null,
+  taskAnswers: rlgymTaskAnswers(r, all),
+  id: r.id, exportId: r.exportId, exportSha256: r.exportSha256, reason: r.reason, tasks: r.tasks, notSent: r.notSent, outcome: r.outcome, httpStatus: r.httpStatus, requestId: r.requestId, receipt: r.receipt, error: r.error, createdAt: r.createdAt.toISOString() });
 
 const needDto = (n: SmeNeed, title: string | null) => ({ id: n.id, taskId: n.taskInstanceId, taskTitle: title, kind: n.kind, content: n.content, state: n.state, mergedIntoId: n.mergedIntoId, rejectReason: n.rejectReason, summary: n.summary, studioItemId: n.studioItemId, studioState: n.studioState, sentAt: n.sentAt?.toISOString() ?? null, createdAt: n.createdAt.toISOString() });
 
@@ -128,15 +132,31 @@ async function studioTemplateRef(tx: Db | Tx, t: Template) {
   return null;
 }
 
-const DECISIONS = ['agent_failure', 'task_correction', 'rubric_correction', 'grader_wrong', 'environment_wrong'] as const;
+const DECISIONS = ['agent_failure', 'task_correction', 'rubric_correction', 'grader_wrong', 'environment_wrong', 'cannot_assess'] as const;
+/**
+ * E-007 phase 2 (owner, 24 Nov 2026): each decision is Accept (the score stands: agent failure confirmed), Dispute (with
+ * what is wrong: task, rubric, grader or environment) or Can't assess. Can't assess stays in ADI Forge: the RL Gym takes
+ * only its five decisions, and nothing is released by it.
+ */
+const verdictOf = (decision: string) => (decision === 'agent_failure' ? 'accept' : decision === 'cannot_assess' ? 'cannot_assess' : 'dispute');
 const DecisionsBody = z
   .object({
     decisions: z
-      .array(z.object({ itemId: z.string().min(1).max(200), decision: z.enum(DECISIONS), rationale: z.string().trim().min(1).max(4000), criterionId: z.string().min(1).max(100).optional() }).strict())
+      .array(z.object({ itemId: z.string().min(1).max(200), decision: z.enum(DECISIONS), rationale: z.string().trim().min(1).max(4000), criterionId: z.string().min(1).max(100).optional(), evidenceSha256: z.string().regex(/^[0-9a-f]{64}$/).optional() }).strict())
       .min(1)
       .max(200),
+    /** The score pass the reviewer saw; a decision for another pass is refused. */
+    scorePass: z.number().int().min(1).optional(),
   })
   .strict();
+
+/** The RL Gym's score pass a batch was scored on (scoring_pass.pass), or null for older batches. */
+export const scorePassOf = (body: unknown): number | null => {
+  const p = isObj(body) && isObj(body.scoring_pass) ? body.scoring_pass.pass : null;
+  return Number.isInteger(p) ? (p as number) : null;
+};
+/** The digest of the evidence a reviewer sees for one episode: the RL Gym's own evidence_sha256, else the episode's JCS SHA-256. */
+export const evidenceDigest = (episode: Record<string, unknown>) => (typeof episode.evidence_sha256 === 'string' && /^[0-9a-f]{64}$/.test(episode.evidence_sha256) ? episode.evidence_sha256 : jcsSha256(episode));
 
 /** The episodes of a batch, as reviewers decide them: one item per episode (item_id, or episode_id when no item_id). */
 function batchItems(body: unknown) {
@@ -362,7 +382,7 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
       rlgymTemplate: s.ref,
       exported: s.runs.some((r) => r.outcome === 'received'),
       tasks: s.records.map((r: ApprovedTaskRecord) => ({ recordId: r.id, taskId: r.taskInstanceId, title: titleOf(r), revision: packages.get(r.id) ?? null, inRlGym: sent.has(r.id), waitingFor: s.held.get(r.taskInstanceId) ?? null })),
-      runs: s.runs.slice(0, 20).map(runDto),
+      runs: s.runs.slice(0, 20).map((r) => runDto(r, s.runs)),
     };
   });
 
@@ -378,7 +398,9 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
         const s = await exportState(actor.clientId, p);
         if (s.reason || !s.ref || !rlgym) throw new AppError(409, 'NOT_EXPORTABLE', s.reason ?? 'The project cannot be exported yet.');
         const batches = await correctionBatches(db, actor.clientId, s.records.map((r) => r.taskInstanceId));
-        const built = await db.$transaction((tx) => buildRlGymExport(tx, { id: p.id, name: p.name, template: p.template }, s.records, s.ref!, { exported: s.runs.some((r) => r.outcome === 'received'), held: s.held, batches }));
+        // E-007 phase 2: every approved record is checked on its frozen snapshot first; a failing one is not sent.
+        const reports = await recordReports(db, s.records);
+        const built = await db.$transaction((tx) => buildRlGymExport(tx, { id: p.id, name: p.name, template: p.template }, s.records, s.ref!, { exported: s.runs.some((r) => r.outcome === 'received'), held: s.held, batches, reports }));
         if (!built.tasks.length) throw new AppError(422, 'NOTHING_TO_EXPORT', 'None of the approved tasks can be sent.', { notSent: built.notSent });
         const result = await rlgym.exportProject(rlgymProjectId(p.id), built.body, built.exportSha256);
         return { projectId: p.id, built, result };
@@ -394,6 +416,7 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
             body: built.body as Prisma.InputJsonValue,
             tasks: built.tasks as unknown as Prisma.InputJsonValue,
             notSent: built.notSent as unknown as Prisma.InputJsonValue,
+            authoringReceipt: exportReceipt(built, new Date()) as Prisma.InputJsonValue,
             outcome: result.ok ? 'received' : result.kind,
             httpStatus: result.httpStatus,
             requestId: result.requestId,
@@ -401,8 +424,8 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
             requestedById: actor.userId,
           },
         });
-        await audit({ entityType: 'Project', entityId: projectId, action: 'project.exported_to_rlgym', after: { runId: run.id, exportId: run.exportId, exportSha256: run.exportSha256, outcome: run.outcome, tasks: built.tasks.length, notSent: built.notSent.length, requestId: run.requestId, ...(result.ok ? { receipt: receiptOf(result.data) } : { error: result.code }) } });
-        return { status: 201, body: runDto(run) };
+        await audit({ entityType: 'Project', entityId: projectId, action: 'project.exported_to_rlgym', after: { runId: run.id, exportId: run.exportId, exportSha256: run.exportSha256, authoringReceiptSha256: (run.authoringReceipt as { receipt_sha256?: string } | null)?.receipt_sha256 ?? null, outcome: run.outcome, tasks: built.tasks.length, notSent: built.notSent.length, requestId: run.requestId, ...(result.ok ? { receipt: receiptOf(result.data) } : { error: result.code }) } });
+        return { status: 201, body: runDto(run, await tx.rlGymProjectExport.findMany({ where: { clientId: actor.clientId, projectId } })) };
       },
     );
     return reply;
@@ -466,7 +489,7 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
           items: batchItems(body).map((i) => {
             const d = b.decisions.find((x) => x.itemId === i.itemId);
             // suspected_cause is the RL Gym's hint only; a person decides.
-            return { itemId: i.itemId, taskId: i.taskId, revision: i.revision, episode: i.episode, decision: d ? { decision: d.decision, rationale: d.rationale, criterionId: d.criterionId, decidedBy: d.decidedBy, at: d.createdAt.toISOString(), response: d.response, reworkTaskId: d.reworkTaskId } : null };
+            return { itemId: i.itemId, taskId: i.taskId, revision: i.revision, episode: i.episode, runId: b.runId, scorePass: scorePassOf(body), evidenceSha256: evidenceDigest(i.episode), decision: d ? { decision: d.decision, verdict: d.verdict ?? verdictOf(d.decision), scorePass: d.scorePass, evidenceSha256: d.evidenceSha256, rationale: d.rationale, criterionId: d.criterionId, decidedBy: d.decidedBy, at: d.createdAt.toISOString(), response: d.response, reworkTaskId: d.reworkTaskId } : null };
           }),
         };
       }),
@@ -482,15 +505,25 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
   });
 
   // ── Benchmark review decisions (staff: PM, Admin; SME: the task's assigned reviewer). One implementation. ──
-  type DecisionPrep = { batchRowId: string; batchId: string; items: z.infer<typeof DecisionsBody>['decisions']; taskOf: Record<string, string>; result: RlGymResult; decidedBy: string };
+  type DecisionPrep = { batchRowId: string; batchId: string; items: z.infer<typeof DecisionsBody>['decisions']; taskOf: Record<string, string>; evidenceOf: Record<string, string>; scorePass: number | null; result: RlGymResult; decidedBy: string };
   type Decisions = z.infer<typeof DecisionsBody>['decisions'];
 
   /** Checks the decisions and sends them to the RL Gym (outside the transaction). `mayDecide` limits which tasks the person may decide. */
-  async function prepareDecisions(where: Prisma.RunReviewBatchWhereInput, decisions: Decisions, decidedBy: string, mayDecide: (taskId: string, current: Map<string, string>) => boolean): Promise<DecisionPrep> {
+  async function prepareDecisions(where: Prisma.RunReviewBatchWhereInput, decisions: Decisions, decidedBy: string, mayDecide: (taskId: string, current: Map<string, string>) => boolean, seenPass?: number): Promise<DecisionPrep> {
     if (!rlgym) throw new AppError(409, 'RLGYM_NOT_CONNECTED', 'RL Gym isn’t connected yet, so decisions cannot be sent.');
     const b = await db.runReviewBatch.findFirst({ where, include: { decisions: true, assignments: { orderBy: { createdAt: 'asc' } } } });
     if (!b) throw notFound('Review batch not found');
     const items = batchItems(b.body);
+    // E-007 phase 2: a decision is bound to the score pass and the evidence the reviewer saw. A decision made on an older
+    // score pass never releases a newer one: it is refused, and the reviewer decides the newer pass.
+    const pass = scorePassOf(b.body);
+    if (seenPass !== undefined && pass !== null && seenPass !== pass) throw new AppError(409, 'STALE_SCORE_PASS', `You reviewed score pass ${seenPass}, but this batch is score pass ${pass}. Reload and review it again.`);
+    if (b.runId && pass !== null) {
+      const later = await db.runReviewBatch.findMany({ where: { clientId: b.clientId, runId: b.runId, createdAt: { gt: b.createdAt } }, select: { body: true, batchId: true } });
+      const ids = new Set(decisions.map((d) => d.itemId));
+      const newer = later.find((l) => (scorePassOf(l.body) ?? 0) > pass && batchItems(l.body).some((i) => ids.has(i.itemId) || ids.has(String(i.episode.episode_id ?? ''))));
+      if (newer) throw new AppError(409, 'SUPERSEDED_SCORE_PASS', `The RL Gym re-scored this run (score pass ${scorePassOf(newer.body)}, batch ${newer.batchId}). Decide the newer score pass; a decision on pass ${pass} cannot stand for it.`);
+    }
     const current = currentAssignees(b.assignments);
     const seen = new Set<string>();
     for (const d of decisions) {
@@ -502,10 +535,14 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
       // A decision is final: a different decision on the same item is refused.
       if (b.decisions.some((x) => x.itemId === d.itemId)) throw new AppError(409, 'ALREADY_DECIDED', `Item ${d.itemId} already has a decision.`);
       if ((d.decision === 'grader_wrong' || d.decision === 'rubric_correction') && !d.criterionId) throw new AppError(422, 'CRITERION_REQUIRED', `${d.decision} needs the criterion it is about.`);
+      if (d.evidenceSha256 && d.evidenceSha256 !== evidenceDigest(item.episode)) throw new AppError(409, 'EVIDENCE_CHANGED', `The evidence for item ${d.itemId} is not what you reviewed. Reload and review it again.`);
     }
-    const body = { schema: 'rlgym.sme-decisions.v1', batch_id: b.batchId, decisions: decisions.map((d) => ({ item_id: d.itemId, decision: d.decision, rationale: d.rationale, decided_by: decidedBy, ...(d.criterionId ? { criterion_id: d.criterionId } : {}) })) };
-    const result = await rlgym.sendDecisions(b.batchId, body, `${b.batchId}-${jcsSha256(body).slice(0, 16)}`);
-    return { batchRowId: b.id, batchId: b.batchId, items: decisions, taskOf: Object.fromEntries(items.map((i) => [i.itemId, i.taskId])), result, decidedBy };
+    const evidenceOf = Object.fromEntries(items.map((i) => [i.itemId, evidenceDigest(i.episode)]));
+    // Can't assess is kept in ADI Forge only; the RL Gym takes the other decisions, with the pass and evidence they bind.
+    const toSend = decisions.filter((d) => d.decision !== 'cannot_assess');
+    const body = { schema: 'rlgym.sme-decisions.v1', batch_id: b.batchId, decisions: toSend.map((d) => ({ item_id: d.itemId, decision: d.decision, rationale: d.rationale, decided_by: decidedBy, ...(d.criterionId ? { criterion_id: d.criterionId } : {}), verdict: verdictOf(d.decision), ...(pass !== null ? { score_pass: pass } : {}), evidence_sha256: evidenceOf[d.itemId] })) };
+    const result: RlGymResult = toSend.length ? await rlgym.sendDecisions(b.batchId, body, `${b.batchId}-${jcsSha256(body).slice(0, 16)}`) : { ok: true, httpStatus: null, requestId: null, data: { not_sent: 'cannot_assess' } } as unknown as RlGymResult;
+    return { batchRowId: b.id, batchId: b.batchId, items: decisions, taskOf: Object.fromEntries(items.map((i) => [i.itemId, i.taskId])), evidenceOf, scorePass: pass, result, decidedBy };
   }
 
   /** Records what the RL Gym took; task_correction sends the task back to Rework with the rationale. `deciderId` is a staff user or an SME user. */
@@ -535,10 +572,10 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
           }
         }
       }
-      const row = await tx.runReviewDecision.create({ data: { clientId, batchRowId: prep.batchRowId, itemId: d.itemId, taskId, decision: d.decision, rationale: d.rationale, criterionId: d.criterionId ?? null, decidedById: deciderId, decidedBy: prep.decidedBy, sendOutcome: 'received', httpStatus: prep.result.httpStatus, response: prep.result.data as Prisma.InputJsonValue, reworkTaskId } });
-      out.push({ itemId: row.itemId, decision: row.decision, reworkTaskId });
+      const row = await tx.runReviewDecision.create({ data: { clientId, batchRowId: prep.batchRowId, itemId: d.itemId, taskId, decision: d.decision, verdict: verdictOf(d.decision), scorePass: prep.scorePass, evidenceSha256: prep.evidenceOf[d.itemId] ?? null, rationale: d.rationale, criterionId: d.criterionId ?? null, decidedById: deciderId, decidedBy: prep.decidedBy, sendOutcome: d.decision === 'cannot_assess' ? 'kept_in_forge' : 'received', httpStatus: prep.result.httpStatus, response: prep.result.data as Prisma.InputJsonValue, reworkTaskId } });
+      out.push({ itemId: row.itemId, decision: row.decision, verdict: row.verdict, scorePass: row.scorePass, evidenceSha256: row.evidenceSha256, reworkTaskId });
     }
-    await audit({ entityType: 'RunReviewBatch', entityId: prep.batchRowId, action: 'run_review.decided', after: { batchId: prep.batchId, decisions: out.map((o) => ({ itemId: o.itemId, decision: o.decision })), requestId: prep.result.requestId } });
+    await audit({ entityType: 'RunReviewBatch', entityId: prep.batchRowId, action: 'run_review.decided', after: { batchId: prep.batchId, scorePass: prep.scorePass, decisions: out.map((o) => ({ itemId: o.itemId, decision: o.decision, verdict: o.verdict, evidenceSha256: o.evidenceSha256 })), requestId: prep.result.requestId } });
     return { status: 201, body: { decisions: out, rlgym: prep.result.data } };
   }
 
@@ -551,7 +588,7 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
       reply,
       async (actor) => {
         const user = await db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { name: true } });
-        return prepareDecisions({ forgeBatchRef: req.params.ref, projectId: req.params.id, clientId: actor.clientId }, req.body.decisions, user.name || actor.userId, () => true);
+        return prepareDecisions({ forgeBatchRef: req.params.ref, projectId: req.params.id, clientId: actor.clientId }, req.body.decisions, user.name || actor.userId, () => true, req.body.scorePass);
       },
       async ({ tx, actor, audit }, prep) => commitDecisions(tx, audit, actor.clientId, actor.userId, prep),
     );
@@ -612,7 +649,7 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
       reply,
       async (actor) => {
         const sme = await db.smeUser.findUniqueOrThrow({ where: { id: actor.smeUserId }, select: { displayName: true, contactEmail: true } });
-        return prepareDecisions({ forgeBatchRef: req.params.ref, clientId: actor.clientId }, req.body.decisions, sme.displayName || sme.contactEmail || actor.smeUserId, (taskId, current) => current.get(taskId) === actor.smeUserId);
+        return prepareDecisions({ forgeBatchRef: req.params.ref, clientId: actor.clientId }, req.body.decisions, sme.displayName || sme.contactEmail || actor.smeUserId, (taskId, current) => current.get(taskId) === actor.smeUserId, req.body.scorePass);
       },
       async ({ tx, actor, audit }, prep) => commitDecisions(tx, audit, actor.clientId, actor.smeUserId, prep),
     );

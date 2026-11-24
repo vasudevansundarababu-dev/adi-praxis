@@ -2433,3 +2433,46 @@ additive: the old export path, the old-flow project page and the author workbenc
   package fetch (`FORGE_UNAVAILABLE`: the RL Gym still fetches packages from its Authoring stub on 8212). It imports
   once the owner points the RL Gym's `RLGYM_FORGE_URL` at this Authoring. 3 of the 4 embedded v8 tasks are not sent
   (`GENERIC_TOOL_UNDECLARED`, as in part 1).
+
+## E-007 phase 2, Authoring part (24 Nov 2026, owner: "Phase 0 to Phase 4 as one Phase")
+
+Source: adi-labs-design `shared/enhancements/E-007-verification-bench.md` §0 and §7, ROADMAP Phase A. Owner constraints:
+no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
+
+- **Task checks on a frozen snapshot** (`apps/api/src/tasks/task-integrity.ts`, report `praxis.task-check-report.v1`).
+  They run on the content being approved, or on the approved record at Validate and Export. Each problem carries
+  section, field, check code, severity, who fixes it (author, PM, template, ADI Forge, RL Gym) and whether trying
+  again helps:
+  - `STEP_TOOL_NOT_OFFERED`: an S5 step names a tool S3 doesn't offer (a tool the template doesn't declare at all
+    stays the existing APR-13d problem, not reported twice);
+  - `CRITICAL_WITHOUT_FAILURE`: a critical S7 criterion with no fail condition. A whole-task failure, a "0:" anchor in
+    its partial credit (the golden KYC style) or the template's own default counts as one;
+  - `S7_MAX_MISMATCH`, `S7_THRESHOLD_OUT_OF_RANGE`, `S7_SCALE_NOT_520`: numbers stated in S7's scoring rule that
+    contradict the weights or the 5/2/0 scale. No numbers stated means nothing to contradict;
+  - `PRIVATE_IN_AGENT_VIEW`: a private long text (40+ characters), or the task's own benchmark code (edge case,
+    archetype, complexity), appears in a field the agent sees. **(chosen by Claude)** A pick-list value shared by a
+    public and a private field (a party role) isn't a leak;
+  - `UNRESOLVED_CLAUSE`: an S4 citation that doesn't resolve to a clause version approved by the time of approval,
+    or to a current policy document of the project rule set;
+  - `APPROVAL_STALE`: an approved record on another template version than the project's.
+- **Where they run.**
+  - Approval: the author's problems join the D18 checks, so the task goes back with them pinned. Anyone else's
+    problem stops the approval with a plain message (`NOT_APPROVABLE`).
+  - Validate: added to the validator's verdict.
+  - Export for benchmark: a failing task isn't sent (`CHECKS_FAILED`, with the problems).
+  - JSON: `GET /projects/:id/tasks/:taskId/check-report`.
+- **Export receipt** `praxis.export-receipt.v1`, kept with the run (`RlGymProjectExport.authoring_receipt`, not sent).
+  - For each task sent: export digest, record content hash, package, snapshot and check-report digests.
+  - `receipt_sha256` is the JCS SHA-256 of the receipt. It's unsigned: signing is phase 7.
+- **The RL Gym's answer per task.** It's accepted, duplicate (the same revision was received before, or the receipt
+  was replayed) or rejected (blocked, or the export refused). **(chosen by Claude)** It's derived in Authoring because
+  the RL Gym's receipt gives counts, not a list.
+- **Benchmark review bound to the score pass.**
+  - Each item shows its run, score pass and evidence digest (the RL Gym's `evidence_sha256`, else the episode's JCS
+    SHA-256).
+  - A decision sends the pass and digest it saw. Another pass gives `STALE_SCORE_PASS`, other evidence gives
+    `EVIDENCE_CHANGED`, and a pass the RL Gym has since re-scored gives `SUPERSEDED_SCORE_PASS`. A decision on an
+    older pass never stands for a newer one.
+  - Choices are Accept (the score stands: agent failure confirmed), Dispute (task, rubric, grader or environment) or
+    Can't assess. **(chosen by Claude)** Can't assess stays in ADI Forge (`kept_in_forge`), since the RL Gym takes
+    only its five decisions. The others go with `verdict`, `score_pass` and `evidence_sha256`.

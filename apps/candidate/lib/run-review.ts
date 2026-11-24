@@ -6,15 +6,16 @@ export interface AssignedReview {
   projectId: string;
   projectName: string;
   receivedAt: string;
-  items: { itemId: string; taskId: string; revision: number; episode: Record<string, unknown>; decision: { decision: string; rationale: string; criterionId: string | null; decidedBy: string; at: string } | null }[];
+  items: { itemId: string; taskId: string; revision: number; episode: Record<string, unknown>; runId?: string | null; scorePass?: number | null; evidenceSha256?: string; decision: { decision: string; verdict?: string | null; scorePass?: number | null; evidenceSha256?: string | null; rationale: string; criterionId: string | null; decidedBy: string; at: string } | null }[];
 }
 
 export const DECISION_LABEL: Record<string, string> = {
-  agent_failure: 'Agent failure confirmed',
-  task_correction: 'Task needs correction',
-  rubric_correction: 'Rubric needs correction',
-  grader_wrong: 'Grader is wrong',
-  environment_wrong: 'Environment is wrong',
+  agent_failure: 'Accept: the score stands (agent failure confirmed)',
+  task_correction: 'Dispute: the task needs correction',
+  rubric_correction: 'Dispute: the rubric needs correction',
+  grader_wrong: 'Dispute: the grader is wrong',
+  environment_wrong: 'Dispute: the environment is wrong',
+  cannot_assess: 'Can’t assess',
 };
 
 /** The RL Gym sends `score` as a number or as {score, passed, failed_criteria}. */

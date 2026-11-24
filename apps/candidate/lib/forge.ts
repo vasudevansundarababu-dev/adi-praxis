@@ -133,6 +133,15 @@ export function signInVariant(forge: PublicForgeSettings): SignInVariant {
   return forge.candidateSignIn === 'ONLINE' ? 'password' : 'offline';
 }
 
+/**
+ * Whether the authoring fields block cut, paste and text drop (a deterrent to pasted answers). Owner, 23 Nov 2026: in
+ * Offline sign-in mode (test environments, new flow on) SMEs may cut and paste; Online keeps the block.
+ */
+export function blocksPaste(taskType: string, forge: PublicForgeSettings): boolean {
+  if (taskType !== 'AUTHORING') return false;
+  return !(forge.newFlow && forge.candidateSignIn === 'OFFLINE');
+}
+
 /** The Set password form's check before it is sent (the server checks again, including the email rule). */
 export function newPasswordProblem(password: string, confirm: string, email?: string | null): string | null {
   if (!password) return 'Enter a new password.';

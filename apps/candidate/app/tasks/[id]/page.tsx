@@ -7,6 +7,7 @@ import { PolicyProposals } from '@/components/work/policy-proposals';
 import { BenchmarkFields } from '@/components/work/benchmark-fields';
 import { TaskRules, type TaskRulesView } from '@/components/work/task-rules';
 import { api, getForgeSettings, getMe } from '@/lib/api';
+import { blocksPaste } from '@/lib/forge';
 import type { ForgeHomeDto } from '@praxis/shared';
 import type { TaskView } from '@/lib/work-types';
 
@@ -19,7 +20,8 @@ export default async function TaskRoute({ params }: { params: Promise<{ id: stri
   if (!data) notFound();
   // MVP1 flow: the contributor terms come before any work (the API's gate answers step 'terms').
   let newFlow = false;
-  if ((await getForgeSettings()).newFlow) {
+  const settings = await getForgeSettings();
+  if (settings.newFlow) {
     const { data: forge } = await api<ForgeHomeDto>('/me/forge/home');
     newFlow = !!forge?.newFlow && forge.authorTasks.some((t) => t.taskId === id);
     if (newFlow && !forge!.termsAccepted) redirect('/welcome');
@@ -32,7 +34,7 @@ export default async function TaskRoute({ params }: { params: Promise<{ id: stri
       {policy && <TaskRules policy={policy} />}
       {data.taskType === 'AUTHORING' && <PolicyProposals taskId={data.id} readOnly={data.readOnly} />}
       {data.taskType === 'AUTHORING' && <BenchmarkFields taskId={data.id} />}
-      <TaskPage task={data} newFlow={newFlow} />
+      <TaskPage task={data} newFlow={newFlow} blockPaste={blocksPaste(data.taskType, settings)} />
     </main>
   );
 }

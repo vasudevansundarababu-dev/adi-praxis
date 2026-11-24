@@ -70,3 +70,14 @@ describe('MVP1 step 6: set and forgot password', () => {
     expect(FORGOT_SENT).toBe("If that email has an account, we've sent a link.");
   });
 });
+
+describe('cut and paste in SME authoring (owner, 23 Nov 2026)', () => {
+  it('is allowed in Offline sign-in mode and blocked in Online', async () => {
+    const { blocksPaste } = await import('@/lib/forge');
+    expect(blocksPaste('AUTHORING', { newFlow: true, candidateSignIn: 'OFFLINE' })).toBe(false);
+    expect(blocksPaste('AUTHORING', { newFlow: true, candidateSignIn: 'ONLINE' })).toBe(true);
+    // The settings could not be read (fallback): keep the block.
+    expect(blocksPaste('AUTHORING', { newFlow: false, candidateSignIn: 'OFFLINE' })).toBe(true);
+    expect(blocksPaste('ANNOTATION', { newFlow: true, candidateSignIn: 'ONLINE' })).toBe(false);
+  });
+});

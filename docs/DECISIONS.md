@@ -2476,3 +2476,24 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
   - Choices are Accept (the score stands: agent failure confirmed), Dispute (task, rubric, grader or environment) or
     Can't assess. **(chosen by Claude)** Can't assess stays in ADI Forge (`kept_in_forge`), since the RL Gym takes
     only its five decisions. The others go with `verdict`, `score_pass` and `evidence_sha256`.
+
+## Owner small-fix path and existing tasks (24 Nov 2026)
+
+- **Owner:** "Keep the existing tasks which I authored." The stronger checks never block tasks approved before them
+  (`STRONGER_CHECKS_FROM` = 24 Nov 17:34 UTC, commit 7c12b835):
+  - their problems are warnings, with the gap "approved before the stronger checks";
+  - they still export and run;
+  - the export receipt marks them so;
+  - approvals are never back-filled.
+- **Owner:** "As long as it's a small fix I can do it myself" (SME time costs about $1000 a day). A PM or Admin corrects
+  one field of an approved task on the console task page ("Correct this approved task"), with a reason:
+  - every check runs on the corrected content first (submit checks, package check, stronger checks); a failing one
+    changes nothing;
+  - the correction is the human approval of a new revision: a new submission version, EDIT and ACCEPT reviews, a new
+    approved record;
+  - the earlier record is kept exactly (append-only); the author keeps authorship; the corrector is the reviewer;
+  - the audit event is `task.corrected_after_approval`, with the changed paths;
+  - Re-export sends the correction as the next revision (`corrects_revision`);
+  - the task's author, or someone with a declared conflict, can't correct it.
+- **Before every migration**, a local `pg_dump -Fc` of praxis_authoring_v2 goes to `~/adi-backups/authoring-<timestamp>/`
+  (outside the repository). Migrations are additive only.

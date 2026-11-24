@@ -153,6 +153,17 @@ export type ForgeDecisionRequest = z.infer<typeof ForgeDecisionRequest>;
 /** PM/Admin: send an approved task back to its author for a new revision (the approved record is kept). */
 export const ForgeSendBackRequest = z.object({ notes: z.string().trim().min(10, 'Say what the author must fix.').max(4000), expectedRevision: z.number().int().min(0) }).strict();
 export type ForgeSendBackRequest = z.infer<typeof ForgeSendBackRequest>;
+/** Owner, 24 Nov 2026: a PM or Admin corrects one field of an approved task (a small fix, no SME); record kept. */
+export const ForgeCorrectRequest = z
+  .object({
+    section: z.string().regex(/^S\d{1,2}$/),
+    field: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/),
+    value: z.unknown(),
+    reason: z.string().trim().min(10, 'Say what you corrected and why.').max(2000),
+    expectedRevision: z.number().int().min(0),
+  })
+  .strict();
+export type ForgeCorrectRequest = z.infer<typeof ForgeCorrectRequest>;
 
 /** The external Reviewer's decision: pass to the PM or Admin, or send back to the author. A Reviewer never rejects. */
 export const ReviewerDecisionRequest = z

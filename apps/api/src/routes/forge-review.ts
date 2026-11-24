@@ -1,8 +1,8 @@
-import { ForgeDecisionRequest, ForgeSendBackRequest, ReviewerDecisionRequest } from '@praxis/shared';
+import { ForgeCorrectRequest, ForgeDecisionRequest, ForgeSendBackRequest, ReviewerDecisionRequest } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db } from '../db';
-import { forgeDecide, forgeSendBack, forgeTaskRows, forgeTaskView, requireNewFlow, reviewerDecide, reviewerTaskList, reviewerTaskView } from '../forge/review';
+import { forgeCorrect, forgeDecide, forgeSendBack, forgeTaskRows, forgeTaskView, requireNewFlow, reviewerDecide, reviewerTaskList, reviewerTaskView } from '../forge/review';
 import { requireForgeTerms } from '../forge/candidate';
 import { forgeSettings } from '../forge/settings';
 import { raisePlacesToTaskCount, sourcingProject } from '../forge/sourcing';
@@ -45,6 +45,12 @@ export const forgeReviewRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, 
   // PM/Admin: send an approved task back to its author for a new revision; the approved record is kept.
   app.post('/projects/:id/tasks/:taskId/send-back', { config: { access: ACCESS }, schema: { tags: ['tasks'], params: TaskParams, body: ForgeSendBackRequest } }, async (req, reply) => {
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => ({ status: 200, body: await forgeSendBack(tx, actor, req.params.id, req.params.taskId, req.body, audit) }));
+    return reply;
+  });
+
+  // Owner, 24 Nov 2026: PM/Admin correct a small mistake in an approved task themselves (no SME); the record is kept.
+  app.post('/projects/:id/tasks/:taskId/correct', { config: { access: ACCESS }, schema: { tags: ['tasks'], params: TaskParams, body: ForgeCorrectRequest } }, async (req, reply) => {
+    await runCommand(db, req, reply, async ({ tx, actor, audit }) => ({ status: 200, body: await forgeCorrect(tx, actor, req.params.id, req.params.taskId, req.body, audit) }));
     return reply;
   });
 

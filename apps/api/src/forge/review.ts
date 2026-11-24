@@ -2,7 +2,7 @@ import { followUpsOf, provenanceSummary, stepToolWarnings, toolOptionLabel } fro
 import { jointTemplateSpec } from '../anvil/joint-template';
 import { declaredToolIds } from '../anvil/tool-binding';
 import { sectionsProfile, suggestionStateOf } from '../tasks/suggestions/service';
-import { CoverageDimensions, forgeSlotSelector, normEmail, smeTaskStatus, type ForgeDecisionRequest, type ForgeSendBackRequest, type ForgeTaskSelector, type SelectorSlot, type ForgePerson, type ForgeTaskRow, type ReviewerDecisionRequest, type ReviewerTaskStatus } from '@praxis/shared';
+import { CoverageDimensions, forgeSlotSelector, normEmail, smeTaskStatus, type ForgeDecisionRequest, type ForgeSendBackRequest, type ForgeCorrectRequest, type ForgeTaskSelector, type SelectorSlot, type ForgePerson, type ForgeTaskRow, type ReviewerDecisionRequest, type ReviewerTaskStatus } from '@praxis/shared';
 import type { Actor, CandidateActor } from '../auth/actor';
 import type { Db, Tx } from '../db';
 import { AppError, forbidden, notFound } from '../lib/errors';
@@ -10,6 +10,7 @@ import type { AuditInput } from '../platform/audit';
 import type { OutboxInput } from '../outbox/outbox';
 import { hasQuotas } from '../tasks/definitions';
 import { sendBackApproved } from '../tasks/send-back';
+import { correctApproved } from '../tasks/admin-correction';
 import { profileFor } from '../tasks/profile-output';
 import { CHECKLIST, decideOneStep } from '../tasks/review-service';
 import { assertCurrent, contentHash, decideStageFor, lock, passInForce, reviewerNames, TASK_INCLUDE, type StageTask } from '../tasks/stage-review';
@@ -205,6 +206,8 @@ export async function forgeTaskView(tx: Db | Tx, actor: Actor, projectId: string
     ...turn(t, await ownOrConflicted(tx, actor, author)),
     // PM/Admin: an approved task can be sent back to its author for a new revision (never by its author).
     canSendBack: t.status === 'ACCEPTED' && !(await ownOrConflicted(tx, actor, author)),
+    // Owner, 24 Nov 2026: a PM or Admin can correct a small mistake in an approved task themselves (record kept).
+    canCorrect: t.status === 'ACCEPTED' && t.taskType === 'AUTHORING' && !(await ownOrConflicted(tx, actor, author)),
     expertPass: inForce ? { version: inForce.submissionVersion, at: inForce.createdAt.toISOString() } : null,
     expectedVersion: latest?.version ?? null,
     expectedRevision: t.revision,
@@ -256,6 +259,15 @@ export async function forgeSendBack(tx: Tx, actor: Actor, projectId: string, tas
   if (t.revision !== body.expectedRevision) throw new AppError(409, 'STALE_REVISION', 'The task changed since you opened it. Reload and try again.');
   const { recordId } = await sendBackApproved(tx, t, { actorId: actor.userId, notes: body.notes, source: 'pm_send_back', audit, auditExtra: { via: 'tasks_tab' } });
   return { status: 'REWORK' as const, recordId, recordKept: true };
+}
+
+/** PM/Admin: correct one field of an approved task without an SME; every check re-runs; the earlier record is kept. */
+export async function forgeCorrect(tx: Tx, actor: Actor, projectId: string, taskId: string, body: ForgeCorrectRequest, audit: Audit) {
+  await requireNewFlow(tx, actor.clientId);
+  await lock(tx, taskId);
+  const t = await consoleTask(tx, actor, projectId, taskId);
+  if (await ownOrConflicted(tx, actor, t.assignedTo?.smeUser)) throw forbidden('You cannot correct this task: you wrote it, or you declared a conflict with its author.');
+  return correctApproved(tx, t, actor.userId, body, audit);
 }
 
 // ── External Reviewer (candidate app) ──

@@ -447,6 +447,57 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(state.runs[0]).toMatchObject({ authoringReceiptSha256: expect.stringMatching(/^[0-9a-f]{64}$/), taskAnswers: expect.any(Object) });
   });
 
+  it('Owner small fix (24 Nov 2026): a PM corrects one field of an approved task without an SME; checks re-run; the earlier record is kept; Re-export sends the correction', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    await qualify(v8);
+    const projectId = await project(v8);
+    let dropped = '';
+    const rows = await packable(
+      await authored(projectId, {
+        output: (i, out) => {
+          if (i !== 0) return out;
+          const used = (out.sections.S5.steps as { tool?: string }[]).map((st) => st.tool).filter(Boolean) as string[];
+          dropped = used.find((tl) => (out.sections.S3.tools as string[]).includes(tl))!;
+          out.sections.S3.tools = (out.sections.S3.tools as string[]).filter((tl) => tl !== dropped);
+          return out;
+        },
+      }),
+    );
+    const rec = rows[0]!.record!;
+    const t = await db.taskInstance.findUniqueOrThrow({ where: { id: rec.taskInstanceId } });
+    const tools = (t.output as any).sections.S3.tools as string[];
+    const view = (await get(pm, `/projects/${projectId}/forge-tasks/${t.id}`)).json();
+    expect(view).toMatchObject({ canCorrect: true, expectedRevision: t.revision });
+    const correct = (body: object) => post(pm, `/projects/${projectId}/tasks/${t.id}/correct`, { section: 'S3', field: 'tools', reason: `Added ${dropped} to S3, because S5 uses it.`, expectedRevision: t.revision, ...body });
+    // A correction that still fails the checks changes nothing.
+    const still = await correct({ value: [...tools, 'search'] });
+    expect(still.statusCode, still.body).toBe(422);
+    expect(still.json().error).toBe('CORRECTION_FAILS_CHECKS');
+    expect((await db.taskInstance.findUniqueOrThrow({ where: { id: t.id } })).revision).toBe(t.revision);
+    expect((await correct({ value: tools })).statusCode).toBe(400);
+    expect((await correct({ value: [...tools, dropped], expectedRevision: t.revision + 5 })).statusCode).toBe(409);
+    expect((await correct({ value: [...tools, dropped], reason: 'short' })).statusCode).toBe(400);
+    // The fix: every check passes; a new approved revision; the earlier record kept.
+    const before = await db.approvedTaskRecord.findUniqueOrThrow({ where: { id: rec.id } });
+    const ok = await correct({ value: [...tools, dropped] });
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(ok.json()).toMatchObject({ status: 'ACCEPTED', revision: t.revision + 1, previousRecordId: rec.id, recordKept: true });
+    expect(await db.approvedTaskRecord.findUniqueOrThrow({ where: { id: rec.id } })).toEqual(before);
+    const next = await db.approvedTaskRecord.findUniqueOrThrow({ where: { id: ok.json().recordId } });
+    expect(((next.output as any).sections.S3.tools as string[])).toContain(dropped);
+    expect(next.candidateId).toBe(before.candidateId);
+    const after = await db.taskInstance.findUniqueOrThrow({ where: { id: t.id } });
+    expect(after).toMatchObject({ status: 'ACCEPTED', revision: t.revision + 1 });
+    expect(await db.auditEvent.count({ where: { action: 'task.corrected_after_approval', entityId: t.id } })).toBe(1);
+    expect((await get(pm, `/projects/${projectId}/tasks/${t.id}/check-report`)).json()).toMatchObject({ status: 'pass', problems: [] });
+    // Re-export sends the corrected task as revision 2, correcting revision 1.
+    answer = (c) => (c.url.endsWith('/exports') ? { status: 201, body: { data: { new: c.body.tasks.length, superseding: 0, unchanged: 0, blocked: [] }, meta: { request_id: 'rq' } } } : { status: 404, body: {} });
+    const exp = await post(pm, `/projects/${projectId}/rlgym-exports`);
+    expect(exp.statusCode, exp.body).toBe(201);
+    const sent = calls.filter((c) => c.url.endsWith('/exports')).at(-1)!;
+    expect(sent.body.tasks.find((x: { task_id: string }) => x.task_id === t.id)).toMatchObject({ revision: 2, corrects_revision: 1 });
+  });
+
   it('export is off and says why when the RL Gym has not qualified the version; an unreachable RL Gym is recorded', async () => {
     const v8 = await publishedV8(CASE_REF_VERIFIERS);
     const projectId = await project(v8);

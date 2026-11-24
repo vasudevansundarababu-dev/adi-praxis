@@ -407,6 +407,19 @@ describe('Task page decision box', () => {
     expect(renderToStaticMarkup(<ForgeTaskPage code="TSK-002" view={view()} people={PEOPLE} exportState={EXPORT} />)).not.toContain('data-send-back');
   });
 
+  it('Correct this approved task (owner, 24 Nov 2026): a PM/Admin small fix without an SME; fields listed by section; lines for lists', async () => {
+    const { correctableFields } = await import('@/components/forge/task-page');
+    const out = { sections: { S3: { tools: ['application.read'], environment: 'golden_kyc_openenv' }, S1: { title: 'Custodial KYC' }, S5: { steps: [{ tool: 'recommend' }] } } };
+    expect(correctableFields(out).map((f) => [f.section, f.field, f.kind])).toEqual([['S1', 'title', 'text'], ['S3', 'tools', 'lines'], ['S3', 'environment', 'text'], ['S5', 'steps', 'json']]);
+    const m = renderToStaticMarkup(<ForgeTaskPage code="TSK-001" view={view({ taskId: T(1), status: 'ACCEPTED', canDecide: false, canCorrect: true, output: out })} people={PEOPLE} exportState={EXPORT} />);
+    const t = text(m);
+    expect(m).toContain('data-correct');
+    expect(t).toContain('Correct this approved task');
+    expect(t).toContain('the earlier approved version is kept');
+    expect(a11yProblems(m)).toEqual([]);
+    expect(renderToStaticMarkup(<ForgeTaskPage code="TSK-001" view={view({ taskId: T(1), status: 'ACCEPTED', canDecide: false, canCorrect: false, output: out })} people={PEOPLE} exportState={EXPORT} />)).not.toContain('data-correct');
+  });
+
   it('trail on the Reviewer route: Author → Reviewer → PM/Admin', () => {
     const steps = reviewTrail({
       status: 'SUBMITTED',

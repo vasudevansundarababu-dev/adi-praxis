@@ -51,6 +51,8 @@ export interface ForgeTaskView {
   canDecide: boolean;
   /** PM/Admin: the task is approved and may be sent back to its author for a new revision. */
   canSendBack?: boolean;
+  /** Owner, 24 Nov 2026: a PM or Admin may correct a small mistake in an approved task themselves. */
+  canCorrect?: boolean;
   waitingFor: 'REVIEWER' | 'PM' | null;
   expectedVersion: number | null;
   expectedRevision: number;
@@ -614,6 +616,121 @@ export function DecisionBox({ projectId, view }: { projectId: string; view: Forg
   );
 }
 
+/** The editable fields of a task's sections, as (section, field, kind) for the correction box. */
+export function correctableFields(output: unknown): { section: string; field: string; kind: 'text' | 'lines' | 'json'; value: unknown }[] {
+  const sections = (output && typeof output === 'object' ? (output as { sections?: unknown }).sections : null) as Record<string, Record<string, unknown>> | null;
+  if (!sections || typeof sections !== 'object') return [];
+  return Object.entries(sections)
+    .filter(([, v]) => v && typeof v === 'object' && !Array.isArray(v))
+    .sort(([a], [b]) => Number(a.slice(1)) - Number(b.slice(1)))
+    .flatMap(([section, fields]) =>
+      Object.entries(fields).map(([field, value]) => ({ section, field, value, kind: typeof value === 'string' ? ('text' as const) : Array.isArray(value) && value.every((x) => typeof x === 'string') ? ('lines' as const) : ('json' as const) })),
+    );
+}
+const shownValue = (kind: 'text' | 'lines' | 'json', v: unknown) => (kind === 'text' ? String(v ?? '') : kind === 'lines' ? (v as string[]).join('\n') : JSON.stringify(v, null, 2));
+
+/**
+ * Owner, 24 Nov 2026: "as long as it's a small fix I can do it myself". A PM or Admin corrects one field of an approved
+ * task, without an SME. Every check runs on the corrected task first; the correction is the approval of a new revision,
+ * the earlier approved version is kept, and Re-export sends the corrected revision.
+ */
+export function CorrectBox({ projectId, view }: { projectId: string; view: ForgeTaskView }) {
+  const router = useRouter();
+  const fields = correctableFields(view.output);
+  const [open, setOpen] = useState(false);
+  const [pick, setPick] = useState(fields[0] ? `${fields[0].section}.${fields[0].field}` : '');
+  const chosen = fields.find((f) => `${f.section}.${f.field}` === pick) ?? null;
+  const [text, setText] = useState(chosen ? shownValue(chosen.kind, chosen.value) : '');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  function choose(key: string) {
+    setPick(key);
+    const f = fields.find((x) => `${x.section}.${x.field}` === key);
+    setText(f ? shownValue(f.kind, f.value) : '');
+    setError(null);
+  }
+  async function save() {
+    if (!chosen) return;
+    if (reason.trim().length < 10) return setError('Say what you corrected and why.');
+    let value: unknown;
+    if (chosen.kind === 'text') value = text;
+    else if (chosen.kind === 'lines') value = text.split('\n').map((x) => x.trim()).filter(Boolean);
+    else {
+      try {
+        value = JSON.parse(text);
+      } catch {
+        return setError('This field holds structured data: keep it as valid JSON.');
+      }
+    }
+    setPending(true);
+    setError(null);
+    const res = await mutate('POST', `/projects/${projectId}/tasks/${view.taskId}/correct`, { section: chosen.section, field: chosen.field, value, reason: reason.trim(), expectedRevision: view.expectedRevision });
+    setPending(false);
+    if (!res.ok) return setError(res.error);
+    setOpen(false);
+    setReason('');
+    router.refresh();
+  }
+  if (!fields.length) return null;
+  return (
+    <section aria-labelledby="correct-h" className="card mb-4 p-5" data-correct>
+      <h3 id="correct-h" className="font-semibold">
+        Correct this approved task
+      </h3>
+      <p className="mt-1 text-[13px] text-fg-muted">
+        For a small fix you can make yourself, without sending the task to its author. Every check runs on the corrected task first; if one fails, nothing changes. Saving approves the corrected version as a new revision: the earlier approved version is kept, and Re-export sends the correction to the benchmark.
+      </p>
+      {!open ? (
+        <button type="button" className="btn btn-secondary mt-3" onClick={() => setOpen(true)}>
+          Correct this approved task
+        </button>
+      ) : (
+        <div className="mt-3 space-y-3">
+          <div>
+            <label htmlFor="correct-field" className="text-sm font-medium">
+              Field <Req />
+            </label>
+            <select id="correct-field" className="input mt-1 block" value={pick} onChange={(e) => choose(e.target.value)}>
+              {fields.map((f) => (
+                <option key={`${f.section}.${f.field}`} value={`${f.section}.${f.field}`}>
+                  {f.section} · {f.field}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="correct-value" className="text-sm font-medium">
+              Corrected value <Req />
+            </label>
+            <p className="text-xs text-fg-muted">{chosen?.kind === 'lines' ? 'One item per line.' : chosen?.kind === 'json' ? 'Structured data, shown as JSON. Change only what is wrong.' : 'Text.'}</p>
+            <textarea id="correct-value" rows={chosen?.kind === 'text' ? 4 : 10} value={text} onChange={(e) => { setText(e.target.value); setError(null); }} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5 font-mono text-xs" />
+          </div>
+          <div>
+            <label htmlFor="correct-reason" className="text-sm font-medium">
+              What you corrected and why <Req />
+            </label>
+            <textarea id="correct-reason" rows={2} value={reason} onChange={(e) => { setReason(e.target.value); setError(null); }} className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5 text-sm" placeholder="For example: added recommend to S3, because S5 step 15 uses it." />
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-error">
+              {error}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button type="button" className="btn btn-primary disabled:opacity-60" disabled={pending} onClick={() => void save()}>
+              {pending ? 'Checking and saving…' : 'Save and approve the correction'}
+            </button>
+            <button type="button" className="btn btn-secondary" disabled={pending} onClick={() => { setOpen(false); setError(null); }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** Owner, 23 Nov 2026: send an approved task back to its author for a new revision. The approved record is kept. */
 export function SendBackBox({ projectId, view }: { projectId: string; view: ForgeTaskView }) {
   const router = useRouter();
@@ -815,6 +932,7 @@ export function ForgeTaskPage({ code, view, people, exportState, rubric = null }
 
       {view.procedure && <ProcedureCard procedure={view.procedure} />}
       {view.canDecide && <DecisionBox projectId={projectId} view={view} />}
+      {view.canCorrect && <CorrectBox projectId={projectId} view={view} />}
       {view.canSendBack && <SendBackBox projectId={projectId} view={view} />}
       {!view.canDecide && view.waitingFor === 'REVIEWER' && (
         <p className="card mb-4 p-5 text-sm" data-waiting>

@@ -692,6 +692,12 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     const inbox = calls.filter((c) => c.url === `${STUDIO}/api/v1/inbox-items`).at(-1)!;
     expect(inbox.body).toMatchObject({ kind: 'new_edge_case_variant', template_id: 'tpl_x5rwt6d5eu', version: 9 });
     expect(inbox.body.evidence[0]).toEqual({ family_id: 'minor_tin', variant: { name: 'TIN one digit short', meaning: VARIANT.meaning, twist: VARIANT.twist, boundary: 'one digit short', outcome: { verdict: 'confirm', decision: 'request_information', fields: { request_type: 'tin', reason_keyword: 'TIN' }, rationale: VARIANT.outcome.rationale, evidence: VARIANT.outcome.evidence } }, task_id: task.taskId, raised_by: expect.stringMatching(/^sme-[0-9a-f]{8}$/) });
+    // Studio's state for the proposed variant reads back on the need: waiting for recipe.
+    answer = (c) => (c.url.endsWith('/inbox-items/inb-0090') ? { status: 200, body: { id: 'inb-0090', state: 'received', catalog_variants: [{ tag: 'tin_one_digit_short', family_id: 'minor_tin', state: 'needs_recipe' }] } } : { status: 404, body: {} });
+    expect((await post(pm, `/projects/${projectId}/needs/${raised.json().id}/refresh`)).statusCode).toBe(200);
+    const read = (await get(pm, `/projects/${projectId}/needs`)).json().items.find((n: { id: string }) => n.id === raised.json().id);
+    expect(read).toMatchObject({ studioState: 'received', studioDetail: { catalog_variants: [{ tag: 'tin_one_digit_short', state: 'needs_recipe' }] } });
+    expect((await get(a.cookie, `/me/tasks/${task.taskId}/benchmark`)).json().needs[0]).toMatchObject({ studioDetail: { catalog_variants: [{ state: 'needs_recipe' }] } });
     // No change to the task.
     const after = await db.taskInstance.findUniqueOrThrow({ where: { id: task.taskId } });
     expect([after.status, after.revision, after.benchmark, after.output]).toEqual([before.status, before.revision, before.benchmark, before.output]);

@@ -116,7 +116,7 @@ const runDto = (r: RlGymProjectExport, all: RlGymProjectExport[] = []) => ({
   taskAnswers: rlgymTaskAnswers(r, all),
   id: r.id, exportId: r.exportId, exportSha256: r.exportSha256, reason: r.reason, tasks: r.tasks, notSent: r.notSent, outcome: r.outcome, httpStatus: r.httpStatus, requestId: r.requestId, receipt: r.receipt, error: r.error, createdAt: r.createdAt.toISOString() });
 
-const needDto = (n: SmeNeed, title: string | null) => ({ id: n.id, taskId: n.taskInstanceId, taskTitle: title, kind: n.kind, content: n.content, state: n.state, mergedIntoId: n.mergedIntoId, rejectReason: n.rejectReason, summary: n.summary, studioItemId: n.studioItemId, studioState: n.studioState, sentAt: n.sentAt?.toISOString() ?? null, createdAt: n.createdAt.toISOString() });
+const needDto = (n: SmeNeed, title: string | null) => ({ id: n.id, taskId: n.taskInstanceId, taskTitle: title, kind: n.kind, content: n.content, state: n.state, mergedIntoId: n.mergedIntoId, rejectReason: n.rejectReason, summary: n.summary, studioItemId: n.studioItemId, studioState: n.studioState, sentAt: n.sentAt?.toISOString() ?? null, createdAt: n.createdAt.toISOString() , studioDetail: n.studioDetail});
 
 /** Studio's evidence entry for one need (AUTHORING-SPEC 1.5). `raised_by` is an opaque pseudonym, never a name. */
 function evidenceOf(n: SmeNeed): Record<string, unknown> {
@@ -392,7 +392,9 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
       async ({ tx, audit }, result) => {
         if (!result.ok) return { status: 503, body: { error: 'STUDIO_' + result.code, message: `Studio’s status could not be read: ${result.message}` } };
         const state = ['received', 'planned', 'released', 'declined'].includes(String(result.data.state)) ? String(result.data.state) : null;
-        const detail = { planned_version: result.data.planned_version ?? null, released_version: result.data.released_version ?? null, decline_reason: result.data.decline_reason ?? null };
+        // E-001 §6b: a family or variant proposal also shows each catalog variant's live state (waiting for recipe, ...).
+        const cv = Array.isArray(result.data.catalog_variants) ? (result.data.catalog_variants as unknown[]).filter(isObj).map((v) => ({ tag: String(v.tag ?? ''), family_id: String(v.family_id ?? ''), state: String(v.state ?? '') })) : null;
+        const detail = { planned_version: result.data.planned_version ?? null, released_version: result.data.released_version ?? null, decline_reason: result.data.decline_reason ?? null, ...(cv ? { catalog_variants: cv } : {}) };
         const n = await tx.smeNeed.findUniqueOrThrow({ where: { id: req.params.needId } });
         await tx.smeNeed.updateMany({ where: { OR: [{ id: n.id }, { mergedIntoId: n.id }] }, data: { studioState: state, studioDetail: detail as Prisma.InputJsonValue } });
         await audit({ entityType: 'SmeNeed', entityId: n.id, action: 'sme_need.studio_state_read', before: { studioState: n.studioState }, after: { studioState: state, ...detail } });

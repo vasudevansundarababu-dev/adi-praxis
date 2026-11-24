@@ -12,6 +12,7 @@ const CATALOG = {
       { variant_id: 'tin_applied', tag: 'tin_applied', name: 'Has applied for a TIN', state: 'available', outcome: { decision: 'approve', written_by: 'admin-0a1b2c3d' } },
       { variant_id: 'tin_invalid', tag: 'tin_invalid', name: 'TIN invalid', state: 'waiting_outcome', outcome: null },
       { variant_id: 'tin_short', tag: 'tin_short', name: 'TIN one digit short', state: 'needs_environment_change', outcome: { decision: 'request_information', written_by: 'sme-0a1b2c3d' } },
+      { variant_id: 'tin_spaces', tag: 'tin_spaces', name: 'TIN with spaces', state: 'needs_recipe', outcome: { decision: 'request_information', written_by: 'sme-0a1b2c3d' } },
       { variant_id: 'fx_kyc_03_positive', tag: 'fx_kyc_03_positive', name: 'Fixture 3 positive', kind: 'fixture', state: 'waiting_outcome', outcome: null, proposed_outcome: { recommendation: 'request_information', request_type: 'tin' } },
       { variant_id: 'bad id!', tag: 'x', state: 'available' },
     ] },
@@ -21,7 +22,7 @@ const CATALOG = {
 describe('families', () => {
   it('reads Studio’s catalog; a migrated outcome still needs a person to confirm it', () => {
     const [f] = familiesOf(CATALOG, []);
-    expect(f!.variants.map((v) => [v.tag, v.state, v.hasOutcome, v.needsConfirmation])).toEqual([['minor_without_tin', 'available', true, true], ['tin_applied', 'available', true, false], ['tin_invalid', 'waiting_outcome', false, true], ['tin_short', 'needs_environment_change', true, false], ['fx_kyc_03_positive', 'waiting_outcome', false, true]]);
+    expect(f!.variants.map((v) => [v.tag, v.state, v.hasOutcome, v.needsConfirmation])).toEqual([['minor_without_tin', 'available', true, true], ['tin_applied', 'available', true, false], ['tin_invalid', 'waiting_outcome', false, true], ['tin_short', 'needs_environment_change', true, false], ['tin_spaces', 'needs_recipe', true, false], ['fx_kyc_03_positive', 'waiting_outcome', false, true]]);
     const fx = f!.variants.at(-1)!;
     expect(fx).toMatchObject({ kind: 'fixture', proposedOutcome: { decision: 'request_information', fields: { request_type: 'tin' } } });
     expect(outcomeFieldsOf(CATALOG)).toEqual([{ name: 'recommendation', label: 'Recommendation', help: 'What the analyst should do', required: true, allowedValues: ['approve', 'refer'], suggestedValues: [] }, { name: 'reason_keyword', label: 'Reason keyword', help: '', required: false, allowedValues: null, suggestedValues: ['TIN', 'expired'] }]);

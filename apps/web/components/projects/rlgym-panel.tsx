@@ -1,5 +1,6 @@
 'use client';
 
+import { VARIANT_STATE_LABEL } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
@@ -34,6 +35,7 @@ export interface NeedRow {
   summary: string | null;
   studioItemId: string | null;
   studioState: string | null;
+  studioDetail?: { catalog_variants?: { tag: string; state: string }[] } | null;
   createdAt: string;
 }
 export interface ReviewBatch {
@@ -228,6 +230,7 @@ export function SmeNeedsPanel({ projectId, needs, studioConnected }: { projectId
             <p className="font-medium">
               {n.kind === 'new_case_kind' ? 'New edge case' : n.kind === 'new_edge_case_family' ? 'New edge-case family' : n.kind === 'new_edge_case_variant' ? 'New variant of a family' : 'More data'} · {n.taskTitle ?? n.taskId.slice(0, 8)} · {n.state}
               {n.studioItemId && ` · Studio ${n.studioItemId}${n.studioState ? ` (${n.studioState})` : ''}`}
+              {!!n.studioDetail?.catalog_variants?.length && ` · ${n.studioDetail.catalog_variants.map((v) => `${v.tag.replace(/_/g, ' ')}: ${VARIANT_STATE_LABEL[v.state as keyof typeof VARIANT_STATE_LABEL] ?? v.state}`).join('; ')}`}
             </p>
             <p className="mt-1">{needText(n)}</p>
             {n.rejectReason && <p className="mt-1 text-fg-muted">Rejected: {n.rejectReason}</p>}

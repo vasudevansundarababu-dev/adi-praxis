@@ -24,7 +24,10 @@ const TAG = /^[a-z][a-z0-9_]{0,63}$/;
 /** The pseudonym of a person who wrote or checked an outcome: an SME, or the owner acting as Admin for an SME. */
 export const PERSON = /^(sme|admin)-[0-9a-f]{8}$/;
 
-export const VARIANT_STATES = ['proposed', 'waiting_outcome', 'outcome_written', 'needs_environment_change', 'generating', 'available', 'retired'] as const;
+export const VARIANT_STATES = ['proposed', 'waiting_outcome', 'outcome_written', 'needs_recipe', 'needs_environment_change', 'leaks_answer', 'generating', 'available', 'retired'] as const;
+
+/** A variant state in plain words (Studio's catalog states). */
+export const VARIANT_STATE_LABEL: Record<VariantState, string> = { proposed: 'proposed', waiting_outcome: 'waiting for an SME outcome', outcome_written: 'outcome written, cases not generated yet', needs_recipe: 'waiting for recipe (environment author or RL Engineer)', needs_environment_change: 'needs a change to the benchmark environment', leaks_answer: 'its recipe would leak the answer: being fixed', generating: 'cases being generated', available: 'available', retired: 'retired' };
 export type VariantState = (typeof VARIANT_STATES)[number];
 
 export interface EdgeVariant {
@@ -123,7 +126,7 @@ export function outcomeFieldsOf(catalog: unknown): OutcomeField[] {
 export const familyOfTag = (families: EdgeFamily[], tag: string | null) => (tag ? (families.find((f) => f.variants.some((v) => v.tag === tag)) ?? null) : null);
 
 /** A variant a task or run may count: it has an SME outcome and is not retired. */
-export const variantUsable = (v: EdgeVariant) => v.kind !== 'fixture' && v.hasOutcome && !['retired', 'proposed', 'waiting_outcome', 'needs_environment_change'].includes(v.state);
+export const variantUsable = (v: EdgeVariant) => v.kind !== 'fixture' && v.hasOutcome && !['retired', 'proposed', 'waiting_outcome', 'needs_recipe', 'needs_environment_change', 'leaks_answer'].includes(v.state);
 
 /** The variant tags a focus covers today (what the export sends the RL Gym), or problems with the focus. */
 export function focusTags(focus: FamilyFocus, families: EdgeFamily[]): { tags: string[]; problems: string[] } {

@@ -1,6 +1,6 @@
 'use client';
 
-import { archetypePlain, complexityPlain, edgeCaseOptionLabel, type AllowedCheck, type EdgeCase, type ExtraStateCheck, type VerifierSlot } from '@praxis/shared';
+import { VARIANT_STATE_LABEL, archetypePlain, complexityPlain, edgeCaseOptionLabel, type AllowedCheck, type EdgeCase, type ExtraStateCheck, type VerifierSlot } from '@praxis/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@/lib/client';
 
@@ -18,7 +18,7 @@ interface View {
   allowedChecks: AllowedCheck[];
   value: { edgeCase: string | null; slots: Record<string, string | number>; extraStateChecks: ExtraStateCheck[]; version: number };
   editable: boolean;
-  needs: { id: string; kind: string; state: string; studioItemId: string | null; studioState: string | null; rejectReason: string | null; createdAt: string; content: Record<string, unknown> }[];
+  needs: { id: string; kind: string; state: string; studioItemId: string | null; studioState: string | null; studioDetail?: { catalog_variants?: { tag: string; state: string }[] } | null; rejectReason: string | null; createdAt: string; content: Record<string, unknown> }[];
   /** E-001 §6b: edge-case families (Studio's catalog, else one per edge case). Absent from older responses. */
   families?: { source: 'catalog' | 'template'; fallbackReason: string | null; outcomeFields?: OutcomeFieldView[]; items: FamilyItem[] };
   focus?: { familyId: string; variants: 'all' | string[]; derived?: boolean } | null;
@@ -39,7 +39,7 @@ interface FamilyItem {
   complexity: string | null;
   variants: { variantId: string; tag: string; name: string; description: string; boundary: string | null; state: string; hasOutcome: boolean; needsConfirmation: boolean; kind?: string }[];
 }
-const usable = (v: FamilyItem['variants'][number]) => v.hasOutcome && !['retired', 'proposed', 'waiting_outcome', 'needs_environment_change'].includes(v.state);
+const usable = (v: FamilyItem['variants'][number]) => v.kind !== 'fixture' && v.hasOutcome && !['retired', 'proposed', 'waiting_outcome', 'needs_recipe', 'needs_environment_change', 'leaks_answer'].includes(v.state);
 
 const NEED_STATE: Record<string, string> = { open: 'With your PM', merged: 'Merged with a similar need', sent: 'Sent to Studio', rejected: 'Not sent' };
 
@@ -317,6 +317,7 @@ export function BenchmarkFields({ taskId }: { taskId: string }) {
                 {n.studioItemId && (n.kind === 'new_case_kind' ? ` · Waiting for new case kind ${n.studioItemId}` : ` · Studio item ${n.studioItemId}`)}
                 {n.studioState && ` (${n.studioState})`}
                 {n.rejectReason && ` · ${n.rejectReason}`}
+                {!!n.studioDetail?.catalog_variants?.length && ` · ${n.studioDetail.catalog_variants.map((v) => `${v.tag.replace(/_/g, ' ')}: ${VARIANT_STATE_LABEL[v.state as keyof typeof VARIANT_STATE_LABEL] ?? v.state}`).join('; ')}`}
               </li>
             ))}
           </ul>
@@ -378,7 +379,7 @@ export function FamilyPicker({ families, familyId, variants, editable, onFamily,
                     <span>
                       {v.name}
                       {v.boundary ? ` (boundary: ${v.boundary})` : ''}
-                      {!can && <span className="text-fg-muted"> · {v.state === 'retired' ? 'retired' : v.state === 'needs_environment_change' ? 'needs a change to the benchmark environment first, so it can’t count yet' : 'waiting for an SME outcome, so it can’t count yet'}</span>}
+                      {!can && <span className="text-fg-muted"> · {v.state === 'retired' ? 'retired' : `${VARIANT_STATE_LABEL[v.state as keyof typeof VARIANT_STATE_LABEL] ?? v.state}, so it can’t count yet`}</span>}
                       {can && v.needsConfirmation && <span className="text-fg-muted"> · outcome carried over, not yet confirmed by a person</span>}
                       {v.description && <span className="block text-xs text-fg-muted">{v.description}</span>}
                     </span>

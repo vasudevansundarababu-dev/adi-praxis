@@ -546,6 +546,74 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(task.case_selector.edge_cases.sort()).toEqual(['expired_document', 'expires_today']);
   });
 
+  it('E-001 §6b outcome batches: the owner confirms migrated outcomes as Admin in one batch; an SME answers another with a second check; Studio gets outcome-request.v1 whole', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    await qualify(v8);
+    const projectId = await project(v8);
+    const anyTask = (await db.taskInstance.findMany({ where: { projectId } }))[0]!;
+    const person = await source(projectId, 'SME', { email: 'sme-outcomes@gmail.test', first: 'Otto', last: 'Comes' });
+    expect((await assign(projectId, person.id, anyTask.id)).statusCode).toBe(200);
+    const me = await signIn('sme-outcomes@gmail.test');
+    const fieldsDef = [{ name: 'recommendation', label: 'Recommendation', help: '', required: true, allowed_values: ['approve', 'request_information', 'refer'] }, { name: 'request_type', label: 'Request type', help: '', required: false, allowed_values: ['proof_of_address', 'current_id'] }];
+    const v = (id: string, extra: object) => ({ variant_id: id, tag: id, name: id.replace(/_/g, ' '), description: '', boundary: null, proposed_by: 'sme', cases_available: 10, ...extra });
+    const catalog = { schema: 'edge-case-catalog.v2', template: { id: 'tpl_x5rwt6d5eu', version: 9 }, environment_key: 'golden-kyc-openenv', catalog_revision: 4, outcome_fields: fieldsDef, families: [
+      { family_id: 'expired_id', name: 'Expired ID', variants: [v('expired_document', { state: 'available', outcome: { decision: 'request_information', fields: { request_type: 'current_id' }, rationale: 'Ask for a current, valid ID.', evidence: [], written_by: 'migration' } }), v('expires_in_30', { state: 'waiting_outcome', outcome: null })] },
+      { family_id: 'id_document_set', name: 'Identity document set', variants: [v('passport_only', { state: 'available', outcome: { decision: 'request_information', fields: {}, rationale: 'Ask for a proof of address.', evidence: [], written_by: 'migration' } })] },
+    ] };
+    const posted: Call[] = [];
+    answer = (c) => {
+      if (c.url.includes('/edge-case-catalog')) return { status: 200, body: catalog };
+      if (c.url.endsWith('/outcome-requests')) { posted.push(c); return { status: 202, body: { data: { accepted: c.body.outcomes.length, variants: [] } } }; }
+      return { status: 404, body: {} };
+    };
+    const state = (await get(pm, `/projects/${projectId}/edge-outcomes`)).json();
+    expect(state.catalog).toMatchObject({ source: 'catalog', revision: 4 });
+    expect(state.waiting.map((w: { variantId: string; migrated: boolean }) => [w.variantId, w.migrated])).toEqual([['expired_document', true], ['expires_in_30', false], ['passport_only', true]]);
+
+    // The owner: the two migrated outcomes, answered as Admin in one short batch.
+    const made = await post(pm, `/projects/${projectId}/edge-outcomes/batches`, { variantIds: ['expired_document', 'passport_only'], answerer: 'admin' });
+    expect(made.statusCode, made.body).toBe(201);
+    const batch = made.json();
+    expect(batch.items.map((i: { variantId: string; proposedOutcome: { decision: string } }) => [i.variantId, i.proposedOutcome.decision])).toEqual([['expired_document', 'request_information'], ['passport_only', 'request_information']]);
+    expect((await post(pm, `/projects/${projectId}/edge-outcomes/batches`, { variantIds: ['passport_only'], answerer: 'admin' })).statusCode).toBe(409);
+    const answerAs = (itemId: string, body: object) => call(app, 'PUT', pm, `/projects/${projectId}/edge-outcomes/batches/${batch.id}/items/${itemId}`, body);
+    const [i1, i2] = batch.items as { id: string }[];
+    expect((await answerAs(i1!.id, { verdict: 'confirm', decision: 'deny', fields: {}, rationale: 'Not allowed decision.', evidence: ['x1'] })).statusCode).toBe(422);
+    expect((await answerAs(i1!.id, { verdict: 'confirm', decision: 'request_information', fields: { request_type: 'current_id' }, rationale: 'Ask for a current, valid ID.', evidence: [] })).statusCode).toBe(400);
+    expect((await answerAs(i1!.id, { verdict: 'confirm', decision: 'request_information', fields: { request_type: 'current_id' }, rationale: 'Ask for a current, valid ID before approval.', evidence: ['the expiry date on the ID (document.read)'] })).statusCode).toBe(200);
+    expect((await post(pm, `/projects/${projectId}/edge-outcomes/batches/${batch.id}/send`)).statusCode).toBe(422);
+    expect((await answerAs(i2!.id, { verdict: 'confirm', decision: 'request_information', fields: {}, rationale: 'A passport proves identity, not the address.', evidence: ['no address document in documents.list'] })).statusCode).toBe(200);
+    // An SME cannot answer an Admin batch.
+    expect((await call(app, 'PUT', me.cookie, `/me/edge-outcomes/${batch.id}/items/${i1!.id}`, { verdict: 'cannot_decide', rationale: 'I would need the full file.' })).statusCode).toBe(403);
+    const sent = await post(pm, `/projects/${projectId}/edge-outcomes/batches/${batch.id}/send`);
+    expect(sent.statusCode, sent.body).toBe(200);
+    expect(sent.json()).toMatchObject({ state: 'sent' });
+    const body = posted.at(-1)!.body;
+    const { request_sha256, ...rest } = body;
+    expect(request_sha256).toBe(jcsSha256(rest));
+    expect(body).toMatchObject({ schema: 'outcome-request.v1', template: { id: 'tpl_x5rwt6d5eu', version: 9 }, second_check: false, request_id: batch.requestId });
+    expect(body.outcomes[0]).toMatchObject({ variant_id: 'expired_document', family_id: 'expired_id', verdict: 'confirm', counts: true, decision: 'request_information', fields: { request_type: 'current_id' }, written_by: expect.stringMatching(/^admin-[0-9a-f]{8}$/) });
+    expect(JSON.stringify(body)).not.toMatch(/@|Otto|admin@test/);
+    expect((await post(pm, `/projects/${projectId}/edge-outcomes/batches/${batch.id}/send`)).statusCode).toBe(409);
+
+    // An SME batch with a second check: the SME answers in the SME app; a PM checks; then it goes to Studio.
+    const smeBatch = (await post(pm, `/projects/${projectId}/edge-outcomes/batches`, { variantIds: ['expires_in_30'], answerer: 'sme', smeUserId: me.smeUserId, secondCheck: true })).json();
+    expect(((await get(me.cookie, '/me/forge/inbox')).json().items as { kind: string }[]).some((i) => i.kind === 'edge_outcomes')).toBe(true);
+    const mine = (await get(me.cookie, '/me/edge-outcomes')).json().items;
+    expect(mine[0]).toMatchObject({ id: smeBatch.id, outcomeFields: expect.any(Array), items: [expect.objectContaining({ variantId: 'expires_in_30', proposedOutcome: null })] });
+    const item = mine[0].items[0].id as string;
+    expect((await call(app, 'PUT', me.cookie, `/me/edge-outcomes/${smeBatch.id}/items/${item}`, { verdict: 'confirm', decision: 'approve', fields: {}, rationale: 'Still valid on the application date.', evidence: ['expiry date vs application date'] })).statusCode).toBe(200);
+    const before = posted.length;
+    const submitted = await call(app, 'POST', me.cookie, `/me/edge-outcomes/${smeBatch.id}/submit`, {});
+    expect(submitted.statusCode, submitted.body).toBe(200);
+    expect(submitted.json()).toMatchObject({ state: 'awaiting_check' });
+    expect(posted.length).toBe(before);
+    const checked = await post(pm, `/projects/${projectId}/edge-outcomes/batches/${smeBatch.id}/send`);
+    expect(checked.statusCode, checked.body).toBe(200);
+    expect(posted.at(-1)!.body).toMatchObject({ second_check: true, outcomes: [{ variant_id: 'expires_in_30', written_by: expect.stringMatching(/^sme-[0-9a-f]{8}$/), checked_by: expect.stringMatching(/^admin-[0-9a-f]{8}$/) }] });
+    expect(await db.auditEvent.count({ where: { action: 'outcome_batch.sent' } })).toBe(2);
+  });
+
   it('export is off and says why when the RL Gym has not qualified the version; an unreachable RL Gym is recorded', async () => {
     const v8 = await publishedV8(CASE_REF_VERIFIERS);
     const projectId = await project(v8);

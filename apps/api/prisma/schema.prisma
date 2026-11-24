@@ -3815,3 +3815,61 @@ model PolicyQualityRun {
 
   @@index([projectId, createdAt])
 }
+
+/// E-001 §6b (owner, 24 Nov 2026): a batch of edge-case variants a PM sends one SME (or answers as Admin) for their
+/// expected outcomes, then writes to Studio as outcome-request.v1. Second check optional per batch (default off).
+model OutcomeBatch {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String             @map("client_id") @db.Uuid
+  projectId         String             @map("project_id") @db.Uuid
+  templateId        String             @map("template_id") @db.Uuid
+  studioTemplateId  String             @map("studio_template_id")
+  studioVersion     Int                @map("studio_version")
+  catalogRevision   Int?               @map("catalog_revision")
+  requestId         String             @unique @map("request_id")
+  /// sme (an SME answers in the SME app) or admin (the owner answers as Admin, acting for an SME, in the console).
+  answererKind      String             @map("answerer_kind")
+  assigneeSmeUserId String?            @map("assignee_sme_user_id") @db.Uuid
+  secondCheck       Boolean            @default(false) @map("second_check")
+  note              String?
+  dueBy             DateTime?          @map("due_by") @db.Date
+  /// open, awaiting_check, sent or send_failed.
+  state             String             @default("open")
+  createdById       String             @map("created_by_id") @db.Uuid
+  createdAt         DateTime           @default(now()) @map("created_at")
+  submittedAt       DateTime?          @map("submitted_at")
+  sentAt            DateTime?          @map("sent_at")
+  sendOutcome       String?            @map("send_outcome")
+  sendResponse      Json?              @map("send_response")
+  requestSha256     String?            @map("request_sha256")
+  items             OutcomeBatchItem[]
+
+  @@index([projectId, createdAt])
+  @@index([assigneeSmeUserId])
+}
+
+model OutcomeBatchItem {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String       @map("client_id") @db.Uuid
+  batchId         String       @map("batch_id") @db.Uuid
+  familyId        String       @map("family_id")
+  familyName      String       @map("family_name")
+  variantId       String       @map("variant_id")
+  tag             String
+  name            String
+  description     String       @default("")
+  boundary        String?
+  /// The outcome on record when the batch was made (to confirm or change), if any.
+  proposedOutcome Json?        @map("proposed_outcome")
+  /// {verdict: confirm|reject|cannot_decide, decision, fields, rationale, evidence}.
+  answer          Json?
+  answeredById    String?      @map("answered_by_id") @db.Uuid
+  answeredByKind  String?      @map("answered_by_kind")
+  answeredAt      DateTime?    @map("answered_at")
+  checkedById     String?      @map("checked_by_id") @db.Uuid
+  checkedByKind   String?      @map("checked_by_kind")
+  checkedAt       DateTime?    @map("checked_at")
+  batch           OutcomeBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@unique([batchId, variantId])
+}

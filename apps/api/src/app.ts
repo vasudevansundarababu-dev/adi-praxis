@@ -88,6 +88,7 @@ import { searchRoutes } from './routes/search';
 import { projectExportRoutes } from './routes/project-export';
 import { taskPackageRoutes } from './routes/task-packages';
 import { benchmarkRoutes } from './routes/benchmark';
+import { edgeOutcomeRoutes } from './routes/edge-outcomes';
 import { RlGymClient, rlGymConnected, type FetchLike as OutboundFetch } from './anvil/rlgym-client';
 import { StudioClient, studioConnected } from './anvil/studio-client';
 import { AnvilGatedValidator, PraxisPrecheckValidator, type AnvilTaskValidator } from './anvil/validator';
@@ -375,6 +376,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         const rl = { apiUrl: deps.config.RLGYM_API_URL, workspace: deps.config.RLGYM_WORKSPACE, key: deps.config.RLGYM_FORGE_CLIENT_KEY };
         const st = { apiUrl: deps.config.STUDIO_API_URL, key: deps.config.STUDIO_INBOX_KEY, tenantId: deps.config.STUDIO_TENANT_ID, actorId: deps.config.STUDIO_ACTOR_ID, actorRoles: deps.config.STUDIO_ACTOR_ROLES };
         await v1.register(benchmarkRoutes, { db: deps.db, rlgym: rlGymConnected(rl) ? new RlGymClient(rl, deps.outboundFetch) : null, studio: studioConnected(st) ? new StudioClient(st, deps.outboundFetch) : null, ...(deps.coverageClient ? { coverage: deps.coverageClient } : studioConnected(st) && deps.config.STUDIO_SEED_FAMILY ? { coverage: new HttpCoverageClient(new StudioClient(st, deps.outboundFetch), deps.config.STUDIO_SEED_FAMILY) } : {}) });
+        await v1.register(edgeOutcomeRoutes, { db: deps.db, studio: studioConnected(st) ? new StudioClient(st, deps.outboundFetch) : null });
       }
       await v1.register(anvilTemplateRoutes, { db: deps.db, anvil: { environment: deps.config.ANVIL_ENVIRONMENT, exportBaseUrl: deps.config.ANVIL_EXPORT_BASE_URL } });
       await v1.register(metaCompilerRoutes, { db: deps.db, config: deps.config });

@@ -2497,3 +2497,34 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
   - the task's author, or someone with a declared conflict, can't correct it.
 - **Before every migration**, a local `pg_dump -Fc` of praxis_authoring_v2 goes to `~/adi-backups/authoring-<timestamp>/`
   (outside the repository). Migrations are additive only.
+
+## E-001 §6b: edge-case families in Authoring (24 Nov 2026)
+
+- **Contract with Studio** (agreed; Studio commits 4d6f712 and 3786a43):
+  - Authoring pulls `GET /api/v1/templates/{id}/versions/{v}/edge-case-catalog` (edge-case-catalog.v2: families with
+    variants, states, outcomes, outcome_fields). A 404 means Authoring uses the template's S4 edge cases.
+  - Authoring holds the batches and writes `POST /api/v1/outcome-requests` (outcome-request.v1: verdict
+    confirm/reject/cannot_decide, decision + fields + rationale + evidence, sme-/admin- pseudonyms, `second_check`).
+- **Picker.** The SME's Benchmark panel picks a family and either every variant that counts (later ones too) or
+  chosen ones.
+  - `familyFocus` is stored beside `edgeCase`, so it's additive.
+  - Older tasks show their family at read time, and their stored data is never rewritten.
+  - Export sends the family's usable variants in `case_selector.edge_cases`. There are no new wire fields, and
+    packages are unchanged.
+- **Outcome batches** (tables `OutcomeBatch`, `OutcomeBatchItem`, migration 20261208000003, dump taken first):
+  - Project → Benchmark → Edge-case outcomes shows the variants waiting for a person's outcome, including migrated
+    ones.
+  - The PM makes one batch for one SME on the project, or answers it as Admin acting for an SME.
+  - The SME answers on the SME app's Edge-case outcomes page, and the bell shows it.
+  - The second check is off by default (owner: SME time costs about $1000 a day); the PM can switch it on per batch,
+    and then a PM or Admin other than the writer checks it.
+  - The batch is written to Studio whole. A failed send keeps every answer, so the PM can send it again.
+- **Defaults the owner may change:**
+  - b: an outcome is a decision, a rationale and at least one piece of evidence to cite;
+  - c: batches count as SME time (reporting only, not built yet);
+  - d: variants are set per task, and a run can only narrow them (`narrowForRun`);
+  - e: SMEs can add variants (through New edge-case family; adding to an existing family is next).
+- **Data safety.**
+  - `data-digests` job (counts and content digests of tasks, records, packages, submissions and exports).
+  - Test `phase-a-data-safety`: Phase A migrations are additive only.
+  - Verified 24 Nov: all digests equal to the coordinator's pre-Phase-A backup after the four migrations.

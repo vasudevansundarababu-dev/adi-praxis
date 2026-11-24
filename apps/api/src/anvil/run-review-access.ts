@@ -119,6 +119,15 @@ export async function staffInbox(db: Db, clientId: string): Promise<InboxItem[]>
     if (unassigned) items.push({ kind: 'run_review_unassigned', title: `Assign a reviewer to ${plural(unassigned, 'task')} in run review ${b.batchId}`, detail: `${name}${b.runId ? ` · run ${b.runId}` : ''}`, href, count: unassigned });
     if (waiting) items.push({ kind: 'run_review_waiting', title: `${plural(waiting, 'episode')} waiting for the assigned SME in ${b.batchId}`, detail: `${name}${b.runId ? ` · run ${b.runId}` : ''}`, href, count: waiting });
   }
+  // E-001 §6b: outcome batches waiting for a PM/Admin (answer as Admin, do the second check, or send again).
+  const ob = await db.outcomeBatch.findMany({ where: { clientId, OR: [{ state: 'awaiting_check' }, { state: 'send_failed' }, { state: 'open', answererKind: 'admin' }] }, select: { projectId: true, state: true, requestId: true } });
+  const obNames = new Map((await db.project.findMany({ where: { id: { in: [...new Set(ob.map((b) => b.projectId))] }, clientId }, select: { id: true, name: true } })).map((p) => [p.id, p.name]));
+  for (const b of ob) {
+    const name = obNames.get(b.projectId);
+    if (!name) continue;
+    const what = b.state === 'awaiting_check' ? 'Second check of edge-case outcomes' : b.state === 'send_failed' ? 'Edge-case outcomes not taken by Studio: send again' : 'Edge-case outcomes to answer as Admin';
+    items.push({ kind: 'edge_outcomes', title: what, detail: `${name} · ${b.requestId}`, href: `/projects/${b.projectId}?tab=benchmark`, count: 1 });
+  }
   // E-001 Q4: tasks held 3+ days waiting for a new case kind: chase it in Studio, or release the task.
   const held = await longHeldTasks(db, clientId);
   const heldNames = new Map((await db.project.findMany({ where: { id: { in: [...new Set(held.map((h) => h.projectId))] }, clientId }, select: { id: true, name: true } })).map((p) => [p.id, p.name]));
@@ -143,6 +152,12 @@ export async function smeInbox(db: Db, clientId: string, smeUserId: string): Pro
   for (const b of await assignedRunReviews(db, clientId, smeUserId)) {
     const open = b.items.filter((i) => !i.decision).length;
     if (open) items.push({ kind: 'run_review', title: `Review run results: ${plural(open, 'episode')}`, detail: `${b.projectName} · ${b.batchId}${b.runId ? ` · run ${b.runId}` : ''}`, href: '/run-reviews', count: open });
+  }
+  // E-001 §6b: edge-case outcomes the PM asked this SME to write, in one batch.
+  const outcomeBatches = await db.outcomeBatch.findMany({ where: { clientId, assigneeSmeUserId: smeUserId, state: 'open' }, include: { items: { select: { answer: true } } }, orderBy: { createdAt: 'asc' } });
+  for (const b of outcomeBatches) {
+    const left = b.items.filter((i) => !i.answer).length;
+    items.push({ kind: 'edge_outcomes', title: `Write edge-case outcomes: ${plural(b.items.length, 'variant')}`, detail: `${left} left to answer${b.dueBy ? ` · due ${b.dueBy.toISOString().slice(0, 10)}` : ''}`, href: '/edge-outcomes', count: Math.max(left, 1) });
   }
   return items;
 }

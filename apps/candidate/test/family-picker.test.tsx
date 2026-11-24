@@ -57,3 +57,18 @@ describe('Raise a new edge-case family', () => {
     });
   });
 });
+
+describe('Propose a new variant of a family (owner, 24 Nov 2026)', () => {
+  it('picks the family, writes meaning, twist and boundary, and the expected outcome with the environment’s pick lists', async () => {
+    const { NewVariantForm, newVariantBody } = await import('@/components/work/benchmark-fields');
+    const fields = [{ name: 'recommendation', label: 'Recommendation', help: '', required: true, allowedValues: ['ready_for_approval', 'request_information'] }, { name: 'request_type', label: 'Request type', help: '', required: false, allowedValues: ['tin', 'none'] }, { name: 'reason_keyword', label: 'Reason keyword', help: '', required: false, allowedValues: null, suggestedValues: ['TIN'] }];
+    const html = renderToStaticMarkup(<NewVariantForm families={FAMILIES.items} fields={fields} onSend={async () => null} onCancel={() => undefined} />);
+    const t = text(html);
+    for (const s of ['Family', 'Already in this family: Expired passport, Expires today, Expires within 30 days.', 'What it means', 'The twist', 'It is a boundary case', 'Expected outcome', 'Recommendation', 'Request type (optional)', 'Send for PM/Admin review']) expect(t).toContain(s);
+    expect(a11yProblems(html)).toEqual([]);
+    expect(newVariantBody({ familyId: 'expired_id', name: ' Expires tomorrow ', meaning: 'Valid on the day.', twist: 'One day left.', isBoundary: true, boundary: ' expires the day after ', decision: 'ready_for_approval', fields: { recommendation: 'x', request_type: 'none', reason_keyword: '' }, rationale: 'Valid on the application date.', evidence: 'expiry date\n' }, fields)).toEqual({
+      kind: 'new_edge_case_variant', familyId: 'expired_id', name: 'Expires tomorrow', meaning: 'Valid on the day.', twist: 'One day left.', boundary: 'expires the day after',
+      outcome: { decision: 'ready_for_approval', fields: { request_type: 'none' }, rationale: 'Valid on the application date.', evidence: ['expiry date'] },
+    });
+  });
+});

@@ -655,6 +655,41 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect((await get(pm, `/projects/${projectId}/rlgym-export`)).json().tasks.find((t: { taskId: string }) => t.taskId === task.taskId).waitingFor).toBeNull();
   });
 
+  it('Owner (24 Nov 2026): an SME proposes a new variant of an existing family for PM/Admin review; Studio gets new_edge_case_variant; no task changes', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    await qualify(v8);
+    const projectId = await project(v8);
+    const a = await signIn('sme-variant@gmail.test');
+    const task = (await packable(await authored(projectId, { smeUserId: a.smeUserId })))[0]!;
+    const catalog = { schema: 'edge-case-catalog.v2', environment_key: 'golden-kyc-openenv', catalog_revision: 1,
+      outcome_fields: [{ name: 'recommendation', label: 'Recommendation', help: '', required: true, allowed_values: ['ready_for_approval', 'request_information'] }, { name: 'request_type', label: 'Request type', help: '', required: false, allowed_values: ['tin', 'none'] }, { name: 'reason_keyword', label: 'Reason keyword', help: '', required: false, suggested_values: ['TIN'] }],
+      families: [{ family_id: 'minor_tin', name: "Minor's TIN", variants: [{ variant_id: 'minor_without_tin', tag: 'minor_without_tin', name: 'Without a TIN', state: 'available', outcome: { decision: 'request_information', written_by: 'migration' } }] }] };
+    answer = (c) => (c.url.includes('/edge-case-catalog') ? { status: 200, body: catalog } : c.url.endsWith('/inbox-items') ? { status: 202, body: { id: 'inb-0090' } } : { status: 404, body: {} });
+    const view = (await get(a.cookie, `/me/tasks/${task.taskId}/benchmark`)).json();
+    expect(view.families.outcomeFields.map((f: { name: string }) => f.name)).toEqual(['recommendation', 'request_type', 'reason_keyword']);
+    const before = await db.taskInstance.findUniqueOrThrow({ where: { id: task.taskId } });
+    const VARIANT = { kind: 'new_edge_case_variant', familyId: 'minor_tin', name: 'TIN one digit short', meaning: 'The minor’s TIN is given but has 8 digits instead of 9.', twist: 'A TIN is present, so a quick check would pass it.', boundary: 'one digit short', outcome: { decision: 'request_information', fields: { request_type: 'tin', reason_keyword: 'TIN' }, rationale: 'An invalid TIN is the same as no TIN for CIP.', evidence: ['the TIN on the application (application.read)'] } };
+    const raise = (body: object) => post(a.cookie, `/me/tasks/${task.taskId}/needs`, body);
+    expect((await raise({ ...VARIANT, familyId: 'no_such_family' })).statusCode).toBe(422);
+    expect((await raise({ ...VARIANT, name: 'Without a TIN' })).statusCode).toBe(422);
+    expect((await raise({ ...VARIANT, outcome: { ...VARIANT.outcome, decision: 'approve' } })).statusCode).toBe(422);
+    expect((await raise({ ...VARIANT, outcome: { ...VARIANT.outcome, fields: { request_type: 'passport' } } })).statusCode).toBe(422);
+    const raised = await raise(VARIANT);
+    expect(raised.statusCode, raised.body).toBe(201);
+    expect(raised.json()).toMatchObject({ kind: 'new_edge_case_variant', state: 'open', content: expect.objectContaining({ familyName: "Minor's TIN" }) });
+    // PM/Admin review: it waits with the PM until sent; then Studio gets it in the family.
+    const needs = (await get(pm, `/projects/${projectId}/needs`)).json().items;
+    expect(needs.find((n: { id: string }) => n.id === raised.json().id)).toMatchObject({ kind: 'new_edge_case_variant', state: 'open' });
+    const sent = await post(pm, `/projects/${projectId}/needs/${raised.json().id}/send`, { summary: "New variant of Minor's TIN: TIN one digit short" });
+    expect(sent.statusCode, sent.body).toBe(200);
+    const inbox = calls.filter((c) => c.url === `${STUDIO}/api/v1/inbox-items`).at(-1)!;
+    expect(inbox.body).toMatchObject({ kind: 'new_edge_case_variant', template_id: 'tpl_x5rwt6d5eu', version: 9 });
+    expect(inbox.body.evidence[0]).toEqual({ family_id: 'minor_tin', variant: { name: 'TIN one digit short', meaning: VARIANT.meaning, twist: VARIANT.twist, boundary: 'one digit short', outcome: { verdict: 'confirm', decision: 'request_information', fields: { request_type: 'tin', reason_keyword: 'TIN' }, rationale: VARIANT.outcome.rationale, evidence: VARIANT.outcome.evidence } }, task_id: task.taskId, raised_by: expect.stringMatching(/^sme-[0-9a-f]{8}$/) });
+    // No change to the task.
+    const after = await db.taskInstance.findUniqueOrThrow({ where: { id: task.taskId } });
+    expect([after.status, after.revision, after.benchmark, after.output]).toEqual([before.status, before.revision, before.benchmark, before.output]);
+  });
+
   it('export is off and says why when the RL Gym has not qualified the version; an unreachable RL Gym is recorded', async () => {
     const v8 = await publishedV8(CASE_REF_VERIFIERS);
     const projectId = await project(v8);

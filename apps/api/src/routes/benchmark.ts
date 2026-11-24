@@ -9,6 +9,7 @@ import { templateBenchmark, taskBenchmarkOf } from '../anvil/benchmark';
 import { buildRlGymExport, exportReceipt, projectIdFromRlGym, rlgymProjectId, rlgymTaskAnswers, rlgymTemplateRef, titleOf, type BuiltExport } from '../anvil/rlgym-export';
 import { recordReports } from './project-export';
 import { familyCatalog } from '../anvil/edge-family-catalog';
+import { answerProblems } from '../forge/outcome-batches';
 import { familyOfTag, focusTags } from '@praxis/shared';
 import type { RlGymClient, RlGymResult } from '../anvil/rlgym-client';
 import type { StudioClient, StudioResult, InboxItemBody } from '../anvil/studio-client';
@@ -122,6 +123,10 @@ function evidenceOf(n: SmeNeed): Record<string, unknown> {
   const c = (n.content ?? {}) as Record<string, unknown>;
   const raised = { task_id: n.taskInstanceId, raised_by: `sme-${n.raisedBySmeUserId.slice(0, 8)}` };
   if (n.kind === 'new_case_kind') return { context: c.context, twist: c.twist, expected_outcome: c.expectedOutcome, complexity: c.complexity, archetype: c.archetype, ...raised };
+  if (n.kind === 'new_edge_case_variant') {
+    const o = (c.outcome ?? {}) as { decision?: string; fields?: Record<string, string>; rationale?: string; evidence?: string[] };
+    return { family_id: c.familyId, variant: { name: c.name, meaning: c.meaning, twist: c.twist, boundary: c.boundary ?? null, outcome: { verdict: 'confirm', decision: o.decision, fields: o.fields ?? {}, rationale: o.rationale, evidence: o.evidence ?? [] } }, ...raised };
+  }
   if (n.kind === 'new_edge_case_family') {
     // E-001 §6b: the family and its first variants, each with the SME's outcome (agreed with Studio, 24 Nov 2026).
     const variants = (Array.isArray(c.variants) ? c.variants : []) as { name: string; description: string; boundary?: string; outcome: { counts: boolean; decision?: string; rationale: string; evidence?: string[] } }[];
@@ -216,7 +221,7 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
     const cat = await familyCatalog(db, t.project.template, studio);
     const derived = !value.familyFocus && value.edgeCase ? familyOfTag(cat.families, value.edgeCase) : null;
     const focus = value.familyFocus ?? (derived ? { familyId: derived.familyId, variants: [derived.variants.find((v) => v.tag === value.edgeCase)!.variantId], derived: true } : null);
-    return { ...authorView(t.project.template), value, editable, needs: needs.map((n) => needDto(n, null)), families: { source: cat.source, fallbackReason: cat.fallbackReason, items: cat.families.map((f) => ({ ...f, variants: f.variants.filter((v) => v.kind !== 'fixture').map(({ outcome: _o, proposedOutcome: _p, ...v }) => v) })).filter((f) => f.variants.length) }, focus };
+    return { ...authorView(t.project.template), value, editable, needs: needs.map((n) => needDto(n, null)), families: { source: cat.source, fallbackReason: cat.fallbackReason, outcomeFields: cat.outcomeFields, items: cat.families.map((f) => ({ ...f, variants: f.variants.filter((v) => v.kind !== 'fixture').map(({ outcome: _o, proposedOutcome: _p, ...v }) => v) })).filter((f) => f.variants.length) }, focus };
   });
 
   app.put('/me/tasks/:id/benchmark', { config: { access: 'candidate', rateLimit: { max: 60, timeWindow: '1 minute' } }, schema: { tags: ['work'], params: Id, body: SaveTaskBenchmarkRequest } }, async (req, reply) => {
@@ -256,6 +261,15 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
       const body = req.body;
       if (body.kind === 'new_case_kind') {
         for (const k of ['complexity', 'archetype'] as const) if (b.sliceLists[k].length && !b.sliceLists[k].includes(body[k])) throw new AppError(422, 'NEED_INVALID', `${k} must be one of ${b.sliceLists[k].join(', ')}.`);
+      } else if (body.kind === 'new_edge_case_variant') {
+        // Owner, 24 Nov 2026: the SME proposes a variant of an existing family; its outcome uses the environment's fields.
+        const cat = await familyCatalog(tx, t.project.template, studio);
+        const fam = cat.families.find((f) => f.familyId === body.familyId);
+        if (!fam) throw new AppError(422, 'NEED_INVALID', 'Choose a family from this template’s edge-case catalog.');
+        if (fam.variants.some((v) => v.name.trim().toLowerCase() === body.name.trim().toLowerCase())) throw new AppError(422, 'NEED_INVALID', `“${fam.name}” already has a variant called “${body.name.trim()}”.`);
+        const problems = answerProblems({ verdict: 'confirm', ...body.outcome }, cat.outcomeFields);
+        if (problems.length) throw new AppError(422, 'NEED_INVALID', problems.join(' '), { problems });
+        (body as { familyName?: string }).familyName = fam.name;
       } else if (body.kind === 'new_edge_case_family') {
         // E-001 §6b: SMEs create families. The archetype and complexity, when given, are the template's own values.
         for (const k of ['complexity', 'archetype'] as const) if (body[k] && b.sliceLists[k].length && !b.sliceLists[k].includes(body[k]!)) throw new AppError(422, 'NEED_INVALID', `${k} must be one of ${b.sliceLists[k].join(', ')}.`);

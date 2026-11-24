@@ -339,9 +339,35 @@ export const NewFamilyNeed = z
   .strict();
 export type NewFamilyNeed = z.infer<typeof NewFamilyNeed>;
 
+export const NEW_VARIANT_KIND = 'new_edge_case_variant' as const;
+/**
+ * Owner (24 Nov 2026): "He can define a new edge case for PM/Admin review". An SME proposes a new variant of an existing
+ * family (from Studio's live catalog): what it means, the twist, whether it is a boundary case, and its expected outcome
+ * with the environment's outcome fields. PM/Admin triage as for any need; then Studio as new_edge_case_variant.
+ */
+export const NewVariantNeed = z
+  .object({
+    kind: z.literal(NEW_VARIANT_KIND),
+    familyId: z.string().regex(/^[a-z0-9][a-z0-9_.:-]{0,99}$/),
+    name: z.string().trim().min(3).max(120),
+    meaning: z.string().trim().min(10).max(2000),
+    twist: z.string().trim().min(10).max(2000),
+    boundary: z.string().trim().min(3).max(500).nullable(),
+    outcome: z
+      .object({
+        decision: z.string().trim().min(1).max(100),
+        fields: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), z.string().max(500)).default({}),
+        rationale: z.string().trim().min(10).max(4000),
+        evidence: z.array(z.string().trim().min(2).max(500)).min(1).max(20),
+      })
+      .strict(),
+  })
+  .strict();
+export type NewVariantNeed = z.infer<typeof NewVariantNeed>;
+
 
 /** SME needs (spec 1.4-1.5; F-11). E-001 §6b adds a new edge-case family. */
-export const NEED_KINDS = ['new_case_kind', 'more_data', 'new_edge_case_family'] as const;
+export const NEED_KINDS = ['new_case_kind', 'more_data', 'new_edge_case_family', 'new_edge_case_variant'] as const;
 export const NEED_STATES = ['open', 'merged', 'sent', 'rejected'] as const;
 export const RaiseNeedRequest = z.discriminatedUnion('kind', [
   z.object({
@@ -354,5 +380,6 @@ export const RaiseNeedRequest = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({ kind: z.literal('more_data'), edgeCase: z.string().regex(TAG), howMany: z.number().int().min(1).max(1000), why: z.string().trim().min(5).max(2000) }).strict(),
   NewFamilyNeed,
+  NewVariantNeed,
 ]);
 export type RaiseNeedRequest = z.infer<typeof RaiseNeedRequest>;

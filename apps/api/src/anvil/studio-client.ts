@@ -22,7 +22,7 @@ export type StudioResult = { ok: true; httpStatus: number; data: Record<string, 
 
 /** Only these fields are sent: Studio refuses unknown fields. */
 export interface InboxItemBody {
-  kind: 'more_data' | 'new_case_kind' | 'new_edge_case_family';
+  kind: 'more_data' | 'new_case_kind' | 'new_edge_case_family' | 'new_edge_case_variant';
   source: 'adi-forge';
   template_id: string;
   version: number;

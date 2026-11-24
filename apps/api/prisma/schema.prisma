@@ -3869,6 +3869,8 @@ model OutcomeBatchItem {
   checkedById     String?      @map("checked_by_id") @db.Uuid
   checkedByKind   String?      @map("checked_by_kind")
   checkedAt       DateTime?    @map("checked_at")
+  /// Default c: active time the answerer spent on this item, summed over saves (seconds; reporting only).
+  activeSeconds   Int?         @map("active_seconds")
   batch           OutcomeBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
 
   @@unique([batchId, variantId])

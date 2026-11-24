@@ -26,7 +26,7 @@ export interface NeedRow {
   id: string;
   taskId: string;
   taskTitle: string | null;
-  kind: 'new_case_kind' | 'more_data' | 'new_edge_case_family';
+  kind: 'new_case_kind' | 'more_data' | 'new_edge_case_family' | 'new_edge_case_variant';
   content: Record<string, unknown>;
   state: string;
   mergedIntoId: string | null;
@@ -189,6 +189,10 @@ export function RlGymExportPanel({ projectId, initial }: { projectId: string; in
 function needText(n: NeedRow) {
   const c = n.content;
   if (n.kind === 'new_case_kind') return `${String(c.context ?? '')} · Twist: ${String(c.twist ?? '')} · Expected: ${String(c.expectedOutcome ?? '')} · ${String(c.complexity ?? '')}, ${String(c.archetype ?? '')}`;
+  if (n.kind === 'new_edge_case_variant') {
+    const o = (c.outcome ?? {}) as { decision?: string; fields?: Record<string, string> };
+    return `New variant of ${String(c.familyName ?? c.familyId ?? '')}: ${String(c.name ?? '')}${c.boundary ? ` (boundary: ${String(c.boundary)})` : ''} · ${String(c.meaning ?? '')} · Twist: ${String(c.twist ?? '')} · Expected: ${o.decision ?? ''}${o.fields && Object.keys(o.fields).length ? ` (${Object.entries(o.fields).map(([k, v]) => `${k}: ${v}`).join(', ')})` : ''}`;
+  }
   if (n.kind === 'new_edge_case_family') {
     const vs = (Array.isArray(c.variants) ? c.variants : []) as { name?: string; boundary?: string; outcome?: { counts?: boolean; decision?: string } }[];
     return `${String(c.name ?? '')}: ${String(c.whyItMatters ?? '')} · Variants: ${vs.map((v) => `${v.name ?? ''}${v.boundary ? ` (boundary: ${v.boundary})` : ''} → ${v.outcome?.counts === false ? 'doesn’t count' : (v.outcome?.decision ?? '')}`).join('; ')}`;
@@ -222,7 +226,7 @@ export function SmeNeedsPanel({ projectId, needs, studioConnected }: { projectId
         {needs.map((n) => (
           <li key={n.id} className="rounded border border-line p-3 text-sm">
             <p className="font-medium">
-              {n.kind === 'new_case_kind' ? 'New edge case' : n.kind === 'new_edge_case_family' ? 'New edge-case family' : 'More data'} · {n.taskTitle ?? n.taskId.slice(0, 8)} · {n.state}
+              {n.kind === 'new_case_kind' ? 'New edge case' : n.kind === 'new_edge_case_family' ? 'New edge-case family' : n.kind === 'new_edge_case_variant' ? 'New variant of a family' : 'More data'} · {n.taskTitle ?? n.taskId.slice(0, 8)} · {n.state}
               {n.studioItemId && ` · Studio ${n.studioItemId}${n.studioState ? ` (${n.studioState})` : ''}`}
             </p>
             <p className="mt-1">{needText(n)}</p>

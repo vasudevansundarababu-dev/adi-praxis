@@ -11,6 +11,7 @@ const CATALOG = {
       { variant_id: 'minor_without_tin', tag: 'minor_without_tin', name: 'Without TIN', state: 'available', outcome: { decision: 'request_information', written_by: 'migration' } },
       { variant_id: 'tin_applied', tag: 'tin_applied', name: 'Has applied for a TIN', state: 'available', outcome: { decision: 'approve', written_by: 'admin-0a1b2c3d' } },
       { variant_id: 'tin_invalid', tag: 'tin_invalid', name: 'TIN invalid', state: 'waiting_outcome', outcome: null },
+      { variant_id: 'tin_short', tag: 'tin_short', name: 'TIN one digit short', state: 'needs_environment_change', outcome: { decision: 'request_information', written_by: 'sme-0a1b2c3d' } },
       { variant_id: 'bad id!', tag: 'x', state: 'available' },
     ] },
   ],
@@ -19,7 +20,7 @@ const CATALOG = {
 describe('families', () => {
   it('reads Studio’s catalog; a migrated outcome still needs a person to confirm it', () => {
     const [f] = familiesOf(CATALOG, []);
-    expect(f!.variants.map((v) => [v.tag, v.hasOutcome, v.needsConfirmation])).toEqual([['minor_without_tin', true, true], ['tin_applied', true, false], ['tin_invalid', false, true]]);
+    expect(f!.variants.map((v) => [v.tag, v.state, v.hasOutcome, v.needsConfirmation])).toEqual([['minor_without_tin', 'available', true, true], ['tin_applied', 'available', true, false], ['tin_invalid', 'waiting_outcome', false, true], ['tin_short', 'needs_environment_change', true, false]]);
     expect(outcomeFieldsOf(CATALOG)).toEqual([{ name: 'recommendation', label: 'Recommendation', help: 'What the analyst should do', required: true, allowedValues: ['approve', 'refer'] }]);
   });
 

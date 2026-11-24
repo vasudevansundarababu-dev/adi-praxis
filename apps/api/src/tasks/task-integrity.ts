@@ -22,6 +22,15 @@ export const TASK_CHECK_REPORT_SCHEMA = 'praxis.task-check-report.v1' as const;
 export const TASK_CHECKER = 'praxis.task-integrity' as const;
 export const TASK_CHECKER_VERSION = '1' as const;
 
+/**
+ * Owner (24 Nov 2026): "keep the existing tasks which I authored". Tasks approved before the stronger checks are never
+ * re-validated into a blocked state and their approvals are never back-filled: their problems are reported as warnings,
+ * with the explicit gap "approved before the stronger checks", and they still export and run. This is the moment the
+ * checks went in (commit 7c12b835).
+ */
+export const STRONGER_CHECKS_FROM = new Date('2026-11-24T17:34:39Z');
+export const CHECKS_GAP = 'approved_before_stronger_checks' as const;
+
 /** Who can fix a problem: the task's author, the project's PM, the template (Studio), Authoring itself, or the RL Gym. */
 export type ProblemOwner = 'author' | 'pm' | 'template' | 'authoring' | 'rlgym';
 
@@ -49,6 +58,8 @@ export interface TaskCheckReport {
   /** JCS SHA-256 of the frozen snapshot the checks ran on: the authored content, the task's input and its template. */
   snapshotSha256: string;
   status: 'pass' | 'fail';
+  /** Set when the record was approved before the stronger checks: its problems are warnings, never a block. */
+  gap: typeof CHECKS_GAP | null;
   problems: TaskProblem[];
 }
 
@@ -244,7 +255,9 @@ export async function taskCheckReport(
   record: Pick<ApprovedTaskRecord, 'id' | 'templateId' | 'templateVersion' | 'createdAt'> | null = null,
 ): Promise<TaskCheckReport> {
   const template = t.project.template;
-  const problems = [...snapshotProblems(template, output, t.benchmark ?? null), ...(await referenceProblems(tx, { clientId: t.clientId, projectTemplateId: t.project.templateId ?? template.id, output, record }))];
+  const found = [...snapshotProblems(template, output, t.benchmark ?? null), ...(await referenceProblems(tx, { clientId: t.clientId, projectTemplateId: t.project.templateId ?? template.id, output, record }))];
+  const gap = record && record.createdAt < STRONGER_CHECKS_FROM ? CHECKS_GAP : null;
+  const problems = gap ? found.map((p) => ({ ...p, severity: 'warning' as const, message: `${p.message} (Approved before the stronger checks: shown as a warning; the task still exports and runs.)` })) : found;
   return {
     schema: TASK_CHECK_REPORT_SCHEMA,
     checker: TASK_CHECKER,
@@ -255,6 +268,7 @@ export async function taskCheckReport(
     templateVersion: template.version,
     snapshotSha256: snapshotOf(template, output, t.input),
     status: problems.some((p) => p.severity === 'blocking') ? 'fail' : 'pass',
+    gap,
     problems,
   };
 }

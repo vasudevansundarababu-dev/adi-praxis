@@ -45,6 +45,9 @@ export interface ExportTask {
   contentHash?: string;
   snapshotSha256?: string | null;
   checkReportSha256?: string | null;
+  /** Approved before the stronger checks: sent, with its warnings, never blocked. */
+  checksGap?: boolean;
+  warnings?: string[];
 }
 export interface NotSent {
   recordId: string;
@@ -149,7 +152,7 @@ export async function buildRlGymExport(
     const policyClauses = await policyClausesFor(tx, r);
     const correctsRevision = stored.revision > 1 ? stored.revision - 1 : null;
     const smeBatchId = correctsRevision ? (opts.batches?.get(r.taskInstanceId) ?? null) : null;
-    tasks.push({ recordId: r.id, taskId: r.taskInstanceId, title, revision: stored.revision, packageSha256: stored.packageSha256, correctsRevision, smeBatchId, complexity, archetype, edgeCase, contentHash: r.contentHash, snapshotSha256: report?.snapshotSha256 ?? null, checkReportSha256: report ? jcsSha256(report) : null });
+    tasks.push({ recordId: r.id, taskId: r.taskInstanceId, title, revision: stored.revision, packageSha256: stored.packageSha256, correctsRevision, smeBatchId, complexity, archetype, edgeCase, contentHash: r.contentHash, snapshotSha256: report?.snapshotSha256 ?? null, checkReportSha256: report ? jcsSha256(report) : null, ...(report?.gap ? { checksGap: true, warnings: report.problems.map((x) => x.code) } : {}) });
     wire.push({
       schema: 'praxis.authored-task-export.v1',
       task_id: r.taskInstanceId,
@@ -198,7 +201,7 @@ export function exportReceipt(built: BuiltExport, issuedAt: Date): Record<string
     template: built.body.template,
     checker: { id: TASK_CHECKER, version: TASK_CHECKER_VERSION },
     issued_at: issuedAt.toISOString(),
-    tasks: built.tasks.map((t) => ({ task_id: t.taskId, revision: t.revision, record_id: t.recordId, record_content_hash: t.contentHash ?? null, package_sha256: t.packageSha256, snapshot_sha256: t.snapshotSha256 ?? null, check_report_sha256: t.checkReportSha256 ?? null, checks: 'pass' })),
+    tasks: built.tasks.map((t) => ({ task_id: t.taskId, revision: t.revision, record_id: t.recordId, record_content_hash: t.contentHash ?? null, package_sha256: t.packageSha256, snapshot_sha256: t.snapshotSha256 ?? null, check_report_sha256: t.checkReportSha256 ?? null, checks: t.checksGap ? 'approved_before_stronger_checks' : 'pass', ...(t.warnings?.length ? { warnings: t.warnings } : {}) })),
     not_sent: built.notSent.map((n) => ({ task_id: n.taskId, record_id: n.recordId, code: n.code, checks: (n.problems ?? []).map((p) => p.code) })),
     signature: null,
   };

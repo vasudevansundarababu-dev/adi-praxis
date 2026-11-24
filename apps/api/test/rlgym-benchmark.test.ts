@@ -396,6 +396,14 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     const problems = report.json().problems as Record<string, unknown>[];
     expect(problems.length).toBeGreaterThan(0);
     for (const p of problems) expect(p).toMatchObject({ code: 'STEP_TOOL_NOT_OFFERED', section: 'S5', field: expect.stringMatching(/^S5\.steps\[\d+\]\.tool$/), owner: 'author', retryHelps: false, severity: 'blocking', message: expect.stringContaining(dropped) });
+    // Owner (24 Nov 2026): a task approved before the stronger checks is never blocked: its problems are warnings with
+    // the explicit gap, and it still exports.
+    const { taskCheckReport, CHECKS_GAP } = await import('../src/tasks/task-integrity');
+    const tOld = await db.taskInstance.findUniqueOrThrow({ where: { id: bad.taskInstanceId }, include: { project: { include: { template: true } } } });
+    const earlier = await taskCheckReport(db, tOld, bad.output, { ...bad, createdAt: new Date('2026-11-23T20:00:00Z') });
+    expect(earlier).toMatchObject({ status: 'pass', gap: CHECKS_GAP });
+    expect(earlier.problems.length).toBe(problems.length);
+    for (const p of earlier.problems) expect(p).toMatchObject({ code: 'STEP_TOOL_NOT_OFFERED', severity: 'warning', message: expect.stringContaining('Approved before the stronger checks') });
     // Approval: the author's problem joins the D18 checks.
     const t = await db.taskInstance.findUniqueOrThrow({ where: { id: bad.taskInstanceId }, include: { project: { include: { template: true } } } });
     const integrity = await db.$transaction((tx) => approvalIntegrity(tx, t));

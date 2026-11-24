@@ -122,6 +122,15 @@ function evidenceOf(n: SmeNeed): Record<string, unknown> {
   const c = (n.content ?? {}) as Record<string, unknown>;
   const raised = { task_id: n.taskInstanceId, raised_by: `sme-${n.raisedBySmeUserId.slice(0, 8)}` };
   if (n.kind === 'new_case_kind') return { context: c.context, twist: c.twist, expected_outcome: c.expectedOutcome, complexity: c.complexity, archetype: c.archetype, ...raised };
+  if (n.kind === 'new_edge_case_family') {
+    // E-001 §6b: the family and its first variants, each with the SME's outcome (agreed with Studio, 24 Nov 2026).
+    const variants = (Array.isArray(c.variants) ? c.variants : []) as { name: string; description: string; boundary?: string; outcome: { counts: boolean; decision?: string; rationale: string; evidence?: string[] } }[];
+    return {
+      family: { name: c.name, why_it_matters: c.whyItMatters, ...(c.archetype ? { archetype: c.archetype } : {}), ...(c.complexity ? { complexity: c.complexity } : {}) },
+      variants: variants.map((v) => ({ name: v.name, description: v.description, boundary: v.boundary || null, outcome: v.outcome.counts ? { verdict: 'confirm', decision: v.outcome.decision, rationale: v.outcome.rationale, evidence: v.outcome.evidence ?? [] } : { verdict: 'reject', rationale: v.outcome.rationale } })),
+      ...raised,
+    };
+  }
   return { tag: c.edgeCase, how_many: c.howMany, why: c.why, ...raised };
 }
 
@@ -247,6 +256,9 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
       const body = req.body;
       if (body.kind === 'new_case_kind') {
         for (const k of ['complexity', 'archetype'] as const) if (b.sliceLists[k].length && !b.sliceLists[k].includes(body[k])) throw new AppError(422, 'NEED_INVALID', `${k} must be one of ${b.sliceLists[k].join(', ')}.`);
+      } else if (body.kind === 'new_edge_case_family') {
+        // E-001 §6b: SMEs create families. The archetype and complexity, when given, are the template's own values.
+        for (const k of ['complexity', 'archetype'] as const) if (body[k] && b.sliceLists[k].length && !b.sliceLists[k].includes(body[k]!)) throw new AppError(422, 'NEED_INVALID', `${k} must be one of ${b.sliceLists[k].join(', ')}.`);
       } else if (!b.edgeCases.some((e) => e.tag === body.edgeCase)) throw new AppError(422, 'NEED_INVALID', 'More data needs an edge case of this template.');
       const { kind, ...content } = body;
       const need = await tx.smeNeed.create({ data: { clientId: t.clientId, projectId: t.projectId, taskInstanceId: t.id, raisedBySmeUserId: actor.smeUserId, kind, content: content as Prisma.InputJsonValue, templateId: t.project.templateId } });

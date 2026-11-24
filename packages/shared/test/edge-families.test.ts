@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { familiesOf, familyOfTag, focusTags, narrowForRun, NewFamilyNeed, outcomeFieldsOf, VariantOutcome } from '../src/edge-families';
+import { NewFamilyNeed, VariantOutcome } from '../src/benchmark';
+import { familiesOf, familyOfTag, focusTags, narrowForRun, outcomeFieldsOf } from '../src/edge-families';
 
 /** E-001 §6b (owner, 24 Nov 2026): edge-case families and variants. */
 const CATALOG = {

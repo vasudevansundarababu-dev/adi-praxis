@@ -311,8 +311,37 @@ export function benchmarkInputProblems(input: TaskBenchmarkInput, t: { edgeCases
   return out;
 }
 
-/** SME needs (spec 1.4-1.5; F-11). */
-export const NEED_KINDS = ['new_case_kind', 'more_data'] as const;
+// ── E-001 §6b: variant outcomes and new families ──
+export const OUTCOME_REQUEST_SCHEMA = 'outcome-request.v1' as const;
+export const NEW_FAMILY_KIND = 'new_edge_case_family' as const;
+
+/** An SME's outcome for one variant (default b: decision, rationale and the evidence to cite), or "does not count". */
+export const VariantOutcome = z.discriminatedUnion('counts', [
+  z.object({ counts: z.literal(true), decision: z.string().trim().min(2).max(200), rationale: z.string().trim().min(10).max(4000), evidence: z.array(z.string().trim().min(2).max(500)).min(1).max(20) }).strict(),
+  z.object({ counts: z.literal(false), rationale: z.string().trim().min(10).max(4000) }).strict(),
+]);
+export type VariantOutcome = z.infer<typeof VariantOutcome>;
+
+
+/** "New edge-case family" in Raise a need: the family and its first variants, each with the SME's outcome. */
+export const NewFamilyNeed = z
+  .object({
+    kind: z.literal(NEW_FAMILY_KIND),
+    name: z.string().trim().min(3).max(120),
+    whyItMatters: z.string().trim().min(10).max(2000),
+    archetype: z.string().trim().max(64).optional(),
+    complexity: z.string().trim().max(64).optional(),
+    variants: z
+      .array(z.object({ name: z.string().trim().min(3).max(120), description: z.string().trim().min(10).max(2000), boundary: z.string().trim().max(500).optional(), outcome: VariantOutcome }).strict())
+      .min(1)
+      .max(20),
+  })
+  .strict();
+export type NewFamilyNeed = z.infer<typeof NewFamilyNeed>;
+
+
+/** SME needs (spec 1.4-1.5; F-11). E-001 §6b adds a new edge-case family. */
+export const NEED_KINDS = ['new_case_kind', 'more_data', 'new_edge_case_family'] as const;
 export const NEED_STATES = ['open', 'merged', 'sent', 'rejected'] as const;
 export const RaiseNeedRequest = z.discriminatedUnion('kind', [
   z.object({
@@ -324,5 +353,6 @@ export const RaiseNeedRequest = z.discriminatedUnion('kind', [
     archetype: z.string().trim().min(1).max(64),
   }).strict(),
   z.object({ kind: z.literal('more_data'), edgeCase: z.string().regex(TAG), howMany: z.number().int().min(1).max(1000), why: z.string().trim().min(5).max(2000) }).strict(),
+  NewFamilyNeed,
 ]);
 export type RaiseNeedRequest = z.infer<typeof RaiseNeedRequest>;

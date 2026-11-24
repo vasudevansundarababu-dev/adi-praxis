@@ -132,30 +132,3 @@ export function narrowForRun(taskTags: string[], runTags: string[] | null): stri
   return taskTags.filter((t) => runTags.includes(t));
 }
 
-// ── Variant outcomes (SME batch) ──
-
-/** An SME's outcome for one variant (default b: decision, rationale and the evidence to cite), or "does not count". */
-export const VariantOutcome = z.discriminatedUnion('counts', [
-  z.object({ counts: z.literal(true), decision: z.string().trim().min(2).max(200), rationale: z.string().trim().min(10).max(4000), evidence: z.array(z.string().trim().min(2).max(500)).min(1).max(20) }).strict(),
-  z.object({ counts: z.literal(false), rationale: z.string().trim().min(10).max(4000) }).strict(),
-]);
-export type VariantOutcome = z.infer<typeof VariantOutcome>;
-
-export const OUTCOME_REQUEST_SCHEMA = 'outcome-request.v1' as const;
-export const NEW_FAMILY_KIND = 'new_edge_case_family' as const;
-
-/** "New edge-case family" in Raise a need: the family and its first variants, each with the SME's outcome. */
-export const NewFamilyNeed = z
-  .object({
-    kind: z.literal(NEW_FAMILY_KIND),
-    name: z.string().trim().min(3).max(120),
-    whyItMatters: z.string().trim().min(10).max(2000),
-    archetype: z.string().trim().max(64).optional(),
-    complexity: z.string().trim().max(64).optional(),
-    variants: z
-      .array(z.object({ name: z.string().trim().min(3).max(120), description: z.string().trim().min(10).max(2000), boundary: z.string().trim().max(500).optional(), outcome: VariantOutcome }).strict())
-      .min(1)
-      .max(20),
-  })
-  .strict();
-export type NewFamilyNeed = z.infer<typeof NewFamilyNeed>;

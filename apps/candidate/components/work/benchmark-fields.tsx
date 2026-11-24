@@ -44,6 +44,7 @@ export function BenchmarkFields({ taskId }: { taskId: string }) {
   const [checks, setChecks] = useState<ExtraStateCheck[]>([]);
   const [message, setMessage] = useState<{ kind: 'error' | 'ok'; text: string } | null>(null);
   const [raising, setRaising] = useState(false);
+  const [raisingFamily, setRaisingFamily] = useState(false);
   const [need, setNeed] = useState({ context: '', twist: '', expectedOutcome: '', complexity: '', archetype: '' });
 
   const load = useCallback(async () => {
@@ -213,10 +214,29 @@ export function BenchmarkFields({ taskId }: { taskId: string }) {
       <div className="mt-6">
         <h3 className="font-medium">Raise a need</h3>
         <p className="text-sm text-fg-muted">Found a situation the template does not cover? Describe it in four parts. It goes to your PM, who decides whether to send it to Studio.</p>
-        {!raising ? (
-          <button type="button" className="btn btn-secondary mt-2" onClick={() => setRaising(true)}>
-            Raise an edge case
-          </button>
+        {raisingFamily ? (
+          <NewFamilyForm
+            sliceLists={view.sliceLists}
+            onCancel={() => setRaisingFamily(false)}
+            onSend={async (body) => {
+              setMessage(null);
+              const res = await call('POST', `/me/tasks/${taskId}/needs`, body);
+              if (!res.ok) return res.error ?? 'Could not send the new family.';
+              setRaisingFamily(false);
+              setMessage({ kind: 'ok', text: 'Sent to your PM. They decide whether it goes to Studio.' });
+              await load();
+              return null;
+            }}
+          />
+        ) : !raising ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className="btn btn-secondary" onClick={() => setRaising(true)}>
+              Raise an edge case
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setRaisingFamily(true)}>
+              Raise a new edge-case family
+            </button>
+          </div>
         ) : (
           <div className="mt-2 grid max-w-3xl gap-3 text-sm">
             <label className="flex flex-col">
@@ -264,7 +284,7 @@ export function BenchmarkFields({ taskId }: { taskId: string }) {
           <ul className="mt-3 space-y-1 text-sm">
             {view.needs.map((n) => (
               <li key={n.id}>
-                {n.kind === 'new_case_kind' ? 'New edge case' : 'More data'} · {NEED_STATE[n.state] ?? n.state}
+                {n.kind === 'new_case_kind' ? 'New edge case' : n.kind === 'new_edge_case_family' ? `New edge-case family: ${String(n.content.name ?? '')}` : 'More data'} · {NEED_STATE[n.state] ?? n.state}
                 {n.studioItemId && (n.kind === 'new_case_kind' ? ` · Waiting for new case kind ${n.studioItemId}` : ` · Studio item ${n.studioItemId}`)}
                 {n.studioState && ` (${n.studioState})`}
                 {n.rejectReason && ` · ${n.rejectReason}`}
@@ -340,6 +360,130 @@ export function FamilyPicker({ families, familyId, variants, editable, onFamily,
           </ul>
         </fieldset>
       )}
+    </div>
+  );
+}
+
+type FamilyVariantDraft = { name: string; description: string; boundary: string; counts: boolean; decision: string; rationale: string; evidence: string };
+const emptyVariant = (): FamilyVariantDraft => ({ name: '', description: '', boundary: '', counts: true, decision: '', rationale: '', evidence: '' });
+
+/** The "New edge-case family" request body from the form. */
+export function newFamilyBody(f: { name: string; whyItMatters: string; archetype: string; complexity: string; variants: FamilyVariantDraft[] }) {
+  return {
+    kind: 'new_edge_case_family' as const,
+    name: f.name.trim(),
+    whyItMatters: f.whyItMatters.trim(),
+    ...(f.archetype ? { archetype: f.archetype } : {}),
+    ...(f.complexity ? { complexity: f.complexity } : {}),
+    variants: f.variants.map((v) => ({
+      name: v.name.trim(),
+      description: v.description.trim(),
+      ...(v.boundary.trim() ? { boundary: v.boundary.trim() } : {}),
+      outcome: v.counts ? { counts: true as const, decision: v.decision.trim(), rationale: v.rationale.trim(), evidence: v.evidence.split('\n').map((x) => x.trim()).filter(Boolean) } : { counts: false as const, rationale: v.rationale.trim() },
+    })),
+  };
+}
+
+/**
+ * E-001 §6b (owner, 24 Nov 2026): SMEs create edge-case families. The family, why it matters to the bank, and its first
+ * variants, each with the expected outcome the SME writes. It goes to the PM, who decides whether to send it to Studio;
+ * Studio checks whether each variant needs only data or an environment change. No task is re-authored when it lands.
+ */
+export function NewFamilyForm({ sliceLists, onSend, onCancel }: { sliceLists: { complexity: string[]; archetype: string[] }; onSend: (body: ReturnType<typeof newFamilyBody>) => Promise<string | null>; onCancel: () => void }) {
+  const [f, setF] = useState({ name: '', whyItMatters: '', archetype: '', complexity: '', variants: [emptyVariant()] });
+  const [error, setError] = useState<string | null>(null);
+  const setV = (i: number, patch: Partial<FamilyVariantDraft>) => setF({ ...f, variants: f.variants.map((v, j) => (j === i ? { ...v, ...patch } : v)) });
+  return (
+    <div className="mt-2 grid max-w-3xl gap-3 text-sm" data-new-family>
+      <label className="flex flex-col">
+        <span>Family name (for example: Deceased applicant)</span>
+        <input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+      </label>
+      <label className="flex flex-col">
+        <span>Why it matters to the bank</span>
+        <textarea className="input" rows={2} value={f.whyItMatters} onChange={(e) => setF({ ...f, whyItMatters: e.target.value })} />
+      </label>
+      <div className="flex flex-wrap gap-3">
+        {(['archetype', 'complexity'] as const).map((k) => (
+          <label key={k} className="flex flex-col">
+            <span>{k === 'archetype' ? 'Archetype' : 'Complexity'} (optional)</span>
+            <select className="input" value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })}>
+              <option value="">—</option>
+              {sliceLists[k].map((v) => (
+                <option key={v} value={v}>
+                  {k === 'archetype' ? (archetypePlain(v) ?? v) : (complexityPlain(v)?.name ?? v)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+      {f.variants.map((v, i) => (
+        <fieldset key={i} className="rounded border border-line p-3">
+          <legend className="px-1 font-medium">Variant {i + 1}</legend>
+          <div className="grid gap-2">
+            <label className="flex flex-col">
+              <span>Name (for example: Death record match)</span>
+              <input className="input" value={v.name} onChange={(e) => setV(i, { name: e.target.value })} />
+            </label>
+            <label className="flex flex-col">
+              <span>The situation</span>
+              <textarea className="input" rows={2} value={v.description} onChange={(e) => setV(i, { description: e.target.value })} />
+            </label>
+            <label className="flex flex-col">
+              <span>Boundary, if it is one (optional: for example, exactly 18 today)</span>
+              <input className="input" value={v.boundary} onChange={(e) => setV(i, { boundary: e.target.value })} />
+            </label>
+            <div className="flex flex-wrap gap-3">
+              <label className="flex items-center gap-1">
+                <input type="radio" name={`nf-counts-${i}`} checked={v.counts} onChange={() => setV(i, { counts: true })} /> Expected outcome
+              </label>
+              <label className="flex items-center gap-1">
+                <input type="radio" name={`nf-counts-${i}`} checked={!v.counts} onChange={() => setV(i, { counts: false })} /> Doesn’t count as a test
+              </label>
+            </div>
+            {v.counts && (
+              <label className="flex flex-col">
+                <span>What a good analyst concludes (for example: refer to a specialist)</span>
+                <input className="input" value={v.decision} onChange={(e) => setV(i, { decision: e.target.value })} />
+              </label>
+            )}
+            <label className="flex flex-col">
+              <span>{v.counts ? 'Why that is right' : 'Why it doesn’t count'}</span>
+              <textarea className="input" rows={2} value={v.rationale} onChange={(e) => setV(i, { rationale: e.target.value })} />
+            </label>
+            {v.counts && (
+              <label className="flex flex-col">
+                <span>Evidence the analyst should cite (one per line)</span>
+                <textarea className="input" rows={2} value={v.evidence} onChange={(e) => setV(i, { evidence: e.target.value })} />
+              </label>
+            )}
+            {f.variants.length > 1 && (
+              <button type="button" className="btn btn-secondary justify-self-start" onClick={() => setF({ ...f, variants: f.variants.filter((_, j) => j !== i) })}>
+                Remove variant {i + 1}
+              </button>
+            )}
+          </div>
+        </fieldset>
+      ))}
+      {f.variants.length < 20 && (
+        <button type="button" className="btn btn-secondary justify-self-start" onClick={() => setF({ ...f, variants: [...f.variants, emptyVariant()] })}>
+          Add a variant
+        </button>
+      )}
+      {error && (
+        <p role="alert" className="text-error">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button type="button" className="btn btn-primary" onClick={async () => setError(await onSend(newFamilyBody(f)))}>
+          Send to SME needs
+        </button>
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

@@ -614,6 +614,47 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(await db.auditEvent.count({ where: { action: 'outcome_batch.sent' } })).toBe(2);
   });
 
+  it('E-001 §6b: an SME raises a new edge-case family with its variants and outcomes; the PM sends it to Studio as new_edge_case_family; the task is not held', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    await qualify(v8);
+    const projectId = await project(v8);
+    const a = await signIn('sme-fam@gmail.test');
+    const task = (await packable(await authored(projectId, { smeUserId: a.smeUserId })))[0]!;
+    const FAMILY = {
+      kind: 'new_edge_case_family',
+      name: 'Deceased applicant',
+      whyItMatters: 'Opening an account in a dead person’s name is a classic identity fraud route.',
+      archetype: 'sanctions_near_match',
+      variants: [
+        { name: 'Death record match', description: 'Screening returns a death record for the applicant’s name and date of birth.', outcome: { counts: true, decision: 'refer', rationale: 'Possible identity fraud: a specialist must confirm.', evidence: ['screening.check result', 'date of birth on the ID'] } },
+        { name: 'Death recorded yesterday', description: 'The death record is dated the day before the application.', boundary: 'one day before the application', outcome: { counts: false, rationale: 'Same as the first variant; it adds nothing to test.' } },
+      ],
+    };
+    expect((await post(a.cookie, `/me/tasks/${task.taskId}/needs`, { ...FAMILY, variants: [{ ...FAMILY.variants[0], outcome: { counts: true, decision: 'refer', rationale: 'short', evidence: [] } }] })).statusCode).toBe(400);
+    const raised = await post(a.cookie, `/me/tasks/${task.taskId}/needs`, FAMILY);
+    expect(raised.statusCode, raised.body).toBe(201);
+    expect(raised.json()).toMatchObject({ kind: 'new_edge_case_family', state: 'open' });
+    const mine = (await get(a.cookie, `/me/tasks/${task.taskId}/benchmark`)).json();
+    expect(mine.needs[0]).toMatchObject({ kind: 'new_edge_case_family', content: expect.objectContaining({ name: 'Deceased applicant' }) });
+    answer = (c) => (c.url.endsWith('/inbox-items') ? { status: 202, body: { id: 'inb-0077' } } : { status: 404, body: {} });
+    const sent = await post(pm, `/projects/${projectId}/needs/${raised.json().id}/send`, { summary: 'New family: deceased applicant' });
+    expect(sent.statusCode, sent.body).toBe(200);
+    const inbox = calls.filter((c) => c.url === `${STUDIO}/api/v1/inbox-items`).at(-1)!;
+    expect(inbox.body).toMatchObject({ kind: 'new_edge_case_family', template_id: 'tpl_x5rwt6d5eu', version: 9 });
+    expect(inbox.body.evidence[0]).toEqual({
+      family: { name: 'Deceased applicant', why_it_matters: FAMILY.whyItMatters, archetype: 'sanctions_near_match' },
+      variants: [
+        { name: 'Death record match', description: FAMILY.variants[0]!.description, boundary: null, outcome: { verdict: 'confirm', decision: 'refer', rationale: 'Possible identity fraud: a specialist must confirm.', evidence: ['screening.check result', 'date of birth on the ID'] } },
+        { name: 'Death recorded yesterday', description: FAMILY.variants[1]!.description, boundary: 'one day before the application', outcome: { verdict: 'reject', rationale: 'Same as the first variant; it adds nothing to test.' } },
+      ],
+      task_id: task.taskId,
+      raised_by: expect.stringMatching(/^sme-[0-9a-f]{8}$/),
+    });
+    expect(JSON.stringify(inbox.body)).not.toContain('sme-fam@gmail.test');
+    // Unlike a new case kind, a new family never holds the task from export (no re-authoring when it lands).
+    expect((await get(pm, `/projects/${projectId}/rlgym-export`)).json().tasks.find((t: { taskId: string }) => t.taskId === task.taskId).waitingFor).toBeNull();
+  });
+
   it('export is off and says why when the RL Gym has not qualified the version; an unreachable RL Gym is recorded', async () => {
     const v8 = await publishedV8(CASE_REF_VERIFIERS);
     const projectId = await project(v8);

@@ -37,3 +37,23 @@ describe('Family picker', () => {
     expect(a11yProblems(html)).toEqual([]);
   });
 });
+
+describe('Raise a new edge-case family', () => {
+  it('collects the family and its variants with the SME’s outcomes; the request is the agreed shape', async () => {
+    const { NewFamilyForm, newFamilyBody } = await import('@/components/work/benchmark-fields');
+    const html = renderToStaticMarkup(<NewFamilyForm sliceLists={{ complexity: ['single_hop'], archetype: ['missing_doc'] }} onSend={async () => null} onCancel={() => undefined} />);
+    const t = text(html);
+    for (const s of ['Family name', 'Why it matters to the bank', 'Variant 1', 'Boundary, if it is one', 'Expected outcome', 'Doesn’t count as a test', 'Evidence the analyst should cite', 'Add a variant']) expect(t).toContain(s);
+    expect(a11yProblems(html)).toEqual([]);
+    expect(newFamilyBody({ name: ' Deceased applicant ', whyItMatters: 'Fraud route.', archetype: '', complexity: 'single_hop', variants: [{ name: 'Death record', description: 'A death record matches.', boundary: '', counts: true, decision: 'refer', rationale: 'Possible fraud.', evidence: 'screening.check\n\n ID date of birth ' }, { name: 'Yesterday', description: 'Dated the day before.', boundary: 'one day', counts: false, decision: 'x', rationale: 'Adds nothing.', evidence: '' }] })).toEqual({
+      kind: 'new_edge_case_family',
+      name: 'Deceased applicant',
+      whyItMatters: 'Fraud route.',
+      complexity: 'single_hop',
+      variants: [
+        { name: 'Death record', description: 'A death record matches.', outcome: { counts: true, decision: 'refer', rationale: 'Possible fraud.', evidence: ['screening.check', 'ID date of birth'] } },
+        { name: 'Yesterday', description: 'Dated the day before.', boundary: 'one day', outcome: { counts: false, rationale: 'Adds nothing.' } },
+      ],
+    });
+  });
+});

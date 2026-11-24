@@ -120,7 +120,7 @@ function mayAnswer(b: OutcomeBatch, who: Who) {
   return b.answererKind === 'admin' ? who.kind === 'admin' : who.kind === 'sme' && who.smeUserId === b.assigneeSmeUserId;
 }
 
-export async function answerItem(tx: Tx, batchId: string, itemId: string, who: Who, answer: OutcomeAnswer, fields: OutcomeField[], audit: Audit, scope: { clientId: string; projectId?: string }) {
+export async function answerItem(tx: Tx, batchId: string, itemId: string, who: Who, answer: OutcomeAnswer, fields: OutcomeField[], audit: Audit, scope: { clientId: string; projectId?: string }, activeSeconds = 0) {
   const b = await tx.outcomeBatch.findFirst({ where: { id: batchId, clientId: scope.clientId, ...(scope.projectId ? { projectId: scope.projectId } : {}) } });
   if (!b) throw notFound('Batch not found');
   if (!mayAnswer(b, who)) throw forbidden(b.answererKind === 'admin' ? 'This batch is answered in the console by a PM or Admin.' : 'This batch is assigned to another SME.');
@@ -129,7 +129,7 @@ export async function answerItem(tx: Tx, batchId: string, itemId: string, who: W
   if (!item) throw notFound('Item not found');
   const problems = answerProblems(answer, fields);
   if (problems.length) throw new AppError(422, 'OUTCOME_INVALID', problems.join(' '), { problems });
-  const row = await tx.outcomeBatchItem.update({ where: { id: item.id }, data: { answer: answer as unknown as Prisma.InputJsonValue, answeredById: whoId(who), answeredByKind: who.kind, answeredAt: new Date(), checkedById: null, checkedByKind: null, checkedAt: null } });
+  const row = await tx.outcomeBatchItem.update({ where: { id: item.id }, data: { answer: answer as unknown as Prisma.InputJsonValue, answeredById: whoId(who), answeredByKind: who.kind, answeredAt: new Date(), checkedById: null, checkedByKind: null, checkedAt: null, activeSeconds: (item.activeSeconds ?? 0) + Math.max(0, Math.min(3600, Math.round(activeSeconds))) } });
   await audit({ entityType: 'OutcomeBatch', entityId: b.id, action: 'outcome_batch.answered', before: item.answer ? { answer: item.answer } : undefined, after: { itemId: item.id, variantId: item.variantId, verdict: answer.verdict, by: pseudonym(who.kind, whoId(who)) } });
   return row;
 }
@@ -201,3 +201,34 @@ export const batchDto = (b: OutcomeBatch & { items: OutcomeBatchItem[] }) => ({
   sendError: b.state === 'send_failed' ? ((b.sendResponse as { message?: string } | null)?.message ?? 'Studio did not take the batch.') : null,
   items: b.items.map((i) => ({ id: i.id, familyId: i.familyId, familyName: i.familyName, variantId: i.variantId, tag: i.tag, name: i.name, description: i.description, boundary: i.boundary, proposedOutcome: i.proposedOutcome, answer: i.answer, answeredAt: i.answeredAt?.toISOString() ?? null, checkedAt: i.checkedAt?.toISOString() ?? null })),
 });
+
+/** Monday (UTC) of the week a date falls in, as YYYY-MM-DD. */
+export function weekOf(d: Date): string {
+  const day = (d.getUTCDay() + 6) % 7;
+  const m = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day));
+  return m.toISOString().slice(0, 10);
+}
+
+/**
+ * Default c (owner, 24 Nov 2026): outcome batches count as SME time, for reporting only. Per week and answerer: the
+ * items answered, the active minutes (from the first edit of an item to its save, summed) and the batches touched.
+ */
+export async function outcomeTimeReport(db: Db | Tx, clientId: string, projectId: string) {
+  const items = await db.outcomeBatchItem.findMany({ where: { clientId, answeredAt: { not: null }, batch: { projectId } }, select: { batchId: true, answeredById: true, answeredByKind: true, answeredAt: true, activeSeconds: true } });
+  const smeIds = [...new Set(items.filter((i) => i.answeredByKind === 'sme').map((i) => i.answeredById!))];
+  const userIds = [...new Set(items.filter((i) => i.answeredByKind === 'admin').map((i) => i.answeredById!))];
+  const smes = new Map((await db.smeUser.findMany({ where: { id: { in: smeIds } }, select: { id: true, displayName: true, contactEmail: true } })).map((s) => [s.id, s.displayName || s.contactEmail || 'SME']));
+  const users = new Map((await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name || 'Admin']));
+  const rows = new Map<string, { week: string; who: string; kind: 'sme' | 'admin'; items: number; seconds: number; batches: Set<string> }>();
+  for (const i of items) {
+    const week = weekOf(i.answeredAt!);
+    const kind = i.answeredByKind === 'admin' ? 'admin' : 'sme';
+    const key = `${week}|${kind}|${i.answeredById}`;
+    const r = rows.get(key) ?? { week, who: kind === 'admin' ? `${users.get(i.answeredById!) ?? 'Admin'} (Admin, for an SME)` : (smes.get(i.answeredById!) ?? 'SME'), kind, items: 0, seconds: 0, batches: new Set<string>() };
+    r.items += 1;
+    r.seconds += i.activeSeconds ?? 0;
+    r.batches.add(i.batchId);
+    rows.set(key, r);
+  }
+  return [...rows.values()].sort((a, b) => (a.week === b.week ? a.who.localeCompare(b.who) : b.week.localeCompare(a.week))).map((r) => ({ week: r.week, who: r.who, kind: r.kind, items: r.items, minutes: Math.round((r.seconds / 60) * 10) / 10, batches: r.batches.size }));
+}

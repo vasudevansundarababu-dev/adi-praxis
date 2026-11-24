@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { call } from '@/lib/client';
 
 /**
@@ -76,11 +76,14 @@ export function answerBody(d: Draft, fields: OutcomeField[]): Answer {
   return { verdict: 'confirm', decision: d.decision.trim(), fields: other, rationale: d.rationale.trim(), evidence: d.evidence.split('\n').map((x) => x.trim()).filter(Boolean) };
 }
 
-export function AnswerForm({ item, fields, editable, onSave }: { item: OutcomeItem; fields: OutcomeField[]; editable: boolean; onSave: (body: Answer) => Promise<string | null> }) {
+export function AnswerForm({ item, fields, editable, onSave }: { item: OutcomeItem; fields: OutcomeField[]; editable: boolean; onSave: (body: Answer, activeSeconds: number) => Promise<string | null> }) {
   const [d, setD] = useState<Draft>(draftOf(item));
+  // Default c: active time from the first edit of this item to its save (reported as SME time; never shown as a timer).
+  const started = useRef<number | null>(null);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const decisionField = fields.find((f) => f.required) ?? null;
   const set = (patch: Partial<Draft>) => {
+    started.current ??= Date.now();
     setD({ ...d, ...patch });
     setMsg(null);
   };
@@ -163,7 +166,9 @@ export function AnswerForm({ item, fields, editable, onSave }: { item: OutcomeIt
             type="button"
             className="btn btn-secondary"
             onClick={async () => {
-              const err = await onSave(answerBody(d, fields));
+              const secs = started.current ? Math.min(3600, Math.round((Date.now() - started.current) / 1000)) : 0;
+              const err = await onSave(answerBody(d, fields), secs);
+              if (!err) started.current = null;
               setMsg(err ? { kind: 'error', text: err } : { kind: 'ok', text: 'Saved.' });
             }}
           >
@@ -219,7 +224,7 @@ export function EdgeOutcomes({ batches }: { batches: MyOutcomeBatch[] }) {
                   </p>
                   {i.description && <p className="text-xs text-fg-muted">{i.description}</p>}
                   {i.proposedOutcome && !i.answer && <p className="text-xs text-fg-muted">An outcome is already on record: confirm it, or change it.</p>}
-                  <AnswerForm item={i} fields={b.outcomeFields} editable={open} onSave={async (body) => { const r = await call('PUT', `/me/edge-outcomes/${b.id}/items/${i.id}`, body); if (!r.ok) return r.error ?? 'Not saved.'; router.refresh(); return null; }} />
+                  <AnswerForm item={i} fields={b.outcomeFields} editable={open} onSave={async (body, secs) => { const r = await call('PUT', `/me/edge-outcomes/${b.id}/items/${i.id}?activeSeconds=${secs}`, body); if (!r.ok) return r.error ?? 'Not saved.'; router.refresh(); return null; }} />
                 </li>
               ))}
             </ul>

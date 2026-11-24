@@ -5,7 +5,7 @@ import type { StudioClient, StudioResult } from '../anvil/studio-client';
 import type { Db } from '../db';
 import { notFound } from '../lib/errors';
 import { runCandidateCommandPrepared, runCommand, runCandidateCommand, runCommandPrepared } from '../platform/command';
-import { answerItem, batchDto, createBatch, markChecked, NewOutcomeBatch, OutcomeAnswer, outcomeRequestBody, readyToSubmit, recordSubmission, waitingVariants, type Who } from '../forge/outcome-batches';
+import { answerItem, outcomeTimeReport, batchDto, createBatch, markChecked, NewOutcomeBatch, OutcomeAnswer, outcomeRequestBody, readyToSubmit, recordSubmission, waitingVariants, type Who } from '../forge/outcome-batches';
 import { loadProject } from './projects';
 
 const ACCESS = ['ADMIN', 'PM'] as const;
@@ -14,6 +14,8 @@ const BatchParams = Id.extend({ batchId: z.string().uuid() });
 const ItemParams = BatchParams.extend({ itemId: z.string().uuid() });
 const MeBatch = z.object({ batchId: z.string().uuid() });
 const MeItem = MeBatch.extend({ itemId: z.string().uuid() });
+/** Default c: the active seconds the answerer spent on this item before saving (reported, never billed here). */
+const Timed = z.object({ activeSeconds: z.coerce.number().int().min(0).max(86_400).optional() });
 
 /**
  * E-001 §6b (owner, 24 Nov 2026): edge-case variant outcomes in one batch. Console (PM/Admin): the variants waiting for
@@ -54,11 +56,11 @@ export const edgeOutcomeRoutes: FastifyPluginAsyncZod<{ db: Db; studio: StudioCl
     return reply;
   });
 
-  app.put('/projects/:id/edge-outcomes/batches/:batchId/items/:itemId', { config: { access: ACCESS }, schema: { tags: ['projects'], params: ItemParams, body: OutcomeAnswer } }, async (req, reply) => {
+  app.put('/projects/:id/edge-outcomes/batches/:batchId/items/:itemId', { config: { access: ACCESS }, schema: { tags: ['projects'], params: ItemParams, querystring: Timed, body: OutcomeAnswer } }, async (req, reply) => {
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
       const p = await loadProject(tx, req.params.id, actor);
       const cat = await familyCatalog(tx, p.template, studio);
-      const row = await answerItem(tx, req.params.batchId, req.params.itemId, { kind: 'admin', userId: actor.userId }, req.body, cat.outcomeFields, audit, { clientId: actor.clientId, projectId: p.id });
+      const row = await answerItem(tx, req.params.batchId, req.params.itemId, { kind: 'admin', userId: actor.userId }, req.body, cat.outcomeFields, audit, { clientId: actor.clientId, projectId: p.id }, req.query.activeSeconds ?? 0);
       return { status: 200, body: { id: row.id, answer: row.answer, answeredAt: row.answeredAt?.toISOString() ?? null } };
     });
     return reply;
@@ -84,6 +86,12 @@ export const edgeOutcomeRoutes: FastifyPluginAsyncZod<{ db: Db; studio: StudioCl
     return reply;
   });
 
+  // Default c (owner, 24 Nov 2026): SME time on outcome batches, per week and answerer (reporting only).
+  app.get('/projects/:id/edge-outcomes/time', { config: { access: ACCESS }, schema: { tags: ['projects'], params: Id } }, async (req) => {
+    const p = await loadProject(db, req.params.id, req.actor!);
+    return { rows: await outcomeTimeReport(db, req.actor!.clientId, p.id) };
+  });
+
   // ── SME app ──
   app.get('/me/edge-outcomes', { config: { access: 'candidate' }, schema: { tags: ['work'] } }, async (req) => {
     const me = req.candidate!;
@@ -94,13 +102,13 @@ export const edgeOutcomeRoutes: FastifyPluginAsyncZod<{ db: Db; studio: StudioCl
     return { items: batches.map((b) => ({ ...batchDto(b), projectName: projects.get(b.projectId)?.name ?? 'Project', outcomeFields: fields.get(b.projectId) ?? [] })) };
   });
 
-  app.put('/me/edge-outcomes/:batchId/items/:itemId', { config: { access: 'candidate' }, schema: { tags: ['work'], params: MeItem, body: OutcomeAnswer } }, async (req, reply) => {
+  app.put('/me/edge-outcomes/:batchId/items/:itemId', { config: { access: 'candidate' }, schema: { tags: ['work'], params: MeItem, querystring: Timed, body: OutcomeAnswer } }, async (req, reply) => {
     await runCandidateCommand(db, req, reply, async ({ tx, actor, audit }) => {
       const b = await tx.outcomeBatch.findFirst({ where: { id: req.params.batchId, clientId: actor.clientId } });
       if (!b) throw notFound('Batch not found');
       const p = await tx.project.findUniqueOrThrow({ where: { id: b.projectId }, include: { template: true } });
       const cat = await familyCatalog(tx, p.template, studio);
-      const row = await answerItem(tx, b.id, req.params.itemId, { kind: 'sme', smeUserId: actor.smeUserId }, req.body, cat.outcomeFields, audit, { clientId: actor.clientId });
+      const row = await answerItem(tx, b.id, req.params.itemId, { kind: 'sme', smeUserId: actor.smeUserId }, req.body, cat.outcomeFields, audit, { clientId: actor.clientId }, req.query.activeSeconds ?? 0);
       return { status: 200, body: { id: row.id, answer: row.answer, answeredAt: row.answeredAt?.toISOString() ?? null } };
     });
     return reply;

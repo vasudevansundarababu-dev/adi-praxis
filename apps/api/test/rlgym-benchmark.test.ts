@@ -602,7 +602,7 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     const mine = (await get(me.cookie, '/me/edge-outcomes')).json().items;
     expect(mine[0]).toMatchObject({ id: smeBatch.id, outcomeFields: expect.any(Array), items: [expect.objectContaining({ variantId: 'expires_in_30', proposedOutcome: null })] });
     const item = mine[0].items[0].id as string;
-    expect((await call(app, 'PUT', me.cookie, `/me/edge-outcomes/${smeBatch.id}/items/${item}`, { verdict: 'confirm', decision: 'approve', fields: {}, rationale: 'Still valid on the application date.', evidence: ['expiry date vs application date'] })).statusCode).toBe(200);
+    expect((await call(app, 'PUT', me.cookie, `/me/edge-outcomes/${smeBatch.id}/items/${item}?activeSeconds=120`, { verdict: 'confirm', decision: 'approve', fields: {}, rationale: 'Still valid on the application date.', evidence: ['expiry date vs application date'] })).statusCode).toBe(200);
     const before = posted.length;
     const submitted = await call(app, 'POST', me.cookie, `/me/edge-outcomes/${smeBatch.id}/submit`, {});
     expect(submitted.statusCode, submitted.body).toBe(200);
@@ -612,6 +612,13 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(checked.statusCode, checked.body).toBe(200);
     expect(posted.at(-1)!.body).toMatchObject({ second_check: true, outcomes: [{ variant_id: 'expires_in_30', written_by: expect.stringMatching(/^sme-[0-9a-f]{8}$/), checked_by: expect.stringMatching(/^admin-[0-9a-f]{8}$/) }] });
     expect(await db.auditEvent.count({ where: { action: 'outcome_batch.sent' } })).toBe(2);
+    // Default c: SME time per week and person (reporting only).
+    const { weekOf } = await import('../src/forge/outcome-batches');
+    expect(weekOf(new Date('2026-11-26T10:00:00Z'))).toBe('2026-11-23');
+    expect(weekOf(new Date('2026-11-23T00:00:00Z'))).toBe('2026-11-23');
+    const time = (await get(pm, `/projects/${projectId}/edge-outcomes/time`)).json().rows as { who: string; kind: string; items: number; minutes: number; batches: number; week: string }[];
+    expect(time.find((r) => r.kind === 'sme')).toMatchObject({ who: 'Otto Comes', items: 1, minutes: 2, batches: 1, week: weekOf(new Date()) });
+    expect(time.find((r) => r.kind === 'admin')).toMatchObject({ items: 2, batches: 1, who: expect.stringContaining('(Admin, for an SME)') });
   });
 
   it('E-001 §6b: an SME raises a new edge-case family with its variants and outcomes; the PM sends it to Studio as new_edge_case_family; the task is not held', async () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { mutate } from '@/lib/client-api';
 
 /**
@@ -81,11 +81,14 @@ export function answerBody(d: Draft, fields: OutcomeField[]): Answer {
   return { verdict: 'confirm', decision: d.decision.trim(), fields: other, rationale: d.rationale.trim(), evidence: d.evidence.split('\n').map((x) => x.trim()).filter(Boolean) };
 }
 
-export function AnswerForm({ item, fields, editable, onSave }: { item: OutcomeItem; fields: OutcomeField[]; editable: boolean; onSave: (body: Answer) => Promise<string | null> }) {
+export function AnswerForm({ item, fields, editable, onSave }: { item: OutcomeItem; fields: OutcomeField[]; editable: boolean; onSave: (body: Answer, activeSeconds: number) => Promise<string | null> }) {
   const [d, setD] = useState<Draft>(draftOf(item));
+  // Default c: active time from the first edit of this item to its save (reported as SME time; never shown as a timer).
+  const started = useRef<number | null>(null);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const decisionField = fields.find((f) => f.required) ?? null;
   const set = (patch: Partial<Draft>) => {
+    started.current ??= Date.now();
     setD({ ...d, ...patch });
     setMsg(null);
   };
@@ -168,7 +171,9 @@ export function AnswerForm({ item, fields, editable, onSave }: { item: OutcomeIt
             type="button"
             className="btn btn-secondary"
             onClick={async () => {
-              const err = await onSave(answerBody(d, fields));
+              const secs = started.current ? Math.min(3600, Math.round((Date.now() - started.current) / 1000)) : 0;
+              const err = await onSave(answerBody(d, fields), secs);
+              if (!err) started.current = null;
               setMsg(err ? { kind: 'error', text: err } : { kind: 'ok', text: 'Saved.' });
             }}
           >
@@ -299,7 +304,7 @@ export function EdgeOutcomesPanel({ projectId, state }: { projectId: string; sta
                     {i.boundary ? ` (boundary: ${i.boundary})` : ''}
                   </p>
                   {i.description && <p className="text-xs text-fg-muted">{i.description}</p>}
-                  <AnswerForm item={i} fields={fields} editable={mine} onSave={async (body) => { const r = await mutate('PUT', `/projects/${projectId}/edge-outcomes/batches/${b.id}/items/${i.id}`, body); if (!r.ok) return r.error; router.refresh(); return null; }} />
+                  <AnswerForm item={i} fields={fields} editable={mine} onSave={async (body, secs) => { const r = await mutate('PUT', `/projects/${projectId}/edge-outcomes/batches/${b.id}/items/${i.id}?activeSeconds=${secs}`, body); if (!r.ok) return r.error; router.refresh(); return null; }} />
                 </li>
               ))}
             </ul>
@@ -311,6 +316,64 @@ export function EdgeOutcomesPanel({ projectId, state }: { projectId: string; sta
           </div>
         );
       })}
+    </section>
+  );
+}
+
+export interface TimeRow {
+  week: string;
+  who: string;
+  kind: 'sme' | 'admin';
+  items: number;
+  minutes: number;
+  batches: number;
+}
+
+/** Default c (owner, 24 Nov 2026): SME time on outcome batches, per week and person, for this project. Reporting only. */
+export function OutcomeTimeReport({ rows }: { rows: TimeRow[] }) {
+  const total = rows.reduce((a, r) => ({ items: a.items + r.items, minutes: a.minutes + r.minutes }), { items: 0, minutes: 0 });
+  return (
+    <section aria-labelledby="outcome-time" className="rounded-md border border-line p-4" data-outcome-time>
+      <h2 id="outcome-time" className="text-lg font-semibold">
+        SME time on edge-case outcomes
+      </h2>
+      <p className="text-sm text-fg-muted">Items answered and active time (from the first edit of an item to its save), per week and person. For reporting; nothing here pays or bills anyone.</p>
+      {rows.length === 0 ? (
+        <p className="mt-2 text-sm text-fg-muted">No outcomes answered yet.</p>
+      ) : (
+        <table className="mt-2 text-sm">
+          <thead>
+            <tr>
+              <th scope="col" className="pr-4 text-left">Week of</th>
+              <th scope="col" className="pr-4 text-left">Who</th>
+              <th scope="col" className="pr-4 text-right">Items</th>
+              <th scope="col" className="pr-4 text-right">Minutes</th>
+              <th scope="col" className="text-right">Batches</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={`${r.week}-${r.who}`}>
+                <td className="pr-4">{r.week}</td>
+                <td className="pr-4">{r.who}</td>
+                <td className="pr-4 text-right">{r.items}</td>
+                <td className="pr-4 text-right">{r.minutes}</td>
+                <td className="text-right">{r.batches}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" colSpan={2} className="pr-4 text-left">
+                Total
+              </th>
+              <td className="pr-4 text-right">{total.items}</td>
+              <td className="pr-4 text-right">{Math.round(total.minutes * 10) / 10}</td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      )}
     </section>
   );
 }

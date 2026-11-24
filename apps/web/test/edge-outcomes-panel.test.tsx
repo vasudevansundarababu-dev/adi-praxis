@@ -35,3 +35,15 @@ describe('Edge-case outcomes panel', () => {
     expect(answerBody({ ...d, verdict: 'cannot_decide', rationale: ' Need the file. ' }, FIELDS)).toEqual({ verdict: 'cannot_decide', rationale: 'Need the file.' });
   });
 });
+
+describe('SME time on edge-case outcomes', () => {
+  it('shows items, minutes and batches per week and person, with a total; says so when empty', async () => {
+    const { OutcomeTimeReport } = await import('@/components/projects/edge-outcomes-panel');
+    const html = renderToStaticMarkup(<OutcomeTimeReport rows={[{ week: '2026-11-23', who: 'Michael Duffy', kind: 'sme', items: 6, minutes: 18.5, batches: 1 }, { week: '2026-11-23', who: 'Owner (Admin, for an SME)', kind: 'admin', items: 12, minutes: 9, batches: 1 }]} />);
+    const t = text(html);
+    expect(t).toContain('2026-11-23 Michael Duffy 6 18.5 1');
+    expect(t).toContain('Total 18 27.5');
+    expect(a11yProblems(html)).toEqual([]);
+    expect(text(renderToStaticMarkup(<OutcomeTimeReport rows={[]} />))).toContain('No outcomes answered yet.');
+  });
+});

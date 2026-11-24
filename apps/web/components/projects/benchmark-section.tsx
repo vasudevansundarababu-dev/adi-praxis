@@ -1,15 +1,16 @@
 import { apiGet } from '@/lib/api';
 import { CoveragePanel, HeldTasksPanel } from './clause-panels';
-import { EdgeOutcomesPanel, type EdgeOutcomesState } from './edge-outcomes-panel';
+import { EdgeOutcomesPanel, OutcomeTimeReport, type EdgeOutcomesState, type TimeRow } from './edge-outcomes-panel';
 import { BenchmarkReviewPanel, RlGymExportPanel, SmeNeedsPanel, type NeedRow, type ReviewBatch, type RlGymExportState } from './rlgym-panel';
 
 /** Project → Benchmark: RL Gym export, SME needs and Benchmark review, each loaded from its own route. */
 export async function BenchmarkSection({ projectId }: { projectId: string }) {
-  const [exp, needs, reviews, outcomes] = await Promise.all([
+  const [exp, needs, reviews, outcomes, time] = await Promise.all([
     apiGet<RlGymExportState>(`/projects/${projectId}/rlgym-export`),
     apiGet<{ items: NeedRow[]; studioConnected: boolean }>(`/projects/${projectId}/needs`),
     apiGet<{ items: ReviewBatch[]; connected: boolean; canDecide?: boolean }>(`/projects/${projectId}/run-reviews`),
     apiGet<EdgeOutcomesState>(`/projects/${projectId}/edge-outcomes`),
+    apiGet<{ rows: TimeRow[] }>(`/projects/${projectId}/edge-outcomes/time`),
   ]);
   return (
     <div className="space-y-6" aria-label="Benchmark">
@@ -17,6 +18,7 @@ export async function BenchmarkSection({ projectId }: { projectId: string }) {
       {exp.data && <HeldTasksPanel projectId={projectId} held={exp.data.tasks.filter((t) => t.waitingFor).map((t) => ({ taskId: t.taskId, title: t.title, waitingFor: t.waitingFor! }))} />}
       <CoveragePanel projectId={projectId} />
       {outcomes.data && <EdgeOutcomesPanel projectId={projectId} state={outcomes.data} />}
+      {time.data && <OutcomeTimeReport rows={time.data.rows} />}
       {needs.data && <SmeNeedsPanel projectId={projectId} needs={needs.data.items} studioConnected={needs.data.studioConnected} />}
       {reviews.data && <BenchmarkReviewPanel projectId={projectId} batches={reviews.data.items} connected={reviews.data.connected} canDecide={reviews.data.canDecide ?? true} />}
     </div>

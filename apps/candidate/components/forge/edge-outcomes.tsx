@@ -16,6 +16,7 @@ export interface OutcomeField {
   help: string;
   required: boolean;
   allowedValues: string[] | null;
+  suggestedValues?: string[];
 }
 export interface Answer {
   verdict: 'confirm' | 'reject' | 'cannot_decide';
@@ -118,7 +119,9 @@ export function AnswerForm({ item, fields, editable, onSave }: { item: OutcomeIt
             .filter((f) => !f.required)
             .map((f) => (
               <label key={f.name} htmlFor={id(f.name)} className="flex flex-col">
-                <span className="text-xs text-fg-muted">{f.label} (optional)</span>
+                <span className="text-xs text-fg-muted">
+                  {f.label} (optional){f.help ? ` · ${f.help}` : ''}
+                </span>
                 {f.allowedValues ? (
                   <select id={id(f.name)} className="input" value={d.fields[f.name] ?? ''} disabled={!editable} onChange={(e) => set({ fields: { ...d.fields, [f.name]: e.target.value } })}>
                     <option value="">—</option>
@@ -129,7 +132,16 @@ export function AnswerForm({ item, fields, editable, onSave }: { item: OutcomeIt
                     ))}
                   </select>
                 ) : (
-                  <input id={id(f.name)} className="input" value={d.fields[f.name] ?? ''} disabled={!editable} onChange={(e) => set({ fields: { ...d.fields, [f.name]: e.target.value } })} />
+                  <>
+                    <input id={id(f.name)} className="input" list={f.suggestedValues?.length ? id(`${f.name}-hints`) : undefined} value={d.fields[f.name] ?? ''} disabled={!editable} onChange={(e) => set({ fields: { ...d.fields, [f.name]: e.target.value } })} />
+                    {!!f.suggestedValues?.length && (
+                      <datalist id={id(`${f.name}-hints`)}>
+                        {f.suggestedValues.map((v) => (
+                          <option key={v} value={v} />
+                        ))}
+                      </datalist>
+                    )}
+                  </>
                 )}
               </label>
             ))}

@@ -53,6 +53,8 @@ export interface OutcomeField {
   help: string;
   required: boolean;
   allowedValues: string[] | null;
+  /** Free-text fields: values seen in the cases, offered as hints (any text is accepted). */
+  suggestedValues: string[];
 }
 
 export interface EdgeFamily {
@@ -105,7 +107,7 @@ export function familiesOf(catalog: unknown, s4EdgeCases: unknown): EdgeFamily[]
 /** The outcome fields of a catalog (edge-case-catalog.v2 outcome_fields), in plain words. */
 export function outcomeFieldsOf(catalog: unknown): OutcomeField[] {
   if (!isObj(catalog) || !Array.isArray(catalog.outcome_fields)) return [];
-  return catalog.outcome_fields.filter(isObj).flatMap((f) => (str(f.name) ? [{ name: str(f.name), label: str(f.label) || str(f.name), help: str(f.help), required: f.required === true, allowedValues: Array.isArray(f.allowed_values) ? f.allowed_values.map(String) : null }] : []));
+  return catalog.outcome_fields.filter(isObj).flatMap((f) => (str(f.name) ? [{ name: str(f.name), label: str(f.label) || str(f.name), help: str(f.help), required: f.required === true, allowedValues: Array.isArray(f.allowed_values) && f.allowed_values.length ? f.allowed_values.map(String) : null, suggestedValues: Array.isArray(f.suggested_values) ? f.suggested_values.map(String) : [] }] : []));
 }
 
 /** The family a stored single edge case belongs to, read at display time (never written back to the task). */

@@ -5,7 +5,7 @@ import { familiesOf, familyOfTag, focusTags, narrowForRun, outcomeFieldsOf } fro
 /** E-001 §6b (owner, 24 Nov 2026): edge-case families and variants. */
 const CATALOG = {
   schema: 'edge-case-catalog.v2',
-  outcome_fields: [{ name: 'recommendation', label: 'Recommendation', help: 'What the analyst should do', required: true, allowed_values: ['approve', 'refer'] }],
+  outcome_fields: [{ name: 'recommendation', label: 'Recommendation', help: 'What the analyst should do', required: true, allowed_values: ['approve', 'refer'] }, { name: 'reason_keyword', label: 'Reason keyword', help: '', required: false, suggested_values: ['TIN', 'expired'] }],
   families: [
     { family_id: 'minor_tin', name: "Minor's TIN", variants: [
       { variant_id: 'minor_without_tin', tag: 'minor_without_tin', name: 'Without TIN', state: 'available', outcome: { decision: 'request_information', written_by: 'migration' } },
@@ -21,7 +21,7 @@ describe('families', () => {
   it('reads Studio’s catalog; a migrated outcome still needs a person to confirm it', () => {
     const [f] = familiesOf(CATALOG, []);
     expect(f!.variants.map((v) => [v.tag, v.state, v.hasOutcome, v.needsConfirmation])).toEqual([['minor_without_tin', 'available', true, true], ['tin_applied', 'available', true, false], ['tin_invalid', 'waiting_outcome', false, true], ['tin_short', 'needs_environment_change', true, false]]);
-    expect(outcomeFieldsOf(CATALOG)).toEqual([{ name: 'recommendation', label: 'Recommendation', help: 'What the analyst should do', required: true, allowedValues: ['approve', 'refer'] }]);
+    expect(outcomeFieldsOf(CATALOG)).toEqual([{ name: 'recommendation', label: 'Recommendation', help: 'What the analyst should do', required: true, allowedValues: ['approve', 'refer'], suggestedValues: [] }, { name: 'reason_keyword', label: 'Reason keyword', help: '', required: false, allowedValues: null, suggestedValues: ['TIN', 'expired'] }]);
   });
 
   it('falls back to one family per S4 edge case', () => {

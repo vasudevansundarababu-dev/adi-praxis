@@ -8,6 +8,8 @@ import { runCandidateCommand, runCandidateCommandPrepared, runCommand, runComman
 import { templateBenchmark, taskBenchmarkOf } from '../anvil/benchmark';
 import { buildRlGymExport, exportReceipt, projectIdFromRlGym, rlgymProjectId, rlgymTaskAnswers, rlgymTemplateRef, titleOf, type BuiltExport } from '../anvil/rlgym-export';
 import { recordReports } from './project-export';
+import { familyCatalog } from '../anvil/edge-family-catalog';
+import { familyOfTag, focusTags } from '@praxis/shared';
 import type { RlGymClient, RlGymResult } from '../anvil/rlgym-client';
 import type { StudioClient, StudioResult, InboxItemBody } from '../anvil/studio-client';
 import { jcsSha256 } from '../anvil/jcs';
@@ -199,7 +201,13 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
     const t = await ownTask(db, req.params.id, req.candidate!.smeUserId);
     const needs = await db.smeNeed.findMany({ where: { taskInstanceId: t.id, raisedBySmeUserId: req.candidate!.smeUserId }, orderBy: { createdAt: 'desc' } });
     const editable = ['ASSIGNED', 'IN_PROGRESS', 'REWORK'].includes(t.status);
-    return { ...authorView(t.project.template), value: taskBenchmarkOf(t.benchmark), editable, needs: needs.map((n) => needDto(n, null)) };
+    const value = taskBenchmarkOf(t.benchmark);
+    // E-001 §6b: the families (Studio's catalog, else one per S4 edge case). A task that only has a single edge case
+    // shows the family it belongs to, read here; the task's stored data is never rewritten from it.
+    const cat = await familyCatalog(db, t.project.template, studio);
+    const derived = !value.familyFocus && value.edgeCase ? familyOfTag(cat.families, value.edgeCase) : null;
+    const focus = value.familyFocus ?? (derived ? { familyId: derived.familyId, variants: [derived.variants.find((v) => v.tag === value.edgeCase)!.variantId], derived: true } : null);
+    return { ...authorView(t.project.template), value, editable, needs: needs.map((n) => needDto(n, null)), families: { source: cat.source, fallbackReason: cat.fallbackReason, items: cat.families.map((f) => ({ ...f, variants: f.variants.map(({ outcome: _o, ...v }) => v) })) }, focus };
   });
 
   app.put('/me/tasks/:id/benchmark', { config: { access: 'candidate', rateLimit: { max: 60, timeWindow: '1 minute' } }, schema: { tags: ['work'], params: Id, body: SaveTaskBenchmarkRequest } }, async (req, reply) => {
@@ -212,11 +220,20 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
       const current = taskBenchmarkOf(t.benchmark);
       if (current.version !== req.body.expectedVersion) throw new AppError(409, 'STALE_VERSION', 'These fields changed in another window. Reload to continue.', { version: current.version });
       const { expectedVersion: _v, ...input } = req.body;
-      const problems = benchmarkInputProblems(input, templateBenchmark(t.project.template));
+      const tb = templateBenchmark(t.project.template);
+      if (input.familyFocus) {
+        // E-001 §6b: a family focus takes every variant that counts (or the chosen ones). A single variant that is one of
+        // the template's own edge cases is also kept as `edgeCase`, so packages and older readers stay as they were.
+        const cat = await familyCatalog(tx, t.project.template, studio);
+        const ft = focusTags(input.familyFocus, cat.families);
+        if (ft.problems.length) throw new AppError(422, 'BENCHMARK_INPUT_INVALID', ft.problems.join(' '), { problems: ft.problems });
+        input.edgeCase = ft.tags.length === 1 && tb.edgeCases.some((e) => e.tag === ft.tags[0]) ? ft.tags[0]! : null;
+      }
+      const problems = benchmarkInputProblems(input, tb);
       if (problems.length) throw new AppError(422, 'BENCHMARK_INPUT_INVALID', problems.join(' '), { problems });
       const next = { ...input, version: current.version + 1 };
       await tx.taskInstance.update({ where: { id: t.id }, data: { benchmark: next as unknown as Prisma.InputJsonValue } });
-      await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.benchmark_saved', before: { edgeCase: current.edgeCase, slots: Object.keys(current.slots), extraChecks: current.extraStateChecks.length }, after: { edgeCase: input.edgeCase, slots: Object.keys(input.slots), extraChecks: input.extraStateChecks.length, version: next.version } });
+      await audit({ entityType: 'TaskInstance', entityId: t.id, action: 'task.benchmark_saved', before: { edgeCase: current.edgeCase, slots: Object.keys(current.slots), extraChecks: current.extraStateChecks.length }, after: { edgeCase: input.edgeCase, familyFocus: input.familyFocus ?? null, slots: Object.keys(input.slots), extraChecks: input.extraStateChecks.length, version: next.version } });
       return { status: 200, body: next };
     });
     return reply;
@@ -400,7 +417,17 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
         const batches = await correctionBatches(db, actor.clientId, s.records.map((r) => r.taskInstanceId));
         // E-007 phase 2: every approved record is checked on its frozen snapshot first; a failing one is not sent.
         const reports = await recordReports(db, s.records);
-        const built = await db.$transaction((tx) => buildRlGymExport(tx, { id: p.id, name: p.name, template: p.template }, s.records, s.ref!, { exported: s.runs.some((r) => r.outcome === 'received'), held: s.held, batches, reports }));
+        // E-001 §6b: a task focused on a family takes every variant that counts at export time (later ones included).
+        const focused = await db.taskInstance.findMany({ where: { id: { in: s.records.map((r) => r.taskInstanceId) } }, select: { id: true, benchmark: true } });
+        const familyTags = new Map<string, string[]>();
+        if (focused.some((x) => taskBenchmarkOf(x.benchmark).familyFocus)) {
+          const cat = await familyCatalog(db, p.template, studio, { fresh: true });
+          for (const x of focused) {
+            const f = taskBenchmarkOf(x.benchmark).familyFocus;
+            if (f) familyTags.set(x.id, focusTags(f, cat.families).tags);
+          }
+        }
+        const built = await db.$transaction((tx) => buildRlGymExport(tx, { id: p.id, name: p.name, template: p.template }, s.records, s.ref!, { exported: s.runs.some((r) => r.outcome === 'received'), held: s.held, batches, reports, familyTags }));
         if (!built.tasks.length) throw new AppError(422, 'NOTHING_TO_EXPORT', 'None of the approved tasks can be sent.', { notSent: built.notSent });
         const result = await rlgym.exportProject(rlgymProjectId(p.id), built.body, built.exportSha256);
         return { projectId: p.id, built, result };

@@ -19,13 +19,27 @@ interface View {
   value: { edgeCase: string | null; slots: Record<string, string | number>; extraStateChecks: ExtraStateCheck[]; version: number };
   editable: boolean;
   needs: { id: string; kind: string; state: string; studioItemId: string | null; studioState: string | null; rejectReason: string | null; createdAt: string; content: Record<string, unknown> }[];
+  /** E-001 §6b: edge-case families (Studio's catalog, else one per edge case). Absent from older responses. */
+  families?: { source: 'catalog' | 'template'; fallbackReason: string | null; items: FamilyItem[] };
+  focus?: { familyId: string; variants: 'all' | string[]; derived?: boolean } | null;
 }
+interface FamilyItem {
+  familyId: string;
+  name: string;
+  description: string;
+  archetype: string | null;
+  complexity: string | null;
+  variants: { variantId: string; tag: string; name: string; description: string; boundary: string | null; state: string; hasOutcome: boolean; needsConfirmation: boolean }[];
+}
+const usable = (v: FamilyItem['variants'][number]) => v.hasOutcome && !['retired', 'proposed', 'waiting_outcome'].includes(v.state);
 
 const NEED_STATE: Record<string, string> = { open: 'With your PM', merged: 'Merged with a similar need', sent: 'Sent to Studio', rejected: 'Not sent' };
 
 export function BenchmarkFields({ taskId }: { taskId: string }) {
   const [view, setView] = useState<View | null>(null);
   const [edgeCase, setEdgeCase] = useState<string>('');
+  const [familyId, setFamilyId] = useState<string>('');
+  const [variants, setVariants] = useState<'all' | string[]>('all');
   const [slots, setSlots] = useState<Record<string, string>>({});
   const [checks, setChecks] = useState<ExtraStateCheck[]>([]);
   const [message, setMessage] = useState<{ kind: 'error' | 'ok'; text: string } | null>(null);
@@ -37,6 +51,8 @@ export function BenchmarkFields({ taskId }: { taskId: string }) {
     if (!res.ok || !res.data) return;
     setView(res.data);
     setEdgeCase(res.data.value.edgeCase ?? '');
+    setFamilyId(res.data.focus?.familyId ?? '');
+    setVariants(res.data.focus?.derived ? 'all' : (res.data.focus?.variants ?? 'all'));
     setSlots(Object.fromEntries(Object.entries(res.data.value.slots).map(([k, v]) => [k, String(v)])));
     setChecks(res.data.value.extraStateChecks);
   }, [taskId]);
@@ -50,7 +66,8 @@ export function BenchmarkFields({ taskId }: { taskId: string }) {
 
   async function save() {
     setMessage(null);
-    const body = { edgeCase: edgeCase || null, slots: Object.fromEntries(Object.entries(slots).filter(([, v]) => v !== '').map(([k, v]) => [k, view!.slots.find((s) => s.id === k)?.type === 'number' ? Number(v) : v])), extraStateChecks: checks, expectedVersion: view!.value.version };
+    const byFamily = !!view!.families;
+    const body = { edgeCase: byFamily ? null : edgeCase || null, ...(byFamily ? { familyFocus: familyId ? { familyId, variants } : null } : {}), slots: Object.fromEntries(Object.entries(slots).filter(([, v]) => v !== '').map(([k, v]) => [k, view!.slots.find((s) => s.id === k)?.type === 'number' ? Number(v) : v])), extraStateChecks: checks, expectedVersion: view!.value.version };
     const res = await call<{ version: number }>('PUT', `/me/tasks/${taskId}/benchmark`, body);
     if (!res.ok) return setMessage({ kind: 'error', text: res.error ?? 'Could not save.' });
     setMessage({ kind: 'ok', text: 'Saved.' });
@@ -75,6 +92,9 @@ export function BenchmarkFields({ taskId }: { taskId: string }) {
       </h2>
       <p className="text-sm text-fg-muted">Set Complexity and Archetype in section S1. These fields go to reviewers and RL Gym only; the agent never sees them.</p>
 
+      {view.families ? (
+        <FamilyPicker families={view.families} familyId={familyId} variants={variants} editable={view.editable} onFamily={(id) => { setFamilyId(id); setVariants('all'); }} onVariants={setVariants} />
+      ) : (
       <label className="mt-3 flex max-w-xl flex-col text-sm">
         <span className="font-medium">Focus on edge case (optional)</span>
         <select className="input" value={edgeCase} disabled={!view.editable} onChange={(e) => setEdgeCase(e.target.value)}>
@@ -86,7 +106,8 @@ export function BenchmarkFields({ taskId }: { taskId: string }) {
           ))}
         </select>
       </label>
-      {focused && (
+      )}
+      {!view.families && focused && (
         <p className="mt-1 max-w-3xl text-sm text-fg-muted">
           {focused.context} {focused.twist} This task’s Archetype becomes “{archetypePlain(focused.archetype) ?? '—'}”; its Complexity is “{complexityPlain(focused.complexity)?.name ?? '—'}” unless you set another in S1.
         </p>
@@ -258,5 +279,67 @@ export function BenchmarkFields({ taskId }: { taskId: string }) {
         </p>
       )}
     </section>
+  );
+}
+
+/**
+ * E-001 §6b (owner, 24 Nov 2026): "Focus on edge case" by family. A task focused on a family takes every variant that
+ * counts, including ones added later, unless the SME chooses which variants count. Variants without an SME outcome
+ * can't count yet; they say so.
+ */
+export function FamilyPicker({ families, familyId, variants, editable, onFamily, onVariants }: { families: NonNullable<View['families']>; familyId: string; variants: 'all' | string[]; editable: boolean; onFamily: (id: string) => void; onVariants: (v: 'all' | string[]) => void }) {
+  const family = families.items.find((f) => f.familyId === familyId) ?? null;
+  const chosen = variants === 'all' ? null : new Set(variants);
+  const toggle = (id: string) => {
+    const now = new Set(chosen ?? family!.variants.filter(usable).map((v) => v.variantId));
+    if (now.has(id)) now.delete(id);
+    else now.add(id);
+    onVariants(now.size ? [...now] : 'all');
+  };
+  return (
+    <div className="mt-3 max-w-3xl text-sm" data-family-picker>
+      <label className="flex max-w-xl flex-col">
+        <span className="font-medium">Focus on edge-case family (optional)</span>
+        <select className="input" value={familyId} disabled={!editable} onChange={(e) => onFamily(e.target.value)}>
+          <option value="">None</option>
+          {families.items.map((f) => (
+            <option key={f.familyId} value={f.familyId}>
+              {f.name} — {f.variants.length} variant{f.variants.length === 1 ? '' : 's'}
+              {f.archetype ? `, ${archetypePlain(f.archetype)}` : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+      {families.fallbackReason && <p className="mt-1 text-xs text-fg-muted">{families.fallbackReason}</p>}
+      {family && (
+        <fieldset className="mt-2">
+          <legend className="text-fg-muted">{family.description || 'Variants of this family'}</legend>
+          <label className="mt-1 flex items-center gap-2">
+            <input type="checkbox" checked={variants === 'all'} disabled={!editable} onChange={(e) => onVariants(e.target.checked ? 'all' : family.variants.filter(usable).map((v) => v.variantId))} />
+            <span>Every variant that counts, including ones added later</span>
+          </label>
+          <ul className="mt-1 space-y-1 pl-1">
+            {family.variants.map((v) => {
+              const can = usable(v);
+              const on = can && (variants === 'all' || (chosen?.has(v.variantId) ?? false));
+              return (
+                <li key={v.variantId}>
+                  <label className="flex items-start gap-2">
+                    <input type="checkbox" checked={on} disabled={!editable || !can || variants === 'all'} onChange={() => toggle(v.variantId)} />
+                    <span>
+                      {v.name}
+                      {v.boundary ? ` (boundary: ${v.boundary})` : ''}
+                      {!can && <span className="text-fg-muted"> · {v.state === 'retired' ? 'retired' : 'waiting for an SME outcome, so it can’t count yet'}</span>}
+                      {can && v.needsConfirmation && <span className="text-fg-muted"> · outcome carried over, not yet confirmed by a person</span>}
+                      {v.description && <span className="block text-xs text-fg-muted">{v.description}</span>}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </fieldset>
+      )}
+    </div>
   );
 }

@@ -77,7 +77,7 @@ export async function rlgymTemplateRef(db: Db | Tx, t: Template): Promise<{ id: 
  * form field it fills (KYC: `S1.applicationType` → `application_type`), the slot's other coverage values, and its
  * edge cases (the slot's, plus the edge case the SME focused the task on). Null when the task has no case at all.
  */
-export function caseSelectorOf(record: ApprovedTaskRecord, focus: string | null = null): Record<string, unknown> | null {
+export function caseSelectorOf(record: ApprovedTaskRecord, focus: string | null = null, familyTags: string[] = []): Record<string, unknown> | null {
   const slot = isObj(record.input) && isObj(record.input.slot) ? record.input.slot : {};
   const out: Record<string, unknown> = {};
   if (isObj(slot.tags)) for (const [k, v] of Object.entries(slot.tags)) if (typeof v === 'string' && v) out[snake(k)] = v;
@@ -88,7 +88,7 @@ export function caseSelectorOf(record: ApprovedTaskRecord, focus: string | null 
     out[snake(source || field || 'case')] = slot.case.value;
   }
   if (!Object.keys(out).length) return null;
-  const edges = [...(typeof slot.edgeCase === 'string' && slot.edgeCase ? [slot.edgeCase] : []), ...(focus ? [focus] : [])];
+  const edges = [...(typeof slot.edgeCase === 'string' && slot.edgeCase ? [slot.edgeCase] : []), ...(focus ? [focus] : []), ...familyTags];
   out.edge_cases = [...new Set(edges)];
   return out;
 }
@@ -114,7 +114,7 @@ export async function buildRlGymExport(
   p: { id: string; name: string; template: Template },
   records: ApprovedTaskRecord[],
   ref: { id: string; version: number; specSha256: string },
-  opts: { exported: boolean; held?: Map<string, string>; batches?: Map<string, string>; reports?: Map<string, TaskCheckReport> },
+  opts: { exported: boolean; held?: Map<string, string>; batches?: Map<string, string>; reports?: Map<string, TaskCheckReport>; familyTags?: Map<string, string[]> },
 ): Promise<BuiltExport> {
   const tasks: ExportTask[] = [];
   const notSent: NotSent[] = [];
@@ -144,7 +144,7 @@ export async function buildRlGymExport(
     const complexity = str(priv.complexity);
     const archetype = str(priv.archetype);
     const edgeCase = str(priv.edge_case);
-    const selector = caseSelectorOf(r, edgeCase);
+    const selector = caseSelectorOf(r, edgeCase, opts.familyTags?.get(r.taskInstanceId) ?? []);
     if (!selector) {
       notSent.push({ recordId: r.id, taskId: r.taskInstanceId, title, code: 'CASE_SELECTOR_MISSING', message: 'The task has no case (no slot case or coverage values), so RL Gym cannot match it to a case.' });
       continue;

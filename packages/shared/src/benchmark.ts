@@ -254,10 +254,24 @@ export function sliceLists(profile: unknown): { complexity: string[]; archetype:
 /** What the SME fills for a task (stored server-side on the task; copied into the package's private part). */
 export const ExtraStateCheck = z.object({ table: z.string().min(1).max(80), row: z.enum(['case', 'any']), column: z.string().min(1).max(80), op: z.enum(CHECK_OPS), value: z.union([z.string().max(500), z.number()]) }).strict();
 export type ExtraStateCheck = z.infer<typeof ExtraStateCheck>;
+/**
+ * E-001 §6b (owner, 24 Nov 2026): the task's focus on an edge-case family: every variant that counts ("all", including
+ * variants added later) or the ones the SME chose. Stored beside `edgeCase`, never in place of it.
+ */
+export const FamilyFocus = z
+  .object({
+    familyId: z.string().regex(/^[a-z0-9][a-z0-9_.:-]{0,99}$/),
+    variants: z.union([z.literal('all'), z.array(z.string().regex(/^[a-z0-9][a-z0-9_.:-]{0,99}$/)).min(1).max(100)]),
+  })
+  .strict();
+export type FamilyFocus = z.infer<typeof FamilyFocus>;
+
 export const TaskBenchmarkInput = z
   .object({
     /** The template edge case this task focuses on (at most one; spec 5 question 2, proposed). */
     edgeCase: z.string().regex(TAG).nullable().default(null),
+    /** E-001 §6b: the family focus, when the SME chose one (additive: older tasks keep only `edgeCase`). */
+    familyFocus: FamilyFocus.nullable().optional(),
     slots: z.record(z.string().regex(SLOT_ID), z.union([z.string().max(2000), z.number()])).default({}),
     extraStateChecks: z.array(ExtraStateCheck).max(10).default([]),
   })

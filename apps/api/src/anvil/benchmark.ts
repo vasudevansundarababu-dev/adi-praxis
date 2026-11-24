@@ -22,7 +22,7 @@ export function templateBenchmark(t: Pick<Template, 'anvilSpec'>): TemplateBench
 
 /** A task's stored benchmark input (TaskInstance.benchmark), or the empty input. `version` counts saves. */
 export function taskBenchmarkOf(v: unknown): TaskBenchmarkInput & { version: number } {
-  const parsed = TaskBenchmarkInput.safeParse(isObj(v) ? { edgeCase: v.edgeCase ?? null, slots: v.slots ?? {}, extraStateChecks: v.extraStateChecks ?? [] } : {});
+  const parsed = TaskBenchmarkInput.safeParse(isObj(v) ? { edgeCase: v.edgeCase ?? null, slots: v.slots ?? {}, extraStateChecks: v.extraStateChecks ?? [], ...(isObj(v.familyFocus) ? { familyFocus: v.familyFocus } : {}) } : {});
   const version = isObj(v) && Number.isInteger(v.version) ? (v.version as number) : 0;
   return { ...(parsed.success ? parsed.data : { edgeCase: null, slots: {}, extraStateChecks: [] }), version };
 }

@@ -287,7 +287,6 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     const projectId = await project(v8);
     const slots = { expected_recommendation: 'specialist_review', reason_contains: 'DOB mismatch on sanctions hit' };
     const rows = await packable(await authored(projectId, { benchmark: () => ({ edgeCase: 'sanctions_dob_mismatch', slots, extraStateChecks: [{ table: 'referrals', row: 'any', column: 'specialty', op: 'exists_where', value: 'sanctions' }], version: 1 }) }));
-    expect(rows.length).toBeGreaterThan(0);
     const pkg = await pkgOf(rows[0]!.record!.id);
     expect(pkg.private).toMatchObject({ edge_case: 'sanctions_dob_mismatch', archetype: 'sanctions_near_match', complexity: 'multi_hop', verifiers: { slots, extra_state_checks: [{ table: 'referrals', column: 'specialty', value: 'sanctions' }] } });
     const actor = JSON.stringify(pkg.actor);
@@ -496,6 +495,55 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     expect(exp.statusCode, exp.body).toBe(201);
     const sent = calls.filter((c) => c.url.endsWith('/exports')).at(-1)!;
     expect(sent.body.tasks.find((x: { task_id: string }) => x.task_id === t.id)).toMatchObject({ revision: 2, corrects_revision: 1 });
+  });
+
+  it('E-001 §6b: families from Studio’s catalog; a task focused on a family exports every variant that counts; a single edge case reads as its family without being rewritten', async () => {
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    await qualify(v8);
+    const projectId = await project(v8);
+    const anyTask = (await db.taskInstance.findMany({ where: { projectId } }))[0]!;
+    const person = await source(projectId, 'SME', { email: 'sme-family@gmail.test', first: 'Fay', last: 'Mily' });
+    expect((await assign(projectId, person.id, anyTask.id)).statusCode).toBe(200);
+    const me = await signIn('sme-family@gmail.test');
+    const catalog = {
+      schema: 'edge-case-catalog.v2', template: { id: 'tpl_x5rwt6d5eu', version: 9 }, environment_key: 'golden-kyc-openenv', catalog_revision: 3,
+      outcome_fields: [{ name: 'recommendation', label: 'Recommendation', help: '', required: true, allowed_values: ['approve', 'request_information', 'refer'] }],
+      families: [
+        { family_id: 'expired_id', name: 'Expired ID', description: 'An identity document that is not valid on the application date.', archetype: 'missing_doc', complexity: 'single_hop', products: ['individual'], variants: [
+          { variant_id: 'expired_document', tag: 'expired_document', name: 'Expired passport', description: '', boundary: null, proposed_by: 'sme', state: 'available', outcome: { decision: 'request_information', fields: {}, rationale: 'Ask for a current ID.', evidence: [], written_by: 'migration' }, cases_available: 40 },
+          { variant_id: 'expires_today', tag: 'expires_today', name: 'Expires today', description: '', boundary: 'expires on the application date', proposed_by: 'rl_engineer', state: 'available', outcome: { decision: 'approve', fields: {}, rationale: 'Valid on the day.', evidence: ['document.read'], written_by: 'sme-0a1b2c3d' }, cases_available: 12 },
+          { variant_id: 'expires_in_30', tag: 'expires_in_30', name: 'Expires within 30 days', description: '', boundary: null, proposed_by: 'rl_engineer', state: 'waiting_outcome', outcome: null, cases_available: 0 },
+        ] },
+      ],
+    };
+    answer = (c) => (c.url.includes('/edge-case-catalog') ? { status: 200, body: catalog } : c.url.endsWith('/exports') ? { status: 201, body: { data: { new: c.body.tasks.length, superseding: 0, unchanged: 0, blocked: [] }, meta: { request_id: 'rq' } } } : { status: 404, body: {} });
+    // One task keeps a single edge case (as tasks authored before families do); one focuses on the family.
+    await authored(projectId, { smeUserId: me.smeUserId, approve: false, benchmark: (i) => (i === 0 ? { edgeCase: 'expired_document', slots: {}, extraStateChecks: [], version: 1 } : null) });
+    const single = (await db.taskInstance.findMany({ where: { projectId } })).find((x) => (x.benchmark as { edgeCase?: string } | null)?.edgeCase === 'expired_document')!;
+    const before = structuredClone(single.benchmark);
+    await db.taskInstance.update({ where: { id: single.id }, data: { status: 'IN_PROGRESS' } });
+    const view = (await get(me.cookie, `/me/tasks/${single.id}/benchmark`)).json();
+    expect(view.families).toMatchObject({ source: 'catalog', items: [{ familyId: 'expired_id', variants: expect.any(Array) }] });
+    expect(view.families.items[0].variants.map((v: { tag: string; needsConfirmation: boolean }) => [v.tag, v.needsConfirmation])).toEqual([['expired_document', true], ['expires_today', false], ['expires_in_30', true]]);
+    expect(JSON.stringify(view.families)).not.toContain('Ask for a current ID.');
+    expect(view.focus).toMatchObject({ familyId: 'expired_id', derived: true });
+    // Read-time only: the stored benchmark is unchanged.
+    expect((await db.taskInstance.findUniqueOrThrow({ where: { id: single.id } })).benchmark).toEqual(before);
+    // A focus on a variant without an outcome is refused; the family focus is saved.
+    const put = (body: object) => call(app, 'PUT', me.cookie, `/me/tasks/${single.id}/benchmark`, { edgeCase: null, slots: {}, extraStateChecks: [], expectedVersion: 1, ...body });
+    expect((await put({ familyFocus: { familyId: 'expired_id', variants: ['expires_in_30'] } })).statusCode).toBe(422);
+    const saved = await put({ familyFocus: { familyId: 'expired_id', variants: 'all' } });
+    expect(saved.statusCode, saved.body).toBe(200);
+    expect(saved.json()).toMatchObject({ familyFocus: { familyId: 'expired_id', variants: 'all' }, edgeCase: null, version: 2 });
+    // Approve it and export: the case selector carries every variant that counts (not the one waiting for an outcome).
+    const reviewer = await createUser(clientId, ['ADMIN']);
+    await db.taskInstance.update({ where: { id: single.id }, data: { status: 'ACCEPTED' } });
+    await db.$transaction((tx) => writeApprovedRecord(tx, { taskId: single.id, reviewerId: reviewer.id, reviewNotes: null, duplicateDecision: null, decidedAt: new Date() }));
+    const exp = await post(pm, `/projects/${projectId}/rlgym-exports`);
+    expect(exp.statusCode, exp.body).toBe(201);
+    const sent = calls.filter((c) => c.url.endsWith('/exports')).at(-1)!;
+    const task = sent.body.tasks.find((x: { task_id: string }) => x.task_id === single.id);
+    expect(task.case_selector.edge_cases.sort()).toEqual(['expired_document', 'expires_today']);
   });
 
   it('export is off and says why when the RL Gym has not qualified the version; an unreachable RL Gym is recorded', async () => {

@@ -52,6 +52,16 @@ export class StudioClient {
     return this.call('POST', '/api/v1/coverage-checks', body);
   }
 
+  /** E-001 §6b: the edge-case families of a template version's environment (edge-case-catalog.v2; 404 = use S4). */
+  edgeCaseCatalog(templateId: string, version: number) {
+    return this.call('GET', `/api/v1/templates/${encodeURIComponent(templateId)}/versions/${version}/edge-case-catalog`);
+  }
+
+  /** E-001 §6b: a batch of SME (or Admin) outcomes, outcome-request.v1; stored whole or not at all. */
+  writeOutcomes(body: Record<string, unknown>, idempotencyKey: string) {
+    return this.call('POST', '/api/v1/outcome-requests', body, idempotencyKey);
+  }
+
   private headers(idempotencyKey?: string): Record<string, string> {
     const h: Record<string, string> = { Accept: 'application/json' };
     if (this.settings.key) h.Authorization = `Bearer ${this.settings.key}`;

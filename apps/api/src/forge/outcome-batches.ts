@@ -104,7 +104,8 @@ export async function createBatch(tx: Tx, p: { id: string; clientId: string; tem
           name: w!.variant.name,
           description: w!.variant.description,
           boundary: w!.variant.boundary,
-          ...(w!.variant.outcome ? { proposedOutcome: w!.variant.outcome as unknown as Prisma.InputJsonValue } : {}),
+          // The outcome on record, else Studio's proposal (a fixture's current reference answer), to confirm or change.
+          ...((w!.variant.outcome ?? w!.variant.proposedOutcome) ? { proposedOutcome: (w!.variant.outcome ?? w!.variant.proposedOutcome) as unknown as Prisma.InputJsonValue } : {}),
         })),
       },
     },

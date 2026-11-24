@@ -216,7 +216,7 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
     const cat = await familyCatalog(db, t.project.template, studio);
     const derived = !value.familyFocus && value.edgeCase ? familyOfTag(cat.families, value.edgeCase) : null;
     const focus = value.familyFocus ?? (derived ? { familyId: derived.familyId, variants: [derived.variants.find((v) => v.tag === value.edgeCase)!.variantId], derived: true } : null);
-    return { ...authorView(t.project.template), value, editable, needs: needs.map((n) => needDto(n, null)), families: { source: cat.source, fallbackReason: cat.fallbackReason, items: cat.families.map((f) => ({ ...f, variants: f.variants.map(({ outcome: _o, ...v }) => v) })) }, focus };
+    return { ...authorView(t.project.template), value, editable, needs: needs.map((n) => needDto(n, null)), families: { source: cat.source, fallbackReason: cat.fallbackReason, items: cat.families.map((f) => ({ ...f, variants: f.variants.filter((v) => v.kind !== 'fixture').map(({ outcome: _o, proposedOutcome: _p, ...v }) => v) })).filter((f) => f.variants.length) }, focus };
   });
 
   app.put('/me/tasks/:id/benchmark', { config: { access: 'candidate', rateLimit: { max: 60, timeWindow: '1 minute' } }, schema: { tags: ['work'], params: Id, body: SaveTaskBenchmarkRequest } }, async (req, reply) => {

@@ -51,7 +51,7 @@ export interface OutcomeBatchView {
 }
 export interface EdgeOutcomesState {
   catalog: { source: 'catalog' | 'template'; fallbackReason: string | null; environmentKey: string | null; revision: number | null; outcomeFields: OutcomeField[] };
-  waiting: { familyId: string; familyName: string; variantId: string; name: string; boundary: string | null; migrated: boolean; inBatch: boolean }[];
+  waiting: { familyId: string; familyName: string; variantId: string; name: string; boundary: string | null; migrated: boolean; fixture?: boolean; proposed?: boolean; inBatch: boolean }[];
   people: { smeUserId: string; name: string }[];
   batches: OutcomeBatchView[];
 }
@@ -237,7 +237,9 @@ export function EdgeOutcomesPanel({ projectId, state }: { projectId: string; sta
                       <span>
                         {w.familyName} · {w.name}
                         {w.boundary ? ` (boundary: ${w.boundary})` : ''}
+                        {w.fixture && <span className="text-fg-muted"> · verification fixture (never used as a task case)</span>}
                         {w.migrated && <span className="text-fg-muted"> · outcome carried over: confirm or change it</span>}
+                        {w.proposed && <span className="text-fg-muted"> · proposed outcome: confirm or change it</span>}
                         {w.inBatch && <span className="text-fg-muted"> · already in a batch</span>}
                       </span>
                     </label>

@@ -43,6 +43,10 @@ export interface EdgeVariant {
   needsConfirmation: boolean;
   /** The outcome on record, for the people who confirm it (never shown to the agent). */
   outcome: { decision: string | null; fields: Record<string, string>; rationale: string; evidence: string[]; writtenBy: string } | null;
+  /** An outcome Studio proposes for a person to confirm or change (a fixture's current reference answer). */
+  proposedOutcome: { decision: string | null; fields: Record<string, string>; rationale: string; evidence: string[]; writtenBy: string } | null;
+  /** variant, boundary or fixture. A fixture is a verification control: never sampled into a task. */
+  kind: string;
   casesAvailable: number | null;
 }
 
@@ -80,14 +84,19 @@ export function familiesOf(catalog: unknown, s4EdgeCases: unknown): EdgeFamily[]
         const tag = str(v.tag);
         if (!ID.test(variantId) || !TAG.test(tag)) return [];
         const state = (VARIANT_STATES as readonly string[]).includes(str(v.state)) ? (str(v.state) as VariantState) : 'proposed';
-        const o = isObj(v.outcome) ? v.outcome : null;
-        const writtenBy = o ? str(o.written_by) : '';
-        const outcome = o
-          ? { decision: str(o.decision) || null, fields: isObj(o.fields) ? Object.fromEntries(Object.entries(o.fields).map(([k, x]) => [k, String(x ?? '')])) : {}, rationale: str(o.rationale), evidence: Array.isArray(o.evidence) ? o.evidence.map(String) : [], writtenBy }
-          : null;
+        const read = (o: Record<string, unknown> | null) => {
+          if (!o) return null;
+          // A proposed outcome may carry its fields flat (recommendation, request_type, ...) or as {decision, fields}.
+          const flat = !isObj(o.fields) && !('decision' in o);
+          const fields = isObj(o.fields) ? o.fields : flat ? Object.fromEntries(Object.entries(o).filter(([k]) => k !== 'recommendation')) : {};
+          return { decision: str(o.decision) || str(o.recommendation) || null, fields: Object.fromEntries(Object.entries(fields).map(([k, x]) => [k, String(x ?? '')])), rationale: str(o.rationale), evidence: Array.isArray(o.evidence) ? o.evidence.map(String) : [], writtenBy: str(o.written_by) };
+        };
+        const outcome = read(isObj(v.outcome) ? v.outcome : null);
+        const proposedOutcome = read(isObj(v.proposed_outcome) ? v.proposed_outcome : null);
+        const writtenBy = outcome?.writtenBy ?? '';
         // A person confirmed it when it was written by an SME or an Admin pseudonym; a migrated outcome still needs one.
         const needsConfirmation = state !== 'retired' && (!outcome || !PERSON.test(writtenBy));
-        return [{ variantId, tag, name: str(v.name) || tag, description: str(v.description), boundary: str(v.boundary) || null, proposedBy: v.proposed_by === 'rl_engineer' ? 'rl_engineer' : 'sme', state, hasOutcome: !!outcome, needsConfirmation, outcome, casesAvailable: Number.isInteger(v.cases_available) ? (v.cases_available as number) : null }];
+        return [{ variantId, tag, name: str(v.name) || tag, description: str(v.description), boundary: str(v.boundary) || null, proposedBy: v.proposed_by === 'rl_engineer' ? 'rl_engineer' : 'sme', state, hasOutcome: !!outcome, needsConfirmation, outcome, proposedOutcome, kind: str(v.kind) || 'variant', casesAvailable: Number.isInteger(v.cases_available) ? (v.cases_available as number) : null }];
       });
       return [{ familyId, name: str(f.name) || familyId, description: str(f.description), archetype: str(f.archetype) || null, complexity: str(f.complexity) || null, products: Array.isArray(f.products) ? f.products.map(String) : [], variants, source: 'catalog' as const }];
     });
@@ -99,7 +108,7 @@ export function familiesOf(catalog: unknown, s4EdgeCases: unknown): EdgeFamily[]
     archetype: e.archetype,
     complexity: e.complexity,
     products: e.products,
-    variants: [{ variantId: e.tag, tag: e.tag, name: e.name || e.tag, description: e.twist || e.context, boundary: null, proposedBy: 'template', state: 'available', hasOutcome: true, needsConfirmation: false, outcome: null, casesAvailable: null }],
+    variants: [{ variantId: e.tag, tag: e.tag, name: e.name || e.tag, description: e.twist || e.context, boundary: null, proposedBy: 'template', state: 'available', hasOutcome: true, needsConfirmation: false, outcome: null, proposedOutcome: null, kind: 'variant', casesAvailable: null }],
     source: 'template',
   }));
 }
@@ -114,7 +123,7 @@ export function outcomeFieldsOf(catalog: unknown): OutcomeField[] {
 export const familyOfTag = (families: EdgeFamily[], tag: string | null) => (tag ? (families.find((f) => f.variants.some((v) => v.tag === tag)) ?? null) : null);
 
 /** A variant a task or run may count: it has an SME outcome and is not retired. */
-export const variantUsable = (v: EdgeVariant) => v.hasOutcome && !['retired', 'proposed', 'waiting_outcome', 'needs_environment_change'].includes(v.state);
+export const variantUsable = (v: EdgeVariant) => v.kind !== 'fixture' && v.hasOutcome && !['retired', 'proposed', 'waiting_outcome', 'needs_environment_change'].includes(v.state);
 
 /** The variant tags a focus covers today (what the export sends the RL Gym), or problems with the focus. */
 export function focusTags(focus: FamilyFocus, families: EdgeFamily[]): { tags: string[]; problems: string[] } {

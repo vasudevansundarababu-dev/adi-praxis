@@ -39,7 +39,7 @@ export const edgeOutcomeRoutes: FastifyPluginAsyncZod<{ db: Db; studio: StudioCl
     const people = await db.smeUser.findMany({ where: { id: { in: ids } }, select: { id: true, displayName: true, contactEmail: true } });
     return {
       catalog: { source: cat.source, fallbackReason: cat.fallbackReason, environmentKey: cat.environmentKey, revision: cat.catalogRevision, outcomeFields: cat.outcomeFields },
-      waiting: waitingVariants(cat.families).map((w) => ({ familyId: w.family.familyId, familyName: w.family.name, variantId: w.variant.variantId, name: w.variant.name, boundary: w.variant.boundary, migrated: !!w.variant.outcome, inBatch: inOpen.has(w.variant.variantId) })),
+      waiting: waitingVariants(cat.families).map((w) => ({ familyId: w.family.familyId, familyName: w.family.name, variantId: w.variant.variantId, name: w.variant.name, boundary: w.variant.boundary, migrated: !!w.variant.outcome, fixture: w.variant.kind === 'fixture', proposed: !w.variant.outcome && !!w.variant.proposedOutcome, inBatch: inOpen.has(w.variant.variantId) })),
       people: people.map((s) => ({ smeUserId: s.id, name: s.displayName || s.contactEmail || 'SME' })),
       batches: batches.map(batchDto),
     };

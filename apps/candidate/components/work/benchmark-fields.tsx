@@ -29,7 +29,7 @@ interface FamilyItem {
   description: string;
   archetype: string | null;
   complexity: string | null;
-  variants: { variantId: string; tag: string; name: string; description: string; boundary: string | null; state: string; hasOutcome: boolean; needsConfirmation: boolean }[];
+  variants: { variantId: string; tag: string; name: string; description: string; boundary: string | null; state: string; hasOutcome: boolean; needsConfirmation: boolean; kind?: string }[];
 }
 const usable = (v: FamilyItem['variants'][number]) => v.hasOutcome && !['retired', 'proposed', 'waiting_outcome', 'needs_environment_change'].includes(v.state);
 

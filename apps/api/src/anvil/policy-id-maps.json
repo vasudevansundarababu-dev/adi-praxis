@@ -1,6 +1,6 @@
 {
   "schema": "praxis.policy-id-map.v1",
-  "note": "D-056. Proposed by ADI Forge on 24 Nov 2026 from the approved rule set v2 texts; every entry waits for the owner's confirmation (confirmed_by), and an unconfirmed entry is not sent.",
+  "note": "D-056. Proposed by ADI Forge on 24 Nov 2026 from the approved rule set v2 texts. The owner confirmed the document entry on 25 Nov 2026 (all 7 environment policies). The 11 rule entries stay proposed and unconfirmed, so they are not sent.",
   "maps": [
     {
       "environment": "golden-kyc-openenv",
@@ -59,13 +59,16 @@
           },
           "environment_policy_ids": [
             "GB-02",
+            "GB-03",
             "GB-05",
+            "KYC-01",
             "KYC-02",
-            "KYC-03"
+            "KYC-03",
+            "KYC-04"
           ],
-          "reason": "All four tasks cite this document. It maps to the union of its rule set v2 rules' matches: R-CIP-ADDRESS (KYC-02, GB-02), R-HUMAN-REVIEW-OF-POSSIBLE-OFAC-MATCHES (KYC-03, GB-05) and R-PRE-OPENING-SANCTIONS-AND-WATCH-LIST-SCR (KYC-03). KYC-01, KYC-04 and GB-03 have no clear source rule, so they are left out.",
-          "confirmed_by": null,
-          "confirmed_at": null
+          "reason": "All four tasks cite this whole document, and these 7 are the environment's whole policy set, so every task gets the same full set and the set gives no hint of the case. It also keeps GB-03 (minor without a TIN) readable for the custodial and teen tasks. Owner decision, 25 Nov 2026.",
+          "confirmed_by": "owner",
+          "confirmed_at": "2026-11-25"
         },
         {
           "forge": {

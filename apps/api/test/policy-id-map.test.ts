@@ -12,7 +12,7 @@ const file = (m: PolicyIdMap[]) => ({ schema: 'praxis.policy-id-map.v1' as const
 const cite = [{ ruleId: DOC, contentSha256: SHA_DOC }];
 
 describe('D-056: Forge policy ids mapped to the environment’s, at export only', () => {
-  it('the shipped proposal: golden-kyc-openenv@12 for tpl_x5rwt6d5eu v8, its 7 policies, the document and all 11 rule set v2 rules, none confirmed yet', () => {
+  it('the shipped map: golden-kyc-openenv@12 for tpl_x5rwt6d5eu v8, its 7 policies; the document confirmed by the owner to all 7, the 11 rule set v2 rules still proposed', () => {
     const parsed = PolicyIdMaps.parse(maps);
     const m = policyIdMapFor({ id: 'tpl_x5rwt6d5eu', version: 8 }, parsed)!;
     expect(m).toMatchObject({ environment: 'golden-kyc-openenv', environment_version: 12 });
@@ -20,12 +20,18 @@ describe('D-056: Forge policy ids mapped to the environment’s, at export only'
     expect(m.entries.filter((e) => e.forge.kind === 'document')).toHaveLength(1);
     expect(m.entries.filter((e) => e.forge.kind === 'rule')).toHaveLength(11);
     for (const e of m.entries) {
-      expect(e.confirmed_by).toBeNull();
+      expect(e.confirmed_by).toBe(e.forge.kind === 'document' ? 'owner' : null);
       expect(e.reason.length).toBeGreaterThan(10);
       for (const id of e.environment_policy_ids) expect(m.environment_policies.some((p) => p.id === id)).toBe(true);
     }
-    // Until the owner confirms, the tasks' citation is flagged and nothing is sent.
-    expect(mapRecordPolicies(record(cite), m)).toMatchObject({ mapped: [], unmapped: [{ message: expect.stringMatching(/waits for the owner's confirmation/) }] });
+    // Owner, 25 Nov 2026: the document the tasks cite maps to the environment's whole policy set.
+    const all = ['GB-02', 'GB-03', 'GB-05', 'KYC-01', 'KYC-02', 'KYC-03', 'KYC-04'];
+    const r = mapRecordPolicies(record(cite), m);
+    expect(r).toEqual({ mapped: [{ forge_rule_id: DOC, forge_content_sha256: SHA_DOC, environment_policy_ids: all }], unmapped: [] });
+    expect(Object.keys((policyIdMapWire(m, r.mapped) as { policies: object }).policies).sort()).toEqual(all);
+    // A rule entry is still proposed, so a task citing it would be flagged, not sent.
+    const rule = m.entries.find((e) => e.forge.kind === 'rule')!;
+    expect(mapRecordPolicies(record([{ ruleId: rule.forge.id, contentSha256: rule.forge.content_sha256 }]), m).unmapped[0]!.message).toMatch(/waits for the owner's confirmation/);
   });
 
   it('picks the map of the exact Studio template release; two maps for one release are refused', () => {

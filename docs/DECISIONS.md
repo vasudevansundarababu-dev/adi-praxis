@@ -2542,7 +2542,12 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
     reason, and `confirmed_by` stays null until the owner confirms it (mechanical, no SME time).
   - Proposed by meaning from rule set v2's approved texts. The APR-04 rule-clause map is not available in this repo.
     - 4 of the 11 rules map. 7 have no clear match and stay flagged.
-    - The document maps to KYC-02, GB-02, KYC-03 and GB-05.
+    - Proposed: the document maps to KYC-02, GB-02, KYC-03 and GB-05.
+  - **Owner decision, 25 Nov 2026: the document entry is confirmed to all 7 @12 policies** (KYC-01 to KYC-04,
+    GB-02, GB-03, GB-05). The tasks cite the whole document and these are the environment's whole policy set, so
+    every task gets the same full set (no hint of the case), and GB-03 stays readable for the custodial and teen
+    tasks. The 11 rule entries stay proposed and unconfirmed, so they are not sent.
+  - Interim only: E-002 (approved clauses served by `policy.read`) replaces this map once built.
 - **Export only (coordinator: option 1).** Each task entry gains `policy_id_map` only for citations with a confirmed
   match: `{environment_version: "golden-kyc-openenv@12", map: {"<source id>": [env ids]}, policies: {id: {content_sha256}}, source_sha256}`,
     the RL Gym's accepted shape (fde41cf). content_sha256 is Studio's text_sha256.

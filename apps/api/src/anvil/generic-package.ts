@@ -1,4 +1,4 @@
-import { agentGraphProjection, agentProjection, followUpsOf, type TemplateProfile, WorkflowGraph } from '@praxis/shared';
+import { agentGraphProjection, agentProjection, coveredCaseValues, followUpsOf, type TemplateProfile, WorkflowGraph } from '@praxis/shared';
 import type { ApprovedTaskRecord, Template } from '@prisma/client';
 import { jcs, jcsBytes, JcsError, jcsSha256, sha256Hex } from './jcs';
 import { caseSelectorOf } from '../tasks/task-service';
@@ -148,6 +148,12 @@ function selectorBlock(input: PackageInput, authored: Record<string, unknown>): 
   const [sectionKey, fieldKey] = sel.source.split('.');
   const s = sectionKey ? sections[sectionKey] : undefined;
   const authoredValue = isObj(s) && fieldKey ? s[fieldKey] : undefined;
+  // KYC Judgment v1 §16: a stratified selector (one task for every value) carries the task's covered list.
+  if (sel.strategy === 'stratified') {
+    const values = coveredCaseValues(sel, authored);
+    if (!values?.length) return { problem: { code: 'GENERIC_CASE_SELECTOR_MISSING', message: `The task covers no ${sel.field} value: choose at least one in ${sel.source}.` } };
+    return { fields: { case_selector: { field: sel.field, values, strategy: 'stratified' } } };
+  }
   const slot = isObj(input.record.input) && isObj(input.record.input.slot) ? input.record.input.slot : {};
   // A slot made for another selector field (the template changed under it) is a conflict, never ignored.
   if (isObj(slot.case) && slot.case.field !== sel.field) return { problem: { code: 'GENERIC_CASE_SELECTOR_MISMATCH', message: `The task's slot is for ${String(slot.case.field)}, but its template selects tasks by ${sel.field}.` } };

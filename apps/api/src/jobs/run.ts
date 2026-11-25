@@ -211,6 +211,17 @@ try {
     } else r = await successorTasks(db, base);
     console.log(JSON.stringify({ report: 'kyc-v8-successor', phase: a.phase, apply: a.apply, ...r }));
     if (r.outcome === 'refused') process.exitCode = 3;
+  } else if (job === 'kyc-judgment-test-project') {
+    const m = await import('./kyc-judgment-test-project');
+    const a = m.parseTestProjectArgs(process.argv.slice(3));
+    let r: { outcome: string };
+    if (a.phase === 'import') r = await m.importTemplate(db, { requestedBy: a.requestedBy, file: a.file ?? '', apply: a.apply });
+    else if (a.phase === 'project') {
+      const { defaultStorage } = await import('../app');
+      r = await m.createTestProject(db, { storage: defaultStorage(config) }, { requestedBy: a.requestedBy, sourceProjectId: a.sourceProjectId ?? '', apply: a.apply });
+    } else r = await m.createTestTask(db, { requestedBy: a.requestedBy, projectId: a.projectId ?? '', apply: a.apply });
+    console.log(JSON.stringify({ report: 'kyc-judgment-test-project', phase: a.phase, apply: a.apply, ...r }));
+    if (r.outcome === 'refused') process.exitCode = 3;
   } else if (job === 'library-copy') {
     const { copyLibrary, parseLibraryCopyArgs } = await import('./library-copy');
     const { defaultStorage } = await import('../app');
@@ -283,7 +294,7 @@ try {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots | marketing-form-v2 | kyc-v8-successor | library-copy | kyc-v8-readback | kyc-v8-tool-binding | kyc-v8-tin-exclusion | task-send-back | data-digests | authored-export`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots | marketing-form-v2 | kyc-v8-successor | library-copy | kyc-judgment-test-project | kyc-v8-readback | kyc-v8-tool-binding | kyc-v8-tin-exclusion | task-send-back | data-digests | authored-export`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

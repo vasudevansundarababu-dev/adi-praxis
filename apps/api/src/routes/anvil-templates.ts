@@ -51,7 +51,28 @@ async function staffingAdvice(db: Db | Tx, clientId: string, spec: { skills: { a
   return out;
 }
 
-type Checked = TemplateSpecCheck & { spec: TemplateSpec | null; joint: StoredJointParts | null; pack: TemplateSpecCheck['pack']; packBody: unknown };
+export type Checked = TemplateSpecCheck & { spec: TemplateSpec | null; joint: StoredJointParts | null; pack: TemplateSpecCheck['pack']; packBody: unknown };
+
+/**
+ * Stores a checked proposal as a DRAFT template version with its TemplateProposal row, audited
+ * (`template_proposal.received`). Shared by the proposals route and the KYC Judgment v1 test-project job, so both store
+ * a proposal exactly the same way. Nothing goes live: a Praxis Admin publishes the draft.
+ */
+export async function storeProposal(tx: Tx, c: { clientId: string; apiClientId: string }, r: Checked, body: unknown, audit: (a: AuditInput) => Promise<void>) {
+  // Joint proposals: the parts are stored exactly as received, so both sides hash the same object.
+  const anvilSpec = (r.joint ?? { requirement: r.spec!.requirement, execution: r.spec!.execution, skills: r.spec!.skills }) as unknown as Prisma.InputJsonValue;
+  const stored = await storePack(tx, { clientId: c.clientId, uploaderId: c.apiClientId, body: r.packBody, audit, anvilSpec, newVersionOfExisting: true, from: 'anvil_proposal' });
+  if (!stored.createdTemplateId) throw new AppError(500, 'NO_DRAFT', 'The proposal was stored but no draft template version was created.');
+  const authoringSkills = r.joint ? ((r.joint.skills.authoring as { mandatory: string[] }).mandatory ?? []) : r.spec!.skills.authoring.mandatory;
+  // The template's skills drive the generated JDs: the authoring skills from Anvil (reviewer JD adds experience).
+  const draft = await tx.template.update({ where: { id: stored.createdTemplateId }, data: { skills: [...new Set(authoringSkills)] } });
+  const requirementId = r.joint ? String((r.joint.requirement as { id?: unknown; reference?: unknown }).id ?? (r.joint.requirement as { reference?: unknown }).reference ?? r.joint.anvil_template_key) : r.spec!.requirement.id;
+  const proposal = await tx.templateProposal.create({
+    data: { clientId: c.clientId, apiClientId: c.apiClientId, requirementId: requirementId.slice(0, 200), profileId: stored.row.profileId, templateId: draft.id, spec: body as Prisma.InputJsonValue, specSha256: r.joint ? jcsSha256(body) : sha256(stableStringify(body)) },
+  });
+  await audit({ entityType: 'TemplateProposal', entityId: proposal.id, action: 'template_proposal.received', after: { requirementId: proposal.requirementId, profileId: proposal.profileId, templateId: draft.id, version: draft.version, specSha256: proposal.specSha256, ...(r.joint ? { anvilTemplateKey: r.joint.anvil_template_key, lineageId: draft.lineageId } : {}) } });
+  return { proposal, draft };
+}
 
 /**
  * Arrival check for case selectors (15 Nov 2026): a proposal whose selector Praxis cannot run as one task per value
@@ -254,18 +275,7 @@ export const anvilTemplateRoutes: FastifyPluginAsyncZod<{ db: Db; anvil?: { envi
         await audit({ entityType: 'TemplateProposal', entityId: req.id, action: 'template_proposal.refused', after: { errorCodes: [...new Set(r.errors.map((e) => e.code))], errorCount: r.errors.length } });
         return { status: 422, body: envelope(req.id, { schema_version: 'praxis.template-validation.v1', valid: false, status: 'template_invalid', errors: r.errors, error_count: r.errors.length, praxis_requirements: r.praxisRequirements, review_gates: [], paid_calls: false }) };
       }
-      // Joint proposals: the parts are stored exactly as received, so both sides hash the same object.
-      const anvilSpec = (r.joint ?? { requirement: r.spec!.requirement, execution: r.spec!.execution, skills: r.spec!.skills }) as unknown as Prisma.InputJsonValue;
-      const stored = await storePack(tx, { clientId: c.clientId, uploaderId: c.apiClientId, body: r.packBody, audit, anvilSpec, newVersionOfExisting: true, from: 'anvil_proposal' });
-      if (!stored.createdTemplateId) throw new AppError(500, 'NO_DRAFT', 'The proposal was stored but no draft template version was created.');
-      const authoringSkills = r.joint ? ((r.joint.skills.authoring as { mandatory: string[] }).mandatory ?? []) : r.spec!.skills.authoring.mandatory;
-      // The template's skills drive the generated JDs: the authoring skills from Anvil (reviewer JD adds experience).
-      const draft = await tx.template.update({ where: { id: stored.createdTemplateId }, data: { skills: [...new Set(authoringSkills)] } });
-      const requirementId = r.joint ? String((r.joint.requirement as { id?: unknown; reference?: unknown }).id ?? (r.joint.requirement as { reference?: unknown }).reference ?? r.joint.anvil_template_key) : r.spec!.requirement.id;
-      const proposal = await tx.templateProposal.create({
-        data: { clientId: c.clientId, apiClientId: c.apiClientId, requirementId: requirementId.slice(0, 200), profileId: stored.row.profileId, templateId: draft.id, spec: req.body as Prisma.InputJsonValue, specSha256: r.joint ? jcsSha256(req.body) : sha256(stableStringify(req.body)) },
-      });
-      await audit({ entityType: 'TemplateProposal', entityId: proposal.id, action: 'template_proposal.received', after: { requirementId: proposal.requirementId, profileId: proposal.profileId, templateId: draft.id, version: draft.version, specSha256: proposal.specSha256, ...(r.joint ? { anvilTemplateKey: r.joint.anvil_template_key, lineageId: draft.lineageId } : {}) } });
+      const { proposal, draft } = await storeProposal(tx, c, r, req.body, audit);
       const identity = r.joint ? { anvil_template_key: r.joint.anvil_template_key, template_id: draft.lineageId, version: draft.version, template_version_id: draft.id } : { template_id: draft.id };
       return { status: 201, body: envelope(req.id, { proposal_id: proposal.id, status: 'draft_created', ...identity, template_version: draft.version, workflow: draft.workflowName, profile_id: proposal.profileId, praxis_requirements: r.praxisRequirements, review_gates: [{ code: 'REVIEW_PRAXIS_PUBLISH', message: 'A Praxis Admin completes and publishes the draft; nothing goes live from the API.' }] }) };
     }));

@@ -2767,3 +2767,18 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
   the conditions and library details C1 needs. The source project is never changed.
 - For KYC Judgment v1: the v8 project's rule set v2 (the federal document and the 11 rules) into the new real project,
   run for real only once that project exists and the coordinator has been told.
+
+## D-077: the KYC Judgment v1 integration test project (coordinator, 25 Nov 2026)
+
+- `run.ts kyc-judgment-test-project import|project|task --requested-by <admin email> [--apply]`, each phase a dry run by
+  default, audited as SYSTEM with the requesting Admin, idempotent.
+  - `import --file <proposal>`: Studio's joint proposal through the same checks and store as the proposals route (the
+    store step is now one shared function), attributed to the client's Studio API client. A DRAFT: an Admin publishes.
+  - `project --source-project <v8 project>`: on the published template, "KYC Judgment v1 — INTEGRATION TEST
+    (test-only)" with testOnly=true, one slot, and only the federal document copied byte for byte (no rules, no
+    approvals).
+  - `task --project <id>`: a test SME account (marked test-only, the author) and one synthetic task covering all four
+    types, submitted only if it passes the checks its approval re-runs. Refused on any project that is not test-only.
+- Nothing is approved by the job: the owner approves in the console (the six checklist ticks, then Approve).
+- S4 `expectedRules` is advisory (coordinator, 25 Nov), optional for every project (Studio's 6th form change).
+- A stratified selector's package entry carries `case_selector: {field, values, strategy: "stratified"}`.

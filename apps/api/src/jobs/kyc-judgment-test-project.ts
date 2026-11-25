@@ -156,8 +156,10 @@ export async function createTestProject(db: Db, deps: { storage: ObjectStorage }
       if (!t) return refuse('KYC Judgment v1 is not published yet: an Admin publishes it in the console first.');
       // A cancelled test project of the same name (e.g. one made with the wrong slots) is left as it is, never reused or
       // renamed: names are unique per client, so the next one is "<name> — run N".
-      const named = await tx.project.findMany({ where: { clientId: admin.clientId, OR: [{ name }, { name: { startsWith: `${name} — run ` } }] }, select: { id: true, name: true, status: true, testOnly: true } });
-      const existing = named.find((x) => x.status !== 'CANCELLED');
+      // One live test project per template version: a test project on an earlier version (cycle 1) stays as it is, and
+      // the next version gets its own.
+      const named = await tx.project.findMany({ where: { clientId: admin.clientId, OR: [{ name }, { name: { startsWith: `${name} — run ` } }] }, select: { id: true, name: true, status: true, testOnly: true, templateId: true } });
+      const existing = named.find((x) => x.status !== 'CANCELLED' && x.templateId === t.id);
       if (existing) return { outcome: 'already_created', projectId: existing.id, name: existing.name, testOnly: existing.testOnly };
       const taken = new Set(named.map((x) => x.name));
       let n = 2;
@@ -232,15 +234,30 @@ export function syntheticSections(profile: TemplateProfile, template: Template, 
     S3: { environment: opts('S3', 'environment')[0], tools, failureBehaviour: 'If a tool fails or a check is pending, record the gap against the party it concerns and carry it into the recommendation as outstanding.' },
     S4: { policyLibrary: [{ documentId: doc.documentId, documentVersion: doc.version, title: doc.title }], expectedRules: [], notes: 'Synthetic integration test: the expected rules come from the library conditions and the references.' },
     S5: {
+      // The SOP, as duties (A6: never "if X → refer"): what to read, check and record, in order. What a finding
+      // requires comes from the published rules. Only the tools the form offers are used.
       steps: [
-        ...step('Read the assigned application and list every party with its role.', 'application.read', 'If the application cannot be read, record the failure and stop.'),
-        ...step('List the parties of the application.', 'parties.list', 'If a party cannot be listed, record the gap.'),
-        ...step('Read the published policy library and decide which rules apply to this application and to each party, from the facts.', 'policy.read', 'If a rule cannot be read, record the gap and leave dependent requirements open.'),
-        ...step('Read any policy notices published so far.', 'notices.read', 'If notices cannot be read, record that the rule in force may be unknown.'),
-        ...step('List and read each party’s documents.', 'documents.list', 'A successful empty list shows which documents were not submitted.'),
-        ...step('Verify each party’s identity using that party’s own evidence and the rules that apply to it.', 'identity.check', 'Record a pending or inconclusive result against that party.'),
-        ...step('Where the applicable rules require an item a party has not provided, request that item from that party.', 'information.request', 'If an equivalent request is already open, do not duplicate it.'),
-        ...step('Submit one evidence-backed recommendation with an assessment for each party and every outstanding item.', 'recommend', 'Never record an automated final approval.'),
+        ...step('Read the assigned application: its parties and their roles, the revision, the submission date, the governing state and the opening channel.', 'application.read', 'If the application cannot be read, record the failure and stop.'),
+        ...step('List the parties of the application.', 'parties.list', 'If a party cannot be listed, record the gap and pause that party’s assessment.'),
+        ...step('Read the published policy library and decide which rules apply to this application and to each party, from the facts.', 'policy.read', 'If a rule cannot be read, record the gap and leave the requirements that depend on it open.'),
+        ...step('Read any policy notices published so far, and apply the rule in force.', 'notices.read', 'If notices cannot be read, record that the rule in force may be unknown.'),
+        ...step('List the documents submitted for each party.', 'documents.list', 'If the lookup fails, keep that party’s document status unknown. A successful empty list shows which documents were not submitted.'),
+        ...step('Read each submitted document: its type, issuer and expiry, without logging full ID numbers or images.', 'document.read', 'If a document cannot be read or is incomplete, record the missing facts against that party.'),
+        ...step('Check each party’s identity documents as of the application’s submission date.', 'document.check', 'Record each result against the document’s owner. A tool error leaves validity unverified.'),
+        ...step('Compare the document details with the application data for each party.', 'document.compare', 'Record any mismatch against the party it concerns.'),
+        ...step('Verify each party’s identity using that party’s own evidence and the rules that apply to it.', 'identity.check', 'Record a pending or inconclusive result against that party. One party’s result never verifies another.'),
+        ...step('Check each party’s address against the rules that apply.', 'address.check', 'Record whose address is unresolved and why: missing evidence, conflicting evidence or a tool error.'),
+        ...step('Screen every party before opening, and keep each result with the party it concerns.', 'screening.check', 'If screening is unavailable or pending, record that status for the party.'),
+        ...step('Check the authority of any party who acts for another party, against the rules that apply.', 'authority.check', 'Record an unconfirmed authority against the party who acts.'),
+        ...step('Look up any check still running for a party.', 'operation.lookup', 'If the lookup fails, keep that check outstanding.'),
+        ...step('Read the status of any pending check.', 'operation.read', 'If it is still pending, carry it into the recommendation as outstanding.'),
+        ...step('Where the evidence and the applicable rules establish an issue, record it against the party it concerns, with the supporting evidence ids.', 'finding.write', 'If the finding cannot be saved, record the failure and keep the issue open.'),
+        ...step('Where later evidence settles a recorded issue, resolve it with that evidence.', 'finding.resolve', 'If it cannot be resolved, keep the issue open.'),
+        ...step('Where the applicable rules require an item a party has not provided, request that specific item from that party.', 'information.request', 'If an equivalent request is already open, do not duplicate it. If the request fails, keep the item outstanding.'),
+        ...step('Read any reply to an information request and use what it provides.', 'information.read', 'If no reply has arrived, keep the item outstanding.'),
+        ...step('Where the applicable rules reserve a matter for specialist review, refer it with the supporting evidence.', 'specialist.refer', 'Record whether the referral succeeded. Only a specialist’s recorded decision resolves it.'),
+        ...step('Read any specialist decision recorded for this application.', 'specialist.read', 'If none is recorded, keep the referred matter outstanding.'),
+        ...step('Submit one evidence-backed recommendation for the application, with an assessment for each party and every outstanding item, routed to the human final decision-maker.', 'recommend', 'Carry open items into the recommendation. Never record an automated final approval.'),
       ],
       decisionRights: [{ action: 'Recommend a decision on the application', whoMay: who[0] ?? 'agent', needsApprovalFrom: 'The human final decision-maker', irreversible: irr.length ? yes(irr) : 'yes', escalateWhen: 'The applicable rules reserve a matter for specialist review.', escalateTo: 'The designated specialist' }, ...(irr.length ? [{ action: 'Request information from a party', whoMay: who[0] ?? 'agent', irreversible: no(irr) }] : [])],
     },

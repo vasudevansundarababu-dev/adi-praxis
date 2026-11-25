@@ -105,6 +105,53 @@ describe('KYC Judgment v1 integration test project (test-only)', () => {
     expect(await createTestProject(db, { storage }, { requestedBy: ADMIN, sourceProjectId: v8, apply: false })).toMatchObject({ outcome: 'already_created', projectId: next.projectId });
   });
 
+  it('cycle 2: the next Studio version (new decision not_eligible, new request types) imports as the next version, gets its own test project beside the earlier one, and its task follows the SOP', async () => {
+    const v1 = await importTemplate(db, { requestedBy: ADMIN, file: '', apply: true, body: pending(structuredClone(PROPOSAL)) });
+    expect((await api().post(`/templates/${v1.templateId as string}/publish`, {})).statusCode).toBe(200);
+    const first = await createTestProject(db, { storage }, { requestedBy: ADMIN, sourceProjectId: v8, apply: true });
+    await createTestTask(db, { requestedBy: ADMIN, projectId: first.projectId as string, apply: true });
+
+    const next = structuredClone(PROPOSAL);
+    next.authoring.profile.profileId = 'kyc-judgment-v1-xcbc2brsxg-v2';
+    next.requirement.studio_template_id = 'tpl_xcbc2brsxg';
+    next.requirement.studio_version = 2;
+    next.execution.output_schema.properties.recommendation.enum.push('not_eligible');
+    const req = next.execution.tools.find((t: { id: string }) => t.id === 'information.request');
+    req.input_schema.properties.type.enum.push('custodian_appointment', 'minor_birth_record');
+    expect(await importTemplate(db, { requestedBy: ADMIN, file: '', apply: false, body: next })).toMatchObject({ outcome: 'would_create' });
+    const v2 = await importTemplate(db, { requestedBy: ADMIN, file: '', apply: true, body: next });
+    expect(v2).toMatchObject({ outcome: 'created', version: 2, status: 'DRAFT' });
+    const t2 = await db.template.findUniqueOrThrow({ where: { id: v2.templateId as string } });
+    expect(t2.lineageId).toBe((await db.template.findUniqueOrThrow({ where: { id: v1.templateId as string } })).lineageId);
+    // The decision values and request types live in the execution part, which Authoring keeps exactly as Studio sent it.
+    const stored = t2.anvilSpec as { execution: { output_schema: { properties: { recommendation: { enum: string[] } } }; tools: { id: string; input_schema: { properties: { type?: { enum: string[] } } } }[] } };
+    expect(stored.execution.output_schema.properties.recommendation.enum).toContain('not_eligible');
+    expect(stored.execution.tools.find((t) => t.id === 'information.request')!.input_schema.properties.type!.enum).toEqual(expect.arrayContaining(['custodian_appointment', 'minor_birth_record']));
+    // Until v2 is published, the existing test project (on v1) is the one there.
+    expect(await createTestProject(db, { storage }, { requestedBy: ADMIN, sourceProjectId: v8, apply: false })).toMatchObject({ outcome: 'already_created', projectId: first.projectId });
+    expect((await api().post(`/templates/${t2.id}/publish`, {})).statusCode).toBe(200);
+
+    // A new test project on v2, beside the v1 one (which is left as it is).
+    expect(await createTestProject(db, { storage }, { requestedBy: ADMIN, sourceProjectId: v8, apply: false })).toMatchObject({ outcome: 'would_create', template: { id: t2.id, version: 2 }, name: `${TEST_PROJECT_NAME} — run 2` });
+    const proj = await createTestProject(db, { storage }, { requestedBy: ADMIN, sourceProjectId: v8, apply: true });
+    expect(proj).toMatchObject({ outcome: 'created', tasks: 1 });
+    expect(await db.project.findUniqueOrThrow({ where: { id: proj.projectId as string } })).toMatchObject({ templateId: t2.id, templateVersion: 2, testOnly: true, status: 'IN_PROGRESS' });
+    expect(await createTestProject(db, { storage }, { requestedBy: ADMIN, sourceProjectId: v8, apply: false })).toMatchObject({ outcome: 'already_created', projectId: proj.projectId });
+    expect((await db.project.findUniqueOrThrow({ where: { id: first.projectId as string } })).templateVersion).toBe(1);
+
+    const made = await createTestTask(db, { requestedBy: ADMIN, projectId: proj.projectId as string, apply: true });
+    expect(made, JSON.stringify(made)).toMatchObject({ outcome: 'created' });
+    const task = await db.taskInstance.findUniqueOrThrow({ where: { id: made.taskId as string } });
+    expect(task.status).toBe('SUBMITTED');
+    const steps = (task.output as { sections: { S5: { steps: { tool: string; action: string }[] } } }).sections.S5.steps;
+    // The SOP: every check the procedure needs, in order, stated as duties (never "if X, refer").
+    const tools = steps.map((s) => s.tool);
+    for (const t of ['application.read', 'policy.read', 'documents.list', 'document.read', 'document.check', 'document.compare', 'identity.check', 'address.check', 'screening.check', 'authority.check', 'operation.read', 'finding.write', 'information.request', 'specialist.refer', 'recommend']) expect(tools, t).toContain(t);
+    expect(tools.indexOf('document.check')).toBeLessThan(tools.indexOf('identity.check'));
+    expect(tools.at(-1)).toBe('recommend');
+    for (const s of steps) expect(s.action).not.toMatch(/individual|adult joint|teen|custodial|CUTMA/i);
+  });
+
   it('import → Admin publishes → test project (testOnly, federal document only) → one synthetic task submitted → the owner approves → export says test_only and the covered types', async () => {
     const body = pending(structuredClone(PROPOSAL));
     expect(await importTemplate(db, { requestedBy: ADMIN, file: '', apply: false, body })).toMatchObject({ outcome: 'would_create' });

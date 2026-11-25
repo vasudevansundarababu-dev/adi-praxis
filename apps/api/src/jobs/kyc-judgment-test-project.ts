@@ -38,7 +38,9 @@ export const WORKFLOW = 'KYC Judgment v1';
 export const TEST_SME_EMAIL = 'kyc-judgment-test-sme@praxis.test';
 
 export interface TestProjectArgs {
-  phase: 'import' | 'project' | 'task';
+  phase: 'import' | 'project' | 'task' | 'retire-draft';
+  templateId?: string;
+  reason?: string;
   requestedBy: string;
   apply: boolean;
   file?: string;
@@ -47,7 +49,7 @@ export interface TestProjectArgs {
 }
 export function parseTestProjectArgs(argv: string[]): TestProjectArgs {
   const phase = argv[0];
-  if (phase !== 'import' && phase !== 'project' && phase !== 'task') throw new Error('kyc-judgment-test-project needs a phase: import | project | task');
+  if (phase !== 'import' && phase !== 'project' && phase !== 'task' && phase !== 'retire-draft') throw new Error('kyc-judgment-test-project needs a phase: import | project | task | retire-draft');
   const a: TestProjectArgs = { phase, requestedBy: '', apply: false };
   for (let i = 1; i < argv.length; i++) {
     const k = argv[i]!;
@@ -56,6 +58,8 @@ export function parseTestProjectArgs(argv: string[]): TestProjectArgs {
     else if (k === '--file' && argv[i + 1]) a.file = argv[++i]!;
     else if (k === '--source-project' && argv[i + 1]) a.sourceProjectId = argv[++i]!;
     else if (k === '--project' && argv[i + 1]) a.projectId = argv[++i]!;
+    else if (k === '--template' && argv[i + 1]) a.templateId = argv[++i]!;
+    else if (k === '--reason' && argv[i + 1]) a.reason = argv[++i]!;
     else throw new Error(`Unknown argument "${k}".`);
   }
   if (!a.requestedBy) throw new Error('--requested-by <admin email> is required');
@@ -71,17 +75,45 @@ const auditAs = (tx: Tx, clientId: string) => (a: AuditInput) => writeAudit(tx, 
 export async function importTemplate(db: Db, args: { requestedBy: string; file: string; apply: boolean; body?: unknown }): Promise<Report> {
   const admin = await adminOf(db, args.requestedBy);
   if (!admin) return refuse('The requester must be an active Admin.');
+  const body = args.body ?? (JSON.parse(readFileSync(args.file, 'utf8')) as unknown);
+  const formId = (body as { authoring?: { profile?: { profileId?: unknown } } }).authoring?.profile?.profileId;
   const existing = await db.template.findFirst({ where: { clientId: admin.clientId, workflowName: { equals: WORKFLOW, mode: 'insensitive' } }, orderBy: { version: 'desc' } });
-  if (existing) return { outcome: 'already_created', templateId: existing.id, version: existing.version, status: existing.status };
+  // The same form already stored (and not retired): done. A draft of another form blocks the next version.
+  if (existing && existing.status !== 'RETIRED' && existing.profileId === formId) return { outcome: 'already_created', templateId: existing.id, version: existing.version, status: existing.status };
+  if (existing?.status === 'DRAFT') return refuse(`Version ${existing.version} (${existing.profileId}) is still a draft: an Admin publishes or retires it first.`, { templateId: existing.id });
   const studio = await db.apiClient.findFirst({ where: { clientId: admin.clientId, kind: 'ANVIL', revokedAt: null }, orderBy: { createdAt: 'asc' } });
   if (!studio) return refuse('No active Studio (ANVIL) API client for this client, so the proposal cannot be attributed to Studio.');
-  const body = args.body ?? (JSON.parse(readFileSync(args.file, 'utf8')) as unknown);
   const r = await check(db, admin.clientId, body);
   if (!r.valid || !r.joint) return refuse('Authoring refuses the proposal.', { errors: r.errors.map((e) => `${e.pointer}: ${e.message}`) });
   if (!args.apply) return { outcome: 'would_create', workflow: WORKFLOW };
   const out = await db.$transaction(async (tx) => storeProposal(tx, { clientId: admin.clientId, apiClientId: studio.id }, r, body, auditAs(tx, admin.clientId)));
   await loadUploadedProfiles(db);
   return { outcome: 'created', templateId: out.draft.id, version: out.draft.version, status: out.draft.status, proposalId: out.proposal.id, next: 'An Admin publishes it: Templates → KYC Judgment v1 → Publish.' };
+}
+
+/**
+ * Retires one unpublished KYC Judgment v1 DRAFT that nothing uses (owner, 25 Nov 2026, via the coordinator: "Authoring
+ * may retire it"), so a correctly identified proposal can be stored as the next version. The console's Retire only
+ * takes published versions; this is the same state change for a draft, with the owner's words as the reason. Refused
+ * for anything else: another workflow, a published version, or a draft any project uses.
+ */
+export async function retireDraft(db: Db, args: { requestedBy: string; templateId: string; reason: string; apply: boolean }): Promise<Report> {
+  return db.$transaction(async (tx) => {
+    const admin = await adminOf(tx, args.requestedBy);
+    if (!admin) return refuse('The requester must be an active Admin.');
+    if (args.reason.trim().length < 5) return refuse('Give the reason (the owner’s words).');
+    const t = await tx.template.findFirst({ where: { id: args.templateId, clientId: admin.clientId } });
+    if (!t) return refuse('Template not found.');
+    if (t.workflowName.toLowerCase() !== WORKFLOW.toLowerCase()) return refuse(`Only a ${WORKFLOW} draft can be retired here.`);
+    if (t.status === 'RETIRED') return { outcome: 'already_created', templateId: t.id, status: t.status };
+    if (t.status !== 'DRAFT') return refuse(`Version ${t.version} is ${t.status}; only an unpublished draft is retired here (use the console for a published one).`);
+    const used = await tx.project.count({ where: { templateId: t.id } });
+    if (used) return refuse(`${used} project(s) use this draft.`);
+    if (!args.apply) return { outcome: 'would_create', templateId: t.id, version: t.version, profileId: t.profileId };
+    await tx.template.update({ where: { id: t.id }, data: { status: 'RETIRED', retiredAt: new Date() } });
+    await auditAs(tx, admin.clientId)({ entityType: 'Template', entityId: t.id, action: 'template.draft_retired', before: { status: 'DRAFT', version: t.version, profileId: t.profileId }, after: { status: 'RETIRED', reason: args.reason.trim(), requestedBy: admin.id } });
+    return { outcome: 'created', templateId: t.id, status: 'RETIRED' };
+  });
 }
 
 // ───────────────────────── Phase 2: project ─────────────────────────

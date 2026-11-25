@@ -5,7 +5,7 @@ import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MemoryStorage } from '../src/candidate/storage';
 import { buildRlGymExport } from '../src/anvil/rlgym-export';
-import { createTestProject, createTestTask, importTemplate, TEST_PROJECT_NAME } from '../src/jobs/kyc-judgment-test-project';
+import { createTestProject, createTestTask, importTemplate, retireDraft, TEST_PROJECT_NAME } from '../src/jobs/kyc-judgment-test-project';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { db, idem, login, resetDb, testConfig } from './helpers';
 
@@ -55,6 +55,27 @@ describe('KYC Judgment v1 integration test project (test-only)', () => {
   });
   afterAll(async () => {
     await app.close();
+  });
+
+  it('an unused draft is retired (owner’s words as the reason) so a correctly identified proposal becomes the next version; nothing else is retired here', async () => {
+    const first = await importTemplate(db, { requestedBy: ADMIN, file: '', apply: true, body: pending(structuredClone(PROPOSAL)) });
+    const second = structuredClone(PROPOSAL);
+    second.authoring.profile.profileId = 'kyc-judgment-v1-xcbc2brsxg-v1';
+    second.requirement.studio_template_id = 'tpl_xcbc2brsxg';
+    second.requirement.studio_version = 1;
+    // While the first draft exists, the next version can't be stored.
+    expect(await importTemplate(db, { requestedBy: ADMIN, file: '', apply: false, body: second })).toMatchObject({ outcome: 'refused', reason: expect.stringContaining('still a draft') });
+    expect((await importTemplate(db, { requestedBy: ADMIN, file: '', apply: false, body: pending(structuredClone(PROPOSAL)) })).outcome).toBe('already_created');
+    expect(await retireDraft(db, { requestedBy: ADMIN, templateId: first.templateId as string, reason: 'x', apply: true })).toMatchObject({ outcome: 'refused' });
+    expect(await retireDraft(db, { requestedBy: ADMIN, templateId: first.templateId as string, reason: 'Owner: "Authoring may retire it"', apply: false })).toMatchObject({ outcome: 'would_create' });
+    expect(await retireDraft(db, { requestedBy: ADMIN, templateId: first.templateId as string, reason: 'Owner: "Authoring may retire it"', apply: true })).toMatchObject({ outcome: 'created', status: 'RETIRED' });
+    expect((await db.auditEvent.findFirstOrThrow({ where: { action: 'template.draft_retired' } })).after).toMatchObject({ reason: 'Owner: "Authoring may retire it"' });
+    const next = await importTemplate(db, { requestedBy: ADMIN, file: '', apply: true, body: second });
+    expect(next).toMatchObject({ outcome: 'created', version: 2, status: 'DRAFT' });
+    expect((await db.template.findUniqueOrThrow({ where: { id: next.templateId as string } })).profileId).toBe('kyc-judgment-v1-xcbc2brsxg-v1');
+    // A published version is never retired by this job.
+    expect((await api().post(`/templates/${next.templateId as string}/publish`, {})).statusCode).toBe(200);
+    expect(await retireDraft(db, { requestedBy: ADMIN, templateId: next.templateId as string, reason: 'Owner: "Authoring may retire it"', apply: true })).toMatchObject({ outcome: 'refused' });
   });
 
   it('import → Admin publishes → test project (testOnly, federal document only) → one synthetic task submitted → the owner approves → export says test_only and the covered types', async () => {

@@ -2782,3 +2782,8 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
 - Nothing is approved by the job: the owner approves in the console (the six checklist ticks, then Approve).
 - S4 `expectedRules` is advisory (coordinator, 25 Nov), optional for every project (Studio's 6th form change).
 - A stratified selector's package entry carries `case_selector: {field, values, strategy: "stratified"}`.
+
+- `retire-draft --template <id> --reason "<owner words>"`: retires one unused, unpublished KYC Judgment v1 draft
+  (the console retires published versions only), audited with the reason; refused for anything else. Used once, 25 Nov
+  2026, for the draft imported without Studio identity (owner: "Authoring may retire it"). The import phase stores a
+  new version when the latest is published or retired with another form, and refuses while a draft of another form exists.

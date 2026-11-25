@@ -34,17 +34,27 @@ export function citationFromRule(field: ItemField, doc: LibraryDocumentView, rul
   const it: Record<string, unknown> = {};
   for (const f of itemFieldsOf(field)) it[f.key] = f.type === 'flag' ? false : '';
   it.ruleId = rule.ruleKey;
-  it.ruleVersion = rule.ruleVersionId;
   it.locator = locatorText(rule.locator, doc.title);
   it.quote = (rule.quote ?? '').trim() || rule.requirement;
+  if (citesByIdentity(field)) {
+    // KYC Judgment v1 C4: C1's rule identity, the same as the policy library export (never typed or shown).
+    it.ruleVersion = rule.version ?? null;
+    it.textSha256 = rule.textSha256 ?? '';
+    return it;
+  }
+  it.ruleVersion = rule.ruleVersionId;
   // KYC Judgment v1 A5: the exact version's content hash, so the export can send the clause (never typed or shown).
   if (rule.contentHash) it.contentSha256 = rule.contentHash;
   return it;
 }
 
+/** A form that cites by C1's identity (it declares textSha256): rule key, integer version and text SHA-256. */
+export const citesByIdentity = (field: ItemField) => itemFieldsOf(field).some((f) => f.key === 'textSha256');
+
 /** The published rule a stored citation points at (by its exact version), or null when it is not in the library. */
-export function ruleOf(lib: LibraryView | null, it: Record<string, unknown>): { doc: LibraryDocumentView; rule: LibraryRuleView } | null {
-  for (const doc of lib?.documents ?? []) for (const rule of doc.rules) if (rule.ruleVersionId === it.ruleVersion) return { doc, rule };
+export function ruleOf(lib: LibraryView | null, it: Record<string, unknown>, field?: ItemField): { doc: LibraryDocumentView; rule: LibraryRuleView } | null {
+  const byIdentity = field ? citesByIdentity(field) : false;
+  for (const doc of lib?.documents ?? []) for (const rule of doc.rules) if (byIdentity ? rule.ruleKey === it.ruleId && rule.version === it.ruleVersion : rule.ruleVersionId === it.ruleVersion) return { doc, rule };
   return null;
 }
 
@@ -83,7 +93,7 @@ export function RuleCitationPicker({
       .then((d) => d && setLib(d as LibraryView));
   }, [taskId, initialLibrary]);
   const ruleCount = lib?.documents.reduce((n, d) => n + d.rules.length, 0) ?? 0;
-  const isAdded = (r: LibraryRuleView) => items.some((it) => it.ruleVersion === r.ruleVersionId);
+  const isAdded = (r: LibraryRuleView) => items.some((it) => (citesByIdentity(field) ? it.ruleId === r.ruleKey && it.ruleVersion === r.version : it.ruleVersion === r.ruleVersionId));
   const add = () => {
     const fresh: Record<string, unknown>[] = [];
     for (const d of lib!.documents) for (const r of d.rules) if (picked.includes(r.ruleVersionId) && !isAdded(r)) fresh.push(citationFromRule(field, d, r));
@@ -116,7 +126,7 @@ export function RuleCitationPicker({
       {items.length > 0 && <p className="mt-2 text-xs text-fg-muted">{items.length} {items.length === 1 ? 'rule' : 'rules'} picked</p>}
       <ol className="mt-2 space-y-2">
         {items.map((it, i) => {
-          const hit = ruleOf(lib, it);
+          const hit = ruleOf(lib, it, field);
           const set = (k: string) => (v: unknown) => onChange(items.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
           return (
             <li key={i} className="min-w-0 rounded-md border border-line p-3 text-sm" data-rule-item>

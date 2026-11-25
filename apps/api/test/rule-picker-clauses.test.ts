@@ -88,6 +88,7 @@ describe('A5: the S4 rule picker stores the content hash, and its citations expo
         version: v.version,
         title: 'CA joint ID',
         obligation: QUOTE,
+        text_sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
         source: { document_id: expect.any(String), document_version: 1, sha256: expect.stringMatching(/^[0-9a-f]{64}$/), quote: QUOTE },
         approval: { approval_id: v.id, project_id: projectId, approved_by: expect.any(String), approved_at: expect.any(String) },
         condition: CA,

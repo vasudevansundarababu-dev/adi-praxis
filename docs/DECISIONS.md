@@ -2663,3 +2663,83 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
   changes. Otherwise each rule goes through "Apply to project" (the same checks), audited per rule
   (`policy.rule_applied`) plus `policy.rules_applied_batch`. A repeat with the same Idempotency-Key replays.
 - The AI never approves: no path leads from a suggestion to Reviewed. The PM's confirm is the approval.
+
+## D-069: the policy library export with its version chain (KYC Judgment v1 A4; contract C1 policy-library.v1 at Studio 1ba841d)
+
+- **What.** `POST …/policy/library-exports` builds the project's library as C1 and keeps it (`PolicyLibraryExport`,
+  append-only, additive migration) with its exact RFC 8785 bytes and their SHA-256. `GET …/library-exports` lists
+  them; `GET …/library-exports/:revision` returns the exact bytes, with the SHA-256 in `x-policy-library-sha256`. The
+  bytes are checked against Studio's C1 schema in tests (the contract files are copied into the test fixtures).
+- **Which rules.** Every approved rule of the project, distractors included, never filtered by the owner's mandatory
+  marking (C1 has no marking). A rule whose latest version is excluded, or was unticked, is left out. Drafts never appear.
+- **Version chain.** Each rule carries every approved version, oldest first, with Authoring's own version numbers (gaps
+  allowed); an unapply and re-apply copy with the same content collapses into the version before it. Later versions name
+  `supersedes` and need the PM's C1 `change`. Rule sets are unchanged (they keep the latest version per rule); the chain
+  is read from the immutable approved versions.
+- **Identity.** (rule key, version, text_sha256). `text` is the PM-approved requirement wording and `text_sha256` the
+  SHA-256 of its UTF-8 bytes; `source.quote` is the verbatim passage. Rule keys are Authoring's (`R-…`).
+- **Both texts travel** (coordinator, 25 Nov; spec §16: `policy.read` serves the source text, as an environment
+  setting). Each version also carries `requirement` (the PM-approved wording, equal to `text`) and `source_text` (the
+  verbatim passage with enough context to stand alone: its whole sentence, or for a list item or fragment its whole
+  paragraph with the line that introduces it), with `source_text_sha256`. Which one is served is the environment's
+  setting; the identity hash stays on the approved wording, so task citations never change. Studio adds the three
+  fields to C1.
+- **Effective.** `scenario_only` when the PM marks the version so (never the first version); otherwise `from_date`, from
+  the rule's date or else its document's.
+- **Documents.** The PM sets each document's kind (official text or bank policy) and ISO jurisdiction
+  (`PUT …/policy/documents/:id/library`, audited; additive columns). An official text needs where and when it was
+  downloaded; its `capture.sha256` is the uploaded version's SHA-256.
+- **Revisions.** The same library returns the stored export (same bytes, same revision); a changed library is the next
+  revision. Exports never change once written.
+- **Never guessed.** A missing condition (null must be set explicitly), library part, date, resolved quote, document kind
+  or ISO jurisdiction, or a condition that fails the catalog, refuses the export with the whole list
+  (`LIBRARY_NOT_EXPORTABLE`); nothing is stored.
+
+## D-070: S4 citations by C1 identity, and C4's private expectedRules (KYC Judgment v1, A5 follow-up)
+
+- **Why.** C1 makes (rule key, integer version, text_sha256) the only rule identity. C4's S4 `expectedRules` is a
+  private policy_citation declaring `ruleId`, a number `ruleVersion`, `textSha256` and long-text notes, which Authoring
+  refused at registration (review of the contracts, 25 Nov).
+- **Registration.** A policy_citation that is private as a whole keeps every sub-field private and declares only the
+  ones it uses; it may declare `textSha256` (text) and a number `ruleVersion`, and its note sub-fields may be text or
+  long text. An unknown or retyped identity sub-field, or an agent-visible sub-field in a private citation, is still
+  refused. Agent-visible citations (Marketing) are unchanged. The agent never sees a private citation.
+- **Picker.** A form that declares `textSha256` stores C1's identity: the rule key, the version number and the text
+  SHA-256 from the library (which now gives each published version both). Other forms keep version-id citations (D-064).
+- **Export and checks.** An identity citation resolves to the project's rule with that key and version whose text hashes
+  to the cited value; otherwise it is a blocking `UNRESOLVED_CLAUSE` and nothing is exported for it. Every
+  `policy_clauses` entry now carries `text_sha256` (approved-task-export.v1, additive). One function computes the hash
+  for the library export, the clauses and the picker.
+
+## D-071: the US-person definition is flagged until approved (owner, 25 Nov 2026: Option A, citizenship only)
+
+- The review queue returns `projectFlags`: `us_person_undefined` while no approved rule `defines` us_person, when the
+  project's catalog has citizenship or a rule names us_person. The definition is data (D-066): under CIP a U.S. person is
+  a U.S. citizen, and residency does not count.
+- A rule whose condition names a derived fact whose definition is not approved yet is flagged `definition_not_approved`,
+  so it can't be confirmed in a batch before its definition.
+
+## D-072: one task covers every application type (KYC Judgment v1 §16, owner, 25 Nov 2026)
+
+- A template's case selector may say `strategy: "stratified"`. It must then read a required multi-select
+  (`S1.coveredApplicationTypes`) whose options are its values. The project's target is 1, and it gets ONE slot with no
+  fixed case. `per_value` (the default) is unchanged: one slot and one task per value.
+- The export sends the task's covered list as `case_selector.application_types` (in the selector's order, values only),
+  with its edge cases. Every other template's selector is exactly as before.
+- Validate warns (`ACCOUNT_TYPE_NAMED`, never a block) when agent-visible wording names one type: by the template's
+  `validateHints` (fields, words and message, from Studio) when it has them, otherwise by the selector's values and labels.
+
+## D-073: test-only projects (RL Gym, 25 Nov 2026)
+
+- `Project.testOnly` (additive column, false for every existing project), set only when a test job creates the project.
+- Its exports carry the top-level boolean `test_only: true` (rlgym.project-export.v1). The RL Gym keeps it for the
+  project, labels it TEST and never puts it on a leaderboard. Other projects send nothing, so their export bodies and
+  export ids are byte-identical to before.
+
+## D-074: importing a library-based template (KYC Judgment v1 C4)
+
+- An `anvil.template-execution.v2` template whose rules come from the policy library (it binds a fact catalog,
+  `execution.policy_bindings`) may omit `federalPolicies`; any it sends are still checked. Others still need them.
+- The pack template may carry Studio's `validateHints` (D-072).
+- New append-only tables (PolicyRuleSuggestion, PolicyCoverageResult, PolicyLibraryExport) are on the app role's revoke
+  list, so the application can never update or delete their rows on Cloud SQL either.

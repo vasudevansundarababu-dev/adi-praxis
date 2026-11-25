@@ -1,4 +1,4 @@
-import { conditionLabel, conditionProblems, PolicyRuleBody, type FactCatalog } from '@praxis/shared';
+import { conditionFacts, conditionLabel, conditionProblems, PolicyRuleBody, type FactCatalog } from '@praxis/shared';
 import type { Db, Tx } from '../db';
 import { conditionCatalog } from './fact-catalog';
 import { currentVersions, reviewProblems } from './rules';
@@ -20,6 +20,10 @@ interface Context {
   approvedBefore: Set<string>;
   coverage: Map<string, { status: string; gaps: unknown; environmentVersionId: string; checkedAt: Date }>;
   suggestions: Map<string, { source: string; content: unknown }[]>;
+  /** Derived facts some approved (Reviewed) rule version defines. */
+  approvedDefinitions: Set<string>;
+  /** Derived facts some rule defines, approved or not. */
+  derivedIds: Set<string>;
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -44,6 +48,9 @@ export function queueFlags(item: Current, ctx: Context): QueueFlag[] {
   if (missing.length) flags.push({ code: 'library_incomplete', message: `Missing for the policy library: ${missing.join(', ')}.` });
   if (lib.effectiveMode !== 'scenario_only' && !body.effective.from && !v.citations.some((c) => c.documentVersion.document.effectiveFrom)) flags.push({ code: 'no_effective_date', message: 'No date the rule is in force from: set it on the rule or on its document.' });
   if (ctx.approvedBefore.has(item.rule.id) && !lib.change) flags.push({ code: 'change_missing', message: 'This is a new version of an approved rule: say how it changes the version before it (contradicts, withdraws, tightens, narrows or clarifies).' });
+  // A condition naming a derived fact (such as us_person) needs that fact's definition approved first.
+  const unapproved = body.condition ? conditionFacts(body.condition).filter((f) => ctx.derivedIds.has(f) && !ctx.approvedDefinitions.has(f)) : [];
+  if (unapproved.length) flags.push({ code: 'definition_not_approved', message: `This rule depends on ${unapproved.join(', ')}, whose definition rule is not approved yet. Approve the definition first.` });
   const cov = ctx.coverage.get(`${v.id}:${v.contentHash}`);
   if (cov && cov.status !== 'supported') {
     const gaps = (Array.isArray(cov.gaps) ? cov.gaps : []).filter(isObj).map((g) => String(g.message ?? g.ref ?? '')).filter(Boolean);
@@ -57,21 +64,52 @@ export function queueFlags(item: Current, ctx: Context): QueueFlag[] {
   return flags;
 }
 
+/** Derived facts the project's approved (Reviewed) rule versions define, and every derived fact any rule defines. */
+async function definitions(tx: Db | Tx, projectId: string) {
+  const versions = await tx.policyRuleVersion.findMany({ where: { rule: { projectId } }, select: { body: true, state: true } });
+  const approved = new Set<string>();
+  const all = new Set<string>();
+  for (const v of versions) {
+    const id = PolicyRuleBody.safeParse(v.body).data?.library?.defines?.id;
+    if (!id) continue;
+    all.add(id);
+    if (v.state === 'REVIEWED') approved.add(id);
+  }
+  return { approved, all };
+}
+
+/**
+ * Flags about the library as a whole. Owner, 25 Nov 2026 (Option A): "US person" is derived from citizenship alone, and
+ * the PM's approved definition rule must say so; until an approved rule defines `us_person`, the project is flagged
+ * (when its catalog has citizenship, or a rule names us_person).
+ */
+export async function projectFlags(tx: Db | Tx, projectId: string): Promise<QueueFlag[]> {
+  const [catalog, defs, conds] = await Promise.all([
+    conditionCatalog(tx, projectId),
+    definitions(tx, projectId),
+    tx.policyRuleVersion.findMany({ where: { rule: { projectId } }, select: { body: true } }),
+  ]);
+  const named = conds.some((v) => { const c = PolicyRuleBody.safeParse(v.body).data?.condition; return !!c && conditionFacts(c).includes('us_person'); });
+  const relevant = !!catalog?.facts.some((f) => f.id === 'citizenship') || named;
+  return relevant && !defs.approved.has('us_person') ? [{ code: 'us_person_undefined', message: 'No approved rule defines “US person”. Under the CIP rule a U.S. person is a U.S. citizen (residency does not count): approve the rule that says so, with its `defines` set to us_person from citizenship.' }] : [];
+}
+
 async function context(tx: Db | Tx, projectId: string, items: Current[]): Promise<Context> {
   const ids = items.map((i) => i.version.id);
   const ruleIds = items.map((i) => i.rule.id);
-  const [catalog, approved, coverage, suggestions] = await Promise.all([
+  const [catalog, approved, coverage, suggestions, defs] = await Promise.all([
     conditionCatalog(tx, projectId),
     tx.policyRuleVersion.findMany({ where: { ruleId: { in: ruleIds }, state: 'REVIEWED' }, select: { ruleId: true, id: true } }),
     tx.policyCoverageResult.findMany({ where: { ruleVersionId: { in: ids } }, orderBy: { createdAt: 'asc' } }),
     tx.policyRuleSuggestion.findMany({ where: { ruleVersionId: { in: ids } }, orderBy: { createdAt: 'asc' } }),
+    definitions(tx, projectId),
   ]);
   const latestIds = new Set(ids);
   const cov = new Map<string, Context['coverage'] extends Map<string, infer V> ? V : never>();
   for (const c of coverage) cov.set(`${c.ruleVersionId}:${c.contentHash}`, { status: c.status, gaps: c.gaps, environmentVersionId: c.environmentVersionId, checkedAt: c.checkedAt });
   const sugg = new Map<string, { source: string; content: unknown }[]>();
   for (const s of suggestions) sugg.set(`${s.ruleVersionId}:${s.contentHash}`, [...(sugg.get(`${s.ruleVersionId}:${s.contentHash}`) ?? []), { source: s.source, content: s.content }]);
-  return { catalog, approvedBefore: new Set(approved.filter((a) => !latestIds.has(a.id)).map((a) => a.ruleId)), coverage: cov, suggestions: sugg };
+  return { approvedDefinitions: defs.approved, derivedIds: defs.all, catalog, approvedBefore: new Set(approved.filter((a) => !latestIds.has(a.id)).map((a) => a.ruleId)), coverage: cov, suggestions: sugg };
 }
 
 /** The drafts of a project in queue order: flagged first (most flags first), then by rule key. */

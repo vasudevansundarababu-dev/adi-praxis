@@ -8,3 +8,7 @@ reading another repository. Do not edit these files; copy them again when Studio
 - `kyc-judgment-openenv.fact-catalog.json`: the C2 catalog.
 - `kyc-judgment.policy-library.json`: Studio's valid C1 fixture (fixture wording, not approved rules).
 - `rejected-unreviewed-rule.policy-library.json`: Studio's rejected fixture (an unreviewed version).
+- `kyc-judgment-v1.proposal.json`: the joint `praxis.anvil.template-spec.v1` proposal Studio's own builder
+  (`utility/integrations/praxis_wire.joint_proposal`, Studio ab1f684) makes from C4's
+  `kyc-judgment-v1.template.json`, with no Studio template id or version yet (so the form id is
+  `kyc-judgment-v1-none-none`).

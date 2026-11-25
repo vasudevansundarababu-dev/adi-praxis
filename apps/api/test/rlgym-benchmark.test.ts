@@ -417,6 +417,11 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     const refused = await db.$transaction((tx) => buildRlGymExport(tx, p, records, ref, { exported: true, policyIdMap: wrong }));
     for (const t of refused.body.tasks as Record<string, unknown>[]) expect(t).not.toHaveProperty('policy_id_map');
     expect(refused.tasks.find((t) => t.taskId === records[0]!.taskInstanceId)!.policyIdsUnmapped![0]!.message).toMatch(/KYC-09/);
+    // KYC Judgment v1: a test-only project sends top-level test_only: true (a new export id); others send nothing.
+    expect(mapped.body).not.toHaveProperty('test_only');
+    const test = await db.$transaction((tx) => buildRlGymExport(tx, { ...p, testOnly: true }, records, ref, { exported: true, policyIdMap: map }));
+    expect(test.body.test_only).toBe(true);
+    expect(test.exportId).not.toBe(mapped.exportId);
     // Nothing about the tasks or their approvals changed.
     expect(await db.approvedTaskRecord.findMany({ where: { projectId }, orderBy: { seq: 'asc' } })).toEqual(before);
   });

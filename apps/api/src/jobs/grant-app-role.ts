@@ -1,7 +1,7 @@
 import type { Db } from '../db';
 
 /** Tables the application may only read and append to (SPEC Security; enforced also by triggers). */
-export const APPEND_ONLY_TABLES = ['ApprovedTaskRecord', 'AuthoredTaskPackage', 'RLReviewRecord', 'AuditEvent', 'SelectionDecision', 'TaskReview', 'CandidateStateEvent', 'SmeStanding', 'EarningEntry', 'PartnerFeeEntry', 'PolicyDocumentVersion', 'ProjectRuleSet', 'TaskPolicySnapshot', 'ExtractionSpend', 'ProjectValidationRun', 'UploadedProfile', 'TemplateProposal', 'TemplateQualification', 'AnvilRevocationEvent', 'PolicyRuleAnnotationRevision', 'RubricRecommendationRun', 'RubricCriterionAnnotation', 'RubricTaskSources', 'TutorialSpend', 'RlGymProjectExport', 'RunReviewBatch', 'RunReviewDecision', 'RunReviewAssignment', 'ProjectFactCatalog', 'TaskHoldRelease', 'PolicyReferenceSet', 'PolicyQualityRun'] as const;
+export const APPEND_ONLY_TABLES = ['ApprovedTaskRecord', 'AuthoredTaskPackage', 'RLReviewRecord', 'AuditEvent', 'SelectionDecision', 'TaskReview', 'CandidateStateEvent', 'SmeStanding', 'EarningEntry', 'PartnerFeeEntry', 'PolicyDocumentVersion', 'ProjectRuleSet', 'TaskPolicySnapshot', 'ExtractionSpend', 'ProjectValidationRun', 'UploadedProfile', 'TemplateProposal', 'TemplateQualification', 'AnvilRevocationEvent', 'PolicyRuleAnnotationRevision', 'RubricRecommendationRun', 'RubricCriterionAnnotation', 'RubricTaskSources', 'TutorialSpend', 'RlGymProjectExport', 'RunReviewBatch', 'RunReviewDecision', 'RunReviewAssignment', 'ProjectFactCatalog', 'TaskHoldRelease', 'PolicyReferenceSet', 'PolicyQualityRun', 'PolicyRuleSuggestion', 'PolicyCoverageResult', 'PolicyLibraryExport'] as const;
 
 /**
  * Grants the runtime database role what the app needs, and nothing more: read/write on ordinary tables, read and

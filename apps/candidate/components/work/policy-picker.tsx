@@ -15,6 +15,9 @@ export interface LibraryRuleView {
   ruleVersionId: string;
   /** The published version's content hash (KYC Judgment v1 A5); the rule picker stores it with the citation. */
   contentHash?: string | null;
+  /** C1 identity (KYC Judgment v1 C4): Authoring's integer version and the text SHA-256. */
+  version?: number | null;
+  textSha256?: string;
   title: string;
   requirement: string;
   marking: string | null;

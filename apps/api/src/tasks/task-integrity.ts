@@ -1,6 +1,7 @@
 import type { ApprovedTaskRecord, Template } from '@prisma/client';
-import { agentProjection, followUpsOf, type TaskCheck, type TemplateProfile } from '@praxis/shared';
-import { citedRules, citedRuleVersions } from '../anvil/clause-export';
+import { agentProjection, followUpsOf, typeSpecificWording, type TaskCheck, type TemplateProfile } from '@praxis/shared';
+import { caseSelectorOf as templateCaseSelector, selectorField } from './task-service';
+import { citedClauseVersions, citedRuleIdentities, citedRules, citedRuleVersions } from '../anvil/clause-export';
 import { actorProjection } from '../anvil/generic-package';
 import { jcsSha256 } from '../anvil/jcs';
 import { jointTemplateSpec } from '../anvil/joint-template';
@@ -241,14 +242,40 @@ export function snapshotProblems(template: Template, output: unknown, benchmark:
   const extra = ['edgeCase', 'archetype', 'complexity'].flatMap((k) => (str(bench[k]) ? [{ path: `benchmark.${k}`, text: str(bench[k]) }] : []));
   const spec = jointTemplateSpec(template);
   const ids = spec ? declaredToolIds(spec.execution) : null;
-  return [...stepTools(sections, ids ? new Set(ids) : null), ...outcomeBranches(sections), ...scoring(sections, form), ...privateLeaks(sections, form, agentView(template, output, form, joint), extra)];
+  const view = agentView(template, output, form, joint);
+  return [...stepTools(sections, ids ? new Set(ids) : null), ...outcomeBranches(sections), ...typeWording(template, view), ...scoring(sections, form), ...privateLeaks(sections, form, view, extra)];
+}
+
+/**
+ * KYC Judgment v1 §16 (owner, 25 Nov 2026): a task that covers every application type is written once, for all of them.
+ * Agent-visible wording that names one type is a warning (never a block): the case, not the task, brings the type.
+ */
+function typeWording(template: Template, view: unknown): TaskProblem[] {
+  const sel = templateCaseSelector(template.caseSelector);
+  if (!sel || selectorField(template, sel.source)?.type !== 'multi_select') return [];
+  const sections = isObj(view) && isObj((view as { sections?: unknown }).sections) ? ((view as { sections: Record<string, unknown> }).sections) : {};
+  // Studio's own hints (authoring.template.validateHints) say which fields and words to check, when the template has them.
+  const hints = (jointTemplateSpec(template)?.authoring.template as { validateHints?: { fields: string[]; warn_when_mentions: string[]; message: string }[] } | undefined)?.validateHints;
+  if (hints?.length) {
+    const out: TaskProblem[] = [];
+    for (const h of hints)
+      for (const path of h.fields) {
+        const [sk, fk] = path.split('.') as [string, string];
+        const v = isObj(sections[sk]) ? (sections[sk] as Record<string, unknown>)[fk] : undefined;
+        const text = JSON.stringify(v ?? '').toLowerCase();
+        const term = h.warn_when_mentions.find((w) => new RegExp(`(^|[^a-z])${w.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z]|$)`).test(text));
+        if (term) out.push({ code: 'ACCOUNT_TYPE_NAMED', section: sk, field: path, severity: 'warning', owner: 'author', retryHelps: false, message: `${h.message} ${path} mentions "${term}".` });
+      }
+    return out;
+  }
+  return typeSpecificWording(sel, sections).map((h) => ({ code: 'ACCOUNT_TYPE_NAMED', section: h.path.split('.')[0]!, field: h.path, severity: 'warning' as const, owner: 'author' as const, retryHelps: false, message: `This task covers every application type, but ${h.path} names one ("${h.term}"). Write it so it fits every type; the case brings its own.` }));
 }
 
 /**
  * The checks that read the database: every S4 clause the task cites resolves to a clause version the PM approved (by
  * the time of approval); an approved record still belongs to the project's template version.
  */
-export async function referenceProblems(tx: Db | Tx, ctx: { clientId: string; projectTemplateId?: string | null; output: unknown; record?: Pick<ApprovedTaskRecord, 'templateId' | 'templateVersion' | 'createdAt'> | null }): Promise<TaskProblem[]> {
+export async function referenceProblems(tx: Db | Tx, ctx: { clientId: string; projectId?: string | null; taskId?: string | null; projectTemplateId?: string | null; output: unknown; record?: Pick<ApprovedTaskRecord, 'templateId' | 'templateVersion' | 'createdAt'> | null }): Promise<TaskProblem[]> {
   const out: TaskProblem[] = [];
   const at = ctx.record?.createdAt ?? new Date();
   const cited = citedRules(authoredContent(ctx.output)).filter((c) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.ruleId));
@@ -272,6 +299,16 @@ export async function referenceProblems(tx: Db | Tx, ctx: { clientId: string; pr
     const why = !v ? 'no longer exists in the policy library at the version picked' : !v.reviewedAt || v.reviewedAt > at ? 'was not approved when the task was approved' : !v.citations.length ? 'has no source citation' : null;
     if (why) out.push({ code: 'UNRESOLVED_CLAUSE', section: 'S4', field: `S4 rule ${c.ruleKey}`, severity: 'blocking', owner: !v ? 'author' : 'pm', retryHelps: false, message: `A policy rule the task cites ${why}. ${!v ? 'Pick the rule again from the library in S4.' : 'The PM approves the rule version, then the task is approved again.'}` });
   }
+  // C1 identity citations (KYC Judgment v1 C4): the project's rule with that key and version, whose text hashes to it.
+  const identities = citedRuleIdentities(authoredContent(ctx.output));
+  if (identities.length) {
+    const projectId = ctx.projectId ?? (ctx.taskId ? (await tx.taskInstance.findUnique({ where: { id: ctx.taskId }, select: { projectId: true } }))?.projectId ?? null : null);
+    const resolved = await citedClauseVersions(tx, ctx.clientId, { sections: { S4: { identities: identities.map((c) => ({ ruleId: c.ruleKey, ruleVersion: c.version, textSha256: c.textSha256 })) } } }, projectId);
+    for (const { citation, version: v } of resolved) {
+      const why = !v ? 'is not in the project’s policy library at the version and text cited' : !v.reviewedAt || v.reviewedAt > at ? 'was not approved when the task was approved' : !v.citations.length ? 'has no source citation' : null;
+      if (why) out.push({ code: 'UNRESOLVED_CLAUSE', section: 'S4', field: `S4 rule ${citation}`, severity: 'blocking', owner: !v ? 'author' : 'pm', retryHelps: false, message: `A policy rule the task cites ${why}. ${!v ? 'Pick the rule again from the library in S4.' : 'The PM approves the rule version, then the task is approved again.'}` });
+    }
+  }
   if (ctx.record && ctx.projectTemplateId && ctx.record.templateId !== ctx.projectTemplateId)
     out.push({ code: 'APPROVAL_STALE', section: 'S1', field: null, severity: 'blocking', owner: 'pm', retryHelps: false, message: `The task was approved on template version ${ctx.record.templateVersion}, but the project now uses another version. Send it back for rework so it is approved on the current version.` });
   return out;
@@ -287,7 +324,7 @@ export async function taskCheckReport(
   record: Pick<ApprovedTaskRecord, 'id' | 'templateId' | 'templateVersion' | 'createdAt'> | null = null,
 ): Promise<TaskCheckReport> {
   const template = t.project.template;
-  const found = [...snapshotProblems(template, output, t.benchmark ?? null), ...(await referenceProblems(tx, { clientId: t.clientId, projectTemplateId: t.project.templateId ?? template.id, output, record }))];
+  const found = [...snapshotProblems(template, output, t.benchmark ?? null), ...(await referenceProblems(tx, { clientId: t.clientId, taskId: t.id, projectTemplateId: t.project.templateId ?? template.id, output, record }))];
   const gap = record && record.createdAt < STRONGER_CHECKS_FROM ? CHECKS_GAP : null;
   const problems = gap ? found.map((p) => ({ ...p, severity: 'warning' as const, message: `${p.message} (Approved before the stronger checks: shown as a warning; the task still exports and runs.)` })) : found;
   return {

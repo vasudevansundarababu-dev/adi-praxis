@@ -26,6 +26,8 @@ export interface QueueRow {
 }
 export interface QueueData {
   items: QueueRow[];
+  /** Flags about the library as a whole (for example: no approved rule defines "US person"). */
+  projectFlags?: { code: string; message: string }[];
   flagged: number;
   total: number;
   studioConnected: boolean;
@@ -66,6 +68,13 @@ export function ReviewQueuePanel({ projectId, initial }: { projectId: string; in
       <p className="text-sm text-fg-muted">
         {data.total ? `${data.total} rules to review, ${data.flagged} flagged.` : 'No draft rules to review.'} Read each rule against its source quote. AI suggestions are not approval: ticking and confirming a rule is your approval. Flagged rules are reviewed one at a time on their own page.
       </p>
+      {(data.projectFlags ?? []).length > 0 && (
+        <ul className="mt-2 space-y-1 text-sm text-warning" data-project-flags>
+          {data.projectFlags!.map((f) => (
+            <li key={f.code}>{f.message}</li>
+          ))}
+        </ul>
+      )}
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" className="btn btn-secondary" disabled={!!busy} onClick={() => run('enrich', `/projects/${projectId}/policy/enrichment`, {}, () => 'Suggesting library details for the drafts. Reload in a minute to see them.')}>
           {busy === 'enrich' ? 'Starting…' : 'Suggest library details (AI)'}

@@ -1,4 +1,4 @@
-import { builtInItemFields, itemFieldsOf, type ItemField } from './helpers';
+import { builtInItemFields, CITATION_IDENTITY_FIELDS, itemFieldsOf, type ItemField } from './helpers';
 import { FIELD_TYPES, SECTION_KEYS, TemplateProfileSchema, type ProfileCondition, type RequiredRule, type TemplateProfile } from './schema';
 
 /**
@@ -225,18 +225,26 @@ export const isUploadedProfile = (id: string) => uploaded.has(id);
  */
 function citationVisibilityProblems(f: ItemField, path: string): string[] {
   const out: string[] = [];
-  const builtIn = new Map(builtInItemFields(f).map((x) => [x.key, x]));
+  const builtIn = new Map([...builtInItemFields(f), ...CITATION_IDENTITY_FIELDS].map((x) => [x.key, x]));
   const isPrivate = (x: { visibility?: string }) => (x.visibility ?? 'author_and_agent') !== 'author_and_agent';
+  // KYC Judgment v1 (C4): a citation field that is private as a whole (the SME's expected rules) keeps every sub-field
+  // private and declares only the ones it uses; the agent never sees the field.
+  const wholePrivate = isPrivate(f);
+  // C4 writes the SME's notes as long text; in a private citation text and long text are the same kind of value.
+  const TEXTUAL = new Set(['text', 'long_text']);
+  const IDENTITY = new Set(['ruleId', 'ruleVersion', 'textSha256']);
   const declared = new Map<string, ItemField>();
   for (const d of f.itemFields ?? []) {
     const b = builtIn.get(d.key);
     if (!b) out.push(`${path}.${d.key}: not a policy citation sub-field`);
-    else if (b.type !== d.type) out.push(`${path}.${d.key}: must keep its type ${b.type}`);
-    else if (isPrivate(b) && !isPrivate(d)) out.push(`${path}.${d.key}: is private in ADI Forge and must stay private`);
+    else if (b.type !== d.type && !(d.key === 'ruleVersion' && d.type === 'number') && !(wholePrivate && !IDENTITY.has(d.key) && TEXTUAL.has(b.type) && TEXTUAL.has(d.type))) out.push(`${path}.${d.key}: must keep its type ${b.type}`);
+    else if (wholePrivate) {
+      if (!isPrivate(d)) out.push(`${path}.${d.key}: is in a private field and must stay private`);
+    } else if (isPrivate(b) && !isPrivate(d)) out.push(`${path}.${d.key}: is private in ADI Forge and must stay private`);
     else if (!isPrivate(b) && isPrivate(d)) out.push(`${path}.${d.key}: is shown to the agent in ADI Forge and must stay agent-visible`);
     if (declared.has(d.key)) out.push(`${path}.${d.key}: duplicate field key`);
     declared.set(d.key, d);
   }
-  for (const b of builtIn.values()) if (!isPrivate(b) && !declared.has(b.key)) out.push(`${path}: declare the agent-visible sub-field ${b.key}`);
+  if (!wholePrivate) for (const b of builtInItemFields(f)) if (!isPrivate(b) && !declared.has(b.key)) out.push(`${path}: declare the agent-visible sub-field ${b.key}`);
   return out;
 }

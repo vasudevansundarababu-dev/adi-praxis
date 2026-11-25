@@ -600,6 +600,9 @@ enum ReviewRoute {
 
 model Project {
   id                       String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// KYC Judgment v1 (RL Gym, 25 Nov 2026): a test-only project (integration tests). Its exports carry `test_only: true`;
+  /// the RL Gym labels it TEST and never puts it on a leaderboard. Set only when the project is created by a test job.
+  testOnly                 Boolean              @default(false) @map("test_only")
   clientId                 String               @map("client_id") @db.Uuid
   ownerId                  String               @map("owner_id") @db.Uuid
   templateId               String               @map("template_id") @db.Uuid
@@ -2967,6 +2970,11 @@ model PolicyDocument {
   effectiveFrom DateTime? @map("effective_from") @db.Date
   effectiveTo   DateTime? @map("effective_to") @db.Date
   latestVersion Int       @default(0) @map("latest_version")
+  /// KYC Judgment v1 A4 (C1): official_text (statute or regulation) or bank_policy. Null until the PM sets it.
+  libraryKind   String?   @map("library_kind")
+  /// C1 capture provenance of an official text: where and when it was downloaded (its sha256 is the version's).
+  captureSourceUrl    String?   @map("capture_source_url")
+  captureDownloadedOn DateTime? @map("capture_downloaded_on") @db.Date
   createdById   String    @map("created_by_id")
   archivedAt    DateTime? @map("archived_at")
   createdAt     DateTime  @default(now()) @map("created_at")
@@ -3860,6 +3868,28 @@ model PolicyCoverageResult {
 
   @@index([ruleVersionId, contentHash, createdAt])
   @@index([projectId, createdAt])
+}
+
+/// KYC Judgment v1 A4 (owner, 25 Nov 2026; contract C1): one policy library export (policy-library.v1), its exact bytes
+/// (RFC 8785 JSON) and their SHA-256. The revision increases only when the library's content changes; the same library
+/// returns the stored export. Append-only.
+model PolicyLibraryExport {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  revision      Int
+  exportId      String   @map("export_id")
+  /// SHA-256 of the library without its export block (what decides whether anything changed).
+  contentSha256 String   @map("content_sha256")
+  bytes         String
+  bytesSha256   String   @map("bytes_sha256")
+  rules         Int
+  versions      Int
+  createdById   String   @map("created_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([projectId, revision])
+  @@index([projectId, contentSha256])
 }
 
 /// E-001 §6b (owner, 24 Nov 2026): a batch of edge-case variants a PM sends one SME (or answers as Admin) for their

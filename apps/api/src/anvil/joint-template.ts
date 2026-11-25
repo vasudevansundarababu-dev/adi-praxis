@@ -116,7 +116,12 @@ export function checkJointProposal(body: Record<string, unknown>): { issues: Joi
     // K5 (12 Nov 2026): v2 carries template-level federal policies as immutable references; bank rules stay in `rules`.
     if (ex.schema_version === 'anvil.template-execution.v2') {
       const fp = ex.federalPolicies;
-      if (!Array.isArray(fp) || !fp.length) issues.push(issue('TP_SPEC_SHAPE', '/execution/federalPolicies', 'anvil.template-execution.v2 needs federalPolicies.', 'List each federal policy as {id, version, content_sha256, publication_ref}.'));
+      // KYC Judgment v1 (C1/C4): a template whose rules come from the project's policy library binds a fact catalog
+      // (execution.policy_bindings) and needs no template-level federal policies; any it sends are still checked.
+      const fromLibrary = isObj(ex.policy_bindings) && fp === undefined;
+      if (fromLibrary) {
+        /* rules come from the policy library (C1) */
+      } else if (!Array.isArray(fp) || !fp.length) issues.push(issue('TP_SPEC_SHAPE', '/execution/federalPolicies', 'anvil.template-execution.v2 needs federalPolicies.', 'List each federal policy as {id, version, content_sha256, publication_ref}.'));
       else
         fp.forEach((f, i) => {
           const ok = isObj(f) && typeof f.id === 'string' && !!f.id && typeof f.version === 'string' && !!f.version && typeof f.content_sha256 === 'string' && /^[0-9a-f]{64}$/.test(f.content_sha256) && typeof f.publication_ref === 'string' && !!f.publication_ref;

@@ -73,6 +73,16 @@ describe('S4 rule picker (D21)', () => {
     expect(citationFromRule(field, doc, doc.rules[1]!)).not.toHaveProperty('contentSha256');
   });
 
+  it('KYC Judgment v1 C4: a form that declares textSha256 stores C1’s identity (rule key, integer version, text SHA-256)', () => {
+    const doc = LIB.documents[0]!;
+    const c4 = { ...field, visibility: 'private_reference', itemFields: [{ key: 'ruleId', type: 'text', label: 'R', help: 'R', visibility: 'private_reference' }, { key: 'ruleVersion', type: 'number', label: 'V', help: 'V', visibility: 'private_reference' }, { key: 'textSha256', type: 'text', label: 'H', help: 'H', visibility: 'private_reference' }] } as typeof field;
+    const it1 = citationFromRule(c4, doc, { ...doc.rules[0]!, version: 3, textSha256: 'e'.repeat(64), contentHash: 'd'.repeat(64) });
+    expect(it1).toMatchObject({ ruleId: 'R-POL-01', ruleVersion: 3, textSha256: 'e'.repeat(64) });
+    expect(it1).not.toHaveProperty('contentSha256');
+    expect(ruleOf(LIB, { ruleId: 'R-POL-01', ruleVersion: 3 }, c4)).toBeNull();
+    expect(ruleOf({ ...LIB, documents: [{ ...doc, rules: [{ ...doc.rules[0]!, version: 3 }] }] }, { ruleId: 'R-POL-01', ruleVersion: 3 }, c4)?.rule.ruleKey).toBe('R-POL-01');
+  });
+
   it('empty state: no published rules, nothing to type', () => {
     const t = text(renderToStaticMarkup(<RuleCitationPicker taskId="t" field={field} value={[]} onChange={() => undefined} readOnly={false} initialLibrary={{ setVersion: null, documents: [] }} renderNote={noteInput} />));
     expect(t).toContain('This project has no published rules yet.');

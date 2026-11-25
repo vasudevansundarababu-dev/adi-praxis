@@ -455,7 +455,7 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
             if (f) familyTags.set(x.id, focusTags(f, cat.families).tags);
           }
         }
-        const built = await db.$transaction((tx) => buildRlGymExport(tx, { id: p.id, name: p.name, template: p.template }, s.records, s.ref!, { exported: s.runs.some((r) => r.outcome === 'received'), held: s.held, batches, reports, familyTags }));
+        const built = await db.$transaction((tx) => buildRlGymExport(tx, { id: p.id, name: p.name, template: p.template, testOnly: p.testOnly }, s.records, s.ref!, { exported: s.runs.some((r) => r.outcome === 'received'), held: s.held, batches, reports, familyTags }));
         if (!built.tasks.length) throw new AppError(422, 'NOTHING_TO_EXPORT', 'None of the approved tasks can be sent.', { notSent: built.notSent });
         const result = await rlgym.exportProject(rlgymProjectId(p.id), built.body, built.exportSha256);
         return { projectId: p.id, built, result };

@@ -37,8 +37,24 @@ const BINDING_FIELDS = (help: string): ItemField[] => [
  * `itemFields` only state sub-field visibility for RL Gym's projection; ADI Forge always uses the built-in ones.
  */
 export function itemFieldsOf(field: ItemField): ItemField[] {
-  return field.type === 'repeated_array' ? (field.itemFields ?? []) : builtInItemFields(field);
+  if (field.type === 'repeated_array') return field.itemFields ?? [];
+  const built = builtInItemFields(field);
+  if (field.type !== 'policy_citation' || !field.itemFields?.length) return built;
+  // KYC Judgment v1 (C4): a declared policy citation keeps the built-in sub-fields, with the declared visibility and a
+  // number ruleVersion (C1's integer version) where declared, plus the C1 identity sub-field textSha256 when declared.
+  const declared = new Map(field.itemFields.map((d) => [d.key, d]));
+  const merged = built.map((b) => {
+    const d = declared.get(b.key);
+    if (!d) return b;
+    const textual = (t: string) => t === 'text' || t === 'long_text';
+    return { ...b, ...(d.visibility ? { visibility: d.visibility } : {}), ...(b.key === 'ruleVersion' && d.type === 'number' ? { type: 'number' as const } : !['ruleId', 'ruleVersion', 'textSha256'].includes(b.key) && textual(b.type) && textual(d.type) && d.type !== b.type ? { type: d.type } : {}) };
+  });
+  const extra = CITATION_IDENTITY_FIELDS.filter((e) => declared.has(e.key)).map((e) => ({ ...e, ...(declared.get(e.key)!.visibility ? { visibility: declared.get(e.key)!.visibility } : {}), required: declared.get(e.key)!.required ?? e.required }));
+  return [...merged, ...extra];
 }
+
+/** C1 rule identity sub-fields a policy citation may declare beyond the built-in ones (KYC Judgment v1 C4). */
+export const CITATION_IDENTITY_FIELDS: ItemField[] = [{ key: 'textSha256', type: 'text', label: 'Text SHA-256', help: 'The SHA-256 of the rule version’s text, as served (C1).', visibility: 'private_reference' }];
 
 /** The built-in item fields of a structured primitive (none for other types). */
 export function builtInItemFields(field: ItemField): ItemField[] {

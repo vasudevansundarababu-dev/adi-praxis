@@ -29,10 +29,11 @@ const row = (over: Partial<QueueRow>): QueueRow => ({
 describe('review queue (console)', () => {
   it('shows each rule’s text and condition beside its source quote, with the AI-filled library details and the flags', () => {
     const flagged = row({ ruleId: 'r2', ruleKey: 'R-CA-ID', title: 'California ID', flags: [{ code: 'condition_not_quoted', message: 'No quote from the source says when this rule applies.' }] });
-    const html = renderToStaticMarkup(<ReviewQueuePanel projectId="p" initial={{ items: [flagged, row({})], flagged: 1, total: 2, studioConnected: true }} />);
+    const html = renderToStaticMarkup(<ReviewQueuePanel projectId="p" initial={{ items: [flagged, row({})], projectFlags: [{ code: 'us_person_undefined', message: 'No approved rule defines “US person”.' }], flagged: 1, total: 2, studioConnected: true }} />);
     const t = text(html);
     expect(t).toContain('Review queue');
     expect(t).toContain('2 rules to review, 1 flagged');
+    expect(t).toContain('No approved rule defines “US person”.');
     expect(t).toContain('Each applicant must give a taxpayer ID.');
     expect(t).toContain('Applies when: Process is account_opening');
     expect(t).toContain('Source quote');

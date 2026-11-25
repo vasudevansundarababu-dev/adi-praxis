@@ -1,5 +1,5 @@
 import { Prisma, type CoverageSlot, type TaskInstance } from '@prisma/client';
-import { CAPPED_TASK_STATUSES, caseSelectorSlots, effectiveCoverage, CoverageDimensions, CoverageQuotas, generateSlots, OPEN_TASK_STATUSES, pickSlot, type CaseSelector, type SlotCase, type SlotSpec } from '@praxis/shared';
+import { CAPPED_TASK_STATUSES, caseSelectorSlots, coveredSelectorSlot, effectiveCoverage, CoverageDimensions, CoverageQuotas, generateSlots, OPEN_TASK_STATUSES, pickSlot, type CaseSelector, type SlotCase, type SlotSpec } from '@praxis/shared';
 import type { Db, Tx } from '../db';
 import { AppError, notFound } from '../lib/errors';
 import type { writeAudit } from '../platform/audit';
@@ -32,7 +32,7 @@ export function caseSelectorOf(v: unknown): CaseSelector | null {
   const s = v as Partial<CaseSelector> | null;
   if (!s || typeof s.field !== 'string' || typeof s.source !== 'string' || !Array.isArray(s.values) || !s.values.every((x) => typeof x === 'string') || !s.values.length) return null;
   const labels = s.labels && typeof s.labels === 'object' && !Array.isArray(s.labels) ? Object.fromEntries(Object.entries(s.labels).filter(([k, l]) => typeof l === 'string' && s.values!.includes(k))) : null;
-  return { field: s.field, source: s.source, values: s.values, ...(labels && Object.keys(labels).length ? { labels } : {}) };
+  return { field: s.field, source: s.source, values: s.values, ...(labels && Object.keys(labels).length ? { labels } : {}), ...(s.strategy === 'stratified' || s.strategy === 'per_value' ? { strategy: s.strategy } : {}) };
 }
 
 /** The form field a case selector reads (`S1.applicationType`), when the version's form is registered. */
@@ -56,7 +56,9 @@ export async function ensureSlots(tx: Tx, projectId: string) {
   const cov = effectiveCoverage(p.template, CoverageQuotas.nullable().safeParse(p.coverageQuotas).data ?? null);
   const matrix = CoverageDimensions.safeParse(p.template.coverageDimensions).data ?? { dimensions: [], cells: [] };
   // A case-selector template: exactly one slot per value, whatever the project's target (13 Nov 2026).
-  const slots = sel ? selectorSlots(p.template, sel) : generateSlots({
+  // KYC Judgment v1 §16: a selector over a multi-select (covered application types) is ONE slot for every type.
+  const selField = sel ? selectorField(p.template, sel.source) : undefined;
+  const slots = sel ? (selField?.type === 'multi_select' ? [coveredSelectorSlot(sel, { fieldLabel: selField.label, labelOf: (v) => selField.options?.find((o) => o.value === v)?.label })] : selectorSlots(p.template, sel)) : generateSlots({
     dimensions: matrix.dimensions,
     cells: cov.cells,
     edgeCases: cov.edgeCases,

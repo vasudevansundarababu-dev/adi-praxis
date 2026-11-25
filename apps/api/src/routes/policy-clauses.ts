@@ -5,7 +5,7 @@ import { notFound } from '../lib/errors';
 import { checkedDispositions, DISPOSITION_PROMPT_VERSION, DispositionUnavailableError, type DispositionSuggester } from '../policy/dispositions';
 import { evaluateQuality, ReferenceLabel, ReferenceSetBody } from '../policy/quality';
 import { editRule, setApplied } from '../policy/rules';
-import { reviewQueue } from '../policy/review-queue';
+import { projectFlags, reviewQueue } from '../policy/review-queue';
 import type { StudioCoverageClient } from '../anvil/coverage-client';
 import { loadVersionText } from '../policy/documents';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -71,7 +71,7 @@ export const policyClauseRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Object
   app.get('/projects/:projectId/policy/review-queue', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams } }, async (req) => {
     const p = await policyProject(db, req.actor!, req.params.projectId);
     const items = await reviewQueue(db, req.actor!.clientId, p.id);
-    return { items, flagged: items.filter((i) => i.flags.length).length, total: items.length, studioConnected: !!coverage };
+    return { items, projectFlags: await projectFlags(db, p.id), flagged: items.filter((i) => i.flags.length).length, total: items.length, studioConnected: !!coverage };
   });
 
   app.post('/projects/:projectId/policy/review-queue/coverage', { config: { access: POLICY_ACCESS, rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['policy'], params: ProjectParams, body: z.object({}).strict() } }, async (req, reply) => {

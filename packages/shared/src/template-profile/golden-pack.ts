@@ -49,8 +49,21 @@ export const GoldenPack = z
             values: z.array(z.string().trim().min(1).max(50)).min(1).max(100),
             /** Optional display label per value (e.g. `{individual: "Single"}`); otherwise the form's option labels. */
             labels: z.record(z.string(), z.string().trim().min(1).max(100)).optional(),
+            /**
+             * KYC Judgment v1 §16 (owner, 25 Nov 2026): `stratified` = ONE task covers every value (the source is a
+             * multi-select; the RL Gym stratifies cases by value). `per_value` (the default) = one task per value.
+             */
+            strategy: z.enum(['per_value', 'stratified']).optional(),
           })
           .strict()
+          .optional(),
+        /**
+         * KYC Judgment v1 §16: Studio's Validate hints, e.g. wording that must not name one account type in a task that
+         * covers them all. Authoring warns on them (never blocks).
+         */
+        validateHints: z
+          .array(z.object({ id: z.string().trim().min(1).max(100), fields: z.array(z.string().regex(/^S\d+\.[A-Za-z][A-Za-z0-9_]{0,62}$/)).max(50), warn_when_mentions: z.array(z.string().trim().min(1).max(100)).min(1).max(100), message: z.string().trim().min(1).max(1000) }).strict())
+          .max(20)
           .optional(),
         /** Distinct tasks to author per project. With a case selector it must equal the number of selector values. */
         defaultDistinctTarget: z.number().int().min(1).max(10_000).optional(),
@@ -102,7 +115,7 @@ export function checkGoldenPack(raw: unknown, isTaken: (profileId: string) => bo
 /** Distinct-task target a template block asks for: explicit, or one task per case-selector value. */
 export function packTarget(template: GoldenPack['template']): number | null {
   if (!template) return null;
-  return template.defaultDistinctTarget ?? template.caseSelector?.values.length ?? null;
+  return template.defaultDistinctTarget ?? (template.caseSelector?.strategy === 'stratified' ? 1 : template.caseSelector?.values.length) ?? null;
 }
 
 /** A case selector must point at a pick list whose options are exactly its values, and must not multiply tasks. */
@@ -113,7 +126,7 @@ function caseSelectorProblems(profile: TemplateProfile, template: GoldenPack['te
   const [sectionKey, fieldKey] = sel.source.split('.');
   const field = profile.sections.find((s) => s.key === sectionKey)?.fields.find((f) => f.key === fieldKey);
   if (!field) out.push(`template.caseSelector.source: "${sel.source}" is not a field of the form`);
-  else if (field.type !== 'pick_list') out.push(`template.caseSelector.source: "${sel.source}" must be a pick_list field`);
+  else if (sel.strategy === 'stratified' ? field.type !== 'multi_select' : field.type !== 'pick_list') out.push(`template.caseSelector.source: "${sel.source}" must be a ${sel.strategy === 'stratified' ? 'multi_select field (one task covers every value)' : 'pick_list field'}`);
   else {
     if (!field.required) out.push(`template.caseSelector.source: "${sel.source}" must be required, so every task names its ${sel.field}`);
     const opts = (field.options ?? []).map((o) => o.value).sort();
@@ -123,8 +136,9 @@ function caseSelectorProblems(profile: TemplateProfile, template: GoldenPack['te
     if (opts.join('\u0000') !== vals.join('\u0000')) out.push(`template.caseSelector.values: must equal the options of ${sel.source} exactly (${opts.join(', ')})`);
   }
   if (profile.contract?.outputsFrom !== 'template_execution') out.push('profile.contract.outputsFrom: a case-selector form must take its outputs from the template execution ("template_execution"); expected answers are private dataset material');
-  if (template.defaultDistinctTarget !== undefined && template.defaultDistinctTarget !== sel.values.length)
-    out.push(`template.defaultDistinctTarget: must be ${sel.values.length}, one task per ${sel.field} value`);
+  const target = sel.strategy === 'stratified' ? 1 : sel.values.length;
+  if (template.defaultDistinctTarget !== undefined && template.defaultDistinctTarget !== target)
+    out.push(`template.defaultDistinctTarget: must be ${target}, ${sel.strategy === 'stratified' ? 'one task for every' : 'one task per'} ${sel.field} value`);
   if (template.coverageDimensions && (template.coverageDimensions.dimensions.length || template.coverageDimensions.cells.length))
     out.push('template.coverageDimensions: a case-selector template has no coverage quotas; cases are dataset inputs, not authored tasks');
   if (template.edgeCaseCatalog?.length) out.push('template.edgeCaseCatalog: a case-selector template has no edge-case quotas; cases are dataset inputs, not authored tasks');

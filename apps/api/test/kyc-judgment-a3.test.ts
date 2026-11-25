@@ -108,6 +108,21 @@ describe('A3: the review queue', () => {
   });
 });
 
+describe('A3: the US-person definition (owner, 25 Nov 2026: Option A, citizenship only)', () => {
+  const US_PERSON = { id: 'us_person', type: 'boolean', definition: { fact: 'citizenship', op: 'in', value: ['US'] } };
+  it('the queue flags the project until an approved rule defines us_person; a rule naming it is flagged while the definition is a draft', async () => {
+    const pf = async () => ((await api(pmCookie).get(`/projects/${projectId}/policy/review-queue`)).json() as { projectFlags: { code: string }[] }).projectFlags.map((f) => f.code);
+    expect(await pf()).toEqual(['us_person_undefined']);
+    const def = await rule('US-PERSON', { condition: null, library: { ...LIB, subject: 'case', defines: US_PERSON } });
+    await rule('TIN-US', { condition: { all: [OPENING, { fact: 'us_person', op: 'eq', value: true }] } });
+    expect(await pf()).toEqual(['us_person_undefined']);
+    expect((await codes())['R-TIN-US']).toEqual(['definition_not_approved']);
+    expect((await api(pmCookie).put(`/projects/${projectId}/policy/rules/${def.ruleId}/applied`, { applied: true, expectedContentHash: def.contentHash })).statusCode).toBe(200);
+    expect(await pf()).toEqual([]);
+    expect((await codes())['R-TIN-US']).toEqual([]);
+  });
+});
+
 describe('A3: Studio’s coverage on draft conditions, stored per version', () => {
   it('sends every draft’s condition with its version; stores each answer for that version and hash; a new version needs a new check', async () => {
     const ok = await rule('COMPLETE');

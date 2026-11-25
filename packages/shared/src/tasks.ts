@@ -23,6 +23,8 @@ export interface CaseSelector {
   values: string[];
   /** Optional display labels per value, from the template; otherwise the form's option labels are used. */
   labels?: Record<string, string>;
+  /** KYC Judgment v1 §16: `stratified` = one task covers every value (a multi-select source). */
+  strategy?: 'per_value' | 'stratified';
 }
 
 export interface SlotCase {
@@ -230,3 +232,67 @@ export interface TaskCheck {
 export const INVITE_DAYS = 7;
 export const RECLAIM_REASONS = ['STALLED', 'AUTHOR_UNAVAILABLE', 'OTHER'] as const;
 export const ReclaimRequest = z.object({ reason: z.enum(RECLAIM_REASONS), note: z.string().trim().max(500).optional() });
+
+/**
+ * KYC Judgment v1 §16 (owner, 25 Nov 2026: "one task that covers all four accounts"): a template whose case selector
+ * reads a multi-select (`S1.coveredApplicationTypes`) gets ONE slot with no fixed case. The task is written once, in
+ * wording that fits every type; each case brings its own type.
+ */
+export function coveredSelectorSlot(sel: CaseSelector, opts: { fieldLabel?: string; labelOf?: (value: string) => string | undefined } = {}): SlotSpec {
+  const name = opts.fieldLabel ?? humaniseField(sel.field);
+  const labels = sel.values.map((v) => selectorValueLabel(sel, v, opts.labelOf?.(v)));
+  return {
+    tags: {},
+    edgeCase: null,
+    isOpen: false,
+    required: true,
+    brief: `${name}: ${labels.join(', ')}. Write one reusable task for every ${name}: each case brings its own type, so keep the wording generic and never name one type.`,
+  };
+}
+
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/** The types a covered-selector task covers (from its multi-select), in the selector's order; null when the field is absent. */
+export function coveredCaseValues(sel: CaseSelector, output: unknown): string[] | null {
+  const [section, field] = sel.source.split('.') as [string, string];
+  const sections = isObj(output) && isObj(output.sections) ? output.sections : {};
+  const s = isObj(sections[section]) ? (sections[section] as Record<string, unknown>) : {};
+  const v = s[field];
+  if (!Array.isArray(v)) return null;
+  return sel.values.filter((x) => v.includes(x));
+}
+
+/** The export key of the covered list: `S1.coveredApplicationTypes` → `application_types` (also from `applicationType`). */
+export function coveredListKey(source: string): string {
+  const key = (source.split('.').pop() ?? source).replace(/^covered(?=[A-Z])/, '');
+  const singular = key.charAt(0).toLowerCase() + key.slice(1);
+  const snake = singular.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  return snake.endsWith('s') ? snake : `${snake}s`;
+}
+
+/**
+ * Wording that names one account type in a covered-selector task (§16: Validate warns). Each value with words
+ * ("adult_joint" → "adult joint") and each template label counts; a single ordinary word value ("individual") counts
+ * only through its label ("Individual account"). The selector's own field is skipped.
+ */
+export function typeSpecificWording(sel: CaseSelector, sections: Record<string, unknown>): { path: string; term: string }[] {
+  const terms = [
+    ...sel.values.filter((v) => /[_-]/.test(v) || /^[a-z]+$/.test(v) === false).map((v) => v.replace(/[_-]+/g, ' ').toLowerCase()),
+    ...sel.values.filter((v) => /^[a-z]+$/.test(v) && !['individual', 'single', 'joint', 'personal'].includes(v)).map((v) => v.toLowerCase()),
+    ...Object.values(sel.labels ?? {}).map((l) => l.toLowerCase()),
+  ];
+  const unique = [...new Set(terms)].sort((a, b) => b.length - a.length);
+  const [selSection, selField] = sel.source.split('.');
+  const out: { path: string; term: string }[] = [];
+  const visit = (v: unknown, path: string) => {
+    if (typeof v === 'string') {
+      const t = v.toLowerCase();
+      const hit = unique.find((term) => new RegExp(`(^|[^a-z])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '[ _-]')}([^a-z]|$)`).test(t));
+      if (hit) out.push({ path, term: hit });
+    } else if (Array.isArray(v)) v.forEach((x, i) => visit(x, `${path}[${i}]`));
+    else if (isObj(v)) for (const [k, x] of Object.entries(v)) visit(x, `${path}.${k}`);
+  };
+  for (const [section, fields] of Object.entries(sections))
+    if (isObj(fields)) for (const [k, v] of Object.entries(fields)) if (!(section === selSection && k === selField)) visit(v, `${section}.${k}`);
+  return out;
+}

@@ -137,7 +137,7 @@ describe('project fact catalog, conditions on rules, approved clauses', () => {
     expect(citedRules(output)).toEqual([{ ruleId: r.ruleId, contentSha256: v.contentHash }]);
     const template = await db.template.findUniqueOrThrow({ where: { id: templateId } });
     const clauses = await clausesFor(db, { clientId, projectId, output }, template.anvilSpec);
-    const entry = { clause_id: 'R-CA-JOINT', version: v.version, title: 'CA joint ID', obligation: POLICY.split('\n')[1], source: { document_id: expect.any(String), document_version: 1, sha256: expect.stringMatching(/^[0-9a-f]{64}$/), quote: POLICY.split('\n')[1] }, approval: { approval_id: v.id, project_id: projectId, approved_by: expect.any(String), approved_at: expect.any(String) }, condition: CA_JOINT };
+    const entry = { clause_id: 'R-CA-JOINT', version: v.version, title: 'CA joint ID', obligation: POLICY.split('\n')[1], text_sha256: expect.stringMatching(/^[0-9a-f]{64}$/), source: { document_id: expect.any(String), document_version: 1, sha256: expect.stringMatching(/^[0-9a-f]{64}$/), quote: POLICY.split('\n')[1] }, approval: { approval_id: v.id, project_id: projectId, approved_by: expect.any(String), approved_at: expect.any(String) }, condition: CA_JOINT };
     expect(clauses).toEqual([{ ...entry, binding_revision: 'golden-kyc-openenv.facts@1' }]);
     // approved-task-export.v1 policy_clauses (Studio ef06119): every approved selected clause, condition null when none.
     expect((await policyClausesFor(db, { clientId, projectId, output })).map((c) => c.entry)).toEqual([entry]);

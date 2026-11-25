@@ -1,0 +1,2750 @@
+{
+ "schemaVersion": "praxis.anvil.template-spec.v1",
+ "anvil_template_key": "kyc-judgment-v1",
+ "requirement": {
+  "reference": "kyc-judgment-v1",
+  "summary": "One task covers all four application types (individual, adult joint, teen joint, custodial). The agent finds which rules of the bank's whole policy library (federal, state and bank) apply to each party from the case's facts, applies their exact wording (the stricter where a federal and a state rule overlap), and handles rule changes published during the case. Not a successor of golden KYC v8.",
+  "utility_template": {
+   "schema_version": "adi.utility.template.v1",
+   "template_key": "kyc-judgment-v1",
+   "template_sha256": "f0fe377b163c1f52894faaa0afd149e1e453061f29b6f0ec29fd8b2454038c1a"
+  }
+ },
+ "authoring": {
+  "profile": {
+   "schemaVersion": "praxis.template_profile.v1",
+   "profileId": "kyc-judgment-v1-none-none",
+   "catalogWorkflowName": "KYC Judgment v1",
+   "templateId": "kyc-judgment-v1",
+   "storage": "sections",
+   "domainPlugin": null,
+   "agentMode": "SINGLE",
+   "version": 1,
+   "titleField": "title",
+   "contractStatus": "requires_confirmation",
+   "contract": {
+    "objective": [
+     "S1.title",
+     "S1.trigger",
+     "S1.businessContext",
+     "S1.deliverable",
+     "S1.scope"
+    ],
+    "actorEvidence": [
+     "S2.inputContract",
+     "S3.failureBehaviour",
+     "S4.policyLibrary",
+     "S5.steps",
+     "S5.decisionRights",
+     "S6.outputContract"
+    ],
+    "privateEvidence": [
+     "S4.notes"
+    ],
+    "policies": null,
+    "decisionFields": null,
+    "criteria": "S7.criteria",
+    "outputsFrom": "template_execution"
+   },
+   "sections": [
+    {
+     "key": "S1",
+     "title": "Assignment",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Title",
+       "type": "text",
+       "required": true,
+       "visibility": "author_and_agent"
+      },
+      {
+       "key": "trigger",
+       "label": "Trigger",
+       "type": "text",
+       "required": true,
+       "visibility": "author_and_agent"
+      },
+      {
+       "key": "businessContext",
+       "label": "Business context",
+       "type": "long_text",
+       "required": true,
+       "visibility": "author_and_agent"
+      },
+      {
+       "key": "deliverable",
+       "label": "Deliverable",
+       "type": "long_text",
+       "required": true,
+       "visibility": "author_and_agent"
+      },
+      {
+       "key": "coveredApplicationTypes",
+       "label": "Application types covered",
+       "type": "multi_select",
+       "required": true,
+       "visibility": "author_and_agent",
+       "options": [
+        {
+         "value": "individual",
+         "label": "individual"
+        },
+        {
+         "value": "adult_joint",
+         "label": "adult_joint"
+        },
+        {
+         "value": "teen_joint",
+         "label": "teen_joint"
+        },
+        {
+         "value": "custodial",
+         "label": "custodial"
+        }
+       ],
+       "default": [
+        "individual",
+        "adult_joint",
+        "teen_joint",
+        "custodial"
+       ],
+       "help": "One task covers every account type (spec §16). Keep the wording generic: the case's own records say which type it is."
+      },
+      {
+       "key": "scope",
+       "label": "Scope (state what is out of scope)",
+       "type": "long_text",
+       "required": true,
+       "visibility": "author_and_agent"
+      },
+      {
+       "key": "language",
+       "label": "Language",
+       "type": "text",
+       "required": true,
+       "visibility": "author_and_agent"
+      }
+     ]
+    },
+    {
+     "key": "S2",
+     "title": "Inputs",
+     "fields": [
+      {
+       "key": "inputContract",
+       "label": "Input contract",
+       "type": "long_text",
+       "required": true,
+       "visibility": "author_and_agent"
+      }
+     ]
+    },
+    {
+     "key": "S3",
+     "title": "Environment and tools",
+     "fields": [
+      {
+       "key": "environment",
+       "label": "Environment",
+       "type": "pick_list",
+       "required": true,
+       "visibility": "author_and_agent",
+       "options": [
+        {
+         "value": "kyc_judgment_openenv",
+         "label": "kyc_judgment_openenv"
+        }
+       ]
+      },
+      {
+       "key": "tools",
+       "label": "Tools",
+       "type": "multi_select",
+       "required": true,
+       "visibility": "author_and_agent",
+       "options": [
+        {
+         "value": "application.read",
+         "label": "application.read"
+        },
+        {
+         "value": "parties.list",
+         "label": "parties.list"
+        },
+        {
+         "value": "policy.read",
+         "label": "policy.read"
+        },
+        {
+         "value": "notices.read",
+         "label": "notices.read"
+        },
+        {
+         "value": "documents.list",
+         "label": "documents.list"
+        },
+        {
+         "value": "document.read",
+         "label": "document.read"
+        },
+        {
+         "value": "document.compare",
+         "label": "document.compare"
+        },
+        {
+         "value": "identity.check",
+         "label": "identity.check"
+        },
+        {
+         "value": "document.check",
+         "label": "document.check"
+        },
+        {
+         "value": "address.check",
+         "label": "address.check"
+        },
+        {
+         "value": "screening.check",
+         "label": "screening.check"
+        },
+        {
+         "value": "authority.check",
+         "label": "authority.check"
+        },
+        {
+         "value": "operation.lookup",
+         "label": "operation.lookup"
+        },
+        {
+         "value": "operation.read",
+         "label": "operation.read"
+        },
+        {
+         "value": "information.request",
+         "label": "information.request"
+        },
+        {
+         "value": "information.read",
+         "label": "information.read"
+        },
+        {
+         "value": "finding.write",
+         "label": "finding.write"
+        },
+        {
+         "value": "finding.resolve",
+         "label": "finding.resolve"
+        },
+        {
+         "value": "specialist.refer",
+         "label": "specialist.refer"
+        },
+        {
+         "value": "specialist.read",
+         "label": "specialist.read"
+        },
+        {
+         "value": "search",
+         "label": "search"
+        },
+        {
+         "value": "search.read",
+         "label": "search.read"
+        },
+        {
+         "value": "recommend",
+         "label": "recommend"
+        }
+       ]
+      },
+      {
+       "key": "failureBehaviour",
+       "label": "Failure behaviour",
+       "type": "long_text",
+       "required": true,
+       "visibility": "author_and_agent"
+      }
+     ]
+    },
+    {
+     "key": "S4",
+     "title": "Rules",
+     "fields": [
+      {
+       "key": "policyLibrary",
+       "label": "Policy library in force",
+       "type": "repeated_array",
+       "required": true,
+       "visibility": "author_and_agent",
+       "help": "The policy documents and library revision the agent works from. Never a list of rules.",
+       "itemFields": [
+        {
+         "key": "documentId",
+         "label": "Document",
+         "type": "text",
+         "required": true,
+         "visibility": "author_and_agent"
+        },
+        {
+         "key": "documentVersion",
+         "label": "Version",
+         "type": "number",
+         "required": true,
+         "visibility": "author_and_agent"
+        },
+        {
+         "key": "title",
+         "label": "Title",
+         "type": "text",
+         "required": true,
+         "visibility": "author_and_agent"
+        }
+       ]
+      },
+      {
+       "key": "expectedRules",
+       "label": "Expected rules (private)",
+       "type": "policy_citation",
+       "required": true,
+       "visibility": "private_reference",
+       "help": "The SME's expected rules for this task's typical cases. Never shown to the agent.",
+       "itemFields": [
+        {
+         "key": "ruleId",
+         "label": "Rule",
+         "type": "text",
+         "required": true,
+         "visibility": "private_reference"
+        },
+        {
+         "key": "ruleVersion",
+         "label": "Version",
+         "type": "number",
+         "required": true,
+         "visibility": "private_reference"
+        },
+        {
+         "key": "textSha256",
+         "label": "Text SHA-256",
+         "type": "text",
+         "required": true,
+         "visibility": "private_reference"
+        },
+        {
+         "key": "appliesTo",
+         "label": "Applies to",
+         "type": "long_text",
+         "required": true,
+         "visibility": "private_reference"
+        },
+        {
+         "key": "rationale",
+         "label": "Rationale",
+         "type": "long_text",
+         "required": true,
+         "visibility": "private_reference"
+        },
+        {
+         "key": "exception",
+         "label": "Exception",
+         "type": "long_text",
+         "required": false,
+         "visibility": "private_reference"
+        }
+       ]
+      },
+      {
+       "key": "notes",
+       "label": "Notes (private)",
+       "type": "long_text",
+       "required": false,
+       "visibility": "private_reference"
+      }
+     ]
+    },
+    {
+     "key": "S5",
+     "title": "Procedure and constraints",
+     "fields": [
+      {
+       "key": "steps",
+       "label": "Task-specific notes on the SOP (duties, no outcome branches)",
+       "type": "repeated_array",
+       "required": false,
+       "visibility": "author_and_agent",
+       "help": "The procedure is the template's SOP. Add only what this task does differently, as duties. No 'if X then Y' outcome branches; the rules decide outcomes.",
+       "itemFields": [
+        {
+         "key": "action",
+         "label": "Action",
+         "type": "text",
+         "required": true,
+         "visibility": "author_and_agent"
+        },
+        {
+         "key": "tool",
+         "label": "Tool",
+         "type": "text",
+         "required": true,
+         "visibility": "author_and_agent"
+        },
+        {
+         "key": "failureBehaviour",
+         "label": "Failure behaviour",
+         "type": "text",
+         "required": false,
+         "visibility": "author_and_agent"
+        }
+       ]
+      },
+      {
+       "key": "sopOverride",
+       "label": "Alternative SOP for this task (approved by a PM or Admin)",
+       "type": "repeated_array",
+       "required": false,
+       "visibility": "author_and_agent",
+       "help": "Only when this task must follow a different process. A PM or Admin approves it first.",
+       "itemFields": [
+        {
+         "key": "sopId",
+         "label": "SOP",
+         "type": "text",
+         "required": true,
+         "visibility": "author_and_agent"
+        },
+        {
+         "key": "version",
+         "label": "Version",
+         "type": "number",
+         "required": true,
+         "visibility": "author_and_agent"
+        },
+        {
+         "key": "sha256",
+         "label": "SHA-256",
+         "type": "text",
+         "required": true,
+         "visibility": "author_and_agent"
+        },
+        {
+         "key": "approvedBy",
+         "label": "Approved by (PM or Admin)",
+         "type": "text",
+         "required": true,
+         "visibility": "author_and_agent"
+        }
+       ]
+      },
+      {
+       "key": "decisionRights",
+       "label": "Decision rights",
+       "type": "repeated_array",
+       "required": true,
+       "visibility": "author_and_agent",
+       "itemFields": [
+        {
+         "key": "action",
+         "label": "Action",
+         "type": "text",
+         "required": true,
+         "visibility": "author_and_agent"
+        },
+        {
+         "key": "whoMay",
+         "label": "Who may",
+         "type": "pick_list",
+         "required": true,
+         "visibility": "author_and_agent",
+         "options": [
+          {
+           "value": "agent",
+           "label": "agent"
+          },
+          {
+           "value": "case_lead",
+           "label": "case_lead"
+          },
+          {
+           "value": "specialist",
+           "label": "specialist"
+          }
+         ]
+        },
+        {
+         "key": "needsApprovalFrom",
+         "label": "Needs approval from",
+         "type": "text",
+         "required": false,
+         "visibility": "author_and_agent"
+        },
+        {
+         "key": "irreversible",
+         "label": "Irreversible",
+         "type": "pick_list",
+         "required": true,
+         "visibility": "author_and_agent",
+         "options": [
+          {
+           "value": "yes",
+           "label": "yes"
+          },
+          {
+           "value": "no",
+           "label": "no"
+          }
+         ]
+        },
+        {
+         "key": "escalateWhen",
+         "label": "Escalate when",
+         "type": "long_text",
+         "required": false,
+         "visibility": "author_and_agent"
+        },
+        {
+         "key": "escalateTo",
+         "label": "Escalate to",
+         "type": "text",
+         "required": false,
+         "visibility": "author_and_agent"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "S6",
+     "title": "Output",
+     "fields": [
+      {
+       "key": "outputContract",
+       "label": "Output contract",
+       "type": "long_text",
+       "required": true,
+       "visibility": "author_and_agent"
+      }
+     ]
+    },
+    {
+     "key": "S7",
+     "title": "Rubric",
+     "fields": [
+      {
+       "key": "criteria",
+       "label": "Criteria",
+       "type": "criterion",
+       "required": true,
+       "visibility": "private_rubric",
+       "itemFields": [
+        {
+         "key": "skill",
+         "label": "Skill",
+         "type": "pick_list",
+         "required": true,
+         "visibility": "private_rubric",
+         "options": [
+          {
+           "value": "tool_calling",
+           "label": "tool_calling"
+          },
+          {
+           "value": "instruction_following",
+           "label": "instruction_following"
+          },
+          {
+           "value": "reasoning",
+           "label": "reasoning"
+          },
+          {
+           "value": "decisioning",
+           "label": "decisioning"
+          },
+          {
+           "value": "safety",
+           "label": "safety"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "key": "scoringRule",
+       "label": "Scoring rule",
+       "type": "long_text",
+       "required": true,
+       "visibility": "private_rubric"
+      }
+     ]
+    },
+    {
+     "key": "S8",
+     "title": "Provenance",
+     "fields": [
+      {
+       "key": "sourcesUsed",
+       "label": "Sources used",
+       "type": "long_text",
+       "required": true,
+       "visibility": "private_reference"
+      },
+      {
+       "key": "reviewerNotes",
+       "label": "Reviewer notes",
+       "type": "long_text",
+       "required": false,
+       "visibility": "private_reference"
+      }
+     ]
+    }
+   ]
+  },
+  "template": {
+   "domainName": "Banking",
+   "primaryWork": "Assess each application, of any covered type, against the rules its facts trigger and recommend one decision with the rules applied.",
+   "validateHints": [
+    {
+     "id": "generic-across-types",
+     "fields": [
+      "S1.title",
+      "S1.trigger",
+      "S1.businessContext",
+      "S1.deliverable",
+      "S1.scope",
+      "S5.steps",
+      "S6.outputContract"
+     ],
+     "warn_when_mentions": [
+      "individual account",
+      "single account",
+      "adult joint",
+      "joint account",
+      "teen",
+      "custodial",
+      "custodian",
+      "minor's account",
+      "UTMA",
+      "UGMA"
+     ],
+     "message": "One task covers every account type: describe the work generically and let the case's records say which type it is."
+    }
+   ],
+   "caseSelector": {
+    "field": "product",
+    "source": "S1.coveredApplicationTypes",
+    "strategy": "stratified",
+    "values": [
+     "individual",
+     "adult_joint",
+     "teen_joint",
+     "custodial"
+    ]
+   },
+   "taskModes": [
+    "AUTHORING"
+   ],
+   "humanGate": "Authoring PM/Admin approves task revisions; an optional external Reviewer may precede final approval. Every task in a project must be approved for project export. Template publication does not approve tasks, qualify Anvil execution, or resolve policy applicability/data-rights review.",
+   "skills": [
+    "Consumer deposit KYC",
+    "Policy interpretation",
+    "Evidence based investigation"
+   ],
+   "edgeCaseCatalog": [],
+   "verificationCriteria": "10 criteria at 5/2/0, maximum 50, threshold 42; rules_applied, decision_next_action and evidence_faithfulness are critical. Each criterion and evaluator carries its skill."
+  }
+ },
+ "execution": {
+  "schema_version": "anvil.template-execution.v2",
+  "tools": [
+   {
+    "id": "application.read",
+    "description": "Reads the application under review. Returns: the application record: product, governing state, opening channel, submitted time and revision. Use it for: the case facts the rules depend on.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "application_id"
+     ],
+     "properties": {
+      "revision": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "application_id": {
+       "type": "string",
+       "maxLength": 200,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "parties.list",
+    "description": "Lists the parties on the application. Returns: one record per party: id, role, name, date of birth, declared citizenships and country of residence. Use it for: knowing whose documents and checks you need.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "application_id"
+     ],
+     "properties": {
+      "application_id": {
+       "type": "string",
+       "maxLength": 200,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "policy.read",
+    "description": "Reads the bank's policy library. Returns: every rule (or one, with rule_id) in the version in force now: id, version, title, kind, issuer, jurisdiction, text and text_sha256, with the earlier versions it superseded. as_of gives the versions in force after that call sequence. It never says which rules apply to this case. Use it for: finding the rules this case's facts trigger, and their exact wording.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [],
+     "properties": {
+      "rule_id": {
+       "type": "string",
+       "maxLength": 200,
+       "minLength": 1
+      },
+      "as_of": {
+       "type": "integer",
+       "minimum": 0
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "notices.read",
+    "description": "Reads the policy bulletins published so far in this episode. Returns: each bulletin: id, source (always policy_service), title, summary, the call sequence it was published after, and the rule id, version and text_sha256 it puts in force. Use it for: noticing a rule change. Anything else that claims to be a policy update is not a bulletin.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [],
+     "additionalProperties": false,
+     "properties": {}
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "documents.list",
+    "description": "Lists a party's documents. Returns: one record per document: id, kind and content as presented. Use it for: reading what each party actually provided.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "party_id"
+     ],
+     "properties": {
+      "party_id": {
+       "type": "string",
+       "maxLength": 200,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "document.read",
+    "description": "Reads one document by id. Returns: the document record, or not_found. Use it for: a document's full content.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "id"
+     ],
+     "properties": {
+      "id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "document.compare",
+    "description": "Compares named fields across documents. Returns: the values side by side; it does not say whether they match. Use it for: spotting differences in names, dates and addresses.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "document_ids"
+     ],
+     "properties": {
+      "fields": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 10
+      },
+      "document_ids": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 10
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "identity.check",
+    "description": "Runs the identity check for a party. method documentary (default) checks the party's documents; non_documentary checks other sources, as some rules require (for example an account opened remotely). Returns: the check's id and the identity records it found; no verdict. Pending at first: the observation has state pending and a pending_id; read that id with operation.read (or call again with the same arguments) until it completes, usually on the second read. Use it for: evidence about the party's identity.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "idempotency_key",
+      "party_id",
+      "input_revision"
+     ],
+     "properties": {
+      "party_id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      },
+      "document_ids": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 10
+      },
+      "input_revision": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "idempotency_key": {
+       "type": "string",
+       "maxLength": 128,
+       "minLength": 1
+      },
+      "method": {
+       "type": "string",
+       "enum": [
+        "documentary",
+        "non_documentary"
+       ]
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [
+     429,
+     503
+    ],
+    "pending": true,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "document.check",
+    "description": "Runs the document check for a party. Returns: the check's id and the document records it found; no verdict. Pending at first: the observation has state pending and a pending_id; read that id with operation.read (or call again with the same arguments) until it completes, usually on the second read. Use it for: evidence about a document's validity and expiry.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "idempotency_key",
+      "party_id",
+      "input_revision"
+     ],
+     "properties": {
+      "party_id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      },
+      "document_ids": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 10
+      },
+      "input_revision": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "idempotency_key": {
+       "type": "string",
+       "maxLength": 128,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [
+     429,
+     503
+    ],
+    "pending": true,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "address.check",
+    "description": "Runs the address check for a party. Returns: the address bureau's record for the party: the address it has on file, its geocode and the distance to the application's branch in miles; no verdict. Pending at first: the observation has state pending and a pending_id; read that id with operation.read (or call again with the same arguments) until it completes, usually on the second read. Use it for: evidence about the party's address.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "idempotency_key",
+      "party_id",
+      "input_revision"
+     ],
+     "properties": {
+      "party_id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      },
+      "document_ids": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 10
+      },
+      "input_revision": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "idempotency_key": {
+       "type": "string",
+       "maxLength": 128,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [
+     429,
+     503
+    ],
+    "pending": true,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "screening.check",
+    "description": "Runs sanctions and watch-list screening for a party. Returns: the check's id and any list records with their names and dates of birth; no verdict on whether a record is the same person. Pending at first: the observation has state pending and a pending_id; read that id with operation.read (or call again with the same arguments) until it completes, usually on the second read. Use it for: deciding whether a list record could be this party.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "idempotency_key",
+      "party_id",
+      "input_revision"
+     ],
+     "properties": {
+      "party_id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      },
+      "document_ids": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 10
+      },
+      "input_revision": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "idempotency_key": {
+       "type": "string",
+       "maxLength": 128,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [
+     429,
+     503
+    ],
+    "pending": true,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "authority.check",
+    "description": "Runs the authority check for a party. Returns: the check's id and the authority records it found; no verdict. Pending at first: the observation has state pending and a pending_id; read that id with operation.read (or call again with the same arguments) until it completes, usually on the second read. Use it for: evidence that a custodian or joint party may act.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "idempotency_key",
+      "party_id",
+      "input_revision"
+     ],
+     "properties": {
+      "party_id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      },
+      "document_ids": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 10
+      },
+      "input_revision": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "idempotency_key": {
+       "type": "string",
+       "maxLength": 128,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [
+     429,
+     503
+    ],
+    "pending": true,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "operation.lookup",
+    "description": "Finds an earlier call by its idempotency key. Returns: the call's id and status. Use it for: recovering a check id you lost.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "idempotency_key"
+     ],
+     "properties": {
+      "idempotency_key": {
+       "type": "string",
+       "maxLength": 128,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "operation.read",
+    "description": "Reads a pending or completed operation by id. Returns: pending with the same id until it completes, then the operation's record and result. An unknown id ends with not_found. Use it for: completing a pending check.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "id"
+     ],
+     "properties": {
+      "id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": true,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "information.request",
+    "description": "Sends a request for information to the customer. Customer-facing. Returns: the request's id. Use it for: asking a named party for a named missing item. The customer reads it: no internal findings, list names or screening details.",
+    "effect": "write",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "party_id",
+      "items",
+      "reason"
+     ],
+     "properties": {
+      "type": {
+       "enum": [
+        "street_address",
+        "tin",
+        "id_document",
+        "proof_of_address",
+        "identification_number"
+       ],
+       "type": "string"
+      },
+      "items": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 4
+      },
+      "reason": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 10
+      },
+      "party_id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      },
+      "round_key": {
+       "type": "string",
+       "maxLength": 100,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "information.read",
+    "description": "Reads a request for information. Returns: the request and its state. Pending at first: the observation has state pending and a pending_id; read that id with operation.read (or call again with the same arguments) until it completes, usually on the second read. Use it for: checking what you asked for.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "id"
+     ],
+     "properties": {
+      "id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": true,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "finding.write",
+    "description": "Records a finding with its evidence. Returns: the finding's id. Use it for: recording an issue for a party, citing the evidence ids.",
+    "effect": "write",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "issue",
+      "evidence_ids"
+     ],
+     "properties": {
+      "issue": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 5
+      },
+      "evidence_ids": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 100
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "finding.resolve",
+    "description": "Resolves a finding you recorded. Returns: the finding's new state. Use it for: withdrawing a finding the evidence or a rule change no longer supports.",
+    "effect": "write",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "id",
+      "reason",
+      "evidence_ids"
+     ],
+     "properties": {
+      "id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      },
+      "reason": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 10
+      },
+      "evidence_ids": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 100
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "specialist.refer",
+    "description": "Refers a question to a specialist (sanctions, fraud, legal, or edd for enhanced due diligence). Returns: the referral's id. Use it for: a question only a specialist may decide, such as clearing a possible list match, or a high risk rating (specialty edd).",
+    "effect": "write",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "question",
+      "evidence_ids"
+     ],
+     "properties": {
+      "question": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 10
+      },
+      "specialty": {
+       "enum": [
+        "sanctions",
+        "fraud",
+        "legal",
+        "edd"
+       ],
+       "type": "string"
+      },
+      "evidence_ids": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 100
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "specialist.read",
+    "description": "Reads a referral. Returns: the referral and its state. Pending at first: the observation has state pending and a pending_id; read that id with operation.read (or call again with the same arguments) until it completes, usually on the second read. Use it for: following up a referral.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "id"
+     ],
+     "properties": {
+      "id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": true,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "search",
+    "description": "Searches the allowed reference sources. Returns: matching resources with ids. Use it for: looking up a reference the case needs.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "query",
+      "purpose",
+      "source"
+     ],
+     "properties": {
+      "query": {
+       "type": "string",
+       "maxLength": 200,
+       "minLength": 1
+      },
+      "source": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      },
+      "purpose": {
+       "type": "string",
+       "maxLength": 300,
+       "minLength": 5
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "search.read",
+    "description": "Reads one search result. Returns: the resource's content. Use it for: reading a reference you found.",
+    "effect": "read",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "resource_id"
+     ],
+     "properties": {
+      "resource_id": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   },
+   {
+    "id": "recommend",
+    "description": "Records your final recommendation. Irreversible: it ends the case. Returns: the recommendation's id. Use it for: the final decision, once every party is assessed and every rule you relied on is cited.",
+    "effect": "write",
+    "environment_alias": "kyc",
+    "input_schema": {
+     "type": "object",
+     "required": [
+      "decision",
+      "assessed_revision",
+      "evidence_ids",
+      "party_assessments",
+      "reason",
+      "policy_bundle"
+     ],
+     "properties": {
+      "reason": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 10
+      },
+      "decision": {
+       "enum": [
+        "ready_for_approval",
+        "request_information",
+        "specialist_review",
+        "not_eligible_for_requested_product"
+       ],
+       "type": "string"
+      },
+      "account_type": {
+       "type": "string",
+       "maxLength": 2000,
+       "minLength": 1
+      },
+      "evidence_ids": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 100
+      },
+      "policy_bundle": {
+       "type": "string",
+       "const": "golden-kyc-1.0.0"
+      },
+      "assessed_revision": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "party_assessments": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "required": [
+         "party_id",
+         "role",
+         "status"
+        ],
+        "properties": {
+         "role": {
+          "type": "string",
+          "maxLength": 2000,
+          "minLength": 1
+         },
+         "status": {
+          "type": "string",
+          "maxLength": 2000,
+          "minLength": 1
+         },
+         "party_id": {
+          "type": "string",
+          "maxLength": 2000,
+          "minLength": 1
+         },
+         "verification_evidence_ids": {
+          "type": "array",
+          "items": {
+           "type": "string",
+           "maxLength": 2000,
+           "minLength": 1
+          },
+          "maxItems": 100
+         }
+        },
+        "additionalProperties": true
+       },
+       "maxItems": 10
+      },
+      "outstanding_actions": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       "maxItems": 100
+      }
+     },
+     "additionalProperties": false
+    },
+    "output_schema": {
+     "type": "object",
+     "required": [
+      "status"
+     ],
+     "properties": {
+      "status": {
+       "enum": [
+        "completed",
+        "denied"
+       ],
+       "type": "string"
+      }
+     },
+     "additionalProperties": true
+    },
+    "error_statuses": [],
+    "pending": false,
+    "reset": "new_episode",
+    "isolation": "per_episode",
+    "response_mode": "environment"
+   }
+  ],
+  "output_schema": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "recommendation",
+    "rules_applied",
+    "assessments",
+    "notices_considered",
+    "risk_rating",
+    "officer_verification",
+    "audit_trail",
+    "rationale"
+   ],
+   "properties": {
+    "recommendation": {
+     "type": "string",
+     "enum": [
+      "ready_for_approval",
+      "request_information",
+      "specialist_review"
+     ]
+    },
+    "rules_applied": {
+     "description": "Every rule you relied on, in the version in force when you decided. Where a federal and a state rule cover the same obligation, list both and mark the stricter one governs.",
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "rule_id",
+       "version"
+      ],
+      "properties": {
+       "rule_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+       },
+       "version": {
+        "type": "integer",
+        "minimum": 1
+       },
+       "text_sha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+       },
+       "party_ids": {
+        "type": "array",
+        "items": {
+         "type": "string",
+         "minLength": 1
+        },
+        "uniqueItems": true
+       },
+       "governs": {
+        "type": "boolean"
+       },
+       "overlaps_with": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "rule_id",
+          "version"
+         ],
+         "properties": {
+          "rule_id": {
+           "type": "string",
+           "minLength": 1,
+           "maxLength": 200
+          },
+          "version": {
+           "type": "integer",
+           "minimum": 1
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "assessments": {
+     "description": "One per party.",
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "party_id",
+       "outcome",
+       "issues"
+      ],
+      "properties": {
+       "party_id": {
+        "type": "string",
+        "minLength": 1
+       },
+       "outcome": {
+        "type": "string",
+        "enum": [
+         "clear",
+         "request_information",
+         "specialist_review"
+        ]
+       },
+       "issues": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "issue",
+          "evidence_ids"
+         ],
+         "properties": {
+          "issue": {
+           "type": "string",
+           "minLength": 5,
+           "maxLength": 2000
+          },
+          "evidence_ids": {
+           "type": "array",
+           "items": {
+            "type": "string",
+            "minLength": 1
+           }
+          },
+          "rules": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+             "rule_id",
+             "version"
+            ],
+            "properties": {
+             "rule_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+             },
+             "version": {
+              "type": "integer",
+              "minimum": 1
+             }
+            }
+           }
+          }
+         }
+        }
+       },
+       "requests": {
+        "type": "array",
+        "items": {
+         "type": "string",
+         "enum": [
+          "id_document",
+          "proof_of_address",
+          "tin",
+          "street_address",
+          "identification_number"
+         ]
+        }
+       },
+       "referral": {
+        "type": "string",
+        "enum": [
+         "sanctions",
+         "fraud",
+         "legal",
+         "edd"
+        ]
+       }
+      }
+     }
+    },
+    "notices_considered": {
+     "description": "The notice ids of every bulletin published in this episode, each considered. Always present; empty only when no bulletin was published.",
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "uniqueItems": true
+    },
+    "risk_rating": {
+     "description": "The customer risk rating under the bank's rules. required is false for an account the rules don't rate (single accounts); level is then null.",
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "required",
+      "level",
+      "factors"
+     ],
+     "properties": {
+      "required": {
+       "type": "boolean"
+      },
+      "level": {
+       "enum": [
+        "low",
+        "medium",
+        "high",
+        null
+       ]
+      },
+      "factors": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "minLength": 1
+       }
+      }
+     }
+    },
+    "officer_verification": {
+     "description": "True when the bank's rules require a human officer to verify before approval (a medium risk rating).",
+     "type": "boolean"
+    },
+    "audit_trail": {
+     "description": "One entry per SOP step, performed or skipped (spec 15.4: written at the end, in the final output).",
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "sop_step",
+       "status",
+       "data_seen",
+       "facts_learnt",
+       "facts_missing",
+       "rules_applied",
+       "principle",
+       "conclusion",
+       "open_items",
+       "confidence"
+      ],
+      "properties": {
+       "sop_step": {
+        "type": "string",
+        "pattern": "^[0-9]{1,2}[a-z]?$"
+       },
+       "status": {
+        "type": "string",
+        "enum": [
+         "done",
+         "skipped",
+         "blocked"
+        ]
+       },
+       "skip_reason": {
+        "type": "string",
+        "maxLength": 1000
+       },
+       "data_seen": {
+        "description": "What you saw earlier in this episode: record ids exactly as returned, or the rules you read as {rule_id, version}.",
+        "type": "array",
+        "items": {
+         "oneOf": [
+          {
+           "type": "string",
+           "minLength": 1,
+           "maxLength": 200
+          },
+          {
+           "type": "object",
+           "additionalProperties": false,
+           "required": [
+            "rule_id",
+            "version"
+           ],
+           "properties": {
+            "rule_id": {
+             "type": "string",
+             "minLength": 1,
+             "maxLength": 200
+            },
+            "version": {
+             "type": "integer",
+             "minimum": 1
+            }
+           }
+          }
+         ]
+        }
+       },
+       "facts_learnt": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "fact",
+          "value",
+          "evidence"
+         ],
+         "properties": {
+          "fact": {
+           "type": "string",
+           "minLength": 1,
+           "maxLength": 100
+          },
+          "value": {
+           "type": [
+            "string",
+            "number",
+            "boolean"
+           ]
+          },
+          "party_id": {
+           "type": "string"
+          },
+          "evidence": {
+           "type": "string",
+           "minLength": 1
+          }
+         }
+        }
+       },
+       "facts_missing": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "fact",
+          "why_needed"
+         ],
+         "properties": {
+          "fact": {
+           "type": "string",
+           "minLength": 1
+          },
+          "party_id": {
+           "type": "string"
+          },
+          "why_needed": {
+           "type": "string",
+           "minLength": 1,
+           "description": "The rule id that needs it."
+          }
+         }
+        }
+       },
+       "rules_applied": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "rule_id",
+          "version",
+          "why"
+         ],
+         "properties": {
+          "rule_id": {
+           "type": "string",
+           "minLength": 1
+          },
+          "version": {
+           "type": "integer",
+           "minimum": 1
+          },
+          "why": {
+           "type": "string",
+           "minLength": 1
+          },
+          "governs": {
+           "type": "boolean"
+          }
+         }
+        }
+       },
+       "rules_rejected": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "rule_id",
+          "why"
+         ],
+         "properties": {
+          "rule_id": {
+           "type": "string"
+          },
+          "version": {
+           "type": "integer"
+          },
+          "why": {
+           "type": "string"
+          }
+         }
+        }
+       },
+       "within_10_miles": {
+        "description": "SOP step 6 (recorded only; no decision effect).",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "value",
+         "distance_miles",
+         "evidence"
+        ],
+        "properties": {
+         "value": {
+          "type": "boolean"
+         },
+         "distance_miles": {
+          "type": "number",
+          "minimum": 0
+         },
+         "evidence": {
+          "type": "string"
+         }
+        }
+       },
+       "risk": {
+        "description": "SOP step 8a.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "required",
+         "rating",
+         "factors"
+        ],
+        "properties": {
+         "required": {
+          "type": "boolean"
+         },
+         "rating": {
+          "type": "string",
+          "enum": [
+           "not_required",
+           "low",
+           "medium",
+           "high"
+          ]
+         },
+         "factors": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "additionalProperties": false,
+           "required": [
+            "factor",
+            "evidence"
+           ],
+           "properties": {
+            "factor": {
+             "type": "string"
+            },
+            "evidence": {
+             "type": "string"
+            }
+           }
+          }
+         }
+        }
+       },
+       "principle": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+       },
+       "conclusion": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+       },
+       "open_items": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "confidence": {
+        "type": "string",
+        "enum": [
+         "high",
+         "medium",
+         "low"
+        ]
+       }
+      }
+     }
+    },
+    "rationale": {
+     "type": "string",
+     "minLength": 10,
+     "maxLength": 4000
+    }
+   }
+  },
+  "evaluators": [
+   {
+    "criterion_id": "tool_calls",
+    "capability": {
+     "id": "kyc-judgment-rubric-v1",
+     "version": "1"
+    },
+    "evidence_source": "tool_events"
+   },
+   {
+    "criterion_id": "procedure_output",
+    "capability": {
+     "id": "kyc-judgment-rubric-v1",
+     "version": "1"
+    },
+    "evidence_source": "final_output"
+   },
+   {
+    "criterion_id": "rules_applied",
+    "capability": {
+     "id": "kyc-judgment-rubric-v1",
+     "version": "1"
+    },
+    "evidence_source": "final_output"
+   },
+   {
+    "criterion_id": "evidence_judgment",
+    "capability": {
+     "id": "kyc-judgment-rubric-v1",
+     "version": "1"
+    },
+    "evidence_source": "run_evidence"
+   },
+   {
+    "criterion_id": "decision_next_action",
+    "capability": {
+     "id": "kyc-judgment-rubric-v1",
+     "version": "1"
+    },
+    "evidence_source": "final_output"
+   },
+   {
+    "criterion_id": "rationale",
+    "capability": {
+     "id": "kyc-judgment-rubric-v1",
+     "version": "1"
+    },
+    "evidence_source": "final_output"
+   },
+   {
+    "criterion_id": "process_adherence",
+    "capability": {
+     "id": "kyc-judgment-rubric-v1",
+     "version": "1"
+    },
+    "evidence_source": "run_evidence"
+   },
+   {
+    "criterion_id": "evidence_faithfulness",
+    "capability": {
+     "id": "kyc-judgment-rubric-v1",
+     "version": "1"
+    },
+    "evidence_source": "run_evidence"
+   },
+   {
+    "criterion_id": "missing_facts",
+    "capability": {
+     "id": "kyc-judgment-rubric-v1",
+     "version": "1"
+    },
+    "evidence_source": "final_output"
+   },
+   {
+    "criterion_id": "consistency",
+    "capability": {
+     "id": "kyc-judgment-rubric-v1",
+     "version": "1"
+    },
+    "evidence_source": "final_output"
+   }
+  ],
+  "paid_calls": false,
+  "environments": [
+   {
+    "alias": "kyc",
+    "description": "KYC Judgment environment (policy library, facts, scenario events)",
+    "environment_key": "kyc-judgment-openenv",
+    "requirement": {
+     "agent_modes": [
+      "SINGLE"
+     ]
+    },
+    "selection_rule": {
+     "rule": "same_data"
+    }
+   }
+  ],
+  "limits": {
+   "tool_calls": 150,
+   "transitions": 100,
+   "output_bytes": 32768,
+   "wall_seconds": 1200
+  },
+  "network": "none",
+  "isolation": "per_episode",
+  "reset": "new_episode",
+  "policy_bindings": {
+   "fact_catalog": "kyc-judgment-openenv.facts@1",
+   "facts": [
+    {
+     "fact": "process",
+     "environment_fact": "process",
+     "label": "Business process",
+     "type": "enum",
+     "allowed_values": [
+      "account_opening",
+      "beneficial_ownership",
+      "currency_transaction_reporting",
+      "record_retention",
+      "periodic_review",
+      "transaction_monitoring",
+      "account_closure",
+      "other"
+     ]
+    },
+    {
+     "fact": "customer_type",
+     "environment_fact": "customer_type",
+     "label": "Customer type",
+     "type": "enum",
+     "allowed_values": [
+      "individual",
+      "legal_entity"
+     ]
+    },
+    {
+     "fact": "product",
+     "environment_fact": "product",
+     "label": "Product",
+     "type": "enum",
+     "allowed_values": [
+      "individual",
+      "adult_joint",
+      "teen_joint",
+      "custodial"
+     ]
+    },
+    {
+     "fact": "governing_state",
+     "environment_fact": "governing_state",
+     "label": "Governing state",
+     "type": "string"
+    },
+    {
+     "fact": "opening_channel",
+     "environment_fact": "opening_channel",
+     "label": "Opening channel",
+     "type": "enum",
+     "allowed_values": [
+      "branch",
+      "remote"
+     ]
+    },
+    {
+     "fact": "party_role",
+     "environment_fact": "party_role",
+     "label": "Party role",
+     "type": "enum",
+     "allowed_values": [
+      "primary",
+      "joint",
+      "minor",
+      "custodian"
+     ]
+    },
+    {
+     "fact": "citizenship",
+     "environment_fact": "citizenship",
+     "label": "Citizenship",
+     "type": "string"
+    },
+    {
+     "fact": "residency",
+     "environment_fact": "residency",
+     "label": "Country of residence",
+     "type": "string"
+    },
+    {
+     "fact": "age_on_submission",
+     "environment_fact": "age_on_submission",
+     "label": "Age at submission",
+     "type": "number"
+    },
+    {
+     "fact": "address_type",
+     "environment_fact": "address_type",
+     "label": "Address type",
+     "type": "enum",
+     "allowed_values": [
+      "street",
+      "apo_fpo_dpo",
+      "next_of_kin",
+      "po_box"
+     ]
+    },
+    {
+     "fact": "document_kinds",
+     "environment_fact": "document_kinds",
+     "label": "Documents presented",
+     "type": "enum",
+     "allowed_values": [
+      "government_id",
+      "passport",
+      "proof_of_address",
+      "screening_result",
+      "tin_application",
+      "alien_identification_card",
+      "non_documentary_check_result",
+      "relationship_evidence"
+     ]
+    },
+    {
+     "fact": "party_relationship",
+     "environment_fact": "party_relationship",
+     "label": "Relationship to the first party",
+     "type": "enum",
+     "allowed_values": [
+      "self",
+      "spouse",
+      "parent_child",
+      "sibling",
+      "guardian",
+      "unrelated"
+     ]
+    },
+    {
+     "fact": "account_purpose",
+     "environment_fact": "account_purpose",
+     "label": "Account purpose",
+     "type": "enum",
+     "allowed_values": [
+      "everyday_banking",
+      "savings",
+      "education_savings",
+      "receiving_transfers",
+      "business_use",
+      "other"
+     ]
+    },
+    {
+     "fact": "id_age_days",
+     "environment_fact": "id_age_days",
+     "label": "Days since the ID was issued",
+     "type": "number"
+    },
+    {
+     "fact": "prior_minor_accounts",
+     "environment_fact": "prior_minor_accounts",
+     "label": "Minor accounts opened by this custodian before",
+     "type": "number"
+    },
+    {
+     "fact": "product_line",
+     "environment_fact": "product_line",
+     "label": "Product line",
+     "type": "enum",
+     "allowed_values": [
+      "deposit",
+      "loan",
+      "credit_card",
+      "mortgage"
+     ]
+    },
+    {
+     "fact": "branch_id",
+     "environment_fact": "branch_id",
+     "label": "Branch",
+     "type": "string"
+    },
+    {
+     "fact": "address_to_branch_miles",
+     "environment_fact": "address_to_branch_miles",
+     "label": "Distance from address to branch",
+     "type": "number"
+    },
+    {
+     "fact": "us_residency_status",
+     "environment_fact": "us_residency_status",
+     "label": "U.S. residency status",
+     "type": "enum",
+     "allowed_values": [
+      "none",
+      "lawful_permanent_resident",
+      "other_resident"
+     ]
+    }
+   ]
+  }
+ },
+ "skills": {
+  "authoring": {
+   "languages": [
+    "en"
+   ],
+   "mandatory": [
+    "Consumer deposit KYC",
+    "Evidence based investigation"
+   ],
+   "preferred": [
+    "Consumer account ownership and capacity"
+   ],
+   "specialties": [
+    "Individual, joint, teen and custodial deposit applications"
+   ],
+   "jurisdictions": [
+    "US",
+    "US-CA"
+   ],
+   "certifications": []
+  },
+  "reviewing": {
+   "languages": [
+    "en"
+   ],
+   "mandatory": [
+    "Consumer deposit KYC",
+    "Independent rubric review"
+   ],
+   "preferred": [
+    "State law and charter applicability review"
+   ],
+   "specialties": [
+    "Evidence provenance and agent safety"
+   ],
+   "jurisdictions": [
+    "US",
+    "US-CA"
+   ],
+   "certifications": []
+  },
+  "schema_version": "anvil.template-skills.v1"
+ }
+}

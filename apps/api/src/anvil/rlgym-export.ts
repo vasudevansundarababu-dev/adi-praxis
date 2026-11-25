@@ -6,6 +6,9 @@ import { jcsSha256 } from './jcs';
 import { storeTaskPackage } from './task-package-store';
 import { mapRecordPolicies, policyIdMapFor, policyIdMapWire, POLICY_ID_UNMAPPED, type PolicyIdMap, type UnmappedPolicy } from './policy-id-map';
 import { OWNER_LABEL, TASK_CHECKER, TASK_CHECKER_VERSION, type TaskCheckReport, type TaskProblem } from '../tasks/task-integrity';
+import { coveredCaseValues, coveredListKey } from '@praxis/shared';
+import { caseSelectorOf as templateCaseSelector, selectorField } from '../tasks/task-service';
+import { authoredContent } from '../tasks/profile-output';
 
 /**
  * The `rlgym.project-export.v1` body for a project's current approved tasks (AUTHORING-SNAPSHOT 3.2 a; AUTHORING-SPEC
@@ -96,6 +99,21 @@ export function caseSelectorOf(record: ApprovedTaskRecord, focus: string | null 
   return out;
 }
 
+/**
+ * KYC Judgment v1 §16 (owner, 25 Nov 2026): a task that covers several application types (the template's selector reads a
+ * multi-select, S1.coveredApplicationTypes) sends the LIST under `application_types`, with its edge cases. Null for every
+ * other template, whose selector stays exactly as before.
+ */
+export function coveredSelectorOf(template: Template, record: ApprovedTaskRecord, focus: string | null = null, familyTags: string[] = []): Record<string, unknown> | null {
+  const sel = templateCaseSelector(template.caseSelector);
+  if (!sel || selectorField(template, sel.source)?.type !== 'multi_select') return null;
+  const values = coveredCaseValues(sel, authoredContent(record.output));
+  if (!values?.length) return null;
+  const slot = isObj(record.input) && isObj(record.input.slot) ? record.input.slot : {};
+  const edges = [...(typeof slot.edgeCase === 'string' && slot.edgeCase ? [slot.edgeCase] : []), ...(focus ? [focus] : []), ...familyTags];
+  return { [coveredListKey(sel.source)]: values, edge_cases: [...new Set(edges)] };
+}
+
 export interface BuiltExport {
   body: Record<string, unknown>;
   exportSha256: string;
@@ -114,7 +132,7 @@ export interface BuiltExport {
  */
 export async function buildRlGymExport(
   tx: Db | Tx,
-  p: { id: string; name: string; template: Template },
+  p: { id: string; name: string; template: Template; testOnly?: boolean },
   records: ApprovedTaskRecord[],
   ref: { id: string; version: number; specSha256: string },
   opts: { exported: boolean; held?: Map<string, string>; batches?: Map<string, string>; reports?: Map<string, TaskCheckReport>; familyTags?: Map<string, string[]>; policyIdMap?: PolicyIdMap | null },
@@ -149,7 +167,8 @@ export async function buildRlGymExport(
     const complexity = str(priv.complexity);
     const archetype = str(priv.archetype);
     const edgeCase = str(priv.edge_case);
-    const selector = caseSelectorOf(r, edgeCase, opts.familyTags?.get(r.taskInstanceId) ?? []);
+    const covered = coveredSelectorOf(p.template, r, edgeCase, opts.familyTags?.get(r.taskInstanceId) ?? []);
+    const selector = covered ?? caseSelectorOf(r, edgeCase, opts.familyTags?.get(r.taskInstanceId) ?? []);
     if (!selector) {
       notSent.push({ recordId: r.id, taskId: r.taskInstanceId, title, code: 'CASE_SELECTOR_MISSING', message: 'The task has no case (no slot case or coverage values), so RL Gym cannot match it to a case.' });
       continue;
@@ -186,8 +205,11 @@ export async function buildRlGymExport(
   // The ID covers everything the body carries, so one export ID never stands for two different bodies (the RL Gym
   // refuses that as an idempotency conflict).
   const projectId = rlgymProjectId(p.id);
-  const exportId = `exp-${jcsSha256({ project: projectId, name: p.name, template, project_config, reason, tasks: wire }).slice(0, 16)}`;
-  const body: Record<string, unknown> = { schema: RLGYM_EXPORT_SCHEMA, project_id: projectId, project_name: p.name, template, project_config, export_id: exportId, reason, tasks: wire };
+  // KYC Judgment v1 (RL Gym, 25 Nov 2026): a test-only project sends top-level `test_only: true` (sticky in the RL Gym,
+  // labelled TEST, never on a leaderboard). Other projects send nothing, so their export bodies stay byte-identical.
+  const test = p.testOnly ? { test_only: true as const } : {};
+  const exportId = `exp-${jcsSha256({ project: projectId, name: p.name, template, project_config, reason, tasks: wire, ...test }).slice(0, 16)}`;
+  const body: Record<string, unknown> = { schema: RLGYM_EXPORT_SCHEMA, project_id: projectId, project_name: p.name, ...test, template, project_config, export_id: exportId, reason, tasks: wire };
   const exportSha256 = jcsSha256(body);
   body.export_sha256 = exportSha256;
   return { body, exportSha256, exportId, reason, tasks, notSent };

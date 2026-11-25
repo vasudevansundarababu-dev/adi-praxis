@@ -123,5 +123,9 @@ export function catalogFromTemplate(anvilSpec: unknown, projectId: string): Fact
   });
   if (!facts.length) return null;
   const unique = facts.filter((f, i) => facts.findIndex((x) => x.id === f.id) === i);
+  // KYC Judgment v1 (C1/C2): bindings that name the environment's catalog ("<id>@<version>") give it that identity, so the
+  // policy library names the catalog the environment resolves conditions with.
+  const env = typeof b.fact_catalog === 'string' ? /^([a-z][a-z0-9_.:-]{1,199})@([1-9][0-9]*)$/.exec(b.fact_catalog) : null;
+  if (env) return FactCatalog.parse({ schema_version: 'adi.utility.fact-catalog.v1', catalog_id: env[1], version: Number(env[2]), owner: { kind: 'environment_version', id: b.fact_catalog }, facts: unique });
   return FactCatalog.parse({ schema_version: 'adi.utility.fact-catalog.v1', catalog_id: 'project.facts', version: 1, owner: { kind: 'project_scope', id: projectId }, facts: unique });
 }

@@ -2,6 +2,7 @@ import type { ProjectDto } from '@praxis/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { LibraryDetailsEditor } from '@/components/policy/library-details';
 import { RuleDetail, type RuleDetailData } from '@/components/policy/rule-detail';
 import { apiGet } from '@/lib/api';
 
@@ -20,6 +21,7 @@ export default async function PolicyRulePage({ params }: { params: Promise<{ id:
       <h1 className="mt-2 text-2xl font-semibold">{rule.body.title}</h1>
       <p className="font-mono text-sm text-fg-muted">{rule.ruleKey}</p>
       <RuleDetail projectId={id} d={rule} />
+      <LibraryDetailsEditor projectId={id} ruleId={rule.ruleId} contentHash={rule.contentHash} body={rule.body} approved={rule.state === 'REVIEWED'} />
     </div>
   );
 }

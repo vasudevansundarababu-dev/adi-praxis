@@ -173,6 +173,12 @@ describe('A4: the policy library export (C1)', () => {
     expect(await db.policyLibraryExport.count()).toBe(0);
   });
 
+  it('the documents list shows each document’s library details (for the console)', async () => {
+    const items = (await api(pmCookie).get(`/projects/${projectId}/policy/documents`)).json().items as Record<string, unknown>[];
+    expect(items.find((d) => d.id === docs.federal!.documentId)).toMatchObject({ jurisdiction: 'US', libraryKind: 'official_text', captureSourceUrl: 'https://example.invalid/federal', captureDownloadedOn: '2026-11-20' });
+    expect(items.find((d) => d.id === docs.bank!.documentId)).toMatchObject({ libraryKind: 'bank_policy', captureSourceUrl: null, captureDownloadedOn: null });
+  });
+
   it('an official text needs its capture (where and when it was downloaded); no catalog means nothing to check conditions against', async () => {
     await rule('TIN', 'federal', line(FEDERAL, 2), { condition: OPENING, library: LIB });
     expect((await api(pmCookie).put(`/projects/${projectId}/policy/documents/${docs.federal!.documentId}/library`, { kind: 'official_text' })).statusCode).toBe(422);

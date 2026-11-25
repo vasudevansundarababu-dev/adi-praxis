@@ -251,6 +251,8 @@ describe('fact catalog from the template (v8 with policy bindings)', () => {
       { id: 'governing_state', label: 'Governing state', type: 'string', availability: 'case_data' },
       { id: 'product', label: 'Product', type: 'enum', allowed_values: ['individual', 'adult_joint', 'teen_joint', 'custodial'], availability: 'case_data' },
     ]);
+    // KYC Judgment v1: the catalog keeps the environment's own id, so the policy library (C1) names it.
+    expect(cat.catalog).toMatchObject({ catalog_id: 'golden-kyc-openenv.facts', version: 1, owner: { kind: 'environment_version', id: 'golden-kyc-openenv.facts@1' } });
     expect((await api(pmCookie).post(`/projects/${projectId}/policy/fact-catalog/from-template`, {})).statusCode).toBe(409);
   });
 });

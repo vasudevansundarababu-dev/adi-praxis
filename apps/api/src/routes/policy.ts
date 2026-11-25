@@ -132,7 +132,7 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
     const docs = await db.policyDocument.findMany({ where: { projectId: p.id, archivedAt: null }, orderBy: { createdAt: 'asc' }, include: { versions: { orderBy: { version: 'desc' } } } });
     return {
       maxPages: policy.maxPages,
-      items: docs.map((d) => ({ id: d.id, title: d.title, category: d.category, language: d.language, jurisdiction: d.jurisdiction, effectiveFrom: d.effectiveFrom, effectiveTo: d.effectiveTo, latestVersion: d.latestVersion, versions: d.versions.map(versionDto) })),
+      items: docs.map((d) => ({ id: d.id, title: d.title, libraryKind: d.libraryKind, captureSourceUrl: d.captureSourceUrl, captureDownloadedOn: d.captureDownloadedOn?.toISOString().slice(0, 10) ?? null, category: d.category, language: d.language, jurisdiction: d.jurisdiction, effectiveFrom: d.effectiveFrom, effectiveTo: d.effectiveTo, latestVersion: d.latestVersion, versions: d.versions.map(versionDto) })),
     };
   });
 

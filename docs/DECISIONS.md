@@ -2743,3 +2743,15 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
 - The pack template may carry Studio's `validateHints` (D-072).
 - New append-only tables (PolicyRuleSuggestion, PolicyCoverageResult, PolicyLibraryExport) are on the app role's revoke
   list, so the application can never update or delete their rows on Cloud SQL either.
+
+## D-075: console for the policy library (KYC Judgment v1, coordinator 25 Nov 2026: the PM never needs API calls)
+
+- **Rule page → Library details:** kind, issuer, ISO jurisdiction, evaluated for (case or party), process, customer
+  types, product lines, channels, effect, takes effect (from date or scenario only), change from the version before
+  (kind and summary), and the condition: "Applies always within its process" (null), or a condition over the case's facts.
+  Bad JSON, a non-ISO jurisdiction or a change without a summary are named and never saved. Saving is an ordinary rule
+  edit; on an approved rule it makes a new draft, which the PM applies again.
+- **Policies page → Library setup:** each document's kind, ISO jurisdiction and (official text) where and when it was
+  downloaded, with what C1 still needs; "Load the environment's fact catalog" (from the template's fact bindings,
+  keeping the environment's catalog id, e.g. kyc-judgment-openenv.facts@1); "Export policy library (C1)" with the
+  refusal's problems listed, and each export's exact bytes to download.

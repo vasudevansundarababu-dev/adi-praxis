@@ -98,19 +98,22 @@ describe('A5: the S4 rule picker stores the content hash, and its citations expo
     expect(await referenceProblems(db, { clientId, output })).toEqual([]);
   });
 
-  it('never guesses: a hash that is not the version’s, another rule’s key or an unknown version is not exported and is flagged', async () => {
+  it('never guesses: a hash that is not the version’s or an unknown version is not exported and is flagged', async () => {
     const v = await publishedRule();
-    const bad = [
-      pickerOutput({ ruleId: 'R-CA-JOINT', ruleVersion: v.id, contentSha256: 'f'.repeat(64) }),
-      pickerOutput({ ruleId: 'R-OTHER', ruleVersion: v.id, contentSha256: v.contentHash }),
-      pickerOutput({ ruleId: 'R-CA-JOINT', ruleVersion: randomUUID(), contentSha256: v.contentHash }),
-    ];
+    const bad = [pickerOutput({ ruleId: 'R-CA-JOINT', ruleVersion: v.id, contentSha256: 'f'.repeat(64) }), pickerOutput({ ruleId: 'R-CA-JOINT', ruleVersion: randomUUID(), contentSha256: v.contentHash })];
     for (const output of bad) {
       expect(await policyClausesFor(db, { clientId, projectId, output })).toEqual([]);
       const p = await referenceProblems(db, { clientId, output });
       expect(p).toHaveLength(1);
       expect(p[0]).toMatchObject({ code: 'UNRESOLVED_CLAUSE', section: 'S4', severity: 'blocking', owner: 'author' });
     }
+  });
+
+  it('the version id names the rule: a key written differently (GB-01 for R-GB-01, as older golden tasks do) still exports under the library’s key', async () => {
+    const v = await publishedRule();
+    const output = pickerOutput({ ruleId: 'CA-JOINT', ruleVersion: v.id, contentSha256: v.contentHash });
+    expect((await policyClausesFor(db, { clientId, projectId, output })).map((c) => c.entry.clause_id)).toEqual(['R-CA-JOINT']);
+    expect(await referenceProblems(db, { clientId, output })).toEqual([]);
   });
 
   it('a citation picked before the hash was stored still resolves by its exact version id; a version approved after the task is flagged for the PM', async () => {

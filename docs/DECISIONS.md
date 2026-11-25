@@ -2571,11 +2571,27 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
 - **Picker.** The library the picker reads gives each published rule version its `contentHash` (from the rule set
   content). A picked item stores it as `contentSha256`, next to `ruleId` (the rule key) and `ruleVersion` (the version
   id). The item's shape is otherwise unchanged; the hash is never typed or shown.
-- **Export.** A picker citation (a rule key plus a version UUID) resolves to that exact version: the rule key must match
-  and, when stored, so must the hash. It then exports the same `policy_clauses` entry as a citation by rule id, pinned
+- **Export.** A picker citation (a rule key plus a version UUID) resolves to that exact version, and, when stored, the
+  hash must match. The version id alone names the rule (golden tasks write `GB-01` for `R-GB-01`), and the clause id
+  exported is always the library's rule key. It then exports the same `policy_clauses` entry as a citation by rule id, pinned
   per revision in the same way. A citation picked before 25 Nov (no hash) resolves by its version id alone, which is exact
   because a published version never changes.
-- **Never guessed.** A wrong hash, another rule's key or an unknown version exports nothing and is a blocking
+- **Never guessed.** A wrong hash or an unknown version exports nothing and is a blocking
   `UNRESOLVED_CLAUSE` check (the author picks again). A version approved after the task is flagged for the PM.
 - **Unchanged.** Document citations and citations by rule id. The D-056 id map reads only citations by id, so it neither
   maps nor flags picker citations: KYC Judgment v1 shares rule ids with the environment through C1.
+
+## D-065: Validate warns on S5 follow-ups that decide the outcome (KYC Judgment v1 A6; owner, 25 Nov 2026: "Accept recommendations")
+
+- **Why.** T2: procedure steps state duties, not outcomes. A step's conditional follow-up such as "if screening returns
+  a possible match → finding.write, specialist.refer" hands the agent the answer the published rules should give.
+  The adult joint KYC task had two such branches before its T2 correction.
+- **Check.** `STEP_OUTCOME_BRANCH`: a follow-up with a condition (`if`) whose tools include an outcome tool
+  (finding.write, finding.resolve, information.request, specialist.refer, recommend). One warning per branch, on
+  `S5.steps[i].followUps[j]`, owned by the author, with the condition and the tools in the message.
+- **Not flagged.** A follow-up with no condition (the documents.list → document.read chain), and a condition whose
+  tools only read.
+- **A warning, never a block.** Validate and the check report show it. It never sends a task back, stops an approval or
+  a PM correction, or holds an export. It applies to every template, so v8 tasks that still have branches show it too.
+- **Note.** The D-016 step drafter still suggests conditional follow-ups for finding.write and specialist.refer. The
+  warning now flags them; changing the drafter is left for later.

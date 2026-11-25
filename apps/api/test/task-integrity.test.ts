@@ -38,6 +38,30 @@ describe('task checks on a frozen snapshot', () => {
     expect(codes(s7('Score each criterion once.'))).toEqual([]);
   });
 
+  it('KYC Judgment v1 A6: a conditional follow-up that decides the outcome ("if possible match → refer") is a warning, never a block', () => {
+    const steps = (followUps: unknown) => ({ S5: { steps: [{ tool: 'application.read', action: 'Read it.' }, { tool: 'recommend', action: 'Recommend.', followUps }] } });
+    // The adult joint task's step before T2: a possible match is recorded and referred by the procedure, not by the rules.
+    const branch = { if: 'screening returns a possible match for an applicant', tools: ['finding.write', 'specialist.refer'] };
+    const [w, ...rest] = snapshotProblems(template, task(steps([branch])));
+    expect(rest).toEqual([]);
+    expect(w).toMatchObject({ code: 'STEP_OUTCOME_BRANCH', section: 'S5', field: 'S5.steps[1].followUps[0]', severity: 'warning', owner: 'author', retryHelps: false });
+    expect(w!.message).toContain('Step 2');
+    expect(w!.message).toContain('finding.write, specialist.refer');
+    expect(w!.message).toContain('screening returns a possible match for an applicant');
+    // One warning per branch; a request or a recommendation decided by the procedure counts too.
+    expect(codes(steps([branch, { if: 'a document is expired', tools: ['information.request'] }]))).toEqual([
+      ['STEP_OUTCOME_BRANCH', 'S5.steps[1].followUps[0]', 'author'],
+      ['STEP_OUTCOME_BRANCH', 'S5.steps[1].followUps[1]', 'author'],
+    ]);
+    // Not outcome branches: the documents.list → document.read chain (no condition), a condition that only reads, none at all.
+    expect(codes(steps([{ tools: ['document.read'] }]))).toEqual([]);
+    expect(codes(steps([{ tools: ['specialist.refer'] }]))).toEqual([]);
+    expect(codes(steps([{ if: 'a check is pending', tools: ['operation.read'] }]))).toEqual([]);
+    expect(codes(steps([]))).toEqual([]);
+    // A warning is shown by Validate but never sends the task back or stops an approval.
+    expect(splitByOwner([w!])).toEqual({ author: [], others: [] });
+  });
+
   it('each problem says its section, field, code, who fixes it and that retrying does not help; author problems become D18 checks', () => {
     const [p] = snapshotProblems(template, task({ S3: { tools: ['application.read'] } }));
     expect(p).toMatchObject({ code: 'STEP_TOOL_NOT_OFFERED', section: 'S5', field: 'S5.steps[1].tool', severity: 'blocking', owner: 'author', retryHelps: false });

@@ -35,7 +35,7 @@ const clauseInclude = { rule: true, citations: { take: 1, include: { documentVer
 
 /**
  * The clause version each S4 citation names, exactly: by rule id and content hash, or (rule picker) by version id, with
- * the rule key and the stored hash both matching. A citation that names nothing exactly resolves to null; never guessed.
+ * the stored hash matching when there is one. The clause id exported is always the library's rule key. A citation that names nothing exactly resolves to null; never guessed.
  */
 export async function citedClauseVersions(tx: Db | Tx, clientId: string, output: unknown) {
   const out: { citation: string; version: Prisma.PolicyRuleVersionGetPayload<{ include: typeof clauseInclude }> | null }[] = [];
@@ -44,7 +44,8 @@ export async function citedClauseVersions(tx: Db | Tx, clientId: string, output:
     out.push({ citation: c.ruleId, version: await tx.policyRuleVersion.findFirst({ where: { ruleId: c.ruleId, contentHash: c.contentSha256, clientId }, include: clauseInclude }) });
   for (const c of citedRuleVersions(output)) {
     const v = await tx.policyRuleVersion.findFirst({ where: { id: c.ruleVersionId, clientId }, include: clauseInclude });
-    const exact = v && v.rule.ruleKey === c.ruleKey && (c.contentSha256 === null || c.contentSha256 === v.contentHash);
+    // The version id names one immutable published version; the stored hash, when present, must be that version's.
+    const exact = v && (c.contentSha256 === null || c.contentSha256 === v.contentHash);
     out.push({ citation: c.ruleKey, version: exact ? v : null });
   }
   return out;

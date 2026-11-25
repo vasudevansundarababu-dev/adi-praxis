@@ -1,5 +1,5 @@
 import type { ApprovedTaskRecord, Template } from '@prisma/client';
-import { agentProjection, type TaskCheck, type TemplateProfile } from '@praxis/shared';
+import { agentProjection, followUpsOf, type TaskCheck, type TemplateProfile } from '@praxis/shared';
 import { citedRules, citedRuleVersions } from '../anvil/clause-export';
 import { actorProjection } from '../anvil/generic-package';
 import { jcsSha256 } from '../anvil/jcs';
@@ -155,6 +155,31 @@ function stepTools(sections: Record<string, unknown>, declared: Set<string> | nu
   return out;
 }
 
+/**
+ * Tools that act on an outcome: recording or resolving a finding, asking the customer, referring to a specialist,
+ * recommending. A step's conditional follow-up that calls one decides for the agent what a finding means.
+ */
+export const OUTCOME_TOOLS: ReadonlySet<string> = new Set(['finding.write', 'finding.resolve', 'information.request', 'specialist.refer', 'recommend']);
+
+/**
+ * KYC Judgment v1 A6 (T2, owner 25 Nov 2026): S5 steps state duties, not outcomes. A conditional follow-up that calls an
+ * outcome tool ("if a possible match → specialist.refer") hands the agent the answer the published rules should give.
+ * A warning on Validate, never a block: the author rewrites it as a duty step.
+ */
+function outcomeBranches(sections: Record<string, unknown>): TaskProblem[] {
+  const s5 = isObj(sections.S5) ? sections.S5 : {};
+  if (!Array.isArray(s5.steps)) return [];
+  const out: TaskProblem[] = [];
+  (s5.steps as unknown[]).forEach((step, i) => {
+    followUpsOf(step).forEach((f, j) => {
+      const decided = f.tools.filter((t) => OUTCOME_TOOLS.has(t));
+      if (!f.if || !decided.length) return;
+      out.push({ code: 'STEP_OUTCOME_BRANCH', section: 'S5', field: `S5.steps[${i}].followUps[${j}]`, severity: 'warning', owner: 'author', retryHelps: false, message: `Step ${i + 1} decides the outcome for the agent: “if ${f.if}” → ${decided.join(', ')}. Write it as a duty (for example a separate step: “where the applicable rules require it, …”), so the agent finds what a finding requires in the published rules.` });
+    });
+  });
+  return out;
+}
+
 /** Numbers stated in S7's scoring rule: the maximum, the pass threshold and the 5/2/0 awards. */
 export function statedScoring(rule: string) {
   const num = (re: RegExp) => {
@@ -216,7 +241,7 @@ export function snapshotProblems(template: Template, output: unknown, benchmark:
   const extra = ['edgeCase', 'archetype', 'complexity'].flatMap((k) => (str(bench[k]) ? [{ path: `benchmark.${k}`, text: str(bench[k]) }] : []));
   const spec = jointTemplateSpec(template);
   const ids = spec ? declaredToolIds(spec.execution) : null;
-  return [...stepTools(sections, ids ? new Set(ids) : null), ...scoring(sections, form), ...privateLeaks(sections, form, agentView(template, output, form, joint), extra)];
+  return [...stepTools(sections, ids ? new Set(ids) : null), ...outcomeBranches(sections), ...scoring(sections, form), ...privateLeaks(sections, form, agentView(template, output, form, joint), extra)];
 }
 
 /**
@@ -240,10 +265,10 @@ export async function referenceProblems(tx: Db | Tx, ctx: { clientId: string; pr
     const why = !v ? 'no longer exists in the policy library' : !v.reviewedAt || v.reviewedAt > at ? 'was not approved when the task was approved' : !v.citations.length ? 'has no source citation' : null;
     if (why) out.push({ code: 'UNRESOLVED_CLAUSE', section: 'S4', field: `S4 clause ${c.ruleId.slice(0, 8)}`, severity: 'blocking', owner: !v ? 'author' : 'pm', retryHelps: false, message: `A policy clause the task cites ${why}. ${!v ? 'Choose a current clause in S4.' : 'The PM approves the clause version, then the task is approved again.'}` });
   }
-  // Rule picker citations (KYC Judgment v1 A5): the exact version by id, with the rule key and the stored hash matching.
+  // Rule picker citations (KYC Judgment v1 A5): the exact version by id, with the stored hash matching when there is one.
   for (const c of citedRuleVersions(authoredContent(ctx.output))) {
-    const found = await tx.policyRuleVersion.findFirst({ where: { id: c.ruleVersionId, clientId: ctx.clientId }, select: { contentHash: true, reviewedAt: true, rule: { select: { ruleKey: true } }, citations: { take: 1, select: { id: true } } } });
-    const v = found && found.rule.ruleKey === c.ruleKey && (c.contentSha256 === null || c.contentSha256 === found.contentHash) ? found : null;
+    const found = await tx.policyRuleVersion.findFirst({ where: { id: c.ruleVersionId, clientId: ctx.clientId }, select: { contentHash: true, reviewedAt: true, citations: { take: 1, select: { id: true } } } });
+    const v = found && (c.contentSha256 === null || c.contentSha256 === found.contentHash) ? found : null;
     const why = !v ? 'no longer exists in the policy library at the version picked' : !v.reviewedAt || v.reviewedAt > at ? 'was not approved when the task was approved' : !v.citations.length ? 'has no source citation' : null;
     if (why) out.push({ code: 'UNRESOLVED_CLAUSE', section: 'S4', field: `S4 rule ${c.ruleKey}`, severity: 'blocking', owner: !v ? 'author' : 'pm', retryHelps: false, message: `A policy rule the task cites ${why}. ${!v ? 'Pick the rule again from the library in S4.' : 'The PM approves the rule version, then the task is approved again.'}` });
   }

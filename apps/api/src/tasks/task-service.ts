@@ -58,7 +58,9 @@ export async function ensureSlots(tx: Tx, projectId: string) {
   // A case-selector template: exactly one slot per value, whatever the project's target (13 Nov 2026).
   // KYC Judgment v1 §16: a selector over a multi-select (covered application types) is ONE slot for every type.
   const selField = sel ? selectorField(p.template, sel.source) : undefined;
-  const slots = sel ? (selField?.type === 'multi_select' ? [coveredSelectorSlot(sel, { fieldLabel: selField.label, labelOf: (v) => selField.options?.find((o) => o.value === v)?.label })] : selectorSlots(p.template, sel)) : generateSlots({
+  // The template's own strategy decides (it holds even where the form isn't loaded); a multi-select source means the same.
+  const covered = sel?.strategy === 'stratified' || selField?.type === 'multi_select';
+  const slots = sel ? (covered ? [coveredSelectorSlot(sel, { fieldLabel: selField?.label, labelOf: (v) => selField?.options?.find((o) => o.value === v)?.label })] : selectorSlots(p.template, sel)) : generateSlots({
     dimensions: matrix.dimensions,
     cells: cov.cells,
     edgeCases: cov.edgeCases,

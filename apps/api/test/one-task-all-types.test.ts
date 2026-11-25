@@ -69,6 +69,14 @@ describe('one task for all types (§16)', () => {
     expect(slot!.brief).toContain('Write one reusable task for every');
   });
 
+  it('the slot decision reads the template’s own strategy, so it holds even where the form isn’t loaded (the job process, 25 Nov)', async () => {
+    const t = await draft(covered());
+    const p = await project(t.id, t.version);
+    // Simulate a process that never loaded the uploaded form: point the template at an unknown form id.
+    await db.template.update({ where: { id: t.id }, data: { profileId: 'not-loaded-here' } });
+    expect(await db.$transaction((tx) => ensureSlots(tx, p.id))).toBe(1);
+  });
+
   it('the export sends the covered list from the task; other templates keep their selector', async () => {
     const t = await draft(covered());
     const record = { input: { slot: {} }, output: { sections: { S1: { governingState: ['NY', 'CA'] } } } } as unknown as ApprovedTaskRecord;

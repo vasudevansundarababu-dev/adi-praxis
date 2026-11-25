@@ -91,7 +91,10 @@ describe('KYC Judgment v1 integration test project (test-only)', () => {
     const proj = await createTestProject(db, { storage }, { requestedBy: ADMIN, sourceProjectId: v8, apply: true });
     expect(proj).toMatchObject({ outcome: 'created', tasks: 1 });
     const p = await db.project.findUniqueOrThrow({ where: { id: proj.projectId as string } });
-    expect(p).toMatchObject({ name: TEST_PROJECT_NAME, testOnly: true, distinctTarget: 1 });
+    expect(p).toMatchObject({ name: TEST_PROJECT_NAME, testOnly: true, distinctTarget: 1, status: 'IN_PROGRESS' });
+    expect(await db.coverageSlot.count({ where: { projectId: p.id } })).toBe(1);
+    // A live project: the export gate never refuses it as a draft.
+    expect((await api().get(`/projects/${p.id}/rlgym-export`)).json().reason ?? '').not.toContain('draft');
     expect(await db.policyRule.count({ where: { projectId: p.id } })).toBe(0);
     expect((await db.policyDocumentVersion.findMany({ where: { projectId: p.id } })).length).toBe(1);
 

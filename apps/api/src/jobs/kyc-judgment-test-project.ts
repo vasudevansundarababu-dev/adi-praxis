@@ -117,14 +117,18 @@ export async function retireDraft(db: Db, args: { requestedBy: string; templateI
 }
 
 // ───────────────────────── Phase 2: project ─────────────────────────
-export async function createTestProject(db: Db, deps: { storage: ObjectStorage }, args: { requestedBy: string; sourceProjectId: string; apply: boolean }): Promise<Report> {
+export async function createTestProject(db: Db, deps: { storage: ObjectStorage }, args: { requestedBy: string; sourceProjectId: string; apply: boolean; name?: string }): Promise<Report> {
+  // The template's form must be registered in this process (slots and checks read it).
+  await loadUploadedProfiles(db);
+  const name = args.name ?? TEST_PROJECT_NAME;
   return db.$transaction(
     async (tx) => {
       const admin = await adminOf(tx, args.requestedBy);
       if (!admin) return refuse('The requester must be an active Admin.');
       const t = await tx.template.findFirst({ where: { clientId: admin.clientId, workflowName: { equals: WORKFLOW, mode: 'insensitive' }, status: 'PUBLISHED' }, orderBy: { version: 'desc' } });
       if (!t) return refuse('KYC Judgment v1 is not published yet: an Admin publishes it in the console first.');
-      const existing = await tx.project.findFirst({ where: { clientId: admin.clientId, name: TEST_PROJECT_NAME } });
+      // A cancelled test project of the same name (e.g. one made with the wrong slots) is left as it is, never reused.
+      const existing = await tx.project.findFirst({ where: { clientId: admin.clientId, name, status: { not: 'CANCELLED' } } });
       if (existing) return { outcome: 'already_created', projectId: existing.id, testOnly: existing.testOnly };
       const src = await tx.project.findFirst({ where: { id: args.sourceProjectId, clientId: admin.clientId } });
       if (!src) return refuse('Source project not found.');
@@ -134,12 +138,12 @@ export async function createTestProject(db: Db, deps: { storage: ObjectStorage }
       const dvs = await tx.policyDocumentVersion.findMany({ where: { id: { in: dvIds } }, include: { document: true } });
       if (dvs.length !== 1) return refuse(`The source project's rule set cites ${dvs.length} document versions; expected exactly the federal document.`);
       const dv = dvs[0]!;
-      const plan = { template: { id: t.id, version: t.version }, name: TEST_PROJECT_NAME, testOnly: true, document: { title: dv.document.title, sha256: dv.sha256 } };
+      const plan = { template: { id: t.id, version: t.version }, name, testOnly: true, document: { title: dv.document.title, sha256: dv.sha256 } };
       if (!args.apply) return { outcome: 'would_create', ...plan };
       const audit = auditAs(tx, admin.clientId);
       const now = new Date();
       const p = await tx.project.create({
-        data: { clientId: admin.clientId, ownerId: admin.id, templateId: t.id, templateVersion: t.version, name: TEST_PROJECT_NAME, description: 'End-to-end integration test (Authoring → Studio → RL Gym). Test-only: never on a leaderboard. Synthetic data only.', testOnly: true, taskMode: 'AUTHORING', reviewRoute: 'SME_PM', distinctTarget: 1, maxPerExpert: 1, requiredWorkers: 1, tptMinutes: 60, startDate: now, endDate: new Date(now.getTime() + 30 * 86_400_000) },
+        data: { clientId: admin.clientId, ownerId: admin.id, templateId: t.id, templateVersion: t.version, name, description: 'End-to-end integration test (Authoring → Studio → RL Gym). Test-only: never on a leaderboard. Synthetic data only.', testOnly: true, status: 'IN_PROGRESS', taskMode: 'AUTHORING', reviewRoute: 'SME_PM', distinctTarget: 1, maxPerExpert: 1, requiredWorkers: 1, tptMinutes: 60, startDate: now, endDate: new Date(now.getTime() + 30 * 86_400_000) },
       });
       await audit({ entityType: 'Project', entityId: p.id, action: 'project.test_created', after: { ...plan, requestedBy: admin.id } });
       const tasks = await ensureSlotTasks(tx, p.id);

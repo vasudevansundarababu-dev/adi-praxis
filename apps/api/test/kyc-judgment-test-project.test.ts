@@ -13,24 +13,11 @@ import { db, idem, login, resetDb, testConfig } from './helpers';
  * KYC Judgment v1 end-to-end integration (coordinator, 25 Nov 2026): import the template, create the test-only project
  * with only the federal document, create ONE synthetic task covering all four types and submit it; a person (the owner,
  * as Admin) approves it through the console's decision route. Nothing in the job approves anything. The proposal is
- * Studio's, with the changes still pending at Studio applied (see kyc-judgment-import.test.ts) plus the 6th: S4
- * expectedRules is optional (coordinator: advisory). Mocks only.
+ * exactly Studio's (e14116d), with S4 expectedRules optional (coordinator: advisory). Mocks only.
  */
 const PROPOSAL = JSON.parse(readFileSync(new URL('./fixtures/kyc-judgment/kyc-judgment-v1.proposal.json', import.meta.url), 'utf8')) as Record<string, any>;
-const pending = (p: Record<string, any>) => {
-  p.authoring.template.defaultTptMinutes ??= 60;
-  const fix = (f: Record<string, any>) => {
-    f.help ??= f.label;
-    delete f.default;
-    for (const x of f.itemFields ?? []) fix(x);
-  };
-  for (const sec of p.authoring.profile.sections) for (const f of sec.fields) fix(f);
-  p.authoring.profile.exportCapabilities ??= { formats: ['praxis.authored-task-export.v2'], executable: false, blockers: ['Exact published template and RL Gym qualification required'] };
-  for (const sec of p.authoring.profile.sections) for (const f of sec.fields) if (f.type === 'criterion') delete f.itemFields;
-  // 6th (coordinator, 25 Nov): expectedRules is advisory, so optional.
-  for (const sec of p.authoring.profile.sections) for (const f of sec.fields) if (f.key === 'expectedRules') f.required = false;
-  return p;
-};
+// Studio e14116d: the six form changes are in (expectedRules optional among them); the proposal is used as it is.
+const pending = (p: Record<string, any>) => p;
 const POLICY = ['Synthetic federal KYC policy', 'Each customer must give a taxpayer identification number.'].join('\n');
 const BASE = { requirementType: 'obligation', visibility: 'agent_visible', applicability: { universal: true, actors: [], actions: [], entities: [], channels: [], locales: [], jurisdictions: [], conditionText: null }, prerequisites: [], precedence: [], exceptions: { kind: 'none', items: [] }, effective: { from: null, to: null, conditionText: 'always' }, evidenceNeeds: ['case record'], verificationHint: null, uncertainty: [] };
 

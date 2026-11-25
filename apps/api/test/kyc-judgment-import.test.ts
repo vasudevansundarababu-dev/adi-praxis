@@ -8,33 +8,12 @@ import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { db, idem, login, resetDb, testConfig } from './helpers';
 
 /**
- * KYC Judgment v1 (C4 at Studio ab1f684): the template arrives the way v8 did, as a joint proposal, and is a new
+ * KYC Judgment v1 (C4 at Studio e14116d): the template arrives the way v8 did, as a joint proposal, and is a new
  * workflow (not a v8 successor). Its rules come from the policy library (C1) through its fact bindings, so it carries no
  * template-level federal policies. Mocks only.
  */
 const PROPOSAL = JSON.parse(readFileSync(new URL('./fixtures/kyc-judgment/kyc-judgment-v1.proposal.json', import.meta.url), 'utf8')) as Record<string, any>;
-/**
- * PENDING AT STUDIO (Studio ab1f684; asked 25 Nov 2026). Authoring's form schema needs these changes to C4. Until Studio
- * ships them, the test applies exactly these and nothing else, so the rest of the import is proven now:
- * 1. authoring.template.defaultTptMinutes (required): 60.
- * 2. Every form field and item field has `help` (required); the label stands in.
- * 3. S1.coveredApplicationTypes has no `default` key (Authoring forms have no defaults; the task sets all four).
- * 4. profile.exportCapabilities (required), as v8's: {formats: ["praxis.authored-task-export.v2"], executable: false, blockers: [...]}.
- * 5. S7.criteria declares no item fields (Authoring refuses them on criterion fields); skills travel in execution.evaluators.
- */
-const PENDING_AT_STUDIO = (p: Record<string, any>) => {
-  p.authoring.template.defaultTptMinutes ??= 60;
-  const fix = (f: Record<string, any>) => {
-    f.help ??= f.label;
-    delete f.default;
-    for (const x of f.itemFields ?? []) fix(x);
-  };
-  for (const sec of p.authoring.profile.sections) for (const f of sec.fields) fix(f);
-  p.authoring.profile.exportCapabilities ??= { formats: ['praxis.authored-task-export.v2'], executable: false, blockers: ['Exact published template and RL Gym qualification required'] };
-  for (const sec of p.authoring.profile.sections) for (const f of sec.fields) if (f.type === 'criterion') delete f.itemFields;
-  return p;
-};
-PENDING_AT_STUDIO(PROPOSAL);
+// Studio e14116d: all six form changes are in; the proposal is used exactly as Studio's builder makes it.
 
 describe('KYC Judgment v1 template import', () => {
   let app: FastifyInstance;

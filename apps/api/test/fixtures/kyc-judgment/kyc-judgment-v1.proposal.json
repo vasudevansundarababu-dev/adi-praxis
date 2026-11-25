@@ -7,7 +7,7 @@
   "utility_template": {
    "schema_version": "adi.utility.template.v1",
    "template_key": "kyc-judgment-v1",
-   "template_sha256": "f0fe377b163c1f52894faaa0afd149e1e453061f29b6f0ec29fd8b2454038c1a"
+   "template_sha256": "317d7f687b9c86f1124ece180d832ee4d73e8dbb8a283de9597a79d346d43847"
   }
  },
  "authoring": {
@@ -22,6 +22,15 @@
    "version": 1,
    "titleField": "title",
    "contractStatus": "requires_confirmation",
+   "exportCapabilities": {
+    "formats": [
+     "praxis.authored-task-export.v2"
+    ],
+    "executable": false,
+    "blockers": [
+     "Exact published template and RL Gym environment qualification required; the policy library rules are placeholders until the PM approves them"
+    ]
+   },
    "contract": {
     "objective": [
      "S1.title",
@@ -56,28 +65,32 @@
        "label": "Title",
        "type": "text",
        "required": true,
-       "visibility": "author_and_agent"
+       "visibility": "author_and_agent",
+       "help": "A short name for the task. Example: \"Review a new deposit account application\"."
       },
       {
        "key": "trigger",
        "label": "Trigger",
        "type": "text",
        "required": true,
-       "visibility": "author_and_agent"
+       "visibility": "author_and_agent",
+       "help": "What starts the work. Example: \"A customer submits an application to open a deposit account\"."
       },
       {
        "key": "businessContext",
        "label": "Business context",
        "type": "long_text",
        "required": true,
-       "visibility": "author_and_agent"
+       "visibility": "author_and_agent",
+       "help": "Why this review matters to the bank, in two or three sentences. Example: the bank must know who it is opening an account for before the account opens."
       },
       {
        "key": "deliverable",
        "label": "Deliverable",
        "type": "long_text",
        "required": true,
-       "visibility": "author_and_agent"
+       "visibility": "author_and_agent",
+       "help": "What the reviewer hands over at the end. Example: one recommendation with the rules relied on and an audit trail of each step."
       },
       {
        "key": "coveredApplicationTypes",
@@ -103,12 +116,6 @@
          "label": "custodial"
         }
        ],
-       "default": [
-        "individual",
-        "adult_joint",
-        "teen_joint",
-        "custodial"
-       ],
        "help": "One task covers every account type (spec §16). Keep the wording generic: the case's own records say which type it is."
       },
       {
@@ -116,14 +123,16 @@
        "label": "Scope (state what is out of scope)",
        "type": "long_text",
        "required": true,
-       "visibility": "author_and_agent"
+       "visibility": "author_and_agent",
+       "help": "What the task covers and what it doesn't. Example: retail deposit accounts only; not loans, cards or mortgages."
       },
       {
        "key": "language",
        "label": "Language",
        "type": "text",
        "required": true,
-       "visibility": "author_and_agent"
+       "visibility": "author_and_agent",
+       "help": "The language the work is done in. Example: English."
       }
      ]
     },
@@ -136,7 +145,8 @@
        "label": "Input contract",
        "type": "long_text",
        "required": true,
-       "visibility": "author_and_agent"
+       "visibility": "author_and_agent",
+       "help": "What the reviewer is given at the start. Example: the application id; everything else is read with the tools."
       }
      ]
     },
@@ -155,7 +165,8 @@
          "value": "kyc_judgment_openenv",
          "label": "kyc_judgment_openenv"
         }
-       ]
+       ],
+       "help": "The case system the task runs in. Example: kyc_judgment_openenv."
       },
       {
        "key": "tools",
@@ -256,14 +267,16 @@
          "value": "recommend",
          "label": "recommend"
         }
-       ]
+       ],
+       "help": "The tools the reviewer may use. Example: application.read, policy.read, screening.check."
       },
       {
        "key": "failureBehaviour",
        "label": "Failure behaviour",
        "type": "long_text",
        "required": true,
-       "visibility": "author_and_agent"
+       "visibility": "author_and_agent",
+       "help": "What to do when a tool fails or a step can't finish. Example: retry a pending check with operation.read; if it still fails, record it as an open item."
       }
      ]
     },
@@ -284,21 +297,24 @@
          "label": "Document",
          "type": "text",
          "required": true,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "The policy document's id. Example: 54e00852."
         },
         {
          "key": "documentVersion",
          "label": "Version",
          "type": "number",
          "required": true,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "The policy document's version. Example: 1."
         },
         {
          "key": "title",
          "label": "Title",
          "type": "text",
          "required": true,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "The policy document's title. Example: US Federal KYC Policy."
         }
        ]
       },
@@ -306,51 +322,57 @@
        "key": "expectedRules",
        "label": "Expected rules (private)",
        "type": "policy_citation",
-       "required": true,
+       "required": false,
        "visibility": "private_reference",
-       "help": "The SME's expected rules for this task's typical cases. Never shown to the agent.",
+       "help": "Optional. The SME's expected rules for this task's typical cases: advisory only, never grading truth (that comes from the library conditions and the references). Never shown to the agent.",
        "itemFields": [
         {
          "key": "ruleId",
          "label": "Rule",
          "type": "text",
          "required": true,
-         "visibility": "private_reference"
+         "visibility": "private_reference",
+         "help": "The rule's id in the policy library. Example: R-CIP-ADDRESS."
         },
         {
          "key": "ruleVersion",
          "label": "Version",
          "type": "number",
          "required": true,
-         "visibility": "private_reference"
+         "visibility": "private_reference",
+         "help": "The rule's version number. Example: 3."
         },
         {
          "key": "textSha256",
          "label": "Text SHA-256",
          "type": "text",
          "required": true,
-         "visibility": "private_reference"
+         "visibility": "private_reference",
+         "help": "The rule text's SHA-256, copied from the library. Example: 5f1c…"
         },
         {
          "key": "appliesTo",
          "label": "Applies to",
          "type": "long_text",
          "required": true,
-         "visibility": "private_reference"
+         "visibility": "private_reference",
+         "help": "Which cases or parties the rule applies to, in plain words. Example: every adult party."
         },
         {
          "key": "rationale",
          "label": "Rationale",
          "type": "long_text",
          "required": true,
-         "visibility": "private_reference"
+         "visibility": "private_reference",
+         "help": "Why the rule applies. Example: the account is opened for individuals."
         },
         {
          "key": "exception",
          "label": "Exception",
          "type": "long_text",
          "required": false,
-         "visibility": "private_reference"
+         "visibility": "private_reference",
+         "help": "Any exception to the rule. Example: none."
         }
        ]
       },
@@ -359,7 +381,8 @@
        "label": "Notes (private)",
        "type": "long_text",
        "required": false,
-       "visibility": "private_reference"
+       "visibility": "private_reference",
+       "help": "Private notes for reviewers of this task. Example: watch for maiden names on older IDs."
       }
      ]
     },
@@ -380,21 +403,24 @@
          "label": "Action",
          "type": "text",
          "required": true,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "The duty in a few words. Example: \"Screen each party\"."
         },
         {
          "key": "tool",
          "label": "Tool",
          "type": "text",
          "required": true,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "The tool used for it. Example: screening.check."
         },
         {
          "key": "failureBehaviour",
          "label": "Failure behaviour",
          "type": "text",
          "required": false,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "What to do when a tool fails or a step can't finish. Example: retry a pending check with operation.read; if it still fails, record it as an open item."
         }
        ]
       },
@@ -411,28 +437,32 @@
          "label": "SOP",
          "type": "text",
          "required": true,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "The alternative SOP's id. Example: kyc-retail-onboarding-branch."
         },
         {
          "key": "version",
          "label": "Version",
          "type": "number",
          "required": true,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "The version number. Example: 1."
         },
         {
          "key": "sha256",
          "label": "SHA-256",
          "type": "text",
          "required": true,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "The SOP document's SHA-256. Example: 9f2e…"
         },
         {
          "key": "approvedBy",
          "label": "Approved by (PM or Admin)",
          "type": "text",
          "required": true,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "The PM or Admin who approved it. Example: Jordan Lee (PM)."
         }
        ]
       },
@@ -448,7 +478,8 @@
          "label": "Action",
          "type": "text",
          "required": true,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "The duty in a few words. Example: \"Screen each party\"."
         },
         {
          "key": "whoMay",
@@ -469,14 +500,16 @@
            "value": "specialist",
            "label": "specialist"
           }
-         ]
+         ],
+         "help": "Who may take the action. Example: case_lead."
         },
         {
          "key": "needsApprovalFrom",
          "label": "Needs approval from",
          "type": "text",
          "required": false,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "Who must approve it first, if anyone. Example: compliance officer."
         },
         {
          "key": "irreversible",
@@ -493,23 +526,27 @@
            "value": "no",
            "label": "no"
           }
-         ]
+         ],
+         "help": "Whether the action can't be undone. Example: yes for the final recommendation."
         },
         {
          "key": "escalateWhen",
          "label": "Escalate when",
          "type": "long_text",
          "required": false,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "When to hand it up. Example: a possible sanctions match."
         },
         {
          "key": "escalateTo",
          "label": "Escalate to",
          "type": "text",
          "required": false,
-         "visibility": "author_and_agent"
+         "visibility": "author_and_agent",
+         "help": "Who to hand it to. Example: the sanctions analyst."
         }
-       ]
+       ],
+       "help": "Who may decide what, and when to escalate. Example: only a human officer approves an account."
       }
      ]
     },
@@ -522,7 +559,8 @@
        "label": "Output contract",
        "type": "long_text",
        "required": true,
-       "visibility": "author_and_agent"
+       "visibility": "author_and_agent",
+       "help": "What the final output must contain. Example: a recommendation, the rules applied, an assessment per party and the audit trail."
       }
      ]
     },
@@ -536,44 +574,15 @@
        "type": "criterion",
        "required": true,
        "visibility": "private_rubric",
-       "itemFields": [
-        {
-         "key": "skill",
-         "label": "Skill",
-         "type": "pick_list",
-         "required": true,
-         "visibility": "private_rubric",
-         "options": [
-          {
-           "value": "tool_calling",
-           "label": "tool_calling"
-          },
-          {
-           "value": "instruction_following",
-           "label": "instruction_following"
-          },
-          {
-           "value": "reasoning",
-           "label": "reasoning"
-          },
-          {
-           "value": "decisioning",
-           "label": "decisioning"
-          },
-          {
-           "value": "safety",
-           "label": "safety"
-          }
-         ]
-        }
-       ]
+       "help": "The scoring criteria. Example: \"Rules applied: the rules whose conditions the case's facts trigger\"."
       },
       {
        "key": "scoringRule",
        "label": "Scoring rule",
        "type": "long_text",
        "required": true,
-       "visibility": "private_rubric"
+       "visibility": "private_rubric",
+       "help": "How the criteria add up. Example: 5, 2 or 0 points each; maximum 50; pass at 42."
       }
      ]
     },
@@ -586,14 +595,16 @@
        "label": "Sources used",
        "type": "long_text",
        "required": true,
-       "visibility": "private_reference"
+       "visibility": "private_reference",
+       "help": "The sources used to write the task. Example: the bank's operating rules draft, 25 Nov."
       },
       {
        "key": "reviewerNotes",
        "label": "Reviewer notes",
        "type": "long_text",
        "required": false,
-       "visibility": "private_reference"
+       "visibility": "private_reference",
+       "help": "Notes for the reviewer of this task. Example: confirm the expected rules with the PM."
       }
      ]
     }
@@ -601,6 +612,7 @@
   },
   "template": {
    "domainName": "Banking",
+   "defaultTptMinutes": 60,
    "primaryWork": "Assess each application, of any covered type, against the rules its facts trigger and recommend one decision with the rules applied.",
    "validateHints": [
     {
@@ -1382,7 +1394,10 @@
         "tin",
         "id_document",
         "proof_of_address",
-        "identification_number"
+        "identification_number",
+        "name_change_evidence",
+        "relationship_proof",
+        "non_documentary_verification"
        ],
        "type": "string"
       },
@@ -1825,7 +1840,7 @@
       },
       "policy_bundle": {
        "type": "string",
-       "const": "golden-kyc-1.0.0"
+       "const": "kyc-judgment.library@1"
       },
       "assessed_revision": {
        "type": "integer",
@@ -2069,7 +2084,10 @@
           "proof_of_address",
           "tin",
           "street_address",
-          "identification_number"
+          "identification_number",
+          "name_change_evidence",
+          "relationship_proof",
+          "non_documentary_verification"
          ]
         }
        },
@@ -2081,6 +2099,35 @@
          "legal",
          "edd"
         ]
+       },
+       "screening": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "result",
+         "identifiers_differ"
+        ],
+        "properties": {
+         "result": {
+          "type": "string",
+          "enum": [
+           "possible_match",
+           "false_positive"
+          ]
+         },
+         "identifiers_differ": {
+          "type": "array",
+          "items": {
+           "type": "string",
+           "enum": [
+            "name",
+            "date_of_birth",
+            "country"
+           ]
+          },
+          "uniqueItems": true
+         }
+        }
        }
       }
      }
@@ -2623,7 +2670,13 @@
       "tin_application",
       "alien_identification_card",
       "non_documentary_check_result",
-      "relationship_evidence"
+      "relationship_evidence",
+      "visa",
+      "military_id",
+      "marriage_certificate",
+      "birth_certificate",
+      "school_record",
+      "government_record"
      ]
     },
     {
@@ -2665,6 +2718,34 @@
      "environment_fact": "prior_minor_accounts",
      "label": "Minor accounts opened by this custodian before",
      "type": "number"
+    },
+    {
+     "fact": "document_format",
+     "environment_fact": "document_format",
+     "label": "Identity document format",
+     "type": "enum",
+     "allowed_values": [
+      "physical",
+      "mobile_dl"
+     ]
+    },
+    {
+     "fact": "proof_of_address_age_days",
+     "environment_fact": "proof_of_address_age_days",
+     "label": "Age of the proof of address",
+     "type": "number"
+    },
+    {
+     "fact": "relationship_proof_kind",
+     "environment_fact": "relationship_proof_kind",
+     "label": "Proof of relationship",
+     "type": "enum",
+     "allowed_values": [
+      "birth_certificate",
+      "school_record",
+      "government_record",
+      "none"
+     ]
     },
     {
      "fact": "product_line",

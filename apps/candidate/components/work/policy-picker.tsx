@@ -13,6 +13,8 @@ import { useEffect, useState } from 'react';
 export interface LibraryRuleView {
   ruleKey: string;
   ruleVersionId: string;
+  /** The published version's content hash (KYC Judgment v1 A5); the rule picker stores it with the citation. */
+  contentHash?: string | null;
   title: string;
   requirement: string;
   marking: string | null;

@@ -2562,3 +2562,20 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
   - an id the environment does not declare.
   - Validate shows the flag as a warning owned by ADI Forge support. The export run lists it per task in
     `policyIdsUnmapped`, and the RL Gym panel shows it. It does not block.
+
+## D-064: the S4 rule picker stores the content hash; picker citations export as clauses (KYC Judgment v1 A5; owner, 25 Nov 2026: "Accept recommendations")
+
+- **Why.** KYC Judgment v1 S4 `expectedRules` is a `policy_citation` field (the rule picker). The picker stored the rule
+  key and the published version id, but no content hash, and the clause export read only citations by rule UUID and
+  hash, so `policy_clauses` was empty for every picker citation (feasibility note, 25 Nov).
+- **Picker.** The library the picker reads gives each published rule version its `contentHash` (from the rule set
+  content). A picked item stores it as `contentSha256`, next to `ruleId` (the rule key) and `ruleVersion` (the version
+  id). The item's shape is otherwise unchanged; the hash is never typed or shown.
+- **Export.** A picker citation (a rule key plus a version UUID) resolves to that exact version: the rule key must match
+  and, when stored, so must the hash. It then exports the same `policy_clauses` entry as a citation by rule id, pinned
+  per revision in the same way. A citation picked before 25 Nov (no hash) resolves by its version id alone, which is exact
+  because a published version never changes.
+- **Never guessed.** A wrong hash, another rule's key or an unknown version exports nothing and is a blocking
+  `UNRESOLVED_CLAUSE` check (the author picks again). A version approved after the task is flagged for the PM.
+- **Unchanged.** Document citations and citations by rule id. The D-056 id map reads only citations by id, so it neither
+  maps nor flags picker citations: KYC Judgment v1 shares rule ids with the environment through C1.

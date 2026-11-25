@@ -83,6 +83,8 @@ export function rubricContext(task: TaskWithTemplate): RubricContext | null {
 export interface LibraryRule {
   ruleKey: string;
   ruleVersionId: string;
+  /** The published version's content hash, stored with a rule picker citation (KYC Judgment v1 A5). */
+  contentHash: string | null;
   title: string;
   requirement: string;
   required: boolean;
@@ -120,7 +122,7 @@ export const noRuleAnnotations: RuleAnnotationSource = { annotations: async () =
 export async function policyLibrary(tx: Db | Tx, clientId: string, projectId: string, notes: RuleAnnotationSource = noRuleAnnotations): Promise<{ setVersion: number | null; documents: LibraryDocument[] }> {
   const set = await latestRuleSet(tx, clientId, projectId);
   if (!set) return { setVersion: null, documents: [] };
-  const content = set.content as { rules?: { ruleKey: string; ruleVersionId: string; body: { title: string; requirement: string; annotation?: { marking?: string; appliesWhen?: string | null; responsibleActor?: string } }; required?: boolean; sources?: { documentVersionId: string; quote?: string; locator?: Record<string, unknown> }[] }[] };
+  const content = set.content as { rules?: { ruleKey: string; ruleVersionId: string; contentHash?: string; body: { title: string; requirement: string; annotation?: { marking?: string; appliesWhen?: string | null; responsibleActor?: string } }; required?: boolean; sources?: { documentVersionId: string; quote?: string; locator?: Record<string, unknown> }[] }[] };
   const rules = content.rules ?? [];
   const dvIds = [...new Set(rules.flatMap((r) => (r.sources ?? []).map((s) => s.documentVersionId)))];
   const dvs = await tx.policyDocumentVersion.findMany({ where: { clientId, projectId, id: { in: dvIds } }, include: { document: true }, orderBy: { createdAt: 'asc' } });
@@ -145,7 +147,7 @@ export async function policyLibrary(tx: Db | Tx, clientId: string, projectId: st
           const own = r.body.annotation;
           const a = own?.marking ? { marking: MARKING_LABEL[own.marking as MandatoryMarking] ?? null, appliesWhen: own.appliesWhen ?? null, actor: own.responsibleActor && own.responsibleActor !== 'unknown' ? (ACTOR_LABEL[own.responsibleActor as ResponsibleActor] ?? null) : null } : ann.get(r.ruleVersionId);
           const required = own?.marking ? own.marking === 'mandatory' : r.required !== false;
-          return { ruleKey: r.ruleKey, ruleVersionId: r.ruleVersionId, title: r.body.title, requirement: r.body.requirement, required, quote: src.quote ?? null, locator: src.locator ?? null, marking: a?.marking ?? null, appliesWhen: a?.appliesWhen ?? null, actor: a?.actor ?? null };
+          return { ruleKey: r.ruleKey, ruleVersionId: r.ruleVersionId, contentHash: r.contentHash ?? null, title: r.body.title, requirement: r.body.requirement, required, quote: src.quote ?? null, locator: src.locator ?? null, marking: a?.marking ?? null, appliesWhen: a?.appliesWhen ?? null, actor: a?.actor ?? null };
         }),
     }));
   return { setVersion: set.version, documents };

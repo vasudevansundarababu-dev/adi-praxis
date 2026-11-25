@@ -66,6 +66,13 @@ describe('S4 rule picker (D21)', () => {
     expect(html).toMatch(/aria-label="rationale"/);
   });
 
+  it('KYC Judgment v1 A5: stores the picked version’s content hash, so the clause exports; a library without one stores none', () => {
+    const doc = LIB.documents[0]!;
+    const hashed = { ...doc.rules[0]!, contentHash: 'd'.repeat(64) };
+    expect(citationFromRule(field, doc, hashed)).toMatchObject({ ruleId: 'R-POL-01', ruleVersion: 'rv-1', contentSha256: 'd'.repeat(64) });
+    expect(citationFromRule(field, doc, doc.rules[1]!)).not.toHaveProperty('contentSha256');
+  });
+
   it('empty state: no published rules, nothing to type', () => {
     const t = text(renderToStaticMarkup(<RuleCitationPicker taskId="t" field={field} value={[]} onChange={() => undefined} readOnly={false} initialLibrary={{ setVersion: null, documents: [] }} renderNote={noteInput} />));
     expect(t).toContain('This project has no published rules yet.');

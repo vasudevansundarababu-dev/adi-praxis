@@ -1,6 +1,6 @@
 import type { ApprovedTaskRecord, Template } from '@prisma/client';
 import { agentProjection, type TaskCheck, type TemplateProfile } from '@praxis/shared';
-import { citedRules } from '../anvil/clause-export';
+import { citedRules, citedRuleVersions } from '../anvil/clause-export';
 import { actorProjection } from '../anvil/generic-package';
 import { jcsSha256 } from '../anvil/jcs';
 import { jointTemplateSpec } from '../anvil/joint-template';
@@ -239,6 +239,13 @@ export async function referenceProblems(tx: Db | Tx, ctx: { clientId: string; pr
     }
     const why = !v ? 'no longer exists in the policy library' : !v.reviewedAt || v.reviewedAt > at ? 'was not approved when the task was approved' : !v.citations.length ? 'has no source citation' : null;
     if (why) out.push({ code: 'UNRESOLVED_CLAUSE', section: 'S4', field: `S4 clause ${c.ruleId.slice(0, 8)}`, severity: 'blocking', owner: !v ? 'author' : 'pm', retryHelps: false, message: `A policy clause the task cites ${why}. ${!v ? 'Choose a current clause in S4.' : 'The PM approves the clause version, then the task is approved again.'}` });
+  }
+  // Rule picker citations (KYC Judgment v1 A5): the exact version by id, with the rule key and the stored hash matching.
+  for (const c of citedRuleVersions(authoredContent(ctx.output))) {
+    const found = await tx.policyRuleVersion.findFirst({ where: { id: c.ruleVersionId, clientId: ctx.clientId }, select: { contentHash: true, reviewedAt: true, rule: { select: { ruleKey: true } }, citations: { take: 1, select: { id: true } } } });
+    const v = found && found.rule.ruleKey === c.ruleKey && (c.contentSha256 === null || c.contentSha256 === found.contentHash) ? found : null;
+    const why = !v ? 'no longer exists in the policy library at the version picked' : !v.reviewedAt || v.reviewedAt > at ? 'was not approved when the task was approved' : !v.citations.length ? 'has no source citation' : null;
+    if (why) out.push({ code: 'UNRESOLVED_CLAUSE', section: 'S4', field: `S4 rule ${c.ruleKey}`, severity: 'blocking', owner: !v ? 'author' : 'pm', retryHelps: false, message: `A policy rule the task cites ${why}. ${!v ? 'Pick the rule again from the library in S4.' : 'The PM approves the rule version, then the task is approved again.'}` });
   }
   if (ctx.record && ctx.projectTemplateId && ctx.record.templateId !== ctx.projectTemplateId)
     out.push({ code: 'APPROVAL_STALE', section: 'S1', field: null, severity: 'blocking', owner: 'pm', retryHelps: false, message: `The task was approved on template version ${ctx.record.templateVersion}, but the project now uses another version. Send it back for rework so it is approved on the current version.` });

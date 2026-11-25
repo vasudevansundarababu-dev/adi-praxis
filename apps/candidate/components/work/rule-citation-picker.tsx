@@ -9,7 +9,7 @@ import type { LibraryDocumentView, LibraryRuleView, LibraryView } from './policy
  * 2026). The author picks published rules from the project's library; the rule ID (its key), the exact rule version,
  * the source locator and the quotation are filled from the library and read-only. The author writes only the
  * free-text notes and the optional output check. KYC-style document references (a `sha256` item key) keep the
- * document picker (`PolicyPicker`). The stored and exported item shape is unchanged.
+ * document picker (`PolicyPicker`). Since KYC Judgment v1 (A5) the item also stores the version's `contentSha256`.
  */
 
 /** The item fields the library fills (read-only in the form). */
@@ -37,6 +37,8 @@ export function citationFromRule(field: ItemField, doc: LibraryDocumentView, rul
   it.ruleVersion = rule.ruleVersionId;
   it.locator = locatorText(rule.locator, doc.title);
   it.quote = (rule.quote ?? '').trim() || rule.requirement;
+  // KYC Judgment v1 A5: the exact version's content hash, so the export can send the clause (never typed or shown).
+  if (rule.contentHash) it.contentSha256 = rule.contentHash;
   return it;
 }
 

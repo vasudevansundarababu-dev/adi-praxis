@@ -4,6 +4,7 @@ import type { Db, Tx } from '../db';
 import { anvilReadiness } from '../routes/anvil-templates';
 import { jcsSha256 } from './jcs';
 import { storeTaskPackage } from './task-package-store';
+import { mapRecordPolicies, policyIdMapFor, POLICY_ID_UNMAPPED, type PolicyIdMap, type UnmappedPolicy } from './policy-id-map';
 import { OWNER_LABEL, TASK_CHECKER, TASK_CHECKER_VERSION, type TaskCheckReport, type TaskProblem } from '../tasks/task-integrity';
 
 /**
@@ -48,6 +49,8 @@ export interface ExportTask {
   /** Approved before the stronger checks: sent, with its warnings, never blocked. */
   checksGap?: boolean;
   warnings?: string[];
+  /** D-056: S4 citations with no reviewed mapping to the environment's policy ids (sent, flagged, never guessed). */
+  policyIdsUnmapped?: UnmappedPolicy[];
 }
 export interface NotSent {
   recordId: string;
@@ -114,8 +117,10 @@ export async function buildRlGymExport(
   p: { id: string; name: string; template: Template },
   records: ApprovedTaskRecord[],
   ref: { id: string; version: number; specSha256: string },
-  opts: { exported: boolean; held?: Map<string, string>; batches?: Map<string, string>; reports?: Map<string, TaskCheckReport>; familyTags?: Map<string, string[]> },
+  opts: { exported: boolean; held?: Map<string, string>; batches?: Map<string, string>; reports?: Map<string, TaskCheckReport>; familyTags?: Map<string, string[]>; policyIdMap?: PolicyIdMap | null },
 ): Promise<BuiltExport> {
+  // D-056: the reviewed mapping from Forge's policy ids to the environment's, for this Studio release (tests pass one).
+  const idMap = opts.policyIdMap !== undefined ? opts.policyIdMap : policyIdMapFor(ref);
   const tasks: ExportTask[] = [];
   const notSent: NotSent[] = [];
   const wire: Record<string, unknown>[] = [];
@@ -152,7 +157,9 @@ export async function buildRlGymExport(
     const policyClauses = await policyClausesFor(tx, r);
     const correctsRevision = stored.revision > 1 ? stored.revision - 1 : null;
     const smeBatchId = correctsRevision ? (opts.batches?.get(r.taskInstanceId) ?? null) : null;
-    tasks.push({ recordId: r.id, taskId: r.taskInstanceId, title, revision: stored.revision, packageSha256: stored.packageSha256, correctsRevision, smeBatchId, complexity, archetype, edgeCase, contentHash: r.contentHash, snapshotSha256: report?.snapshotSha256 ?? null, checkReportSha256: report ? jcsSha256(report) : null, ...(report?.gap ? { checksGap: true, warnings: report.problems.map((x) => x.code) } : {}) });
+    const ids = mapRecordPolicies(r, idMap);
+    const warnings = [...(report?.gap ? report.problems.map((x) => x.code) : []), ...(ids.unmapped.length ? [POLICY_ID_UNMAPPED] : [])];
+    tasks.push({ recordId: r.id, taskId: r.taskInstanceId, title, revision: stored.revision, packageSha256: stored.packageSha256, correctsRevision, smeBatchId, complexity, archetype, edgeCase, contentHash: r.contentHash, snapshotSha256: report?.snapshotSha256 ?? null, checkReportSha256: report ? jcsSha256(report) : null, ...(report?.gap ? { checksGap: true } : {}), ...(warnings.length ? { warnings } : {}), ...(ids.unmapped.length ? { policyIdsUnmapped: ids.unmapped } : {}) });
     wire.push({
       schema: 'praxis.authored-task-export.v1',
       task_id: r.taskInstanceId,
@@ -168,6 +175,9 @@ export async function buildRlGymExport(
       ...(edgeCase ? { edge_case: edgeCase } : {}),
       // E-002 (Studio ef06119): the approved clause versions selected in S4, pinned as approved. Only when there are any.
       ...(policyClauses.length ? { policy_clauses: policyClauses.map((c) => c.entry) } : {}),
+      // D-056: the environment's policy ids for each S4 citation the mapping covers; the package itself is unchanged.
+      // Only when there are any, so a task with no mapping exports exactly as before.
+      ...(ids.mapped.length ? { policy_id_map: ids.mapped } : {}),
     });
   }
   const template = { id: ref.id, version: ref.version, spec_sha256: ref.specSha256, forge_template_id: p.template.lineageId, forge_version: p.template.version };

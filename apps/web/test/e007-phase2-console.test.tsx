@@ -24,7 +24,7 @@ describe('Export for benchmark: why a task was not sent, the RL Gym’s answer p
           reason: 'first export of KYC',
           outcome: 'received',
           createdAt: '2026-11-24T12:00:00Z',
-          tasks: [{ taskId: 't-a', title: 'Adult joint', revision: 1 }, { taskId: 't-b', title: 'Teen joint', revision: 2, checksGap: true, warnings: ['STEP_TOOL_NOT_OFFERED'] }],
+          tasks: [{ taskId: 't-a', title: 'Adult joint', revision: 1, warnings: ['POLICY_ID_UNMAPPED'], policyIdsUnmapped: [{ ruleId: '54e00852-42c6-4f43-a7b9-732cf7fd0882' }] }, { taskId: 't-b', title: 'Teen joint', revision: 2, checksGap: true, warnings: ['STEP_TOOL_NOT_OFFERED'] }],
           taskAnswers: { 't-a': 'accepted', 't-b': 'duplicate' },
           notSent: [{ title: 'Custodial', code: 'CHECKS_FAILED', message: 'S5: …', problems: [{ code: 'STEP_TOOL_NOT_OFFERED', section: 'S5', field: 'S5.steps[14].tool', owner: 'author', retryHelps: false, message: 'Step 15 uses recommend, but S3 does not offer it to the agent.' }] }],
           authoringReceiptSha256: 'd'.repeat(64),
@@ -36,6 +36,8 @@ describe('Export for benchmark: why a task was not sent, the RL Gym’s answer p
     const html = renderToStaticMarkup(<RlGymExportPanel projectId="p" initial={state} />);
     const t = text(html);
     expect(t).toContain('Adult joint (revision 1): accepted by RL Gym');
+    // D-056: a cited policy with no reviewed mapping to the environment's ids is shown, not hidden.
+    expect(t).toContain('a policy it cites is not mapped to the environment’s policy ids, so the agent’s policy.read will not find it');
     expect(t).toContain('Teen joint (revision 2): already in RL Gym (duplicate, unchanged) · approved before the stronger checks (warnings: STEP_TOOL_NOT_OFFERED)');
     expect(t).toContain('STEP_TOOL_NOT_OFFERED S5 · S5.steps[14].tool: Step 15 uses recommend');
     expect(t).toContain('To fix: the author (send it back for rework). Trying again won’t help until it is fixed.');

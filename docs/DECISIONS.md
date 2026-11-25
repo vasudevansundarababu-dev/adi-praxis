@@ -2528,3 +2528,29 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
   - `data-digests` job (counts and content digests of tasks, records, packages, submissions and exports).
   - Test `phase-a-data-safety`: Phase A migrations are additive only.
   - Verified 24 Nov: all digests equal to the coordinator's pre-Phase-A backup after the four migrations.
+
+## D-056: S4 policy ids mapped to the environment's at export (owner, 24 Nov 2026: "4. Yes")
+
+- **Problem.** A task's S4 cites ADI Forge's own id, and the benchmark environment knows its policies by other ids
+  (KYC-01 to KYC-04, GB-02, GB-03, GB-05), so the agent's `policy.read` returns 0 records.
+  - All 4 authored tasks in the owner's KYC project cite the bank policy document 54e00852… at rs2.d1, not one rule.
+  - Rule set v2 holds 11 rules under that document.
+- **Mapping source.** A reviewed file, `apps/api/src/anvil/policy-id-maps.json` (`praxis.policy-id-map.v1`), with one
+  map per Studio template version.
+  - Each map declares the environment's policies (id, version, content_sha256) and its entries.
+  - An entry maps a Forge id plus its content hash to one or more environment policy ids, and names who confirmed it.
+  - It ships empty. Forge cannot read the environment's policy list: Studio refuses the service role and RL Gym has
+    no endpoint for it. So the list and the confirmation come from outside Forge.
+- **Export only.** Each task entry gains `policy_id_map` when the mapping covers a citation.
+  - The stored task, its approvals, its package (same hash) and earlier exports are unchanged.
+  - A task with no mapping exports exactly as before.
+- **Never guessed.** These cases are flagged as `POLICY_ID_UNMAPPED` and nothing is sent for them:
+  - a citation with no entry;
+  - a citation at another content hash;
+  - an entry naming a policy the environment does not declare.
+  - Validate shows the flag as a warning owned by ADI Forge support. The export run lists it per task in
+    `policyIdsUnmapped`, and the RL Gym panel shows it.
+  - It does not block, so nothing that runs today stops running.
+- **Open.**
+  - The environment's policy list and the confirmed mapping.
+  - Where RL Gym applies `policy_id_map` (option 1). Option 2, a mapped copy of the package, was not built.

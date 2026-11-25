@@ -368,6 +368,54 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     await expect(db.$executeRaw`DELETE FROM "RlGymProjectExport"`).rejects.toThrow();
   });
 
+  it('D-056: S4 policy ids are mapped to the environment’s at export only; unmapped ones are flagged in Validate and Export, never guessed; packages are unchanged', async () => {
+    const { buildRlGymExport } = await import('../src/anvil/rlgym-export');
+    const { citedRules } = await import('../src/anvil/clause-export');
+    const v8 = await publishedV8(CASE_REF_VERIFIERS);
+    await qualify(v8);
+    const projectId = await project(v8);
+    const rows = await packable(await authored(projectId));
+    const records = rows.map((r) => r.record!);
+    const cites = citedRules(records[0]!.output);
+    expect(cites.length).toBeGreaterThan(0);
+    const before = await db.approvedTaskRecord.findMany({ where: { projectId }, orderBy: { seq: 'asc' } });
+    // Validate: each cited policy with no mapping is a warning for ADI Forge support; it does not make the task need a fix.
+    const v = await post(pm, `/projects/${projectId}/validate`, { recordIds: [records[0]!.id] });
+    expect(v.statusCode, v.body).toBe(201);
+    const flagged = (v.json().results[0].issues as { code: string }[]).filter((i) => i.code === 'POLICY_ID_UNMAPPED');
+    expect(flagged).toHaveLength(cites.length);
+    for (const i of flagged) expect(i).toMatchObject({ section: 'S4', owner: 'authoring', severity: 'warning', retryHelps: false, message: expect.stringContaining('policy.read') });
+    expect(v.json().results[0].status).toBe('valid');
+    // Export with no reviewed mapping (the shipped state): sent as before, no policy_id_map, flagged on the run.
+    answer = (c) => (c.url.endsWith('/exports') ? { status: 201, body: { data: { new: c.body.tasks.length, superseding: 0, unchanged: 0, blocked: [] }, meta: { request_id: 'req-1' } } } : { status: 404, body: {} });
+    const res = await post(pm, `/projects/${projectId}/rlgym-exports`);
+    expect(res.statusCode, res.body).toBe(201);
+    const sent = calls.find((c) => c.url.endsWith('/exports'))!;
+    for (const t of sent.body.tasks) expect(t).not.toHaveProperty('policy_id_map');
+    const run = await db.rlGymProjectExport.findFirstOrThrow({ where: { projectId } });
+    for (const t of run.tasks as { warnings?: string[]; policyIdsUnmapped?: unknown[] }[]) {
+      expect(t.warnings).toContain('POLICY_ID_UNMAPPED');
+      expect(t.policyIdsUnmapped?.length).toBeGreaterThan(0);
+    }
+    // A reviewed mapping for this release: the export carries the environment's ids; the package bytes stay the same.
+    const ref = { id: 'tpl_x5rwt6d5eu', version: 9, specSha256: 'c'.repeat(64) };
+    const env = (id: string) => ({ id, version: 'golden-kyc-1.0.0', content_sha256: 'b'.repeat(64) });
+    const map = { studio_template_id: ref.id, studio_version: ref.version, environment: 'golden-kyc-openenv', environment_policies: [env('KYC-01'), env('GB-02')], entries: [{ forge: { kind: 'document' as const, id: cites[0]!.ruleId, content_sha256: cites[0]!.contentSha256 }, environment_policy_ids: ['KYC-01', 'GB-02'], confirmed_by: 'owner', confirmed_at: '2026-11-24' }] };
+    const p = await db.project.findUniqueOrThrow({ where: { id: projectId }, include: { template: true } });
+    const mapped = await db.$transaction((tx) => buildRlGymExport(tx, p, records, ref, { exported: true, policyIdMap: map }));
+    const first = mapped.body.tasks as { task_id: string; package_sha256: string; policy_id_map?: unknown }[];
+    const t0 = first.find((t) => t.task_id === records[0]!.taskInstanceId)!;
+    expect(t0.policy_id_map).toEqual([{ forge_rule_id: cites[0]!.ruleId, forge_content_sha256: cites[0]!.contentSha256, environment_policy_ids: ['KYC-01', 'GB-02'] }]);
+    for (const t of first) expect(t.package_sha256).toBe((sent.body.tasks as { task_id: string; package_sha256: string }[]).find((x) => x.task_id === t.task_id)!.package_sha256);
+    // An entry naming a policy the environment does not declare is flagged, not sent.
+    const wrong = { ...map, entries: [{ ...map.entries[0]!, environment_policy_ids: ['KYC-09'] }] };
+    const refused = await db.$transaction((tx) => buildRlGymExport(tx, p, records, ref, { exported: true, policyIdMap: wrong }));
+    for (const t of refused.body.tasks as Record<string, unknown>[]) expect(t).not.toHaveProperty('policy_id_map');
+    expect(refused.tasks.find((t) => t.taskId === records[0]!.taskInstanceId)!.policyIdsUnmapped![0]!.message).toMatch(/KYC-09/);
+    // Nothing about the tasks or their approvals changed.
+    expect(await db.approvedTaskRecord.findMany({ where: { projectId }, orderBy: { seq: 'asc' } })).toEqual(before);
+  });
+
   it('E-007 phase 2: stronger checks on the frozen snapshot in Validate, approval and Export; JSON report; receipt; the RL Gym’s answer per task', async () => {
     const { approvalIntegrity } = await import('../src/tasks/revalidation');
     const v8 = await publishedV8(CASE_REF_VERIFIERS);

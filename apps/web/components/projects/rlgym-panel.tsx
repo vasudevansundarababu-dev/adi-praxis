@@ -145,10 +145,11 @@ export function RlGymExportPanel({ projectId, initial }: { projectId: string; in
                   : `${r.outcome === 'rejected' ? 'Refused by RL Gym' : 'RL Gym unavailable'}: ${r.error?.message ?? ''}`}
                 {r.taskAnswers && Object.keys(r.taskAnswers).length > 0 && (
                   <ul className="mt-1 list-disc pl-5" aria-label="RL Gym’s answer per task" data-task-answers>
-                    {(r.tasks as { taskId: string; title: string; revision: number; checksGap?: boolean; warnings?: string[] }[]).map((t) => (
+                    {(r.tasks as { taskId: string; title: string; revision: number; checksGap?: boolean; warnings?: string[]; policyIdsUnmapped?: { ruleId: string }[] }[]).map((t) => (
                       <li key={t.taskId} data-answer={r.taskAnswers![t.taskId]}>
                         {t.title} (revision {t.revision}): {ANSWER_LABEL[r.taskAnswers![t.taskId] ?? 'not_answered']}
                         {t.checksGap && <span data-checks-gap> · approved before the stronger checks{t.warnings?.length ? ` (warnings: ${t.warnings.join(', ')})` : ''}</span>}
+                        {!!t.policyIdsUnmapped?.length && <span data-policy-unmapped> · {t.policyIdsUnmapped.length === 1 ? 'a policy it cites is' : `${t.policyIdsUnmapped.length} policies it cites are`} not mapped to the environment’s policy ids, so the agent’s policy.read will not find {t.policyIdsUnmapped.length === 1 ? 'it' : 'them'}</span>}
                       </li>
                     ))}
                   </ul>

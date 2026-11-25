@@ -1,4 +1,4 @@
-import type { ApprovedTaskRecord, Prisma } from '@prisma/client';
+import type { ApprovedTaskRecord, Prisma, Template } from '@prisma/client';
 import { anvilRunDto, exportEligibility, ProjectExportStateDto, TaskValidationResult, ValidateRequest, ValidationRunDto } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -15,6 +15,8 @@ import type { AuditInput } from '../platform/audit';
 import { revalidateTask, reworkForValidation } from '../tasks/revalidation';
 import type { TaskCheck } from '@praxis/shared';
 import { taskCheckReport, type TaskCheckReport } from '../tasks/task-integrity';
+import { mapRecordPolicies, policyIdMapFor, POLICY_ID_UNMAPPED } from '../anvil/policy-id-map';
+import { rlgymTemplateRef } from '../anvil/rlgym-export';
 
 const Params = z.object({ id: z.string().uuid() });
 const ACCESS = ['ADMIN', 'PM'] as const;
@@ -94,14 +96,24 @@ async function validate(tx: Db | Tx, validator: AnvilTaskValidator, records: App
   }
   // E-007 phase 2: ADI Forge's own checks on each approved record (the frozen snapshot), added to the validator's verdict.
   const reports = await recordReports(tx, records);
+  // D-056: S4 citations the environment would not find by policy.read (no reviewed mapping): flagged, never blocking.
+  const unmapped = await unmappedPolicies(tx, records, templates);
   out.results = out.results.map((r) => {
     const rep = reports.get(r.recordId);
-    if (!rep?.problems.length) return r;
-    const issues = [...r.issues, ...rep.problems.map((p) => ({ code: p.code, path: p.field, message: p.message, section: p.section, owner: p.owner, retryHelps: p.retryHelps, severity: p.severity }))];
-    const status = r.status === 'valid' && rep.status === 'fail' ? ('needs_fix' as const) : r.status;
+    const ids = unmapped.get(r.recordId) ?? [];
+    if (!rep?.problems.length && !ids.length) return r;
+    const issues = [...r.issues, ...(rep?.problems ?? []).map((p) => ({ code: p.code, path: p.field, message: p.message, section: p.section, owner: p.owner, retryHelps: p.retryHelps, severity: p.severity })), ...ids.map((u) => ({ code: POLICY_ID_UNMAPPED, path: `S4 policy ${u.ruleId.slice(0, 8)}`, message: u.message, section: 'S4', owner: 'authoring' as const, retryHelps: false, severity: 'warning' as const }))];
+    const status = r.status === 'valid' && rep?.status === 'fail' ? ('needs_fix' as const) : r.status;
     return { ...r, status, issues };
   });
   return { ...out, reports };
+}
+
+/** D-056: per record, the S4 citations with no reviewed mapping to the environment's policy ids for its Studio release. */
+async function unmappedPolicies(tx: Db | Tx, records: ApprovedTaskRecord[], templates: Map<string, Template>) {
+  const refs = new Map<string, { id: string; version: number } | null>();
+  for (const [id, t] of templates) refs.set(id, await rlgymTemplateRef(tx, t));
+  return new Map(records.map((r) => [r.id, mapRecordPolicies(r, policyIdMapFor(refs.get(r.templateId) ?? null)).unmapped]));
 }
 
 /** The task check report of each approved record, on the record's own content. */

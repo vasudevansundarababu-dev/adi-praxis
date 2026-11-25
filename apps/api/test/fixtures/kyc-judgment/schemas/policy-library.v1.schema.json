@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:adi-labs:utility:policy-library:v1",
+  "title": "Policy library v1 (KYC Judgment v1 contract C1; E-002, E-010). DRAFT for Authoring and RL Gym review",
+  "description": "Every PM-approved rule of one Authoring project's policy library, with each rule's whole version chain. Authoring exports it; Studio's generator copies it word for word into the environment's policies collection and refuses a text whose SHA-256 differs; the RL Gym resolves conditions from it. Rule identity is the triple (rule_id, version, text_sha256): rule_id is Authoring's rule key (unique in the project, which export.project_id names), version is Authoring's approved version number, the same in Authoring, Studio, the RL Gym and every receipt. text_sha256 is lower-case hex SHA-256 of the version's text as UTF-8 bytes, exactly as served (no trimming or normalisation). Only approved versions appear: an AI draft no person has reviewed is never exported. The library is every approved rule of the project, distractors included, never filtered by the owner's mandatory selection, which stays a private expectation in Authoring and in the task's expectedRules. Versions are append-only: a change is the next version of the same rule, and earlier versions stay in the chain. Agent visibility: rule_id, version, supersedes, title, kind, issuer, jurisdiction, text and effective are what policy.read serves. condition, scope, exception conditions, derived_facts, source and approval are private reference data, because serving them would give the agent the applicability answer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "library_id", "export", "fact_catalog", "documents", "rules"],
+  "properties": {
+    "schema_version": { "const": "adi.utility.policy-library.v1" },
+    "library_id": {
+      "description": "The Authoring project's library, stable across exports (for example kyc-judgment.library).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.:-]{1,199}$"
+    },
+    "export": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["export_id", "project_id", "library_revision", "exported_at"],
+      "properties": {
+        "export_id": { "type": "string", "minLength": 1 },
+        "project_id": { "type": "string", "minLength": 1 },
+        "library_revision": {
+          "description": "Authoring's library revision. It increases with every approved change; an environment version pins one.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "exported_at": { "type": "string", "format": "date-time" },
+        "exported_by": { "type": "string" }
+      }
+    },
+    "fact_catalog": {
+      "description": "The fact catalog (catalog_id@version) the conditions and derived facts are written over.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.:-]{1,199}@[1-9][0-9]*$"
+    },
+    "documents": {
+      "description": "The source documents the rules were extracted from, each pinned by the SHA-256 of its uploaded bytes.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/document" }
+    },
+    "derived_facts": {
+      "description": "Facts the case data never states, defined by a rule of this library (for example us_person from citizenship alone: under the CIP rule a U.S. person is a U.S. citizen, and residency, lawful permanent residence included, does not make one). A resolver computes them from the case's facts with the definition in force; they never appear in case data or registry cases.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/derivedFact" }
+    },
+    "rules": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/rule" } }
+  },
+  "$defs": {
+    "ruleId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$" },
+    "ruleRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "version"],
+      "properties": { "rule_id": { "$ref": "#/$defs/ruleId" }, "version": { "type": "integer", "minimum": 1 } }
+    },
+    "jurisdiction": {
+      "description": "ISO 3166-1 alpha-2 country, optionally with an ISO 3166-2 subdivision: US, US-CA. California is US-CA; a bare CA would be Canada.",
+      "type": "string",
+      "pattern": "^[A-Z]{2}(-[A-Z0-9]{1,3})?$"
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_id", "document_version", "title", "kind", "jurisdiction", "sha256"],
+      "properties": {
+        "document_id": { "type": "string", "minLength": 1 },
+        "document_version": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "kind": {
+          "description": "official_text: a statute or regulation. bank_policy: the bank's own written policy or operating choices.",
+          "enum": ["official_text", "bank_policy"]
+        },
+        "jurisdiction": { "$ref": "#/$defs/jurisdiction" },
+        "sha256": {
+          "description": "SHA-256 of the document's bytes as uploaded to Authoring. For a captured document it equals capture.sha256.",
+          "$ref": "urn:adi-labs:utility:common:v1#/$defs/sha256"
+        },
+        "capture": {
+          "description": "Where and when an official text was downloaded (owner, 25 Nov: the California document was downloaded from California sites). Required for official_text.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source_url", "downloaded_on", "sha256"],
+          "properties": {
+            "source_url": { "type": "string", "format": "uri", "pattern": "^https?://" },
+            "downloaded_on": { "type": "string", "format": "date" },
+            "sha256": { "$ref": "urn:adi-labs:utility:common:v1#/$defs/sha256" }
+          }
+        }
+      },
+      "if": { "properties": { "kind": { "const": "official_text" } }, "required": ["kind"] },
+      "then": { "required": ["capture"] }
+    },
+    "derivedFact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "definition", "defined_by"],
+      "properties": {
+        "id": { "$ref": "urn:adi-labs:utility:fact-catalog:v1#/$defs/factId" },
+        "type": { "enum": ["boolean", "string", "enum"] },
+        "allowed_values": { "type": "array", "items": { "type": ["string", "boolean"] } },
+        "definition": {
+          "description": "For a boolean fact: true exactly when this predicate holds over the catalog's facts.",
+          "$ref": "urn:adi-labs:utility:clause-condition:v1#/$defs/predicate"
+        },
+        "defined_by": { "$ref": "#/$defs/ruleRef" },
+        "description": { "type": "string" }
+      }
+    },
+    "scope": {
+      "description": "Review and filtering metadata only. Applicability comes from the condition alone: a rule from another process (for example currency transaction reporting) carries a condition on the process fact, so it never applies to this project's cases.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["process"],
+      "properties": {
+        "process": {
+          "description": "The same values as the fact catalog's process fact.",
+          "enum": ["account_opening", "beneficial_ownership", "currency_transaction_reporting", "record_retention", "periodic_review", "transaction_monitoring", "account_closure", "other"]
+        },
+        "customer_types": { "type": "array", "items": { "enum": ["individual", "legal_entity"] }, "uniqueItems": true },
+        "product_lines": {
+          "description": "Expert, 25 Nov: the SOP covers deposit accounts only; loan, credit card and mortgage rules are distractors. The same values as the fact catalog's product_line fact.",
+          "type": "array",
+          "items": { "enum": ["deposit", "loan", "credit_card", "mortgage"] },
+          "uniqueItems": true
+        },
+        "channels": { "type": "array", "items": { "enum": ["branch", "remote"] }, "uniqueItems": true }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "title", "kind", "issuer", "jurisdiction", "subject", "scope", "versions"],
+      "properties": {
+        "rule_id": { "$ref": "#/$defs/ruleId" },
+        "title": { "type": "string", "minLength": 1 },
+        "kind": {
+          "description": "The same enum as template.v1 policies.rules[].kind.",
+          "enum": ["regulation", "policy", "business_rule"]
+        },
+        "issuer": { "enum": ["federal", "state", "bank"] },
+        "jurisdiction": { "$ref": "#/$defs/jurisdiction" },
+        "subject": {
+          "description": "What the condition is evaluated for. party: once per party, with that party's facts and the case's facts; the rule applies to the case when it applies to any party. case: once, with the case's facts.",
+          "enum": ["case", "party"]
+        },
+        "scope": { "$ref": "#/$defs/scope" },
+        "versions": {
+          "description": "Every approved version, oldest first, with Authoring's own version numbers: strictly increasing, gaps allowed (an unreviewed draft or a collapsed duplicate takes a number but never appears). The first entry supersedes nothing; every later entry supersedes the entry before it.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ruleVersion" }
+        }
+      }
+    },
+    "ruleVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "text", "text_sha256", "effect", "condition", "effective", "source", "approval"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "supersedes": { "description": "The version of the entry before this one in the chain.", "type": "integer", "minimum": 1 },
+        "change": {
+          "description": "How this version differs from the one it supersedes (for review and grading; never served).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "summary"],
+          "properties": {
+            "kind": { "enum": ["contradicts", "withdraws", "tightens", "narrows", "clarifies"] },
+            "summary": { "type": "string", "minLength": 1 }
+          }
+        },
+        "text": { "description": "The approved wording, served to the agent verbatim.", "type": "string", "minLength": 1 },
+        "text_sha256": { "$ref": "urn:adi-labs:utility:common:v1#/$defs/sha256" },
+        "effect": {
+          "description": "obligation: the text imposes a requirement when the condition holds. withdrawn: from this version on the rule imposes nothing (its text says so).",
+          "enum": ["obligation", "withdrawn"]
+        },
+        "condition": {
+          "description": "When the rule applies (clause-condition.v1, three-valued). null: wherever the project's approved scope applies (clause-condition.v1). For a fact whose catalog cardinality is many (citizenship, document_kinds), eq and in hold when any value matches; ne and not_in hold when none does.",
+          "$ref": "urn:adi-labs:utility:clause-condition:v1"
+        },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text"],
+            "properties": {
+              "text": { "type": "string", "minLength": 1 },
+              "condition": { "$ref": "urn:adi-labs:utility:clause-condition:v1" }
+            }
+          }
+        },
+        "effective": {
+          "description": "from_date: in force from that date. Without a scenario event, the version in force for a case is the latest from_date version whose date is on or before the case's submission date (applications.submitted_at). scenario_only: never in force at the start of an episode; only a scenario-event.v1 publication puts it in force.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "from"],
+              "properties": { "mode": { "const": "from_date" }, "from": { "type": "string", "format": "date" } }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode"],
+              "properties": { "mode": { "const": "scenario_only" } }
+            }
+          ]
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["document_id", "document_version", "quote"],
+          "properties": {
+            "document_id": { "type": "string", "minLength": 1 },
+            "document_version": { "type": "integer", "minimum": 1 },
+            "locator": { "type": "string" },
+            "quote": { "description": "The source passage the text was extracted from, word for word.", "type": "string", "minLength": 1 }
+          }
+        },
+        "approval": {
+          "description": "A person (the PM or policy owner) approved this version's text and condition. AI suggestions are never approval.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "approval_id", "approved_by", "approved_at"],
+          "properties": {
+            "state": { "const": "approved" },
+            "approval_id": { "type": "string", "minLength": 1 },
+            "approved_by": { "type": "string", "minLength": 1 },
+            "approved_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      },
+      "dependentRequired": { "supersedes": ["change"], "change": ["supersedes"] }
+    }
+  }
+}

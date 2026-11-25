@@ -1,0 +1,744 @@
+{
+  "schema_version": "adi.utility.policy-library.v1",
+  "library_id": "kyc-judgment.library",
+  "export": {
+    "export_id": "exp-fixture-0001",
+    "project_id": "prj-kyc-judgment",
+    "library_revision": 1,
+    "exported_at": "2026-11-25T12:30:00Z",
+    "exported_by": "authoring-export"
+  },
+  "fact_catalog": "kyc-judgment-openenv.facts@1",
+  "documents": [
+    {
+      "document_id": "doc-federal-kyc-policy",
+      "document_version": 1,
+      "title": "Federal KYC policy (fixture)",
+      "kind": "official_text",
+      "jurisdiction": "US",
+      "sha256": "95475f013d7a26bd05e986459e2be481135a8be8d14f16a265354779b5870e21",
+      "capture": {
+        "source_url": "https://example.invalid/fixture/doc-federal-kyc-policy",
+        "downloaded_on": "2026-11-20",
+        "sha256": "95475f013d7a26bd05e986459e2be481135a8be8d14f16a265354779b5870e21"
+      }
+    },
+    {
+      "document_id": "doc-california-kyc",
+      "document_version": 1,
+      "title": "California statute or regulation text (placeholder)",
+      "kind": "official_text",
+      "jurisdiction": "US-CA",
+      "sha256": "0d81de150f4220613bf1a9dd578121a85825ef1d5ad38c012b8c01aaa5d078db",
+      "capture": {
+        "source_url": "https://example.invalid/fixture/doc-california-kyc",
+        "downloaded_on": "2026-11-20",
+        "sha256": "0d81de150f4220613bf1a9dd578121a85825ef1d5ad38c012b8c01aaa5d078db"
+      }
+    },
+    {
+      "document_id": "doc-bank-operating-choices",
+      "document_version": 1,
+      "title": "Bank operating choices (fixture)",
+      "kind": "bank_policy",
+      "jurisdiction": "US",
+      "sha256": "2f29470458e5c828a68695fd0b3998dbe807498115fbb5f030b0dcbdb6b9b97a"
+    },
+    {
+      "document_id": "doc-bank-sop-addendum",
+      "document_version": 1,
+      "title": "Bank SOP addendum: customer risk rating (fixture)",
+      "kind": "bank_policy",
+      "jurisdiction": "US",
+      "sha256": "b402ba54c515bfd21d85350a0e3fba77e0b30219dafa8857732f544ad01b1a45"
+    }
+  ],
+  "derived_facts": [
+    {
+      "id": "us_person",
+      "type": "boolean",
+      "definition": {
+        "fact": "citizenship",
+        "op": "in",
+        "value": [
+          "US"
+        ],
+        "label": "A U.S. citizen"
+      },
+      "defined_by": {
+        "rule_id": "R-US-PERSON-DEFINITION",
+        "version": 1
+      },
+      "description": "Never stated in case data; derived from the party's declared citizenships alone (CIP: a U.S. person is a U.S. citizen; a lawful permanent resident is a non-U.S. person)."
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "R-US-PERSON-DEFINITION",
+      "title": "Who is a U.S. person",
+      "kind": "regulation",
+      "issuer": "federal",
+      "jurisdiction": "US",
+      "subject": "party",
+      "scope": {
+        "process": "account_opening",
+        "customer_types": [
+          "individual"
+        ]
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] A U.S. person is an individual who is a United States citizen. Residency, including lawful permanent residence, does not make an individual a U.S. person.",
+          "text_sha256": "daeb3cd876984d24d6fab7681f043dd759a80d7074f18befbe2bebb5c5d95d93",
+          "effect": "obligation",
+          "condition": null,
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-federal-kyc-policy",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] U.S. person means a United States citizen."
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-federal-kyc-policy-1-68e6e46d"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "R-US-PERSON-IDENTIFICATION-NUMBER",
+      "title": "Identification number for a U.S. person",
+      "kind": "regulation",
+      "issuer": "federal",
+      "jurisdiction": "US",
+      "subject": "party",
+      "scope": {
+        "process": "account_opening",
+        "customer_types": [
+          "individual"
+        ]
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] For a U.S. person, obtain a taxpayer identification number before opening the account.",
+          "text_sha256": "80797bd9474c65408c01538d77bb37213b2cd73ae5528fbf3f4f108bc0dedd75",
+          "effect": "obligation",
+          "condition": {
+            "all": [
+              {
+                "fact": "process",
+                "op": "eq",
+                "value": "account_opening"
+              },
+              {
+                "fact": "us_person",
+                "op": "eq",
+                "value": true,
+                "label": "The party is a U.S. person"
+              }
+            ]
+          },
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-federal-kyc-policy",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] For a U.S. person, a taxpayer identification number."
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-federal-kyc-policy-1-646e7f7e"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "R-NON-US-PERSON-IDENTIFICATION-NUMBER",
+      "title": "Identification number for a non-U.S. person",
+      "kind": "regulation",
+      "issuer": "federal",
+      "jurisdiction": "US",
+      "subject": "party",
+      "scope": {
+        "process": "account_opening",
+        "customer_types": [
+          "individual"
+        ]
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] For a non-U.S. person, obtain one or more of: a taxpayer identification number; a passport number and country of issuance; an alien identification card number; or the number and country of issuance of another government-issued photo document showing nationality or residence.",
+          "text_sha256": "246ef77196ff7727dd148adefdfc628c9d8bf8bb317ef8a39a1f0eee5c1e207e",
+          "effect": "obligation",
+          "condition": {
+            "all": [
+              {
+                "fact": "process",
+                "op": "eq",
+                "value": "account_opening"
+              },
+              {
+                "fact": "us_person",
+                "op": "eq",
+                "value": false
+              }
+            ]
+          },
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-federal-kyc-policy",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] For a non-U.S. person, one or more of the following."
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-federal-kyc-policy-1-8d92b0c4"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "R-REMOTE-ACCOUNT-NON-DOCUMENTARY-CHECK",
+      "title": "Non-documentary check for accounts opened remotely",
+      "kind": "regulation",
+      "issuer": "federal",
+      "jurisdiction": "US",
+      "subject": "case",
+      "scope": {
+        "process": "account_opening",
+        "channels": [
+          "remote"
+        ]
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] When the customer opens the account without appearing in person, verify identity by a non-documentary method as well as by documents.",
+          "text_sha256": "7a61c5d3ca0809a797984f562ae1ffcd0f67e63bbdc4f6334cc1ed436f561156",
+          "effect": "obligation",
+          "condition": {
+            "all": [
+              {
+                "fact": "process",
+                "op": "eq",
+                "value": "account_opening"
+              },
+              {
+                "fact": "opening_channel",
+                "op": "eq",
+                "value": "remote"
+              }
+            ]
+          },
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-federal-kyc-policy",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] the customer opens the account without appearing in person"
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-federal-kyc-policy-1-98477f4e"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "R-INDIVIDUAL-ADDRESS-TYPES",
+      "title": "Acceptable addresses for an individual",
+      "kind": "regulation",
+      "issuer": "federal",
+      "jurisdiction": "US",
+      "subject": "party",
+      "scope": {
+        "process": "account_opening"
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] An individual's address is a residential or business street address; an Army Post Office or Fleet Post Office box number, or the residential or business street address of next of kin or another contact individual, is acceptable when the individual has none.",
+          "text_sha256": "5bc5c3ff4a4fe7f50f71e7891254ebffaee823250d136950f275744293cdec55",
+          "effect": "obligation",
+          "condition": {
+            "fact": "process",
+            "op": "eq",
+            "value": "account_opening"
+          },
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-federal-kyc-policy",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] APO or FPO box number"
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-federal-kyc-policy-1-917ac430"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "R-CTR-FILING",
+      "title": "Currency transaction report",
+      "kind": "regulation",
+      "issuer": "federal",
+      "jurisdiction": "US",
+      "subject": "case",
+      "scope": {
+        "process": "currency_transaction_reporting"
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] File a currency transaction report for each cash transaction over the reporting threshold.",
+          "text_sha256": "7c84fb3209b462b6857f7980e4631df9e392b3bd9572c95ae50e34c394e6ab6d",
+          "effect": "obligation",
+          "condition": {
+            "fact": "process",
+            "op": "eq",
+            "value": "currency_transaction_reporting"
+          },
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-federal-kyc-policy",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] each deposit, withdrawal, exchange of currency"
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-federal-kyc-policy-1-5ea2ae50"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "GB-03",
+      "title": "Minor without a taxpayer ID",
+      "kind": "business_rule",
+      "issuer": "bank",
+      "jurisdiction": "US",
+      "subject": "party",
+      "scope": {
+        "process": "account_opening"
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] If a minor party who is a U.S. person has no taxpayer ID on file, request it; do not approve until it is received.",
+          "text_sha256": "40c663f564c9d27be3f475f0913737f401b9a74b15f3141b9bae621db2219684",
+          "effect": "obligation",
+          "condition": {
+            "all": [
+              {
+                "fact": "process",
+                "op": "eq",
+                "value": "account_opening"
+              },
+              {
+                "fact": "party_role",
+                "op": "eq",
+                "value": "minor"
+              },
+              {
+                "fact": "us_person",
+                "op": "eq",
+                "value": true
+              }
+            ]
+          },
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-bank-operating-choices",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] minor without TIN: request it"
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-bank-operating-choices-1-b37e3846"
+          }
+        },
+        {
+          "version": 2,
+          "text": "[Fixture wording for contract tests, not an approved rule] Rule GB-03 is withdrawn: a minor's taxpayer ID is collected after the account opens.",
+          "text_sha256": "9f208411105fa0ee88bcdfa38ce88d2abda620a5130eb1bb9436e293f04f0181",
+          "effect": "withdrawn",
+          "condition": {
+            "all": [
+              {
+                "fact": "process",
+                "op": "eq",
+                "value": "account_opening"
+              },
+              {
+                "fact": "party_role",
+                "op": "eq",
+                "value": "minor"
+              }
+            ]
+          },
+          "effective": {
+            "mode": "scenario_only"
+          },
+          "source": {
+            "document_id": "doc-bank-operating-choices",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] minor TIN collected after opening"
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-bank-operating-choices-2-6ee7a697"
+          },
+          "supersedes": 1,
+          "change": {
+            "kind": "withdraws",
+            "summary": "The TIN request before opening is withdrawn."
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "CA-EXAMPLE-ID-01",
+      "title": "California identity requirement (placeholder)",
+      "kind": "regulation",
+      "issuer": "state",
+      "jurisdiction": "US-CA",
+      "subject": "party",
+      "scope": {
+        "process": "account_opening"
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] Placeholder until the owner uploads the California document; no California requirement is stated here.",
+          "text_sha256": "22ffaff24006f326f5e03aee514f0e5b87ac205e0579b8e82ed543fa6a645c8d",
+          "effect": "obligation",
+          "condition": {
+            "all": [
+              {
+                "fact": "process",
+                "op": "eq",
+                "value": "account_opening"
+              },
+              {
+                "fact": "governing_state",
+                "op": "eq",
+                "value": "CA"
+              }
+            ]
+          },
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-california-kyc",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] placeholder"
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-california-kyc-1-ac511236"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "GB-STRICTER-APPLIES",
+      "title": "Federal and state rules: the stricter applies",
+      "kind": "business_rule",
+      "issuer": "bank",
+      "jurisdiction": "US",
+      "subject": "case",
+      "scope": {
+        "process": "account_opening"
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] Apply rules whichever is stricter.",
+          "text_sha256": "fe8dfc5a7461cb2c7440224ece95552e4437aa185a78366cf331db684d6a2afe",
+          "effect": "obligation",
+          "condition": null,
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-bank-operating-choices",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] Apply rules whichever is stricter."
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-bank-operating-choices-1-5ad658b7"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "GB-RISK-RATING-REQUIRED",
+      "title": "Risk rating required for joint, custodial and teen accounts",
+      "kind": "business_rule",
+      "issuer": "bank",
+      "jurisdiction": "US",
+      "subject": "case",
+      "scope": {
+        "process": "account_opening",
+        "product_lines": [
+          "deposit"
+        ]
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] Rate the customer risk before opening every adult joint, custodial or teen joint deposit account. Single accounts are not rated.",
+          "text_sha256": "4de55b6052e0afca864185c46021bfa0b58aadb4d340a99835e9b253df6e17e8",
+          "effect": "obligation",
+          "condition": {
+            "all": [
+              {
+                "fact": "process",
+                "op": "eq",
+                "value": "account_opening"
+              },
+              {
+                "fact": "product_line",
+                "op": "eq",
+                "value": "deposit"
+              },
+              {
+                "fact": "product",
+                "op": "in",
+                "value": [
+                  "adult_joint",
+                  "custodial",
+                  "teen_joint"
+                ]
+              }
+            ]
+          },
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-bank-sop-addendum",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] Risk rating applies to joint, custodial and teen accounts, not single accounts."
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-bank-sop-addendum-1-6dd54726"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "GB-RISK-RATING-RULE",
+      "title": "How to rate customer risk, and what each rating means",
+      "kind": "business_rule",
+      "issuer": "bank",
+      "jurisdiction": "US",
+      "subject": "case",
+      "scope": {
+        "process": "account_opening",
+        "product_lines": [
+          "deposit"
+        ]
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] Rate high when any high-weight factor is present (among them, joint holders with no documented family relationship) or three or more factors are; medium for one or two other factors; low for none. Low: no effect. Medium: the account may be recommended for approval, with officer verification required. High: no approval; refer the customer for enhanced due diligence.",
+          "text_sha256": "0979e2bbe9d7a75c2a9ef0f596bdcbe2d8f53a4c6e87fb58ec0fc815108b53a2",
+          "effect": "obligation",
+          "condition": {
+            "all": [
+              {
+                "fact": "process",
+                "op": "eq",
+                "value": "account_opening"
+              },
+              {
+                "fact": "product_line",
+                "op": "eq",
+                "value": "deposit"
+              },
+              {
+                "fact": "product",
+                "op": "in",
+                "value": [
+                  "adult_joint",
+                  "custodial",
+                  "teen_joint"
+                ]
+              }
+            ]
+          },
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-bank-sop-addendum",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] Medium: approval with officer verification. High: enhanced due diligence, no approval."
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-bank-sop-addendum-1-3d1a0110"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "GB-NAME-MATCH",
+      "title": "How names must match",
+      "kind": "business_rule",
+      "issuer": "bank",
+      "jurisdiction": "US",
+      "subject": "party",
+      "scope": {
+        "process": "account_opening",
+        "product_lines": [
+          "deposit"
+        ]
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] A name matches when the first name and the last name are the same; a middle name may match by its initial. A nickname or a different last name is a mismatch.",
+          "text_sha256": "f6e72cc45e2303211a7e9dfa42a4f771981a7f5cb1c50457a159865cc4a672b1",
+          "effect": "obligation",
+          "condition": {
+            "all": [
+              {
+                "fact": "process",
+                "op": "eq",
+                "value": "account_opening"
+              },
+              {
+                "fact": "product_line",
+                "op": "eq",
+                "value": "deposit"
+              }
+            ]
+          },
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-bank-sop-addendum",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] First name and last name must match; a middle name may match by its initial."
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-bank-sop-addendum-1-a0c96d12"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "R-CREDIT-CARD-ABILITY-TO-PAY",
+      "title": "Credit card: ability to pay",
+      "kind": "regulation",
+      "issuer": "federal",
+      "jurisdiction": "US",
+      "subject": "case",
+      "scope": {
+        "process": "account_opening",
+        "product_lines": [
+          "credit_card"
+        ]
+      },
+      "versions": [
+        {
+          "version": 1,
+          "text": "[Fixture wording for contract tests, not an approved rule] Before opening a credit card account, consider the consumer's ability to make the required payments.",
+          "text_sha256": "2f537c4b60124152da9f946501f96e24956eb7e13ca03b37627b47eb55aea89c",
+          "effect": "obligation",
+          "condition": {
+            "all": [
+              {
+                "fact": "process",
+                "op": "eq",
+                "value": "account_opening"
+              },
+              {
+                "fact": "product_line",
+                "op": "eq",
+                "value": "credit_card"
+              }
+            ]
+          },
+          "effective": {
+            "mode": "from_date",
+            "from": "2026-01-01"
+          },
+          "source": {
+            "document_id": "doc-federal-kyc-policy",
+            "document_version": 1,
+            "quote": "[Fixture wording for contract tests, not an approved rule] ability to make the required payments"
+          },
+          "approval": {
+            "state": "approved",
+            "approved_by": "pm-fixture",
+            "approved_at": "2026-11-25T12:00:00Z",
+            "approval_id": "appr-doc-federal-kyc-policy-1-5d6a702b"
+          }
+        }
+      ]
+    }
+  ]
+}

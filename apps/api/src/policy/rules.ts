@@ -1,5 +1,5 @@
-import { conditionProblems } from '@praxis/shared';
-import { projectFactCatalog } from './fact-catalog';
+import { conditionProblems, derivedAsFact } from '@praxis/shared';
+import { conditionCatalog, derivedFactProblems } from './fact-catalog';
 import type { Prisma, PolicyDocumentVersion } from '@prisma/client';
 import { PolicyRuleBody, isOpenClarification, type CandidateCitation, type CandidateRule } from '@praxis/shared';
 import type { Db, Tx } from '../db';
@@ -32,6 +32,7 @@ export async function createRuleFromCandidate(
 ) {
   const { citations: raw, ruleKey: proposedKey, ...rest } = input.candidate;
   const parsed = PolicyRuleBody.parse(rest);
+  if (parsed.library || parsed.condition) await libraryChecks(tx, input.projectId, null, parsed);
   const resolved = raw.map((c: CandidateCitation) => ({ c, r: resolveCitation(c, input.doc) }));
   const key = await uniqueKey(tx, input.projectId, input.ruleKey ?? proposedKey ?? slug(parsed.title));
   const rule = await tx.policyRule.create({ data: { clientId: input.clientId, projectId: input.projectId, ruleKey: key, sourceKey: (input.ruleKey ?? proposedKey)?.trim() || null } });
@@ -76,6 +77,24 @@ export interface CitationEdit {
  * Edits a rule (S1 R03–R09). A DRAFT/NEEDS_DEFINITION version is edited in place; a REVIEWED or EXCLUDED version is
  * never changed: a new draft version is created. Stale edits (expectedContentHash mismatch) are rejected (409).
  */
+/**
+ * E-002 and KYC Judgment v1 A1: a rule's condition is checked against the project's fact catalog plus the derived facts
+ * its rules define; a derived-fact definition may name catalog facts only and its id must be the project's only one.
+ */
+async function libraryChecks(tx: Tx, projectId: string, ruleId: string | null, body: PolicyRuleBody) {
+  const defines = body.library?.defines;
+  if (defines) {
+    const problems = await derivedFactProblems(tx, projectId, ruleId, defines);
+    if (problems.length) throw new AppError(422, 'DEFINITION_INVALID', `The derived fact cannot be saved: ${problems.join(' ')}`, { problems });
+  }
+  if (body.condition !== undefined && body.condition !== null) {
+    const catalog = await conditionCatalog(tx, projectId);
+    const own = defines && catalog && !catalog.facts.some((f) => f.id === defines.id) ? { ...catalog, facts: [...catalog.facts, derivedAsFact(defines)] } : catalog;
+    const problems = conditionProblems(body.condition, own);
+    if (problems.length) throw new AppError(422, 'CONDITION_INVALID', `The condition cannot be saved: ${problems.join(' ')}`, { problems });
+  }
+}
+
 export async function editRule(
   tx: Tx,
   deps: { loadText: (v: PolicyDocumentVersion) => Promise<{ text: string; pages: string[] }> },
@@ -92,12 +111,11 @@ export async function editRule(
   const prepared = await prepareAnnotation(tx, rule.id, PolicyRuleBody.parse(cur.body).annotation, PolicyRuleBody.parse(input.body));
   let body = prepared.body;
   // E-002: a condition is kept when an edit omits it (like annotations), and checked against the project's fact catalog.
-  const curCondition = PolicyRuleBody.parse(cur.body).condition;
-  if (body.condition === undefined && curCondition !== undefined) body = { ...body, condition: curCondition };
-  if (body.condition !== undefined && body.condition !== null) {
-    const problems = conditionProblems(body.condition, await projectFactCatalog(tx, input.projectId));
-    if (problems.length) throw new AppError(422, 'CONDITION_INVALID', `The condition cannot be saved: ${problems.join(' ')}`, { problems });
-  }
+  const curParsed = PolicyRuleBody.parse(cur.body);
+  if (body.condition === undefined && curParsed.condition !== undefined) body = { ...body, condition: curParsed.condition };
+  // KYC Judgment v1 A1: the library metadata is kept the same way when an edit omits it.
+  if (body.library === undefined && curParsed.library !== undefined) body = { ...body, library: curParsed.library };
+  await libraryChecks(tx, input.projectId, rule.id, body);
 
   const citationInputs = input.citations ?? cur.citations.map((c) => ({ documentVersionId: c.documentVersionId, fieldPath: c.fieldPath, role: c.role as CitationEdit['role'], quote: c.quote, section: (c.locator as { section?: string | null })?.section ?? null }));
   const resolved = [];

@@ -1,0 +1,353 @@
+{
+  "schema_version": "adi.utility.fact-catalog.v1",
+  "catalog_id": "kyc-judgment-openenv.facts",
+  "version": 1,
+  "owner": {
+    "kind": "environment_version",
+    "id": "kyc-judgment-openenv@1"
+  },
+  "facts": [
+    {
+      "id": "process",
+      "label": "Business process",
+      "type": "enum",
+      "availability": "case_data",
+      "source": {
+        "collection": "applications",
+        "field": "process"
+      },
+      "description": "Case level: read from the application. The process the application belongs to (always account_opening in this environment); rules of other processes condition on it.",
+      "allowed_values": [
+        "account_opening",
+        "beneficial_ownership",
+        "currency_transaction_reporting",
+        "record_retention",
+        "periodic_review",
+        "transaction_monitoring",
+        "account_closure",
+        "other"
+      ]
+    },
+    {
+      "id": "customer_type",
+      "label": "Customer type",
+      "type": "enum",
+      "availability": "case_data",
+      "source": {
+        "collection": "applications",
+        "field": "customer_type"
+      },
+      "description": "Case level: read from the application.",
+      "allowed_values": [
+        "individual",
+        "legal_entity"
+      ]
+    },
+    {
+      "id": "product",
+      "label": "Product",
+      "type": "enum",
+      "availability": "case_data",
+      "source": {
+        "collection": "applications",
+        "field": "product"
+      },
+      "description": "Case level: read from the application.",
+      "allowed_values": [
+        "individual",
+        "adult_joint",
+        "teen_joint",
+        "custodial"
+      ]
+    },
+    {
+      "id": "governing_state",
+      "label": "Governing state",
+      "type": "string",
+      "availability": "case_data",
+      "source": {
+        "collection": "applications",
+        "field": "governing_state"
+      },
+      "description": "Case level: read from the application. Two-letter state code."
+    },
+    {
+      "id": "opening_channel",
+      "label": "Opening channel",
+      "type": "enum",
+      "availability": "case_data",
+      "source": {
+        "collection": "applications",
+        "field": "opening_channel"
+      },
+      "description": "Case level: read from the application. How the customer opened the account.",
+      "allowed_values": [
+        "branch",
+        "remote"
+      ]
+    },
+    {
+      "id": "party_role",
+      "label": "Party role",
+      "type": "enum",
+      "availability": "case_data",
+      "source": {
+        "collection": "parties",
+        "field": "role"
+      },
+      "description": "Party level: one value per party.",
+      "allowed_values": [
+        "primary",
+        "joint",
+        "minor",
+        "custodian"
+      ]
+    },
+    {
+      "id": "citizenship",
+      "label": "Citizenship",
+      "type": "string",
+      "availability": "case_data",
+      "source": {
+        "collection": "parties",
+        "field": "citizenships"
+      },
+      "description": "Party level: one value per party. ISO 3166-1 alpha-2 codes the party declared on the application. Multi-valued: a set per party; eq/in hold when any value matches.",
+      "cardinality": "many"
+    },
+    {
+      "id": "residency",
+      "label": "Country of residence",
+      "type": "string",
+      "availability": "case_data",
+      "source": {
+        "collection": "parties",
+        "field": "residence_country"
+      },
+      "description": "Party level: one value per party. ISO 3166-1 alpha-2 code the party declared on the application."
+    },
+    {
+      "id": "age_on_submission",
+      "label": "Age at submission",
+      "type": "number",
+      "availability": "case_data",
+      "source": {
+        "collection": "parties",
+        "field": "date_of_birth"
+      },
+      "description": "Party level: one value per party. Whole years from date_of_birth to applications.submitted_at, computed by Studio when the registry case is written. The agent sees only the dates.",
+      "unit": "years",
+      "derivation": {
+        "method": "years_between",
+        "inputs": [
+          "parties.date_of_birth",
+          "applications.submitted_at"
+        ],
+        "description": "Whole years from the date of birth to the submission date."
+      }
+    },
+    {
+      "id": "address_type",
+      "label": "Address type",
+      "type": "enum",
+      "availability": "case_data",
+      "source": {
+        "collection": "documents",
+        "field": "content.address"
+      },
+      "description": "Party level: one value per party. Classified by Studio from the address on the party's proof of address when the registry case is written. The agent sees only the address.",
+      "allowed_values": [
+        "street",
+        "apo_fpo_dpo",
+        "next_of_kin",
+        "po_box"
+      ],
+      "derivation": {
+        "method": "classify_address",
+        "inputs": [
+          "documents.content.address"
+        ],
+        "parameters": {
+          "document_kind": "proof_of_address"
+        },
+        "description": "street, apo_fpo_dpo, next_of_kin or po_box, read from the address text."
+      }
+    },
+    {
+      "id": "document_kinds",
+      "label": "Documents presented",
+      "type": "enum",
+      "availability": "case_data",
+      "source": {
+        "collection": "documents",
+        "field": "kind"
+      },
+      "description": "Party level: one value per party. The kinds of the party's documents. Multi-valued: a set per party; eq/in hold when any value matches.",
+      "allowed_values": [
+        "government_id",
+        "passport",
+        "proof_of_address",
+        "screening_result",
+        "tin_application",
+        "alien_identification_card",
+        "non_documentary_check_result",
+        "relationship_evidence"
+      ],
+      "cardinality": "many"
+    },
+    {
+      "id": "party_relationship",
+      "label": "Relationship to the first party",
+      "type": "enum",
+      "availability": "case_data",
+      "source": {
+        "collection": "parties",
+        "field": "relationship_to_primary"
+      },
+      "description": "Party level: one value per party. The relationship the application declares between this party and the application's first party (self for the first party). Documentary support, when presented, is a relationship_evidence document.",
+      "allowed_values": [
+        "self",
+        "spouse",
+        "parent_child",
+        "sibling",
+        "guardian",
+        "unrelated"
+      ]
+    },
+    {
+      "id": "account_purpose",
+      "label": "Account purpose",
+      "type": "enum",
+      "availability": "case_data",
+      "source": {
+        "collection": "applications",
+        "field": "account_purpose"
+      },
+      "description": "Case level: read from the application. The purpose the applicant states. Proposed values; the bank expert replaces them.",
+      "allowed_values": [
+        "everyday_banking",
+        "savings",
+        "education_savings",
+        "receiving_transfers",
+        "business_use",
+        "other"
+      ]
+    },
+    {
+      "id": "id_age_days",
+      "label": "Days since the ID was issued",
+      "type": "number",
+      "availability": "case_data",
+      "source": {
+        "collection": "documents",
+        "field": "content.issued_on"
+      },
+      "description": "Party level: one value per party. Days from the issue date of the party's identity document (government ID or passport; the most recent if several) to applications.submitted_at, computed by Studio when the registry case is written. The agent sees only the dates.",
+      "unit": "days",
+      "derivation": {
+        "method": "days_between",
+        "inputs": [
+          "documents.content.issued_on",
+          "applications.submitted_at"
+        ],
+        "parameters": {
+          "document_kinds": "government_id,passport",
+          "pick": "most_recent"
+        },
+        "description": "Days from the most recent identity document's issue date to the submission date."
+      }
+    },
+    {
+      "id": "prior_minor_accounts",
+      "label": "Minor accounts opened by this custodian before",
+      "type": "number",
+      "availability": "case_data",
+      "source": {
+        "collection": "existing_accounts",
+        "field": "opened_on"
+      },
+      "description": "Party level: one value per party. The count of the bank's existing minor accounts with this party as custodian, opened in the 365 days before submission (the bank's own records, an existing_accounts collection the environment adds). Computed by Studio when the registry case is written.",
+      "unit": "accounts",
+      "derivation": {
+        "method": "count_within_days",
+        "inputs": [
+          "existing_accounts.opened_on"
+        ],
+        "parameters": {
+          "window_days": 365,
+          "party_role": "custodian",
+          "account_holder": "minor"
+        },
+        "description": "Existing minor accounts with this party as custodian opened in the window before submission."
+      }
+    },
+    {
+      "id": "product_line",
+      "label": "Product line",
+      "type": "enum",
+      "availability": "case_data",
+      "source": {
+        "collection": "applications",
+        "field": "product_line"
+      },
+      "description": "Case level: read from the application. Always deposit in this environment; loan, credit card and mortgage rules condition on it, so they never apply (distractors).",
+      "allowed_values": [
+        "deposit",
+        "loan",
+        "credit_card",
+        "mortgage"
+      ]
+    },
+    {
+      "id": "branch_id",
+      "label": "Branch",
+      "type": "string",
+      "availability": "case_data",
+      "source": {
+        "collection": "applications",
+        "field": "branch_id"
+      },
+      "description": "Case level: read from the application. The branch the application belongs to; its location is in the branches collection."
+    },
+    {
+      "id": "address_to_branch_miles",
+      "label": "Distance from address to branch",
+      "type": "number",
+      "availability": "case_data",
+      "source": {
+        "collection": "documents",
+        "field": "content.address"
+      },
+      "description": "Party level: one value per party. Miles from the address on the party's proof of address to the branch. The audit records within_10_miles from it; it has no decision effect.",
+      "unit": "miles",
+      "derivation": {
+        "method": "distance_miles",
+        "inputs": [
+          "documents.content.address",
+          "branches.location"
+        ],
+        "parameters": {
+          "document_kind": "proof_of_address",
+          "decimals": 1
+        },
+        "description": "Great-circle miles from the address's geocode to the branch's location."
+      }
+    },
+    {
+      "id": "us_residency_status",
+      "label": "U.S. residency status",
+      "type": "enum",
+      "availability": "case_data",
+      "source": {
+        "collection": "parties",
+        "field": "us_residency_status"
+      },
+      "description": "Party level: one value per party. Declared on the application: none, lawful_permanent_resident or other_resident. Used only if the approved U.S. person definition (option B) or a bank rule (option C) needs it.",
+      "allowed_values": [
+        "none",
+        "lawful_permanent_resident",
+        "other_resident"
+      ]
+    }
+  ]
+}

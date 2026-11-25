@@ -41,9 +41,34 @@ export const FactDef = z
     operators: z.array(z.enum(CLAUSE_OPS)).optional(),
     availability: z.string().min(1).max(60),
     source: z.record(z.string(), z.unknown()).optional(),
+    /** KYC Judgment v1 C2 (Studio 1ba841d), additive: what the fact means. */
+    description: z.string().max(4000).optional(),
+    /** C2: `many` for a multi-valued fact (citizenship, document_kinds): eq and in hold when any value matches; ne and not_in when none does. */
+    cardinality: z.enum(['one', 'many']).optional(),
+    /** C2: how the environment computes the fact from data the agent sees (method, inputs, parameters). */
+    derivation: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 export type FactDef = z.infer<typeof FactDef>;
+
+/**
+ * KYC Judgment v1 C1 `derived_facts` (Studio 1ba841d): a fact the case data never states, defined by a rule of the
+ * project's library (for example us_person from citizenship alone). Its definition names catalog facts only; other
+ * rules' conditions may name it. The resolver (RL Gym, Studio's generator) computes it with the definition in force.
+ */
+export const DerivedFactDef = z
+  .object({
+    id: z.string().regex(FACT_ID),
+    type: z.enum(['boolean', 'string', 'enum']),
+    allowed_values: z.array(z.union([z.string().max(200), z.boolean()])).max(500).optional(),
+    definition: ConditionPredicate,
+    description: z.string().max(4000).optional(),
+  })
+  .strict();
+export type DerivedFactDef = z.infer<typeof DerivedFactDef>;
+
+/** A derived fact as a catalog entry, so conditions naming it are checked like any other fact. */
+export const derivedAsFact = (d: DerivedFactDef): FactDef => ({ id: d.id, label: d.id, type: d.type, ...(d.allowed_values?.length ? { allowed_values: d.allowed_values } : {}), availability: 'derived', description: d.description });
 
 /** fact-catalog.v1. */
 export const FactCatalog = z

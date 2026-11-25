@@ -1,4 +1,4 @@
-import { ClauseCondition } from './clause-condition';
+import { ClauseCondition, DerivedFactDef } from './clause-condition';
 import { z } from 'zod';
 import { RuleAnnotation } from './policy-annotations';
 
@@ -71,6 +71,53 @@ export const PrecedenceClaim = z.object({
   note: shortText.nullable().default(null),
 });
 
+/** KYC Judgment v1 C1 vocabularies (Studio 1ba841d). */
+export const LIBRARY_PROCESSES = ['account_opening', 'beneficial_ownership', 'currency_transaction_reporting', 'record_retention', 'periodic_review', 'transaction_monitoring', 'account_closure', 'other'] as const;
+export const LIBRARY_CUSTOMER_TYPES = ['individual', 'legal_entity'] as const;
+export const LIBRARY_PRODUCT_LINES = ['deposit', 'loan', 'credit_card', 'mortgage'] as const;
+export const LIBRARY_CHANNELS = ['branch', 'remote'] as const;
+export const LIBRARY_RULE_KINDS = ['regulation', 'policy', 'business_rule'] as const;
+export const LIBRARY_ISSUERS = ['federal', 'state', 'bank'] as const;
+export const LIBRARY_SUBJECTS = ['case', 'party'] as const;
+export const LIBRARY_CHANGE_KINDS = ['contradicts', 'withdraws', 'tightens', 'narrows', 'clarifies'] as const;
+/** ISO 3166-1 alpha-2, optionally with an ISO 3166-2 subdivision: US, US-CA (a bare CA is Canada). */
+export const ISO_JURISDICTION = /^[A-Z]{2}(-[A-Z0-9]{1,3})?$/;
+
+/** C1 `scope`: review metadata only; applicability comes from the condition. */
+export const LibraryScope = z
+  .object({
+    process: z.enum(LIBRARY_PROCESSES),
+    customer_types: z.array(z.enum(LIBRARY_CUSTOMER_TYPES)).max(2).optional(),
+    product_lines: z.array(z.enum(LIBRARY_PRODUCT_LINES)).max(4).optional(),
+    channels: z.array(z.enum(LIBRARY_CHANNELS)).max(2).optional(),
+  })
+  .strict();
+export type LibraryScope = z.infer<typeof LibraryScope>;
+
+/**
+ * What the policy library export (C1 policy-library.v1) needs beyond the rule's text and condition: kind, issuer,
+ * jurisdiction, subject, scope, effect, how the version takes effect, how it changes the version before it, and a
+ * derived fact it defines. Every part is optional while a rule is drafted (AI suggestions fill some, the PM confirms);
+ * the export refuses a rule whose parts are incomplete. Optional and never defaulted on the body, so rules without it
+ * keep their content hash.
+ */
+export const RuleLibraryMeta = z
+  .object({
+    kind: z.enum(LIBRARY_RULE_KINDS).optional(),
+    issuer: z.enum(LIBRARY_ISSUERS).optional(),
+    jurisdiction: z.string().regex(ISO_JURISDICTION).optional(),
+    subject: z.enum(LIBRARY_SUBJECTS).optional(),
+    scope: LibraryScope.optional(),
+    effect: z.enum(['obligation', 'withdrawn']).optional(),
+    /** scenario_only: never in force at the start of an episode; only a scenario event (C3) publishes it. */
+    effectiveMode: z.enum(['from_date', 'scenario_only']).optional(),
+    /** How this version changes the approved version before it (required by the export from the second version on). */
+    change: z.object({ kind: z.enum(LIBRARY_CHANGE_KINDS), summary: shortText.min(1) }).strict().optional(),
+    defines: DerivedFactDef.optional(),
+  })
+  .strict();
+export type RuleLibraryMeta = z.infer<typeof RuleLibraryMeta>;
+
 /** The reviewed, human-editable body of a rule version (S1 R03–R09). */
 export const PolicyRuleBody = z.object({
   title: shortText.min(1),
@@ -95,6 +142,8 @@ export const PolicyRuleBody = z.object({
    * across the approved scope). Optional, never defaulted: a rule without one keeps its body, content hash and digest.
    */
   condition: ClauseCondition.optional(),
+  /** KYC Judgment v1 (C1): the policy library metadata. Optional, never defaulted (see RuleLibraryMeta). */
+  library: RuleLibraryMeta.optional(),
 });
 export type PolicyRuleBody = z.infer<typeof PolicyRuleBody>;
 

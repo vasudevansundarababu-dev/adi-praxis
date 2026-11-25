@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:adi-labs:utility:clause-condition:v1",
+  "title": "Clause condition v1 (E-002 §3, §3a)",
+  "description": "When an approved clause applies: a predicate over logical facts (fact-catalog.v1), never over template fields. The RL Gym compiles it to a GoRules ZEN expression. Evaluation is three-valued: a predicate that needs a fact with no value is Unresolved (excluded from the score, owner decision 9.2), never guessed. null means the clause applies wherever the project's approved scope applies.",
+  "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/predicate" }],
+  "$defs": {
+    "op": {
+      "enum": ["eq", "ne", "in", "not_in", "lt", "lte", "gt", "gte", "between", "present", "absent"]
+    },
+    "predicate": {
+      "oneOf": [
+        { "$ref": "#/$defs/compare" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["all"],
+          "properties": { "all": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/predicate" } } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["any"],
+          "properties": { "any": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/predicate" } } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["not"],
+          "properties": { "not": { "$ref": "#/$defs/predicate" } }
+        }
+      ]
+    },
+    "compare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fact", "op"],
+      "properties": {
+        "fact": { "$ref": "urn:adi-labs:utility:fact-catalog:v1#/$defs/factId" },
+        "op": { "$ref": "#/$defs/op" },
+        "value": {
+          "description": "Absent for present/absent; a list for in/not_in; [low, high] for between.",
+          "type": ["string", "number", "boolean", "array"]
+        },
+        "label": { "type": "string", "description": "Plain-language form shown in the UI (for example 'Governing state is CA')." }
+      }
+    }
+  }
+}

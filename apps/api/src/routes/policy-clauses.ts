@@ -12,7 +12,8 @@ import type { Db } from '../db';
 import { AppError } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { POLICY_ACCESS, policyProject } from '../policy/access';
-import { approvedClauses, catalogFromTemplate, projectFactCatalog, templateBoundFacts } from '../policy/fact-catalog';
+import { approvedClauses, catalogFromTemplate, conditionCatalog, projectFactCatalog, templateBoundFacts } from '../policy/fact-catalog';
+import { adoptedBody, storeSuggestion } from '../policy/suggestions';
 import { jcsSha256 } from '../anvil/jcs';
 import { ownTask } from './work';
 
@@ -27,10 +28,11 @@ export const policyClauseRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Object
   const loadText = (v: { textStorageKey: string }) => loadVersionText(storage, v);
 
   // ── E-002 §1.3: suggested dispositions (never approvals). Manual review stays available when the AI fails. ──
-  app.post('/projects/:projectId/policy/dispositions', { config: { access: POLICY_ACCESS, rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['policy'], params: ProjectParams, body: z.object({ scope: z.string().trim().max(2000).optional() }).strict() } }, async (req) => {
+  app.post('/projects/:projectId/policy/dispositions', { config: { access: POLICY_ACCESS, rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['policy'], params: ProjectParams, body: z.object({ scope: z.string().trim().max(2000).optional() }).strict() } }, async (req, reply) => {
     const p = await policyProject(db, req.actor!, req.params.projectId);
     const project = await db.project.findUniqueOrThrow({ where: { id: p.id }, include: { template: true } });
-    const catalog = await projectFactCatalog(db, p.id);
+    // KYC Judgment v1 A1: conditions may name the derived facts the project's rules define.
+    const catalog = await conditionCatalog(db, p.id);
     const rules = await db.policyRule.findMany({ where: { clientId: req.actor!.clientId, projectId: p.id }, include: { versions: { orderBy: { version: 'desc' }, take: 1, include: { citations: true } } }, orderBy: { ruleKey: 'asc' } });
     const input = rules.flatMap((r) => {
       const v = r.versions[0];
@@ -48,7 +50,46 @@ export const policyClauseRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Object
     }
     const bound = templateBoundFacts(project.template.anvilSpec);
     const checked = checkedDispositions(raw, input, catalog, bound?.facts ?? null);
-    return { model: dispositions.modelVersion, items: checked.map((d) => { const r = rules.find((x) => x.ruleKey === d.ruleKey)!; return { ...d, ruleId: r.id, contentHash: r.versions[0]!.contentHash }; }) };
+    // KYC Judgment v1 A1: each suggestion is stored once against the exact rule version it was made for (never applied).
+    await runCommand<unknown>(db, req, reply, async ({ tx, actor, audit }) => {
+      const items = [];
+      for (const d of checked) {
+        const r = rules.find((x) => x.ruleKey === d.ruleKey)!;
+        const v = r.versions[0]!;
+        const row = await storeSuggestion(tx, { clientId: actor.clientId, projectId: p.id, ruleId: r.id, ruleVersionId: v.id, contentHash: v.contentHash, source: 'disposition', model: dispositions.modelVersion, promptVersion: DISPOSITION_PROMPT_VERSION, content: (({ ruleKey: _k, ...rest }) => rest)(d), problems: [], createdById: actor.userId });
+        items.push({ ...d, ruleId: r.id, contentHash: v.contentHash, suggestionId: row.id });
+      }
+      await audit({ entityType: 'Project', entityId: p.id, action: 'policy.dispositions_suggested', after: { model: dispositions.modelVersion, promptVersion: DISPOSITION_PROMPT_VERSION, items: items.length } });
+      return { status: 200, body: { model: dispositions.modelVersion, items } };
+    });
+    return reply;
+  });
+
+  // ── KYC Judgment v1 A1: stored suggestions of a rule, and the PM adopting one (an ordinary, audited rule edit) ──
+  app.get('/projects/:projectId/policy/rules/:ruleId/suggestions', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ ruleId: z.string().uuid() }) } }, async (req) => {
+    const p = await policyProject(db, req.actor!, req.params.projectId);
+    const latest = await db.policyRuleVersion.findFirst({ where: { ruleId: req.params.ruleId, clientId: req.actor!.clientId, rule: { projectId: p.id } }, orderBy: { version: 'desc' } });
+    if (!latest) throw notFound('Rule not found');
+    const rows = await db.policyRuleSuggestion.findMany({ where: { ruleId: req.params.ruleId, projectId: p.id }, orderBy: { createdAt: 'desc' } });
+    return { items: rows.map((s) => ({ id: s.id, source: s.source, model: s.model, promptVersion: s.promptVersion, ruleVersionId: s.ruleVersionId, contentHash: s.contentHash, content: s.content, problems: s.problems, current: s.ruleVersionId === latest.id && s.contentHash === latest.contentHash, at: s.createdAt.toISOString() })) };
+  });
+
+  app.post('/projects/:projectId/policy/suggestions/:suggestionId/adopt', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ suggestionId: z.string().uuid() }), body: z.object({ expectedContentHash: z.string().length(64) }).strict() } }, async (req, reply) => {
+    await runCommand<unknown>(db, req, reply, async ({ tx, actor, audit }) => {
+      const p = await policyProject(tx, actor, req.params.projectId);
+      const s = await tx.policyRuleSuggestion.findFirst({ where: { id: req.params.suggestionId, projectId: p.id, clientId: actor.clientId } });
+      if (!s) throw notFound('Suggestion not found');
+      const cur = await tx.policyRuleVersion.findFirstOrThrow({ where: { ruleId: s.ruleId }, orderBy: { version: 'desc' } });
+      if (cur.id !== s.ruleVersionId || cur.contentHash !== s.contentHash) throw new AppError(409, 'STALE_SUGGESTION', 'This suggestion was made for an earlier version of the rule. Ask for a new suggestion, or edit the rule by hand.');
+      const problems = Array.isArray(s.problems) ? (s.problems as string[]) : [];
+      if (problems.length) throw new AppError(422, 'SUGGESTION_HAS_PROBLEMS', `This suggestion did not pass the checks, so it can't be adopted: ${problems.join(' ')}`, { problems });
+      const { body, parts } = adoptedBody(PolicyRuleBody.parse(cur.body), s.content);
+      if (!parts.length) throw new AppError(422, 'NOTHING_TO_ADOPT', 'This suggestion asks a question; it has no condition or library details to adopt. Answer it by editing the rule.');
+      const out = await editRule(tx, { loadText }, { clientId: actor.clientId, projectId: p.id, ruleId: s.ruleId, actorId: actor.userId, expectedContentHash: req.body.expectedContentHash, body }, audit);
+      await audit({ entityType: 'PolicyRuleVersion', entityId: out.id, action: 'policy.rule_suggestion_adopted', after: { suggestionId: s.id, source: s.source, model: s.model, parts, version: out.version, contentHash: out.contentHash } });
+      return { status: 200, body: { versionId: out.id, version: out.version, state: out.state, contentHash: out.contentHash, adopted: parts } };
+    });
+    return reply;
   });
 
   // ── E-002 §4.1.4: PM-only quality evaluation (private reference labels; reproducible runs) ──
@@ -138,7 +179,8 @@ export const policyClauseRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Object
   app.put('/projects/:projectId/policy/fact-catalog', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams, body: FactCatalog } }, async (req, reply) => {
     await runCommand<unknown>(db, req, reply, async ({ tx, actor, audit }) => {
       const p = await policyProject(tx, actor, req.params.projectId);
-      if (req.body.owner.kind !== 'project_scope' || req.body.owner.id !== p.id) throw new AppError(422, 'NOT_PROJECT_SCOPE', 'A project fact catalog has owner kind project_scope and this project’s ID.');
+      // KYC Judgment v1 A1: the environment's own catalog (C2, owner environment_version) may be the project's, as it is.
+      if (!(req.body.owner.kind === 'environment_version' || (req.body.owner.kind === 'project_scope' && req.body.owner.id === p.id))) throw new AppError(422, 'NOT_PROJECT_SCOPE', 'A project fact catalog has owner kind project_scope and this project’s ID, or is the environment’s catalog (owner kind environment_version).');
       const latest = await tx.projectFactCatalog.findFirst({ where: { projectId: p.id }, orderBy: { version: 'desc' } });
       const { version: _v, ...content } = req.body;
       if (latest && jcsSha256({ ...(latest.catalog as Record<string, unknown>), version: 0 }) === jcsSha256({ ...content, version: 0 })) {

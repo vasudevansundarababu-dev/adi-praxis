@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:adi-labs:utility:common:v1",
+  "title": "Shared definitions",
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "ociDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "timestamp": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$" },
+    "nonEmpty": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "jsonPointer": { "type": "string", "pattern": "^(/([^~/]|~[01])*)*$" },
+    "owner": { "enum": ["Utility", "Praxis", "Anvil", "Designer", "Admin", "Reviewer"] },
+    "errorCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,63}$" },
+    "templateRef": {
+      "description": "Exact template identity (SPEC 06.4 Template row).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["praxis_lineage_id", "version", "sha256"],
+      "properties": {
+        "praxis_lineage_id": { "$ref": "#/$defs/nonEmpty" },
+        "version": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "profile_id": { "type": "string" },
+        "profile_version": { "type": "integer", "minimum": 1 },
+        "graph_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "taskRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "revision", "sha256"],
+      "properties": {
+        "task_id": { "$ref": "#/$defs/nonEmpty" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "environmentVersionRef": {
+      "description": "SPEC 06.4 Environment version row.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment_version_id", "runtime_profile_version", "oci_digest", "dataset_sha256", "qualification_receipt_id"],
+      "properties": {
+        "environment_version_id": { "$ref": "#/$defs/nonEmpty" },
+        "runtime_profile_version": { "$ref": "#/$defs/nonEmpty" },
+        "oci_digest": { "$ref": "#/$defs/ociDigest" },
+        "dataset_sha256": { "$ref": "#/$defs/sha256" },
+        "tool_schema_sha256": { "$ref": "#/$defs/sha256" },
+        "data_schema_sha256": { "$ref": "#/$defs/sha256" },
+        "reset_strategy": { "type": "string" },
+        "qualification_receipt_id": { "$ref": "#/$defs/nonEmpty" }
+      }
+    }
+  }
+}

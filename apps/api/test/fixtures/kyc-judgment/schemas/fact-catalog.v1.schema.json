@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:adi-labs:utility:fact-catalog:v1",
+  "title": "Fact catalog v1 (E-002 §3; owner decision 9.1)",
+  "description": "Versioned logical facts that clause conditions and edge-case recipes use, for any domain. A project scope (Authoring) declares facts for suggestions; an environment version (Studio) declares the facts its cases supply at runtime; a template maps one to the other (template.v1 policies.policy_bindings). Logical facts never name a template field.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "catalog_id", "version", "owner", "facts"],
+  "properties": {
+    "schema_version": { "const": "adi.utility.fact-catalog.v1" },
+    "catalog_id": { "type": "string", "pattern": "^[a-z][a-z0-9_.:-]{1,199}$" },
+    "version": { "type": "integer", "minimum": 1 },
+    "owner": {
+      "description": "Who declares it: an Authoring project scope, or a Studio environment version (its facts come from case data).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["project_scope", "environment_version"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "facts": { "type": "array", "items": { "$ref": "#/$defs/fact" } }
+  },
+  "$defs": {
+    "factId": {
+      "description": "A logical fact name, domain-neutral: governing_state, audience, channel, approval_recorded.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "availability"],
+      "properties": {
+        "id": { "$ref": "#/$defs/factId" },
+        "label": { "type": "string" },
+        "type": { "enum": ["string", "number", "boolean", "date", "enum"] },
+        "unit": { "type": "string" },
+        "cardinality": {
+          "description": "KYC Judgment v1 (optional; default one): many means each case or party has a set of values. A condition's eq and in hold when any value matches; ne and not_in when none does. An empty set is a value (none), not absence.",
+          "enum": ["one", "many"]
+        },
+        "derivation": {
+          "description": "KYC Judgment v1 (optional): the fact is computed by Studio from fields the agent sees when the registry case is written, never stored as a field in the agent's data. method names the computation; inputs are collection.field paths; parameters hold its settings (for example a window in days), so changing them is a catalog version, not code.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "inputs"],
+          "properties": {
+            "method": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+            "inputs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+            "parameters": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean"] } },
+            "description": { "type": "string" }
+          }
+        },
+        "allowed_values": { "type": "array", "items": { "type": ["string", "number", "boolean"] } },
+        "operators": {
+          "description": "Operators a condition may use on this fact (clause-condition.v1). Omitted: every operator valid for the type.",
+          "type": "array",
+          "items": { "$ref": "urn:adi-labs:utility:clause-condition:v1#/$defs/op" }
+        },
+        "availability": {
+          "description": "case_data: known before the episode (resolved at admission). episode_evidence: known only from what happened (resolved after the episode from sealed evidence).",
+          "enum": ["case_data", "episode_evidence"]
+        },
+        "source": {
+          "description": "Environment catalogs only: where each case's value is read. A case_data fact reads a field of the case's root record or a related collection; an episode_evidence fact reads a verifier-blocks evidence path.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "collection": { "type": "string", "minLength": 1 },
+            "field": { "type": "string", "minLength": 1 },
+            "evidence_path": { "type": "string", "minLength": 1 }
+          }
+        },
+        "description": { "type": "string" }
+      }
+    }
+  }
+}

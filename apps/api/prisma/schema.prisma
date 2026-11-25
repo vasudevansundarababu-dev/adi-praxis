@@ -3816,6 +3816,30 @@ model PolicyQualityRun {
   @@index([projectId, createdAt])
 }
 
+/// KYC Judgment v1 A1/A2 (owner, 25 Nov 2026): an AI suggestion for one exact rule version (its id and content hash):
+/// a disposition, a condition, scope or jurisdiction. Kept with the server's checks of it. Only a PM adopts one, as an
+/// ordinary rule edit. Append-only.
+model PolicyRuleSuggestion {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  ruleId        String   @map("rule_id") @db.Uuid
+  ruleVersionId String   @map("rule_version_id") @db.Uuid
+  contentHash   String   @map("content_hash")
+  /// disposition | enrichment
+  source        String
+  model         String
+  promptVersion String   @map("prompt_version")
+  content       Json
+  problems      Json     @default("[]")
+  createdById   String   @map("created_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([ruleVersionId, contentHash, source, promptVersion, model])
+  @@index([projectId, createdAt])
+  @@index([ruleId])
+}
+
 /// E-001 §6b (owner, 24 Nov 2026): a batch of edge-case variants a PM sends one SME (or answers as Admin) for their
 /// expected outcomes, then writes to Studio as outcome-request.v1. Second check optional per batch (default off).
 model OutcomeBatch {

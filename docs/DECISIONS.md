@@ -2595,3 +2595,26 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
   a PM correction, or holds an export. It applies to every template, so v8 tasks that still have branches show it too.
 - **Note.** The D-016 step drafter still suggests conditional follow-ups for finding.write and specialist.refer. The
   warning now flags them; changing the drafter is left for later.
+
+## D-066: the environment's fact catalog, derived facts and stored suggestions (KYC Judgment v1 A1; contracts C1/C2 at Studio 1ba841d)
+
+- **Catalog.** A project may hold the environment's fact catalog as it is (C2, owner kind `environment_version`), as
+  well as its own (`project_scope`). fact-catalog.v1's additive `description`, `cardinality` and `derivation` are
+  accepted. Earlier catalog versions stay (append-only, as before).
+- **Rule library metadata.** The rule body gains an optional `library` block (C1 policy-library.v1): kind, issuer, ISO
+  jurisdiction, subject (case or party), scope (process, customer types, product lines, channels), effect, effective
+  mode (from_date or scenario_only), change (kind and summary) and a derived fact it `defines`. It is never defaulted, so
+  every existing rule keeps its body and content hash. An edit that omits it keeps it, as conditions are kept.
+- **Derived facts** (C1 `derived_facts`, for example `us_person` from citizenship alone; spec §15.6 Option A). A rule
+  defines one; the definition is data, so the PM can change it with no code.
+  - The definition may name catalog facts only, never another derived fact.
+  - Its id may not be a catalog fact, and only one rule of a project may define it.
+  - Other rules' conditions may name it: conditions are checked against the catalog plus the defined facts.
+- **Stored suggestions.** `PolicyRuleSuggestion` (append-only, additive migration) keeps each AI suggestion against the
+  exact rule version and content hash it was made for, with the server's checks. Suggested dispositions are now stored
+  (once per version, hash, source, prompt and model) and answered with their `suggestionId`.
+- **Only a PM adopts.** `POST …/policy/suggestions/:id/adopt` applies the suggestion's condition and library parts as an
+  ordinary, audited rule edit (`policy.rule_suggestion_adopted`).
+  - Refused when the rule changed since (`STALE_SUGGESTION`), or when the suggestion failed its checks
+    (`SUGGESTION_HAS_PROBLEMS`).
+  - On an approved rule it makes a new draft; the approved version and the rule sets are untouched.

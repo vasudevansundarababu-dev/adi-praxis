@@ -399,13 +399,18 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     }
     // A reviewed mapping for this release: the export carries the environment's ids; the package bytes stay the same.
     const ref = { id: 'tpl_x5rwt6d5eu', version: 9, specSha256: 'c'.repeat(64) };
-    const env = (id: string) => ({ id, version: 'golden-kyc-1.0.0', content_sha256: 'b'.repeat(64) });
-    const map = { studio_template_id: ref.id, studio_version: ref.version, environment: 'golden-kyc-openenv', environment_policies: [env('KYC-01'), env('GB-02')], entries: [{ forge: { kind: 'document' as const, id: cites[0]!.ruleId, content_sha256: cites[0]!.contentSha256 }, environment_policy_ids: ['KYC-01', 'GB-02'], confirmed_by: 'owner', confirmed_at: '2026-11-24' }] };
+    const env = (id: string) => ({ id, title: id, text_sha256: 'b'.repeat(64) });
+    const map = { environment: 'golden-kyc-openenv', environment_version: 12, applies_to: [{ studio_template_id: ref.id, studio_version: ref.version }], source: 'test', environment_policies: [env('KYC-01'), env('GB-02')], entries: [{ forge: { kind: 'document' as const, id: cites[0]!.ruleId, content_sha256: cites[0]!.contentSha256, label: 'doc' }, environment_policy_ids: ['KYC-01', 'GB-02'], reason: 'test', confirmed_by: 'owner', confirmed_at: '2026-11-25' }] };
     const p = await db.project.findUniqueOrThrow({ where: { id: projectId }, include: { template: true } });
     const mapped = await db.$transaction((tx) => buildRlGymExport(tx, p, records, ref, { exported: true, policyIdMap: map }));
     const first = mapped.body.tasks as { task_id: string; package_sha256: string; policy_id_map?: unknown }[];
     const t0 = first.find((t) => t.task_id === records[0]!.taskInstanceId)!;
-    expect(t0.policy_id_map).toEqual([{ forge_rule_id: cites[0]!.ruleId, forge_content_sha256: cites[0]!.contentSha256, environment_policy_ids: ['KYC-01', 'GB-02'] }]);
+    // The exact shape the RL Gym accepts (fde41cf): environment_version, map, policies with content_sha256.
+    expect(t0.policy_id_map).toEqual({ environment_version: 'golden-kyc-openenv@12', map: { [cites[0]!.ruleId]: ['KYC-01', 'GB-02'] }, policies: { 'GB-02': { content_sha256: 'b'.repeat(64) }, 'KYC-01': { content_sha256: 'b'.repeat(64) } }, source_sha256: { [cites[0]!.ruleId]: cites[0]!.contentSha256 } });
+    // An entry the owner has not confirmed yet is flagged and not sent.
+    const unconfirmed = { ...map, entries: [{ ...map.entries[0]!, confirmed_by: null, confirmed_at: null }] };
+    const waiting = await db.$transaction((tx) => buildRlGymExport(tx, p, records, ref, { exported: true, policyIdMap: unconfirmed }));
+    for (const t of waiting.body.tasks as Record<string, unknown>[]) expect(t).not.toHaveProperty('policy_id_map');
     for (const t of first) expect(t.package_sha256).toBe((sent.body.tasks as { task_id: string; package_sha256: string }[]).find((x) => x.task_id === t.task_id)!.package_sha256);
     // An entry naming a policy the environment does not declare is flagged, not sent.
     const wrong = { ...map, entries: [{ ...map.entries[0]!, environment_policy_ids: ['KYC-09'] }] };

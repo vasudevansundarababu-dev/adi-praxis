@@ -2532,25 +2532,28 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
 ## D-056: S4 policy ids mapped to the environment's at export (owner, 24 Nov 2026: "4. Yes")
 
 - **Problem.** A task's S4 cites ADI Forge's own id, and the benchmark environment knows its policies by other ids
-  (KYC-01 to KYC-04, GB-02, GB-03, GB-05), so the agent's `policy.read` returns 0 records.
+  (golden-kyc-openenv@12: KYC-01 to KYC-04, GB-02, GB-03, GB-05), so the agent's `policy.read` returns 0 records.
   - All 4 authored tasks in the owner's KYC project cite the bank policy document 54e00852… at rs2.d1, not one rule.
-  - Rule set v2 holds 11 rules under that document.
-- **Mapping source.** A reviewed file, `apps/api/src/anvil/policy-id-maps.json` (`praxis.policy-id-map.v1`), with one
-  map per Studio template version.
-  - Each map declares the environment's policies (id, version, content_sha256) and its entries.
-  - An entry maps a Forge id plus its content hash to one or more environment policy ids, and names who confirmed it.
-  - It ships empty. Forge cannot read the environment's policy list: Studio refuses the service role and RL Gym has
-    no endpoint for it. So the list and the confirmation come from outside Forge.
-- **Export only.** Each task entry gains `policy_id_map` when the mapping covers a citation.
+- **Mapping source.** A reviewed file, `apps/api/src/anvil/policy-id-maps.json` (`praxis.policy-id-map.v1`).
+  - Keyed by environment version, with each environment policy's text_sha256 (from Studio's @12 note: its rows have
+    no version or content hash). It applies to the Studio template releases listed in `applies_to`
+    (tpl_x5rwt6d5eu v8).
+  - Entries map at document level, which is what the tasks cite. Rule-level entries are optional. Each entry has a
+    reason, and `confirmed_by` stays null until the owner confirms it (mechanical, no SME time).
+  - Proposed by meaning from rule set v2's approved texts. The APR-04 rule-clause map is not available in this repo.
+    - 4 of the 11 rules map. 7 have no clear match and stay flagged.
+    - The document maps to KYC-02, GB-02, KYC-03 and GB-05.
+- **Export only (coordinator: option 1).** Each task entry gains `policy_id_map` only for citations with a confirmed
+  match: `{environment_version: "golden-kyc-openenv@12", map: {"<source id>": [env ids]}, policies: {id: {content_sha256}}, source_sha256}`,
+    the RL Gym's accepted shape (fde41cf). content_sha256 is Studio's text_sha256.
+  - The RL Gym applies it at reset.
   - The stored task, its approvals, its package (same hash) and earlier exports are unchanged.
-  - A task with no mapping exports exactly as before.
-- **Never guessed.** These cases are flagged as `POLICY_ID_UNMAPPED` and nothing is sent for them:
+  - A task with no confirmed mapping exports exactly as before.
+- **Never guessed.** These cases are flagged as `POLICY_ID_UNMAPPED` and left out of the map:
   - a citation with no entry;
   - a citation at another content hash;
-  - an entry naming a policy the environment does not declare.
+  - an entry that is not confirmed;
+  - an entry with no clear match;
+  - an id the environment does not declare.
   - Validate shows the flag as a warning owned by ADI Forge support. The export run lists it per task in
-    `policyIdsUnmapped`, and the RL Gym panel shows it.
-  - It does not block, so nothing that runs today stops running.
-- **Open.**
-  - The environment's policy list and the confirmed mapping.
-  - Where RL Gym applies `policy_id_map` (option 1). Option 2, a mapped copy of the package, was not built.
+    `policyIdsUnmapped`, and the RL Gym panel shows it. It does not block.

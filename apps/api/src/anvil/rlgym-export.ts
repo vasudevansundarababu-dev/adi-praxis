@@ -4,7 +4,7 @@ import type { Db, Tx } from '../db';
 import { anvilReadiness } from '../routes/anvil-templates';
 import { jcsSha256 } from './jcs';
 import { storeTaskPackage } from './task-package-store';
-import { mapRecordPolicies, policyIdMapFor, POLICY_ID_UNMAPPED, type PolicyIdMap, type UnmappedPolicy } from './policy-id-map';
+import { mapRecordPolicies, policyIdMapFor, policyIdMapWire, POLICY_ID_UNMAPPED, type PolicyIdMap, type UnmappedPolicy } from './policy-id-map';
 import { OWNER_LABEL, TASK_CHECKER, TASK_CHECKER_VERSION, type TaskCheckReport, type TaskProblem } from '../tasks/task-integrity';
 
 /**
@@ -177,7 +177,7 @@ export async function buildRlGymExport(
       ...(policyClauses.length ? { policy_clauses: policyClauses.map((c) => c.entry) } : {}),
       // D-056: the environment's policy ids for each S4 citation the mapping covers; the package itself is unchanged.
       // Only when there are any, so a task with no mapping exports exactly as before.
-      ...(ids.mapped.length ? { policy_id_map: ids.mapped } : {}),
+      ...(ids.mapped.length && idMap ? { policy_id_map: policyIdMapWire(idMap, ids.mapped) } : {}),
     });
   }
   const template = { id: ref.id, version: ref.version, spec_sha256: ref.specSha256, forge_template_id: p.template.lineageId, forge_version: p.template.version };

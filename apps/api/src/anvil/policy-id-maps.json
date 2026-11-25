@@ -1,4 +1,213 @@
 {
   "schema": "praxis.policy-id-map.v1",
-  "maps": []
+  "note": "D-056. Proposed by ADI Forge on 24 Nov 2026 from the approved rule set v2 texts; every entry waits for the owner's confirmation (confirmed_by), and an unconfirmed entry is not sent.",
+  "maps": [
+    {
+      "environment": "golden-kyc-openenv",
+      "environment_version": 12,
+      "applies_to": [
+        {
+          "studio_template_id": "tpl_x5rwt6d5eu",
+          "studio_version": 8
+        }
+      ],
+      "source": "Studio note studio-D-056-policies-v12.md (24 Nov 2026): the policies collection of golden-kyc-openenv@12; text_sha256 is the sha256 of each policy's UTF-8 text.",
+      "environment_policies": [
+        {
+          "id": "KYC-01",
+          "title": "Verify each party's identity",
+          "text_sha256": "67b1bbd6e399a2d38c2529fe24dee75a5f5e57f1c86f72a7bd2564836cc33796"
+        },
+        {
+          "id": "KYC-02",
+          "title": "Proof of address",
+          "text_sha256": "a2bd3cad6996f87c8a4b6dbf41df0f15919c0d76b45d27c761e2cb364907dcfa"
+        },
+        {
+          "id": "KYC-03",
+          "title": "Sanctions and watch-list screening",
+          "text_sha256": "be65782655e998d207012781c6e74cb35a268fe22eaeeaebecf426e06b9f3e0b"
+        },
+        {
+          "id": "KYC-04",
+          "title": "Ready for approval",
+          "text_sha256": "bb5df1885f706a8ae93e22a49dac092dc4bc100bc612e0855855f2e4f8c52e9b"
+        },
+        {
+          "id": "GB-02",
+          "title": "Documents that are not enough on their own",
+          "text_sha256": "525cc6e0debd7bab11d940efddf586d1995a13466faeba4b32eb3d2d454d58b6"
+        },
+        {
+          "id": "GB-03",
+          "title": "Minor without a TIN",
+          "text_sha256": "7d7b3da964f5db331600be58cfae97c74d5b2890325f084e5689791829f056ce"
+        },
+        {
+          "id": "GB-05",
+          "title": "Sanctions name match with a different date of birth",
+          "text_sha256": "95a41fe1593e30a0e6b4fc7884e00d9179281255eced18c5f713348593d4bbd7"
+        }
+      ],
+      "entries": [
+        {
+          "forge": {
+            "kind": "document",
+            "id": "54e00852-42c6-4f43-a7b9-732cf7fd0882",
+            "content_sha256": "a5c0aa26ed48ceda91c4cc8238bb8fde588342626e9e27f1c04bfb0c5be51aea",
+            "label": "00-US-federal-KYC-policy.md (rule set v2, rs2.d1)"
+          },
+          "environment_policy_ids": [
+            "GB-02",
+            "GB-05",
+            "KYC-02",
+            "KYC-03"
+          ],
+          "reason": "All four tasks cite this document. It maps to the union of its rule set v2 rules' matches: R-CIP-ADDRESS (KYC-02, GB-02), R-HUMAN-REVIEW-OF-POSSIBLE-OFAC-MATCHES (KYC-03, GB-05) and R-PRE-OPENING-SANCTIONS-AND-WATCH-LIST-SCR (KYC-03). KYC-01, KYC-04 and GB-03 have no clear source rule, so they are left out.",
+          "confirmed_by": null,
+          "confirmed_at": null
+        },
+        {
+          "forge": {
+            "kind": "rule",
+            "id": "cee6850b-e17e-4a0d-a8c4-237eb2bd57b1",
+            "content_sha256": "99bcd262a90ee89ca5ea619f5b62919cfd2792d67dd939d1b0b6b24999a06129",
+            "label": "R-CASE-FACTS-AND-MISSING-FACTS"
+          },
+          "environment_policy_ids": [],
+          "reason": "An authoring rule about how the case shows facts; no environment policy tells the agent this.",
+          "confirmed_by": null,
+          "confirmed_at": null
+        },
+        {
+          "forge": {
+            "kind": "rule",
+            "id": "355654d8-00d7-477a-8471-7952dcb45f3a",
+            "content_sha256": "88c458433e87ae03fd009e41a122719c6e06bcdda44c419bf6443f410ddf5804",
+            "label": "R-CIP-ADDRESS"
+          },
+          "environment_policy_ids": [
+            "KYC-02",
+            "GB-02"
+          ],
+          "reason": "Obtain an address before opening: KYC-02 (each application needs proof of address) and GB-02 (a passport alone does not prove address).",
+          "confirmed_by": null,
+          "confirmed_at": null
+        },
+        {
+          "forge": {
+            "kind": "rule",
+            "id": "346de397-52cb-47b2-8bd8-6bc76122eb45",
+            "content_sha256": "f80a6e102d589d1b6e146579e93ed612d4f78cd9d3919b3d51226ce0127f2261",
+            "label": "R-CIP-DOCUMENT-RECORD-FORMAT"
+          },
+          "environment_policy_ids": [],
+          "reason": "Record-keeping of document descriptions (no images, no full ID numbers); no environment policy covers record format.",
+          "confirmed_by": null,
+          "confirmed_at": null
+        },
+        {
+          "forge": {
+            "kind": "rule",
+            "id": "58907287-2ab0-4453-83d3-863ee7a46183",
+            "content_sha256": "cc4474d148fffae260c3e0c01aa0e076cb8419686f15be1eeaea7577ff58ffd2",
+            "label": "R-CIP-IDENTIFICATION-NUMBER"
+          },
+          "environment_policy_ids": [],
+          "reason": "Obtain an identification number from every customer. GB-03 covers only a minor without a TIN, and KYC-01 is about identity documents, so neither is a clear match.",
+          "confirmed_by": null,
+          "confirmed_at": null
+        },
+        {
+          "forge": {
+            "kind": "rule",
+            "id": "53aa8c9e-ee53-42de-941e-6940fdb40b14",
+            "content_sha256": "a510e558e63aa054602b0446919797c62ff76edf8e83545942dfa60207fb9b37",
+            "label": "R-HUMAN-FINAL-DECISION-MAKER"
+          },
+          "environment_policy_ids": [],
+          "reason": "A human makes the final decision. KYC-04 says when to recommend ready_for_approval but not who decides, so it is not a clear match.",
+          "confirmed_by": null,
+          "confirmed_at": null
+        },
+        {
+          "forge": {
+            "kind": "rule",
+            "id": "a8d261f2-66d2-4984-af61-8e7fb7c34793",
+            "content_sha256": "9a6f4863efaf4f02da36e4c500661d40185ad79a90bd32ecaa5feed120063b35",
+            "label": "R-HUMAN-REVIEW-OF-POSSIBLE-OFAC-MATCHES"
+          },
+          "environment_policy_ids": [
+            "KYC-03",
+            "GB-05"
+          ],
+          "reason": "A possible sanctions match goes to a human analyst: KYC-03 (a hit is never auto-rejected; refer to a sanctions specialist) and GB-05 (name match with another date of birth goes to manual review).",
+          "confirmed_by": null,
+          "confirmed_at": null
+        },
+        {
+          "forge": {
+            "kind": "rule",
+            "id": "bc54cce8-e98f-4879-95ca-21185b0ce60d",
+            "content_sha256": "a12611a403219fe7fe48a5ec71907d5f4e3ea39b257363bdb24f142524ce7224",
+            "label": "R-INDIVIDUAL-ADDRESS-TYPES"
+          },
+          "environment_policy_ids": [],
+          "reason": "Which address types are acceptable (street, APO/FPO, next of kin). KYC-02 only says proof of address is needed, not which types count, so it is not a clear match.",
+          "confirmed_by": null,
+          "confirmed_at": null
+        },
+        {
+          "forge": {
+            "kind": "rule",
+            "id": "58d4f09d-9924-4422-9d95-db74f25e8ef1",
+            "content_sha256": "696d7e1d76d1913d233d1974825955136fe75ec21873eefec6ddf1b11f7e0b2e",
+            "label": "R-NON-US-PERSON-IDENTIFICATION-NUMBER"
+          },
+          "environment_policy_ids": [],
+          "reason": "Identification numbers for a non-US person; no environment policy covers non-US persons.",
+          "confirmed_by": null,
+          "confirmed_at": null
+        },
+        {
+          "forge": {
+            "kind": "rule",
+            "id": "e435ba78-1ad1-4e06-bd3e-4a702f039bd2",
+            "content_sha256": "b31c66b2eeff59e0b438529e72c92d6a38a91e8330333b8fd19a7507ca82c39f",
+            "label": "R-PRE-OPENING-SANCTIONS-AND-WATCH-LIST-SCR"
+          },
+          "environment_policy_ids": [
+            "KYC-03"
+          ],
+          "reason": "Screening runs before opening: KYC-03 (run screening.check for every party).",
+          "confirmed_by": null,
+          "confirmed_at": null
+        },
+        {
+          "forge": {
+            "kind": "rule",
+            "id": "22252498-f369-4cff-891d-45badb2d485b",
+            "content_sha256": "184305a0297ff7bd79df7b47c30c70b3106ee17623f63d1d5579bab9926c9fa2",
+            "label": "R-REMOTE-ACCOUNT-NON-DOCUMENTARY-CHECK"
+          },
+          "environment_policy_ids": [],
+          "reason": "A remote account needs a non-documentary check; no environment policy covers remote opening.",
+          "confirmed_by": null,
+          "confirmed_at": null
+        },
+        {
+          "forge": {
+            "kind": "rule",
+            "id": "60226341-0c70-4696-bdbc-d3c28aad8d63",
+            "content_sha256": "756450006d5d6553ca4abd1503ff3b9ba5fc6ae2b03c12b0f9ad6d8b5b520adb",
+            "label": "R-US-PERSON-IDENTIFICATION-NUMBER"
+          },
+          "environment_policy_ids": [],
+          "reason": "A US person provides a TIN before opening. GB-03 covers only the minor case, so it is a partial match; the owner may add GB-03 if that is enough.",
+          "confirmed_by": null,
+          "confirmed_at": null
+        }
+      ]
+    }
+  ]
 }

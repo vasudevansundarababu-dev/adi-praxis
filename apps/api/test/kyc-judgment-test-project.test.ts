@@ -5,7 +5,7 @@ import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MemoryStorage } from '../src/candidate/storage';
 import { buildRlGymExport } from '../src/anvil/rlgym-export';
-import { createTestProject, createTestTask, importTemplate, retireDraft, TEST_PROJECT_NAME } from '../src/jobs/kyc-judgment-test-project';
+import { cancelTestProject, createTestProject, createTestTask, importTemplate, retireDraft, TEST_PROJECT_NAME } from '../src/jobs/kyc-judgment-test-project';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { db, idem, login, resetDb, testConfig } from './helpers';
 
@@ -76,6 +76,33 @@ describe('KYC Judgment v1 integration test project (test-only)', () => {
     // A published version is never retired by this job.
     expect((await api().post(`/templates/${next.templateId as string}/publish`, {})).statusCode).toBe(200);
     expect(await retireDraft(db, { requestedBy: ADMIN, templateId: next.templateId as string, reason: 'Owner: "Authoring may retire it"', apply: true })).toMatchObject({ outcome: 'refused' });
+  });
+
+  it('a faulty test-only project is cancelled (owner’s words as the reason) and its tasks are left as they are; a real project never is; the next run makes a fresh one', async () => {
+    const imported = await importTemplate(db, { requestedBy: ADMIN, file: '', apply: true, body: pending(structuredClone(PROPOSAL)) });
+    expect((await api().post(`/templates/${imported.templateId as string}/publish`, {})).statusCode).toBe(200);
+    const first = await createTestProject(db, { storage }, { requestedBy: ADMIN, sourceProjectId: v8, apply: true });
+    const id = first.projectId as string;
+    // Stand-in for the faulty one made before the fix: still a draft.
+    await db.project.update({ where: { id }, data: { status: 'DRAFT' } });
+    const tasksBefore = await db.taskInstance.findMany({ where: { projectId: id }, orderBy: { id: 'asc' } });
+    const reason = 'Owner: "Authoring may cancel it"';
+    expect(await cancelTestProject(db, { requestedBy: ADMIN, projectId: id, reason: 'x', apply: true })).toMatchObject({ outcome: 'refused' });
+    expect(await cancelTestProject(db, { requestedBy: ADMIN, projectId: v8, reason, apply: true })).toMatchObject({ outcome: 'refused', reason: expect.stringContaining('test-only') });
+    expect(await cancelTestProject(db, { requestedBy: ADMIN, projectId: id, reason, apply: false })).toMatchObject({ outcome: 'would_create', status: 'DRAFT' });
+    expect((await db.project.findUniqueOrThrow({ where: { id } })).status).toBe('DRAFT');
+    expect(await cancelTestProject(db, { requestedBy: ADMIN, projectId: id, reason, apply: true })).toMatchObject({ outcome: 'created', status: 'CANCELLED' });
+    expect(await cancelTestProject(db, { requestedBy: ADMIN, projectId: id, reason, apply: true })).toMatchObject({ outcome: 'already_created' });
+    const ev = await db.auditEvent.findFirstOrThrow({ where: { action: 'project.cancelled', entityId: id } });
+    expect(ev).toMatchObject({ actorType: 'SYSTEM', before: { status: 'DRAFT' }, after: { status: 'CANCELLED', reason } });
+    expect(await db.taskInstance.findMany({ where: { projectId: id }, orderBy: { id: 'asc' } })).toEqual(tasksBefore);
+    expect((await db.project.findUniqueOrThrow({ where: { id: v8 } })).status).not.toBe('CANCELLED');
+    const next = await createTestProject(db, { storage }, { requestedBy: ADMIN, sourceProjectId: v8, apply: true });
+    expect(next).toMatchObject({ outcome: 'created', tasks: 1, name: `${TEST_PROJECT_NAME} — run 2` });
+    expect(next.projectId).not.toBe(id);
+    // The cancelled one keeps its name; a further run finds the live one.
+    expect((await db.project.findUniqueOrThrow({ where: { id } })).name).toBe(TEST_PROJECT_NAME);
+    expect(await createTestProject(db, { storage }, { requestedBy: ADMIN, sourceProjectId: v8, apply: false })).toMatchObject({ outcome: 'already_created', projectId: next.projectId });
   });
 
   it('import → Admin publishes → test project (testOnly, federal document only) → one synthetic task submitted → the owner approves → export says test_only and the covered types', async () => {

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { ProjectRuleSetContent, templateRubric, type TemplateProfile, type TemplateProfileField } from '@praxis/shared';
+import { CANCELLABLE_STATUSES, ProjectRuleSetContent, templateRubric, type TemplateProfile, type TemplateProfileField } from '@praxis/shared';
 import type { Prisma, Template } from '@prisma/client';
 import type { ObjectStorage } from '../candidate/storage';
 import { stubScanner } from '../candidate/storage';
@@ -38,7 +38,7 @@ export const WORKFLOW = 'KYC Judgment v1';
 export const TEST_SME_EMAIL = 'kyc-judgment-test-sme@praxis.test';
 
 export interface TestProjectArgs {
-  phase: 'import' | 'project' | 'task' | 'retire-draft';
+  phase: 'import' | 'project' | 'task' | 'retire-draft' | 'cancel-project';
   templateId?: string;
   reason?: string;
   requestedBy: string;
@@ -49,7 +49,7 @@ export interface TestProjectArgs {
 }
 export function parseTestProjectArgs(argv: string[]): TestProjectArgs {
   const phase = argv[0];
-  if (phase !== 'import' && phase !== 'project' && phase !== 'task' && phase !== 'retire-draft') throw new Error('kyc-judgment-test-project needs a phase: import | project | task | retire-draft');
+  if (phase !== 'import' && phase !== 'project' && phase !== 'task' && phase !== 'retire-draft' && phase !== 'cancel-project') throw new Error('kyc-judgment-test-project needs a phase: import | project | task | retire-draft | cancel-project');
   const a: TestProjectArgs = { phase, requestedBy: '', apply: false };
   for (let i = 1; i < argv.length; i++) {
     const k = argv[i]!;
@@ -116,6 +116,33 @@ export async function retireDraft(db: Db, args: { requestedBy: string; templateI
   });
 }
 
+/**
+ * Cancels one KYC Judgment v1 TEST-ONLY project (owner, 25 Nov 2026, via the coordinator: "Authoring may cancel it"),
+ * e.g. the one made with four slots before the stratified-slot fix, so the test project can be made again. The same
+ * state change and audit action as the console's Cancel (project.cancelled, from a cancellable status), as SYSTEM with
+ * the requesting Admin and the owner's words as the reason. Its tasks, revisions and records are left exactly as they
+ * are. Refused for a real (not test-only) project, another workflow, or a status the console can't cancel.
+ */
+export async function cancelTestProject(db: Db, args: { requestedBy: string; projectId: string; reason: string; apply: boolean }): Promise<Report> {
+  return db.$transaction(async (tx) => {
+    const admin = await adminOf(tx, args.requestedBy);
+    if (!admin) return refuse('The requester must be an active Admin.');
+    if (args.reason.trim().length < 5) return refuse('Give the reason (the owner’s words).');
+    const p = await tx.project.findFirst({ where: { id: args.projectId, clientId: admin.clientId }, include: { template: true } });
+    if (!p) return refuse('Project not found.');
+    if (!p.testOnly) return refuse('Only a test-only project is cancelled here; a real project is cancelled in the console.');
+    if (p.template.workflowName.toLowerCase() !== WORKFLOW.toLowerCase()) return refuse(`Only a ${WORKFLOW} test project is cancelled here.`);
+    if (p.status === 'CANCELLED') return { outcome: 'already_created', projectId: p.id, status: p.status };
+    if (!CANCELLABLE_STATUSES.includes(p.status)) return refuse(`A ${p.status} project cannot be cancelled.`);
+    const tasks = await tx.taskInstance.count({ where: { projectId: p.id } });
+    if (!args.apply) return { outcome: 'would_create', projectId: p.id, name: p.name, status: p.status, tasksLeftAsTheyAre: tasks };
+    const { count } = await tx.project.updateMany({ where: { id: p.id, status: p.status }, data: { status: 'CANCELLED' } });
+    if (count === 0) return refuse('The project changed meanwhile; run it again.');
+    await auditAs(tx, admin.clientId)({ entityType: 'Project', entityId: p.id, action: 'project.cancelled', before: { status: p.status }, after: { status: 'CANCELLED', reason: args.reason.trim(), requestedBy: admin.id } });
+    return { outcome: 'created', projectId: p.id, status: 'CANCELLED', tasksLeftAsTheyAre: tasks };
+  });
+}
+
 // ───────────────────────── Phase 2: project ─────────────────────────
 export async function createTestProject(db: Db, deps: { storage: ObjectStorage }, args: { requestedBy: string; sourceProjectId: string; apply: boolean; name?: string }): Promise<Report> {
   // The template's form must be registered in this process (slots and checks read it).
@@ -127,9 +154,15 @@ export async function createTestProject(db: Db, deps: { storage: ObjectStorage }
       if (!admin) return refuse('The requester must be an active Admin.');
       const t = await tx.template.findFirst({ where: { clientId: admin.clientId, workflowName: { equals: WORKFLOW, mode: 'insensitive' }, status: 'PUBLISHED' }, orderBy: { version: 'desc' } });
       if (!t) return refuse('KYC Judgment v1 is not published yet: an Admin publishes it in the console first.');
-      // A cancelled test project of the same name (e.g. one made with the wrong slots) is left as it is, never reused.
-      const existing = await tx.project.findFirst({ where: { clientId: admin.clientId, name, status: { not: 'CANCELLED' } } });
-      if (existing) return { outcome: 'already_created', projectId: existing.id, testOnly: existing.testOnly };
+      // A cancelled test project of the same name (e.g. one made with the wrong slots) is left as it is, never reused or
+      // renamed: names are unique per client, so the next one is "<name> — run N".
+      const named = await tx.project.findMany({ where: { clientId: admin.clientId, OR: [{ name }, { name: { startsWith: `${name} — run ` } }] }, select: { id: true, name: true, status: true, testOnly: true } });
+      const existing = named.find((x) => x.status !== 'CANCELLED');
+      if (existing) return { outcome: 'already_created', projectId: existing.id, name: existing.name, testOnly: existing.testOnly };
+      const taken = new Set(named.map((x) => x.name));
+      let n = 2;
+      while (taken.has(`${name} — run ${n}`)) n++;
+      const freeName = taken.has(name) ? `${name} — run ${n}` : name;
       const src = await tx.project.findFirst({ where: { id: args.sourceProjectId, clientId: admin.clientId } });
       if (!src) return refuse('Source project not found.');
       const set = await latestRuleSet(tx, admin.clientId, src.id);
@@ -138,12 +171,12 @@ export async function createTestProject(db: Db, deps: { storage: ObjectStorage }
       const dvs = await tx.policyDocumentVersion.findMany({ where: { id: { in: dvIds } }, include: { document: true } });
       if (dvs.length !== 1) return refuse(`The source project's rule set cites ${dvs.length} document versions; expected exactly the federal document.`);
       const dv = dvs[0]!;
-      const plan = { template: { id: t.id, version: t.version }, name, testOnly: true, document: { title: dv.document.title, sha256: dv.sha256 } };
+      const plan = { template: { id: t.id, version: t.version }, name: freeName, testOnly: true, document: { title: dv.document.title, sha256: dv.sha256 } };
       if (!args.apply) return { outcome: 'would_create', ...plan };
       const audit = auditAs(tx, admin.clientId);
       const now = new Date();
       const p = await tx.project.create({
-        data: { clientId: admin.clientId, ownerId: admin.id, templateId: t.id, templateVersion: t.version, name, description: 'End-to-end integration test (Authoring → Studio → RL Gym). Test-only: never on a leaderboard. Synthetic data only.', testOnly: true, status: 'IN_PROGRESS', taskMode: 'AUTHORING', reviewRoute: 'SME_PM', distinctTarget: 1, maxPerExpert: 1, requiredWorkers: 1, tptMinutes: 60, startDate: now, endDate: new Date(now.getTime() + 30 * 86_400_000) },
+        data: { clientId: admin.clientId, ownerId: admin.id, templateId: t.id, templateVersion: t.version, name: freeName, description: 'End-to-end integration test (Authoring → Studio → RL Gym). Test-only: never on a leaderboard. Synthetic data only.', testOnly: true, status: 'IN_PROGRESS', taskMode: 'AUTHORING', reviewRoute: 'SME_PM', distinctTarget: 1, maxPerExpert: 1, requiredWorkers: 1, tptMinutes: 60, startDate: now, endDate: new Date(now.getTime() + 30 * 86_400_000) },
       });
       await audit({ entityType: 'Project', entityId: p.id, action: 'project.test_created', after: { ...plan, requestedBy: admin.id } });
       const tasks = await ensureSlotTasks(tx, p.id);

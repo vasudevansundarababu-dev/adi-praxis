@@ -215,7 +215,8 @@ try {
     const m = await import('./kyc-judgment-test-project');
     const a = m.parseTestProjectArgs(process.argv.slice(3));
     let r: { outcome: string };
-    if (a.phase === 'retire-draft') r = await m.retireDraft(db, { requestedBy: a.requestedBy, templateId: a.templateId ?? '', reason: a.reason ?? '', apply: a.apply });
+    if (a.phase === 'cancel-project') r = await m.cancelTestProject(db, { requestedBy: a.requestedBy, projectId: a.projectId ?? '', reason: a.reason ?? '', apply: a.apply });
+    else if (a.phase === 'retire-draft') r = await m.retireDraft(db, { requestedBy: a.requestedBy, templateId: a.templateId ?? '', reason: a.reason ?? '', apply: a.apply });
     else if (a.phase === 'import') r = await m.importTemplate(db, { requestedBy: a.requestedBy, file: a.file ?? '', apply: a.apply });
     else if (a.phase === 'project') {
       const { defaultStorage } = await import('../app');

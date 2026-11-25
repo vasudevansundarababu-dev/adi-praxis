@@ -2787,3 +2787,14 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
   (the console retires published versions only), audited with the reason; refused for anything else. Used once, 25 Nov
   2026, for the draft imported without Studio identity (owner: "Authoring may retire it"). The import phase stores a
   new version when the latest is published or retired with another form, and refuses while a draft of another form exists.
+
+## D-078: test-channel template activation exports only from test-only projects (RL Gym faa2805, 25 Nov 2026)
+
+- The RL Gym's qualification receipt may name its `channel`. When it is `test`, Authoring's export gate allows the export
+  only from a test-only project (D-073). A real project on that template version is refused before anything is sent,
+  with: "RL Gym activated this template version in its test channel only: only a test-only project can export on it. A
+  real project waits for the real release (a successor version)." The RL Gym refuses it too; Authoring does not rely on
+  that alone.
+- A version activated in the test channel can't later be activated for real, so the real release is a successor
+  version. The real project's tasks then move to it with a successor job (as for KYC v8), without re-authoring; the
+  approved records stay, and a person approves each successor revision.

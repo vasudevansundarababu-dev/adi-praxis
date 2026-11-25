@@ -405,12 +405,12 @@ export const benchmarkRoutes: FastifyPluginAsyncZod<{ db: Db; rlgym: RlGymClient
   });
 
   // ── Projects → Export for benchmark / Re-export (snapshot 3.2 a) ──
-  async function exportState(clientId: string, p: { id: string; status: string; templateId: string; template: Template }) {
+  async function exportState(clientId: string, p: { id: string; status: string; templateId: string; template: Template; testOnly?: boolean }) {
     const records = await currentRecords(db, clientId, p.id);
     const ref = await rlgymTemplateRef(db, p.template);
     const runs = await db.rlGymProjectExport.findMany({ where: { clientId, projectId: p.id }, orderBy: { createdAt: 'desc' } });
     const held = await heldTasks(db, p.id, p.templateId);
-    const reason = p.status === 'DRAFT' ? 'The project is still a draft.' : p.status === 'CANCELLED' ? 'The project is cancelled.' : !rlgym ? 'RL Gym isn’t connected yet.' : !ref ? 'RL Gym hasn’t qualified this template version yet.' : records.length < 1 ? 'Export needs at least one approved task.' : null;
+    const reason = p.status === 'DRAFT' ? 'The project is still a draft.' : p.status === 'CANCELLED' ? 'The project is cancelled.' : !rlgym ? 'RL Gym isn’t connected yet.' : !ref ? 'RL Gym hasn’t qualified this template version yet.' : ref.channel === 'test' && !p.testOnly ? 'RL Gym activated this template version in its test channel only: only a test-only project can export on it. A real project waits for the real release (a successor version).' : records.length < 1 ? 'Export needs at least one approved task.' : null;
     return { records, ref, runs, held, reason };
   }
 

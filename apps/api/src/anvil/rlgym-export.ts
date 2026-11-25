@@ -66,7 +66,7 @@ export interface NotSent {
 }
 
 /** The RL Gym's identity of a template version: from its standing qualification receipt, or null when not qualified. */
-export async function rlgymTemplateRef(db: Db | Tx, t: Template): Promise<{ id: string; version: number; specSha256: string } | null> {
+export async function rlgymTemplateRef(db: Db | Tx, t: Template): Promise<{ id: string; version: number; specSha256: string; channel?: string } | null> {
   const r = await anvilReadiness(db, t);
   if (r.qualification !== 'qualified' || !r.receiptId) return null;
   const q = await db.templateQualification.findFirst({ where: { templateId: t.id, receiptId: r.receiptId, status: 'QUALIFIED' }, orderBy: { createdAt: 'desc' } });
@@ -75,7 +75,8 @@ export async function rlgymTemplateRef(db: Db | Tx, t: Template): Promise<{ id: 
   const version = receipt.rlgym_template_version;
   const spec = receipt.spec_sha256;
   if (typeof id !== 'string' || !Number.isInteger(version) || typeof spec !== 'string') return null;
-  return { id, version: version as number, specSha256: spec };
+  // RL Gym faa2805: a test-channel activation names its channel; only test-only projects may export on it.
+  return { id, version: version as number, specSha256: spec, ...(typeof receipt.channel === 'string' ? { channel: receipt.channel } : {}) };
 }
 
 /**

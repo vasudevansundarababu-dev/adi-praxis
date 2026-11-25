@@ -230,8 +230,8 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
   }
 
   /** The RL Gym's qualification of the version, naming Studio's release (as the RL Gym sends it). */
-  async function qualify(t: Template) {
-    const res = await asGym('POST', '/integrations/anvil/templates/qualifications', { template_id: t.lineageId, version: t.version, template_version_hash: templateVersionHash(t), status: 'QUALIFIED', receipt_id: `tq-${randomUUID().slice(0, 12)}`, receipt: { rlgym_template_id: 'tpl_x5rwt6d5eu', rlgym_template_version: 9, spec_sha256: 'c'.repeat(64) } });
+  async function qualify(t: Template, channel?: string) {
+    const res = await asGym('POST', '/integrations/anvil/templates/qualifications', { template_id: t.lineageId, version: t.version, template_version_hash: templateVersionHash(t), status: 'QUALIFIED', receipt_id: `tq-${randomUUID().slice(0, 12)}`, receipt: { rlgym_template_id: 'tpl_x5rwt6d5eu', rlgym_template_version: 9, spec_sha256: 'c'.repeat(64), ...(channel ? { channel } : {}) } });
     expect(res.statusCode, res.body).toBeLessThan(300);
   }
 
@@ -271,6 +271,20 @@ describe('Authoring with Studio and the RL Gym (integration, mocks only)', () =>
     return rows.filter((r) => r.record && !taskPackageProblem({ record: r.record, template: templates.get(r.record.templateId)! }));
   };
   const pkgOf = async (recordId: string) => JSON.parse((await db.authoredTaskPackage.findUniqueOrThrow({ where: { recordId } })).content);
+
+  it('RL Gym faa2805: a template version activated in the TEST channel exports only from test-only projects; a real project is refused, plainly', async () => {
+    const v8 = await publishedV8(null);
+    await qualify(v8, 'test');
+    const projectId = await project(v8);
+    const state = async () => (await get(pm, `/projects/${projectId}/rlgym-export`)).json();
+    expect(await state()).toMatchObject({ canExport: false, reason: expect.stringContaining('test channel') });
+    const res = await post(pm, `/projects/${projectId}/rlgym-exports`, {});
+    expect(res.statusCode).toBe(409);
+    expect(res.json().message).toContain('test channel');
+    // The same template version on a test-only project is not refused for its channel.
+    await db.project.update({ where: { id: projectId }, data: { testOnly: true } });
+    expect((await state()).reason ?? '').not.toContain('test channel');
+  });
 
   it('sme template: approval needs every required slot; slot values go only to the private part', async () => {
     const v8 = await publishedV8(SME_VERIFIERS);

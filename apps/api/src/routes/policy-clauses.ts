@@ -4,7 +4,9 @@ import { aiFailureKind, aiUnavailableMessage } from '../lib/ai-errors';
 import { notFound } from '../lib/errors';
 import { checkedDispositions, DISPOSITION_PROMPT_VERSION, DispositionUnavailableError, type DispositionSuggester } from '../policy/dispositions';
 import { evaluateQuality, ReferenceLabel, ReferenceSetBody } from '../policy/quality';
-import { editRule } from '../policy/rules';
+import { editRule, setApplied } from '../policy/rules';
+import { reviewQueue } from '../policy/review-queue';
+import type { StudioCoverageClient } from '../anvil/coverage-client';
 import { loadVersionText } from '../policy/documents';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -24,7 +26,7 @@ import { ownTask } from './work';
  */
 const ProjectParams = z.object({ projectId: z.string().uuid() });
 
-export const policyClauseRoutes: FastifyPluginAsyncZod<{ db: Db; storage: ObjectStorage; dispositions: DispositionSuggester }> = async (app, { db, storage, dispositions }) => {
+export const policyClauseRoutes: FastifyPluginAsyncZod<{ db: Db; storage: ObjectStorage; dispositions: DispositionSuggester; coverage?: StudioCoverageClient | null }> = async (app, { db, storage, dispositions, coverage = null }) => {
   const loadText = (v: { textStorageKey: string }) => loadVersionText(storage, v);
 
   // ── E-002 §1.3: suggested dispositions (never approvals). Manual review stays available when the AI fails. ──
@@ -61,6 +63,61 @@ export const policyClauseRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Object
       }
       await audit({ entityType: 'Project', entityId: p.id, action: 'policy.dispositions_suggested', after: { model: dispositions.modelVersion, promptVersion: DISPOSITION_PROMPT_VERSION, items: items.length } });
       return { status: 200, body: { model: dispositions.modelVersion, items } };
+    });
+    return reply;
+  });
+
+  // ── KYC Judgment v1 A3: the PM's review queue, Studio's coverage on draft conditions, and bulk confirm ──
+  app.get('/projects/:projectId/policy/review-queue', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams } }, async (req) => {
+    const p = await policyProject(db, req.actor!, req.params.projectId);
+    const items = await reviewQueue(db, req.actor!.clientId, p.id);
+    return { items, flagged: items.filter((i) => i.flags.length).length, total: items.length, studioConnected: !!coverage };
+  });
+
+  app.post('/projects/:projectId/policy/review-queue/coverage', { config: { access: POLICY_ACCESS, rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['policy'], params: ProjectParams, body: z.object({}).strict() } }, async (req, reply) => {
+    const p = await policyProject(db, req.actor!, req.params.projectId);
+    if (!coverage) return reply.status(200).send({ connected: false, checked: 0, stored: 0, message: 'Studio is not connected here, so coverage can’t be checked. The queue still shows every other flag.' });
+    const project = await db.project.findUniqueOrThrow({ where: { id: p.id }, include: { template: true } });
+    const items = (await reviewQueue(db, req.actor!.clientId, p.id)).filter((i) => i.conditionSet && i.condition !== null);
+    const clauses = items.map((i) => ({ clause_id: i.ruleKey, version: i.version, condition: i.condition }));
+    if (!clauses.length) return reply.status(200).send({ connected: true, checked: 0, stored: 0 });
+    const r = await coverage.check({ template: { id: project.template.lineageId, version: project.template.version }, edge_case_tags: [], edge_cases: [], clauses });
+    if (!r.ok) throw new AppError(502, 'COVERAGE_UNAVAILABLE', r.message);
+    await runCommand<unknown>(db, req, reply, async ({ tx, actor, audit }) => {
+      let stored = 0;
+      for (const c of r.result.clauses) {
+        const i = items.find((x) => x.ruleKey === c.clause_id && x.version === c.version);
+        if (!i) continue;
+        await tx.policyCoverageResult.create({ data: { clientId: actor.clientId, projectId: p.id, ruleId: i.ruleId, ruleVersionId: i.versionId, contentHash: i.contentHash, environmentVersionId: r.result.environment_version_id, status: c.status, gaps: c.gaps as object[], checkedAt: new Date(r.result.checked_at), createdById: actor.userId } });
+        stored++;
+      }
+      await audit({ entityType: 'Project', entityId: p.id, action: 'policy.coverage_checked', after: { environmentVersionId: r.result.environment_version_id, checked: clauses.length, stored } });
+      return { status: 200, body: { connected: true, checked: clauses.length, stored, environmentVersionId: r.result.environment_version_id } };
+    });
+    return reply;
+  });
+
+  const BatchBody = z.object({ items: z.array(z.object({ ruleId: z.string().uuid(), expectedContentHash: z.string().length(64) }).strict()).min(1).max(200) }).strict();
+  app.post('/projects/:projectId/policy/rules/apply-batch', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams, body: BatchBody } }, async (req, reply) => {
+    await runCommand<unknown>(db, req, reply, async ({ tx, actor, audit }) => {
+      const p = await policyProject(tx, actor, req.params.projectId);
+      // The server recomputes the queue: any rule that is not a draft, changed since, or carries a flag refuses the batch.
+      const queue = await reviewQueue(tx, actor.clientId, p.id);
+      const refused: { ruleId: string; reason: string }[] = [];
+      for (const it of req.body.items) {
+        const row = queue.find((q) => q.ruleId === it.ruleId);
+        if (!row) refused.push({ ruleId: it.ruleId, reason: 'Not a draft in this project’s review queue.' });
+        else if (row.contentHash !== it.expectedContentHash) refused.push({ ruleId: it.ruleId, reason: `${row.ruleKey} changed since you opened the queue. Reload it.` });
+        else if (row.flags.length) refused.push({ ruleId: it.ruleId, reason: `${row.ruleKey} is flagged (${row.flags.map((f) => f.code).join(', ')}): open it and review it on its own.` });
+      }
+      if (refused.length) throw new AppError(409, 'BATCH_REFUSED', `Nothing was applied: ${refused.length} of ${req.body.items.length} rules can't be confirmed in a batch. ${refused.map((r) => r.reason).join(' ')}`, { refused });
+      const versions = [];
+      for (const it of req.body.items) {
+        const out = await setApplied(tx, { clientId: actor.clientId, projectId: p.id, ruleId: it.ruleId, actorId: actor.userId, roles: actor.roles, applied: true, expectedContentHash: it.expectedContentHash }, audit);
+        versions.push({ ruleId: it.ruleId, versionId: out.version.id, version: out.version.version, contentHash: out.version.contentHash });
+      }
+      await audit({ entityType: 'Project', entityId: p.id, action: 'policy.rules_applied_batch', after: { applied: versions.length, ruleIds: versions.map((v) => v.ruleId) } });
+      return { status: 200, body: { applied: versions.length, versions } };
     });
     return reply;
   });

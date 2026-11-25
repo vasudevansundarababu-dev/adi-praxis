@@ -2637,3 +2637,29 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
   written in (an ordinary draft edit by `enrichment:<run>`, audited as SYSTEM). A draft a person has edited is only
   offered the suggestion (A1 adopt). Nothing is approved: the PM's tick on each rule is the approval (A3).
 - A rule that changed while the model was answering is left alone (`stale`).
+
+## D-068: the PM's review queue, coverage on draft conditions and bulk confirm (KYC Judgment v1 A3; owner, 25 Nov 2026)
+
+- **Queue.** `GET …/policy/review-queue` lists every rule whose latest version is a draft (approved and excluded rules
+  are not in it), with its text and condition (in plain words) beside its source quotes, and the AI-filled library
+  details. Flagged rules come first. The Policies page shows it under the workspace.
+- **Flags** (computed by the server, deterministic):
+  - `not_ready`: the existing readiness checks (definition and quotes).
+  - `condition_not_set`: the PM has not set when the rule applies (C1 needs a condition, or null for always).
+  - `condition_invalid`, `condition_not_quoted`: the condition fails the catalog, or no resolved quote says when the
+    rule applies.
+  - `library_incomplete`: kind, issuer, jurisdiction, subject or scope missing. `no_effective_date`: no from-date on the
+    rule or its document (unless scenario-only).
+  - `change_missing`: a new version of an approved rule without its C1 change kind and summary.
+  - `coverage_needs_data`, `coverage_needs_environment_change`: Studio's stored answer for this exact version.
+  - `needs_review`, `outside_scope`, `open_question`: the AI's dispositions and questions, and the annotation's open
+    questions.
+- **Coverage on drafts.** `POST …/review-queue/coverage` sends every draft condition with its version to Studio's
+  coverage check and stores each answer in `PolicyCoverageResult` (append-only, additive migration) for that exact
+  version and content hash. An edited rule needs a new check. Not connected: the queue says so and still shows every
+  other flag. Benchmark's Validate is unchanged.
+- **Bulk confirm.** `POST …/policy/rules/apply-batch`, one command. The server recomputes the queue; any rule that is not
+  a draft, changed since, or is flagged refuses the **whole** batch (`BATCH_REFUSED`, with the list) and nothing
+  changes. Otherwise each rule goes through "Apply to project" (the same checks), audited per rule
+  (`policy.rule_applied`) plus `policy.rules_applied_batch`. A repeat with the same Idempotency-Key replays.
+- The AI never approves: no path leads from a suggestion to Reviewed. The PM's confirm is the approval.

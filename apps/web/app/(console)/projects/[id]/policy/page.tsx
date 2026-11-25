@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PolicyWorkspace, type DocumentsData, type ExtractionData, type PreviewData, type RuleRow } from '@/components/policy/policy-workspace';
+import { ReviewQueuePanel, type QueueData } from '@/components/policy/review-queue';
 import { apiGet, getCurrentUser } from '@/lib/api';
 
 export const metadata: Metadata = { title: 'Policy rules' };
@@ -11,12 +12,13 @@ export default async function ProjectPolicyPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const { data: project } = await apiGet<ProjectDto>(`/projects/${id}`);
   if (!project) notFound();
-  const [docs, extraction, rules, preview, user] = await Promise.all([
+  const [docs, extraction, rules, preview, user, queue] = await Promise.all([
     apiGet<DocumentsData>(`/projects/${id}/policy/documents`),
     apiGet<ExtractionData>(`/projects/${id}/policy/extraction`),
     apiGet<{ items: RuleRow[] }>(`/projects/${id}/policy/rules`),
     apiGet<PreviewData>(`/projects/${id}/policy/rule-set/preview`),
     getCurrentUser(),
+    apiGet<QueueData>(`/projects/${id}/policy/review-queue`),
   ]);
   return (
     <div>
@@ -38,6 +40,7 @@ export default async function ProjectPolicyPage({ params }: { params: Promise<{ 
         rules={rules.data?.items ?? []}
         preview={preview.data}
       />
+      <ReviewQueuePanel projectId={id} initial={queue.data} />
     </div>
   );
 }

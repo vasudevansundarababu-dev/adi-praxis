@@ -420,7 +420,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(modelProviderRoutes, { db: deps.db, config: deps.config });
       await v1.register(conversationRoutes, { db: deps.db, selectionGate, dailyModelCallCap: deps.config.AUTHORING_DAILY_CALL_CAP, suggestionsEnabled: deps.config.FIELD_SUGGESTIONS_ENABLED });
       await v1.register(draftingRoutes, { db: deps.db, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
-      await v1.register(policyClauseRoutes, { db: deps.db, storage, dispositions: deps.dispositionSuggester ?? defaultDispositionSuggester(deps.config) });
+      await v1.register(policyClauseRoutes, { db: deps.db, storage, dispositions: deps.dispositionSuggester ?? defaultDispositionSuggester(deps.config), coverage: deps.coverageClient ?? coverageFromConfig(deps.config, deps.outboundFetch) });
       await v1.register(policyRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, adapters: deps.policyAdapters ?? defaultAdapters(deps.config.policy), assistant: deps.ruleAssistant ?? defaultRuleAssistant(deps.config) });
       await v1.register(policyProposalRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       // M10 SME supply: nothing is registered with the flag off (docs/SME-SUPPLY.md section 13).

@@ -3840,6 +3840,28 @@ model PolicyRuleSuggestion {
   @@index([ruleId])
 }
 
+/// KYC Judgment v1 A3 (owner, 25 Nov 2026): Studio's coverage answer (coverage-check.v1) for one draft or approved rule
+/// version's condition, kept for that exact version and content hash so the review queue sorts without asking again.
+/// Append-only.
+model PolicyCoverageResult {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId             String   @map("client_id") @db.Uuid
+  projectId            String   @map("project_id") @db.Uuid
+  ruleId               String   @map("rule_id") @db.Uuid
+  ruleVersionId        String   @map("rule_version_id") @db.Uuid
+  contentHash          String   @map("content_hash")
+  environmentVersionId String   @map("environment_version_id")
+  /// supported | needs_data | needs_environment_change
+  status               String
+  gaps                 Json     @default("[]")
+  checkedAt            DateTime @map("checked_at")
+  createdById          String   @map("created_by_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@index([ruleVersionId, contentHash, createdAt])
+  @@index([projectId, createdAt])
+}
+
 /// E-001 §6b (owner, 24 Nov 2026): a batch of edge-case variants a PM sends one SME (or answers as Admin) for their
 /// expected outcomes, then writes to Studio as outcome-request.v1. Second check optional per batch (default off).
 model OutcomeBatch {

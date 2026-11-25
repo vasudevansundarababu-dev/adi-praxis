@@ -39,6 +39,8 @@ import { grantAppRole } from './grant-app-role';
  * - `marketing-form-v2 <templateId> --requested-by <admin email> [--apply]`: creates the next DRAFT version of the
  *   published VEYRA Hush One template with form veyra-hush-one-launch-v2 (S4 citation visibility declared for RL Gym;
  *   everything else unchanged). An Admin publishes it in the console. Dry run by default.
+ * - `library-copy --from <projectId> --to <projectId> --requested-by <admin email> [--apply]`: copies a project's
+ *   published rule set into another project as DRAFT rules, documents byte for byte, no approval carried (library-copy.ts).
  * - `kyc-v8-successor template|project|tasks --requested-by <admin email> [--apply] [--v7-template <id>] [--v7-project <id>]`:
  *   the KYC v8 successor of the published v7 (kyc-v8-successor.ts): the v8 DRAFT (form kept, TS-24); then, once v8 is
  *   published, its project with the v7 project's policy documents, the official 31 CFR 1020.220 text and DRAFT rules;
@@ -209,6 +211,13 @@ try {
     } else r = await successorTasks(db, base);
     console.log(JSON.stringify({ report: 'kyc-v8-successor', phase: a.phase, apply: a.apply, ...r }));
     if (r.outcome === 'refused') process.exitCode = 3;
+  } else if (job === 'library-copy') {
+    const { copyLibrary, parseLibraryCopyArgs } = await import('./library-copy');
+    const { defaultStorage } = await import('../app');
+    const a = parseLibraryCopyArgs(process.argv.slice(3));
+    const r = await copyLibrary(db, { storage: defaultStorage(config) }, a);
+    console.log(JSON.stringify({ report: 'library-copy', apply: a.apply, ...r }));
+    if (r.outcome === 'refused') process.exitCode = 3;
   } else if (job === 'kyc-v8-readback') {
     const { KYC_V8_DEFAULTS } = await import('./kyc-v8-successor');
     const rest = process.argv.slice(3);
@@ -274,7 +283,7 @@ try {
     const { parseCatalogImportArgs, runCatalogImport } = await import('./catalog-import');
     await runCatalogImport(db, parseCatalogImportArgs(process.argv.slice(3)), log);
   } else {
-    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots | marketing-form-v2 | kyc-v8-successor | kyc-v8-readback | kyc-v8-tool-binding | kyc-v8-tin-exclusion | task-send-back | data-digests | authored-export`);
+    throw new Error(`Unknown job "${job}". Use: migrate | verify-chains | bundle-sweep | seed | demo-setup | catalog-v2 | catalog-import | policy-seed | qa-users | qa-smoke | qa-seed-projects | qa-project-cleanup | qa-sme-cleanup | qa-template-cleanup | case-selector-slots | marketing-form-v2 | kyc-v8-successor | library-copy | kyc-v8-readback | kyc-v8-tool-binding | kyc-v8-tin-exclusion | task-send-back | data-digests | authored-export`);
   }
 } catch (err) {
   log('error', 'job failed', { err: String(err), alert: true });

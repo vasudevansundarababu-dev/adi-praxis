@@ -2755,3 +2755,14 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
   downloaded, with what C1 still needs; "Load the environment's fact catalog" (from the template's fact bindings,
   keeping the environment's catalog id, e.g. kyc-judgment-openenv.facts@1); "Export policy library (C1)" with the
   refusal's problems listed, and each export's exact bytes to download.
+
+## D-076: copying a published rule set into another project (KYC Judgment v1; precedent: the v8 successor job)
+
+- `run.ts library-copy --from <project> --to <project> --requested-by <admin email> [--apply]`, dry run by default,
+  audited as SYSTEM with the requesting Admin, idempotent, one transaction.
+- The documents the source rule set cites are copied byte for byte (SHA-256 checked); each rule arrives as a DRAFT with
+  the same key, body and quotes, re-linked to the copy (`origin: library_copy`).
+- No approval is carried across: rules and approvals are per project. The PM reviews them again in the new project, with
+  the conditions and library details C1 needs. The source project is never changed.
+- For KYC Judgment v1: the v8 project's rule set v2 (the federal document and the 11 rules) into the new real project,
+  run for real only once that project exists and the coordinator has been told.

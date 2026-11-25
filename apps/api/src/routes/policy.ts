@@ -22,6 +22,7 @@ import { contentHash, createRuleFromCandidate, currentVersions, definitionProble
 import { addChange, effectivePolicy, removeChange, sidecar, snapshotTask } from '../policy/task-policy';
 import { annotationState, editorRole, revisionDto, revisionsForRules, type RevisionRow } from '../policy/annotations';
 import { ANNOTATION_ACTIONS } from '../policy/annotate-job';
+import { ENRICHMENT_ACTIONS } from '../policy/enrich';
 import { POLICY_AI_ACTIONS } from '../policy/ai-cap';
 
 const ProjectParams = z.object({ projectId: z.string().uuid() });
@@ -425,6 +426,42 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
     });
     return reply;
   });
+
+  /**
+   * KYC Judgment v1 A2: the AI enrichment pass over the project's draft rules (or one document's), a worker job. It
+   * suggests library parts and conditions; it never re-extracts, never touches an approved rule and approves nothing.
+   * Asking again while a run is still going returns that run.
+   */
+  app.post('/projects/:projectId/policy/enrichment', { config: { access: POLICY_ACCESS, rateLimit: perSession(10) }, schema: { tags: ['policy'], params: ProjectParams, body: z.object({ documentId: z.string().uuid().optional() }).strict() } }, async (req, reply) => {
+    const actor = req.actor!;
+    const p = await policyProject(db, actor, req.params.projectId);
+    if (req.body.documentId && !(await db.policyDocument.findFirst({ where: { id: req.body.documentId, projectId: p.id } }))) throw notFound('Document not found');
+    await checkAiCap(actor.clientId);
+    const running = await enrichmentRun(actor.clientId, p.id);
+    if (running?.status === 'running') return reply.status(200).send(running);
+    await runCommand(db, req, reply, async ({ audit, emit }) => {
+      const runId = randomUUID();
+      await emit({ name: 'policy.enrichment_requested', aggregateType: 'PolicyEnrichmentRun', aggregateId: runId, payload: { clientId: actor.clientId, projectId: p.id, requestedById: actor.userId, requestedRoles: actor.roles, ...(req.body.documentId ? { documentId: req.body.documentId } : {}) } });
+      await audit({ entityType: 'Project', entityId: p.id, action: ENRICHMENT_ACTIONS.requested, after: { runId, ...(req.body.documentId ? { documentId: req.body.documentId } : {}) } });
+      return { status: 202, body: { status: 'running', runId } };
+    });
+    return reply;
+  });
+
+  app.get('/projects/:projectId/policy/enrichment', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams } }, async (req) => {
+    const p = await policyProject(db, req.actor!, req.params.projectId);
+    return (await enrichmentRun(req.actor!.clientId, p.id)) ?? { status: 'none' };
+  });
+
+  /** The latest enrichment run of a project (requested, then suggested / failed / skipped). */
+  async function enrichmentRun(clientId: string, projectId: string) {
+    const requested = await db.auditEvent.findFirst({ where: { clientId, entityType: 'Project', entityId: projectId, action: ENRICHMENT_ACTIONS.requested }, orderBy: { createdAt: 'desc' } });
+    if (!requested) return null;
+    const runId = (requested.after as { runId?: string } | null)?.runId ?? '';
+    const end = await db.auditEvent.findFirst({ where: { clientId, entityType: 'Project', entityId: projectId, action: { in: [ENRICHMENT_ACTIONS.suggested, ENRICHMENT_ACTIONS.failed, ENRICHMENT_ACTIONS.skipped] }, after: { path: ['runId'], equals: runId } } });
+    const status = !end ? 'running' : end.action === ENRICHMENT_ACTIONS.suggested ? 'done' : end.action === ENRICHMENT_ACTIONS.failed ? 'failed' : 'skipped';
+    return { status, runId, requestedAt: requested.createdAt.toISOString(), ...(end ? { finishedAt: end.createdAt.toISOString(), result: end.after } : {}) };
+  }
 
   /** The latest annotation run for a document (requested, then suggested / failed / skipped), for the page's progress. */
   async function annotationRun(clientId: string, documentId: string) {

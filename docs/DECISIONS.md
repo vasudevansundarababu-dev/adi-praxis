@@ -2618,3 +2618,22 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
   - Refused when the rule changed since (`STALE_SUGGESTION`), or when the suggestion failed its checks
     (`SUGGESTION_HAS_PROBLEMS`).
   - On an approved rule it makes a new draft; the approved version and the rule sets are untouched.
+
+## D-067: the AI enrichment pass over draft rules (KYC Judgment v1 A2; owner, 25 Nov 2026: AI Extract is supervised)
+
+- **What.** A worker job (`policy.enrichment_requested`), started by a PM or Admin for the project or one document, within
+  the daily AI cap. For each draft it suggests C1's library parts (kind, issuer, subject, scope) and a condition over the
+  fact catalog (plus derived facts), and gives the PM one question when it can't decide. Prompt `enrichment/1`; the
+  model is the policy assistant's (Vertex), mocked in tests and locally.
+- **Never re-extracts.** It reads the rules already in the library. The California document goes through extraction as
+  usual, then this pass.
+- **Never touches an approved or excluded rule.** Their versions, hashes and the rule sets stay as they are; they are
+  counted as skipped.
+- **Jurisdiction codes are deterministic first.** The extraction's own values are mapped to ISO codes (US, US-CA and so
+  on); the model only fills a gap; several codes are a question for the PM, never a guess.
+- **Checked on the server.** A part outside C1's vocabulary is dropped and named as a problem. A condition that fails
+  the catalog is dropped, and the PM gets a question. Every answer is stored as a suggestion for the exact rule version.
+- **Pre-filled only where no person has edited.** A draft last edited by extraction or by this pass gets the valid parts
+  written in (an ordinary draft edit by `enrichment:<run>`, audited as SYSTEM). A draft a person has edited is only
+  offered the suggestion (A1 adopt). Nothing is approved: the PM's tick on each rule is the approval (A3).
+- A rule that changed while the model was answering is left alone (`stale`).

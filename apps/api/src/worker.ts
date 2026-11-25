@@ -13,6 +13,7 @@ import { createDomainEventsQueue, createDomainEventsWorker, startOutboxPoller } 
 import { defaultHandlers } from './outbox/handlers';
 import { defaultAdapters, policyExtractionHandler } from './policy/extraction/service';
 import { policyAnnotationHandler } from './policy/annotate-job';
+import { defaultRuleEnricher, policyEnrichmentHandler } from './policy/enrich';
 import { POLICY_AI_ACTIONS } from './policy/ai-cap';
 import { defaultRuleAssistant } from './policy/rule-assistant';
 import { resolveDeps } from './meta-compiler/deps';
@@ -39,6 +40,8 @@ const registry = defaultHandlers({ evaluator: defaultEvaluator(config), email: d
 const storage = defaultStorage(config);
 registry.register(policyExtractionHandler({ storage, adapters: defaultAdapters(config.policy) }));
 registry.register(policyAnnotationHandler({ storage, assistant: defaultRuleAssistant(config), dailyCap: config.POLICY_AI_DAILY_CALL_CAP, capActions: POLICY_AI_ACTIONS }));
+// KYC Judgment v1 A2: the enrichment pass over draft rules (suggestions only; mocks unless Vertex is configured).
+registry.register(policyEnrichmentHandler({ storage, enricher: defaultRuleEnricher(config), dailyCap: config.POLICY_AI_DAILY_CALL_CAP, capActions: POLICY_AI_ACTIONS }));
 // D2: tutorial video runs (mocks unless TUTORIAL_VIDEO_LIVE; never on publish in QA or locally).
 registry.register(tutorialVideoHandler(defaultTutorialPipeline(config)));
 for (const h of metaCompilerHandlers({ config, storage, drafters: defaultDrafterFactory(config), deps: resolveDeps(), runner: defaultRunner(config, storage), judge: defaultJudge(config) })) registry.register(h);

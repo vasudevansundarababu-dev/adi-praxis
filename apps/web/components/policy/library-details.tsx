@@ -25,6 +25,9 @@ export interface LibraryForm {
   changeSummary: string;
   always: boolean;
   condition: string;
+  /** A derived fact this rule defines (C1 derived_facts), e.g. us_person; its definition names catalog facts only. */
+  definesId: string;
+  definesDefinition: string;
 }
 
 export function libraryForm(body: PolicyRuleBody): LibraryForm {
@@ -44,6 +47,8 @@ export function libraryForm(body: PolicyRuleBody): LibraryForm {
     changeSummary: l.change?.summary ?? '',
     always: body.condition === null,
     condition: body.condition ? JSON.stringify(body.condition, null, 2) : '',
+    definesId: l.defines?.id ?? '',
+    definesDefinition: l.defines ? JSON.stringify(l.defines.definition, null, 2) : '',
   };
 }
 
@@ -61,6 +66,14 @@ export function libraryBody(body: PolicyRuleBody, f: LibraryForm): { body: Polic
   } else condition = undefined;
   if (f.jurisdiction && !ISO_JURISDICTION.test(f.jurisdiction)) problems.push(`"${f.jurisdiction}" is not an ISO code: use US, or US-CA for California.`);
   if (f.changeKind && !f.changeSummary.trim()) problems.push('Say in a short summary how this version changes the one before it.');
+  let defines: unknown;
+  if (f.definesId.trim()) {
+    try {
+      defines = { id: f.definesId.trim(), type: 'boolean', definition: JSON.parse(f.definesDefinition) };
+    } catch {
+      problems.push('The definition is not valid JSON.');
+    }
+  }
   const library = {
     ...(body.library ?? {}),
     ...(f.kind ? { kind: f.kind } : {}),
@@ -71,7 +84,9 @@ export function libraryBody(body: PolicyRuleBody, f: LibraryForm): { body: Polic
     effect: f.effect,
     effectiveMode: f.effectiveMode,
     ...(f.changeKind ? { change: { kind: f.changeKind, summary: f.changeSummary.trim() } } : {}),
+    ...(defines ? { defines } : {}),
   } as NonNullable<PolicyRuleBody['library']>;
+  if (!f.definesId.trim()) delete (library as { defines?: unknown }).defines;
   const next = { ...body, library, ...(condition === undefined ? {} : { condition }) } as PolicyRuleBody;
   return { body: next, problems };
 }
@@ -161,6 +176,17 @@ export function LibraryDetailsEditor({ projectId, ruleId, contentHash, body, app
           </label>
         )}
       </div>
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer font-medium">This rule defines a fact (for example “US person”)</summary>
+        <label htmlFor="lib-defines-id" className="mt-2 flex flex-col">
+          <span>Fact name (lower case, e.g. us_person)</span>
+          <input id="lib-defines-id" className="input mt-1" value={f.definesId} onChange={(e) => set('definesId', e.target.value.trim())} />
+        </label>
+        <label htmlFor="lib-defines-def" className="mt-2 flex flex-col">
+          <span>True when (JSON over catalog facts only, e.g. {'{"fact":"citizenship","op":"in","value":["US"]}'})</span>
+          <textarea id="lib-defines-def" rows={4} className="mt-1 rounded-md border border-line bg-surface px-2 py-1.5 font-mono text-xs" value={f.definesDefinition} onChange={(e) => set('definesDefinition', e.target.value)} />
+        </label>
+      </details>
       {msg && (
         <p role={msg.kind === 'error' ? 'alert' : 'status'} className={`mt-2 text-sm ${msg.kind === 'error' ? 'text-error' : ''}`}>
           {msg.text}

@@ -2748,7 +2748,8 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
 
 - **Rule page → Library details:** kind, issuer, ISO jurisdiction, evaluated for (case or party), process, customer
   types, product lines, channels, effect, takes effect (from date or scenario only), change from the version before
-  (kind and summary), and the condition: "Applies always within its process" (null), or a condition over the case's facts.
+  (kind and summary), the condition ("Applies always within its process" = null, or a condition over the case's facts),
+  and "This rule defines a fact" (a derived fact such as us_person, with its definition over catalog facts).
   Bad JSON, a non-ISO jurisdiction or a change without a summary are named and never saved. Saving is an ordinary rule
   edit; on an approved rule it makes a new draft, which the PM applies again.
 - **Policies page → Library setup:** each document's kind, ISO jurisdiction and (official text) where and when it was

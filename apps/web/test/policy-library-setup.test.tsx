@@ -35,6 +35,13 @@ describe('(a) rule page: condition and library details', () => {
     expect(libraryBody(BODY, { ...f, effectiveMode: 'scenario_only', changeKind: 'tightens', changeSummary: 'Shorter window.' }).body).toMatchObject({ library: { effectiveMode: 'scenario_only', change: { kind: 'tightens', summary: 'Shorter window.' } } });
   });
 
+  it('a rule may define a derived fact (us_person from citizenship alone, Option A); a bad definition is named', () => {
+    const f = { ...libraryForm(BODY), definesId: 'us_person', definesDefinition: '{"fact":"citizenship","op":"in","value":["US"]}' };
+    expect(libraryBody(BODY, f).body).toMatchObject({ library: { defines: { id: 'us_person', type: 'boolean', definition: { fact: 'citizenship', op: 'in', value: ['US'] } } } });
+    expect(libraryBody(BODY, { ...f, definesDefinition: 'nope' }).problems.join(' ')).toContain('The definition is not valid JSON');
+    expect(libraryForm({ ...(BODY as object), library: { defines: { id: 'us_person', type: 'boolean', definition: { fact: 'citizenship', op: 'in', value: ['US'] } } } } as never)).toMatchObject({ definesId: 'us_person' });
+  });
+
   it('renders labelled controls and says an approved rule becomes a new draft', () => {
     const html = renderToStaticMarkup(<LibraryDetailsEditor projectId="p" ruleId="r" contentHash={'a'.repeat(64)} body={BODY} approved />);
     const t = text(html);

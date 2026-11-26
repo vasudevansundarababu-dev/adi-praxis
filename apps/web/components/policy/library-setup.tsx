@@ -4,6 +4,9 @@ import { jurisdictionProblem } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { documentLibraryProblem, documentReady, type LibraryDocument, type LibraryExportRow } from './library-logic';
+
+export type { LibraryDocument, LibraryExportRow } from './library-logic';
 
 /**
  * KYC Judgment v1 console gaps (b)–(d) (coordinator, 25 Nov 2026: the PM never needs API calls): each document's kind,
@@ -12,35 +15,6 @@ import { mutate } from '@/lib/client-api';
  * D-090 (owner, 26 Nov 2026): every detail stays editable after upload, including the date the document is in force
  * from (rules without their own date take it); jurisdictions must be real ISO 3166 codes.
  */
-export interface LibraryDocument {
-  id: string;
-  title: string;
-  jurisdiction: string | null;
-  libraryKind: string | null;
-  captureSourceUrl: string | null;
-  captureDownloadedOn: string | null;
-  effectiveFrom?: string | null;
-}
-export interface LibraryExportRow {
-  revision: number;
-  exportId: string;
-  sha256: string;
-  rules: number;
-  versions: number;
-  at: string;
-}
-
-/** What C1 still needs from a document, in plain words (null when nothing). */
-export function documentLibraryProblem(d: LibraryDocument): string | null {
-  if (!d.libraryKind || !d.jurisdiction) return 'Set the kind (official text or bank policy) and an ISO jurisdiction such as US-CA.';
-  const j = jurisdictionProblem(d.jurisdiction);
-  if (j) return `${j} Set an ISO jurisdiction such as US or US-CA.`;
-  if (d.libraryKind === 'official_text' && (!d.captureSourceUrl || !d.captureDownloadedOn)) return 'An official text needs where and when it was downloaded.';
-  return null;
-}
-
-/** A document is ready for the library when C1 needs nothing more and it has an in-force date for its rules (D-090). */
-export const documentReady = (d: LibraryDocument) => !documentLibraryProblem(d) && !!d.effectiveFrom;
 
 const day = (s: string | null | undefined) => (s ? s.slice(0, 10) : '');
 

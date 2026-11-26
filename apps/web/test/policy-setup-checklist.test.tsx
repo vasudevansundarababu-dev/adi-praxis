@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { DocumentDetailsList, documentLibraryProblem, documentReady } from '@/components/policy/library-setup';
+import { DocumentDetailsList } from '@/components/policy/library-setup';
+import { documentLibraryProblem, documentReady } from '@/components/policy/library-logic';
 import { SetupChecklist, checklistSteps, type ChecklistInput } from '@/components/policy/setup-checklist';
 import { focusTarget } from '@/components/policy/focus-on-load';
 import { a11yProblems } from './a11y';

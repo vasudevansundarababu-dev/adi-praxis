@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { LibraryDetailsEditor, libraryForm, libraryBody } from '@/components/policy/library-details';
-import { LibrarySetupPanel, documentLibraryProblem } from '@/components/policy/library-setup';
+import { LibrarySetupPanel } from '@/components/policy/library-setup';
+import { documentLibraryProblem } from '@/components/policy/library-logic';
 import { a11yProblems } from './a11y';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, refresh: () => undefined }) }));

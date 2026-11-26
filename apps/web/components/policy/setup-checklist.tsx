@@ -1,4 +1,4 @@
-import { documentReady, type LibraryDocument, type LibraryExportRow } from './library-setup';
+import { documentReady, type LibraryDocument, type LibraryExportRow } from './library-logic';
 
 /**
  * D-092 (owner, 26 Nov 2026): the Policy page opens with what to do next. Five steps (Documents → Facts → AI suggestions

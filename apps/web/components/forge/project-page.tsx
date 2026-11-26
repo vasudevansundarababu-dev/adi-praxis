@@ -10,7 +10,8 @@ import type { ExportState } from '@/components/projects/export-panel';
 import type { SearchParams } from '@/components/pager';
 import { apiGet, getCurrentUser } from '@/lib/api';
 import { benchmarkTabCount, type WaitingBatch } from '@/lib/benchmark-waiting';
-import { smesOf, type ProjectTab, type ReviewRoute } from '@/lib/forge-console';
+import { policiesTabRedirect, smesOf, type ProjectTab, type ReviewRoute } from '@/lib/forge-console';
+import { redirect } from 'next/navigation';
 
 type People = { reviewRoute: ReviewRoute; requiredWorkers: number | null; items: ProjectPersonDto[]; withoutTask?: WithoutTask };
 
@@ -40,6 +41,10 @@ export async function ForgeProjectPage({ project, tab, searchParams = {} }: { pr
   } else if (tab === 'benchmark') {
     body = <BenchmarkSection projectId={id} />;
   } else if (tab === 'policies') {
+    // A KYC Judgment project's policies live on the Policy page (checklist and review queue; D-090), not in this tab.
+    const route = await apiGet<{ approvalRoute?: string }>(`/projects/${id}/policy/review-queue`);
+    const to = policiesTabRedirect(id, route.data?.approvalRoute);
+    if (to) redirect(to);
     const [docs, extraction, rules, preview, user, clauses, factCatalog, quality] = await Promise.all([
       apiGet<DocumentsData>(`/projects/${id}/policy/documents`),
       apiGet<ExtractionData>(`/projects/${id}/policy/extraction`),

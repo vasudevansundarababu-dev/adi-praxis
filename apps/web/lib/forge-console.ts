@@ -43,6 +43,14 @@ export function projectTab(v: string | string[] | undefined): ProjectTab {
 
 export const tabHref = (projectId: string, tab: ProjectTab) => (tab === 'dashboard' ? `/projects/${projectId}` : `/projects/${projectId}?tab=${tab}`);
 
+/**
+ * Where the Policies tab sends a policy-library project (KYC Judgment, approval route `review_queue`; D-090): to the
+ * Policy page with its setup checklist and review queue. Every other project keeps the tab (null).
+ */
+export function policiesTabRedirect(projectId: string, approvalRoute: string | undefined | null): string | null {
+  return approvalRoute === 'review_queue' ? `/projects/${projectId}/policy` : null;
+}
+
 /** The seven task statuses as the console shows them (owner, 15 Nov), with the pill tone of the mockup. */
 const TASK_STATUS: Record<string, [string, string]> = {
   CREATED: ['Open', ''],

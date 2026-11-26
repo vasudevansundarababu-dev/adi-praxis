@@ -18,17 +18,32 @@ import { startBatch, spentUsd, type Adapters } from '../policy/extraction/servic
 import { ensureProfiles } from '../policy/profiles';
 import { previewRuleSet, publishRuleSet } from '../policy/rule-sets';
 import { RuleAssistantUnavailableError, type PolicyRuleAssistant, type SuggestRule } from '../policy/rule-assistant';
-import { contentHash, createRuleFromCandidate, currentVersions, definitionProblems, editRule, evidenceProblems, markExcluded, markReviewed, reviewProblems, ruleVersionFull, setApplied, type CitationEdit } from '../policy/rules';
+import { contentHash, createRuleFromCandidate, currentVersions, definitionProblems, editRule, evidenceProblems, inheritedEffectiveFrom, markExcluded, markReviewed, reviewProblems, ruleVersionFull, setApplied, type CitationEdit } from '../policy/rules';
 import { addChange, effectivePolicy, removeChange, sidecar, snapshotTask } from '../policy/task-policy';
 import { annotationState, editorRole, revisionDto, revisionsForRules, type RevisionRow } from '../policy/annotations';
 import { ANNOTATION_ACTIONS } from '../policy/annotate-job';
-import { ENRICHMENT_ACTIONS } from '../policy/enrich';
+import { ENRICHMENT_ACTIONS, enrichmentCalls, enrichmentInputs } from '../policy/enrich';
+import { approvalRoute, assertApprovable } from '../policy/approval-route';
+import { nextAction, ruleQueueFlags } from '../policy/review-queue';
+import { estimateUsd, modelPrice } from '../policy/ai-pricing';
+import { policyAiModel } from '../policy/rule-assistant';
+import { jurisdictionProblem } from '@praxis/shared';
+
+/** D-089: a requested job no worker has taken within this long is reported as "no worker", never a silent queue. */
+export const WORKER_PICKUP_MS = 60_000;
+const NO_WORKER_MESSAGE = 'No worker is running, so this job has not started. Ask whoever runs this deployment to start the policy worker; the job starts as soon as it runs.';
 import { POLICY_AI_ACTIONS } from '../policy/ai-cap';
 
 const ProjectParams = z.object({ projectId: z.string().uuid() });
 /** Per signed-in session rather than per IP, so colleagues behind one office address do not share a limit. */
 const perSession = (max: number) => ({ max, timeWindow: '1 minute', keyGenerator: (req: FastifyRequest) => req.cookies?.praxis_session ?? req.ip });
 const TaskParams = z.object({ taskId: z.string().uuid() });
+/** D-090: a rule's library jurisdiction must be a real ISO 3166 code, not only look like one ("US-A" is refused). */
+function assertRuleJurisdiction(body: { library?: { jurisdiction?: string } | undefined }) {
+  const j = body.library?.jurisdiction;
+  const problem = j === undefined ? null : jurisdictionProblem(j);
+  if (problem) throw new AppError(422, 'JURISDICTION_NOT_ISO', problem);
+}
 const DocMeta = z.object({
   title: z.string().trim().min(1).max(300),
   category: z.string().trim().max(100).nullish(),
@@ -110,7 +125,7 @@ function ruleDto(r: Current, ann: ReturnType<typeof annotationDto>) {
     applied: r.version.state === 'REVIEWED',
     documentIds: [...new Set(r.version.citations.map((c) => c.documentVersion.documentId))],
     evidence: evidence ? { quote: evidence.quote.slice(0, 600), resolution: evidence.resolution, document: evidence.documentVersion.document.title, documentVersion: evidence.documentVersion.version, locator: evidence.locator } : null,
-    definitionProblems: definitionProblems(r.version.body),
+    definitionProblems: definitionProblems(r.version.body, { inheritedFrom: inheritedEffectiveFrom(r.version.citations) }),
     evidenceProblems: evidenceProblems(r.version),
     sources: r.version.citations.map((c) => ({ document: c.documentVersion.document.title, documentVersion: c.documentVersion.version, locator: c.locator, resolution: c.resolution })),
     effective: { from: b.effective.from, to: b.effective.to },
@@ -193,11 +208,16 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
     const resolved = profiles.find((x) => x.id === resolvedId) ?? null;
     const problems = resolved ? [...(resolved.enabled ? [] : ['This extraction profile is disabled.']), ...adapters[resolved.provider as keyof Adapters].availability()] : ['No extraction profile is configured.'];
     const batches = await db.extractionBatch.findMany({ where: { projectId: p.id }, orderBy: { createdAt: 'desc' }, take: 20, include: { jobs: { include: { documentVersion: { include: { document: true } } } } } });
+    // D-089: an extraction request still in the outbox after a minute means no worker is taking jobs.
+    const queuedJobs = await db.extractionJob.findMany({ where: { status: 'QUEUED', batch: { projectId: p.id } }, select: { id: true } });
+    const waiting = queuedJobs.length ? await db.outboxEvent.findFirst({ where: { name: 'policy.extraction_requested', dispatchedAt: null, createdAt: { lt: new Date(Date.now() - WORKER_PICKUP_MS) }, aggregateId: { in: queuedJobs.map((j) => j.id) } }, select: { id: true } }) : null;
     const budget = resolved ? { provider: resolved.provider, ceilingUsd: policy.budgets[resolved.provider as keyof typeof policy.budgets], spentUsd: await spentUsd(db, resolved.provider as 'llamaextract' | 'google'), usdPerPage: policy.prices[resolved.provider as keyof typeof policy.prices] } : null;
     return {
       profile: resolved && { id: resolved.id, label: resolved.label, provider: resolved.provider, revision: resolved.revision, source: setting ? 'project' : 'deployment' },
       available: problems.length === 0,
       problems,
+      workerMissing: !!waiting,
+      ...(waiting ? { workerMessage: NO_WORKER_MESSAGE } : {}),
       budget: isAdmin(actor) ? budget : budget && { provider: budget.provider, exhausted: budget.ceilingUsd !== null && budget.spentUsd >= budget.ceilingUsd },
       profiles: isAdmin(actor) ? profiles.map((x) => ({ id: x.id, label: x.label, provider: x.provider, enabled: x.enabled, isDefault: x.isDefault, revision: x.revision, problems: adapters[x.provider as keyof Adapters].availability() })) : undefined,
       batches: batches.map((b) => ({
@@ -270,8 +290,15 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
     const all = await currentVersions(db, clientId, projectId);
     const ann = annotationDto(PolicyRuleBody.parse(v.body), revisions, new Set(all.map((i) => i.rule.ruleKey)), reverseLinks(all).get(v.rule.ruleKey) ?? []);
     const template = await db.project.findUnique({ where: { id: projectId }, select: { template: { select: { caseSelector: true } } } });
+    // D-091/D-092: the project's approval route, and for the current version its queue flags and next action.
+    const route = await approvalRoute(db, projectId);
+    const current = all.find((i) => i.version.id === v.id);
+    const queueFlags = route === 'review_queue' && current && v.state !== 'REVIEWED' ? await ruleQueueFlags(db, clientId, projectId, v.ruleId) : [];
     return {
       ...ann,
+      approvalRoute: route,
+      queueFlags,
+      nextAction: current && v.state !== 'REVIEWED' && route === 'review_queue' ? nextAction(current, queueFlags) : null,
       annotationHistory: [...revisions].reverse().map(revisionDto),
       applicationTypeOptions: caseSelectorOf(template?.template.caseSelector)?.values ?? [],
       projectRuleKeys: all.map((i) => i.rule.ruleKey),
@@ -292,7 +319,7 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
       createdAt: v.createdAt,
       updatedAt: v.updatedAt,
       problems: v.state === 'REVIEWED' || v.state === 'EXCLUDED' ? [] : reviewProblems(v),
-      definitionProblems: definitionProblems(v.body),
+      definitionProblems: definitionProblems(v.body, { inheritedFrom: inheritedEffectiveFrom(v.citations) }),
       evidenceProblems: evidenceProblems(v),
       citations: v.citations.map((c) => ({ id: c.id, fieldPath: c.fieldPath, role: c.role, quote: c.quote, locator: c.locator, resolution: c.resolution, documentVersionId: c.documentVersionId, documentId: c.documentVersion.documentId, document: c.documentVersion.document.title, documentVersion: c.documentVersion.version, sha256: c.documentVersion.sha256, format: c.documentVersion.format })),
       history,
@@ -316,6 +343,11 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
   app.put('/projects/:projectId/policy/rules/:ruleId/applied', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ ruleId: z.string().uuid() }), body: ApplyBody } }, async (req, reply) => {
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
       const p = await policyProject(tx, actor, req.params.projectId);
+      // D-091: in a policy-library project a flagged rule is never ticked Reviewed (the review queue's check).
+      if (req.body.applied) {
+        const rule = await tx.policyRule.findFirst({ where: { id: req.params.ruleId, clientId: actor.clientId, projectId: p.id }, select: { ruleKey: true } });
+        if (rule) await assertApprovable(tx, { clientId: actor.clientId, projectId: p.id, ruleId: req.params.ruleId, ruleKey: rule.ruleKey });
+      }
       const r = await setApplied(tx, { clientId: actor.clientId, projectId: p.id, ruleId: req.params.ruleId, actorId: actor.userId, roles: actor.roles, applied: req.body.applied, expectedContentHash: req.body.expectedContentHash, acceptUnverifiedEvidence: req.body.acceptUnverifiedEvidence, required: req.body.required }, audit);
       if (!r.changed) await audit({ entityType: 'PolicyRuleVersion', entityId: r.version.id, action: 'policy.rule_apply_unchanged', after: { applied: req.body.applied } });
       return { status: 200, body: { applied: r.version.state === 'REVIEWED', changed: r.changed, versionId: r.version.id, version: r.version.version, state: r.version.state, contentHash: r.version.contentHash, warnings: r.warnings } };
@@ -460,8 +492,37 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
     const runId = (requested.after as { runId?: string } | null)?.runId ?? '';
     const end = await db.auditEvent.findFirst({ where: { clientId, entityType: 'Project', entityId: projectId, action: { in: [ENRICHMENT_ACTIONS.suggested, ENRICHMENT_ACTIONS.failed, ENRICHMENT_ACTIONS.skipped] }, after: { path: ['runId'], equals: runId } } });
     const status = !end ? 'running' : end.action === ENRICHMENT_ACTIONS.suggested ? 'done' : end.action === ENRICHMENT_ACTIONS.failed ? 'failed' : 'skipped';
-    return { status, runId, requestedAt: requested.createdAt.toISOString(), ...(end ? { finishedAt: end.createdAt.toISOString(), result: end.after } : {}) };
+    const documentId = (requested.after as { documentId?: string } | null)?.documentId ?? null;
+    if (!end) {
+      // D-089: the run's event is still in the outbox after a minute, so no worker is taking jobs.
+      const waiting = await db.outboxEvent.findFirst({ where: { name: 'policy.enrichment_requested', aggregateId: runId, dispatchedAt: null }, select: { createdAt: true } });
+      if (waiting && Date.now() - waiting.createdAt.getTime() > WORKER_PICKUP_MS) return { status: 'no_worker' as const, runId, documentId, requestedAt: requested.createdAt.toISOString(), message: NO_WORKER_MESSAGE };
+    }
+    return { status, runId, documentId, requestedAt: requested.createdAt.toISOString(), ...(end ? { finishedAt: end.createdAt.toISOString(), result: end.after } : {}) };
   }
+
+  /**
+   * D-092: what "Suggest library details (AI)" would cost before it runs, for every draft or one document's drafts. The
+   * model is never called. The dollar figure is for Admins only (D7: no cost figures for PMs on project screens).
+   */
+  app.get('/projects/:projectId/policy/enrichment/estimate', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams, querystring: z.object({ documentId: z.string().uuid().optional() }) } }, async (req) => {
+    const actor = req.actor!;
+    const p = await policyProject(db, actor, req.params.projectId);
+    if (req.query.documentId && !(await db.policyDocument.findFirst({ where: { id: req.query.documentId, projectId: p.id } }))) throw notFound('Document not found');
+    const { rules, catalog } = await enrichmentInputs(db, actor.clientId, p.id, req.query.documentId);
+    const calls = enrichmentCalls({ catalog, rules });
+    // The configured model's price, also where the stand-in runs (live: false), so the figure is what a live run costs.
+    const model = policyAiModel(config);
+    const price = modelPrice(model, config.POLICY_AI_PRICE_USD_PER_MTOK);
+    const cost = estimateUsd(calls, price);
+    return {
+      rules: rules.length,
+      calls: calls.length,
+      model,
+      live: config.assistantMode === 'vertex',
+      ...(isAdmin(actor) ? { estimatedUsd: cost.estimatedUsd, inputTokens: cost.inputTokens, outputTokens: cost.outputTokens, priceSource: price.source } : {}),
+    };
+  });
 
   /** The latest annotation run for a document (requested, then suggested / failed / skipped), for the page's progress. */
   async function annotationRun(clientId: string, documentId: string) {
@@ -489,8 +550,9 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
       const p = await policyProject(tx, actor, req.params.projectId);
       const dv = await tx.policyDocumentVersion.findFirst({ where: { id: req.body.documentVersionId, projectId: p.id } });
       if (!dv) throw notFound('Document version not found');
+      assertRuleJurisdiction(req.body.body);
       const text = await loadText(dv);
-      const candidate = CandidateRule.parse({ ...req.body.body, ruleKey: req.body.ruleKey ?? null, citations: req.body.citations.map((c) => ({ fieldPath: c.fieldPath, role: c.role, quote: c.quote, page: null, chunkId: null, lineStart: null, lineEnd: null, confidence: null })) });
+      const candidate =CandidateRule.parse({ ...req.body.body, ruleKey: req.body.ruleKey ?? null, citations: req.body.citations.map((c) => ({ fieldPath: c.fieldPath, role: c.role, quote: c.quote, page: null, chunkId: null, lineStart: null, lineEnd: null, confidence: null })) });
       const r = await createRuleFromCandidate(tx, { clientId: actor.clientId, projectId: p.id, documentVersion: dv, doc: { ...text, format: dv.format }, candidate, origin: 'manual', editedById: actor.userId, ruleKey: req.body.ruleKey ?? null });
       await audit({ entityType: 'PolicyRuleVersion', entityId: r.version.id, action: 'policy.rule_created', after: { ruleKey: r.rule.ruleKey, state: r.version.state } });
       return { status: 201, body: { ruleId: r.rule.id, ruleKey: r.rule.ruleKey, versionId: r.version.id, state: r.version.state, contentHash: r.version.contentHash } };
@@ -501,7 +563,8 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
   app.put('/projects/:projectId/policy/rules/:ruleId', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ ruleId: z.string().uuid() }), body: EditBody } }, async (req, reply) => {
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
       const p = await policyProject(tx, actor, req.params.projectId);
-      const annotationSave = { source: 'AUTHOR_EDIT' as const, editedById: actor.userId, editedRole: editorRole(actor.roles), basedOnRevisionId: req.body.annotationBasedOnRevisionId ?? null };
+      assertRuleJurisdiction(req.body.body);
+      const annotationSave ={ source: 'AUTHOR_EDIT' as const, editedById: actor.userId, editedRole: editorRole(actor.roles), basedOnRevisionId: req.body.annotationBasedOnRevisionId ?? null };
       const v = await editRule(tx, { loadText }, { clientId: actor.clientId, projectId: p.id, ruleId: req.params.ruleId, actorId: actor.userId, expectedContentHash: req.body.expectedContentHash, body: req.body.body, citations: req.body.citations as CitationEdit[] | undefined, annotationSave }, audit);
       return { status: 200, body: { versionId: v.id, version: v.version, state: v.state, contentHash: v.contentHash } };
     });
@@ -530,6 +593,8 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
   app.post('/projects/:projectId/policy/rule-versions/:versionId/review', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ versionId: z.string().uuid() }), body: Decision } }, async (req, reply) => {
     await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
       const p = await policyProject(tx, actor, req.params.projectId);
+      const target = await tx.policyRuleVersion.findFirst({ where: { id: req.params.versionId, clientId: actor.clientId, rule: { projectId: p.id } }, select: { ruleId: true, rule: { select: { ruleKey: true } } } });
+      if (target) await assertApprovable(tx, { clientId: actor.clientId, projectId: p.id, ruleId: target.ruleId, ruleKey: target.rule.ruleKey });
       const v = await markReviewed(tx, { clientId: actor.clientId, projectId: p.id, ruleVersionId: req.params.versionId, actorId: actor.userId, expectedContentHash: req.body.expectedContentHash, required: req.body.required }, audit);
       return { status: 200, body: { versionId: v.id, state: v.state, reviewedAt: v.reviewedAt } };
     });

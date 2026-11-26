@@ -2798,3 +2798,35 @@ no template changes, no new Authoring screens, S7's 5/2/0 is the scoring truth.
 - A version activated in the test channel can't later be activated for real, so the real release is a successor
   version. The real project's tasks then move to it with a successor job (as for KYC v8), without re-authoring; the
   approved records stay, and a person approves each successor revision.
+
+## D-089–D-092: the Policy page redesign (owner, 26 Nov 2026: "Yes, build it")
+
+The coordinator's numbers. What was built, and the defaults taken where the brief left a choice (owner may change):
+- **D-090 documents.** Kind, jurisdiction, source URL, downloaded on and *in force from* stay editable after upload
+  (`PUT …/documents/:id/library`, audited). No migration: `PolicyDocument.effective_from` already existed (set only at
+  upload until now). A rule without its own date takes its document's date (the document of its resolved requirement
+  quote, else any quoted document); its own date wins. The queue's flags, the tick's readiness, the rule-set preview
+  and the C1 export all use the same inheritance. Jurisdictions are checked against real ISO 3166: every alpha-2
+  country, and subdivisions of the US (50 states, DC, territories) and Canada. *Default:* another country's
+  subdivision is refused with "use the country code"; a stored value that fails ("US-A") is reported, never rewritten.
+- **D-091 one approval route.** A project "builds a policy library" when its template binds the environment's facts
+  (`policy_bindings.facts`, as KYC Judgment v1 v4 does with 24). A fact catalog alone (clause conditions) does not count. There, the review queue is the only approval route on the page; the
+  annotation table is not shown, and the server refuses to mark a flagged rule Reviewed by the tick or Mark reviewed
+  (409 RULE_FLAGGED, the queue's own check). Unticking is never blocked. *Default:* other projects (Marketing) keep the
+  tick exactly as before, because the library flags (condition, library details) don't apply to them. The batch limit
+  of Confirm selected went from 200 to 500 rules so "Confirm all ready" stays one all-or-nothing batch.
+- **D-092 review queue.** A table with next actions in a fixed order: Set when it applies → Fill in library details →
+  Set the in-force date → Link to a source quote → Check the quote → Answer the open question → (then: complete the
+  definition, say how it changes the version before, approve the definition first, check Studio's coverage) → Ready
+  to confirm. Each row links to the rule page with `?focus=`, which opens that field. Filters: document, next action,
+  jurisdiction, status and text; 25 a page (the shared pager). The US-person warning names the rule to approve.
+- **AI suggestions.** "Suggest library details (AI)" shows its estimate first (rules, model calls, model) and runs for
+  the current document filter or all drafts. *Default (D7 kept):* the dollar figure is shown to Admins only; PMs see
+  "An Admin sees the cost estimate". The estimate counts characters / 4 per call at a list price by model family
+  (`POLICY_AI_PRICE_USD_PER_MTOK` overrides it) and never calls a model.
+- **D-089 no silent queue.** A requested enrichment or extraction whose outbox event no worker has taken within 60 s
+  reads "No worker is running". `pnpm --filter @praxis/api worker:policy` runs a worker for the three policy events only
+  (extraction, the annotation pass that follows it, enrichment), on its own queue, with none of the full worker's
+  maintenance (no bundle-deletion sweep). The earlier ad-hoc scoped worker dispatched every outbox event; the 9
+  non-policy events it took (25–26 Nov) have no handler in the full worker with SME supply off, so nothing was lost,
+  but the 4 annotation passes after extraction in project 605fed3e never ran.

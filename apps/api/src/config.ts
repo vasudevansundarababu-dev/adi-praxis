@@ -80,6 +80,8 @@ const Env = z.object({
    * PROFILE_MODEL. Empty follows a Gemini AUTHORING_MODEL (QA), otherwise claude-sonnet-5-5. Suggests only; never decides.
    */
   POLICY_AI_MODEL: z.string().default(''),
+  /** D-092: "input,output" USD per million tokens for the policy model's cost estimate; empty = the list price by family. */
+  POLICY_AI_PRICE_USD_PER_MTOK: z.string().default(''),
   /** Per-client daily cap on policy AI calls (suggestion runs + definitions). */
   POLICY_AI_DAILY_CALL_CAP: z.coerce.number().int().min(1).max(100_000).default(1000),
   /**

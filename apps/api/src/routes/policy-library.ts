@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { jurisdictionProblem } from '@praxis/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { jcs, jcsSha256 } from '../anvil/jcs';
@@ -22,8 +23,16 @@ const DocumentLibrary = z
     jurisdiction: z.string().trim().min(1).max(100).optional(),
     captureSourceUrl: z.string().trim().url().regex(/^https?:\/\//).max(2000).optional(),
     captureDownloadedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    /** D-090: the date the document is in force from; rules without their own date take it. null clears it; absent keeps it. */
+    effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   })
   .strict();
+
+/** A calendar date that exists (2026-02-30 does not), as a UTC midnight. */
+function calendarDay(s: string): Date | null {
+  const d = new Date(`${s}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s ? null : d;
+}
 
 export const policyLibraryRoutes: FastifyPluginAsyncZod<{ db: Db; storage: ObjectStorage }> = async (app, { db, storage }) => {
   const loadText = (v: { textStorageKey: string }) => loadVersionText(storage, v);
@@ -35,11 +44,17 @@ export const policyLibraryRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Objec
       const b = req.body;
       if (b.kind === 'official_text' && (!b.captureSourceUrl || !b.captureDownloadedOn)) throw new AppError(422, 'CAPTURE_REQUIRED', 'An official text needs where it was downloaded from (http or https) and the date it was downloaded.');
       const jurisdiction = b.jurisdiction === undefined ? doc.jurisdiction : isoJurisdiction(b.jurisdiction);
-      if (b.jurisdiction !== undefined && !jurisdiction) throw new AppError(422, 'JURISDICTION_NOT_ISO', `"${b.jurisdiction}" is not a jurisdiction the library can use. Use an ISO code such as US or US-CA.`);
-      const data = { libraryKind: b.kind, jurisdiction, captureSourceUrl: b.kind === 'official_text' ? b.captureSourceUrl! : null, captureDownloadedOn: b.kind === 'official_text' ? new Date(`${b.captureDownloadedOn}T00:00:00Z`) : null };
+      if (b.jurisdiction !== undefined && !jurisdiction) throw new AppError(422, 'JURISDICTION_NOT_ISO', `${jurisdictionProblem(b.jurisdiction.trim().toUpperCase()) ?? `"${b.jurisdiction}" is not a jurisdiction the library can use.`} Use an ISO code such as US or US-CA.`);
+      const captureDay = b.kind === 'official_text' ? calendarDay(b.captureDownloadedOn!) : null;
+      if (b.kind === 'official_text' && !captureDay) throw new AppError(422, 'DATE_INVALID', `${b.captureDownloadedOn} is not a calendar date.`);
+      const effectiveDay = b.effectiveFrom ? calendarDay(b.effectiveFrom) : null;
+      if (b.effectiveFrom && !effectiveDay) throw new AppError(422, 'DATE_INVALID', `${b.effectiveFrom} is not a calendar date.`);
+      const effectiveFrom = b.effectiveFrom === undefined ? doc.effectiveFrom : effectiveDay;
+      const data = { libraryKind: b.kind, jurisdiction, captureSourceUrl: b.kind === 'official_text' ? b.captureSourceUrl! : null, captureDownloadedOn: captureDay, effectiveFrom };
       await tx.policyDocument.update({ where: { id: doc.id }, data });
-      await audit({ entityType: 'PolicyDocument', entityId: doc.id, action: 'policy.document_library_set', before: { kind: doc.libraryKind, jurisdiction: doc.jurisdiction, captureSourceUrl: doc.captureSourceUrl }, after: { kind: data.libraryKind, jurisdiction: data.jurisdiction, captureSourceUrl: data.captureSourceUrl, captureDownloadedOn: b.captureDownloadedOn ?? null } });
-      return { status: 200, body: { kind: data.libraryKind, jurisdiction: data.jurisdiction, captureSourceUrl: data.captureSourceUrl, captureDownloadedOn: b.captureDownloadedOn ?? null } };
+      const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+      await audit({ entityType: 'PolicyDocument', entityId: doc.id, action: 'policy.document_library_set', before: { kind: doc.libraryKind, jurisdiction: doc.jurisdiction, captureSourceUrl: doc.captureSourceUrl, effectiveFrom: day(doc.effectiveFrom) }, after: { kind: data.libraryKind, jurisdiction: data.jurisdiction, captureSourceUrl: data.captureSourceUrl, captureDownloadedOn: b.captureDownloadedOn ?? null, effectiveFrom: day(effectiveFrom) } });
+      return { status: 200, body: { kind: data.libraryKind, jurisdiction: data.jurisdiction, captureSourceUrl: data.captureSourceUrl, captureDownloadedOn: day(captureDay), effectiveFrom: day(effectiveFrom) } };
     });
     return reply;
   });

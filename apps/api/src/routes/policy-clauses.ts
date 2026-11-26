@@ -5,7 +5,8 @@ import { notFound } from '../lib/errors';
 import { checkedDispositions, DISPOSITION_PROMPT_VERSION, DispositionUnavailableError, type DispositionSuggester } from '../policy/dispositions';
 import { evaluateQuality, ReferenceLabel, ReferenceSetBody } from '../policy/quality';
 import { editRule, setApplied } from '../policy/rules';
-import { projectFlags, reviewQueue } from '../policy/review-queue';
+import { projectFlags, reviewQueue, ruleCounts } from '../policy/review-queue';
+import { approvalRoute } from '../policy/approval-route';
 import type { StudioCoverageClient } from '../anvil/coverage-client';
 import { loadVersionText } from '../policy/documents';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -71,7 +72,8 @@ export const policyClauseRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Object
   app.get('/projects/:projectId/policy/review-queue', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams } }, async (req) => {
     const p = await policyProject(db, req.actor!, req.params.projectId);
     const items = await reviewQueue(db, req.actor!.clientId, p.id);
-    return { items, projectFlags: await projectFlags(db, p.id), flagged: items.filter((i) => i.flags.length).length, total: items.length, studioConnected: !!coverage };
+    // D-091/D-092: which approval route the project uses, and the counts the page's setup checklist shows.
+    return { items, projectFlags: await projectFlags(db, p.id), flagged: items.filter((i) => i.flags.length).length, total: items.length, studioConnected: !!coverage, approvalRoute: await approvalRoute(db, p.id), counts: await ruleCounts(db, req.actor!.clientId, p.id) };
   });
 
   app.post('/projects/:projectId/policy/review-queue/coverage', { config: { access: POLICY_ACCESS, rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['policy'], params: ProjectParams, body: z.object({}).strict() } }, async (req, reply) => {
@@ -97,7 +99,7 @@ export const policyClauseRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Object
     return reply;
   });
 
-  const BatchBody = z.object({ items: z.array(z.object({ ruleId: z.string().uuid(), expectedContentHash: z.string().length(64) }).strict()).min(1).max(200) }).strict();
+  const BatchBody = z.object({ items: z.array(z.object({ ruleId: z.string().uuid(), expectedContentHash: z.string().length(64) }).strict()).min(1).max(500) }).strict();
   app.post('/projects/:projectId/policy/rules/apply-batch', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams, body: BatchBody } }, async (req, reply) => {
     await runCommand<unknown>(db, req, reply, async ({ tx, actor, audit }) => {
       const p = await policyProject(tx, actor, req.params.projectId);

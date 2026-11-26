@@ -104,6 +104,8 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
     </label>
   );
 
+  // D-092: the review queue's "Check the quote" / "Link to a source quote" opens the first quote not found in the source.
+  const firstUnresolved = cites.findIndex((c) => c.resolution !== 'RESOLVED');
   return (
     <div className="grid gap-4 text-sm xl:grid-cols-2">
       <section aria-label="Source evidence" className="rounded border border-line p-3">
@@ -118,7 +120,7 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
               {locked ? (
                 <blockquote className="mt-1 border-l-2 border-line pl-2">{c.quote}</blockquote>
               ) : (
-                <textarea aria-label={`Quote ${i + 1}`} className="rounded-md border border-line bg-surface px-2 py-1 text-fg mt-1 w-full text-xs" value={c.quote} onChange={(e) => setCites(cites.map((x, j) => (j === i ? { ...x, quote: e.target.value } : x)))} />
+                <textarea aria-label={`Quote ${i + 1}`} data-focus={i === (firstUnresolved < 0 ? 0 : firstUnresolved) ? 'quote' : undefined} className="rounded-md border border-line bg-surface px-2 py-1 text-fg mt-1 w-full text-xs" value={c.quote} onChange={(e) => setCites(cites.map((x, j) => (j === i ? { ...x, quote: e.target.value } : x)))} />
               )}
               <p className={`text-xs ${c.resolution === 'RESOLVED' ? 'text-success' : 'text-warning'}`}>{RESOLUTION[c.resolution]}</p>
               {!locked && (
@@ -155,7 +157,7 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
         {d.history.length > 1 && <p className="text-xs text-fg-muted">History: {d.history.map((h) => `v${h.version} ${h.state.toLowerCase()}`).join(' · ')}</p>}
         {locked && <p className="mt-1 text-xs text-fg-muted">{d.state === 'REVIEWED' ? 'Reviewed content is fixed. Editing below creates a new draft version.' : `Excluded: ${d.excludeReason}`}</p>}
         <fieldset className="mt-2 grid gap-2" disabled={pending}>
-          {field('Title', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.title} onChange={(e) => set('title', e.target.value)} />)}
+          {field('Title', <input data-focus="definition" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.title} onChange={(e) => set('title', e.target.value)} />)}
           {field('Requirement', <textarea className="rounded-md border border-line bg-surface px-2 py-1 text-fg min-h-20" value={body.requirement} onChange={(e) => set('requirement', e.target.value)} />)}
           {body.annotation ? (
             <p className="text-xs text-fg-muted">Type follows the annotation’s classification (edit it in Annotation above).</p>
@@ -204,7 +206,7 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
               'One per line; an exemption on a task must cite one of these',
             )}
           <div className="grid grid-cols-2 gap-2">
-            {field('Effective from', <input type="date" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.from ?? ''} onChange={(e) => set('effective', { ...body.effective, from: e.target.value || null })} />)}
+            {field('Effective from', <input type="date" data-focus="effective" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.from ?? ''} onChange={(e) => set('effective', { ...body.effective, from: e.target.value || null })} />)}
             {field('Effective to', <input type="date" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.to ?? ''} onChange={(e) => set('effective', { ...body.effective, to: e.target.value || null })} />)}
           </div>
           {field('Or effective when', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.conditionText ?? ''} onChange={(e) => set('effective', { ...body.effective, conditionText: e.target.value || null })} />, 'e.g. always')}

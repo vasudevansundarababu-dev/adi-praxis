@@ -4,7 +4,7 @@ import type { Db, Tx } from '../db';
 import { sha256, stableStringify } from '../lib/crypto';
 import { AppError, conflict } from '../lib/errors';
 import type { AuditInput } from '../platform/audit';
-import { currentVersions, definitionProblems } from './rules';
+import { currentVersions, definitionProblems, inheritedEffectiveFrom } from './rules';
 
 type Current = Awaited<ReturnType<typeof currentVersions>>[number];
 
@@ -128,7 +128,7 @@ export async function previewRuleSet(tx: Db | Tx, clientId: string, projectId: s
   // Anvil cannot accept a rule without its required fields: an applied rule that is still incomplete blocks (owner, 14 Nov 2026).
   for (const i of items) {
     if (i.version.state !== 'REVIEWED') continue;
-    const gaps = definitionProblems(i.version.body);
+    const gaps = definitionProblems(i.version.body, { inheritedFrom: inheritedEffectiveFrom(i.version.citations) });
     if (gaps.length) blocking.push(`${i.rule.ruleKey} is applied but incomplete: ${gaps.join(' ')} Define it (with AI or by hand) and tick it again.`);
   }
   const content = setContent(items);

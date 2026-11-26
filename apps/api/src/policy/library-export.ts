@@ -1,10 +1,11 @@
-import { conditionProblems, derivedAsFact, ISO_JURISDICTION, PolicyRuleBody, type DerivedFactDef } from '@praxis/shared';
+import { conditionProblems, derivedAsFact, isIsoJurisdiction, ISO_JURISDICTION, jurisdictionProblem, PolicyRuleBody, type DerivedFactDef } from '@praxis/shared';
 import type { Db, Tx } from '../db';
 import { normaliseJurisdiction } from './enrich';
 import { projectFactCatalog } from './fact-catalog';
 import { sourceLocation } from './anvil-project-policy';
 import { sourcePassage } from './source-text';
 import { textSha256 } from './text-hash';
+import { inheritedEffectiveFrom } from './rules';
 
 /**
  * KYC Judgment v1 A4 (owner, 25 Nov 2026; contract C1 policy-library.v1 at Studio 1ba841d): the project's policy library
@@ -22,7 +23,11 @@ const day = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : 
 const LIBRARY_PARTS = ['kind', 'issuer', 'jurisdiction', 'subject', 'scope'] as const;
 
 /** A document's jurisdiction as an ISO code (C1), or null when it can't be placed. */
-export const isoJurisdiction = (j: string | null | undefined) => (j && ISO_JURISDICTION.test(j) ? j : normaliseJurisdiction(j));
+export const isoJurisdiction = (j: string | null | undefined) => {
+  const code = j && ISO_JURISDICTION.test(j) ? j : normaliseJurisdiction(j);
+  // D-090: the code must be real ISO 3166, not only shaped like it ("US-A" is refused).
+  return code && isIsoJurisdiction(code) ? code : null;
+};
 
 /** Reads a document version's text (from storage), for C1 `source_text`. */
 export type LoadText = (dv: { textStorageKey: string }) => Promise<{ text: string }>;
@@ -71,6 +76,7 @@ export async function buildPolicyLibrary(tx: Db | Tx, clientId: string, projectI
     const lib = latest.library ?? {};
     const missing = LIBRARY_PARTS.filter((k) => lib[k] === undefined);
     if (missing.length) problems.push(`${rule.ruleKey}: missing ${missing.join(', ')}.`);
+    if (lib.jurisdiction !== undefined && jurisdictionProblem(lib.jurisdiction)) problems.push(`${rule.ruleKey}: ${jurisdictionProblem(lib.jurisdiction)}`);
     const versions = [];
     for (const [i, v] of chain.entries()) {
       versionCount++;
@@ -87,7 +93,8 @@ export async function buildPolicyLibrary(tx: Db | Tx, clientId: string, projectI
         effective = { mode: 'scenario_only' };
         if (i === 0) problems.push(`${at}: the first version must be in force from a date, not scenario-only.`);
       } else {
-        const from = body.effective.from ?? day(src?.documentVersion.document.effectiveFrom);
+        // D-090: the rule's own date wins; otherwise its document's (the same inheritance as the review queue).
+        const from = body.effective.from ?? (day(src?.documentVersion.document.effectiveFrom) || inheritedEffectiveFrom(v.citations));
         if (!from) problems.push(`${at}: no date it is in force from (on the rule or its document).`);
         effective = { mode: 'from_date', from: from ?? '' };
       }

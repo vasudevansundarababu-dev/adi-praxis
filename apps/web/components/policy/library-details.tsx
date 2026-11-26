@@ -1,6 +1,6 @@
 'use client';
 
-import { ISO_JURISDICTION, LIBRARY_CHANGE_KINDS, LIBRARY_CHANNELS, LIBRARY_CUSTOMER_TYPES, LIBRARY_ISSUERS, LIBRARY_PROCESSES, LIBRARY_PRODUCT_LINES, LIBRARY_RULE_KINDS, LIBRARY_SUBJECTS, type PolicyRuleBody } from '@praxis/shared';
+import { ISO_JURISDICTION, jurisdictionProblem, LIBRARY_CHANGE_KINDS, LIBRARY_CHANNELS, LIBRARY_CUSTOMER_TYPES, LIBRARY_ISSUERS, LIBRARY_PROCESSES, LIBRARY_PRODUCT_LINES, LIBRARY_RULE_KINDS, LIBRARY_SUBJECTS, type PolicyRuleBody } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
@@ -65,6 +65,7 @@ export function libraryBody(body: PolicyRuleBody, f: LibraryForm): { body: Polic
     }
   } else condition = undefined;
   if (f.jurisdiction && !ISO_JURISDICTION.test(f.jurisdiction)) problems.push(`"${f.jurisdiction}" is not an ISO code: use US, or US-CA for California.`);
+  else if (f.jurisdiction && jurisdictionProblem(f.jurisdiction)) problems.push(`${jurisdictionProblem(f.jurisdiction)} Use US, or US-CA for California.`);
   if (f.changeKind && !f.changeSummary.trim()) problems.push('Say in a short summary how this version changes the one before it.');
   let defines: unknown;
   if (f.definesId.trim()) {
@@ -110,10 +111,12 @@ export function LibraryDetailsEditor({ projectId, ruleId, contentHash, body, app
     setMsg({ kind: 'ok', text: 'Saved.' });
     router.refresh();
   }
+  // D-092: the review queue opens this page at a field (?focus=library | change | condition | defines).
+  const focusOf: Partial<Record<string, string>> = { kind: 'library', changeKind: 'change' };
   const select = (id: string, name: string, k: 'kind' | 'issuer' | 'subject' | 'process' | 'effect' | 'effectiveMode' | 'changeKind', options: readonly string[], none = 'Not set') => (
     <label htmlFor={id} className="flex flex-col text-sm">
       <span className="font-medium">{name}</span>
-      <select id={id} className="input mt-1" value={f[k]} onChange={(e) => set(k, e.target.value)}>
+      <select id={id} className="input mt-1" value={f[k]} data-focus={focusOf[k]} onChange={(e) => set(k, e.target.value)}>
         <option value="">{none}</option>
         {options.map((o) => (
           <option key={o} value={o}>
@@ -164,7 +167,7 @@ export function LibraryDetailsEditor({ projectId, ruleId, contentHash, body, app
         {checks('Product lines', 'productLines', LIBRARY_PRODUCT_LINES)}
         {checks('Channels', 'channels', LIBRARY_CHANNELS)}
       </div>
-      <div className="mt-3">
+      <div className="mt-3" data-focus="condition">
         <label className="inline-flex items-center gap-2 text-sm">
           <input type="checkbox" checked={f.always} onChange={(e) => set('always', e.target.checked)} />
           Applies always within its process (no condition)
@@ -180,7 +183,7 @@ export function LibraryDetailsEditor({ projectId, ruleId, contentHash, body, app
         <summary className="cursor-pointer font-medium">This rule defines a fact (for example “US person”)</summary>
         <label htmlFor="lib-defines-id" className="mt-2 flex flex-col">
           <span>Fact name (lower case, e.g. us_person)</span>
-          <input id="lib-defines-id" className="input mt-1" value={f.definesId} onChange={(e) => set('definesId', e.target.value.trim())} />
+          <input id="lib-defines-id" data-focus="defines" className="input mt-1" value={f.definesId} onChange={(e) => set('definesId', e.target.value.trim())} />
         </label>
         <label htmlFor="lib-defines-def" className="mt-2 flex flex-col">
           <span>True when (JSON over catalog facts only, e.g. {'{"fact":"citizenship","op":"in","value":["US"]}'})</span>

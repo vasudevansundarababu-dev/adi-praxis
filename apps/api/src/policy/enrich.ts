@@ -153,6 +153,38 @@ export interface EnrichRequest {
 type EnrichResult = { status: 'done' | 'skipped' | 'failed'; prefilled: number; offered: number; skippedApproved: number; stale: number };
 const CHUNK = 25;
 
+/** The drafts a run covers (all, or those citing one document), as sent to the model. Shared by the run and its estimate. */
+export async function enrichmentInputs(db: Db, clientId: string, projectId: string, documentId?: string) {
+  const current = (await currentVersions(db, clientId, projectId)).filter((r) => !documentId || r.version.citations.some((c) => c.documentVersion.documentId === documentId));
+  const skippedApproved = current.filter((r) => r.version.state === 'REVIEWED').length;
+  const items = current.filter((r) => r.version.state === 'DRAFT' || r.version.state === 'NEEDS_DEFINITION');
+  const catalog = await conditionCatalog(db, projectId);
+  const rules: EnrichRule[] = items.map((r) => {
+    const b = PolicyRuleBody.parse(r.version.body);
+    const quotes = [...r.version.citations].sort((x, y) => (x.fieldPath === 'requirement' ? -1 : y.fieldPath === 'requirement' ? 1 : 0)).map((c) => c.quote);
+    return { ruleKey: r.rule.ruleKey, title: b.title, requirement: b.requirement, quotes, conditionText: b.applicability.conditionText, jurisdictions: b.applicability.jurisdictions };
+  });
+  return { skippedApproved, items, catalog, rules };
+}
+
+/** Output tokens allowed per rule in the estimate (library parts, jurisdictions, a condition and a question). */
+const OUTPUT_TOKENS_PER_RULE = 300;
+
+/**
+ * D-092: what a run would send, before it runs: one model call per CHUNK rules, each carrying the instructions, the fact
+ * list and that chunk's rules. Tokens are counted as characters / 4 (rounded up); the estimate never calls the model.
+ */
+export function enrichmentCalls(input: { catalog: FactCatalog | null; rules: EnrichRule[] }) {
+  const facts = JSON.stringify(input.catalog?.facts.map((f) => ({ id: f.id, type: f.type, allowed_values: f.allowed_values, cardinality: f.cardinality, description: f.description })) ?? []);
+  const calls = [];
+  for (let i = 0; i < input.rules.length; i += CHUNK) {
+    const chunk = input.rules.slice(i, i + CHUNK);
+    const chars = SYSTEM.length + facts.length + JSON.stringify(chunk).length + 32;
+    calls.push({ rules: chunk.length, inputTokens: Math.ceil(chars / 4), outputTokens: chunk.length * OUTPUT_TOKENS_PER_RULE });
+  }
+  return calls;
+}
+
 /** A draft no person has edited: extraction's own, or this pass's. */
 const untouched = (editedById: string) => editedById.startsWith('extraction:') || editedById.startsWith('enrichment:');
 
@@ -167,15 +199,7 @@ export async function enrichProject(db: Db, deps: { storage: ObjectStorage; enri
     return none('skipped');
   }
 
-  const current = (await currentVersions(db, req.clientId, req.projectId)).filter((r) => !req.documentId || r.version.citations.some((c) => c.documentVersion.documentId === req.documentId));
-  const skippedApproved = current.filter((r) => r.version.state === 'REVIEWED').length;
-  const items = current.filter((r) => r.version.state === 'DRAFT' || r.version.state === 'NEEDS_DEFINITION');
-  const catalog = await conditionCatalog(db, req.projectId);
-  const rules: EnrichRule[] = items.map((r) => {
-    const b = PolicyRuleBody.parse(r.version.body);
-    const quotes = [...r.version.citations].sort((x, y) => (x.fieldPath === 'requirement' ? -1 : y.fieldPath === 'requirement' ? 1 : 0)).map((c) => c.quote);
-    return { ruleKey: r.rule.ruleKey, title: b.title, requirement: b.requirement, quotes, conditionText: b.applicability.conditionText, jurisdictions: b.applicability.jurisdictions };
-  });
+  const { skippedApproved, items, catalog, rules } = await enrichmentInputs(db, req.clientId, req.projectId, req.documentId);
   let raw: unknown[] = [];
   try {
     for (let i = 0; i < rules.length; i += CHUNK) raw.push(...(await deps.enricher.enrich({ catalog, rules: rules.slice(i, i + CHUNK) })));

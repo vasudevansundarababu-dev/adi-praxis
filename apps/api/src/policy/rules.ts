@@ -152,8 +152,25 @@ export async function editRule(
   return version;
 }
 
-/** Gaps in the rule's definition (the fields an evaluator needs). Empty = fully defined. */
-export function definitionProblems(body: unknown): string[] {
+/** Citations as loaded with their document (for the document's in-force date). */
+type DatedCitation = { fieldPath: string; resolution: string; documentVersion?: { document?: { effectiveFrom: Date | null } | null } | null };
+
+/**
+ * The in-force date a rule without its own date takes from its document (D-090, owner 26 Nov 2026): the document of
+ * its resolved requirement quote, else of any quoted document. The rule's own date always wins over this.
+ */
+export function inheritedEffectiveFrom(citations: readonly DatedCitation[]): string | null {
+  const dateOf = (c: DatedCitation | undefined) => c?.documentVersion?.document?.effectiveFrom ?? null;
+  const pick = citations.find((c) => c.fieldPath.startsWith('requirement') && c.resolution === 'RESOLVED' && dateOf(c)) ?? citations.find((c) => dateOf(c));
+  const d = dateOf(pick);
+  return d ? d.toISOString().slice(0, 10) : null;
+}
+
+/**
+ * Gaps in the rule's definition (the fields an evaluator needs). Empty = fully defined. A rule without its own effective
+ * scope is in force from its document's date when the caller passes that date (`inheritedFrom`, D-090).
+ */
+export function definitionProblems(body: unknown, opts: { inheritedFrom?: string | null } = {}): string[] {
   const b = PolicyRuleBody.parse(body);
   const p: string[] = [];
   const a = b.applicability;
@@ -161,7 +178,7 @@ export function definitionProblems(body: unknown): string[] {
   // An unresolved rule openly marked "needs clarification" may be applied and published, flagged (owner, A5).
   if (b.requirementType === 'unknown' && !isOpenClarification(b.annotation)) p.push('Choose whether this is an obligation, prohibition, permission or definition.');
   if (!a.universal && a.actors.length + a.actions.length + a.channels.length + a.entities.length + a.locales.length + a.jurisdictions.length === 0 && !a.conditionText) p.push('Define where the rule applies, or mark it as applying everywhere.');
-  if (!b.effective.from && !b.effective.to && !b.effective.conditionText) p.push('Set the effective scope (a date, or "always" in the condition).');
+  if (!b.effective.from && !b.effective.to && !b.effective.conditionText && !opts.inheritedFrom) p.push('Set the effective scope (a date, or "always" in the condition).');
   return p;
 }
 
@@ -177,8 +194,8 @@ export function evidenceProblems(v: { body: unknown; citations: Array<{ fieldPat
 }
 
 /** Reasons a version cannot be marked Reviewed through Mark Reviewed (S1 R10, PRD PR-R02/R04). Empty = reviewable. */
-export function reviewProblems(v: { body: unknown; citations: Array<{ fieldPath: string; resolution: string }> }): string[] {
-  return [...definitionProblems(v.body), ...evidenceProblems(v)];
+export function reviewProblems(v: { body: unknown; citations: DatedCitation[] }): string[] {
+  return [...definitionProblems(v.body, { inheritedFrom: inheritedEffectiveFrom(v.citations) }), ...evidenceProblems(v)];
 }
 
 /**
@@ -252,7 +269,7 @@ export async function setApplied(
     return { version: out, changed: true, warnings: [] };
   }
 
-  const definition = definitionProblems(v.body);
+  const definition = definitionProblems(v.body, { inheritedFrom: inheritedEffectiveFrom(v.citations) });
   if (!PolicyRuleBody.parse(v.body).requirement.trim()) throw new AppError(422, 'NOT_DEFINED', 'Add the requirement before applying this rule.');
   const evidence = evidenceProblems(v);
   if (evidence.length && !input.acceptUnverifiedEvidence) throw new AppError(422, 'EVIDENCE_UNVERIFIED', `The source evidence is not verified: ${evidence.join(' ')} Check the source, then confirm to apply anyway.`);

@@ -4,7 +4,7 @@
  * Each paragraph starts with its heading (before the first full stop), which the offline bot matches on; paragraphs are
  * separated by blank lines. Keep it in step with the page when it changes.
  */
-export const POLICY_PAGE_HELP = `POLICY PAGE (PM, Admin). For a policy-library project (for example KYC Judgment), the project's Policy page builds the policy library the benchmark uses. The Policies tab on the project page opens it. It opens with a setup checklist of five steps: Documents, Facts, AI suggestions, Review and Export. The step to do next is highlighted. Each step's button takes you to the part of the page where you do it.
+export const POLICY_PAGE_HELP = `POLICY PAGE (PM, Admin). For a policy-library project (for example KYC Judgment), the project's Policy page (headed "Policy rules") builds the policy library the benchmark uses. For these projects the Policies tab on the project page opens it; other projects keep their rules on the Policies tab itself. It opens with a setup checklist of five steps: Documents, Facts, AI suggestions, Review and Export. The step to do next is highlighted. Each step's button takes you to the part of the page where you do it.
 
 POLICY CHECKLIST STEP 1, DOCUMENTS. Upload each policy document (official texts such as a federal or state rule, and the bank's own policies) and set its details: kind (official text or bank policy), ISO jurisdiction (US, or a state such as US-CA), and for an official text where and when it was downloaded. Also set the date it is in force from. A document is "Ready" when all of these are set. Rules are extracted from the documents as drafts.
 
@@ -48,7 +48,7 @@ NEXT ACTION "CHECK STUDIO'S COVERAGE ANSWER". Studio checked whether the environ
 
 READY TO CONFIRM, AND "CONFIRM ALL READY". A rule with nothing left to do reads "Ready to confirm". "Confirm all ready" approves every ready rule within the current filter in one step. Your confirm is the approval. If any of those rules changed or gained a flag since the page loaded, nothing is confirmed and the page says why; reload and try again.
 
-POLICY CHECKLIST STEP 5, EXPORT. "Export policy library" builds the policy library the benchmark serves: every approved rule with its versions, conditions, library details and derived facts, as one file with a revision number. If anything is missing, the export lists what to fix and nothing is exported. Each export is kept; download its exact file from the list.
+POLICY CHECKLIST STEP 5, EXPORT. "Export policy library (C1)" builds the policy library the benchmark serves: every approved rule with its versions, conditions, library details and derived facts, as one file with a revision number. If anything is missing, the export lists what to fix and nothing is exported. Each export is kept; download its exact file from the list.
 
 WHY AI SUGGESTIONS ARE NOT APPROVAL. The AI can be wrong about what a rule says or when it applies. So it only drafts: it fills in suggestions for drafts nobody edited, and offers them for drafts a person has edited. A person checks each rule against its source quote and confirms it in the review queue. Only that confirm approves a rule, and only approved rules are exported.`;
 

@@ -7,7 +7,7 @@ import { HELP_VERSION, STAFF_HELP } from '../src/support/help-pack';
 describe('Policy page help', () => {
   it('is part of the staff help pack the bot reads', () => {
     expect(STAFF_HELP).toContain(POLICY_PAGE_HELP);
-    expect(HELP_VERSION).toMatch(/^help\/2\.3/);
+    expect(HELP_VERSION).toMatch(/^help\/3/);
   });
 
   it('covers every checklist step, the terms, the library details, every next action, Confirm all ready, export and AI', () => {

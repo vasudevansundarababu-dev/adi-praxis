@@ -78,6 +78,28 @@ Approvers (PMs), and it was too basic. Now:
   `llm.call` line (`feature: support-bot`) and fails closed on a bad answer.
 - **Offline bot** (local, demo, tests) ranks help paragraphs by tf-idf and returns the best three.
 
+## 5. Help text audit and plain English (help/3.0, 27 Nov 2026)
+
+Owner, 26 Nov 2026: "recheck every page help text in all of the application and fix this. I want to make it easy for
+them", and "use as much as simple english and business english especially in Authoring and Candidate". Every console
+and SME app page was rechecked against the code; the help now follows one pattern: what it is, why it matters, what you
+do next, and a KYC example.
+
+- **SMEs get their own help** (`apps/api/src/support/sme-help.ts`): `SME_GUIDE` (home, task statuses, sections,
+  saving, typing your own words, invented data, AI helpers, workflow, procedure, rubric, submit, rules, proposals,
+  reviewing, rework, run reviews, edge-case outcomes, bell, payments), `SME_BENCHMARK_HELP` (also exported as
+  `BENCHMARK_HELP`: the family and variant picker, archetype and complexity, raise a need) and `CANDIDATE_GUIDE`
+  (sign-in, applying, identity, profile, status, onboarding, certification). No system words (API, JSON, id, schema,
+  grader, worker, queue); the staff `AUTHORING_GUIDE` is no longer in the SME help.
+- **Staff get a current-flow guide** (`apps/api/src/support/staff-help.ts`, `STAFF_CONSOLE_GUIDE`): menu, roles,
+  home, bell, projects, new project, the five project tabs, assigning, validate and export, the task page decision,
+  correct and send back, the Benchmark tab, the Policies tab, rule search, templates (read-only, from Studio), users,
+  candidate app sign-in, approved exports. Earlier-flow and hidden areas stay, labelled as such, in `STAFF_HELP`.
+- **The bot answers in simple business English** (`SUPPORT_SYSTEM`); for SMEs it never uses system words or codes.
+- **Tests:** `apps/api/test/help-text-plain.test.ts` asks the offline bot two real questions per page, per audience,
+  and checks plain words and that internal names never appear. `apps/api/scripts/help-live-check.ts` asks the live bot
+  (it spends money: run only with the owner's yes).
+
 ## Gaps found while marking required fields (not changed; for the owner to prioritise)
 
 - Several minimum lengths and formats are checked only by the API or by disabling a button, not on the field itself:

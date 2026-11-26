@@ -5,7 +5,10 @@ import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { MemoryStorage } from '../src/candidate/storage';
 import { buildRlGymExport } from '../src/anvil/rlgym-export';
-import { cancelTestProject, createTestProject, createTestTask, importTemplate, retireDraft, TEST_PROJECT_NAME } from '../src/jobs/kyc-judgment-test-project';
+import { cancelTestProject, createTestProject, createTestTask, importTemplate, retireDraft, syntheticSections, TEST_PROJECT_NAME } from '../src/jobs/kyc-judgment-test-project';
+import { snapshotProblems } from '../src/tasks/task-integrity';
+import type { Template } from '@prisma/client';
+import type { TemplateProfile } from '@praxis/shared';
 import { stubSelectionGate } from '../src/staffing/selection-gate';
 import { db, idem, login, resetDb, testConfig } from './helpers';
 
@@ -150,6 +153,27 @@ describe('KYC Judgment v1 integration test project (test-only)', () => {
     expect(tools.indexOf('document.check')).toBeLessThan(tools.indexOf('identity.check'));
     expect(tools.at(-1)).toBe('recommend');
     for (const s of steps) expect(s.action).not.toMatch(/individual|adult joint|teen|custodial|CUTMA/i);
+    // On this form S4 is a list of documents, so the task names the federal file: Validate warns (Haiku pilot, 25 Nov).
+    expect(snapshotProblems(t2, task.output).map((p) => p.code)).toContain('POLICY_DOCUMENT_NAMED');
+  });
+
+  it('Haiku pilot (25 Nov): when the form’s S4 policy library is text, the task describes the library (read with policy.read by rule id) and names no document', () => {
+    const profile = structuredClone(PROPOSAL.authoring.profile) as TemplateProfile & { sections: { key: string; fields: Record<string, unknown>[] }[] };
+    const s4 = profile.sections.find((s) => s.key === 'S4')!;
+    s4.fields = s4.fields.map((x) => (x.key === 'policyLibrary' ? { key: 'policyLibrary', type: 'long_text', label: 'Policy library in force', required: true, visibility: 'author_and_agent', help: 'Describe the bank’s policy library.' } : x));
+    const template = { id: '00000000-0000-4000-8000-0000000000aa', version: 1, workflowName: 'KYC Judgment v1', profileId: profile.profileId, anvilSpec: { ...PROPOSAL, authoring: { ...PROPOSAL.authoring, profile } }, caseSelector: null } as unknown as Template;
+    const doc = { documentId: 'de1b78fa-6c1e-4f8e-9d1a-0123456789ab', version: 1, title: '00-US-federal-KYC-policy.md' };
+    const lib = syntheticSections(profile, template, doc).S4!.policyLibrary;
+    expect(typeof lib).toBe('string');
+    expect(lib).toMatch(/policy\.read/);
+    expect(lib).toMatch(/rule id/);
+    expect(lib).toMatch(/federal/);
+    expect(lib).not.toContain(doc.title);
+    expect(lib).not.toContain(doc.documentId.slice(0, 8));
+    expect(lib).not.toMatch(/\.(md|pdf|docx?|txt)\b/i);
+    // The old form (a list of documents) is written as before.
+    const old = syntheticSections(PROPOSAL.authoring.profile as TemplateProfile, { ...template, anvilSpec: PROPOSAL } as unknown as Template, doc).S4!.policyLibrary;
+    expect(old).toEqual([{ documentId: doc.documentId, documentVersion: 1, title: doc.title }]);
   });
 
   it('import → Admin publishes → test project (testOnly, federal document only) → one synthetic task submitted → the owner approves → export says test_only and the covered types', async () => {

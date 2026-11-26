@@ -193,6 +193,12 @@ export async function createTestProject(db: Db, deps: { storage: ObjectStorage }
 }
 
 // ───────────────────────── Phase 3: the one synthetic task ─────────────────────────
+/**
+ * S4 as the agent should read it (Haiku pilot, 25 Nov 2026): the bank's policy library, read with policy.read by rule
+ * id, never a document file or id (the environment serves rules, not documents). An older form whose S4 is a list of
+ * documents still gets the document it asks for; Validate then warns (POLICY_DOCUMENT_NAMED).
+ */
+export const LIBRARY_DESCRIPTION = 'The bank’s policy library in force for account opening: the federal rules, the state rules and the bank’s own rules. Read each rule with policy.read by its rule id; which rules apply comes from the case’s facts.';
 /** Synthetic, generic wording for one task covering every application type (no type named; §16). */
 export function syntheticSections(profile: TemplateProfile, template: Template, doc: { documentId: string; version: number; title: string }): Record<string, Record<string, unknown>> {
   const f = (s: string, k: string) => profile.sections.find((x) => x.key === s)?.fields.find((x) => x.key === k) as TemplateProfileField | undefined;
@@ -232,7 +238,7 @@ export function syntheticSections(profile: TemplateProfile, template: Template, 
     },
     S2: { inputContract: 'The assigned application and its parties, documents and check results, read through the declared tools. No case facts are given in this task.' },
     S3: { environment: opts('S3', 'environment')[0], tools, failureBehaviour: 'If a tool fails or a check is pending, record the gap against the party it concerns and carry it into the recommendation as outstanding.' },
-    S4: { policyLibrary: [{ documentId: doc.documentId, documentVersion: doc.version, title: doc.title }], expectedRules: [], notes: 'Synthetic integration test: the expected rules come from the library conditions and the references.' },
+    S4: { policyLibrary: f('S4', 'policyLibrary')?.type === 'repeated_array' ? [{ documentId: doc.documentId, documentVersion: doc.version, title: doc.title }] : LIBRARY_DESCRIPTION, expectedRules: [], notes: 'Synthetic integration test: the expected rules come from the library conditions and the references.' },
     S5: {
       // The SOP, as duties (A6: never "if X → refer"): what to read, check and record, in order. What a finding
       // requires comes from the published rules. Only the tools the form offers are used.

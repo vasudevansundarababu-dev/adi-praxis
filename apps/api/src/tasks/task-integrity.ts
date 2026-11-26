@@ -234,6 +234,48 @@ function scoring(sections: Record<string, unknown>, form: Form | null): TaskProb
 }
 
 /** The checks that need only the snapshot (no database). */
+const DOC_FILE = /[\w.-]+\.(?:md|markdown|pdf|docx?|txt|html?|rtf|odt)\b/i;
+const DOC_UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
+const DOC_ID_TEXT = /\bdocument\s+(?:id\s+)?[0-9a-f]{8}\b/i;
+
+/** What in an S4 value names a policy document (a file name, a document id), or null. */
+function namedDocument(v: unknown): string | null {
+  if (isObj(v) && str(v.documentId)) return `document ${str(v.documentId).slice(0, 8)}`;
+  for (const { text } of strings(v, '')) {
+    const m = DOC_FILE.exec(text) ?? DOC_UUID.exec(text) ?? DOC_ID_TEXT.exec(text);
+    if (m) return `"${m[0]}"`;
+  }
+  return null;
+}
+
+/**
+ * KYC Judgment v1 (Haiku pilot, 25 Nov 2026): the agent reads the bank's policy library by rule id with policy.read; it
+ * cannot open a policy document by its file name or id. S4 text the agent sees that names one sends it looking for a
+ * document that is not there. A warning on Validate, never a block: the author describes the library instead.
+ */
+function policyDocumentsNamed(sections: Record<string, unknown>, view: unknown): TaskProblem[] {
+  const s3 = isObj(sections.S3) ? sections.S3 : {};
+  const tools = Array.isArray(s3.tools) ? (s3.tools as unknown[]).map((t) => (isObj(t) ? str(t.id) : str(t))) : [];
+  if (!tools.includes('policy.read')) return [];
+  const seen = isObj(view) && isObj((view as { sections?: unknown }).sections) ? (view as { sections: Record<string, unknown> }).sections.S4 : sections.S4;
+  if (!isObj(seen)) return [];
+  const out: TaskProblem[] = [];
+  const flag = (field: string, what: string) =>
+    out.push({ code: 'POLICY_DOCUMENT_NAMED', section: 'S4', field, severity: 'warning', owner: 'author', retryHelps: false, message: `S4 names a policy document (${what}). The agent reads the bank’s policy library with policy.read by rule id; it cannot open a document by its file name or id. Describe the library instead (for example: the federal, state and bank rules for account opening, read with policy.read by rule id).` });
+  for (const [k, v] of Object.entries(seen)) {
+    if (Array.isArray(v))
+      v.forEach((item, i) => {
+        const what = namedDocument(item);
+        if (what) flag(`S4.${k}[${i}]`, what);
+      });
+    else {
+      const what = namedDocument(v);
+      if (what) flag(`S4.${k}`, what);
+    }
+  }
+  return out;
+}
+
 export function snapshotProblems(template: Template, output: unknown, benchmark: unknown = null): TaskProblem[] {
   const authored = authoredContent(output) as Record<string, unknown>;
   const sections = isObj(authored?.sections) ? (authored.sections as Record<string, unknown>) : {};
@@ -243,7 +285,7 @@ export function snapshotProblems(template: Template, output: unknown, benchmark:
   const spec = jointTemplateSpec(template);
   const ids = spec ? declaredToolIds(spec.execution) : null;
   const view = agentView(template, output, form, joint);
-  return [...stepTools(sections, ids ? new Set(ids) : null), ...outcomeBranches(sections), ...typeWording(template, view), ...scoring(sections, form), ...privateLeaks(sections, form, view, extra)];
+  return [...stepTools(sections, ids ? new Set(ids) : null), ...outcomeBranches(sections), ...policyDocumentsNamed(sections, view), ...typeWording(template, view), ...scoring(sections, form), ...privateLeaks(sections, form, view, extra)];
 }
 
 /**

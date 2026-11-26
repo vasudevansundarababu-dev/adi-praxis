@@ -62,6 +62,26 @@ describe('task checks on a frozen snapshot', () => {
     expect(splitByOwner([w!])).toEqual({ author: [], others: [] });
   });
 
+  it('KYC Judgment v1 (Haiku pilot, 25 Nov): S4 naming a policy document by file or id is a warning when the agent reads rules with policy.read', () => {
+    const offered = { S3: { tools: ['application.read', 'policy.read', 'recommend'] } };
+    const doc = { documentId: 'de1b78fa-6c1e-4f8e-9d1a-0123456789ab', documentVersion: 1, title: '00-US-federal-KYC-policy.md' };
+    const [w, ...rest] = snapshotProblems(template, task({ ...offered, S4: { policyLibrary: [doc] } }));
+    expect(rest).toEqual([]);
+    expect(w).toMatchObject({ code: 'POLICY_DOCUMENT_NAMED', section: 'S4', field: 'S4.policyLibrary[0]', severity: 'warning', owner: 'author', retryHelps: false });
+    expect(w!.message).toContain('policy.read');
+    expect(w!.message).toContain('rule id');
+    // A file name in free text, or a document id alone, counts too; one warning per field.
+    expect(codes({ ...offered, S4: { policyLibrary: 'Work from 00-US-federal-KYC-policy.md and CA-rules.pdf.' } })).toEqual([['POLICY_DOCUMENT_NAMED', 'S4.policyLibrary', 'author']]);
+    expect(codes({ ...offered, S4: { policyLibrary: [{ documentId: 'de1b78fa', title: 'US Federal KYC Policy' }] } })).toEqual([['POLICY_DOCUMENT_NAMED', 'S4.policyLibrary[0]', 'author']]);
+    // A description of the library is what S4 should say: no warning.
+    expect(codes({ ...offered, S4: { policyLibrary: 'The bank’s policy library for account opening: the federal, state and bank rules. Read each rule with policy.read by its rule id.' } })).toEqual([]);
+    // Rule ids are not documents.
+    expect(codes({ ...offered, S4: { policyLibrary: 'Rules such as R-CIP-ADDRESS v3 apply.' } })).toEqual([]);
+    // A template whose agent has no policy.read: not this problem.
+    expect(codes({ S4: { policyLibrary: [doc] } })).toEqual([]);
+    expect(splitByOwner([w!])).toEqual({ author: [], others: [] });
+  });
+
   it('each problem says its section, field, code, who fixes it and that retrying does not help; author problems become D18 checks', () => {
     const [p] = snapshotProblems(template, task({ S3: { tools: ['application.read'] } }));
     expect(p).toMatchObject({ code: 'STEP_TOOL_NOT_OFFERED', section: 'S5', field: 'S5.steps[1].tool', severity: 'blocking', owner: 'author', retryHelps: false });

@@ -3,9 +3,10 @@
  * plain language. Source: docs/SPEC.md, docs/FLOW2-SME.md, docs/TASK-KYC.md, docs/SME-SUPPLY.md and docs/DECISIONS.md.
  * Keep it in step with those documents when behaviour changes. Paragraphs are separated by blank lines.
  */
+import { POLICY_PAGE_HELP } from '@praxis/shared';
 import { AUTHORING_GUIDE } from './authoring-help';
 
-export const HELP_VERSION = 'help/2.2 (23 Nov 2026: Benchmark panel, procedure tool guide and follow-ups, AI unavailable) · help/2.1 (12 Nov 2026: authoring v2.1, review routes, policy proposals, template guides, generated job descriptions, KYC template v2, golden task packs)';
+export const HELP_VERSION = 'help/2.3 (26 Nov 2026: the Policy page, its checklist, facts and conditions, next actions, export) · help/2.2 (23 Nov 2026: Benchmark panel, procedure tool guide and follow-ups, AI unavailable) · help/2.1 (12 Nov 2026: authoring v2.1, review routes, policy proposals, template guides, generated job descriptions, KYC template v2, golden task packs)';
 
 const COMMON = `ADI Forge is where subject-matter experts (SMEs) write and review realistic, fully synthetic work tasks from domain workflow templates (for example Banking / KYC onboarding). Approved tasks go into an append-only Approved Task Dataset that the separate RL Gym platform uses. People make every decision — selection, task acceptance, certification, payment approval. AI only drafts, checks and recommends.
 
@@ -49,7 +50,9 @@ PAYMENTS (Finance, PM, Admin). Rate cards are versioned (USD or INR, a price per
 
 ADMIN. Users: invite staff, set roles, disable access. Taxonomy: domains and skills. Terms: publish contributor, confidentiality/IP and data-use terms (placeholder terms block onboarding in production). Failure codes: reason codes for RL reviews. API clients: machine access keys (for example RL Gym).
 
-${AUTHORING_GUIDE}`;
+${AUTHORING_GUIDE}
+
+${POLICY_PAGE_HELP}`;
 
 export const PARTNER_HELP = `${COMMON}
 

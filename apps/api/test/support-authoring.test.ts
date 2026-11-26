@@ -15,6 +15,7 @@ import { TEMPLATE_PROFILES } from '@praxis/shared';
 import { AUTHORING_GUIDE, templateGuide, templatesFor } from '../src/support/authoring-help';
 import { GeminiSupportAssistant, MockSupportAssistant, rankParagraphs, SUPPORT_SYSTEM, supportModel, SupportUnavailableError, type SupportContext } from '../src/support/assistant';
 import { SME_HELP, STAFF_HELP } from '../src/support/help-pack';
+import { SME_GUIDE } from '../src/support/sme-help';
 import { createUser, db, idem, login, resetDb, testConfig } from './helpers';
 
 /**
@@ -119,8 +120,9 @@ describe('help bot: authoring v2.1 knowledge for authors, reviewers and approver
     ])
       expect(AUTHORING_GUIDE, phrase).toContain(phrase);
     expect(STAFF_HELP).toContain(AUTHORING_GUIDE);
-    expect(SME_HELP).toContain(AUTHORING_GUIDE);
-    expect(SME_HELP).toContain('You earn once per accepted task');
+    expect(SME_HELP).toContain(SME_GUIDE);
+    expect(SME_HELP).not.toContain(AUTHORING_GUIDE);
+    expect(SME_HELP).toContain('You are paid once per accepted task');
   });
 
   it('every template has a generated guide with its fields, graded outputs, workflow and owner decisions', () => {
@@ -155,7 +157,7 @@ describe('help bot: authoring v2.1 knowledge for authors, reviewers and approver
     expect(SUPPORT_SYSTEM('SME')).toContain('Never write task content for the author');
     expect(SUPPORT_SYSTEM('STAFF')).not.toContain('Never write task content for the author');
     const top = (help: string, q: string) => rankParagraphs(help, q, 3).map((p) => p.split(/[.(]/)[0]!.trim());
-    expect(top(SME_HELP, 'Why did my task come back after the Expert changed the rubric?')).toContain('EXPERT EDITS AND "MATERIAL" CHANGES');
+    expect(top(SME_HELP, 'Why did my task come back after the Expert changed the rubric?')).toContain('WHEN A REVIEWER CHANGES YOUR TASK');
     expect(top(STAFF_HELP, 'Can the PM reject a task?')).toContain('REVIEW ROUTES');
     expect(top(SME_HELP, 'How do I propose a policy document?')[0]).toBe('PROPOSING A POLICY DOCUMENT');
   });
@@ -171,7 +173,7 @@ describe('help bot: authoring v2.1 knowledge for authors, reviewers and approver
     const ctx: SupportContext = { audience: 'SME', roles: ['SME'], screen: { path: '/tasks/x', title: 'Task', headings: [], fields: [], messages: [] }, record: null, help: SME_HELP, templates: ['TEMPLATE GUIDE: Customer risk rating'] };
     expect((await g.answer(ctx, [], 'Why?')).answer).toBe('Rubric changes are always material.');
     expect(prompts[0]!.system).toContain('Never write task content for the author');
-    expect(prompts[0]!.system).toContain('EXPERT EDITS AND');
+    expect(prompts[0]!.system).toContain('WHEN A REVIEWER CHANGES YOUR TASK');
     expect(prompts[0]!.user).toContain('<template>');
     reply = 'not json';
     await expect(g.answer(ctx, [], 'Why?')).rejects.toBeInstanceOf(SupportUnavailableError);
@@ -183,7 +185,7 @@ describe('help bot: authoring v2.1 knowledge for authors, reviewers and approver
     const res = await ask(p.a.cookie, '/me/support/ask', 'What happens when the Expert changes my rubric?', `/tasks/${p.taskA}`);
     expect(res.statusCode, res.body).toBe(200);
     expect(res.json()).toMatchObject({ usedRecord: 'your task', usedTemplates: ['KYC onboarding and refresh'] });
-    expect(res.json().helpVersion).toMatch(/^help\/2/);
+    expect(res.json().helpVersion).toMatch(/^help\/3/);
     expect(res.json().answer).toContain('always material');
     expect(bot.calls[0]!.ctx).toMatchObject({ audience: 'SME', roles: ['SME'] });
     expect(bot.calls[0]!.ctx.templates![0]).toContain('TEMPLATE GUIDE: KYC onboarding and refresh');

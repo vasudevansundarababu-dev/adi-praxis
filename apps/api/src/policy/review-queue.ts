@@ -218,6 +218,8 @@ export async function reviewQueue(tx: Db | Tx, clientId: string, projectId: stri
       requirement: body.requirement,
       condition: body.condition ?? null,
       conditionSet: body.condition !== undefined,
+      /** The facts the condition names (the queue's fact filter, from the Policy page's fact list). */
+      facts: body.condition ? conditionFacts(body.condition) : [],
       conditionText: body.condition === undefined ? 'Not set yet.' : conditionLabel(body.condition, ctx.catalog),
       library: body.library ?? null,
       documents: docs,

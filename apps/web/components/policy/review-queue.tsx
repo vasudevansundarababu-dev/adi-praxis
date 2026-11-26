@@ -32,6 +32,7 @@ export interface QueueRow {
   coverage: { status: string; environmentVersionId: string } | null;
   flags: { code: string; message: string }[];
   nextAction?: QueueNextAction;
+  facts?: string[];
 }
 export interface QueueData {
   items: QueueRow[];
@@ -50,7 +51,7 @@ export const confirmable = (rows: QueueRow[]) => rows.filter((r) => r.flags.leng
 const READY: QueueNextAction = { code: 'ready', label: 'Ready to confirm', focus: null };
 /** Rows as the table needs them (older API answers lack the D-092 fields). */
 export const tableRows = (items: QueueRow[]) =>
-  items.map((r) => ({ ...r, state: r.state ?? 'DRAFT', jurisdiction: r.jurisdiction !== undefined ? r.jurisdiction : (r.library?.jurisdiction ?? null), documents: r.documents ?? [...new Map(r.quotes.map((q) => [q.document, { id: q.document, title: q.document }])).values()], nextAction: r.nextAction ?? (r.flags.length ? { code: r.flags[0]!.code, label: 'Review on its page', focus: null } : READY) }));
+  items.map((r) => ({ ...r, state: r.state ?? 'DRAFT', jurisdiction: r.jurisdiction !== undefined ? r.jurisdiction : (r.library?.jurisdiction ?? null), documents: r.documents ?? [...new Map(r.quotes.map((q) => [q.document, { id: q.document, title: q.document }])).values()], nextAction: r.nextAction ?? (r.flags.length ? { code: r.flags[0]!.code, label: 'Review on its page', focus: null } : READY), facts: r.facts ?? [] }));
 
 interface Estimate {
   rules: number;
@@ -144,9 +145,9 @@ export function AiSuggestions({ projectId, documentId, documentTitle, initialRun
   );
 }
 
-export function ReviewQueuePanel({ projectId, initial, enrichment = null }: { projectId: string; initial: QueueData | null; enrichment?: EnrichmentRun | null }) {
+export function ReviewQueuePanel({ projectId, initial, enrichment = null, initialFact = '' }: { projectId: string; initial: QueueData | null; enrichment?: EnrichmentRun | null; initialFact?: string }) {
   const router = useRouter();
-  const [filters, setFilters] = useState<QueueFilters>(NO_FILTERS);
+  const [filters, setFilters] = useState<QueueFilters>({ ...NO_FILTERS, fact: initialFact });
   const [busy, setBusy] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -240,6 +241,14 @@ export function ReviewQueuePanel({ projectId, initial, enrichment = null }: { pr
         <button type="button" className="btn btn-secondary" disabled={!!busy || !data.studioConnected} onClick={() => void run('coverage', `/projects/${projectId}/policy/review-queue/coverage`, {}, (d) => `Studio checked ${String(d.checked ?? 0)} conditions.`)}>
           {busy === 'coverage' ? 'Checking…' : 'Check coverage with Studio'}
         </button>
+        {filters.fact && (
+          <span className="rounded border border-line px-2 py-0.5 text-sm" data-fact-filter={filters.fact}>
+            Fact: <span className="font-mono">{filters.fact}</span>{' '}
+            <button type="button" className="text-link hover:underline" aria-label={`Remove the fact filter ${filters.fact}`} onClick={() => set('fact', '')}>
+              ×
+            </button>
+          </span>
+        )}
         {filtered && (
           <button type="button" className="text-link hover:underline" onClick={() => setFilters(NO_FILTERS)}>
             Clear filters

@@ -2830,3 +2830,17 @@ The coordinator's numbers. What was built, and the defaults taken where the brie
   maintenance (no bundle-deletion sweep). The earlier ad-hoc scoped worker dispatched every outbox event; the 9
   non-policy events it took (25–26 Nov) have no handler in the full worker with SME supply off, so nothing was lost,
   but the 4 annotation passes after extraction in project 605fed3e never ran.
+
+## D-093: the Policy page's fact list, fact filter and help (owner, 26 Nov 2026)
+- **Policies tab:** for a policy-library project (approval route `review_queue`) the project page's Policies tab opens
+  the Policy page; other projects keep the tab.
+- **Fact list:** the Facts step has an expandable, read-only table of every fact a condition may name
+  (`GET /projects/:id/policy/facts`): variable, description, type and allowed values, where it comes from (case data,
+  or derived with the rule that defines it), and how many rules (not excluded) name it. The count links to the review
+  queue filtered to those rules (`?fact=`; queue rows carry the facts their condition names). Search covers variable,
+  label and description; 25 rows a page. A fact without a description in the catalog shows "No description"; nothing
+  is made up. All 24 facts of `kyc-judgment-openenv.facts` v1 have a label but no description (26 Nov 2026).
+- **Help:** `POLICY_PAGE_HELP` in `packages/shared/src/policy-help.ts` is the one source for the page's "How this page
+  works" and the Support Bot's staff help pack (help/2.3).
+- **Client boundary:** pure helpers live in modules without 'use client' (`library-logic.ts`, `queue-logic.ts`,
+  `facts-logic.ts`); `test/client-boundary.test.ts` fails if a server module takes a plain function from a client one.

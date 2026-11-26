@@ -1,4 +1,4 @@
-import type { ProjectDto } from '@praxis/shared';
+import { policyHelpSections, type ProjectDto } from '@praxis/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -6,6 +6,8 @@ import { Documents, Extraction, PolicyWorkspace, Publish, type DocumentsData, ty
 import { DocumentDetailsList, ExportLibraryButton, ExportList, LibrarySetupPanel, LoadCatalogButton, type LibraryDocument, type LibraryExportRow } from '@/components/policy/library-setup';
 import { ReviewQueuePanel, type QueueData } from '@/components/policy/review-queue';
 import { SetupChecklist, checklistSteps } from '@/components/policy/setup-checklist';
+import { FactsTable } from '@/components/policy/facts-table';
+import type { FactsData } from '@/components/policy/facts-logic';
 import { apiGet, getCurrentUser } from '@/lib/api';
 
 export const metadata: Metadata = { title: 'Policy rules' };
@@ -16,11 +18,13 @@ export const metadata: Metadata = { title: 'Policy rules' };
  * the annotation table (Mandatory marking / Applies when / Why / Apply to project) is not shown there. Every other
  * project keeps the page as it was.
  */
-export default async function ProjectPolicyPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectPolicyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const { id } = await params;
+  const sp = (await searchParams) ?? {};
+  const initialFact = typeof sp.fact === 'string' ? sp.fact : '';
   const { data: project } = await apiGet<ProjectDto>(`/projects/${id}`);
   if (!project) notFound();
-  const [docs, extraction, rules, preview, user, queue, catalog, exportsList, enrichment] = await Promise.all([
+  const [docs, extraction, rules, preview, user, queue, catalog, exportsList, enrichment, factList] = await Promise.all([
     apiGet<DocumentsData>(`/projects/${id}/policy/documents`),
     apiGet<ExtractionData>(`/projects/${id}/policy/extraction`),
     apiGet<{ items: RuleRow[] }>(`/projects/${id}/policy/rules`),
@@ -30,6 +34,7 @@ export default async function ProjectPolicyPage({ params }: { params: Promise<{ 
     apiGet<{ catalog: { catalog_id?: string; facts?: unknown[] } | null; version: number | null }>(`/projects/${id}/policy/fact-catalog`),
     apiGet<{ items: LibraryExportRow[] }>(`/projects/${id}/policy/library-exports`),
     apiGet<{ status: string; message?: string; result?: Record<string, unknown> }>(`/projects/${id}/policy/enrichment`),
+    apiGet<FactsData>(`/projects/${id}/policy/facts`),
   ]);
   const isAdmin = user?.roles.includes('ADMIN') ?? false;
   const documents = docs.data ?? { maxPages: 20, items: [] };
@@ -100,9 +105,18 @@ export default async function ProjectPolicyPage({ params }: { params: Promise<{ 
           2. Facts
         </h2>
         {cat.version ? (
-          <p>
-            Fact catalog <span className="font-mono">{cat.catalogId ?? 'project'}</span>, version {cat.version}: {cat.facts} facts. Conditions are written over these facts.
-          </p>
+          <>
+            <p>
+              Fact catalog <span className="font-mono">{cat.catalogId ?? 'project'}</span>, version {cat.version}: {cat.facts} facts. Conditions are written over these facts.
+            </p>
+            <details className="mt-2" open={!!initialFact || undefined}>
+              <summary className="cursor-pointer text-link">See the fact list ({factList.data?.items.length ?? cat.facts})</summary>
+              <p className="mt-2 text-fg-muted">A fact is something known about a case, such as the customer’s product or citizenship. A rule’s condition (when it applies) is written over these variables. Read-only: the facts come from the environment’s catalog.</p>
+              <div className="mt-2">
+                <FactsTable projectId={id} rows={factList.data?.items ?? []} />
+              </div>
+            </details>
+          </>
         ) : (
           <>
             <p>No fact catalog yet, so conditions can’t be checked. Load the facts the environment knows about cases.</p>
@@ -114,7 +128,7 @@ export default async function ProjectPolicyPage({ params }: { params: Promise<{ 
       </section>
 
       <p className="mt-6 text-sm text-fg-muted">3. AI suggestions and 4. Review are in the review queue below: choose a document to run the AI for its drafts only.</p>
-      <ReviewQueuePanel projectId={id} initial={q} enrichment={enrichment.data as never} />
+      <ReviewQueuePanel projectId={id} initial={q} enrichment={enrichment.data as never} initialFact={initialFact} />
 
       <section id="export" aria-labelledby="export-step-h" className="card mt-6 p-4 text-sm">
         <h2 id="export-step-h" className="text-lg font-semibold">
@@ -129,6 +143,18 @@ export default async function ProjectPolicyPage({ params }: { params: Promise<{ 
       <div className="mt-6">
         <Publish projectId={id} preview={preview.data} />
       </div>
+      <details id="policy-help" className="card mt-6 p-4 text-sm">
+        <summary className="cursor-pointer text-lg font-semibold">How this page works</summary>
+        <p className="mt-1 text-fg-muted">The same help the Support Bot answers from.</p>
+        <dl className="mt-2 space-y-2">
+          {policyHelpSections().map((h) => (
+            <div key={h.heading}>
+              <dt className="text-xs font-semibold uppercase tracking-wide">{h.heading}</dt>
+              <dd className="text-fg-muted">{h.body}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
     </div>
   );
 }

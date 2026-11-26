@@ -16,6 +16,7 @@ import { AppError } from '../lib/errors';
 import { runCommand } from '../platform/command';
 import { POLICY_ACCESS, policyProject } from '../policy/access';
 import { approvedClauses, catalogFromTemplate, conditionCatalog, projectFactCatalog, templateBoundFacts } from '../policy/fact-catalog';
+import { projectFactRows } from '../policy/fact-table';
 import { adoptedBody, storeSuggestion } from '../policy/suggestions';
 import { jcsSha256 } from '../anvil/jcs';
 import { ownTask } from './work';
@@ -232,6 +233,12 @@ export const policyClauseRoutes: FastifyPluginAsyncZod<{ db: Db; storage: Object
     const p = await policyProject(db, req.actor!, req.params.projectId);
     const row = await db.projectFactCatalog.findFirst({ where: { projectId: p.id }, orderBy: { version: 'desc' } });
     return { catalog: row ? (row.catalog as unknown) : null, version: row?.version ?? null, at: row?.createdAt.toISOString() ?? null };
+  });
+
+  // The fact list (read-only): each fact's meaning, type and values, origin, and how many rules' conditions use it.
+  app.get('/projects/:projectId/policy/facts', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams } }, async (req) => {
+    const p = await policyProject(db, req.actor!, req.params.projectId);
+    return projectFactRows(db, p.id);
   });
 
   // A new version of the project's fact catalog (frozen and versioned; earlier versions stay).

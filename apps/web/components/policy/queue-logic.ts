@@ -18,15 +18,19 @@ export interface QueueTableRow {
   documents: { id: string; title: string }[];
   nextAction: QueueNextAction;
   flags: { code: string; message: string }[];
+  /** Facts the rule's condition names (the fact filter; the Policy page's fact list links here). */
+  facts: string[];
 }
 export interface QueueFilters {
   documentId: string;
   action: string;
   jurisdiction: string;
   status: string;
+  /** A fact id: rules whose condition names it. */
+  fact: string;
   q: string;
 }
-export const NO_FILTERS: QueueFilters = { documentId: '', action: '', jurisdiction: '', status: '', q: '' };
+export const NO_FILTERS: QueueFilters = { documentId: '', action: '', jurisdiction: '', status: '', fact: '', q: '' };
 /** The jurisdiction filter's value for rows with none. */
 export const NO_JURISDICTION = '__none__';
 
@@ -40,6 +44,7 @@ export function filterQueue<T extends QueueTableRow>(rows: readonly T[], f: Queu
       (!f.action || r.nextAction.code === f.action) &&
       (!f.jurisdiction || (f.jurisdiction === NO_JURISDICTION ? !r.jurisdiction : r.jurisdiction === f.jurisdiction)) &&
       (!f.status || r.state === f.status) &&
+      (!f.fact || r.facts.includes(f.fact)) &&
       (!q || r.ruleKey.toLowerCase().includes(q) || r.title.toLowerCase().includes(q)),
   );
 }

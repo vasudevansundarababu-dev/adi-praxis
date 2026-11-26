@@ -20,6 +20,7 @@ export * from './certification';
 export * from './praxis-contract';
 export * from './blueprint';
 export * from './policy';
+export * from './iso-jurisdiction';
 export * from './policy-annotations';
 export * from './anvil-project-policy';
 

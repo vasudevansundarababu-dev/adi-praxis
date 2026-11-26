@@ -20,12 +20,20 @@ export const JOB_OPTIONS = {
  * Moves undispatched outbox rows onto the queue. Rows are locked with SKIP LOCKED so several dispatchers can run;
  * the BullMQ job id is the event id, so a re-dispatch after a crash never creates a second job.
  */
-export async function dispatchOutboxBatch(db: Db, queue: Queue<DomainEventJob>, batchSize = 100): Promise<number> {
+export async function dispatchOutboxBatch(db: Db, queue: Queue<DomainEventJob>, batchSize = 100, names?: readonly string[]): Promise<number> {
   // available_at is written by the application (Prisma fills @default(now()) client-side), so compare it with the
   // application clock too; the database clock can differ by a few milliseconds (e.g. Docker's VM locally).
   const now = new Date();
   return db.$transaction(async (tx) => {
-    const rows = await tx.$queryRaw<{ id: string; name: string }[]>`
+    // `names` (D-089): a scoped worker takes only the events it handles and leaves every other one in the outbox.
+    const rows = names
+      ? await tx.$queryRaw<{ id: string; name: string }[]>`
+      SELECT id, name FROM "OutboxEvent"
+      WHERE dispatched_at IS NULL AND available_at <= ${now} AND name = ANY(${[...names]}::text[])
+      ORDER BY created_at
+      LIMIT ${batchSize}
+      FOR UPDATE SKIP LOCKED`
+      : await tx.$queryRaw<{ id: string; name: string }[]>`
       SELECT id, name FROM "OutboxEvent"
       WHERE dispatched_at IS NULL AND available_at <= ${now}
       ORDER BY created_at
@@ -103,7 +111,7 @@ export function createDomainEventsWorker(
 export function startOutboxPoller(
   db: Db,
   queue: Queue<DomainEventJob>,
-  opts: { intervalMs?: number; onError?: (err: unknown) => void } = {},
+  opts: { intervalMs?: number; onError?: (err: unknown) => void; names?: readonly string[] } = {},
 ) {
   const interval = opts.intervalMs ?? 500;
   let stopped = false;
@@ -112,7 +120,7 @@ export function startOutboxPoller(
     if (stopped) return;
     try {
       // Drain in batches, then wait for the next tick.
-      while (!stopped && (await dispatchOutboxBatch(db, queue)) > 0);
+      while (!stopped && (await dispatchOutboxBatch(db, queue, 100, opts.names)) > 0);
     } catch (err) {
       opts.onError?.(err);
     }

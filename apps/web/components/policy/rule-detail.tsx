@@ -51,6 +51,11 @@ export interface RuleDetailData {
   annotationHistory?: AnnotationRevision[];
   applicationTypeOptions?: string[];
   projectRuleKeys?: string[];
+  /** D-091: 'review_queue' projects approve in the review queue only (no tick here). */
+  approvalRoute?: 'review_queue' | 'apply_tick';
+  /** The review queue's flags and next action for the current version (review_queue projects). */
+  queueFlags?: Array<{ code: string; message: string }>;
+  nextAction?: { code: string; label: string; focus: string | null } | null;
 }
 
 const scope = (s: ScopeList) => (s.kind === 'all' ? 'All' : s.kind === 'listed' ? s.items.join(', ') || 'None listed' : 'Unknown');
@@ -131,6 +136,7 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
   const b = d.body;
   const a = b.applicability;
   const target: ApplyTarget = { ruleId: d.ruleId, contentHash: d.contentHash, definitionProblems: d.definitionProblems, evidenceProblems: d.evidenceProblems };
+  const queueRoute = d.approvalRoute === 'review_queue';
 
   async function apply(applied: boolean, accept = false, t: ApplyTarget = target) {
     setMsg(null);
@@ -161,7 +167,7 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
         </h2>
         <div className="flex flex-wrap items-center gap-4">
           <span className={`rounded px-2 py-0.5 ${d.applied ? 'bg-success/15 text-success' : d.state === 'EXCLUDED' ? 'bg-bg text-fg-muted' : 'bg-warning/15 text-warning'}`}>{STATE[d.state]}</span>
-          <span>
+          <span hidden={queueRoute}>
             Mandatory marking: <strong>{d.annotation ? MARKING_LABEL[d.annotation.marking] : 'Not annotated'}</strong> <span className="text-xs text-fg-muted">({sourceLabel({ ruleKey: d.ruleKey, annotation: d.annotation, annotationSource: d.annotationSource })})</span>
           </span>
           <span className="text-fg-muted">
@@ -169,10 +175,44 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
             {d.reviewedAt && ` · applied ${day(d.reviewedAt)}`}
           </span>
         </div>
+        {queueRoute && (
+          <div className="mt-3" data-queue-status>
+            {d.applied ? (
+              <p>Approved in the review queue{d.reviewedAt ? ` on ${day(d.reviewedAt)}` : ''}. Editing it makes a new draft that goes back to the queue.</p>
+            ) : d.nextAction?.code === 'ready' ? (
+              <p className="text-success">
+                Ready to confirm.{' '}
+                <a className="text-link hover:underline" href={`/projects/${projectId}/policy#review-queue`}>
+                  Confirm it in the review queue
+                </a>
+                .
+              </p>
+            ) : (
+              <>
+                <p>
+                  Next action: <strong>{d.nextAction?.label ?? 'Review this rule'}</strong>. When nothing is left below, the rule reads “Ready to confirm” and you approve it in the{' '}
+                  <a className="text-link hover:underline" href={`/projects/${projectId}/policy#review-queue`}>
+                    review queue
+                  </a>
+                  .
+                </p>
+                {(d.queueFlags ?? []).length > 0 && (
+                  <ul className="mt-1 list-disc pl-5 text-xs text-warning" aria-label="Still to do" data-focus="question" tabIndex={-1}>
+                    {d.queueFlags!.map((f) => (
+                      <li key={f.code}>{f.message}</li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label className="inline-flex items-center gap-2 font-medium">
-            <input type="checkbox" checked={d.applied} disabled={!!stage} onChange={(e) => void apply(e.target.checked)} /> Apply to project
-          </label>
+          {!queueRoute && (
+            <label className="inline-flex items-center gap-2 font-medium">
+              <input type="checkbox" checked={d.applied} disabled={!!stage} onChange={(e) => void apply(e.target.checked)} /> Apply to project
+            </label>
+          )}
           {!d.applied && (
             <button type="button" className="btn btn-secondary disabled:opacity-50" disabled={!!stage} onClick={define}>
               Define with AI
@@ -184,7 +224,7 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
             </span>
           )}
         </div>
-        <p className="mt-1 text-xs text-fg-muted">Your tick is the review; no further approval is needed. The assistant only drafts fields and never ticks a rule.</p>
+        <p className="mt-1 text-xs text-fg-muted">{queueRoute ? 'Your confirm in the review queue is the approval. The assistant only drafts fields and never approves a rule.' : 'Your tick is the review; no further approval is needed. The assistant only drafts fields and never ticks a rule.'}</p>
         {d.excludeReason && <p className="mt-1 text-fg-muted">Excluded: {d.excludeReason}</p>}
         {confirm && (
           <div role="alertdialog" aria-labelledby="rd-confirm" className="mt-3 rounded border border-warning/40 bg-warning/10 p-3">
@@ -225,7 +265,7 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
           Annotation
         </h2>
         <p className="text-xs text-fg-muted">
-          {d.annotation ? `${sourceLabel({ ruleKey: d.ruleKey, annotation: d.annotation, annotationSource: d.annotationSource })}. ` : ''}AI annotations are suggestions; your edit and your Apply tick are the decision. Extraction is not approval or legal validation.
+          {d.annotation ? `${sourceLabel({ ruleKey: d.ruleKey, annotation: d.annotation, annotationSource: d.annotationSource })}. ` : ''}AI annotations are suggestions; {queueRoute ? 'your edit and your confirm in the review queue are the decision' : 'your edit and your Apply tick are the decision'}. Extraction is not approval or legal validation.
         </p>
         {(d.flags ?? []).length > 0 && (
           <ul className="mt-2 space-y-0.5 text-xs text-warning" aria-label="Flags">
@@ -446,7 +486,7 @@ export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailD
 
       <details className="card p-4">
         <summary className="cursor-pointer font-semibold">Edit fields and quotes</summary>
-        <p className="mt-1 text-xs text-fg-muted">{d.applied ? 'This rule is applied; saving an edit creates a new draft version that you tick again.' : 'Save your changes, then tick Apply to project.'}</p>
+        <p className="mt-1 text-xs text-fg-muted">{queueRoute ? (d.applied ? 'This rule is approved; saving an edit creates a new draft that goes back to the review queue.' : 'Save your changes; the review queue then shows what is left, or “Ready to confirm”.') : d.applied ? 'This rule is applied; saving an edit creates a new draft version that you tick again.' : 'Save your changes, then tick Apply to project.'}</p>
         <div className="mt-3">
           <RuleReview key={d.versionId} projectId={projectId} versionId={d.versionId} editOnly />
         </div>

@@ -145,6 +145,19 @@ describe('rule page (PR-M07)', () => {
     expect(a11yProblems(html)).toEqual([]);
   });
 
+  it('D-091: in a review-queue project the rule page has no tick; it shows the next action and sends approval to the queue', () => {
+    const flagged = renderToStaticMarkup(<RuleDetail projectId="p1" d={{ ...d, approvalRoute: 'review_queue', queueFlags: [{ code: 'library_incomplete', message: 'Missing for the policy library: issuer.' }], nextAction: { code: 'fill_library', label: 'Fill in library details', focus: 'library' } }} />);
+    expect(flagged).not.toContain('Apply to project');
+    expect(flagged).toContain('Next action: <strong>Fill in library details</strong>');
+    expect(flagged).toContain('Missing for the policy library: issuer.');
+    expect(flagged).toContain('href="/projects/p1/policy#review-queue"');
+    expect(flagged).toContain('Your confirm in the review queue is the approval.');
+    const ready = renderToStaticMarkup(<RuleDetail projectId="p1" d={{ ...d, approvalRoute: 'review_queue', queueFlags: [], nextAction: { code: 'ready', label: 'Ready to confirm', focus: null } }} />);
+    expect(ready).toContain('Confirm it in the review queue');
+    expect(ready).not.toContain('Apply to project');
+    expect(a11yProblems(flagged)).toEqual([]);
+  });
+
   it('an applied rule shows as applied and offers no AI redefinition', () => {
     const html = renderToStaticMarkup(<RuleDetail projectId="p1" d={{ ...d, state: 'REVIEWED', applied: true, reviewedAt: '2026-11-14T11:00:00Z' }} />);
     expect(html).toContain('Applied to the project (reviewed)');

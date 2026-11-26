@@ -46,6 +46,9 @@ export interface ExtractionData {
   profile: { id: string; label: string; provider: string; revision: number; source: string } | null;
   available: boolean;
   problems: string[];
+  /** D-089: a requested extraction no worker has taken within a minute. */
+  workerMissing?: boolean;
+  workerMessage?: string;
   budget: { provider: string; ceilingUsd?: number | null; spentUsd?: number; usdPerPage?: number; exhausted?: boolean } | null;
   profiles?: Array<{ id: string; label: string; provider: string; enabled: boolean; isDefault: boolean; revision: number; problems: string[] }>;
   batches: Array<{ id: string; status: string; profileId: string; profileRevision: number; selectionSource: string; parentBatchId: string | null; createdAt: string; jobs: Job[] }>;
@@ -108,7 +111,7 @@ export function PolicyWorkspace(props: { projectId: string; isAdmin: boolean; do
   );
 }
 
-function Documents({ projectId, data }: { projectId: string; data: DocumentsData }) {
+export function Documents({ projectId, data }: { projectId: string; data: DocumentsData }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
@@ -275,7 +278,7 @@ function useLiveExtraction(projectId: string, initial: ExtractionData | null) {
   return { data, active, now, restart: () => setKick((k) => k + 1) };
 }
 
-function Extraction({ projectId, isAdmin, data: initial, documents }: { projectId: string; isAdmin: boolean; data: ExtractionData | null; documents: DocumentsData }) {
+export function Extraction({ projectId, isAdmin, data: initial, documents }:{ projectId: string; isAdmin: boolean; data: ExtractionData | null; documents: DocumentsData }) {
   const router = useRouter();
   const [chosen, setChosen] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
@@ -337,9 +340,14 @@ function Extraction({ projectId, isAdmin, data: initial, documents }: { projectI
         </fieldset>
       )}
       <Message m={msg} />
-      {live.active && (
+      {live.active && !data.workerMissing && (
         <p role="status" aria-live="polite" className="mt-2 text-fg-muted">
           Extraction in progress — this page updates by itself.
+        </p>
+      )}
+      {data.workerMissing && (
+        <p role="alert" className="mt-2 text-warning">
+          <strong>No worker is running.</strong> {data.workerMessage ?? 'The extraction has not started.'}
         </p>
       )}
       {receipts.total > 0 && (
@@ -463,7 +471,7 @@ export function PublishedVersions({ items }: { items: PublishedSet[] }) {
   );
 }
 
-function Publish({ projectId, preview }: { projectId: string; preview: PreviewData | null }) {
+export function Publish({ projectId, preview }:{ projectId: string; preview: PreviewData | null }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);

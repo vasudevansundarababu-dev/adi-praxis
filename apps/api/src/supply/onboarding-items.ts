@@ -30,7 +30,7 @@ export async function supplyOnboardingItems(tx: Db | Tx, enrollmentId: string, s
       key: 'payee',
       kind: 'payee' as const,
       title: 'Payment set-up',
-      description: 'Set up how you are paid with our payout provider (tax form and payout method). Praxis never sees your bank or tax details.',
+      description: 'Set up how you are paid with our payout provider (tax form and payout method). ADI Forge never sees your bank or tax details.',
       done: payee?.status === 'READY',
       data: { status: payee?.status ?? 'NOT_STARTED' },
       terms: null,

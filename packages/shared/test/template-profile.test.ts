@@ -326,9 +326,9 @@ describe('Anvil contract compiler (praxis.anvil.task.v1)', () => {
     expect(blockers([{ ...crit, expectedValue: other }])).toContain('REFERENCE_FAILS_RULE@S7.criteria[0]');
   });
 
-  it('export status reads "Approved; export adapter blocked: <reason>"', () => {
-    expect(exportStatusLine('Approved', { status: 'blocked', blockers: [{ code: 'MISSING_BINDING', path: 'rubric.criteria[0].outputField', message: 'Name the output field' }, { code: 'X', path: 'y', message: 'z' }] })).toBe('Approved; export adapter blocked: Name the output field (rubric.criteria[0].outputField) and 1 more');
-    expect(exportStatusLine('Submitted', { status: 'ready', blockers: [] })).toBe('Submitted; export adapter ready (praxis.anvil.task.v1)');
+  it('export status reads "Approved; can\'t be sent to the benchmark yet: <reason>", with no internal names or paths', () => {
+    expect(exportStatusLine('Approved', { status: 'blocked', blockers: [{ code: 'MISSING_BINDING', path: 'rubric.criteria[0].outputField', message: 'Name the output field' }, { code: 'X', path: 'y', message: 'z' }] })).toBe("Approved; can't be sent to the benchmark yet: Name the output field and 1 more");
+    expect(exportStatusLine('Submitted', { status: 'ready', blockers: [] })).toBe('Submitted; ready to send to the benchmark');
     expect(exportStatusLine('Approved', null)).toBeNull();
   });
 

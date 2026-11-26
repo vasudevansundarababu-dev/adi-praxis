@@ -387,9 +387,10 @@ export interface ExportStatusView {
 /** "Approved; export adapter blocked: <reason>" for the task view and review screen. Null when not applicable. */
 export function exportStatusLine(statusLabel: string, s: ExportStatusView | null | undefined): string | null {
   if (!s) return null;
-  if (s.status === 'ready') return `${statusLabel}; export adapter ready (praxis.anvil.task.v1)`;
+  // Night of 26 Nov 2026 (public names rule; plain words for SMEs): no internal format name and no field paths.
+  if (s.status === 'ready') return `${statusLabel}; ready to send to the benchmark`;
   const [first, ...rest] = s.blockers;
-  return `${statusLabel}; export adapter blocked: ${first ? `${first.message} (${first.path})` : 'unknown reason'}${rest.length ? ` and ${rest.length} more` : ''}`;
+  return `${statusLabel}; can't be sent to the benchmark yet: ${first ? first.message : 'reason not given'}${rest.length ? ` and ${rest.length} more` : ''}`;
 }
 
 /**

@@ -4,7 +4,6 @@ import { pageTitle } from '@praxis/shared/theme';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Assignments } from '@/components/journey/assignments';
-import { SupportBot } from '@/components/support/support-bot';
 import { Journey, NextStep, StatusPill } from '@/components/ui';
 import { ForgeHome } from '@/components/forge/forge-home';
 import { api, getForgeSettings, getMe } from '@/lib/api';
@@ -124,7 +123,6 @@ export default async function HomePage() {
           <Assignments initial={assignments?.items ?? []} onboarded={!!selected} />
         </div>
       )}
-      <SupportBot />
     </main>
   );
 }

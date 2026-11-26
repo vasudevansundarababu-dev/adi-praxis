@@ -4,6 +4,7 @@ import { api, getForgeSettings, getMeSafe } from '@/lib/api';
 import { InboxBell, type InboxItem } from './inbox-bell';
 import { smeSupplyEnabled } from '@/lib/features';
 import { SignOut } from './sign-out';
+import { SiteHelp } from './support/site-help';
 
 /** Top navigation: mark + product name and the account menu. With the MVP1 flow on: only Home and Sign out. */
 export async function Header() {
@@ -56,6 +57,7 @@ export async function Header() {
         )}
       </div>
       <div className="h-[3px] bg-brand-gradient" aria-hidden />
+      {me && <SiteHelp />}
     </header>
   );
 }

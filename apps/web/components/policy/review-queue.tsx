@@ -296,6 +296,11 @@ export function ReviewQueuePanel({ projectId, initial, enrichment = null, initia
                       </Link>
                     )}
                     {r.flags.length > 1 && <span className="block text-xs text-fg-muted">and {r.flags.length - 1} more</span>}
+                    {data.approvalRoute === 'review_queue' && (
+                      <Link className="block text-xs text-fg-muted hover:underline" href={`/projects/${projectId}/policy/rules/${r.ruleId}?focus=exclude`} aria-label={`Exclude ${r.ruleKey}`}>
+                        Exclude…
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))}

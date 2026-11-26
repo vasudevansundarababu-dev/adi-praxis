@@ -43,7 +43,16 @@ const list = (v: string) =>
 const RESOLUTION: Record<Citation['resolution'], string> = { RESOLVED: 'Quote found in this version', QUOTE_MISMATCH: 'Quote NOT found in this version — check it', UNRESOLVED: 'Not linked to a location' };
 
 /** Review Rules (S1 R01–R11): source evidence beside the editable rule. Reviewed content is read-only; editing makes a new draft. */
-export function RuleReview({ projectId, versionId, editOnly = false }: { projectId: string; versionId: string; editOnly?: boolean }) {
+/**
+ * `library` (D-094, KYC Judgment projects): only what the policy library (C1) and the run use: title, requirement,
+ * exceptions, the in-force date and the quotes, with plain names for what each quote supports. Type and where the rule
+ * applies show only while a check still needs them. Exclude lives on the rule page's status card instead.
+ */
+/** D-094: what each quote supports, in plain words (library mode). */
+export const QUOTE_FOR: Record<string, string> = { requirement: 'The requirement', applicability: 'When it applies', exceptions: 'Exceptions', effective: 'In-force date', precedence: 'Precedence' };
+export const quoteKey = (fieldPath: string) => fieldPath.split('.')[0]!.replace(/^condition$/, 'applicability');
+
+export function RuleReview({ projectId, versionId, editOnly = false, library = false }: { projectId: string; versionId: string; editOnly?: boolean; library?: boolean }) {
   const router = useRouter();
   const [d, setD] = useState<Detail | null>(null);
   const [body, setBody] = useState<PolicyRuleBody | null>(null);
@@ -69,6 +78,10 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
   if (loadError) return <p role="alert" className="text-error">{loadError}</p>;
   if (!d || !body) return <p className="text-sm text-fg-muted">Loading…</p>;
   const locked = d.state === 'REVIEWED' || d.state === 'EXCLUDED';
+  // D-094: in library mode, the older fields appear only while the definition check still asks for them.
+  const scopeEmpty = !body.applicability.universal && body.applicability.actors.length + body.applicability.actions.length + body.applicability.channels.length + body.applicability.locales.length + body.applicability.jurisdictions.length + body.applicability.entities.length === 0 && !body.applicability.conditionText;
+  const needsType = d.body.requirementType === 'unknown';
+  const needsScope = scopeEmpty || (d.body.applicability && !d.body.applicability.universal && (d.body.applicability.actors.length + d.body.applicability.actions.length + d.body.applicability.channels.length + d.body.applicability.locales.length + d.body.applicability.jurisdictions.length + d.body.applicability.entities.length === 0) && !d.body.applicability.conditionText);
   const set = <K extends keyof PolicyRuleBody>(k: K, v: PolicyRuleBody[K]) => setBody({ ...body, [k]: v });
   const setA = <K extends keyof PolicyRuleBody['applicability']>(k: K, v: PolicyRuleBody['applicability'][K]) => setBody({ ...body, applicability: { ...body.applicability, [k]: v } });
   const dirty = JSON.stringify(body) !== JSON.stringify(d.body) || JSON.stringify(cites.map((c) => [c.fieldPath, c.role, c.quote])) !== JSON.stringify(d.citations.map((c) => [c.fieldPath, c.role, c.quote]));
@@ -115,7 +128,7 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
           {cites.map((c, i) => (
             <li key={`${c.id}-${i}`} className="rounded bg-bg p-2">
               <p className="text-xs text-fg-muted">
-                {c.document} v{c.documentVersion} · {locatorText(c.locator)} · <span title={c.sha256}>sha {c.sha256.slice(0, 8)}</span> · supports <code>{c.fieldPath}</code>
+                {c.document} v{c.documentVersion} · {locatorText(c.locator)} {library ? <> · supports {QUOTE_FOR[quoteKey(c.fieldPath)] ?? c.fieldPath}</> : <> · <span title={c.sha256}>sha {c.sha256.slice(0, 8)}</span> · supports <code>{c.fieldPath}</code></>}
               </p>
               {locked ? (
                 <blockquote className="mt-1 border-l-2 border-line pl-2">{c.quote}</blockquote>
@@ -126,11 +139,11 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
               {!locked && (
                 <div className="mt-1 flex gap-2 text-xs">
                   <select aria-label="Field this quote supports" className="rounded-md border border-line bg-surface px-2 py-1 text-fg text-xs" value={c.fieldPath} onChange={(e) => setCites(cites.map((x, j) => (j === i ? { ...x, fieldPath: e.target.value } : x)))}>
-                    <option value="requirement">requirement</option>
-                    <option value="applicability.conditionText">applicability</option>
-                    <option value="exceptions">exceptions</option>
-                    <option value="effective">effective dates</option>
-                    <option value="precedence">precedence</option>
+                    <option value="requirement">{library ? QUOTE_FOR.requirement : 'requirement'}</option>
+                    <option value="applicability.conditionText">{library ? QUOTE_FOR.applicability : 'applicability'}</option>
+                    <option value="exceptions">{library ? QUOTE_FOR.exceptions : 'exceptions'}</option>
+                    <option value="effective">{library ? QUOTE_FOR.effective : 'effective dates'}</option>
+                    {!library && <option value="precedence">precedence</option>}
                   </select>
                   <button type="button" className="text-error hover:underline" onClick={() => setCites(cites.filter((_, j) => j !== i))}>
                     Remove
@@ -159,7 +172,7 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
         <fieldset className="mt-2 grid gap-2" disabled={pending}>
           {field('Title', <input data-focus="definition" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.title} onChange={(e) => set('title', e.target.value)} />)}
           {field('Requirement', <textarea className="rounded-md border border-line bg-surface px-2 py-1 text-fg min-h-20" value={body.requirement} onChange={(e) => set('requirement', e.target.value)} />)}
-          {body.annotation ? (
+          {library && !needsType ? null : body.annotation && !library ? (
             <p className="text-xs text-fg-muted">Type follows the annotation’s classification (edit it in Annotation above).</p>
           ) : field(
             'Type',
@@ -171,17 +184,19 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
               <option value="unknown">Unknown — needs definition</option>
             </select>,
           )}
-          {field(
+          {!library && field(
             'Who sees it',
             <select className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.visibility} onChange={(e) => set('visibility', e.target.value as PolicyRuleBody['visibility'])}>
               <option value="agent_visible">Agent-visible (shown to the SME and the agent)</option>
               <option value="evaluator_only">Evaluator-only (never in agent-visible files)</option>
             </select>,
           )}
+          {(!library || needsScope) && (
           <label className="inline-flex items-center gap-2">
             <input type="checkbox" checked={body.applicability.universal} onChange={(e) => setA('universal', e.target.checked)} /> Applies everywhere in the project
           </label>
-          {!body.applicability.universal && (
+          )}
+          {(!library || needsScope) && !body.applicability.universal && (
             <>
               {field('Applies to actors', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.applicability.actors.join(', ')} onChange={(e) => setA('actors', list(e.target.value))} />, 'Comma-separated, e.g. agent, reviewer')}
               {field('When the agent does', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.applicability.actions.join(', ')} onChange={(e) => setA('actions', list(e.target.value))} />, 'e.g. schedule launch event')}
@@ -206,14 +221,14 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
               'One per line; an exemption on a task must cite one of these',
             )}
           <div className="grid grid-cols-2 gap-2">
-            {field('Effective from', <input type="date" data-focus="effective" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.from ?? ''} onChange={(e) => set('effective', { ...body.effective, from: e.target.value || null })} />)}
-            {field('Effective to', <input type="date" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.to ?? ''} onChange={(e) => set('effective', { ...body.effective, to: e.target.value || null })} />)}
+            {field(library ? 'In force from (leave empty to use the document’s date)' : 'Effective from', <input type="date" data-focus="effective" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.from ?? ''} onChange={(e) => set('effective', { ...body.effective, from: e.target.value || null })} />)}
+            {!library && field('Effective to', <input type="date" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.to ?? ''} onChange={(e) => set('effective', { ...body.effective, to: e.target.value || null })} />)}
           </div>
-          {field('Or effective when', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.conditionText ?? ''} onChange={(e) => set('effective', { ...body.effective, conditionText: e.target.value || null })} />, 'e.g. always')}
-          {field('Required evidence', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.evidenceNeeds.join(', ')} onChange={(e) => set('evidenceNeeds', list(e.target.value))} />)}
-          {field('Gate / precedence', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.precedence.map((p) => `${p.relation}:${p.ruleKey}`).join(', ')} onChange={(e) => set('precedence', list(e.target.value).map((x) => { const [relation, ruleKey] = x.includes(':') ? x.split(':') : ['overrides', x]; return { relation: (['overridden_by', 'requires_before'].includes(relation!) ? relation : 'overrides') as PolicyRuleBody['precedence'][number]['relation'], ruleKey: ruleKey!.trim(), note: null }; }))} />, 'overrides:R-OTHER, overridden_by:R-OTHER or requires_before:R-OTHER')}
-          {field('Suggested check (hint only)', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.verificationHint ?? ''} onChange={(e) => set('verificationHint', e.target.value || null)} />)}
-          {body.uncertainty.length > 0 && <p className="text-xs text-warning">Extraction noted: {body.uncertainty.join('; ')}</p>}
+          {!library && field('Or effective when', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.conditionText ?? ''} onChange={(e) => set('effective', { ...body.effective, conditionText: e.target.value || null })} />, 'e.g. always')}
+          {!library && field('Required evidence', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.evidenceNeeds.join(', ')} onChange={(e) => set('evidenceNeeds', list(e.target.value))} />)}
+          {!library && field('Gate / precedence', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.precedence.map((p) => `${p.relation}:${p.ruleKey}`).join(', ')} onChange={(e) => set('precedence', list(e.target.value).map((x) => { const [relation, ruleKey] = x.includes(':') ? x.split(':') : ['overrides', x]; return { relation: (['overridden_by', 'requires_before'].includes(relation!) ? relation : 'overrides') as PolicyRuleBody['precedence'][number]['relation'], ruleKey: ruleKey!.trim(), note: null }; }))} />, 'overrides:R-OTHER, overridden_by:R-OTHER or requires_before:R-OTHER')}
+          {!library && field('Suggested check (hint only)', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.verificationHint ?? ''} onChange={(e) => set('verificationHint', e.target.value || null)} />)}
+          {!library && body.uncertainty.length > 0 && <p className="text-xs text-warning">Extraction noted: {body.uncertainty.join('; ')}</p>}
         </fieldset>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" disabled={!dirty || pending} onClick={save} className="btn btn-secondary disabled:opacity-50">
@@ -234,7 +249,7 @@ export function RuleReview({ projectId, versionId, editOnly = false }: { project
             ))}
           </ul>
         )}
-        {!locked && (
+        {!locked && !library && (
           <div className="mt-3 flex flex-wrap items-end gap-2">
             {field('Reason to exclude', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={reason} onChange={(e) => setReason(e.target.value)} />)}
             <button type="button" disabled={!reason.trim() || pending} onClick={() => decide('exclude')} className="btn btn-secondary disabled:opacity-50">

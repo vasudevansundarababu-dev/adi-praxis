@@ -22,7 +22,8 @@ export default async function PolicyRulePage({ params }: { params: Promise<{ id:
       <h1 className="mt-2 text-2xl font-semibold">{rule.body.title}</h1>
       <p className="font-mono text-sm text-fg-muted">{rule.ruleKey}</p>
       <RuleDetail projectId={id} d={rule} />
-      <LibraryDetailsEditor projectId={id} ruleId={rule.ruleId} contentHash={rule.contentHash} body={rule.body} approved={rule.state === 'REVIEWED'} />
+      {/* D-094: the KYC Judgment layout places Library details itself. */}
+      {rule.approvalRoute !== 'review_queue' && <LibraryDetailsEditor projectId={id} ruleId={rule.ruleId} contentHash={rule.contentHash} body={rule.body} approved={rule.state === 'REVIEWED'} />}
       <FocusOnLoad />
     </div>
   );

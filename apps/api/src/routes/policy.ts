@@ -18,7 +18,7 @@ import { startBatch, spentUsd, type Adapters } from '../policy/extraction/servic
 import { ensureProfiles } from '../policy/profiles';
 import { previewRuleSet, publishRuleSet } from '../policy/rule-sets';
 import { RuleAssistantUnavailableError, type PolicyRuleAssistant, type SuggestRule } from '../policy/rule-assistant';
-import { contentHash, createRuleFromCandidate, currentVersions, definitionProblems, editRule, evidenceProblems, inheritedEffectiveFrom, markExcluded, markReviewed, reviewProblems, ruleVersionFull, setApplied, type CitationEdit } from '../policy/rules';
+import { contentHash, createRuleFromCandidate, currentVersions, definitionProblems, editRule, evidenceProblems, inheritedEffectiveFrom, markExcluded, markReviewed, restoreExcluded, reviewProblems, ruleVersionFull, setApplied, type CitationEdit } from '../policy/rules';
 import { addChange, effectivePolicy, removeChange, sidecar, snapshotTask } from '../policy/task-policy';
 import { annotationState, editorRole, revisionDto, revisionsForRules, type RevisionRow } from '../policy/annotations';
 import { ANNOTATION_ACTIONS } from '../policy/annotate-job';
@@ -27,7 +27,8 @@ import { approvalRoute, assertApprovable } from '../policy/approval-route';
 import { nextAction, ruleQueueFlags } from '../policy/review-queue';
 import { estimateUsd, modelPrice } from '../policy/ai-pricing';
 import { policyAiModel } from '../policy/rule-assistant';
-import { jurisdictionProblem } from '@praxis/shared';
+import { conditionFacts, conditionLabel, jurisdictionProblem } from '@praxis/shared';
+import { conditionCatalog } from '../policy/fact-catalog';
 
 /** D-089: a requested job no worker has taken within this long is reported as "no worker", never a silent queue. */
 export const WORKER_PICKUP_MS = 60_000;
@@ -294,7 +295,20 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
     const route = await approvalRoute(db, projectId);
     const current = all.find((i) => i.version.id === v.id);
     const queueFlags = route === 'review_queue' && current && v.state !== 'REVIEWED' ? await ruleQueueFlags(db, clientId, projectId, v.ruleId) : [];
+    // D-094: what the library (C1) uses, for the KYC rule page: the condition in plain words and its facts, and where the
+    // in-force date comes from (the rule's own date wins; otherwise its document's, as in the queue and the export).
+    const parsed = PolicyRuleBody.parse(v.body);
+    const inherited = inheritedEffectiveFrom(v.citations);
+    const library = route === 'review_queue'
+      ? {
+          conditionSet: parsed.condition !== undefined,
+          conditionText: parsed.condition === undefined ? null : conditionLabel(parsed.condition, await conditionCatalog(db, projectId)),
+          conditionFacts: parsed.condition ? conditionFacts(parsed.condition) : [],
+          inForce: parsed.effective.from ? { from: parsed.effective.from, source: 'rule' as const } : inherited ? { from: inherited, source: 'document' as const } : null,
+        }
+      : null;
     return {
+      library,
       ...ann,
       approvalRoute: route,
       queueFlags,
@@ -606,6 +620,16 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
       const p = await policyProject(tx, actor, req.params.projectId);
       const v = await markExcluded(tx, { clientId: actor.clientId, projectId: p.id, ruleVersionId: req.params.versionId, actorId: actor.userId, expectedContentHash: req.body.expectedContentHash, reason: req.body.reason }, audit);
       return { status: 200, body: { versionId: v.id, state: v.state } };
+    });
+    return reply;
+  });
+
+  // D-094: bring an excluded rule back for review (a new draft; the excluded version and its reason stay in the history).
+  app.post('/projects/:projectId/policy/rules/:ruleId/restore', { config: { access: POLICY_ACCESS }, schema: { tags: ['policy'], params: ProjectParams.extend({ ruleId: z.string().uuid() }), body: ExcludeBody } }, async (req, reply) => {
+    await runCommand(db, req, reply, async ({ tx, actor, audit }) => {
+      const p = await policyProject(tx, actor, req.params.projectId);
+      const out = await restoreExcluded(tx, { clientId: actor.clientId, projectId: p.id, ruleId: req.params.ruleId, actorId: actor.userId, expectedContentHash: req.body.expectedContentHash, reason: req.body.reason }, audit);
+      return { status: 200, body: { versionId: out.version.id, state: out.version.state, changed: out.changed } };
     });
     return reply;
   });

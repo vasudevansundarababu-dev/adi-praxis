@@ -10,6 +10,8 @@ import { setRuleApplied, type ApplyTarget } from './apply-rule';
 import { locatorText } from './locator';
 import { RuleReview } from './rule-review';
 import { AnnotationEditor } from './annotation-editor';
+import { LibraryRuleDetail } from './rule-library-view';
+import type { LibraryRuleView } from './rule-library-logic';
 import { sourceLabel, type AnnotationSource, type PendingSuggestion } from './annotation-logic';
 
 export interface AnnotationRevision {
@@ -56,6 +58,8 @@ export interface RuleDetailData {
   /** The review queue's flags and next action for the current version (review_queue projects). */
   queueFlags?: Array<{ code: string; message: string }>;
   nextAction?: { code: string; label: string; focus: string | null } | null;
+  /** D-094: what the policy library uses (review_queue projects only): the condition in plain words, its facts, the in-force date. */
+  library?: LibraryRuleView | null;
 }
 
 const scope = (s: ScopeList) => (s.kind === 'all' ? 'All' : s.kind === 'listed' ? s.items.join(', ') || 'None listed' : 'Unknown');
@@ -127,6 +131,13 @@ const List = ({ items }: { items: string[] }) => (
 
 /** The rule page (PRD PR-M07): every field, formatted; evidence; history; Apply to project and Define with AI. */
 export function RuleDetail({ projectId, d }: { projectId: string; d: RuleDetailData }) {
+  // D-094: a KYC Judgment (policy-library) project shows only what the library and the run use.
+  if (d.approvalRoute === 'review_queue') return <LibraryRuleDetail projectId={projectId} d={d} />;
+  return <LegacyRuleDetail projectId={projectId} d={d} />;
+}
+
+/** The rule page of every other project, unchanged. */
+function LegacyRuleDetail({ projectId, d }: { projectId: string; d: RuleDetailData }) {
   const router = useRouter();
   const [stage, setStage] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ target: ApplyTarget; problems: string[] } | null>(null);

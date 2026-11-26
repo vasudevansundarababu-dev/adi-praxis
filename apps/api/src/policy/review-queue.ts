@@ -1,6 +1,6 @@
 import { conditionFacts, conditionLabel, conditionProblems, jurisdictionProblem, PolicyRuleBody, type FactCatalog } from '@praxis/shared';
 import type { Db, Tx } from '../db';
-import { conditionCatalog } from './fact-catalog';
+import { conditionCatalog, templateBoundFacts } from './fact-catalog';
 import { currentVersions, definitionProblems, evidenceProblems, inheritedEffectiveFrom, reviewProblems } from './rules';
 
 /**
@@ -50,6 +50,12 @@ interface Context {
   approvedDefinitions: Set<string>;
   /** Derived facts some rule defines, approved or not. */
   derivedIds: Set<string>;
+  /**
+   * D-094: whether the annotation pass's open questions count. A policy-library project (KYC Judgment) uses only what
+   * the library (C1) and the run use, so its annotation questions are kept but never block confirm; other projects
+   * keep them as before.
+   */
+  annotationQuestions: boolean;
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -87,7 +93,7 @@ export function queueFlags(item: Current, ctx: Context): QueueFlag[] {
   const sugg = ctx.suggestions.get(`${v.id}:${v.contentHash}`) ?? [];
   const disposition = sugg.find((s) => s.source === 'disposition' && isObj(s.content) && (s.content.disposition === 'needs_review' || s.content.disposition === 'outside_scope'));
   if (disposition && isObj(disposition.content)) flags.push({ code: String(disposition.content.disposition), message: String(disposition.content.question ?? (isObj(disposition.content.mismatch) ? disposition.content.mismatch.reason : '') ?? 'The suggestion asks for a careful read.') });
-  const questions = [...sugg.filter((s) => s.source === 'enrichment' && isObj(s.content) && typeof s.content.question === 'string').map((s) => (s.content as { question: string }).question), ...(body.annotation?.openQuestions ?? [])];
+  const questions = [...sugg.filter((s) => s.source === 'enrichment' && isObj(s.content) && typeof s.content.question === 'string').map((s) => (s.content as { question: string }).question), ...(ctx.annotationQuestions ? (body.annotation?.openQuestions ?? []) : [])];
   if (questions.length) flags.push({ code: 'open_question', message: questions.join(' ') });
   return flags;
 }
@@ -174,19 +180,22 @@ export async function projectFlags(tx: Db | Tx, projectId: string): Promise<(Que
 async function context(tx: Db | Tx, projectId: string, items: Current[]): Promise<Context> {
   const ids = items.map((i) => i.version.id);
   const ruleIds = items.map((i) => i.rule.id);
-  const [catalog, approved, coverage, suggestions, defs] = await Promise.all([
+  const [catalog, approved, coverage, suggestions, defs, project] = await Promise.all([
     conditionCatalog(tx, projectId),
     tx.policyRuleVersion.findMany({ where: { ruleId: { in: ruleIds }, state: 'REVIEWED' }, select: { ruleId: true, id: true } }),
     tx.policyCoverageResult.findMany({ where: { ruleVersionId: { in: ids } }, orderBy: { createdAt: 'asc' } }),
     tx.policyRuleSuggestion.findMany({ where: { ruleVersionId: { in: ids } }, orderBy: { createdAt: 'asc' } }),
     definitions(tx, projectId),
+    tx.project.findUnique({ where: { id: projectId }, select: { template: { select: { anvilSpec: true } } } }),
   ]);
+  // The same test as approvalRoute (D-091): the template binds the environment's facts.
+  const libraryProject = (templateBoundFacts(project?.template?.anvilSpec ?? null)?.facts.length ?? 0) > 0;
   const latestIds = new Set(ids);
   const cov = new Map<string, Context['coverage'] extends Map<string, infer V> ? V : never>();
   for (const c of coverage) cov.set(`${c.ruleVersionId}:${c.contentHash}`, { status: c.status, gaps: c.gaps, environmentVersionId: c.environmentVersionId, checkedAt: c.checkedAt });
   const sugg = new Map<string, { source: string; content: unknown }[]>();
   for (const s of suggestions) sugg.set(`${s.ruleVersionId}:${s.contentHash}`, [...(sugg.get(`${s.ruleVersionId}:${s.contentHash}`) ?? []), { source: s.source, content: s.content }]);
-  return { approvedDefinitions: defs.approved, derivedIds: defs.all, catalog, approvedBefore: new Set(approved.filter((a) => !latestIds.has(a.id)).map((a) => a.ruleId)), coverage: cov, suggestions: sugg };
+  return { approvedDefinitions: defs.approved, derivedIds: defs.all, catalog, approvedBefore: new Set(approved.filter((a) => !latestIds.has(a.id)).map((a) => a.ruleId)), coverage: cov, suggestions: sugg, annotationQuestions: !libraryProject };
 }
 
 /** The flags of one rule's current version, whatever its state (the approval gate, D-091). */

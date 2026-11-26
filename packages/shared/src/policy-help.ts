@@ -32,7 +32,11 @@ NEXT ACTION "SET THE IN-FORCE DATE". Neither the rule nor its document has an in
 
 NEXT ACTION "LINK TO A SOURCE QUOTE" AND "CHECK THE QUOTE". Every rule must be backed by an exact quote from its document. Link one, or check a quote that no longer matches the document text exactly, and fix it.
 
-NEXT ACTION "ANSWER THE OPEN QUESTION". Extraction or the AI left a question about the rule, for example an unclear threshold. Read it on the rule page, answer it, and update the rule if needed.
+NEXT ACTION "ANSWER THE OPEN QUESTION". The AI suggestions left a question about the rule that matters for the library, for example whether it duplicates another rule or which customers it covers. Read it on the rule page, then fix the rule (its condition or library details), or exclude it if it is a duplicate. Older annotation questions are kept but no longer hold a rule back in a policy-library project.
+
+THE RULE PAGE. Open a rule from the review queue to see only what the policy library and the benchmark run use. From the top: its status and the one next action; the requirement beside the source quote that backs it, with a tick when the quote is found word for word in the document; when it applies (the condition in plain words) and the facts it uses; the library details; the date it is in force from (its own, or its document's); a fact it defines, if any; any exceptions; and its version history. "Edit the text, the in-force date and the quotes" is at the bottom. Why it matters: you check the rule against its source before you confirm it. Example: R-ELSEWHERE-TEEN-JOINT-ACCOUNT-AGE shows the rule that a teen joint account is for a minor aged 16 or younger, the bank policy sentence it comes from, and when it applies: the product is a teen joint account and the party is the minor.
+
+EXCLUDING A RULE. Exclude a draft rule that does not belong in the library, for example a duplicate of another rule or a rule about something outside this project. Open the rule (or press "Exclude…" in the review queue), give a reason and press Exclude. The rule leaves the review queue and the library, and the reason is recorded. Nothing is deleted: press "Bring back for review" on the rule page, with a reason, to make it a draft again. An approved rule is not excluded directly: edit it to make a new draft, then exclude that.
 
 NEXT ACTION "COMPLETE THE RULE'S DEFINITION". The rule is missing part of its definition (what it requires, who or what it applies to, or its effect). Fill in the missing parts on its page.
 

@@ -230,6 +230,24 @@ export async function markExcluded(tx: Tx, input: { clientId: string; projectId:
   return out;
 }
 
+/**
+ * D-094: brings an excluded rule back for review. The excluded version stays as it is (with its reason, in the
+ * history); its content is copied into a new draft, which goes back to the review queue. Recorded; deletes nothing.
+ */
+export async function restoreExcluded(tx: Tx, input: { clientId: string; projectId: string; ruleId: string; actorId: string; expectedContentHash: string; reason: string }, audit: (a: AuditInput) => Promise<void>) {
+  const rule = await tx.policyRule.findFirst({ where: { id: input.ruleId, clientId: input.clientId, projectId: input.projectId }, select: { id: true } });
+  if (!rule) throw notFound('Rule not found');
+  await tx.$queryRaw`SELECT id FROM "PolicyRule" WHERE id = ${rule.id}::uuid FOR UPDATE`;
+  const latest = await tx.policyRuleVersion.findFirstOrThrow({ where: { ruleId: rule.id }, orderBy: { version: 'desc' }, select: { id: true } });
+  const v = await ruleVersionFull(tx, input.clientId, latest.id);
+  if (v.contentHash !== input.expectedContentHash) throw conflict('This rule changed since you opened it. Reload first.');
+  if (v.state !== 'EXCLUDED') return { version: v, changed: false };
+  if (!input.reason.trim()) throw new AppError(422, 'REASON_REQUIRED', 'Say why this rule comes back for review.');
+  const out = await copyVersion(tx, v, 'DRAFT', input.actorId, 'restored');
+  await audit({ entityType: 'PolicyRuleVersion', entityId: out.id, action: 'policy.rule_restored', before: { versionId: v.id, version: v.version, state: v.state, excludeReason: v.excludeReason }, after: { version: out.version, state: out.state, ruleKey: v.rule.ruleKey, reason: input.reason.trim() } });
+  return { version: out, changed: true };
+}
+
 type Audit = (a: AuditInput) => Promise<void>;
 
 /** Copies a version (body and citations) into a new version of the same rule, in the given state. */

@@ -2844,3 +2844,24 @@ The coordinator's numbers. What was built, and the defaults taken where the brie
   works" and the Support Bot's staff help pack (help/2.3).
 - **Client boundary:** pure helpers live in modules without 'use client' (`library-logic.ts`, `queue-logic.ts`,
   `facts-logic.ts`); `test/client-boundary.test.ts` fails if a server module takes a plain function from a client one.
+
+## D-094: the rule page of a policy-library project shows only what the library and the run use (owner, 26 Nov 2026)
+Owner: "Why we have this? If its from old page and it has nothing to do with current re design or Run we should not
+confuse this" (rule R-ELSEWHERE-TEEN-JOINT-ACCOUNT-AGE, project 605fed3e). In the spirit of D-091.
+- **Layout (review_queue projects only):** status and the one next action, with Exclude (drafts) or Bring back
+  (excluded); the requirement beside its source quotes and the quote check; when it applies in plain words and the facts
+  it uses; Library details; the in-force date (own or inherited); a fact it defines; listed exceptions; version
+  history; an editor for the text, date and quotes. Every other project's rule page is unchanged.
+- **Not shown there (data kept):** the Annotation section and its history, the older Definition fields, and "Define
+  with AI". Field by field from the C1 export (`library-export.ts`): it uses title, requirement, condition, listed
+  exceptions, `effective.from` (or the document's date), the library details (kind, issuer, jurisdiction, subject,
+  scope, effect, effectiveMode, change, defines) and the requirement's source quote. It does not use Type, Who sees it,
+  Applies to (actors, actions, entities, channels, locales), Prerequisites, Precedence, Required evidence, Suggested
+  check, Noted uncertainty, Effective to or "effective when", or the annotation. Type and Applies to still appear in the
+  editor while the definition check asks for them (the check itself is unchanged: enforcing checks stay enforcing).
+- **Open questions:** in a policy-library project the annotation pass's open questions no longer flag a rule
+  ("Answer the open question"); questions from the AI suggestions (enrichment) still do. Other projects are unchanged.
+- **Exclude:** the existing exclusion (reason required, recorded, the version kept) is now on the rule page's status
+  card, and each queue row links to it. New: "Bring back for review" (`POST /policy/rules/:ruleId/restore`, reason
+  required) copies the excluded version into a new draft; the excluded version and its reason stay in the history. An
+  approved rule is not excluded directly (edit it to make a draft, then exclude that).

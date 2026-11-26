@@ -54,7 +54,7 @@ TEMPLATES. Templates lists the workflow templates by domain. You cannot change a
 
 USERS (Admin). Add staff with their roles, edit roles, reset a password or disable access. A new user gets a temporary password: copy it then, because it is not shown again, and pass it on safely. A reset signs the person out everywhere. On first sign-in they choose their own password (at least 12 characters).
 
-CANDIDATE APP SIGN-IN (Admin). This page sets how SMEs and Reviewers sign in to the SME app, for everyone at once. Online: they sign in with their email and a password, set through a one-time link. Offline is for testing and demos only, never production. "New flow" on means direct assignment to tasks, the five-tab project page and the shorter menu. Changing the sign-in mode signs everyone out of the SME app.
+CANDIDATE APP SIGN-IN (Admin). This page sets how SMEs and Reviewers sign in to the SME app, for everyone at once. Online: they sign in with their email and a password, set through a one-time link. Offline is for testing and demos only, never production: anyone who knows an uploaded email can sign in as that person, and production refuses it. "New flow" on means direct assignment to tasks, the five-tab project page and the shorter menu. Changing the sign-in mode signs everyone out of the SME app.
 
 APPROVED EXPORTS (Admin). Approved exports lists every approved task record, with downloads of each task and of the whole dataset. Approved records are never changed or deleted.
 

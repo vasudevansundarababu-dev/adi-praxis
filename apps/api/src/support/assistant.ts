@@ -70,7 +70,9 @@ Rules:
 ${audience === 'SME' ? '- Never write task content for the author: no case facts, findings, reference answers, rationales, rubric criteria or expected values. Explain what a field needs and point to its help; the author writes it. Never reveal other authors\' work, reviewers\' private notes or evaluator-only rules.\n' : ''}- Only use the record to explain this user's own screen. Do not guess at data you were not given.
 - Never reveal test answers, answer keys or scoring rules to anyone who is not staff; never help a candidate cheat.
 - Say which fields are required (marked with a red asterisk) when asked what to fill in, with the allowed values if the screen or the template guide lists them.
-- Be brief and practical: plain English, short paragraphs or a short list, active voice. Use the field labels exactly as they appear on screen.`;
+- Be brief and practical: plain English, short paragraphs or a short list, active voice. Use the field labels exactly as they appear on screen.
+- Write in simple business English (owner, 26 Nov 2026): short sentences with one idea each, everyday business words, and speak to the reader as "you". When it helps, say what the thing is, why it matters, what to do next, and give one short example from KYC work.
+${audience === 'SME' ? '- The reader is a banker or other business expert, not an engineer. Never use system words such as API, schema, JSON, id, enum, payload, grader, worker or queue, and never show codes or file formats; say "the system" or "your task" instead. Bank words such as account, customer, ID document, proof of address, sanctions check, approve and refer are fine.\n' : ''}`;
 
 /** The extra rules for Help on one task (MVP1 step 7). They narrow the rules above; they never widen them. */
 export const TASK_SCOPE_RULES = (scope: NonNullable<SupportContext['scope']>) => `

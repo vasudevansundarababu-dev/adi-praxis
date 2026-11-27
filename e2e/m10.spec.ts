@@ -222,7 +222,9 @@ test('a pay run is built, confirmed by a PM, approved by Finance and submitted',
   await p.goto(runUrl);
   await p.getByRole('button', { name: 'Confirm pay run' }).click();
   // The confirmation lands first; the refreshed run state can take longer on a loaded CI runner.
-  await expect(p.getByText('Confirmed. Finance can now approve it.')).toBeVisible({ timeout: 15_000 });
+  // D-112: the refresh after the confirm can replace the one-off success message with the new state before the test
+  // looks; either shows the confirm landed (the reload below checks the saved state).
+  await expect(p.getByText('Confirmed. Finance can now approve it.').or(p.getByText('Waiting for Finance to approve.')).first()).toBeVisible({ timeout: 15_000 });
   await p.reload();
   await expect(p.getByText('Waiting for Finance to approve.')).toBeVisible({ timeout: 15_000 });
 

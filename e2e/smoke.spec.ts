@@ -27,12 +27,13 @@ test.describe('console smoke', () => {
     await page.getByRole('link', { name: /new project/i }).click();
     await page.waitForURL(/\/projects\/new(\?|$)/);
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/project/i);
-    await nav.getByRole('link', { name: 'Projects' }).click();
-    await page.getByRole('navigation', { name: 'Projects pages' }).getByRole('link', { name: 'Templates' }).click();
+    // D-024 (owner, 23 Nov 2026): Templates is its own top-level menu item, right after Projects.
+    await nav.getByRole('link', { name: 'Templates' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Harbor Templates Directory');
     // S1-12, S1-13: templates and domains come only from the seed and Save Variant.
     await expect(page.getByRole('main').getByText(/new template|add domain/i)).toHaveCount(0);
-    await expect(nav.getByRole('link', { name: 'Projects' })).toHaveAttribute('aria-current', 'true');
+    await expect(nav.getByRole('link', { name: 'Templates' })).toHaveAttribute('aria-current', 'true');
+    await nav.getByRole('link', { name: 'Projects' }).click();
     await page.getByRole('navigation', { name: 'Projects pages' }).getByRole('link', { name: 'Approved exports' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Approved task exports');
     await expect(page.getByRole('link', { name: 'Download existing NDJSON dataset' })).toBeVisible();

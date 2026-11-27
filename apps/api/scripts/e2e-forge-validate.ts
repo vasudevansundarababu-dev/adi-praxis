@@ -27,7 +27,7 @@ const pmEmail = `pm.forge-validate.${tag}@e2e.local`;
 await db.user.create({ data: { clientId: client.id, email: pmEmail, name: 'Priya Menon', roles: ['PM'], passwordHash: await hashPassword(PASSWORD) } });
 
 const google = new MockGoogleVerifier(SECRET);
-const config = loadConfig({ ...process.env, NODE_ENV: 'test', DATABASE_URL: url, REDIS_URL: process.env.E2E_REDIS_URL ?? 'redis://localhost:6389/7', LOGIN_RATE_LIMIT_PER_MINUTE: '1000' });
+const config = loadConfig({ ...process.env, NODE_ENV: 'test', DATABASE_URL: url, REDIS_URL: process.env.E2E_REDIS_URL ?? 'redis://localhost:6389/7', LOGIN_RATE_LIMIT_PER_MINUTE: '1000', TEMPLATE_EDITING_ENABLED: 'true' });
 const app = await buildApp({ config, db, pingRedis: async () => true, google, identity: new MockIdentityProvider(SECRET, 'http://candidate.test'), resolveClientId: async () => client.id, storage: new MemoryStorage(), email: new MemoryEmailSender(), embeddings: new HashingEmbeddingProvider() });
 
 type Method = 'GET' | 'POST' | 'PUT';

@@ -45,7 +45,9 @@ async function eachDirectoryPage(page: Page, check: () => Promise<void>) {
   }
 }
 
-test('an Admin takes a template from the directory to a deployed studio; the SME commits a task; a separate Reviewer approves it', async ({ browser }) => {
+// D-024 (owner, 23 Nov 2026): templates are read-only in the console and the Meta-Compiler is no longer shown, so this journey
+// can't run as written. Kept (not deleted) for when Studio's release flow replaces it.
+test.skip('an Admin takes a template from the directory to a deployed studio; the SME commits a task; a separate Reviewer approves it', async ({ browser }) => {
   test.setTimeout(240_000);
   const adminCtx = await browser.newContext();
   const admin = await adminCtx.newPage();
@@ -146,7 +148,8 @@ test('an Admin takes a template from the directory to a deployed studio; the SME
   await Promise.all([adminCtx.close(), smeCtx.close(), revCtx.close()]);
 });
 
-test('the workflow name opens Screen 2 and Back keeps the filter; Save Variant copies it; Reset to factory restores it (S1-05, S2-12, S2-13)', async ({ page }) => {
+// D-024: Save Variant and Reset to factory were Meta-Compiler actions, which the console no longer shows.
+test.skip('the workflow name opens Screen 2 and Back keeps the filter; Save Variant copies it; Reset to factory restores it (S1-05, S2-12, S2-13)', async ({ page }) => {
   test.setTimeout(120_000);
   await signIn(page, ADMIN.email, ADMIN.password);
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible({ timeout: 30_000 });

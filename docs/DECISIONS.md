@@ -2889,3 +2889,18 @@ Owner: "D120 -- 10 , D109 yes (for authoring)".
   false) sets TUTORIALS_ENABLED on the API, worker, jobs, console and SME app; only `infra/terraform/envs/staging/main.tf`
   sets it to true. QA (local and the demo project) and production leave it unset, so it is off. Regenerate the videos
   before staging (D-124).
+
+## D-126: rule page aids for the review with Jose (owner, 27 Nov 2026)
+Owner: "highlight the fix next to the field"; Jose: "We can answer the question in a text box. Use AI to decipher the
+answer and fill the fields."
+- **Field links** (RULE_FIELD_LINKS_ENABLED, on unless false): "To fix" lists every open problem as a link to its field;
+  the field has an amber outline and a plain-words hint with an example that goes away once filled in; a sticky "Next
+  problem" bar, "Ready to approve" when nothing is left (approval stays in the review queue). Map in
+  `apps/web/components/policy/fix-logic.ts`. No check, flag or server rule changed.
+- **Answer box** (always on, no cost): under each open question; the answer is stored verbatim with who and when in
+  `PolicyQuestionAnswer` (append-only, additive migration). Saving changes no field.
+- **"Fill from my answer"** (AI_ANSWER_ENABLED, off unless true): one call on the policy model; proposals are checked
+  against the library vocabulary and the fact catalog (never an unknown fact, never a quote) and shown before → after;
+  accepting is an ordinary rule edit (a new draft, every check unchanged). Daily budget AI_ANSWER_DAILY_BUDGET_USD
+  (US Central day); at the budget the button reads "AI answers are paused for today (budget reached)". Cost per call
+  is stored and logged. Measured on gemini-3.8-flash: about $0.0006 per answer.

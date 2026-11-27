@@ -1,3 +1,4 @@
+import { withoutTutorials } from '@praxis/shared';
 import { describe, expect, it } from 'vitest';
 import { rankParagraphs } from '../src/support/assistant';
 import { AUTHORING_GUIDE } from '../src/support/authoring-help';
@@ -121,4 +122,17 @@ const STAFF_QUESTIONS: [string, string, string][] = [
 describe('the offline bot answers two real questions per page from the right paragraph', () => {
   it.each(SME_QUESTIONS)('SME · %s: %s', (_page, q, heading) => expect(top(SME_HELP, q)).toContain(heading));
   it.each(STAFF_QUESTIONS)('Staff · %s: %s', (_page, q, heading) => expect(top(STAFF_HELP, q)).toContain(heading));
+});
+
+describe('Tutorials hidden (owner, 27 Nov 2026: TUTORIALS_ENABLED off)', () => {
+  it('neither help pack mentions Tutorials while the switch is off (as in tests and every deployment today)', () => {
+    expect(STAFF_HELP).not.toMatch(/tutorials/i);
+    expect(SME_HELP).not.toMatch(/tutorials/i);
+  });
+  it('the guides keep their Tutorials text, which comes back when the switch is on', () => {
+    expect(STAFF_CONSOLE_GUIDE).toContain('TUTORIALS.');
+    expect(CANDIDATE_GUIDE).toContain('TUTORIALS.');
+    expect(withoutTutorials(STAFF_CONSOLE_GUIDE)).toContain('Home, Projects, Templates, Sourcing and Admin.');
+    expect(withoutTutorials(STAFF_CONSOLE_GUIDE)).not.toMatch(/tutorials/i);
+  });
 });

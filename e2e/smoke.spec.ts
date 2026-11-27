@@ -134,7 +134,36 @@ test.describe('candidate smoke', () => {
   });
 });
 
+// Owner, 27 Nov 2026: Tutorials is behind TUTORIALS_ENABLED (off until the videos are regenerated).
+const tutorialsOn = ['true', '1'].includes((process.env.TUTORIALS_ENABLED ?? '').toLowerCase());
+
+test.describe('tutorials hidden (TUTORIALS_ENABLED off)', () => {
+  test.skip(tutorialsOn, 'Tutorials is on for this run');
+  test('no Tutorials link in the console or the SME app; /tutorials goes Home; the files are not served', async ({ page, request }) => {
+    expect((await request.get(`${WEB}/tutorials/files/01-getting-started.mp4`)).status()).toBe(404);
+    await page.goto(`${WEB}/login`);
+    await page.waitForLoadState('networkidle');
+    await page.getByLabel('Email').fill(PM.email);
+    await page.getByLabel('Password').fill(PM.password);
+    await page.getByRole('button', { name: /sign in/i }).click();
+    await page.waitForURL((u) => !u.pathname.startsWith('/login'));
+    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Projects' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Tutorials' })).toHaveCount(0);
+    await page.goto(`${WEB}/tutorials`);
+    await expect(page).toHaveURL(`${WEB}/`);
+    expect((await page.request.get(`${WEB}/tutorials/files/03-program-manager.mp4`)).status()).toBe(404);
+    await page.goto(`${CANDIDATE}/opportunities`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Opportunities');
+    await expect(page.getByRole('link', { name: 'Tutorials' })).toHaveCount(0);
+    await page.goto(`${CANDIDATE}/tutorials`);
+    await expect(page).toHaveURL(`${CANDIDATE}/`);
+    expect((await request.get(`${CANDIDATE}/api/v1/help/public?app=sme&path=%2Ftutorials`)).status()).toBe(404);
+    expect((await request.get(`${CANDIDATE}/api/v1/help/public?app=sme&path=%2Fsign-in`)).status()).toBe(200);
+  });
+});
+
 test.describe('tutorials', () => {
+  test.skip(!tutorialsOn, 'Tutorials is hidden (TUTORIALS_ENABLED off); run with TUTORIALS_ENABLED=true to check it comes back');
   test('a signed-in PM opens Tutorials: their video first, every video and the guide play, and the files need a sign-in', async ({ page, request }) => {
     const anonymous = await request.get(`${WEB}/tutorials/files/01-getting-started.mp4`);
     expect(anonymous.status()).toBe(401);

@@ -1,10 +1,14 @@
+import { tutorialsEnabled } from '@praxis/shared';
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { GuideCard, RecordingNote, VideoGrid } from '@/components/tutorials/tutorials';
 import { TUTORIAL_GUIDES, TUTORIAL_VIDEOS } from '@/lib/tutorials';
 
 export const metadata: Metadata = { title: 'Tutorials' };
 
 export default function PartnerTutorialsPage() {
+  // Owner, 27 Nov 2026: hidden while TUTORIALS_ENABLED is off.
+  if (!tutorialsEnabled()) redirect('/partner');
   return (
     <div className="space-y-8">
       <div>

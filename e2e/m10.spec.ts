@@ -240,6 +240,7 @@ test('a pay run is built, confirmed by a PM, approved by Finance and submitted',
 });
 
 test('a partner opens Tutorials: the partner video and guide, never the staff files', async ({ page }) => {
+  test.skip(!['true', '1'].includes((process.env.TUTORIALS_ENABLED ?? '').toLowerCase()), 'Tutorials is hidden (TUTORIALS_ENABLED off, owner 27 Nov 2026)');
   const s = await supply();
   await page.goto(`${WEB}/partner/login`);
   await page.waitForLoadState('networkidle');

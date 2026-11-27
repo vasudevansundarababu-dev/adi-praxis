@@ -1,6 +1,7 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import { tutorialsEnabled } from '@praxis/shared';
 import { getCurrentUser } from '@/lib/api';
 import { getPartnerMe } from '@/lib/partner-api';
 import { tutorialFilesFor } from '@/lib/tutorials';
@@ -14,6 +15,8 @@ const DIRS = [path.join(process.cwd(), 'tutorials'), path.join(process.cwd(), 'a
 const TYPES: Record<string, string> = { '.mp4': 'video/mp4', '.pdf': 'application/pdf' };
 
 export async function GET(req: Request, { params }: { params: Promise<{ file: string }> }) {
+  // Owner, 27 Nov 2026: while TUTORIALS_ENABLED is off the files are kept but not served.
+  if (!tutorialsEnabled()) return new Response('Not found', { status: 404 });
   const { file } = await params;
   const allowed = new Set<string>();
   if (await getCurrentUser()) tutorialFilesFor('staff').forEach((f) => allowed.add(f));

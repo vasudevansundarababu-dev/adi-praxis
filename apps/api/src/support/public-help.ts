@@ -1,3 +1,5 @@
+import { tutorialsEnabled } from '@praxis/shared';
+
 /**
  * D-109 and D-110 (owner, 27 Nov 2026: "D109 yes (for authoring)"): Help for the pages anyone can open without signing
  * in, plus the console's change-password page (the API refuses every other call there until the password is changed).
@@ -148,7 +150,7 @@ export function publicHelpFor(app: PublicHelpApp, path: string): PublicPageHelp 
   if (p === '/forgot-password') return SME.forgotPassword!;
   if (/^\/set-password\/[^/]+$/.test(p)) return SME.setPassword!;
   if (p === '/opportunities' || /^\/opportunities\/[^/]+$/.test(p)) return SME.opportunities!;
-  if (p === '/tutorials') return SME.tutorials!;
+  if (p === '/tutorials') return tutorialsEnabled() ? SME.tutorials! : null;
   if (p === '/privacy') return SME.privacy!;
   if (p === '/terms') return SME.terms!;
   return null;

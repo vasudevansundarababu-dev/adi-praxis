@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from 'fastify-type-provider-zod';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { publicHelpRoutes } from '../src/routes/public-help';
 import { PUBLIC_PAGE_HELP, publicHelpFor } from '../src/support/public-help';
 
@@ -13,10 +13,18 @@ const text = JSON.stringify(PUBLIC_PAGE_HELP);
 
 describe('public page help', () => {
   it('covers every page anyone can open without signing in, and the console change-password page', () => {
-    for (const p of ['/', '/sign-in', '/forgot-password', '/set-password/abc123', '/opportunities', '/opportunities/4f0c', '/tutorials', '/privacy', '/terms', '/sign-in?returnTo=%2Fhome', '/terms/'])
+    for (const p of ['/', '/sign-in', '/forgot-password', '/set-password/abc123', '/opportunities', '/opportunities/4f0c', '/privacy', '/terms', '/sign-in?returnTo=%2Fhome', '/terms/'])
       expect(publicHelpFor('sme', p), p).not.toBeNull();
     expect(publicHelpFor('console', '/login')!.title).toBe('Sign in to Authoring');
     expect(publicHelpFor('console', '/change-password')!.title).toBe('Change password');
+  });
+
+  it('Tutorials has public help only while TUTORIALS_ENABLED is on (owner, 27 Nov 2026)', () => {
+    vi.stubEnv('TUTORIALS_ENABLED', '');
+    expect(publicHelpFor('sme', '/tutorials')).toBeNull();
+    vi.stubEnv('TUTORIALS_ENABLED', 'true');
+    expect(publicHelpFor('sme', '/tutorials')!.title).toBe('Tutorials');
+    vi.unstubAllEnvs();
   });
 
   it('returns nothing for any signed-in page, so no internal page help leaks', () => {

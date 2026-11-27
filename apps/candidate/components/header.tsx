@@ -5,6 +5,7 @@ import { InboxBell, type InboxItem } from './inbox-bell';
 import { smeSupplyEnabled } from '@/lib/features';
 import { SignOut } from './sign-out';
 import { PublicSiteHelp, SiteHelp } from './support/site-help';
+import { tutorialsEnabled } from '@praxis/shared';
 
 /** Top navigation: mark + product name and the account menu. With the MVP1 flow on: only Home and Sign out. */
 export async function Header() {
@@ -48,9 +49,11 @@ export async function Header() {
               </Link>
             </>
           )}
-          <Link href="/tutorials" className="text-link hover:underline">
-            Tutorials
-          </Link>
+          {tutorialsEnabled() && (
+            <Link href="/tutorials" className="text-link hover:underline">
+              Tutorials
+            </Link>
+          )}
           {bell}
           {me ? <SignOut /> : <Link href="/sign-in" className="btn btn-primary !px-3 !py-1.5">Sign in</Link>}
         </nav>

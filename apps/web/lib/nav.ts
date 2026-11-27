@@ -1,4 +1,4 @@
-import type { InternalRole } from '@praxis/shared';
+import { tutorialsEnabled, type InternalRole } from '@praxis/shared';
 
 export interface NavItem {
   label: string;
@@ -82,8 +82,9 @@ export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
 const smeSupplyOn = () => ['true', '1'].includes(process.env.SME_SUPPLY_ENABLED ?? '');
 
+// Owner, 27 Nov 2026: Tutorials is hidden while TUTORIALS_ENABLED is off (the videos are being regenerated).
 const visible = (i: NavItem, roles: InternalRole[], smeSupply: boolean, newFlow: boolean) =>
-  !i.hidden && (smeSupply || !i.smeSupply) && !(newFlow && i.oldFlowOnly) && [...i.roles, ...(newFlow ? (i.newFlowRoles ?? []) : [])].some((r) => roles.includes(r));
+  !i.hidden && (i.href !== '/tutorials' || tutorialsEnabled()) && (smeSupply || !i.smeSupply) && !(newFlow && i.oldFlowOnly) && [...i.roles, ...(newFlow ? (i.newFlowRoles ?? []) : [])].some((r) => roles.includes(r));
 
 export const navFor = (roles: InternalRole[], smeSupply = smeSupplyOn(), newFlow = false) => NAV_ITEMS.filter((i) => visible(i, roles, smeSupply, newFlow));
 

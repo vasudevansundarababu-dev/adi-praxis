@@ -1,3 +1,4 @@
+import { tutorialsEnabled } from '@praxis/shared';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { GuideCard, RecordingNote, VideoGrid } from '@/components/tutorials/tutorials';
@@ -7,6 +8,8 @@ import { TUTORIAL_GUIDES, videosForRoles } from '@/lib/tutorials';
 export const metadata: Metadata = { title: 'Tutorials' };
 
 export default async function TutorialsPage() {
+  // Owner, 27 Nov 2026: hidden while TUTORIALS_ENABLED is off; the page code and videos are kept.
+  if (!tutorialsEnabled()) redirect('/');
   const user = await getCurrentUser();
   if (!user) redirect('/login');
   const { mine, others } = videosForRoles(user.roles);

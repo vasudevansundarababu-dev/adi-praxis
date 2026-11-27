@@ -1,4 +1,6 @@
+import { tutorialsEnabled } from '@praxis/shared';
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { pageTitle } from '@praxis/shared/theme';
 
 export const metadata: Metadata = { title: { absolute: pageTitle('Tutorials') } };
@@ -8,6 +10,8 @@ export const metadata: Metadata = { title: { absolute: pageTitle('Tutorials') } 
  * can see how the work goes before they apply. Files are in public/tutorials (built by e2e/demo-videos/package.mjs).
  */
 export default function TutorialsPage() {
+  // Owner, 27 Nov 2026: hidden while TUTORIALS_ENABLED is off (Home for signed-in experts, the welcome page otherwise).
+  if (!tutorialsEnabled()) redirect('/');
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-8">
       <section className="hero p-6 sm:p-8">

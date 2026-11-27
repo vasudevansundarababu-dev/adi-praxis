@@ -441,7 +441,17 @@ describe('Task page decision box', () => {
 
 describe('Menus and Admin → Candidate app sign-in', () => {
   const keys = (g: ReturnType<typeof navGroupsFor>) => g.map((x) => x.key);
+  it('Tutorials is in the menu only while TUTORIALS_ENABLED is on (owner, 27 Nov 2026)', () => {
+    vi.stubEnv('TUTORIALS_ENABLED', '');
+    expect(keys(navGroupsFor(['ADMIN'], true, true))).toEqual(['home', 'projects', 'templates', 'sourcing', 'admin']);
+    expect(keys(navGroupsFor(['REVIEWER'], false, true))).toEqual(['home']);
+    vi.stubEnv('TUTORIALS_ENABLED', 'true');
+    expect(keys(navGroupsFor(['ADMIN'], true, true))).toContain('tutorials');
+    vi.unstubAllEnvs();
+  });
+
   it('with the new flow on the menu is Home, Projects, Templates (D-024), Sourcing, Admin, Tutorials; Certification, Partners and Payments are always hidden', () => {
+    vi.stubEnv('TUTORIALS_ENABLED', 'true');
     expect(keys(navGroupsFor(['ADMIN'], true, true))).toEqual(['home', 'projects', 'templates', 'sourcing', 'admin', 'tutorials']);
     const projects = navGroupsFor(['ADMIN', 'PM'], true, true).find((g) => g.key === 'projects')!;
     expect(projects.items.map((i) => i.label)).toEqual(['Projects', 'Approved exports']);
@@ -454,6 +464,7 @@ describe('Menus and Admin → Candidate app sign-in', () => {
     expect(keys(navGroupsFor(['PM'], false, false))).not.toContain('admin');
     expect(navGroupsFor(['PM'], false, true).find((g) => g.key === 'admin')!.items.map((i) => i.href)).toEqual(['/admin/candidate-sign-in']);
     expect(keys(navGroupsFor(['REVIEWER'], false, true))).toEqual(['home', 'tutorials']);
+    vi.unstubAllEnvs();
   });
 
   it('Offline is disabled with an explanation when the server refuses it; PMs see it read-only; Save sends only changes', () => {

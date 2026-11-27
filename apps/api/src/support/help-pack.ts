@@ -3,12 +3,12 @@
  * plain language. Source: docs/SPEC.md, docs/FLOW2-SME.md, docs/TASK-KYC.md, docs/SME-SUPPLY.md and docs/DECISIONS.md.
  * Keep it in step with those documents when behaviour changes. Paragraphs are separated by blank lines.
  */
-import { POLICY_PAGE_HELP } from '@praxis/shared';
+import { POLICY_PAGE_HELP, tutorialsEnabled, withoutTutorials } from '@praxis/shared';
 import { AUTHORING_GUIDE } from './authoring-help';
 import { CANDIDATE_GUIDE, SME_BENCHMARK_HELP, SME_GUIDE } from './sme-help';
 import { STAFF_CONSOLE_GUIDE } from './staff-help';
 
-export const HELP_VERSION = 'help/3.0 (27 Nov 2026: every console and SME app page rechecked against the code and rewritten in plain business English; SME help separate from staff help; current-flow console guide; earlier-flow areas labelled) · help/2.3 (26 Nov 2026: the Policy page, its checklist, facts and conditions, next actions, export) · help/2.2 (23 Nov 2026: Benchmark panel, procedure tool guide and follow-ups, AI unavailable) · help/2.1 (12 Nov 2026: authoring v2.1, review routes, policy proposals, template guides, generated job descriptions, KYC template v2, golden task packs)';
+export const HELP_VERSION = 'help/3.1 (27 Nov 2026: Tutorials left out while TUTORIALS_ENABLED is off) · help/3.0 (27 Nov 2026: every console and SME app page rechecked against the code and rewritten in plain business English; SME help separate from staff help; current-flow console guide; earlier-flow areas labelled) · help/2.3 (26 Nov 2026: the Policy page, its checklist, facts and conditions, next actions, export) · help/2.2 (23 Nov 2026: Benchmark panel, procedure tool guide and follow-ups, AI unavailable) · help/2.1 (12 Nov 2026: authoring v2.1, review routes, policy proposals, template guides, generated job descriptions, KYC template v2, golden task packs)';
 
 const COMMON = `ADI FORGE. ADI Forge is where subject-matter experts (SMEs) write and check realistic work tasks from a workflow template, such as KYC onboarding. Every task uses invented data only. Approved tasks go into a dataset that is only ever added to, never changed, and RL Gym (the separate benchmark platform) uses it to test AI agents. People make every decision: who is selected, which tasks are accepted, and who is paid. The AI only drafts, checks and suggests.
 
@@ -16,7 +16,7 @@ REQUIRED FIELDS. Required fields have a red asterisk (*). You cannot save a form
 
 INVENTED DATA ONLY. All task content is invented: made-up people, companies and numbers. Never enter real customer, employer or identity details. ADI Forge never stores identity images or ID numbers.`;
 
-export const STAFF_HELP = `${COMMON}
+const STAFF_HELP_ALL = `${COMMON}
 
 ${STAFF_CONSOLE_GUIDE}
 
@@ -74,10 +74,15 @@ API AND WEBHOOKS. Create API clients per environment: Sandbox (simulated candida
  */
 export const BENCHMARK_HELP = SME_BENCHMARK_HELP;
 
-export const SME_HELP = `ADI FORGE. ADI Forge is where bankers and other experts like you write realistic work cases ("tasks") from a project's template. Each task is used to test AI agents on real-world work. People make every decision about your task: your reviewer, the project manager or an admin. The AI helpers only suggest and check; you write the task.
+const SME_HELP_ALL = `ADI FORGE. ADI Forge is where bankers and other experts like you write realistic work cases ("tasks") from a project's template. Each task is used to test AI agents on real-world work. People make every decision about your task: your reviewer, the project manager or an admin. The AI helpers only suggest and check; you write the task.
 
 ${SME_GUIDE}
 
 ${BENCHMARK_HELP}
 
 ${CANDIDATE_GUIDE}`;
+
+/** Owner, 27 Nov 2026: with TUTORIALS_ENABLED off the help never points people to the Tutorials page. */
+const gate = (text: string) => (tutorialsEnabled() ? text : withoutTutorials(text));
+export const STAFF_HELP = gate(STAFF_HELP_ALL);
+export const SME_HELP = gate(SME_HELP_ALL);

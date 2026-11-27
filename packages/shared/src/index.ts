@@ -40,6 +40,7 @@ export * from './forge';
 export * from "./rubric";
 export * from "./field-suggestions";
 export * from './pagination';
+export * from './tutorials-switch';
 export * from './benchmark';
 export * from './step-tools';
 export * from './clause-condition';

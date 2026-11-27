@@ -2879,3 +2879,9 @@ Owner: "D120 -- 10 , D109 yes (for authoring)".
   and change password. Each term has its meaning and an example, and each page says what to do if stuck. The panel
   (`PublicHelp`, packages/shared/src/ui/public-help.tsx) has no question box. Signed-in pages keep the Support Bot.
   The parked partner sign-in pages are not covered.
+- **Tutorials hidden (owner, 27 Nov 2026: "These videos are outdated ... Right now you can hide this page"):** one switch,
+  `TUTORIALS_ENABLED` (env, off unless `true`/`1`; `packages/shared/src/tutorials-switch.ts`), read by the API, the
+  console and the SME app. Off: no Tutorials link (console menu, SME app header, partner portal menu), `/tutorials`
+  redirects to Home (`/` in both apps, `/partner` for partners), the console's tutorial files answer 404, and neither
+  the help pack nor the public help mentions Tutorials. On: everything as before. Nothing deleted (pages, videos,
+  guides and help text kept). The per-template tutorial video on a task page is a different feature, unchanged.

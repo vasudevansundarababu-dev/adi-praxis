@@ -1,3 +1,4 @@
+import { tutorialsEnabled } from '@praxis/shared';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { NavBrand } from '@/components/brand';
@@ -48,7 +49,7 @@ export default async function PartnerPortalLayout({ children }: { children: Reac
           </div>
         </div>
         <nav aria-label="Partner" className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 pb-2 text-sm">
-          {PARTNER_NAV.map((item) => (
+          {PARTNER_NAV.filter((item) => item.href !== '/partner/tutorials' || tutorialsEnabled()).map((item) => (
             <Link key={item.href} href={item.href} className="shrink-0 rounded-lg px-2 py-1.5 whitespace-nowrap text-white/85 hover:bg-white/10 hover:text-white">
               {item.label}
             </Link>

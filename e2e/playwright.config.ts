@@ -8,7 +8,8 @@ import { defineConfig } from '@playwright/test';
 const external = !!process.env.E2E_WEB_URL;
 const E2E_DB = process.env.E2E_DATABASE_URL ?? 'postgresql://praxis:praxis@localhost:5442/praxis_e2e';
 const REDIS = process.env.E2E_REDIS_URL ?? 'redis://localhost:6389/7';
-const env = { NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1' };
+// TUTORIALS_ENABLED (owner, 27 Nov 2026): off, as deployed, unless the run sets it (TUTORIALS_ENABLED=true pnpm test:e2e).
+const env = { NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1', TUTORIALS_ENABLED: process.env.TUTORIALS_ENABLED ?? 'false' };
 // The API and the worker must share one object store, or worker jobs fall back to real GCS and hang.
 // TEMPLATE_EDITING_ENABLED (below): the tests build their own templates through the API, as the unit tests do
 // (test/helpers.ts); D-024 keeps templates read-only in every real deployment.

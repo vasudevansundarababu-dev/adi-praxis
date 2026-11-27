@@ -56,6 +56,7 @@ import { certCandidateRoutes } from './routes/cert-candidate';
 import { paymentCandidateRoutes, paymentRoutes } from './routes/payments';
 import { supportRoutes } from './routes/support';
 import { forgeHelpRoutes } from './routes/forge-help';
+import { publicHelpRoutes } from './routes/public-help';
 import { ClaudeVertexSupportAssistant, GeminiSupportAssistant, MockSupportAssistant, supportModel, type SupportAssistant } from './support/assistant';
 import { MockPayoutProvider, TrolleyPayoutProvider, type PayoutProvider } from './pay/provider';
 import { ClaudeVertexCurriculumGenerator, MockCurriculumGenerator, type CurriculumGenerator } from './cert/generator';
@@ -364,6 +365,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       // Which build is running (testers put this in defect reports). Set by the deploy; "local" otherwise.
       v1.get('/version', { config: { access: 'public' }, schema: { tags: ['health'] } }, async () => ({ build: process.env.PRAXIS_BUILD || 'local', commit: process.env.PRAXIS_COMMIT || null, env: deps.config.appEnv, ai: deps.config.assistantMode }));
       v1.get('/openapi.json', { config: { access: 'public' }, schema: { hide: true } }, async () => app.swagger());
+      await v1.register(publicHelpRoutes);
       await v1.register(authRoutes, { db: deps.db, config: deps.config });
       const searchService = new SearchService(deps.db, deps.embeddings ?? defaultEmbeddings(deps.config));
       const idSearch: IdSearch = async (actor, type, q) => (await searchService.search(actor, type, q, 1)).ids;

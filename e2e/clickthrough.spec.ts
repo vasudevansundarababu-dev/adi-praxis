@@ -38,7 +38,7 @@ async function visit(page: Page, app: Row['app'], role: string, url: string, opt
   page.on('console', onConsole);
   page.on('response', onResponse);
   const res = await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 }).catch(() => null);
-  const help = (await page.locator('[data-support-bot], [data-task-help], button:has-text("Help")').count()) > 0;
+  const help = (await page.locator('[data-support-bot], [data-task-help], [data-public-help], button:has-text("Help")').count()) > 0;
   page.off('console', onConsole);
   page.off('response', onResponse);
   // A page the role may not open answers 404 by design (role guard): that is an access refusal, not a defect.
@@ -61,6 +61,9 @@ test.describe.configure({ mode: 'serial' });
 
 test('console: every page, as Admin, PM, Validator and Finance (e2e fixtures)', async ({ page }) => {
   test.setTimeout(20 * 60_000);
+  // D-109: the signed-out sign-in page has its public help.
+  await page.context().clearCookies();
+  await visit(page, 'console', 'Signed out', `${WEB}/login`);
   for (const [role, who] of [['Admin', ADMIN], ['PM', PM], ['Validator', VALIDATOR], ['Finance', FINANCE]] as const) {
     await page.context().clearCookies();
     await consoleLogin(page, who);
@@ -94,7 +97,7 @@ test('console: the new-flow project of the multi-select fixture, as its PM', asy
 
 test('SME app: every page, as a signed-in SME (mock Google sign-in)', async ({ page }) => {
   test.setTimeout(10 * 60_000);
-  for (const r of ['/', '/sign-in', '/forgot-password', '/privacy', '/terms', '/opportunities', '/tutorials']) await visit(page, 'sme', 'Signed out', CANDIDATE + r);
+  for (const r of ['/', '/sign-in', '/forgot-password', '/set-password/not-a-real-link', '/privacy', '/terms', '/opportunities', '/tutorials']) await visit(page, 'sme', 'Signed out', CANDIDATE + r);
   const token = await (await page.request.post(`${CANDIDATE}/api/v1/auth/dev/google-token`, { data: { email: `clickthrough.${randomUUID()}@example.test`, name: 'Click Through' } })).json();
   const signed = await page.request.post(`${CANDIDATE}/api/v1/auth/google`, { data: { credential: token.credential, adultAttested: true } });
   expect(signed.ok()).toBe(true);
@@ -114,6 +117,12 @@ test.afterAll(() => {
   writeFileSync(LOG, JSON.stringify(rows, null, 2));
   const bad = rows.filter((r) => r.serverErrors.length || r.consoleErrors.length || (r.status ?? 0) >= 500);
   console.log(`clickthrough: ${rows.length} page views, ${bad.length} with errors, ${rows.filter((r) => !r.help).length} without a Help panel`);
+});
+
+test('D-109 / D-110: every signed-out page, and the console change-password page, has its Help panel', () => {
+  const pub = rows.filter((r) => r.role === 'Signed out' || r.route.startsWith('/change-password'));
+  expect(pub.length).toBeGreaterThan(0);
+  expect(pub.filter((r) => !r.help).map((r) => `${r.app} ${r.role} ${r.route}`)).toEqual([]);
 });
 
 test('no page view had a server error or a console error', () => {

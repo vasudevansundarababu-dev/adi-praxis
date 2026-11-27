@@ -2865,3 +2865,17 @@ confuse this" (rule R-ELSEWHERE-TEEN-JOINT-ACCOUNT-AGE, project 605fed3e). In th
   card, and each queue row links to it. New: "Bring back for review" (`POST /policy/rules/:ruleId/restore`, reason
   required) copies the excluded version into a new draft; the excluded version and its reason stay in the history. An
   approved rule is not excluded directly (edit it to make a draft, then exclude that).
+
+## D-120 and D-109: 10 rows a page everywhere; Help on signed-out pages (owner, 27 Nov 2026)
+Owner: "D120 -- 10 , D109 yes (for authoring)".
+- **D-120 (layout only):** every client-paged list uses the one shared `PAGE_SIZE` (10, `packages/shared/src/pagination.ts`);
+  the shared pager's default is that constant too. The Policy page's review queue and fact list moved from 25 to 10.
+  "Showing 1–10 of N", the page number in the URL and "Confirm all ready" (which works on the whole filter, not the page)
+  are unchanged.
+- **D-109 / D-110:** `GET /api/v1/help/public?app=sme|console&path=…` (public, rate-limited, cacheable) returns the fixed
+  help-pack text (`apps/api/src/support/public-help.ts`) for a page anyone can open without signing in, and 404 for
+  any other page. No Support Bot, no model call, no spend; no project, rule, task or user data. Pages: SME app welcome,
+  sign-in, forgot password, set password, opportunities (list and detail), tutorials, privacy and terms; console sign-in
+  and change password. Each term has its meaning and an example, and each page says what to do if stuck. The panel
+  (`PublicHelp`, packages/shared/src/ui/public-help.tsx) has no question box. Signed-in pages keep the Support Bot.
+  The parked partner sign-in pages are not covered.

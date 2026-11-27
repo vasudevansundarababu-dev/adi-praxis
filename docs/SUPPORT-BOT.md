@@ -100,6 +100,12 @@ do next, and a KYC example.
   and checks plain words and that internal names never appear. `apps/api/scripts/help-live-check.ts` asks the live bot
   (it spends money: run only with the owner's yes).
 
+## 6. Help on signed-out pages (D-109 / D-110, 27 Nov 2026)
+Pages anyone can open without signing in (SME app: welcome, sign-in, forgot password, set password, opportunities,
+tutorials, privacy, terms; console: sign-in, change password) show a Help button with fixed text from the help pack
+(`apps/api/src/support/public-help.ts`, served by `GET /api/v1/help/public`). It is not the Support Bot: there is no
+question box, no model call and no spend, and it holds only the help for those pages.
+
 ## Gaps found while marking required fields (not changed; for the owner to prioritise)
 
 - Several minimum lengths and formats are checked only by the API or by disabling a button, not on the field itself:

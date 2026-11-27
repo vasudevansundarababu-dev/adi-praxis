@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { FullLogo } from '@/components/brand';
+import { PublicPageHelp } from '@/components/support/public-page-help';
 import { SignOutButton } from '@/components/shell-controls';
 import { ChangePasswordForm } from '@/components/users/change-password-form';
 import { getCurrentUser } from '@/lib/api';
@@ -32,6 +33,7 @@ export default async function ChangePasswordPage() {
           <SignOutButton />
         </div>
       </div>
+      <PublicPageHelp />
     </main>
   );
 }

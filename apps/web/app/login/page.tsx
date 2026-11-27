@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { FullLogo } from '@/components/brand';
+import { PublicPageHelp } from '@/components/support/public-page-help';
 import { LoginForm } from '@/components/login-form';
 import AccessRequest from '@/components/AccessRequest';
 import { getCurrentUser } from '@/lib/api';
@@ -20,6 +21,7 @@ export default async function LoginPage() {
           <AccessRequest />
         </div>
       </div>
+      <PublicPageHelp />
     </main>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { PublicHelp } from '@praxis/shared/ui/public-help';
 import { SupportBot } from './support-bot';
 import { siteHelpShown } from './site-help-logic';
 
@@ -11,4 +12,10 @@ import { siteHelpShown } from './site-help-logic';
 export function SiteHelp() {
   const path = usePathname() ?? '/';
   return siteHelpShown(path) ? <SupportBot /> : null;
+}
+
+/** D-109 (owner, 27 Nov 2026): signed-out pages show their fixed public help (no Support Bot, no model call). */
+export function PublicSiteHelp() {
+  const path = usePathname() ?? '/';
+  return <PublicHelp app="sme" path={path} />;
 }

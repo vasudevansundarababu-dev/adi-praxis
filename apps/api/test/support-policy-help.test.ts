@@ -34,6 +34,14 @@ describe('Policy page help', () => {
     expect(POLICY_PAGE_HELP).toContain('product == teen_joint');
   });
 
+  it('explains "To fix" and "Next problem" on the rule page (owner, 27 Nov 2026), and the bot finds them', () => {
+    const headings = policyHelpSections().map((s) => s.heading);
+    expect(headings).toContain('"TO FIX" ON THE RULE PAGE');
+    expect(headings).toContain('"NEXT PROBLEM" ON THE RULE PAGE');
+    expect(rankParagraphs(STAFF_HELP, 'how do I get to the field I need to fix on a rule', 2).join(' ')).toMatch(/"TO FIX" ON THE RULE PAGE|"NEXT PROBLEM" ON THE RULE PAGE/);
+    expect(rankParagraphs(STAFF_HELP, 'what does the next problem button do', 2)[0]).toMatch(/^"NEXT PROBLEM" ON THE RULE PAGE/);
+  });
+
   it('uses no internal product names', () => {
     expect(POLICY_PAGE_HELP).not.toMatch(/Praxis|Anvil|ADI-Labs/);
   });

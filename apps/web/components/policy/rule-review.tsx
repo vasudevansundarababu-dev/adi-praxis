@@ -4,6 +4,8 @@ import type { PolicyRuleBody } from '@praxis/shared';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import type { FixField, FixItem } from './fix-logic';
+import { FIX_OUTLINE, FixHint, fixOpen } from './fix-nav';
 import { locatorText } from './locator';
 
 interface Citation {
@@ -52,7 +54,7 @@ const RESOLUTION: Record<Citation['resolution'], string> = { RESOLVED: 'Quote fo
 export const QUOTE_FOR: Record<string, string> = { requirement: 'The requirement', applicability: 'When it applies', exceptions: 'Exceptions', effective: 'In-force date', precedence: 'Precedence' };
 export const quoteKey = (fieldPath: string) => fieldPath.split('.')[0]!.replace(/^condition$/, 'applicability');
 
-export function RuleReview({ projectId, versionId, editOnly = false, library = false }: { projectId: string; versionId: string; editOnly?: boolean; library?: boolean }) {
+export function RuleReview({ projectId, versionId, editOnly = false, library = false, fixes = [] }: { projectId: string; versionId: string; editOnly?: boolean; library?: boolean; fixes?: readonly FixItem[] }) {
   const router = useRouter();
   const [d, setD] = useState<Detail | null>(null);
   const [body, setBody] = useState<PolicyRuleBody | null>(null);
@@ -84,6 +86,13 @@ export function RuleReview({ projectId, versionId, editOnly = false, library = f
   const needsScope = scopeEmpty || (d.body.applicability && !d.body.applicability.universal && (d.body.applicability.actors.length + d.body.applicability.actions.length + d.body.applicability.channels.length + d.body.applicability.locales.length + d.body.applicability.jurisdictions.length + d.body.applicability.entities.length === 0) && !d.body.applicability.conditionText);
   const set = <K extends keyof PolicyRuleBody>(k: K, v: PolicyRuleBody[K]) => setBody({ ...body, [k]: v });
   const setA = <K extends keyof PolicyRuleBody['applicability']>(k: K, v: PolicyRuleBody['applicability'][K]) => setBody({ ...body, applicability: { ...body.applicability, [k]: v } });
+  // Owner, 27 Nov 2026 (library rule page): a field with something to fix has an amber outline and a hint under it,
+  // which goes away once the field is filled in; the quote problems clear when the saved quotes pass the server's check.
+  const applies = body.applicability;
+  const valueOf = (k: FixField): string | undefined =>
+    k === 'requirement' ? body.requirement : k === 'effective' ? (body.effective.from ?? '') : k === 'type' ? (body.requirementType === 'unknown' ? '' : body.requirementType) : k === 'applies' ? (applies.universal || applies.actors.length + applies.actions.length + applies.channels.length + applies.locales.length + applies.jurisdictions.length + applies.entities.length > 0 || applies.conditionText ? 'set' : '') : undefined;
+  const fx = (k: FixField) => (library && fixOpen(fixes, k, valueOf(k)) ? FIX_OUTLINE : '');
+  const hint = (k: FixField) => (library ? <FixHint fixes={fixes} field={k} value={valueOf(k)} /> : null);
   const dirty = JSON.stringify(body) !== JSON.stringify(d.body) || JSON.stringify(cites.map((c) => [c.fieldPath, c.role, c.quote])) !== JSON.stringify(d.citations.map((c) => [c.fieldPath, c.role, c.quote]));
 
   async function save() {
@@ -121,8 +130,9 @@ export function RuleReview({ projectId, versionId, editOnly = false, library = f
   const firstUnresolved = cites.findIndex((c) => c.resolution !== 'RESOLVED');
   return (
     <div className="grid gap-4 text-sm xl:grid-cols-2">
-      <section aria-label="Source evidence" className="rounded border border-line p-3">
+      <section aria-label="Source evidence" className={`rounded border border-line p-3 ${fx('quotes')}`} id={library ? 'fix-quotes' : undefined} tabIndex={-1}>
         <h3 className="font-semibold">Source evidence</h3>
+        {hint('quotes')}
         {cites.length === 0 && <p className="mt-1 text-warning">No source quote yet. Add one so the rule can be reviewed.</p>}
         <ul className="mt-2 space-y-3">
           {cites.map((c, i) => (
@@ -171,12 +181,13 @@ export function RuleReview({ projectId, versionId, editOnly = false, library = f
         {locked && <p className="mt-1 text-xs text-fg-muted">{d.state === 'REVIEWED' ? 'Reviewed content is fixed. Editing below creates a new draft version.' : `Excluded: ${d.excludeReason}`}</p>}
         <fieldset className="mt-2 grid gap-2" disabled={pending}>
           {field('Title', <input data-focus="definition" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.title} onChange={(e) => set('title', e.target.value)} />)}
-          {field('Requirement', <textarea className="rounded-md border border-line bg-surface px-2 py-1 text-fg min-h-20" value={body.requirement} onChange={(e) => set('requirement', e.target.value)} />)}
+          {field('Requirement', <textarea id={library ? 'fix-requirement' : undefined} className={`rounded-md border border-line bg-surface px-2 py-1 text-fg min-h-20 ${fx('requirement')}`} value={body.requirement} onChange={(e) => set('requirement', e.target.value)} />)}
+          {hint('requirement')}
           {library && !needsType ? null : body.annotation && !library ? (
             <p className="text-xs text-fg-muted">Type follows the annotation’s classification (edit it in Annotation above).</p>
           ) : field(
             'Type',
-            <select className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.requirementType} onChange={(e) => set('requirementType', e.target.value as PolicyRuleBody['requirementType'])}>
+            <select id={library ? 'fix-type' : undefined} className={`rounded-md border border-line bg-surface px-2 py-1 text-fg ${fx('type')}`} value={body.requirementType} onChange={(e) => set('requirementType', e.target.value as PolicyRuleBody['requirementType'])}>
               <option value="obligation">Obligation (must)</option>
               <option value="prohibition">Prohibition (must not)</option>
               <option value="permission">Permission (may)</option>
@@ -191,11 +202,13 @@ export function RuleReview({ projectId, versionId, editOnly = false, library = f
               <option value="evaluator_only">Evaluator-only (never in agent-visible files)</option>
             </select>,
           )}
+          {library && needsType && hint('type')}
           {(!library || needsScope) && (
-          <label className="inline-flex items-center gap-2">
+          <label className={`inline-flex items-center gap-2 ${fx('applies')}`} id={library ? 'fix-applies' : undefined}>
             <input type="checkbox" checked={body.applicability.universal} onChange={(e) => setA('universal', e.target.checked)} /> Applies everywhere in the project
           </label>
           )}
+          {library && needsScope && hint('applies')}
           {(!library || needsScope) && !body.applicability.universal && (
             <>
               {field('Applies to actors', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.applicability.actors.join(', ')} onChange={(e) => setA('actors', list(e.target.value))} />, 'Comma-separated, e.g. agent, reviewer')}
@@ -221,9 +234,10 @@ export function RuleReview({ projectId, versionId, editOnly = false, library = f
               'One per line; an exemption on a task must cite one of these',
             )}
           <div className="grid grid-cols-2 gap-2">
-            {field(library ? 'In force from (leave empty to use the document’s date)' : 'Effective from', <input type="date" data-focus="effective" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.from ?? ''} onChange={(e) => set('effective', { ...body.effective, from: e.target.value || null })} />)}
+            {field(library ? 'In force from (leave empty to use the document’s date)' : 'Effective from', <input type="date" data-focus="effective" id={library ? 'fix-effective' : undefined} className={`rounded-md border border-line bg-surface px-2 py-1 text-fg ${fx('effective')}`} value={body.effective.from ?? ''} onChange={(e) => set('effective', { ...body.effective, from: e.target.value || null })} />)}
             {!library && field('Effective to', <input type="date" className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.to ?? ''} onChange={(e) => set('effective', { ...body.effective, to: e.target.value || null })} />)}
           </div>
+          {hint('effective')}
           {!library && field('Or effective when', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.effective.conditionText ?? ''} onChange={(e) => set('effective', { ...body.effective, conditionText: e.target.value || null })} />, 'e.g. always')}
           {!library && field('Required evidence', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.evidenceNeeds.join(', ')} onChange={(e) => set('evidenceNeeds', list(e.target.value))} />)}
           {!library && field('Gate / precedence', <input className="rounded-md border border-line bg-surface px-2 py-1 text-fg" value={body.precedence.map((p) => `${p.relation}:${p.ruleKey}`).join(', ')} onChange={(e) => set('precedence', list(e.target.value).map((x) => { const [relation, ruleKey] = x.includes(':') ? x.split(':') : ['overrides', x]; return { relation: (['overridden_by', 'requires_before'].includes(relation!) ? relation : 'overrides') as PolicyRuleBody['precedence'][number]['relation'], ruleKey: ruleKey!.trim(), note: null }; }))} />, 'overrides:R-OTHER, overridden_by:R-OTHER or requires_before:R-OTHER')}

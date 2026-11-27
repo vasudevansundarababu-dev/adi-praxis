@@ -149,7 +149,8 @@ describe('rule page (PR-M07)', () => {
     const flagged = renderToStaticMarkup(<RuleDetail projectId="p1" d={{ ...d, approvalRoute: 'review_queue', queueFlags: [{ code: 'library_incomplete', message: 'Missing for the policy library: issuer.' }], nextAction: { code: 'fill_library', label: 'Fill in library details', focus: 'library' } }} />);
     expect(flagged).not.toContain('Apply to project');
     expect(flagged).toContain('Next action: <strong>Fill in library details</strong>');
-    expect(flagged).toContain('Missing for the policy library: issuer.');
+    expect(flagged).toContain('data-fix-link="issuer"'); // owner, 27 Nov 2026: the flag is a "To fix" link to the Issuer field
+    expect(flagged).toContain('Issuer is missing.');
     expect(flagged).toContain('href="/projects/p1/policy#review-queue"');
     expect(flagged).toContain('Your confirm in the review queue is the approval.');
     const ready = renderToStaticMarkup(<RuleDetail projectId="p1" d={{ ...d, approvalRoute: 'review_queue', queueFlags: [], nextAction: { code: 'ready', label: 'Ready to confirm', focus: null } }} />);

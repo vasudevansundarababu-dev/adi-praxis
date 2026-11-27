@@ -4,6 +4,8 @@ import { ISO_JURISDICTION, jurisdictionProblem, LIBRARY_CHANGE_KINDS, LIBRARY_CH
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { mutate } from '@/lib/client-api';
+import { fixesFor, type FixField, type FixItem } from './fix-logic';
+import { FIX_OUTLINE, FixHint, fixOpen } from './fix-nav';
 
 /**
  * KYC Judgment v1 console gap (a): the rule page sets the condition and the policy library details C1 needs (kind,
@@ -94,7 +96,7 @@ export function libraryBody(body: PolicyRuleBody, f: LibraryForm): { body: Polic
 
 const label = (v: string) => v.replace(/_/g, ' ');
 
-export function LibraryDetailsEditor({ projectId, ruleId, contentHash, body, approved }: { projectId: string; ruleId: string; contentHash: string; body: PolicyRuleBody; approved: boolean }) {
+export function LibraryDetailsEditor({ projectId, ruleId, contentHash, body, approved, fixes = [] }: { projectId: string; ruleId: string; contentHash: string; body: PolicyRuleBody; approved: boolean; fixes?: readonly FixItem[] }) {
   const router = useRouter();
   const [f, setF] = useState<LibraryForm>(() => libraryForm(body));
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -113,10 +115,15 @@ export function LibraryDetailsEditor({ projectId, ruleId, contentHash, body, app
   }
   // D-092: the review queue opens this page at a field (?focus=library | change | condition | defines).
   const focusOf: Partial<Record<string, string>> = { kind: 'library', changeKind: 'change' };
+  // Owner, 27 Nov 2026: the field with something to fix has an amber outline and a hint under it, which goes away as
+  // soon as the field is filled in (the server's checks are unchanged; they run again when you save).
+  const fixField: Partial<Record<string, FixField>> = { kind: 'kind', issuer: 'issuer', subject: 'subject', process: 'process', changeKind: 'change' };
+  const valueFor = (field: FixField): string | undefined => (field === 'change' ? (f.changeKind && f.changeSummary.trim() ? 'set' : '') : field === 'condition' ? (fixesFor(fixes, 'condition').every((x) => x.flag === 'condition_not_set') ? (f.always ? 'always' : f.condition) : undefined) : field === 'kind' || field === 'issuer' || field === 'subject' || field === 'process' || field === 'jurisdiction' ? f[field] : undefined);
+  const outline = (field: FixField | undefined) => (field && fixOpen(fixes, field, valueFor(field)) ? FIX_OUTLINE : '');
   const select = (id: string, name: string, k: 'kind' | 'issuer' | 'subject' | 'process' | 'effect' | 'effectiveMode' | 'changeKind', options: readonly string[], none = 'Not set') => (
     <label htmlFor={id} className="flex flex-col text-sm">
       <span className="font-medium">{name}</span>
-      <select id={id} className="input mt-1" value={f[k]} data-focus={focusOf[k]} onChange={(e) => set(k, e.target.value)}>
+      <select id={id} className={`input mt-1 ${outline(fixField[k])}`} value={f[k]} data-focus={focusOf[k]} onChange={(e) => set(k, e.target.value)}>
         <option value="">{none}</option>
         {options.map((o) => (
           <option key={o} value={o}>
@@ -124,6 +131,7 @@ export function LibraryDetailsEditor({ projectId, ruleId, contentHash, body, app
           </option>
         ))}
       </select>
+      {fixField[k] && <FixHint fixes={fixes} field={fixField[k]!} value={valueFor(fixField[k]!)} />}
     </label>
   );
   const checks = (legend: string, k: 'customerTypes' | 'productLines' | 'channels', options: readonly string[]) => (
@@ -150,7 +158,8 @@ export function LibraryDetailsEditor({ projectId, ruleId, contentHash, body, app
         {select('lib-issuer', 'Issuer', 'issuer', LIBRARY_ISSUERS)}
         <label htmlFor="lib-jurisdiction" className="flex flex-col text-sm">
           <span className="font-medium">Jurisdiction (ISO: US, US-CA)</span>
-          <input id="lib-jurisdiction" className="input mt-1" value={f.jurisdiction} onChange={(e) => set('jurisdiction', e.target.value.trim().toUpperCase())} />
+          <input id="lib-jurisdiction" className={`input mt-1 ${outline('jurisdiction')}`} value={f.jurisdiction} onChange={(e) => set('jurisdiction', e.target.value.trim().toUpperCase())} />
+          <FixHint fixes={fixes} field="jurisdiction" value={valueFor('jurisdiction')} />
         </label>
         {select('lib-subject', 'Evaluated for', 'subject', LIBRARY_SUBJECTS)}
         {select('lib-process', 'Process', 'process', LIBRARY_PROCESSES)}
@@ -167,7 +176,7 @@ export function LibraryDetailsEditor({ projectId, ruleId, contentHash, body, app
         {checks('Product lines', 'productLines', LIBRARY_PRODUCT_LINES)}
         {checks('Channels', 'channels', LIBRARY_CHANNELS)}
       </div>
-      <div className="mt-3" data-focus="condition">
+      <div className={`mt-3 rounded ${outline('condition')}`} data-focus="condition" id="fix-condition" tabIndex={-1}>
         <label className="inline-flex items-center gap-2 text-sm">
           <input type="checkbox" checked={f.always} onChange={(e) => set('always', e.target.checked)} />
           Applies always within its process (no condition)
@@ -178,6 +187,7 @@ export function LibraryDetailsEditor({ projectId, ruleId, contentHash, body, app
             <textarea id="lib-condition" rows={6} className="mt-1 rounded-md border border-line bg-surface px-2 py-1.5 font-mono text-xs" value={f.condition} onChange={(e) => set('condition', e.target.value)} />
           </label>
         )}
+        <FixHint fixes={fixes} field="condition" value={valueFor('condition')} />
       </div>
       <details className="mt-3 text-sm">
         <summary className="cursor-pointer font-medium">This rule defines a fact (for example “US person”)</summary>

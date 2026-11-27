@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ClientPager } from '@/components/pager';
 import { mutate } from '@/lib/client-api';
+import { fixItems } from './fix-logic';
+import { FixHint, FixList, NextProblemBar } from './fix-nav';
 import { LibraryDetailsEditor } from './library-details';
 import { locatorText } from './locator';
 import type { RuleDetailData } from './rule-detail';
@@ -32,6 +34,9 @@ export function LibraryRuleDetail({ projectId, d }: { projectId: string; d: Rule
   const lib = d.library;
   const quotes = quoteGroups(d.citations);
   const queue = `/projects/${projectId}/policy#review-queue`;
+  // Owner, 27 Nov 2026: every open problem as a "To fix" link to its field, with a hint at the field (presentation only).
+  const draft = !d.applied && d.state !== 'EXCLUDED';
+  const fixes = draft ? fixItems(d) : [];
 
   async function act(kind: 'exclude' | 'restore') {
     setPending(true);
@@ -70,7 +75,7 @@ export function LibraryRuleDetail({ projectId, d }: { projectId: string; d: Rule
           <span className={`rounded px-2 py-0.5 ${d.applied ? 'bg-success/15 text-success' : d.state === 'EXCLUDED' ? 'bg-bg text-fg-muted' : 'bg-warning/15 text-warning'}`}>{LIBRARY_STATE[d.state] ?? d.state}</span>{' '}
           <span className="text-fg-muted">Version {d.version}</span>
         </p>
-        <div className="mt-2" data-queue-status>
+        <div className="mt-2" data-queue-status id="fix-status" tabIndex={-1}>
           {d.applied ? (
             <p>Approved in the review queue{d.reviewedAt ? ` on ${day(d.reviewedAt)}` : ''}. Editing it makes a new draft that goes back to the queue.</p>
           ) : d.state === 'EXCLUDED' ? (
@@ -92,13 +97,10 @@ export function LibraryRuleDetail({ projectId, d }: { projectId: string; d: Rule
                 </a>
                 .
               </p>
-              {(d.queueFlags ?? []).length > 0 && (
-                <ul className="mt-1 list-disc pl-5 text-xs text-warning" aria-label="Still to do" data-focus="question" tabIndex={-1}>
-                  {d.queueFlags!.map((f) => (
-                    <li key={f.code}>{f.message}</li>
-                  ))}
-                </ul>
-              )}
+              <div data-focus="question" tabIndex={-1}>
+                <FixList fixes={fixes} />
+              </div>
+              <FixHint fixes={fixes} field="status" />
             </>
           )}
         </div>
@@ -176,7 +178,7 @@ export function LibraryRuleDetail({ projectId, d }: { projectId: string; d: Rule
         )}
       </section>
 
-      <LibraryDetailsEditor projectId={projectId} ruleId={d.ruleId} contentHash={d.contentHash} body={b} approved={d.applied} />
+      <LibraryDetailsEditor projectId={projectId} ruleId={d.ruleId} contentHash={d.contentHash} body={b} approved={d.applied} fixes={fixes} />
 
       <section aria-labelledby="hist-h" className="card p-4">
         <h2 id="hist-h" className="font-semibold">
@@ -208,14 +210,15 @@ export function LibraryRuleDetail({ projectId, d }: { projectId: string; d: Rule
       </section>
 
       {d.state !== 'EXCLUDED' && (
-        <details className="card p-4" data-focus="quote">
+        <details className="card p-4" data-focus="quote" data-edit-form>
           <summary className="cursor-pointer font-semibold">Edit the text, the in-force date and the quotes</summary>
           <p className="mt-1 text-xs text-fg-muted">{d.applied ? 'This rule is approved; saving an edit creates a new draft that goes back to the review queue.' : 'Save your changes; the review queue then shows what is left, or “Ready to confirm”. To back the condition with the source, add a quote that supports “When it applies”.'}</p>
           <div className="mt-3">
-            <RuleReview key={d.versionId} projectId={projectId} versionId={d.versionId} editOnly library />
+            <RuleReview key={d.versionId} projectId={projectId} versionId={d.versionId} editOnly library fixes={fixes} />
           </div>
         </details>
       )}
+      {draft && d.nextAction && <NextProblemBar fixes={fixes} queueHref={queue} />}
     </div>
   );
 }

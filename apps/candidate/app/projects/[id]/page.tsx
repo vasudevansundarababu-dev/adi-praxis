@@ -6,8 +6,8 @@ import { redirect } from 'next/navigation';
 import { NextTaskButton } from '@/components/work/next-task';
 import { getMe } from '@/lib/api';
 import type { OutstandingStep, ProjectView } from '@/lib/work-types';
-import { minutes, TASK_STATUS } from '@/lib/work-types';
 import { cookies } from 'next/headers';
+import { ProjectTaskList } from './task-list';
 
 export const metadata: Metadata = { title: { absolute: pageTitle('Project tasks') } };
 
@@ -64,21 +64,7 @@ export default async function ProjectTasksPage({ params, searchParams }: { param
           </div>
         </div>
         {open.length === 0 && <p className="mt-2 text-sm text-fg-muted">No open tasks. {v.canPull ? 'Get your next task when you’re ready.' : ''}</p>}
-        <ul className="mt-2 space-y-2">
-          {[...open, ...rest].map((t) => (
-            <li key={t.id} className="rounded-md border border-line p-3 text-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link href={`/tasks/${t.id}`} className="font-medium text-link hover:underline">
-                  {t.brief ?? 'Task'}
-                </Link>
-                <span className={`ml-auto text-xs ${t.status === 'REWORK' ? 'text-warning' : t.status === 'ACCEPTED' ? 'text-success' : 'text-fg-muted'}`}>{TASK_STATUS[t.status]}</span>
-              </div>
-              <p className="mt-1 text-xs text-fg-muted">
-                {t.isOpenSlot ? 'Open slot · ' : ''}active {minutes(t.activeSeconds)} min{t.submittedAt ? ` · submitted ${new Date(t.submittedAt).toLocaleDateString()}` : ''}
-              </p>
-            </li>
-          ))}
-        </ul>
+        <ProjectTaskList tasks={[...open, ...rest]} />
       </section>
     </main>
   );

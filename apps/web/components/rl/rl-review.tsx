@@ -66,7 +66,7 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
         <section aria-labelledby="src-h" className="min-w-0 card p-3 text-sm">
           <h2 id="src-h" className="font-semibold">Original approved task</h2>
           {d.sources.map((s) => (
-            <details key={s.id} open className="mt-2">
+            <details key={s.id} className="mt-2">
               <summary className="cursor-pointer">{s.workflow} · <span className="font-mono text-xs">{s.contentHash.slice(0, 12)}</span></summary>
               <pre className="mt-1 max-h-[32rem] overflow-auto whitespace-pre-wrap rounded border border-line p-2 text-xs">{show({ input: s.input, output: s.output })}</pre>
             </details>
@@ -93,8 +93,19 @@ export function RlReview({ data: d }: { data: RlReviewData }) {
                 </div>
                 {s.thought && <p className="mt-1 text-fg-muted">{s.thought}</p>}
                 {s.tool && <p className="mt-1 text-xs">Tool: {s.tool}</p>}
-                {s.input !== undefined && <pre className="mt-1 overflow-auto whitespace-pre-wrap text-xs">in: {show(s.input)}</pre>}
-                {s.output !== undefined && <pre className="mt-1 overflow-auto whitespace-pre-wrap text-xs">out: {show(s.output)}</pre>}
+                {/* UI standard 3a: a step's raw input and output are collapsed. */}
+                {s.input !== undefined && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs">Step {s.index} input</summary>
+                    <pre className="mt-1 overflow-auto whitespace-pre-wrap text-xs">in: {show(s.input)}</pre>
+                  </details>
+                )}
+                {s.output !== undefined && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs">Step {s.index} output</summary>
+                    <pre className="mt-1 overflow-auto whitespace-pre-wrap text-xs">out: {show(s.output)}</pre>
+                  </details>
+                )}
               </li>
             ))}
           </ol>

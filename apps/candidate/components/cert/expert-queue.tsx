@@ -1,6 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { matchesQuery } from '@praxis/shared';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
+import { useMemo, useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { Req, RequiredNote } from '@/components/required';
 import { call } from '@/lib/client';
 import type { AssessmentItem, ExpertReviewItem } from '@/lib/supply-types';
@@ -10,6 +13,25 @@ const input = 'mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5'
 export function ExpertQueue({ assessments, families }: { assessments: AssessmentItem[]; families: ExpertReviewItem[] }) {
   const [grades, setGrades] = useState(assessments);
   const [fams, setFams] = useState(families);
+  // UI standard 3a: both lists are searched and paged 10 a page. A card holds an unsaved score, so a card off the page
+  // or outside the search is hidden, never unmounted.
+  const [gq, setGq] = useState('');
+  const [fq, setFq] = useState('');
+  const gKey = (g: AssessmentItem) => `${g.attemptId}:${g.itemId}`;
+  const gShown = useMemo(() => grades.filter((g) => matchesQuery([g.domain, g.stem], gq)), [grades, gq]);
+  const fShown = useMemo(() => fams.filter((f) => matchesQuery([f.competency.replace(/_/g, ' '), f.itemType.toLowerCase().replace(/_/g, ' '), f.citation, f.stemPattern], fq)), [fams, fq]);
+  const gPaged = usePagedRows(gShown, { param: 'gradesPage', resetKey: gq });
+  const fPaged = usePagedRows(fShown, { param: 'familiesPage', resetKey: fq });
+  const gVisible = new Set(gPaged.items.map(gKey));
+  const fVisible = new Set(fPaged.items.map((f) => f.id));
+  const noMatch = (q: string, clear: () => void) => (
+    <p className="mt-3 text-sm text-fg-muted">
+      No matches for &lsquo;{q}&rsquo;.{' '}
+      <button type="button" className="text-link hover:underline" onClick={clear}>
+        Clear search
+      </button>
+    </p>
+  );
   return (
     <>
       <section aria-labelledby="grades-h">
@@ -19,13 +41,21 @@ export function ExpertQueue({ assessments, families }: { assessments: Assessment
         {grades.length === 0 ? (
           <p className="card mt-3 p-4 text-sm text-fg-muted">Nothing to mark right now. New tasks appear here when candidates in your domain submit their test.</p>
         ) : (
+          <>
+          <label className="mt-3 block text-sm">
+            <span className="sr-only">Search tasks to mark</span>
+            <input type="search" value={gq} onChange={(e) => setGq(e.target.value)} placeholder="Search tasks to mark" className="rounded-md border border-line bg-surface px-2 py-1" />
+          </label>
+          {gShown.length === 0 && noMatch(gq, () => setGq(''))}
           <ul className="mt-3 grid gap-4">
             {grades.map((g) => (
-              <li key={`${g.attemptId}:${g.itemId}`}>
+              <li key={`${g.attemptId}:${g.itemId}`} hidden={!gVisible.has(gKey(g))}>
                 <GradeCard item={g} onDone={() => setGrades((l) => l.filter((x) => !(x.attemptId === g.attemptId && x.itemId === g.itemId)))} />
               </li>
             ))}
           </ul>
+          {gShown.length > 0 && <ClientPager paged={gPaged} noun="tasks to mark" singular="task to mark" />}
+          </>
         )}
       </section>
 
@@ -36,13 +66,21 @@ export function ExpertQueue({ assessments, families }: { assessments: Assessment
         {fams.length === 0 ? (
           <p className="card mt-3 p-4 text-sm text-fg-muted">No question families are waiting for you.</p>
         ) : (
+          <>
+          <label className="mt-3 block text-sm">
+            <span className="sr-only">Search question families</span>
+            <input type="search" value={fq} onChange={(e) => setFq(e.target.value)} placeholder="Search question families" className="rounded-md border border-line bg-surface px-2 py-1" />
+          </label>
+          {fShown.length === 0 && noMatch(fq, () => setFq(''))}
           <ul className="mt-3 grid gap-4">
             {fams.map((f) => (
-              <li key={f.id}>
+              <li key={f.id} hidden={!fVisible.has(f.id)}>
                 <FamilyCard family={f} onDone={() => setFams((l) => l.filter((x) => x.id !== f.id))} />
               </li>
             ))}
           </ul>
+          {fShown.length > 0 && <ClientPager paged={fPaged} noun="question families" singular="question family" />}
+          </>
         )}
       </section>
     </>

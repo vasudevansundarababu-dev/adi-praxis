@@ -1,11 +1,10 @@
 import type { DemographicAttributeDto, ForgeTaskRow, JobDescriptionDto, ProjectDto, ProjectPersonDto } from '@praxis/shared';
-import { parsePage, slicePage } from '@praxis/shared';
 import Link from 'next/link';
-import { UrlPager, type SearchParams } from '@/components/pager';
+import type { SearchParams } from '@/components/pager';
 import type { ExportState } from '@/components/projects/export-panel';
 import { projectDetailRows } from '@/components/projects/summary';
-import { exportStatusLine, fullName, nextStep, reviewersOf, routeLabel, rowSelector, selectorName, smesOf, taskCode, taskName, taskStatusLabel, taskStatusTone, type ReviewRoute } from '@/lib/forge-console';
-import { TD, TH } from './project-shell';
+import { exportStatusLine, fullName, nextStep, reviewersOf, routeLabel, selectorName, smesOf, type ReviewRoute } from '@/lib/forge-console';
+import { CoverageTable } from './coverage-table';
 
 export interface DashboardNumbers {
   reworkRate: number;
@@ -29,7 +28,6 @@ export function ForgeDashboardTab({
   exportState,
   attributes,
   jobDescriptions,
-  searchParams = {},
 }: {
   project: ProjectDto;
   reviewRoute: ReviewRoute;
@@ -41,11 +39,9 @@ export function ForgeDashboardTab({
   exportState: ExportState | null;
   attributes: DemographicAttributeDto[];
   jobDescriptions: JobDescriptionDto[];
-  /** D24: the URL's `?page=` for the coverage table. */
+  /** D24: the URL's `?page=` for the coverage table (read in the browser by CoverageTable). */
   searchParams?: SearchParams;
 }) {
-  // D24: the coverage table, 10 tasks a page; task codes keep their place in the whole list.
-  const coverage = slicePage(tasks.map((t, i) => ({ t, i })), parsePage(searchParams.page));
   const smes = smesOf(people).length;
   const approved = tasks.filter((t) => t.status === 'ACCEPTED').length;
   const waiting = tasks.filter((t) => t.status === 'SUBMITTED').length;
@@ -105,39 +101,7 @@ export function ForgeDashboardTab({
         </Link>
       </div>
 
-      <h2 className="mt-7 mb-3 text-lg font-semibold">Coverage by {selector}</h2>
-      <div className="card overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-hairline">
-            <tr>
-              <th className={TH}>{selector === 'task' ? 'Slot' : selector.charAt(0).toUpperCase() + selector.slice(1)}</th>
-              <th className={TH}>Task</th>
-              <th className={TH}>Authored by</th>
-              <th className={TH}>Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-hairline">
-            {coverage.items.map(({ t, i }) => (
-              <tr key={t.taskId} data-coverage-row>
-                <td className={`${TD} font-semibold`}>{rowSelector(t)?.value ?? taskName(t.label)}</td>
-                <td className={`${TD} font-mono text-xs`}>{taskCode(i)}</td>
-                <td className={TD}>{t.author?.name ?? ''}</td>
-                <td className={TD}>
-                  <span className={`pill ${taskStatusTone(t.status)}`}>{taskStatusLabel(t.status)}</span>
-                </td>
-              </tr>
-            ))}
-            {tasks.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-fg-muted">
-                  This project has no tasks yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      {tasks.length > 0 && <UrlPager searchParams={searchParams} page={coverage.page} total={coverage.total} shown={coverage.items.length} noun="tasks" singular="task" />}
+      <CoverageTable tasks={tasks} selector={selector} />
       <p className="mt-2.5 text-xs text-fg-muted">
         {covered} of {tasks.length} covered by an approved task.
       </p>

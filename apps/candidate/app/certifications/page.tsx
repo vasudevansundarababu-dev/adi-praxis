@@ -5,6 +5,7 @@ import { notFound, redirect } from 'next/navigation';
 import { LicenceForm } from '@/components/cert/licence-form';
 import { api, getMe } from '@/lib/api';
 import { CERT_STATE, fmtDate, fmtDateTime, type CertificationCard } from '@/lib/supply-types';
+import { CertList } from './cert-list';
 
 export const metadata: Metadata = { title: { absolute: pageTitle('Certifications') } };
 
@@ -33,21 +34,24 @@ export default async function CertificationsPage() {
         </p>
       )}
 
-      <ul className="grid gap-4">
-        {items.map((c) => (
-          <li key={c.id} className="card p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm text-fg-muted">{c.domain}</p>
-                <h2 className="text-lg font-semibold">{c.tierLabel} certification</h2>
+      <CertList
+        cards={items.map((c) => ({
+          id: c.id,
+          node: (
+            <>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm text-fg-muted">{c.domain}</p>
+                  <h2 className="text-lg font-semibold">{c.tierLabel} certification</h2>
+                </div>
+                <span className={`pill ${CERT_STATE[c.state][1]}`}>{CERT_STATE[c.state][0]}</span>
               </div>
-              <span className={`pill ${CERT_STATE[c.state][1]}`}>{CERT_STATE[c.state][0]}</span>
-            </div>
-            <CertNext c={c} />
-            {c.licenceRequired && <LicenceForm certificationId={c.id} status={c.licenceStatus ?? 'NOT_SUBMITTED'} />}
-          </li>
-        ))}
-      </ul>
+              <CertNext c={c} />
+              {c.licenceRequired && <LicenceForm certificationId={c.id} status={c.licenceStatus ?? 'NOT_SUBMITTED'} />}
+            </>
+          ),
+        }))}
+      />
 
       {expert && (
         <section className="card p-5">

@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { NoAccess } from '@/components/no-access';
-import { ProposalReview, type ProposalRow } from '@/components/policy/proposal-review';
+import type { ProposalRow } from '@/components/policy/proposal-review';
 import { apiGet, getCurrentUser } from '@/lib/api';
+import { ProposalList } from './proposal-list';
 
 export const metadata: Metadata = { title: 'Policy proposals' };
 
@@ -17,7 +18,7 @@ export default async function PolicyProposalQueue() {
       <p className="mt-1 max-w-3xl text-sm text-fg-muted">
         Documents SMEs have proposed for your projects. Check that each is a real, relevant policy and contains no real customer data. Accepting adds it to the project’s documents; nothing becomes a rule until its rules are extracted, reviewed and published by the PM.
       </p>
-      {items.length === 0 ? <p className="mt-6 text-fg-muted">No policy proposals are waiting.</p> : <div className="mt-6 space-y-4">{items.map((p) => <ProposalReview key={p.id} p={p} />)}</div>}
+      {items.length === 0 ? <p className="mt-6 text-fg-muted">No policy proposals are waiting.</p> : <ProposalList items={items} />}
     </div>
   );
 }

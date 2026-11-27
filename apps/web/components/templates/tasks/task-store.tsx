@@ -1,8 +1,8 @@
 'use client';
 
-import type { SmeAuthoredTaskDto } from '@praxis/shared';
+import { matchesQuery, type SmeAuthoredTaskDto } from '@praxis/shared';
 import { usePagedRows } from '@praxis/shared/ui/use-page';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ClientPager } from '@/components/pager';
 import { Modal } from '@/components/templates/compiler/custom-field-dialog';
 import { JudgePanel } from '@/components/templates/tasks/judge-panel';
@@ -22,7 +22,10 @@ const score = (n: number | null) => (n === null ? '—' : n.toFixed(2));
 /** Task store (Mock S4): every studio-authored task for the client, with JSON and Harbor bundle (S4-11, S4-12). */
 export function TaskStore({ tasks }: { tasks: SmeAuthoredTaskDto[] }) {
   const [inspect, setInspect] = useState<{ task: SmeAuthoredTaskDto; json: string | null; error: string | null } | null>(null);
-  const paged = usePagedRows(tasks);
+  const [q, setQ] = useState('');
+  // UI standard 3a: a list that can pass 10 rows has a search box; a new search goes back to page 1.
+  const shown = useMemo(() => tasks.filter((t) => matchesQuery([t.externalTaskId, t.workflowName, t.projectName, t.authoredBy, t.title, reviewPill(t.reviewStatus)[0]], q)), [tasks, q]);
+  const paged = usePagedRows(shown, { resetKey: q });
 
   async function open(task: SmeAuthoredTaskDto) {
     setInspect({ task, json: null, error: null });
@@ -33,6 +36,12 @@ export function TaskStore({ tasks }: { tasks: SmeAuthoredTaskDto[] }) {
   return (
     <div>
       <div className="mt-4 flex flex-wrap items-center gap-3">
+        {tasks.length > 0 && (
+          <label className="text-sm">
+            <span className="sr-only">Search studio tasks</span>
+            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search studio tasks" className="rounded-md border border-line bg-surface px-2 py-1 text-sm" />
+          </label>
+        )}
         <p className="text-sm text-fg-muted">
           {tasks.length} task{tasks.length === 1 ? '' : 's'}. Each is stored in PostgreSQL, as task JSON and as a Harbor bundle, and goes through independent review before it can reach the
           Approved Task Dataset.
@@ -43,6 +52,13 @@ export function TaskStore({ tasks }: { tasks: SmeAuthoredTaskDto[] }) {
       </div>
       {tasks.length === 0 ? (
         <p className="mt-6 text-fg-muted">No studio tasks yet. They appear here after an SME uses Save &amp; Commit.</p>
+      ) : shown.length === 0 ? (
+        <p className="mt-6 text-sm text-fg-muted">
+          No matches for &lsquo;{q}&rsquo;.{' '}
+          <button type="button" className="text-link hover:underline" onClick={() => setQ('')}>
+            Clear search
+          </button>
+        </p>
       ) : (
         <div className="card mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -97,7 +113,7 @@ export function TaskStore({ tasks }: { tasks: SmeAuthoredTaskDto[] }) {
           </table>
         </div>
       )}
-      {tasks.length > 0 && <ClientPager paged={paged} noun="tasks" singular="task" />}
+      {shown.length > 0 && <ClientPager paged={paged} noun="tasks" singular="task" />}
       <Modal open={inspect !== null} onClose={() => setInspect(null)} label="Task JSON">
         {inspect && (
           <div className="space-y-3">

@@ -1,7 +1,10 @@
 'use client';
 
+import { matchesQuery } from '@praxis/shared';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { call } from '@/lib/client';
 import { canDecide, decideHint, DECISION_LABEL, pathText, scoreText, type AssignedReview } from '@/lib/run-review';
 
@@ -23,6 +26,12 @@ export function RunReviews({ reviews }: { reviews: AssignedReview[] }) {
     if (!res.ok) return setError(res.error ?? 'The decision was not sent. Try again.');
     router.refresh();
   }
+  // UI standard 3a: batches are searched and paged 10 a page; a batch off the page or outside the search is hidden, never
+  // unmounted, and each batch is collapsible and open by default. Items inside a batch are never paged.
+  const [q, setQ] = useState('');
+  const shown = useMemo(() => reviews.filter((b) => matchesQuery([b.projectName, b.batchId, b.runId, ...b.items.map((i) => i.itemId)], q)), [reviews, q]);
+  const paged = usePagedRows(shown, { param: 'batchesPage', resetKey: q });
+  const visible = new Set(paged.items.map((b) => b.ref));
   if (!reviews.length) return <p className="card p-5 text-sm text-fg-muted">No run reviews are assigned to you right now.</p>;
   return (
     <div className="space-y-6">
@@ -31,12 +40,29 @@ export function RunReviews({ reviews }: { reviews: AssignedReview[] }) {
           {error}
         </p>
       )}
+      {reviews.length > 1 && (
+        <label className="block text-sm">
+          <span className="sr-only">Search run reviews</span>
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search run reviews" className="rounded-md border border-line bg-surface px-2 py-1" />
+        </label>
+      )}
+      {shown.length === 0 && (
+        <p className="text-sm text-fg-muted">
+          No matches for &lsquo;{q}&rsquo;.{' '}
+          <button type="button" className="text-link hover:underline" onClick={() => setQ('')}>
+            Clear search
+          </button>
+        </p>
+      )}
       {reviews.map((b) => (
-        <section key={b.ref} aria-labelledby={`rr-${b.ref}`} className="card p-4">
-          <h2 id={`rr-${b.ref}`} className="font-semibold">
+        <section key={b.ref} aria-labelledby={`rr-${b.ref}`} className="card p-4" hidden={!visible.has(b.ref)}>
+          <details open>
+          <summary className="cursor-pointer">
+          <h2 id={`rr-${b.ref}`} className="inline font-semibold">
             {b.projectName} · batch <span className="font-mono">{b.batchId}</span>
             {b.runId && <> · run {b.runId}</>}
           </h2>
+          </summary>
           <p className="text-xs text-fg-muted">Received {new Date(b.receivedAt).toLocaleString()}</p>
           <ul className="mt-3 space-y-3 text-sm">
             {b.items.map((i) => {
@@ -93,8 +119,10 @@ export function RunReviews({ reviews }: { reviews: AssignedReview[] }) {
               );
             })}
           </ul>
+          </details>
         </section>
       ))}
+      {shown.length > 0 && <ClientPager paged={paged} noun="batches" singular="batch" />}
     </div>
   );
 }

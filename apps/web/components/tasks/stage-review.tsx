@@ -74,8 +74,11 @@ export function StageSummary({ d, status }: { d: StageData; status: string }) {
         )}
       </p>
       {d.viewer.bothResponsibilities && <p className="rounded-md border border-line p-2">You hold both responsibilities on this project, Expert and PM. Each decision is recorded and audited separately under its own responsibility.</p>}
-      <div>
-        <h3 className="font-medium">Stage history</h3>
+      {/* UI standard 3a: long secondary content (the stage history) is collapsed. */}
+      <details>
+        <summary className="cursor-pointer font-medium">
+          <h3 className="inline font-medium">Stage history</h3> ({d.stageHistory.length})
+        </summary>
         {d.stageHistory.length === 0 ? (
           <p className="text-fg-muted">No stage decisions yet.</p>
         ) : (
@@ -100,9 +103,9 @@ export function StageSummary({ d, status }: { d: StageData; status: string }) {
             ))}
           </ol>
         )}
-      </div>
+      </details>
       {d.diff && (
-        <details open>
+        <details>
           <summary className="cursor-pointer font-medium">
             Changes from version {d.diff.fromVersion} to version {d.diff.toVersion} ({d.diff.changes.length})
           </summary>

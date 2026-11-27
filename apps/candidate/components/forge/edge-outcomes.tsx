@@ -1,7 +1,10 @@
 'use client';
 
+import { matchesQuery } from '@praxis/shared';
+import { usePagedRows } from '@praxis/shared/ui/use-page';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { ClientPager } from '@/components/pager';
 import { call } from '@/lib/client';
 
 /**
@@ -188,6 +191,12 @@ export function AnswerForm({ item, fields, editable, onSave }: { item: OutcomeIt
 export function EdgeOutcomes({ batches }: { batches: MyOutcomeBatch[] }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  // UI standard 3a: batches are searched and paged 10 a page. Each answer form holds unsaved text, so a batch off the
+  // page or outside the search is hidden, never unmounted; each batch is collapsible and open by default.
+  const [q, setQ] = useState('');
+  const shown = useMemo(() => batches.filter((b) => matchesQuery([b.projectName, STATE_LABEL[b.state], b.note, ...b.items.flatMap((i) => [i.familyName, i.name])], q)), [batches, q]);
+  const paged = usePagedRows(shown, { param: 'batchesPage', resetKey: q });
+  const visible = new Set(paged.items.map((b) => b.id));
   if (!batches.length) return <p className="card p-5 text-sm text-fg-muted">No edge-case outcomes are waiting for you.</p>;
   async function submit(id: string) {
     setError(null);
@@ -202,14 +211,31 @@ export function EdgeOutcomes({ batches }: { batches: MyOutcomeBatch[] }) {
           {error}
         </p>
       )}
+      {batches.length > 1 && (
+        <label className="block text-sm">
+          <span className="sr-only">Search batches</span>
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search batches" className="rounded-md border border-line bg-surface px-2 py-1" />
+        </label>
+      )}
+      {shown.length === 0 && (
+        <p className="text-sm text-fg-muted">
+          No matches for &lsquo;{q}&rsquo;.{' '}
+          <button type="button" className="text-link hover:underline" onClick={() => setQ('')}>
+            Clear search
+          </button>
+        </p>
+      )}
       {batches.map((b) => {
         const answered = b.items.filter((i) => i.answer).length;
         const open = b.state === 'open';
         return (
-          <section key={b.id} aria-labelledby={`ob-${b.id}`} className="card p-4 text-sm" data-outcome-batch={b.state}>
-            <h2 id={`ob-${b.id}`} className="font-semibold">
+          <section key={b.id} aria-labelledby={`ob-${b.id}`} className="card p-4 text-sm" data-outcome-batch={b.state} hidden={!visible.has(b.id)}>
+            <details open>
+            <summary className="cursor-pointer">
+            <h2 id={`ob-${b.id}`} className="inline font-semibold">
               {b.projectName} · {b.items.length} variant{b.items.length === 1 ? '' : 's'} · {STATE_LABEL[b.state]}
             </h2>
+            </summary>
             <p className="text-xs text-fg-muted">
               {answered} of {b.items.length} answered{b.dueBy ? ` · due ${b.dueBy}` : ''}
               {b.secondCheck ? ' · another person checks your answers before they are used' : ''}
@@ -233,9 +259,11 @@ export function EdgeOutcomes({ batches }: { batches: MyOutcomeBatch[] }) {
                 {b.secondCheck ? 'Submit for the second check' : 'Submit the batch'}
               </button>
             )}
+            </details>
           </section>
         );
       })}
+      {shown.length > 0 && <ClientPager paged={paged} noun="batches" singular="batch" />}
     </div>
   );
 }

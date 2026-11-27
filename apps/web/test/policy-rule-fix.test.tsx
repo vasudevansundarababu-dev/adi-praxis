@@ -64,6 +64,11 @@ describe('flag → field map', () => {
     expect(items.map((i) => i.field).sort()).toEqual(['applies', 'effective', 'quotes', 'quotes', 'quotes', 'requirement', 'type'].sort());
   });
 
+  it('a problem reported by both a flag and a server check is listed once', () => {
+    const items = fixItems({ queueFlags: [flag('no_effective_date'), flag('not_ready', 'x')], definitionProblems: ['Set the effective scope (a date, or "always" in the condition).'], body: { library: {} } });
+    expect(items.filter((i) => i.field === 'effective')).toHaveLength(1);
+  });
+
   it('the condition-quote problem says it in plain words, with how to fix it', () => {
     const [i] = fixItems({ queueFlags: [EXAMPLES.condition_not_quoted!], body: { library: {} } });
     expect(i!.field).toBe('quotes');

@@ -158,7 +158,9 @@ export function fixItems(d: FixInput): FixItem[] {
   }
   // Top to bottom on the page: status card, Library details (selects, then the condition), then the edit form (quotes, then the text fields).
   const order: FixField[] = ['status', 'kind', 'issuer', 'jurisdiction', 'subject', 'process', 'change', 'condition', 'quotes', 'requirement', 'type', 'applies', 'effective'];
-  return out.sort((a, b) => order.indexOf(a.field) - order.indexOf(b.field));
+  // The same problem can come from a queue flag and from the server's check (for example a missing in-force date): once.
+  const unique = out.filter((x, i) => out.findIndex((y) => y.field === x.field && y.label === x.label) === i);
+  return unique.sort((a, b) => order.indexOf(a.field) - order.indexOf(b.field));
 }
 
 /** The fixes for one field. */

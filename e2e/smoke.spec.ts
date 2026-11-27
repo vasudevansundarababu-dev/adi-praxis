@@ -29,13 +29,16 @@ test.describe('console smoke', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/project/i);
     // D-024 (owner, 23 Nov 2026): Templates is its own top-level menu item, right after Projects.
     await nav.getByRole('link', { name: 'Templates' }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Harbor Templates Directory');
+    // Each page compiles on its first visit to the dev server: wait for the navigation, not a fixed 5 s.
+    await page.waitForURL(/\/templates(\?|$)/, { timeout: 30_000 });
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Harbor Templates Directory', { timeout: 30_000 });
     // S1-12, S1-13: templates and domains come only from the seed and Save Variant.
     await expect(page.getByRole('main').getByText(/new template|add domain/i)).toHaveCount(0);
     await expect(nav.getByRole('link', { name: 'Templates' })).toHaveAttribute('aria-current', 'true');
     await nav.getByRole('link', { name: 'Projects' }).click();
     await page.getByRole('navigation', { name: 'Projects pages' }).getByRole('link', { name: 'Approved exports' }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Approved task exports');
+    await page.waitForURL(/\/dataset(\?|$)/, { timeout: 30_000 });
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Approved task exports', { timeout: 30_000 });
     await expect(page.getByRole('link', { name: 'Download existing NDJSON dataset' })).toBeVisible();
   });
 

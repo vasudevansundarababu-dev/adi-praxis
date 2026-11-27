@@ -2885,3 +2885,7 @@ Owner: "D120 -- 10 , D109 yes (for authoring)".
   redirects to Home (`/` in both apps, `/partner` for partners), the console's tutorial files answer 404, and neither
   the help pack nor the public help mentions Tutorials. On: everything as before. Nothing deleted (pages, videos,
   guides and help text kept). The per-template tutorial video on a task page is a different feature, unchanged.
+  Owner, 27 Nov 2026: "Its by default off in QA. Its on only in Staging." Terraform `tutorials_enabled` (default
+  false) sets TUTORIALS_ENABLED on the API, worker, jobs, console and SME app; only `infra/terraform/envs/staging/main.tf`
+  sets it to true. QA (local and the demo project) and production leave it unset, so it is off. Regenerate the videos
+  before staging (D-124).

@@ -105,6 +105,7 @@ module "run" {
   deletion_protection = var.deletion_protection
   harbor_verify_job   = "praxis-harbor-verify"
   meta_compiler       = var.meta_compiler
+  tutorials_enabled   = var.tutorials_enabled
   policy_extraction   = var.policy_extraction == null ? { env = {}, secret_env = {} } : { env = module.policy_extraction[0].env, secret_env = module.policy_extraction[0].secret_env }
   depends_on          = [module.iam, module.policy_extraction]
 }

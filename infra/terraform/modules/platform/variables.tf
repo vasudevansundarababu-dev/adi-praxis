@@ -52,3 +52,8 @@ variable "policy_extraction" {
   })
   default = null
 }
+variable "tutorials_enabled" {
+  description = "Tutorials page (TUTORIALS_ENABLED). Off in QA, on in Staging; regenerate the videos before staging (D-124)."
+  type        = bool
+  default     = false
+}

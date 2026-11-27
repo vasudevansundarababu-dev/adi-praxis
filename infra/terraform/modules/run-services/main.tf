@@ -39,6 +39,8 @@ locals {
     META_COMPILER_MODELS        = var.meta_compiler.models
     GENERATION_COST_CAP_USD     = tostring(var.meta_compiler.cost_cap_usd)
     GENERATION_DAILY_BUDGET_USD = tostring(var.meta_compiler.daily_budget_usd)
+    # Tutorials page: off in QA, on in Staging; regenerate the videos before staging (D-124).
+    TUTORIALS_ENABLED = tostring(var.tutorials_enabled)
   }, var.policy_extraction.env)
   # Policy secrets go to api and worker only; the jobs service account cannot read them.
   service_secret_env = merge(local.secret_env, var.policy_extraction.secret_env)
@@ -206,6 +208,10 @@ resource "google_cloud_run_v2_service" "front" {
       env {
         name  = "CANDIDATE_APP_URL"
         value = "https://${var.domains.candidate}"
+      }
+      env {
+        name  = "TUTORIALS_ENABLED"
+        value = tostring(var.tutorials_enabled)
       }
       dynamic "env" {
         for_each = each.key == "candidate" ? ["google-oauth-client-id"] : []

@@ -42,7 +42,9 @@ module "platform" {
   monthly_budget_usd  = var.monthly_budget_usd
   app_secret_values   = var.app_secret_values
   # Owner approval (8 Nov 2026): live Claude in staging, $2 per run, $10 per day.
-  meta_compiler = { live_ai = true, models = "claude:claude-sonnet-5", cost_cap_usd = 2, daily_budget_usd = 10 }
+  # Owner, 27 Nov 2026: Tutorials on in Staging only (off in QA and production by default). Regenerate the videos first (D-124).
+  tutorials_enabled = true
+  meta_compiler     = { live_ai = true, models = "claude:claude-sonnet-5", cost_cap_usd = 2, daily_budget_usd = 10 }
   # Owner decisions D-B1/D-D1: $20 LlamaExtract, $30 Google, 20 pages. Set live = true only after the
   # llamaextract-api-key secret has a version (docs/integrations/POLICY-EXTRACTION-LIVE-SETUP.md).
   policy_extraction = { live = false, llamaextract_project_id = "bbe4af96-0b9d-4518-99f8-1bb62570b278", budget_llama_usd = 20, budget_google_usd = 30, max_pages = 20 }

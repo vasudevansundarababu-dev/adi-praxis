@@ -46,3 +46,8 @@ variable "policy_extraction" {
   type        = object({ env = map(string), secret_env = map(string) })
   default     = { env = {}, secret_env = {} }
 }
+variable "tutorials_enabled" {
+  description = "Tutorials page (TUTORIALS_ENABLED). Off in QA, on in Staging; regenerate the videos before staging (D-124)."
+  type        = bool
+  default     = false
+}

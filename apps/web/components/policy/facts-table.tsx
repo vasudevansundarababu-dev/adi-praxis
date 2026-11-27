@@ -8,12 +8,12 @@ import { filterFacts, NO_DESCRIPTION, originText, queueForFact, typeText, type F
 
 /**
  * The fact list (read-only): each fact a condition may name, with what it means, its type and values, where it comes
- * from, and how many rules use it (linked to the review queue filtered to them). Search and 25 rows a page.
+ * from, and how many rules use it (linked to the review queue filtered to them). Search and 10 rows a page (PAGE_SIZE, D-120).
  */
 export function FactsTable({ projectId, rows }: { projectId: string; rows: FactRow[] }) {
   const [q, setQ] = useState('');
   const shown = useMemo(() => filterFacts(rows, q), [rows, q]);
-  const paged = usePagedRows(shown, { param: 'factsPage', pageSize: 25, resetKey: q });
+  const paged = usePagedRows(shown, { param: 'factsPage', resetKey: q });
   return (
     <div>
       <label htmlFor="facts-q" className="flex max-w-sm flex-col text-sm">

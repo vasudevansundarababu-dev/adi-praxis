@@ -12,7 +12,7 @@ import { filterOptions, filterQueue, NO_FILTERS, readyRows, ruleHref, STATUS_LAB
  * KYC Judgment v1 A3 (owner, 25 Nov 2026) and D-091/D-092 (owner, 26 Nov 2026): the PM's review queue, the one place a
  * policy-library project approves rules. A table of every draft with its document, jurisdiction, status and what to do
  * next in plain words; each row opens the rule page at the field for that action. Filters (document, next action,
- * jurisdiction, status, text) and 25 rows a page. "Confirm all ready" confirms the unflagged rules within the current
+ * jurisdiction, status, text) and 10 rows a page (PAGE_SIZE, D-120). "Confirm all ready" confirms the unflagged rules within the current
  * filter: the PM's confirm is the approval, never the AI's, and the server refuses the whole batch if any rule changed
  * or became flagged. The AI suggestions step runs for the drafts in the current document filter, or all of them.
  */
@@ -156,7 +156,7 @@ export function ReviewQueuePanel({ projectId, initial, enrichment = null, initia
   const options = useMemo(() => filterOptions(rows), [rows]);
   const shown = useMemo(() => filterQueue(rows, filters), [rows, filters]);
   const ready = readyRows(shown);
-  const paged = usePagedRows(shown, { param: 'queuePage', pageSize: 25, resetKey: JSON.stringify(filters) });
+  const paged = usePagedRows(shown, { param: 'queuePage', resetKey: JSON.stringify(filters) });
   const set = (k: keyof QueueFilters, v: string) => setFilters((f) => ({ ...f, [k]: v }));
   const filtered = JSON.stringify(filters) !== JSON.stringify(NO_FILTERS);
 

@@ -9,7 +9,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, r
 /**
  * KYC Judgment v1 A3 (owner, 25 Nov 2026) and D-092 (owner, 26 Nov 2026): the PM's review queue as a table. Each row has
  * its rule, document, jurisdiction, status and the next action in plain words, linking to the rule page at that field;
- * filters by document, next action, jurisdiction and status; 25 a page; "Confirm all ready" within the filter.
+ * filters by document, next action, jurisdiction and status; 10 a page; "Confirm all ready" within the filter.
  * Synthetic data only.
  */
 const text = (m: string) => m.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
@@ -90,10 +90,10 @@ describe('review queue table (console)', () => {
     expect(ruleHref('p', { ruleId: 'r9', nextAction: { code: 'ready', label: 'Ready to confirm', focus: null } })).toBe('/projects/p/policy/rules/r9');
   });
 
-  it('pages 25 rules at a time; an empty queue says so', () => {
+  it('pages 10 rules at a time (PAGE_SIZE, D-120); an empty queue says so', () => {
     const many = Array.from({ length: 30 }, (_, i) => row({ ruleId: `r${i}`, ruleKey: `R-${String(i).padStart(2, '0')}` }));
     const html = renderToStaticMarkup(<ReviewQueuePanel projectId="p" initial={{ items: many, flagged: 0, total: 30, studioConnected: false }} />);
-    expect((html.match(/data-next-action=/g) ?? []).length).toBe(25);
+    expect((html.match(/data-next-action=/g) ?? []).length).toBe(10);
     expect(text(html)).toContain('Confirm all ready (30)');
     expect(text(renderToStaticMarkup(<ReviewQueuePanel projectId="p" initial={{ items: [], flagged: 0, total: 0, studioConnected: false }} />))).toContain('No draft rules to review.');
   });

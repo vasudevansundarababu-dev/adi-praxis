@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { filterFacts, originText, queueForFact, typeText, undescribed, type FactRow } from '@/components/policy/facts-logic';
 import { filterQueue, NO_FILTERS, type QueueTableRow } from '@/components/policy/queue-logic';
 
-// The Policy page's fact list (owner, 26 Nov 2026): read-only table, search, 25 a page, "Used by" links to the queue's fact filter.
+// The Policy page's fact list (owner, 26 Nov 2026): read-only table, search, 10 a page (D-120), "Used by" links to the queue's fact filter.
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }), notFound: () => { throw new Error('NOT_FOUND'); }, redirect: () => undefined }));
 const api = vi.hoisted(() => ({ routes: {} as Record<string, unknown> }));
 vi.mock('@/lib/api', () => ({
@@ -63,11 +63,11 @@ describe('Policy page server render with the fact list', () => {
     return renderToStaticMarkup((await Page({ params: Promise.resolve({ id: P }), searchParams: Promise.resolve(sp) })) as React.ReactElement).replace(/&amp;/g, '&');
   };
 
-  it('renders the Facts step with the fact table: 25 a page, columns, "No description", derived origin and Used by link', async () => {
+  it('renders the Facts step with the fact table: 10 a page, columns, "No description", derived origin and Used by link', async () => {
     const out = await render();
     expect(out).toContain('See the fact list (31)');
     for (const h of ['Variable', 'Description', 'Type and allowed values', 'Where it comes from', 'Used by']) expect(out).toContain(`>${h}</th>`);
-    expect(out.match(/data-fact="/g)).toHaveLength(25);
+    expect(out.match(/data-fact="/g)).toHaveLength(10);
     expect(out).toContain('No description');
     expect(out).toContain(`href="/projects/${P}/policy?fact=fact_00#review-queue"`);
     expect(out).toContain('2 rules');

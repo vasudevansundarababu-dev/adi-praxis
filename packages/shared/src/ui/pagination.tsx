@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
-import { pageButtons, pageCount, showingText } from '../pagination';
+import { PAGE_SIZE, pageButtons, pageCount, showingText } from '../pagination';
 
 /** A link component such as next/link; a plain <a> when none is given. */
 export type PageLinkComponent = ComponentType<{ href: string; className?: string; 'aria-label'?: string; 'aria-current'?: 'page'; rel?: string; scroll?: boolean; children?: ReactNode }>;
@@ -40,7 +40,7 @@ const DISABLED = `${ITEM} cursor-not-allowed text-fg-muted opacity-50`;
  * pages, so back and refresh keep the page) or buttons (client tables). Hook-free, so server and client components can
  * both use it.
  */
-export function Pagination({ page, total, shown, pageSize = 10, noun, singular, hrefFor, onPage, linkAs, label, className = '' }: PaginationProps) {
+export function Pagination({ page, total, shown, pageSize = PAGE_SIZE, noun, singular, hrefFor, onPage, linkAs, label, className = '' }: PaginationProps) {
   const count = pageCount(total, pageSize);
   const current = Math.min(Math.max(1, page), count);
   const Link = linkAs ?? PlainLink;

@@ -57,6 +57,7 @@ export class StubAnswerFiller implements AnswerFiller {
     if (/\balways applies\b|\bapplies always\b|\balways\b/.test(t)) changes.push({ field: 'condition', value: null, reason: 'The answer says it always applies.' });
     const code = /\b(US-[A-Z]{2}|US)\b/.exec(answer)?.[1];
     if (code) changes.push({ field: 'jurisdiction', value: code, reason: `The answer names ${code}.` });
+    if (t.includes('account opening')) changes.push({ field: 'process', value: 'account_opening', reason: 'The answer names account opening.' });
     const ch = (['branch', 'remote'] as const).filter((c) => t.includes(c));
     if (ch.length) changes.push({ field: 'channels', value: ch, reason: 'The answer names the channels.' });
     return { raw: changes.length ? { changes } : { changes: [], cannot: 'I couldn’t tell which field your answer is about.' }, inputTokens: 0, outputTokens: 0 };
@@ -162,7 +163,19 @@ export function checkedProposal(raw: unknown, body: Pick<PolicyRuleBody, 'librar
       }
     }
   }
-  const parts = [cannot, dropped.length ? `I couldn’t map ${dropped.join(', ')} from your answer to an allowed value; fill ${dropped.length > 1 ? 'them' : 'it'} by hand.` : null].filter(Boolean);
+  // Customer types, product lines and channels belong to the scope, which needs a process (C1): without one, say so.
+  const hasProcess = !!scope.process || out.some((c) => c.field === 'process');
+  const needsProcess = out.filter((c) => c.field === 'customer_types' || c.field === 'product_lines' || c.field === 'channels');
+  if (!hasProcess && needsProcess.length) {
+    for (const c of needsProcess) out.splice(out.indexOf(c), 1);
+    const named = needsProcess.map((c) => (c.field === 'customer_types' ? 'the customer types' : c.field === 'product_lines' ? 'the product lines' : 'the channels')).join(' and ');
+    return finish(cannot, dropped, out, `I can set ${named} once the rule has a Process: choose the Process in Library details (for example account opening), then fill from your answer again.`);
+  }
+  return finish(cannot, dropped, out, null);
+}
+
+function finish(cannot: string | null, dropped: string[], out: ProposedChange[], extra: string | null): { changes: ProposedChange[]; message: string | null } {
+  const parts = [cannot, extra, dropped.length ? `I couldn’t map ${dropped.join(', ')} from your answer to an allowed value; fill ${dropped.length > 1 ? 'them' : 'it'} by hand.` : null].filter(Boolean);
   const message = parts.length ? parts.join(' ') : out.length ? null : 'Your answer doesn’t change any field I can fill. Your answer is saved.';
   return { changes: out, message };
 }

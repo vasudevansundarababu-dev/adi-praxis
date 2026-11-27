@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { EDIT_FORM_FIELDS, FIX_ANCHOR, fixesFor, stillMissing, type FixField, type FixItem } from './fix-logic';
 
 /** The amber outline on a field that still has something to fix. */
@@ -35,7 +35,7 @@ export async function jumpToField(field: FixField): Promise<boolean> {
   for (let p: HTMLElement | null = el; p; p = p.parentElement) if (p instanceof HTMLDetailsElement) p.open = true;
   const target = el.matches('input, select, textarea, button') ? el : (el.querySelector<HTMLElement>('input, select, textarea, button') ?? el);
   if (!target.matches('input, select, textarea, button')) target.tabIndex = -1;
-  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.scrollIntoView({ block: 'center' });
   target.focus({ preventScroll: true });
   el.classList.add(...FLASH);
   setTimeout(() => el!.classList.remove(...FLASH), 2000);
@@ -64,7 +64,7 @@ export function FixHint({ fixes, field, value }: { fixes: readonly FixItem[]; fi
 }
 
 /** "To fix" at the top of the rule page: every open problem as a link to its field. */
-export function FixList({ fixes }: { fixes: readonly FixItem[] }) {
+export function FixList({ fixes, under }: { fixes: readonly FixItem[]; under?: (f: FixItem) => ReactNode }) {
   if (!fixes.length) return null;
   return (
     <div className="mt-2 rounded border border-warning p-3" data-fix-list>
@@ -85,6 +85,7 @@ export function FixList({ fixes }: { fixes: readonly FixItem[] }) {
             >
               {f.label}
             </a>
+            {under?.(f)}
           </li>
         ))}
       </ol>

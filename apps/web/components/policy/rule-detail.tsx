@@ -60,6 +60,9 @@ export interface RuleDetailData {
   nextAction?: { code: string; label: string; focus: string | null } | null;
   /** D-094: what the policy library uses (review_queue projects only): the condition in plain words, its facts, the in-force date. */
   library?: LibraryRuleView | null;
+  /** Owner, 27 Nov 2026: the rule page's aids (switches) and the answers to its open questions (review_queue projects). */
+  aids?: import('./answer-logic').RuleAids;
+  answers?: import('./answer-logic').AnswerDto[];
 }
 
 const scope = (s: ScopeList) => (s.kind === 'all' ? 'All' : s.kind === 'listed' ? s.items.join(', ') || 'None listed' : 'Unknown');

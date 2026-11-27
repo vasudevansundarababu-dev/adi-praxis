@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { seed } from '../prisma/seed';
 import { buildApp } from '../src/app';
 import { hashPassword } from '../src/auth/password';
-import { MemoryStorage } from '../src/candidate/storage';
 import { loadConfig } from '../src/config';
 import { createDb } from '../src/db';
 import { MemoryEmailSender } from '../src/lib/email';
@@ -24,8 +23,9 @@ const { client } = await seed(db, { SEED_CLIENT_NAME: `E2E policy library ${tag}
 const pmEmail = `pm.policy-library.${tag}@e2e.local`;
 const pm = await db.user.create({ data: { clientId: client.id, email: pmEmail, name: 'Priya Menon', roles: ['PM'], passwordHash: await hashPassword(PASSWORD) } });
 
-const config = loadConfig({ ...process.env, NODE_ENV: 'test', DATABASE_URL: url, REDIS_URL: process.env.E2E_REDIS_URL ?? 'redis://localhost:6389/7', LOGIN_RATE_LIMIT_PER_MINUTE: '1000' });
-const app = await buildApp({ config, db, pingRedis: async () => true, resolveClientId: async () => client.id, storage: new MemoryStorage(), email: new MemoryEmailSender(), embeddings: new HashingEmbeddingProvider() });
+// The same object store as the e2e API (playwright.config.ts), so the rule's source text is there when an edit is saved.
+const config = loadConfig({ ...process.env, NODE_ENV: 'test', DATABASE_URL: url, REDIS_URL: process.env.E2E_REDIS_URL ?? 'redis://localhost:6389/7', LOGIN_RATE_LIMIT_PER_MINUTE: '1000', VERTEX_PROJECT_ID: '', EVIDENCE_BUCKET: 'praxis-evidence', GCS_EMULATOR_HOST: 'http://localhost:4443', GCS_PROJECT_ID: 'praxis-local' });
+const app = await buildApp({ config, db, pingRedis: async () => true, resolveClientId: async () => client.id, email: new MemoryEmailSender(), embeddings: new HashingEmbeddingProvider() });
 const login = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { email: pmEmail, password: PASSWORD } });
 if (login.statusCode !== 200) throw new Error(`login → ${login.statusCode}: ${login.body}`);
 const cookie = login.cookies.map((c) => `${c.name}=${c.value}`).join('; ');
@@ -63,6 +63,9 @@ const ready = await call('POST', `/projects/${projectId}/policy/rules`, {
     { fieldPath: 'applicability.conditionText', role: 'qualifies', quote: line(2) },
   ],
 });
+// An open question from the AI suggestions on the flagged rule (the answer box journey).
+const fv = await db.policyRuleVersion.findFirstOrThrow({ where: { ruleId: flagged.ruleId }, orderBy: { version: 'desc' } });
+await db.policyRuleSuggestion.create({ data: { clientId: client.id, projectId, ruleId: flagged.ruleId, ruleVersionId: fv.id, contentHash: fv.contentHash, source: 'enrichment', model: 'e2e', promptVersion: 'enrichment/1', content: { question: 'Should the rule cover remote openings?' }, problems: [], createdById: pm.id } });
 await app.close();
 await db.$disconnect();
 console.log(JSON.stringify({ projectId, flaggedRuleId: flagged.ruleId, readyRuleId: ready.ruleId, pm: { email: pmEmail, password: PASSWORD } }));

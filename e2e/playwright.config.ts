@@ -12,7 +12,8 @@ const REDIS = process.env.E2E_REDIS_URL ?? 'redis://localhost:6389/7';
 const env = { NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1', TUTORIALS_ENABLED: process.env.TUTORIALS_ENABLED ?? 'false' };
 // The API and the worker must share one object store, or worker jobs fall back to real GCS and hang.
 // TEMPLATE_EDITING_ENABLED (below): the tests build their own templates through the API, as the unit tests do
-// (test/helpers.ts); D-024 keeps templates read-only in every real deployment.
+// (test/helpers.ts); D-024 keeps templates read-only in every real deployment. AI_ANSWER_ENABLED with VERTEX_PROJECT_ID
+// empty: "Fill from my answer" runs on the stub; tests never call a live model.
 const storage = { EVIDENCE_BUCKET: 'praxis-evidence', GCS_EMULATOR_HOST: 'http://localhost:4443', GCS_PROJECT_ID: 'praxis-local' };
 
 export default defineConfig({
@@ -36,7 +37,7 @@ export default defineConfig({
     {
       command: 'pnpm --filter @praxis/api exec tsx src/server.ts',
       url: 'http://localhost:4300/healthz',
-      env: { ...env, ...storage, DATABASE_URL: E2E_DB, REDIS_URL: REDIS, API_PORT: '4300', CANDIDATE_APP_URL: 'http://localhost:3301', CORS_ORIGINS: 'http://localhost:3300,http://localhost:3301', LOGIN_RATE_LIMIT_PER_MINUTE: '1000', SME_SUPPLY_ENABLED: 'true', TEMPLATE_EDITING_ENABLED: 'true' },
+      env: { ...env, ...storage, DATABASE_URL: E2E_DB, REDIS_URL: REDIS, API_PORT: '4300', CANDIDATE_APP_URL: 'http://localhost:3301', CORS_ORIGINS: 'http://localhost:3300,http://localhost:3301', LOGIN_RATE_LIMIT_PER_MINUTE: '1000', SME_SUPPLY_ENABLED: 'true', TEMPLATE_EDITING_ENABLED: 'true', AI_ANSWER_ENABLED: 'true', VERTEX_PROJECT_ID: '' },
       reuseExistingServer: false,
       timeout: 240_000,
     },

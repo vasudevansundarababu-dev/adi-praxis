@@ -148,6 +148,7 @@ export const policyAnswerRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config;
       if (!latest) throw notFound('Rule not found');
       // Accepting is an ordinary rule edit: a new draft, the quotes untouched, every check unchanged.
       const next = applyChanges(PolicyRuleBody.parse(latest.body), chosen);
+      if (!PolicyRuleBody.safeParse(next).success) throw new AppError(422, 'CHANGES_INCOMPLETE', 'These changes can’t be saved on their own: customer types, product lines and channels need the Process too. Accept the Process change as well, or set the Process in Library details first.');
       const v = await editRule(tx, { loadText }, { clientId: actor.clientId, projectId: p.id, ruleId: a.ruleId, actorId: actor.userId, expectedContentHash: req.body.expectedContentHash, body: next }, audit);
       await audit({ entityType: 'PolicyQuestionAnswer', entityId: a.id, action: ANSWER_ACTIONS.accepted, after: { fields: chosen.map((c) => c.field), ruleVersionId: v.id } });
       return { status: 200, body: { versionId: v.id, version: v.version, state: v.state, contentHash: v.contentHash } };

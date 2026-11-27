@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ClientPager } from '@/components/pager';
 import { mutate } from '@/lib/client-api';
-import { fixItems } from './fix-logic';
+import { AnswerBox } from './answer-box';
+import { fixItems, splitQuestions } from './fix-logic';
 import { FixHint, FixList, NextProblemBar } from './fix-nav';
 import { LibraryDetailsEditor } from './library-details';
 import { locatorText } from './locator';
@@ -36,7 +37,10 @@ export function LibraryRuleDetail({ projectId, d }: { projectId: string; d: Rule
   const queue = `/projects/${projectId}/policy#review-queue`;
   // Owner, 27 Nov 2026: every open problem as a "To fix" link to its field, with a hint at the field (presentation only).
   const draft = !d.applied && d.state !== 'EXCLUDED';
-  const fixes = draft ? fixItems(d) : [];
+  // Field links on unless switched off; the AI answer only when switched on (RULE_FIELD_LINKS_ENABLED, AI_ANSWER_ENABLED).
+  const aids = d.aids ?? { fieldLinks: true, aiAnswer: false, aiPaused: false };
+  const fixes = draft && aids.fieldLinks ? fixItems(d) : [];
+  const answerBox = (question: string) => <AnswerBox projectId={projectId} ruleId={d.ruleId} contentHash={d.contentHash} question={question} answers={d.answers ?? []} aids={aids} />;
 
   async function act(kind: 'exclude' | 'restore') {
     setPending(true);
@@ -98,9 +102,25 @@ export function LibraryRuleDetail({ projectId, d }: { projectId: string; d: Rule
                 .
               </p>
               <div data-focus="question" tabIndex={-1}>
-                <FixList fixes={fixes} />
+                {aids.fieldLinks ? (
+                  <FixList fixes={fixes} under={(f) => (f.question ? answerBox(f.question) : null)} />
+                ) : (
+                  // Field links switched off: the server's messages as before, each open question with its answer box.
+                  <ul className="mt-1 list-disc pl-5 text-xs text-warning" aria-label="Still to do">
+                    {(d.queueFlags ?? []).map((f) => (
+                      <li key={f.code}>
+                        {f.message}
+                        {(f.code === 'open_question' ? splitQuestions(f.message) : f.code === 'needs_review' || f.code === 'outside_scope' ? [f.message] : []).map((q) => (
+                          <div key={q} className="text-fg">
+                            {answerBox(q)}
+                          </div>
+                        ))}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <FixHint fixes={fixes} field="status" />
+              {aids.fieldLinks && <FixHint fixes={fixes} field="status" />}
             </>
           )}
         </div>
@@ -122,6 +142,19 @@ export function LibraryRuleDetail({ projectId, d }: { projectId: string; d: Rule
           </p>
         )}
       </section>
+
+      {(d.answers ?? []).length > 0 && (
+        // Every answer stays on the rule, exactly as typed, with what was proposed and accepted, after its question closes.
+        <details className="card p-4" data-answer-history open={!fixes.some((f) => f.question)}>
+          <summary className="cursor-pointer font-semibold">Answers on this rule ({d.answers!.length})</summary>
+          {[...new Set(d.answers!.map((a) => a.question))].map((q) => (
+            <div key={q} className="mt-3">
+              <p className="text-xs font-medium">Question: {q}</p>
+              <AnswerBox projectId={projectId} ruleId={d.ruleId} contentHash={d.contentHash} question={q} answers={d.answers!} aids={aids} readOnly />
+            </div>
+          ))}
+        </details>
+      )}
 
       <section aria-labelledby="req-h" className="card p-4">
         <h2 id="req-h" className="font-semibold">
@@ -178,7 +211,8 @@ export function LibraryRuleDetail({ projectId, d }: { projectId: string; d: Rule
         )}
       </section>
 
-      <LibraryDetailsEditor projectId={projectId} ruleId={d.ruleId} contentHash={d.contentHash} body={b} approved={d.applied} fixes={fixes} />
+      {/* Re-keyed by the content hash, so the form shows the saved values after any edit (an accepted answer included). */}
+      <LibraryDetailsEditor key={d.contentHash} projectId={projectId} ruleId={d.ruleId} contentHash={d.contentHash} body={b} approved={d.applied} fixes={fixes} />
 
       <section aria-labelledby="hist-h" className="card p-4">
         <h2 id="hist-h" className="font-semibold">
@@ -218,7 +252,7 @@ export function LibraryRuleDetail({ projectId, d }: { projectId: string; d: Rule
           </div>
         </details>
       )}
-      {draft && d.nextAction && <NextProblemBar fixes={fixes} queueHref={queue} />}
+      {draft && d.nextAction && aids.fieldLinks && <NextProblemBar fixes={fixes} queueHref={queue} />}
     </div>
   );
 }

@@ -76,3 +76,50 @@ test('the rule page lists what to fix, takes you to each field, and says when th
   await expect(page.locator('[data-fix-list]')).toHaveCount(0);
   await shot(page, 'after-4-ready');
 });
+
+test('an open question is answered in a text box, saved verbatim; "Fill from my answer" proposes changes that save only when accepted', async ({ page }) => {
+  test.setTimeout(180_000);
+  const out = execFileSync('pnpm', ['--silent', '--filter', '@praxis/api', 'exec', 'tsx', 'scripts/e2e-policy-library.ts'], { encoding: 'utf8' }).trim().split('\n').pop()!;
+  const fx = JSON.parse(out) as { projectId: string; flaggedRuleId: string; pm: { email: string; password: string } };
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`${WEB}/login`);
+  await page.waitForLoadState('networkidle');
+  await page.getByLabel('Email').fill(fx.pm.email);
+  await page.getByLabel('Password').fill(fx.pm.password);
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30_000 });
+  await page.goto(`${WEB}/projects/${fx.projectId}/policy/rules/${fx.flaggedRuleId}`);
+  const box = page.locator('[data-answer-box]').first();
+  await expect(box).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('[data-fix-list]')).toContainText('Open question: Should the rule cover remote openings?');
+
+  // The plain answer: saved exactly as typed, with who and when.
+  const typed = 'We check this at the branch only —  not  for remote openings.';
+  await box.getByLabel('Your answer').fill(typed);
+  await box.getByRole('button', { name: 'Save answer' }).click();
+  await expect(box.locator('[data-answer]').first()).toContainText('✓ Answered by Priya Menon', { timeout: 15_000 });
+  expect(await box.locator('[data-answer] blockquote').first().textContent()).toBe(typed);
+
+  // "Fill from my answer" (the stub here): a proposal shown before → after; nothing saved until accepted.
+  await box.getByLabel('Add to your answer').fill('For account opening, mobile licences are fine for both branch and remote.');
+  await box.getByRole('button', { name: 'Fill from my answer (AI)' }).click();
+  const change = box.locator('[data-change="channels"]').first();
+  await expect(change).toContainText('not set → branch, remote', { timeout: 15_000 });
+  await expect(page.getByRole('checkbox', { name: 'remote' })).not.toBeChecked();
+  await shot(page, 'after-5-answer-proposal');
+  await expect(box.locator('[data-change="process"]').first()).toContainText('not set → account opening');
+  const accepted = page.waitForResponse((r) => r.url().includes('/accept') && r.request().method() === 'POST');
+  await box.getByRole('button', { name: 'Accept all (2)' }).click();
+  expect((await accepted).status()).toBe(200);
+  // Accepted as an ordinary edit (a new draft): the Library details show both channels ticked, and both answers stay
+  // on the rule, verbatim, with the accepted change marked.
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: 'branch' })).toBeChecked({ timeout: 30_000 });
+  await expect(page.getByRole('checkbox', { name: 'remote' })).toBeChecked();
+  const history = page.locator('[data-answer-history]');
+  await expect(history).toContainText('Answers on this rule (2)');
+  await expect(history.locator('[data-change="channels"]')).toContainText('Accepted');
+  await expect(history.locator('[data-change="process"]')).toContainText('Accepted');
+  await expect(history).toContainText(typed);
+  await shot(page, 'after-6-answer-accepted');
+});

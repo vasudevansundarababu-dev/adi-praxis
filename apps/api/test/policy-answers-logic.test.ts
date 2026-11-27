@@ -51,6 +51,18 @@ describe('checked proposal', () => {
   });
 });
 
+describe('scope needs a process', () => {
+  it('channels on a rule without a process are not proposed alone; with the process proposed too they are', () => {
+    const bare = PolicyRuleBody.parse({ title: 't', requirement: 'r', library: { kind: 'policy' } });
+    const alone = checkedProposal({ changes: [{ field: 'channels', value: ['branch'] }] }, bare, CATALOG, label);
+    expect(alone.changes).toEqual([]);
+    expect(alone.message).toBe('I can set the channels once the rule has a Process: choose the Process in Library details (for example account opening), then fill from your answer again.');
+    const both = checkedProposal({ changes: [{ field: 'process', value: 'account_opening' }, { field: 'channels', value: ['branch'] }] }, bare, CATALOG, label);
+    expect(both.changes.map((c) => c.field)).toEqual(['process', 'channels']);
+    expect(PolicyRuleBody.safeParse(applyChanges(bare, both.changes)).success).toBe(true);
+  });
+});
+
 describe('accepting changes', () => {
   it('applies only the accepted changes to the body; quotes are not part of the body', () => {
     const next = applyChanges(BODY, [{ field: 'channels', value: ['branch', 'remote'] }, { field: 'condition', value: null }, { field: 'jurisdiction', value: 'US' }]);

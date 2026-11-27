@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { TableSearch } from '@/components/search/table-search';
 import Link from 'next/link';
+import { LinkSelect } from '@/components/link-select';
 import { redirect } from 'next/navigation';
 import { type SearchParams, UrlPager } from '@/components/pager';
 import { recommendationLabel, statusLabel } from '@/components/review/labels';
@@ -36,13 +37,7 @@ export default async function ApplicationsPage({ searchParams }: { searchParams:
       <p className="mt-1 max-w-3xl text-sm text-fg-muted">
         Applications for the pools you review. The assessment is a recommendation only; you make every selection decision.
       </p>
-      <nav aria-label="Filter applications" className="mt-4 flex flex-wrap gap-2 text-sm">
-        {FILTERS.map(([v, label]) => (
-          <Link key={v} href={v ? `/review/applications?status=${v}` : '/review/applications'} aria-current={filter === v ? 'page' : undefined} className={`rounded-full border px-3 py-1 ${filter === v ? 'border-primary bg-primary text-on-primary' : 'border-line'}`}>
-            {label}
-          </Link>
-        ))}
-      </nav>
+      <LinkSelect className="mt-4" label="Status" options={FILTERS.map(([v, label]) => ({ label, href: v ? `/review/applications?status=${v}` : '/review/applications', selected: filter === v }))} />
       {items.length === 0 ? (
         <p className="mt-6 text-fg-muted">No applications here.</p>
       ) : (

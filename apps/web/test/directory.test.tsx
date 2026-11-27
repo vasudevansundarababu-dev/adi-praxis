@@ -32,14 +32,14 @@ describe('U1 Screen 1 directory', () => {
     expect(text(html(<DirectoryView data={pm} />))).not.toContain('Healthcare');
   });
 
-  it('S1-02: filter pills link to ?domain= and only the chosen section renders; unknown ids fall back to All', async () => {
+  it('S1-02: the domain filter (a dropdown, UI standard 3.11) goes to ?domain= and only the chosen section renders; unknown ids fall back to All', async () => {
     const data = await directory(['ADMIN']);
     const markup = html(<DirectoryView data={data} domainFilter={DOMAIN_BANK} />);
-    expect(markup).toContain(`href="/templates?domain=${DOMAIN_BANK}"`);
-    expect(markup).toContain('href="/templates"');
+    expect(markup).toContain(`value="/templates?domain=${DOMAIN_BANK}"`);
+    expect(markup).toContain('value="/templates"');
     expect(markup).toContain(`id="domain-${DOMAIN_BANK}"`);
     expect(markup).not.toContain(`id="domain-${DOMAIN_MKTG}"`);
-    expect(markup).toMatch(new RegExp(`aria-current="true" href="/templates\\?domain=${DOMAIN_BANK}"`));
+    expect(markup).toMatch(new RegExp(`value="/templates\\?domain=${DOMAIN_BANK}" selected=""`));
     expect(filterDomains(data, 'nope').selected).toBeNull();
     expect(filterDomains(data, undefined).domains).toHaveLength(3);
   });

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { LinkSelect } from '@/components/link-select';
 import { parsePage, slicePage } from '@praxis/shared';
 import { type SearchParams, UrlPager } from '@/components/pager';
 import { apiGet, getCurrentUser } from '@/lib/api';
@@ -22,10 +23,7 @@ export default async function RlQueue({ searchParams }: { searchParams: Promise<
     <div>
       <h1 className="text-2xl font-semibold">RL reviews</h1>
       <p className="mt-1 max-w-3xl text-sm text-fg-muted">Results from RL Gym that need a human verdict. Check the trajectory against the original approved task; comment on every failure and every disagreement with an automated eval.</p>
-      <nav aria-label="Filter" className="mt-4 flex gap-2 text-sm">
-        <Link href="/review/rl" aria-current={!done ? 'page' : undefined} className={`rounded-full border px-3 py-1 ${!done ? 'border-primary bg-primary text-on-primary' : 'border-line'}`}>Open</Link>
-        <Link href="/review/rl?status=DONE" aria-current={done ? 'page' : undefined} className={`rounded-full border px-3 py-1 ${done ? 'border-primary bg-primary text-on-primary' : 'border-line'}`}>Completed</Link>
-      </nav>
+      <LinkSelect className="mt-4" label="Status" options={[{ label: 'Open', href: '/review/rl', selected: !done }, { label: 'Completed', href: '/review/rl?status=DONE', selected: done }]} />
       {items.length === 0 ? (
         <p className="mt-6 text-fg-muted">Nothing here.</p>
       ) : (

@@ -1,6 +1,6 @@
 'use client';
 
-import type { ForgeTaskRow, ProjectPersonDto } from '@praxis/shared';
+import { matchesQuery, type ForgeTaskRow, type ProjectPersonDto } from '@praxis/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { usePagedRows } from '@praxis/shared/ui/use-page';
@@ -80,9 +80,11 @@ export function ForgeTasksTab({ projectId, tasks, people, exportState }: { proje
   const selectable = selectableRecords(exportState);
   const selecting = selectable.size > 0;
   const smes = smesOf(people);
-  const rows = tasks.map((t, i) => ({ t, code: taskCode(i) })).filter(({ t }) => !filter || t.status === filter);
-  // D24: 10 tasks a page, the page in the URL; a new status filter goes back to page 1.
-  const paged = usePagedRows(rows, { resetKey: filter });
+  // UI standard 3a: a search box next to the status filter (task code, name or what it covers).
+  const [q, setQ] = useState('');
+  const rows = tasks.map((t, i) => ({ t, code: taskCode(i) })).filter(({ t, code }) => (!filter || t.status === filter) && matchesQuery([code, t.label, t.slotLabel], q));
+  // D24: 10 tasks a page, the page in the URL; a new status filter or search goes back to page 1.
+  const paged = usePagedRows(rows, { resetKey: `${filter}|${q}` });
   // Select-all covers every approved task the filter lists, on every page.
   const listed = rows.flatMap(({ t }) => (selectable.has(t.taskId) ? [selectable.get(t.taskId)!] : []));
   const chosen = validateBody(selected, exportState?.tasks ?? []).recordIds;
@@ -94,6 +96,10 @@ export function ForgeTasksTab({ projectId, tasks, people, exportState }: { proje
           {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'} set for this project · {tasksSummary(tasks)}
         </span>
         <label className="ml-auto text-sm">
+          <span className="sr-only">Search tasks</span>
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tasks" className="rounded-md border border-line bg-surface px-2 py-1 text-sm" />
+        </label>
+        <label className="text-sm">
           <span className="sr-only">Filter by status</span>
           <select value={filter} onChange={(e) => setFilter(e.target.value)} className="rounded-md border border-line bg-surface px-2 py-1 text-sm">
             {FILTERS.map((f) => (

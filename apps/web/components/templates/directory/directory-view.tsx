@@ -2,6 +2,7 @@ import type { DirectoryRowDto, TemplateDirectoryResponse } from '@praxis/shared'
 import { BLUEPRINT_SECTIONS, PAGE_SIZE, parsePage, slicePage } from '@praxis/shared';
 import Link from 'next/link';
 import { UrlPager, type SearchParams } from '@/components/pager';
+import { LinkSelect } from '@/components/link-select';
 import { TableSearch } from '@/components/search/table-search';
 import { directoryHref, filterDomains, modesText, STATUS_PILLS, tptText, versionLabel } from '@/lib/mc/format';
 
@@ -48,28 +49,11 @@ export function DirectoryView({ data, domainFilter, searchParams = {}, query = '
         ))}
       </ul>
 
-      <nav aria-label="Filter by domain" className="mt-6">
-        <ul className="flex flex-wrap gap-2">
-          <li>
-            <Link href={directoryHref(null)} className={pillClass(selected === null)} aria-current={selected === null ? 'true' : undefined}>
-              All
-            </Link>
-          </li>
-          {data.domains.map((d) => (
-            <li key={d.domainId}>
-              <Link
-                href={directoryHref(d.domainId)}
-                className={pillClass(selected === d.domainId)}
-                aria-current={selected === d.domainId ? 'true' : undefined}
-              >
-                {d.domainName} <span className="text-fg-muted">{d.rows.length}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      <div className="mt-6"><TableSearch type="templates" label="Search templates" placeholder="Search templates by workflow, domain or skills" syncUrl initialQuery={query} /></div>
+      {/* UI standard 3a: one toolbar, search first, then the filter as a dropdown (same addresses as before). */}
+      <div className="mt-6 flex flex-wrap items-end gap-3">
+        <div className="min-w-64 flex-1"><TableSearch type="templates" label="Search templates" placeholder="Search templates by workflow, domain or skills" syncUrl initialQuery={query} /></div>
+        <LinkSelect label="Domain" options={[{ label: 'All domains', href: directoryHref(null), selected: selected === null }, ...data.domains.map((d) => ({ label: `${d.domainName} (${d.rows.length})`, href: directoryHref(d.domainId), selected: selected === d.domainId }))]} />
+      </div>
       <div data-search-scope="templates">
       {domains.map((d) => (
         <section key={d.domainId} aria-labelledby={`domain-${d.domainId}`} className="mt-8">

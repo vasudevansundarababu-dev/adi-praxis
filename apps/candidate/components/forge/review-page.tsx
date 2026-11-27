@@ -238,10 +238,10 @@ export function ReviewPage({ initial, rubric = null }: { initial: ReviewView; ru
       )}
 
       {view.myDecisions.length > 0 && (
-        <section aria-labelledby="prior-h" className="mt-6">
-          <h2 id="prior-h" className="text-lg font-semibold">
-            Your earlier decisions
-          </h2>
+        <details className="mt-6">
+          <summary id="prior-h" className="cursor-pointer text-lg font-semibold">
+            Your earlier decisions ({view.myDecisions.length})
+          </summary>
           <ul className="mt-2 space-y-2">
             {[...view.myDecisions].reverse().map((d) => (
               <li key={d.id} className="card p-3 text-sm">
@@ -257,7 +257,7 @@ export function ReviewPage({ initial, rubric = null }: { initial: ReviewView; ru
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       )}
     </main>
   );

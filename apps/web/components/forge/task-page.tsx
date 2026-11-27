@@ -290,7 +290,14 @@ export function FieldValue({ field, value }: { field: ItemField; value: unknown 
         ))}
       </ul>
     );
-  if (value && typeof value === 'object') return <pre className="whitespace-pre-wrap break-words font-mono text-xs">{JSON.stringify(value, null, 2)}</pre>;
+  // UI standard 3a: raw detail stays collapsed so the page stays short.
+  if (value && typeof value === 'object')
+    return (
+      <details className="text-xs">
+        <summary className="cursor-pointer text-link">Show the full value</summary>
+        <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-xs">{JSON.stringify(value, null, 2)}</pre>
+      </details>
+    );
   return <span className="whitespace-pre-wrap break-words">{scalar(field, value)}</span>;
 }
 
@@ -300,7 +307,10 @@ export function AuthoredForm({ profile, output, rubric = null }: { profile: Temp
     return output ? (
       <section className="card mb-4 p-5">
         <h3 className="mb-3 font-semibold">Authored task</h3>
-        <pre className="whitespace-pre-wrap break-words font-mono text-xs">{JSON.stringify(output, null, 2)}</pre>
+        <details>
+          <summary className="cursor-pointer text-sm text-link">Show the task as entered</summary>
+          <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-xs">{JSON.stringify(output, null, 2)}</pre>
+        </details>
       </section>
     ) : (
       <p className="card mb-4 p-5 text-sm text-fg-muted">Not authored yet.</p>
@@ -910,7 +920,10 @@ export function ForgeTaskPage({ code, view, people, exportState, rubric = null }
               : 'The PM or Admin reviews directly. Approve adds the task to the dataset.'}
           </p>
           {view.reviews.length > 0 && (
-            <ul className="mt-3 space-y-2 text-sm" data-decisions>
+            // UI standard 3a: the decision history is collapsed; the Review card above shows where the task is now.
+            <details className="mt-3">
+            <summary className="cursor-pointer text-sm font-medium text-link">Decision history ({view.reviews.length})</summary>
+            <ul className="mt-2 space-y-2 text-sm" data-decisions>
               {[...view.reviews].reverse().map((r) => (
                 <li key={r.id} className="rounded-lg border border-hairline p-3">
                   <p className="font-medium">
@@ -926,6 +939,7 @@ export function ForgeTaskPage({ code, view, people, exportState, rubric = null }
                 </li>
               ))}
             </ul>
+            </details>
           )}
         </section>
       )}

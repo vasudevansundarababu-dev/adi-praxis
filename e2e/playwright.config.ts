@@ -16,7 +16,9 @@ const storage = { EVIDENCE_BUCKET: 'praxis-evidence', GCS_EMULATOR_HOST: 'http:/
 
 export default defineConfig({
   testDir: '.',
-  testIgnore: 'demo-videos/**', // the demo video recorder has its own config
+  // The demo video recorder has its own config. The click-through of every page loads the dev servers heavily, so it
+  // runs on its own: CLICKTHROUGH=1 pnpm test:e2e clickthrough.
+  testIgnore: ['demo-videos/**', ...(process.env.CLICKTHROUGH ? [] : ['clickthrough.spec.ts'])],
   // Compiles every page on the local `next dev` servers before the tests start (no-op against a deployed environment).
   globalSetup: './warm-up.ts',
   timeout: 60_000,

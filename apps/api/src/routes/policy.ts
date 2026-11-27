@@ -29,6 +29,7 @@ import { estimateUsd, modelPrice } from '../policy/ai-pricing';
 import { policyAiModel } from '../policy/rule-assistant';
 import { conditionFacts, conditionLabel, jurisdictionProblem } from '@praxis/shared';
 import { conditionCatalog } from '../policy/fact-catalog';
+import { answersFor, ruleAids } from './policy-answers';
 
 /** D-089: a requested job no worker has taken within this long is reported as "no worker", never a silent queue. */
 export const WORKER_PICKUP_MS = 60_000;
@@ -309,6 +310,8 @@ export const policyRoutes: FastifyPluginAsyncZod<{ db: Db; config: Config; stora
       : null;
     return {
       library,
+      // Owner, 27 Nov 2026: the rule page's aids (field links, the answer box and "Fill from my answer") and the answers.
+      ...(route === 'review_queue' ? { aids: await ruleAids(db, config, clientId), answers: await answersFor(db, clientId, v.ruleId) } : {}),
       ...ann,
       approvalRoute: route,
       queueFlags,

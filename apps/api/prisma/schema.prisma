@@ -3170,6 +3170,7 @@ model PolicyRule {
 
   versions    PolicyRuleVersion[]
   annotations PolicyRuleAnnotationRevision[]
+  answers     PolicyQuestionAnswer[]
 
   @@unique([projectId, ruleKey])
   @@index([clientId, projectId])
@@ -3950,4 +3951,35 @@ model OutcomeBatchItem {
   batch           OutcomeBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
 
   @@unique([batchId, variantId])
+}
+
+/// Owner and Jose, 27 Nov 2026: an open question's answer on a rule, stored verbatim with who answered and when, and
+/// (when "Fill from my answer" was used) the AI's proposed field changes, its plain-words message and the call's cost.
+/// Proposals are never applied here; the reviewer accepts them as an ordinary rule edit. Append-only (trigger).
+model PolicyQuestionAnswer {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String   @map("client_id") @db.Uuid
+  projectId       String   @map("project_id") @db.Uuid
+  ruleId          String   @map("rule_id") @db.Uuid
+  ruleVersionId   String   @map("rule_version_id") @db.Uuid
+  contentHash     String   @map("content_hash")
+  question        String
+  /// Exactly as typed.
+  answer          String
+  answeredById    String   @map("answered_by_id") @db.Uuid
+  /// none | proposed | unmapped | failed | paused
+  aiStatus        String   @default("none") @map("ai_status")
+  aiModel         String?  @map("ai_model")
+  aiPromptVersion String?  @map("ai_prompt_version")
+  aiProposal      Json?    @map("ai_proposal")
+  aiMessage       String?  @map("ai_message")
+  inputTokens     Int?     @map("input_tokens")
+  outputTokens    Int?     @map("output_tokens")
+  costUsd         Decimal? @map("cost_usd") @db.Decimal(10, 6)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  rule PolicyRule @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+
+  @@index([ruleId])
+  @@index([clientId, createdAt])
 }

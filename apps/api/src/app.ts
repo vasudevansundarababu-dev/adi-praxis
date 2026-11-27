@@ -57,6 +57,7 @@ import { paymentCandidateRoutes, paymentRoutes } from './routes/payments';
 import { supportRoutes } from './routes/support';
 import { forgeHelpRoutes } from './routes/forge-help';
 import { publicHelpRoutes } from './routes/public-help';
+import { policyAnswerRoutes } from './routes/policy-answers';
 import { ClaudeVertexSupportAssistant, GeminiSupportAssistant, MockSupportAssistant, supportModel, type SupportAssistant } from './support/assistant';
 import { MockPayoutProvider, TrolleyPayoutProvider, type PayoutProvider } from './pay/provider';
 import { ClaudeVertexCurriculumGenerator, MockCurriculumGenerator, type CurriculumGenerator } from './cert/generator';
@@ -166,6 +167,8 @@ export interface AppDeps {
   policyAdapters?: Adapters;
   /** Policy rule assistant (suggest + define): POLICY_AI_MODEL on Vertex when configured, otherwise the mock. */
   ruleAssistant?: PolicyRuleAssistant;
+  /** "Fill from my answer" on the rule page (tests pass the stub). */
+  answerFiller?: import('./policy/answers').AnswerFiller;
   /** Rubric wording assistant; null = off. Defaults from RUBRIC_AI_ENABLED (off by default; mock without Vertex). */
   rubricAssistant?: RubricAssistant | null;
   /** Field suggestions (FIELD_SUGGESTIONS_ENABLED): the model on Vertex when configured, otherwise the mock. */
@@ -426,6 +429,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       await v1.register(policyLibraryRoutes, { db: deps.db, storage });
       await v1.register(policyClauseRoutes, { db: deps.db, storage, dispositions: deps.dispositionSuggester ?? defaultDispositionSuggester(deps.config), coverage: deps.coverageClient ?? coverageFromConfig(deps.config, deps.outboundFetch) });
       await v1.register(policyRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, adapters: deps.policyAdapters ?? defaultAdapters(deps.config.policy), assistant: deps.ruleAssistant ?? defaultRuleAssistant(deps.config) });
+      await v1.register(policyAnswerRoutes, { db: deps.db, config: deps.config, storage, ...(deps.answerFiller ? { filler: deps.answerFiller } : {}) });
       await v1.register(policyProposalRoutes, { db: deps.db, config: deps.config, storage, scanner: deps.scanner ?? stubScanner, selectionGate });
       // M10 SME supply: nothing is registered with the flag off (docs/SME-SUPPLY.md section 13).
       if (deps.config.SME_SUPPLY_ENABLED) {

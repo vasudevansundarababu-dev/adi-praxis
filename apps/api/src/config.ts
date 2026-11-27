@@ -82,6 +82,12 @@ const Env = z.object({
   POLICY_AI_MODEL: z.string().default(''),
   /** D-092: "input,output" USD per million tokens for the policy model's cost estimate; empty = the list price by family. */
   POLICY_AI_PRICE_USD_PER_MTOK: z.string().default(''),
+  // Owner, 27 Nov 2026: the rule page's two aids. "Field links" (To fix, hints, Next problem) is on unless set to false.
+  // "AI answer" (Fill from my answer) calls the policy model and is off unless set to true; the typed answer box
+  // itself costs nothing and is always there. The AI answers stop for the day at AI_ANSWER_DAILY_BUDGET_USD.
+  RULE_FIELD_LINKS_ENABLED: z.enum(['true', 'false', '1', '0', '']).default('true').transform((v) => v !== 'false' && v !== '0'),
+  AI_ANSWER_ENABLED: z.enum(['true', 'false', '1', '0', '']).default('false').transform((v) => v === 'true' || v === '1'),
+  AI_ANSWER_DAILY_BUDGET_USD: z.coerce.number().min(0).default(0.5),
   /** Per-client daily cap on policy AI calls (suggestion runs + definitions). */
   POLICY_AI_DAILY_CALL_CAP: z.coerce.number().int().min(1).max(100_000).default(1000),
   /**

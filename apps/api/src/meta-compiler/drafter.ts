@@ -150,7 +150,7 @@ export class GeminiVertexContentDrafter implements ContentDrafter {
     if (!res.ok) throw new DrafterError(`Gemini call failed (${res.status})`);
     const body = (await res.json()) as {
       candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean; thoughtSignature?: string }[] } }[];
-      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number };
     };
     const c = body.candidates?.[0];
     if (!c) throw new DrafterError('Gemini returned no candidate');
@@ -159,7 +159,8 @@ export class GeminiVertexContentDrafter implements ContentDrafter {
       // Thinking models (Gemini 3.x) may return thought summaries as parts marked `thought: true`; only answer text counts.
       text: (c.content?.parts ?? []).filter((x) => !x.thought).map((x) => x.text ?? '').join(''),
       inputTokens: body.usageMetadata?.promptTokenCount ?? 0,
-      outputTokens: body.usageMetadata?.candidatesTokenCount ?? 0,
+      // Thinking tokens are billed as output (owner, 27 Nov 2026: cost per AI answer must be real).
+      outputTokens: (body.usageMetadata?.candidatesTokenCount ?? 0) + (body.usageMetadata?.thoughtsTokenCount ?? 0),
     };
   }
 }
